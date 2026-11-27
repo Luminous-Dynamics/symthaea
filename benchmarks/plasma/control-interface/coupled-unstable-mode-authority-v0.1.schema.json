@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/control-interface/coupled-unstable-mode-authority-v0.1.schema.json",
+  "title": "Coupled two-mode unstable-subspace sensor-actuator authority fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "status",
+    "cases",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "synthetic_analytic_only"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_kinetic_linearization_used",
+        "no_physical_plasma_run",
+        "no_closed_loop_stability_claim"
+      ],
+      "properties": {
+        "no_kinetic_linearization_used": {
+          "const": true
+        },
+        "no_physical_plasma_run": {
+          "const": true
+        },
+        "no_closed_loop_stability_claim": {
+          "const": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pair": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number"
+      }
+    },
+    "matrix": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "number"
+      }
+    },
+    "diagnostic_matrix": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "transition_matrix",
+        "horizon_steps",
+        "diagnostic_gain",
+        "diagnostic_noise_variance",
+        "diagnostic_sampling_stride_steps",
+        "diagnostic_delivery_delay_steps",
+        "actuator_gain",
+        "actuator_update_stride_steps",
+        "actuator_delivery_delay_steps",
+        "minimum_observability_eigenvalue",
+        "minimum_controllability_eigenvalue",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transition_matrix": {
+          "$ref": "#/$defs/matrix"
+        },
+        "horizon_steps": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000000
+        },
+        "diagnostic_gain": {
+          "$ref": "#/$defs/diagnostic_matrix"
+        },
+        "diagnostic_noise_variance": {
+          "$ref": "#/$defs/pair"
+        },
+        "diagnostic_sampling_stride_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "diagnostic_delivery_delay_steps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actuator_gain": {
+          "$ref": "#/$defs/pair"
+        },
+        "actuator_update_stride_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "actuator_delivery_delay_steps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_observability_eigenvalue": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_controllability_eigenvalue": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "observation_sample_count",
+            "actuator_command_count",
+            "observable",
+            "controllable",
+            "authority_qualified"
+          ],
+          "properties": {
+            "observation_sample_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "actuator_command_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "observable": {
+              "type": "boolean"
+            },
+            "controllable": {
+              "type": "boolean"
+            },
+            "authority_qualified": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}

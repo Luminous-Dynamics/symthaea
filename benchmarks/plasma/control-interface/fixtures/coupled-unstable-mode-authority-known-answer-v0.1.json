@@ -1,0 +1,135 @@
+{
+  "schema_version": "0.1",
+  "fixture_id": "coupled-two-mode-unstable-subspace-authority-v1",
+  "status": "synthetic_analytic_only",
+  "cases": [
+    {
+      "case_id": "positive-distinct-growth-two-channel-diagnostic-one-actuator",
+      "transition_matrix": [
+        1.2,
+        0,
+        0,
+        1.1
+      ],
+      "horizon_steps": 12,
+      "diagnostic_gain": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "diagnostic_noise_variance": [
+        1,
+        1
+      ],
+      "diagnostic_sampling_stride_steps": 1,
+      "diagnostic_delivery_delay_steps": 0,
+      "actuator_gain": [
+        1,
+        1
+      ],
+      "actuator_update_stride_steps": 1,
+      "actuator_delivery_delay_steps": 0,
+      "minimum_observability_eigenvalue": 0.000001,
+      "minimum_controllability_eigenvalue": 0.000001,
+      "expected": {
+        "observation_sample_count": 12,
+        "actuator_command_count": 12,
+        "observable": true,
+        "controllable": true,
+        "authority_qualified": true
+      }
+    },
+    {
+      "case_id": "negative-collinear-diagnostics-after-delay",
+      "transition_matrix": [
+        1.2,
+        0,
+        0,
+        1.1
+      ],
+      "horizon_steps": 3,
+      "diagnostic_gain": [
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          2
+        ]
+      ],
+      "diagnostic_noise_variance": [
+        1,
+        1
+      ],
+      "diagnostic_sampling_stride_steps": 1,
+      "diagnostic_delivery_delay_steps": 2,
+      "actuator_gain": [
+        1,
+        1
+      ],
+      "actuator_update_stride_steps": 1,
+      "actuator_delivery_delay_steps": 0,
+      "minimum_observability_eigenvalue": 0.000001,
+      "minimum_controllability_eigenvalue": 0.000001,
+      "expected": {
+        "observation_sample_count": 1,
+        "actuator_command_count": 3,
+        "observable": false,
+        "controllable": true,
+        "authority_qualified": false
+      }
+    },
+    {
+      "case_id": "negative-rank-one-actuator-on-repeated-unstable-eigenspace",
+      "transition_matrix": [
+        1.2,
+        0,
+        0,
+        1.2
+      ],
+      "horizon_steps": 12,
+      "diagnostic_gain": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "diagnostic_noise_variance": [
+        1,
+        1
+      ],
+      "diagnostic_sampling_stride_steps": 1,
+      "diagnostic_delivery_delay_steps": 0,
+      "actuator_gain": [
+        1,
+        1
+      ],
+      "actuator_update_stride_steps": 1,
+      "actuator_delivery_delay_steps": 0,
+      "minimum_observability_eigenvalue": 0.000001,
+      "minimum_controllability_eigenvalue": 0.000001,
+      "expected": {
+        "observation_sample_count": 12,
+        "actuator_command_count": 12,
+        "observable": true,
+        "controllable": false,
+        "authority_qualified": false
+      }
+    }
+  ],
+  "claim_boundary": {
+    "no_kinetic_linearization_used": true,
+    "no_physical_plasma_run": true,
+    "no_closed_loop_stability_claim": true
+  }
+}

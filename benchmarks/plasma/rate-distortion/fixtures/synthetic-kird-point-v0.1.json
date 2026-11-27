@@ -1,0 +1,88 @@
+{
+  "schema_version": "0.1",
+  "record_id": "KIRD-SYNTHETIC-WIRE-FIXTURE-001",
+  "record_status": "synthetic_fixture_only",
+  "cohort": {
+    "equation": "periodic_1d1v_collisionless_vlasov_poisson",
+    "dimensions": [
+      1,
+      1
+    ],
+    "normalization_id": "synthetic-wire-fixture-only",
+    "boundary_id": "periodic-unit-domain",
+    "initial_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "reference_solver_revision": "no-physical-reference-fixture"
+  },
+  "task_contract": {
+    "contract_id": "synthetic-no-science",
+    "intervention_family_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "qoi_registry_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "horizon": 1,
+    "time_unit": "synthetic_time",
+    "split_role": "development",
+    "acquisition_allowed": true
+  },
+  "candidate": {
+    "representation_family": "synthetic-demo",
+    "representation_revision": "not-a-solver",
+    "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "storage": {
+    "state_payload_bytes": 1024,
+    "basis_codec_metadata_bytes": 128,
+    "coordinate_normalization_bytes": 64,
+    "component_lineage_bytes": 0,
+    "residual_memory_bytes": 0,
+    "uncertainty_validity_bytes": 32,
+    "provenance_contract_bytes": 256,
+    "model_asset_bytes": 4096,
+    "decoder_asset_bytes": 512,
+    "amortization_rollouts": 100,
+    "peak_working_set_bytes": 16384
+  },
+  "cost": {
+    "encode_seconds": 0,
+    "decode_seconds": 0,
+    "advance_seconds": 0,
+    "observe_seconds": 0,
+    "transition_seconds": 0,
+    "fallback_seconds": 0,
+    "training_seconds": 0,
+    "measured_rollouts": 1
+  },
+  "distortion": {
+    "microscopic": {
+      "status": "UNSUPPORTED"
+    },
+    "weak_observable": {
+      "status": "UNKNOWN"
+    },
+    "macroscopic_qoi": {
+      "status": "UNKNOWN"
+    },
+    "intervention_response": {
+      "status": "UNKNOWN",
+      "missing_branch_count": 0,
+      "misassociated_branch_count": 0
+    },
+    "sensitivity": {
+      "status": "UNSUPPORTED"
+    }
+  },
+  "physical_gates": {
+    "status": "UNKNOWN",
+    "gate_results": []
+  },
+  "response_scope": {
+    "coverage_kind": "none",
+    "registered_probe_count": 0,
+    "confirmed_probe_count": 0,
+    "globally_bounded": false
+  },
+  "provenance": {
+    "candidate_output_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "run_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "analysis_revision": "synthetic-fixture-only",
+    "physical_execution_authorized": false
+  }
+}

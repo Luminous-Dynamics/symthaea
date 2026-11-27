@@ -1,0 +1,57 @@
+{
+  "schema_version": "0.1",
+  "contract_id": "VPFP-HIGH-FIELD-MICRO-MACRO-SYNTHETIC-001",
+  "cohort": {
+    "equation_id": "high_field_vlasov_poisson_fokker_planck",
+    "dimension": "manufactured 1D1V",
+    "boundary_contract_id": "periodic-x-homogeneous-v-boundary-manufactured-v1",
+    "reference_revision": "synthetic-reference-not-a-solver"
+  },
+  "scaling": {
+    "nondimensionalization_id": "manufactured-high-field-scaling-v1",
+    "epsilon_definition": "positive dimensionless ratio tending to zero in the declared high-field limit",
+    "epsilon_values": [
+      1,
+      0.1,
+      0.01,
+      0.001
+    ],
+    "field_scaling_id": "manufactured-field-over-epsilon-v1"
+  },
+  "macro_contract": {
+    "variables": [
+      "density"
+    ],
+    "spatial_resolution": 16,
+    "retained_full_order": true,
+    "macro_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "micro_contract": {
+    "basis_family": "POD",
+    "rank": 3,
+    "projection_metric_id": "weighted-velocity-quadrature-v1",
+    "constraint_ids": [
+      "zero-density-moment-of-micro-fluctuation"
+    ],
+    "constraint_matrix_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "projector_id": "weighted-nullspace-projection-v1"
+  },
+  "collision_contract": {
+    "operator_id": "manufactured-fokker-planck-operator-v1",
+    "discrete_operator_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "nullspace_identity_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "dissipation_law_id": "manufactured-nonnegative-collision-dissipation-v1"
+  },
+  "limit_contract": {
+    "limit_epsilon": 0,
+    "limit_model_id": "manufactured-high-field-limit-v1",
+    "limit_model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "verification_method": "analytic-manufactured-known-answer-only",
+    "status": "SYNTHETIC_FIXTURE_ONLY"
+  },
+  "claim_boundary": {
+    "physical_vpfp_run_performed": false,
+    "asymptotic_preservation_claimed": false,
+    "status": "synthetic_contract_only"
+  }
+}

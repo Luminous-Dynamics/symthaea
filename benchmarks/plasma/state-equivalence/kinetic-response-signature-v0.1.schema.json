@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/state-equivalence/kinetic-response-signature-v0.1.schema.json",
+  "title": "Kinetic response signature and non-transitivity fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "status",
+    "pairwise_tolerance",
+    "states",
+    "expected_pairwise_comparisons",
+    "claim_boundary",
+    "expected_finite_class_audit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "synthetic_analytic_only"
+    },
+    "pairwise_tolerance": {
+      "type": "number",
+      "minimum": 0
+    },
+    "states": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/state"
+      }
+    },
+    "expected_pairwise_comparisons": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "left",
+          "right",
+          "normalized_rms_distance",
+          "pairwise_compatible",
+          "maximum_normalized_entry_error"
+        ],
+        "properties": {
+          "left": {
+            "type": "string",
+            "minLength": 1
+          },
+          "right": {
+            "type": "string",
+            "minLength": 1
+          },
+          "normalized_rms_distance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "pairwise_compatible": {
+            "type": "boolean"
+          },
+          "maximum_normalized_entry_error": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approximate_pairwise_compatibility_is_not_transitive",
+        "no_kinetic_state_pair_evaluated",
+        "no_physical_plasma_run",
+        "finite_cluster_requires_all_pairwise_comparisons"
+      ],
+      "properties": {
+        "approximate_pairwise_compatibility_is_not_transitive": {
+          "const": true
+        },
+        "no_kinetic_state_pair_evaluated": {
+          "const": true
+        },
+        "no_physical_plasma_run": {
+          "const": true
+        },
+        "finite_cluster_requires_all_pairwise_comparisons": {
+          "const": true
+        }
+      }
+    },
+    "expected_finite_class_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "member_count",
+        "compared_pair_count",
+        "compatible_pair_count",
+        "incompatible_pair_count",
+        "maximum_pairwise_normalized_rms_distance",
+        "maximum_pairwise_normalized_entry_error",
+        "complete_response_coverage",
+        "stable_branch_association",
+        "compatible_structure_class",
+        "within_finite_class_diameter"
+      ],
+      "properties": {
+        "member_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "compared_pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compatible_pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "incompatible_pair_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_pairwise_normalized_rms_distance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_pairwise_normalized_entry_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "complete_response_coverage": {
+          "type": "boolean"
+        },
+        "stable_branch_association": {
+          "type": "boolean"
+        },
+        "compatible_structure_class": {
+          "type": "boolean"
+        },
+        "within_finite_class_diameter": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "complex_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "real",
+        "imag"
+      ],
+      "properties": {
+        "real": {
+          "type": "number"
+        },
+        "imag": {
+          "type": "number"
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "structure_class_id",
+        "intervention_ids",
+        "qoi_ids",
+        "qoi_scales",
+        "time_samples",
+        "responses",
+        "branch_ids"
+      ],
+      "properties": {
+        "contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structure_class_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intervention_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "qoi_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "time_samples": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        },
+        "responses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/complex_response"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "branch_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "qoi_scales": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_id",
+        "signature"
+      ],
+      "properties": {
+        "state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signature": {
+          "$ref": "#/$defs/signature"
+        }
+      }
+    }
+  }
+}

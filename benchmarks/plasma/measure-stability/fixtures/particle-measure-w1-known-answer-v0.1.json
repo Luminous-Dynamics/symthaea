@@ -1,0 +1,140 @@
+{
+  "schema_version": "0.1",
+  "record_status": "synthetic_known_answer_only",
+  "domain": {
+    "topology": "interval",
+    "minimum": 0,
+    "maximum": 1,
+    "unit": "normalized_physical_coordinate",
+    "domain_id": "fixed-unit-interval-v1"
+  },
+  "metric": {
+    "id": "wasserstein_1_interval_1d",
+    "definition": "integral_over_interval_abs(CDF_left(x)-CDF_right(x)) dx",
+    "scope": "one_dimensional_fixed_interval",
+    "mass_convention": "nonnegative_weights_normalized_to_probability"
+  },
+  "cases": [
+    {
+      "case_id": "permutation-is-the-same-measure",
+      "transformation": "permutation",
+      "left": {
+        "positions": [
+          0.1,
+          0.4,
+          0.8
+        ],
+        "weights": [
+          0.2,
+          0.3,
+          0.5
+        ]
+      },
+      "right": {
+        "positions": [
+          0.8,
+          0.1,
+          0.4
+        ],
+        "weights": [
+          0.5,
+          0.2,
+          0.3
+        ]
+      },
+      "expected_w1": 0
+    },
+    {
+      "case_id": "co-located-split-merge-is-the-same-measure",
+      "transformation": "exact_split_merge",
+      "left": {
+        "positions": [
+          0.2,
+          0.8
+        ],
+        "weights": [
+          0.4,
+          0.6
+        ]
+      },
+      "right": {
+        "positions": [
+          0.2,
+          0.2,
+          0.8,
+          0.8
+        ],
+        "weights": [
+          0.1,
+          0.3,
+          0.2,
+          0.4
+        ]
+      },
+      "expected_w1": 0
+    },
+    {
+      "case_id": "particle-count-change-preserves-weighted-measure",
+      "transformation": "particle_count_change_same_measure",
+      "left": {
+        "positions": [
+          0.1,
+          0.5,
+          0.9
+        ],
+        "weights": [
+          0.2,
+          0.5,
+          0.3
+        ]
+      },
+      "right": {
+        "positions": [
+          0.1,
+          0.1,
+          0.5,
+          0.9,
+          0.9
+        ],
+        "weights": [
+          0.05,
+          0.15,
+          0.5,
+          0.1,
+          0.2
+        ]
+      },
+      "expected_w1": 0
+    },
+    {
+      "case_id": "move-one-quarter-of-mass-by-one-tenth",
+      "transformation": "move_weighted_mass",
+      "left": {
+        "positions": [
+          0.2,
+          0.8
+        ],
+        "weights": [
+          0.25,
+          0.75
+        ]
+      },
+      "right": {
+        "positions": [
+          0.3,
+          0.8
+        ],
+        "weights": [
+          0.25,
+          0.75
+        ]
+      },
+      "expected_w1": 0.025
+    }
+  ],
+  "claim_boundary": {
+    "no_field_operator_evaluated": true,
+    "no_physical_solver_run": true,
+    "not_a_global_stability_certificate": true
+  }
+}

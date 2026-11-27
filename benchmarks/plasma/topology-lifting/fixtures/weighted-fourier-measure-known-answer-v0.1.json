@@ -1,0 +1,51 @@
+{
+  "schema_version": "0.1",
+  "fixture_id": "weighted-fourier-empirical-measure-known-answer-v1",
+  "status": "synthetic_analytic_only",
+  "positions": [
+    0,
+    0.25,
+    0.5,
+    0.75
+  ],
+  "weights": [
+    0.1,
+    0.2,
+    0.3,
+    0.4
+  ],
+  "max_harmonic": 4,
+  "expected_normalized_complex_moments": [
+    {
+      "harmonic": 1,
+      "real": -0.2,
+      "imag": -0.2
+    },
+    {
+      "harmonic": 2,
+      "real": -0.2,
+      "imag": 0
+    },
+    {
+      "harmonic": 3,
+      "real": -0.2,
+      "imag": 0.2
+    },
+    {
+      "harmonic": 4,
+      "real": 1,
+      "imag": 0
+    }
+  ],
+  "properties_under_test": [
+    "particle_permutation_invariance",
+    "coincident_particle_split_merge_invariance",
+    "global_weight_rescaling_invariance",
+    "global_torus_translation_phase_rotation"
+  ],
+  "claim_boundary": {
+    "finite_fourier_band_is_not_injective": true,
+    "no_field_operator_evaluated": true,
+    "no_physical_plasma_run": true
+  }
+}

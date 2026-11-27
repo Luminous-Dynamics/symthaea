@@ -1,0 +1,390 @@
+{
+  "schema_version": "0.1",
+  "record_status": "synthetic_benchmark_contract_only",
+  "benchmark_id": "KRESP-C-VPD-1D1V",
+  "equation": "periodic_1d1v_vlasov_poisson_dougherty",
+  "domain": {
+    "x_min": 0,
+    "x_max": 6.283185307179586,
+    "x_periodic": true,
+    "v_min": -12,
+    "v_max": 12,
+    "velocity_boundary_condition": "zero_velocity_flux",
+    "time_unit": "omega_pe^-1"
+  },
+  "collision_model": {
+    "operator": "dougherty_fokker_planck",
+    "self_consistent_temperature": true,
+    "invariants": [
+      "mass",
+      "momentum",
+      "kinetic_energy"
+    ],
+    "entropy_functional": "boltzmann_h_negative_integral_f_log_f"
+  },
+  "discretization": {
+    "splitting": "strang_collision_half_transport_full_collision_half",
+    "transport_scheme": "MUSCL",
+    "spatial_cells": 64,
+    "velocity_nodes": 128,
+    "time_step": 0.00125,
+    "transport_reference_grid_retained": true
+  },
+  "trajectory_cohorts": [
+    {
+      "cohort_id": "vpd-training-a",
+      "kind": "two_stream_relaxation",
+      "end_time": 8,
+      "collision_frequency": 0.3,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.15,
+        "stream_speed": 1.6,
+        "temperature_plus": 0.4,
+        "temperature_minus": 0.7,
+        "mixture_weight_mean": 0.6,
+        "mixture_weight_amplitude": 0.07,
+        "velocity_shift_amplitude": 0.2
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0,
+          "frequency": 0
+        }
+      ],
+      "split_role": "training",
+      "independent_initial_state_digest": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "cohort_id": "vpd-training-b",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "collision_frequency": 0.5,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.12,
+        "stream_speed": 2,
+        "temperature_plus": 0.6,
+        "temperature_minus": 0.45,
+        "mixture_weight_mean": 0.45,
+        "mixture_weight_amplitude": 0.1,
+        "velocity_shift_amplitude": 0.1
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.8,
+          "frequency": 1.25
+        }
+      ],
+      "split_role": "training",
+      "independent_initial_state_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "cohort_id": "vpd-training-c",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "collision_frequency": 0.15,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.2,
+        "stream_speed": 1,
+        "temperature_plus": 0.45,
+        "temperature_minus": 0.8,
+        "mixture_weight_mean": 0.5,
+        "mixture_weight_amplitude": 0.04,
+        "velocity_shift_amplitude": 0.2
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.55,
+          "frequency": 1.4
+        }
+      ],
+      "split_role": "training",
+      "independent_initial_state_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "cohort_id": "vpd-training-d",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "collision_frequency": 0.4,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.16,
+        "stream_speed": 1.7,
+        "temperature_plus": 0.25,
+        "temperature_minus": 0.5,
+        "mixture_weight_mean": 0.5,
+        "mixture_weight_amplitude": 0.12,
+        "velocity_shift_amplitude": 0.22
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.45,
+          "frequency": 1.3
+        }
+      ],
+      "split_role": "training",
+      "independent_initial_state_digest": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "cohort_id": "vpd-validation-a",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "collision_frequency": 0.25,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.13,
+        "stream_speed": 1.5,
+        "temperature_plus": 0.55,
+        "temperature_minus": 0.4,
+        "mixture_weight_mean": 0.52,
+        "mixture_weight_amplitude": 0.05,
+        "velocity_shift_amplitude": 0.13
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.6,
+          "frequency": 1
+        }
+      ],
+      "split_role": "validation",
+      "independent_initial_state_digest": "5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    {
+      "cohort_id": "vpd-validation-b",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "collision_frequency": 0.3,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.14,
+        "stream_speed": 1.4,
+        "temperature_plus": 0.3,
+        "temperature_minus": 0.45,
+        "mixture_weight_mean": 0.48,
+        "mixture_weight_amplitude": 0.07,
+        "velocity_shift_amplitude": 0.18
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.5,
+          "frequency": 1.2
+        }
+      ],
+      "split_role": "validation",
+      "independent_initial_state_digest": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    {
+      "cohort_id": "vpd-heldout-two-stream-relaxation",
+      "kind": "two_stream_relaxation",
+      "end_time": 4,
+      "collision_frequency": 0.35,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.18,
+        "stream_speed": 1.8,
+        "temperature_plus": 0.35,
+        "temperature_minus": 0.6,
+        "mixture_weight_mean": 0.55,
+        "mixture_weight_amplitude": 0.08,
+        "velocity_shift_amplitude": 0.15
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 4,
+          "amplitude": 0,
+          "frequency": 0
+        }
+      ],
+      "split_role": "sealed_holdout",
+      "independent_initial_state_digest": "7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    {
+      "cohort_id": "vpd-heldout-sustained-heating",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "collision_frequency": 0.2,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.1,
+        "stream_speed": 1.2,
+        "temperature_plus": 0.5,
+        "temperature_minus": 0.5,
+        "mixture_weight_mean": 0.5,
+        "mixture_weight_amplitude": 0.06,
+        "velocity_shift_amplitude": 0.1
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.7,
+          "frequency": 1.1
+        }
+      ],
+      "split_role": "sealed_holdout",
+      "independent_initial_state_digest": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "cohort_id": "vpd-heldout-drive-switching",
+      "kind": "drive_switching",
+      "end_time": 12,
+      "collision_frequency": 0.2,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.1,
+        "stream_speed": 1.2,
+        "temperature_plus": 0.5,
+        "temperature_minus": 0.5,
+        "mixture_weight_mean": 0.5,
+        "mixture_weight_amplitude": 0.06,
+        "velocity_shift_amplitude": 0.1
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 4,
+          "amplitude": 0.7,
+          "frequency": 1.1
+        },
+        {
+          "start_time": 4,
+          "end_time": 8,
+          "amplitude": -0.7,
+          "frequency": 1.1
+        },
+        {
+          "start_time": 8,
+          "end_time": 12,
+          "amplitude": 0,
+          "frequency": 1.1
+        }
+      ],
+      "split_role": "sealed_holdout",
+      "independent_initial_state_digest": "9999999999999999999999999999999999999999999999999999999999999999"
+    }
+  ],
+  "registered_qois": [
+    "distribution_space_time_error",
+    "density_error",
+    "current_error",
+    "temperature_error",
+    "electric_field_error",
+    "third_central_moment_error",
+    "entropy_dissipation_residual",
+    "mass_drift",
+    "momentum_drift",
+    "kinetic_energy_drift",
+    "positivity_violation"
+  ],
+  "structure_contract": {
+    "positivity_required": true,
+    "local_mass_conservation_required": true,
+    "local_momentum_conservation_required": true,
+    "local_kinetic_energy_conservation_required": true,
+    "entropy_dissipation_required": true,
+    "positive_empirical_cubature_required": true,
+    "fallback_on_structure_failure": "full_order_collision_step"
+  },
+  "reduction_contract": {
+    "physical_moments_retained": [
+      "density",
+      "mean_velocity",
+      "temperature"
+    ],
+    "basis_family": "rbkr_response_augmented_entropy_family",
+    "basis_updates_allowed_on": [
+      "training",
+      "development_challenge"
+    ],
+    "cubature_weight_constraint": "strictly_positive",
+    "maximum_variables_per_cell": 13,
+    "representation_objective": "joint_rate_distortion_and_drive_response"
+  },
+  "separation_of_error": {
+    "representation_error_reported": true,
+    "evolution_error_reported": true,
+    "transport_error_reported": true,
+    "collision_hyperreduction_error_reported": true,
+    "same_grid_full_order_reference_required": true
+  },
+  "comparators": [
+    "published_entropy_vpd_rom",
+    "entropy_vpd_without_posttraining",
+    "entropy_vpd_without_positive_cubature",
+    "snapshot_pod",
+    "adaptive_hermite",
+    "micro_macro_pod",
+    "full_order_vpd"
+  ],
+  "published_prior_art_reference": {
+    "arxiv_id": "2611.27904",
+    "published_methods": [
+      "positive_exponential_moments",
+      "data_adapted_velocity_functions",
+      "dynamics_posttraining",
+      "positive_empirical_cubature"
+    ],
+    "variables_per_cell": 13,
+    "reported_distribution_error_percent_strict_upper": 0.25,
+    "reported_speedup_min": 1.36,
+    "reported_speedup_max": 2.89,
+    "reference_grid_transport_retained": true,
+    "status": "literature_claim_not_reproduced_here",
+    "spatial_cells": 64,
+    "time_step": 0.00125,
+    "velocity_node_counts_tested": [
+      128,
+      256,
+      512,
+      1024
+    ],
+    "timing_repetitions": 3,
+    "timing_statistic": "median_with_min_max_range",
+    "host_cpu": "AMD EPYC 9654",
+    "blas_threads": 1,
+    "setup_included_in_timing": false,
+    "full_grid_muscl_transport_retained": true
+  },
+  "reference_convergence": {
+    "spatial_refinement_levels": 2,
+    "velocity_refinement_levels": 2,
+    "time_refinement_levels": 2,
+    "velocity_domain_extension_required": true,
+    "independent_reference_confirmation_required": true
+  },
+  "matched_cost_modes": [
+    "equal_variables_per_cell",
+    "equal_total_stored_bytes",
+    "equal_end_to_end_wall_time",
+    "equal_full_order_solver_budget"
+  ],
+  "success_targets": {
+    "status": "prospective_only_not_achieved",
+    "structure_guarantees_must_match": true,
+    "distribution_error_must_be_below_published_reference": true,
+    "drive_response_improvement_required": true,
+    "all_claims_prospective": true
+  },
+  "claim_boundary": {
+    "physical_solver_executed": false,
+    "physical_trajectory_measured": false,
+    "entropy_guarantee_proved_for_this_implementation": false,
+    "competitive_result_reproduced": false
+  },
+  "provenance": {
+    "fixture_class": "synthetic_kresp_c_design_fixture_only",
+    "generator_seed": 11,
+    "source_contract_refs": [
+      "arxiv:2611.27904",
+      "published-table-1-training-validation-and-test-trajectories"
+    ]
+  },
+  "initial_condition_formula_id": "two_stream_gaussian_mixture_density_weight_and_velocity_shift_v1",
+  "external_field_formula_id": "sinusoidal_two_mode_external_field_v1"
+}

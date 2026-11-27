@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.1",
+  "case_id": "three-cell-positivity-mass-linear-response-kkt-v1",
+  "input_values": [
+    -0.1,
+    0.5,
+    0.6
+  ],
+  "cell_volumes": [
+    1,
+    1,
+    1
+  ],
+  "response_coefficients": [
+    1,
+    0,
+    0
+  ],
+  "target_mass": 1,
+  "target_response": 0.1,
+  "expected": {
+    "projected_values": [
+      0.1,
+      0.4,
+      0.5
+    ],
+    "positive_cell_count": 3,
+    "achieved_mass": 1,
+    "mass_residual": 0,
+    "achieved_response": 0.1,
+    "response_residual": 0,
+    "lagrange_multipliers": [
+      0.1,
+      -0.3
+    ],
+    "weighted_correction_norm": 0.2449489742783178,
+    "objective_value": 0.03,
+    "maximum_primal_violation": 0,
+    "maximum_dual_violation": 0,
+    "maximum_stationarity_residual": 0,
+    "maximum_complementarity_residual": 0
+  },
+  "claim_boundary": {
+    "status": "synthetic_known_answer_only",
+    "synthetic_qp_only": true,
+    "no_physical_solver_run": true,
+    "not_a_general_multi_constraint_solver": true
+  }
+}

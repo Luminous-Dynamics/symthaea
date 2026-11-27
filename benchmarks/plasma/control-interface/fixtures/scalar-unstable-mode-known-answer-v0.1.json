@@ -1,0 +1,52 @@
+{
+  "schema_version": "0.1",
+  "contract_id": "SCALAR-UNSTABLE-MODE-SYNTHETIC-001",
+  "model": {
+    "equation": "x[k+1] = exp(gamma*dt)*x[k] + b*u[k]",
+    "growth_rate_per_second": 0.5,
+    "oscillation_frequency_hz": 5,
+    "time_step_seconds": 0.01,
+    "horizon_steps": 10
+  },
+  "diagnostic": {
+    "gain": 2,
+    "noise_std": 0.1,
+    "bandwidth_hz": 80,
+    "sampling_stride_steps": 2,
+    "delivery_delay_steps": 1
+  },
+  "actuator": {
+    "gain": 0.5,
+    "bandwidth_hz": 20,
+    "update_stride_steps": 2,
+    "delivery_delay_steps": 1
+  },
+  "controller": {
+    "execution_latency_seconds": 0.005,
+    "minimum_bandwidth_multiple": 2,
+    "maximum_loop_latency_efold_fraction": 0.1,
+    "minimum_observability_fisher_information": 1000,
+    "minimum_controllability_gramian": 1
+  },
+  "known_answers": {
+    "observation_sample_count": 5,
+    "actuator_command_count": 5,
+    "observability_fisher_information": 2082.4542913757846,
+    "controllability_gramian": 1.3015339321098656,
+    "effective_diagnostic_bandwidth_hz": 25,
+    "effective_actuator_bandwidth_hz": 20,
+    "diagnostic_bandwidth_multiple": 5,
+    "actuator_bandwidth_multiple": 4,
+    "conservative_loop_latency_seconds": 0.065,
+    "loop_latency_efold_fraction": 0.0325,
+    "mode_interface_qualified": true,
+    "minimum_required_observability_fisher_information": 1000,
+    "minimum_required_controllability_gramian": 1
+  },
+  "claim_boundary": {
+    "status": "synthetic_analytic_reference_only",
+    "no_nonlinear_kinetic_model": true,
+    "no_closed_loop_stability_claim": true,
+    "scalar_mode_only": true
+  }
+}

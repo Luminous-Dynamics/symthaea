@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/control-interface/scalar-unstable-mode-contract-v0.1.schema.json",
+  "title": "Scalar unstable kinetic mode authority contract v0.1",
+  "description": "Manufactured scalar discrete-time unstable-mode reference for exact sparse observation and delayed-actuation Gramians. This is not a coupled plasma model or stability certificate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "model",
+    "diagnostic",
+    "actuator",
+    "controller",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "contract_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "equation",
+        "growth_rate_per_second",
+        "oscillation_frequency_hz",
+        "time_step_seconds",
+        "horizon_steps"
+      ],
+      "properties": {
+        "equation": {
+          "const": "x[k+1] = exp(gamma*dt)*x[k] + b*u[k]"
+        },
+        "growth_rate_per_second": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "oscillation_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "time_step_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "horizon_steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gain",
+        "noise_std",
+        "bandwidth_hz",
+        "sampling_stride_steps",
+        "delivery_delay_steps"
+      ],
+      "properties": {
+        "gain": {
+          "type": "number",
+          "minimum": 0
+        },
+        "noise_std": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "bandwidth_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "sampling_stride_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "delivery_delay_steps": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "actuator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gain",
+        "bandwidth_hz",
+        "update_stride_steps",
+        "delivery_delay_steps"
+      ],
+      "properties": {
+        "gain": {
+          "type": "number",
+          "minimum": 0
+        },
+        "bandwidth_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "update_stride_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "delivery_delay_steps": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "execution_latency_seconds",
+        "minimum_bandwidth_multiple",
+        "maximum_loop_latency_efold_fraction",
+        "minimum_observability_fisher_information",
+        "minimum_controllability_gramian"
+      ],
+      "properties": {
+        "execution_latency_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_bandwidth_multiple": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maximum_loop_latency_efold_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_observability_fisher_information": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_controllability_gramian": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "known_answers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_sample_count",
+        "actuator_command_count",
+        "observability_fisher_information",
+        "controllability_gramian",
+        "effective_diagnostic_bandwidth_hz",
+        "effective_actuator_bandwidth_hz",
+        "diagnostic_bandwidth_multiple",
+        "actuator_bandwidth_multiple",
+        "conservative_loop_latency_seconds",
+        "loop_latency_efold_fraction",
+        "mode_interface_qualified",
+        "minimum_required_observability_fisher_information",
+        "minimum_required_controllability_gramian"
+      ],
+      "properties": {
+        "observation_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actuator_command_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observability_fisher_information": {
+          "type": "number",
+          "minimum": 0
+        },
+        "controllability_gramian": {
+          "type": "number",
+          "minimum": 0
+        },
+        "effective_diagnostic_bandwidth_hz": {
+          "type": "number",
+          "minimum": 0
+        },
+        "effective_actuator_bandwidth_hz": {
+          "type": "number",
+          "minimum": 0
+        },
+        "diagnostic_bandwidth_multiple": {
+          "type": "number",
+          "minimum": 0
+        },
+        "actuator_bandwidth_multiple": {
+          "type": "number",
+          "minimum": 0
+        },
+        "conservative_loop_latency_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "loop_latency_efold_fraction": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mode_interface_qualified": {
+          "type": "boolean"
+        },
+        "minimum_required_observability_fisher_information": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_required_controllability_gramian": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "no_nonlinear_kinetic_model",
+        "no_closed_loop_stability_claim",
+        "scalar_mode_only"
+      ],
+      "properties": {
+        "status": {
+          "const": "synthetic_analytic_reference_only"
+        },
+        "no_nonlinear_kinetic_model": {
+          "const": true
+        },
+        "no_closed_loop_stability_claim": {
+          "const": true
+        },
+        "scalar_mode_only": {
+          "const": true
+        }
+      }
+    }
+  }
+}

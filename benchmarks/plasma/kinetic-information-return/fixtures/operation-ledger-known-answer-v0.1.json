@@ -1,0 +1,72 @@
+{
+  "schema_version": "0.1",
+  "record_status": "synthetic_operation_ledger_contract_only",
+  "ledgers": [
+    {
+      "ledger_id": "collisionless-filter-projection-transition",
+      "physical_model": "collisionless_vlasov",
+      "maximum_time": 10,
+      "events": [
+        {
+          "event_id": "filter-at-t1",
+          "operation_id": "hou-li-filter-v1",
+          "application_time": 1,
+          "operation_class": "numerical_filter",
+          "state_before_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state_after_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "discarded_effect_metric_id": "hermite-modal-l2-squared",
+          "discarded_effect_measure": 0.025,
+          "numerical_entropy_measure_id": "discrete-numerical-entropy-delta",
+          "numerical_entropy_delta": -0.01,
+          "declared_reversible": false
+        },
+        {
+          "event_id": "projection-at-t2",
+          "operation_id": "positivity-mass-projection-v1",
+          "application_time": 2,
+          "operation_class": "projection",
+          "state_before_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "state_after_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "discarded_effect_metric_id": "phase-space-weighted-l2",
+          "discarded_effect_measure": 0.004,
+          "declared_reversible": false
+        },
+        {
+          "event_id": "exact-transition-at-t3",
+          "operation_id": "basis-transition-exact-v1",
+          "application_time": 3,
+          "operation_class": "basis_transition",
+          "state_before_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "state_after_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "discarded_effect_metric_id": "registered-transition-residual",
+          "discarded_effect_measure": 0,
+          "declared_reversible": true
+        }
+      ]
+    },
+    {
+      "ledger_id": "collisional-vp-l-theorem-channel",
+      "physical_model": "vlasov_poisson_landau",
+      "maximum_time": 10,
+      "events": [
+        {
+          "event_id": "physical-collision-at-t1",
+          "operation_id": "discrete-landau-collision-v1",
+          "application_time": 1,
+          "operation_class": "physical_collision",
+          "state_before_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "state_after_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "physical_entropy_measure_id": "physical-boltzmann-h-theorem-production",
+          "physical_entropy_production": 0.04,
+          "declared_reversible": false,
+          "physical_entropy_sign_convention": "boltzmann_entropy_increase"
+        }
+      ]
+    }
+  ],
+  "claim_boundary": {
+    "no_vlasov_solver_executed": true,
+    "no_entropy_production_measured": true,
+    "not_a_physical_irreversibility_budget": true
+  }
+}

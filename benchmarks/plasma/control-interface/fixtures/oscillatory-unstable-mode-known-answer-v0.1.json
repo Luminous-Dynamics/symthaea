@@ -1,0 +1,64 @@
+{
+  "schema_version": "0.1",
+  "contract_id": "OSCILLATORY-UNSTABLE-MODE-SYNTHETIC-001",
+  "model": {
+    "equation": "x[k+1] = exp(gamma*dt)*R(2*pi*f*dt)*x[k] + B*u[k]",
+    "growth_rate_per_second": 0.2,
+    "oscillation_frequency_hz": 5,
+    "time_step_seconds": 0.01,
+    "horizon_steps": 10
+  },
+  "diagnostic": {
+    "gain_real": 1,
+    "gain_imag": 0.3,
+    "noise_std": 0.1,
+    "bandwidth_hz": 80,
+    "sampling_stride_steps": 2,
+    "delivery_delay_steps": 1
+  },
+  "actuator": {
+    "gain_real": 0.5,
+    "gain_imag": 0.2,
+    "bandwidth_hz": 20,
+    "update_stride_steps": 2,
+    "delivery_delay_steps": 1
+  },
+  "controller": {
+    "execution_latency_seconds": 0.005,
+    "minimum_bandwidth_multiple": 2,
+    "maximum_loop_latency_efold_fraction": 0.1,
+    "minimum_observability_min_eigenvalue": 200,
+    "minimum_controllability_min_eigenvalue": 0.5
+  },
+  "known_answers": {
+    "observation_sample_count": 5,
+    "actuator_command_count": 5,
+    "observability_gramian": [
+      275.1525629919475,
+      0.6727614529200991,
+      278.6730137656183
+    ],
+    "observability_min_eigenvalue": 275.0283782893929,
+    "observability_max_eigenvalue": 278.79719846817295,
+    "controllability_gramian": [
+      0.7374311161436637,
+      -0.004965766841578345,
+      0.7360497761471079
+    ],
+    "controllability_min_eigenvalue": 0.7317268780176508,
+    "controllability_max_eigenvalue": 0.7417540142731208,
+    "effective_diagnostic_bandwidth_hz": 25,
+    "effective_actuator_bandwidth_hz": 20,
+    "diagnostic_bandwidth_multiple": 5,
+    "actuator_bandwidth_multiple": 4,
+    "conservative_loop_latency_seconds": 0.065,
+    "loop_latency_efold_fraction": 0.013,
+    "mode_interface_qualified": true
+  },
+  "claim_boundary": {
+    "status": "synthetic_analytic_reference_only",
+    "two_quadrature_linear_mode_only": true,
+    "no_nonlinear_kinetic_model": true,
+    "no_closed_loop_stability_claim": true
+  }
+}

@@ -1,0 +1,932 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/plasma/response-balanced-experiment-v0.1.schema.json",
+  "title": "RBKR Kinetic Response Experiment Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_status",
+    "experiment_id",
+    "source_pulse_family_contract_id",
+    "cohort",
+    "frozen_checkpoint",
+    "pulse_family",
+    "split",
+    "observables",
+    "prediction_horizon",
+    "reference_convergence",
+    "comparators",
+    "success_targets",
+    "resource_budget",
+    "claim_boundary",
+    "provenance",
+    "adjacent_methods",
+    "linearization_contract",
+    "response_qualification",
+    "methodological_prior_art"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "record_status": {
+      "const": "synthetic_experiment_contract_only"
+    },
+    "experiment_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"
+    },
+    "source_pulse_family_contract_id": {
+      "const": "AKPD-SYNTHETIC-PULSE-FAMILY-001"
+    },
+    "cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "equation",
+        "normalization_id",
+        "spatial_domain",
+        "velocity_domain",
+        "time_unit",
+        "maximum_time",
+        "state_metric_id",
+        "state_coordinate_id"
+      ],
+      "properties": {
+        "equation": {
+          "const": "periodic_1d1v_collisionless_vlasov_poisson"
+        },
+        "normalization_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spatial_domain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum",
+            "periodic"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "number"
+            },
+            "maximum": {
+              "type": "number"
+            },
+            "periodic": {
+              "const": true
+            }
+          }
+        },
+        "velocity_domain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum",
+            "velocity_unit"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "number"
+            },
+            "maximum": {
+              "type": "number"
+            },
+            "velocity_unit": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "time_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maximum_time": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "state_metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_coordinate_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "frozen_checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkpoint_id",
+        "step",
+        "time",
+        "state_sha256",
+        "phase_mixing_complete",
+        "second_pulse_not_yet_applied",
+        "solver_revision",
+        "first_pulse_applied"
+      ],
+      "properties": {
+        "checkpoint_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "step": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "time": {
+          "type": "number",
+          "minimum": 0
+        },
+        "state_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "phase_mixing_complete": {
+          "const": true
+        },
+        "second_pulse_not_yet_applied": {
+          "const": true
+        },
+        "solver_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "first_pulse_applied": {
+          "const": true
+        }
+      }
+    },
+    "pulse_family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operator_id",
+        "amplitude_semantics",
+        "application_semantics",
+        "allowed_spatial_mode",
+        "allowed_phase_rad",
+        "allowed_kick_amplitude",
+        "maximum_application_time"
+      ],
+      "properties": {
+        "operator_id": {
+          "const": "sinusoidal_velocity_kick_v1"
+        },
+        "amplitude_semantics": {
+          "const": "maximum_absolute_delta_v"
+        },
+        "application_semantics": {
+          "const": "instantaneous_canonical_velocity_kick"
+        },
+        "allowed_spatial_mode": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maximum": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "allowed_phase_rad": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "number"
+            },
+            "maximum": {
+              "type": "number"
+            }
+          }
+        },
+        "allowed_kick_amplitude": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum",
+            "unit"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "number",
+              "minimum": 0
+            },
+            "maximum": {
+              "type": "number",
+              "minimum": 0
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "maximum_application_time": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "held_out_axes",
+        "training",
+        "validation",
+        "held_out"
+      ],
+      "properties": {
+        "held_out_axes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "pulse_phase",
+              "kick_amplitude",
+              "spatial_mode",
+              "pulse_separation",
+              "pulse_order"
+            ]
+          }
+        },
+        "training": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/trial"
+          }
+        },
+        "validation": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/trial"
+          }
+        },
+        "held_out": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/trial"
+          }
+        }
+      }
+    },
+    "observables": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "qoi_id",
+          "kind",
+          "unit",
+          "normalization_scale",
+          "priority"
+        ],
+        "properties": {
+          "qoi_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "complex_field_coefficient",
+              "distribution_norm",
+              "echo_peak_time",
+              "echo_peak_width",
+              "waveform",
+              "branch_identity"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "normalization_scale": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "prediction_horizon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_time",
+        "end_time",
+        "unit"
+      ],
+      "properties": {
+        "start_time": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end_time": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reference_convergence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_spatial_refinement_levels",
+        "minimum_velocity_refinement_levels",
+        "minimum_time_refinement_levels",
+        "domain_extension_required",
+        "independent_reference_confirmation_required",
+        "convergence_observables"
+      ],
+      "properties": {
+        "minimum_spatial_refinement_levels": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "minimum_velocity_refinement_levels": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "minimum_time_refinement_levels": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "domain_extension_required": {
+          "const": true
+        },
+        "independent_reference_confirmation_required": {
+          "const": true
+        },
+        "convergence_observables": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "comparators": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "snapshot_pod",
+          "padovan_nonintrusive_balancing",
+          "adaptive_hermite",
+          "adaptive_fourier",
+          "tensor_network_vlasov_poisson",
+          "non_markovian_fno_closure",
+          "full_order_reference",
+          "time_windowed_pod",
+          "energy_windowed_pod",
+          "conservative_fluid_kinetic_rom"
+        ]
+      }
+    },
+    "success_targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "linear_damping_or_growth_relative_error",
+        "complex_echo_amplitude_relative_error",
+        "wrapped_echo_phase_error_radians",
+        "all_targets_are_prospective"
+      ],
+      "properties": {
+        "status": {
+          "const": "prospective_only_not_achieved"
+        },
+        "linear_damping_or_growth_relative_error": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.01
+        },
+        "complex_echo_amplitude_relative_error": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.02
+        },
+        "wrapped_echo_phase_error_radians": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.02
+        },
+        "all_targets_are_prospective": {
+          "const": true
+        }
+      }
+    },
+    "resource_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_reference_steps",
+        "maximum_wall_time_seconds",
+        "maximum_memory_bytes",
+        "comparison_modes"
+      ],
+      "properties": {
+        "maximum_reference_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_wall_time_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "comparison_modes": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "equal_rank",
+              "equal_stored_bytes",
+              "equal_end_to_end_wall_time"
+            ]
+          }
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_solver_executed",
+        "physical_response_measured",
+        "competitive_ranking_claimed",
+        "independent_reference_converged"
+      ],
+      "properties": {
+        "physical_solver_executed": {
+          "const": false
+        },
+        "physical_response_measured": {
+          "const": false
+        },
+        "competitive_ranking_claimed": {
+          "const": false
+        },
+        "independent_reference_converged": {
+          "const": false
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_class",
+        "generator_seed",
+        "source_record_refs"
+      ],
+      "properties": {
+        "fixture_class": {
+          "const": "synthetic_schema_test_only"
+        },
+        "generator_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_record_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "adjacent_methods": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "adaptive_opinf_port",
+          "adaptive_nitrom_port",
+          "adaptive_opinf_nitrom_hybrid_port",
+          "symmetry_augmented_kinetic_closure",
+          "entropy_based_vlasov_poisson_dougherty_moment_port",
+          "adaptive_symplectic_particle_vlasov_rom_port",
+          "goal_oriented_dwr_hyperreduction_port",
+          "balanced_truncation_a_posteriori_bound_port"
+        ]
+      }
+    },
+    "linearization_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "derivative_source",
+        "future_solver_transition_jacobians_required",
+        "pulse_map_state_jacobian_required",
+        "pulse_map_parameter_jacobian_required",
+        "split_solver_composition_order_required",
+        "independent_finite_difference_cross_check_required",
+        "branch_change_disposition",
+        "pulse_application_time_jacobian_required",
+        "pulse_time_finite_difference_cross_check_required",
+        "pulse_time_sensitivity_convention",
+        "pulse_time_sensitivity_status",
+        "distribution_pulse_pullback_required",
+        "distribution_pulse_remap_mass_ledger_required",
+        "distribution_pulse_pullback_status",
+        "distribution_pulse_remap_jacobian_status",
+        "distribution_pulse_boundary_outflow_disposition",
+        "distribution_pulse_remap_jacobian_finite_difference_required",
+        "distribution_pulse_remap_topology_change_disposition",
+        "distribution_pulse_spatial_integral_weights_required",
+        "distribution_pulse_unweighted_total_mass_interpretation",
+        "distribution_pulse_weighted_quadrature_api_status"
+      ],
+      "properties": {
+        "status": {
+          "const": "synthetic_derivatives_not_computed"
+        },
+        "derivative_source": {
+          "const": "not_computed_synthetic"
+        },
+        "future_solver_transition_jacobians_required": {
+          "const": true
+        },
+        "pulse_map_state_jacobian_required": {
+          "const": true
+        },
+        "pulse_map_parameter_jacobian_required": {
+          "const": true
+        },
+        "split_solver_composition_order_required": {
+          "const": true
+        },
+        "independent_finite_difference_cross_check_required": {
+          "const": true
+        },
+        "branch_change_disposition": {
+          "const": "UNKNOWN_OR_HANDOFF"
+        },
+        "pulse_application_time_jacobian_required": {
+          "const": true
+        },
+        "pulse_time_finite_difference_cross_check_required": {
+          "const": true
+        },
+        "pulse_time_sensitivity_convention": {
+          "const": "scheduled_reset_D_R_f_minus_plus_R_t_minus_f_plus"
+        },
+        "pulse_time_sensitivity_status": {
+          "const": "synthetic_not_computed"
+        },
+        "distribution_pulse_pullback_required": {
+          "const": true
+        },
+        "distribution_pulse_remap_mass_ledger_required": {
+          "const": true
+        },
+        "distribution_pulse_pullback_status": {
+          "const": "first_order_piecewise_constant_module_only"
+        },
+        "distribution_pulse_remap_jacobian_status": {
+          "const": "fixed_topology_piecewise_constant_analytic_module_only"
+        },
+        "distribution_pulse_boundary_outflow_disposition": {
+          "const": "UNQUALIFIED_UNLESS_GRID_CONVERGENCE_OR_EXPLICIT_BOUNDARY_ERROR"
+        },
+        "distribution_pulse_remap_jacobian_finite_difference_required": {
+          "const": true
+        },
+        "distribution_pulse_remap_topology_change_disposition": {
+          "const": "UNKNOWN_OR_HANDOFF"
+        },
+        "distribution_pulse_spatial_integral_weights_required": {
+          "const": true
+        },
+        "distribution_pulse_unweighted_total_mass_interpretation": {
+          "const": "unit_weight_row_sum_not_general_spatial_integral"
+        },
+        "distribution_pulse_weighted_quadrature_api_status": {
+          "const": "positive_spatial_weight_api_implemented_module_only"
+        }
+      }
+    },
+    "response_qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkpoint_state_residual_required",
+        "future_pulse_injection_residual_required",
+        "risk_summary_metrics",
+        "cvar_alpha",
+        "residual_threshold_status",
+        "nonlinear_full_order_response_required",
+        "scalar_separation_oracle",
+        "joint_box_oracle"
+      ],
+      "properties": {
+        "checkpoint_state_residual_required": {
+          "const": true
+        },
+        "future_pulse_injection_residual_required": {
+          "const": true
+        },
+        "risk_summary_metrics": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "weighted_mean",
+              "worst_case",
+              "cvar"
+            ]
+          }
+        },
+        "cvar_alpha": {
+          "const": 0.9
+        },
+        "residual_threshold_status": {
+          "const": "calibrate_on_independently_converged_physical_reference"
+        },
+        "nonlinear_full_order_response_required": {
+          "const": true
+        },
+        "scalar_separation_oracle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "method",
+            "continuous_parameter_axes",
+            "interior_search_required",
+            "boundary_only_search_sufficient",
+            "lipschitz_certificate_status",
+            "branch_stability_evidence_status",
+            "budget_exhaustion_disposition",
+            "global_bound_claim_status",
+            "full_order_confirmation_required",
+            "objective_sample_error_interval_required",
+            "sample_interval_semantics",
+            "physical_sample_error_bound_status",
+            "convergence_flag_alone_means_zero_error"
+          ],
+          "properties": {
+            "status": {
+              "const": "design_only_not_executed"
+            },
+            "method": {
+              "const": "branch_conditioned_lipschitz_branch_and_bound_1d"
+            },
+            "continuous_parameter_axes": {
+              "type": "array",
+              "minItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pulse_phase",
+                  "kick_amplitude",
+                  "pulse_separation"
+                ]
+              }
+            },
+            "interior_search_required": {
+              "const": true
+            },
+            "boundary_only_search_sufficient": {
+              "const": false
+            },
+            "lipschitz_certificate_status": {
+              "const": "not_issued_synthetic"
+            },
+            "branch_stability_evidence_status": {
+              "const": "not_issued_synthetic"
+            },
+            "budget_exhaustion_disposition": {
+              "const": "unqualified"
+            },
+            "global_bound_claim_status": {
+              "const": "conditional_on_valid_lipschitz_and_branch_evidence"
+            },
+            "full_order_confirmation_required": {
+              "const": true
+            },
+            "objective_sample_error_interval_required": {
+              "const": true
+            },
+            "sample_interval_semantics": {
+              "const": "max_zero_value_minus_abs_error_to_value_plus_abs_error"
+            },
+            "physical_sample_error_bound_status": {
+              "const": "not_issued_synthetic"
+            },
+            "convergence_flag_alone_means_zero_error": {
+              "const": false
+            }
+          }
+        },
+        "joint_box_oracle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "method",
+            "continuous_parameter_axes",
+            "coordinate_lipschitz_semantics",
+            "subdivision_policy",
+            "interior_search_required",
+            "boundary_only_search_sufficient",
+            "lipschitz_certificate_status",
+            "branch_stability_evidence_status",
+            "budget_exhaustion_disposition",
+            "global_bound_claim_status",
+            "full_order_confirmation_required",
+            "objective_normalization",
+            "reference_response_denominator_lower_bound_required",
+            "objective_sample_error_interval_required",
+            "sample_interval_semantics",
+            "physical_sample_error_bound_status",
+            "convergence_flag_alone_means_zero_error"
+          ],
+          "properties": {
+            "status": {
+              "const": "design_only_not_executed"
+            },
+            "method": {
+              "const": "anisotropic_lipschitz_branch_and_bound_nd"
+            },
+            "continuous_parameter_axes": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 3,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pulse_phase",
+                  "kick_amplitude",
+                  "pulse_separation"
+                ]
+              }
+            },
+            "coordinate_lipschitz_semantics": {
+              "const": "sum_i_L_i_abs_coordinate_delta_i"
+            },
+            "subdivision_policy": {
+              "const": "largest_Li_times_half_width"
+            },
+            "interior_search_required": {
+              "const": true
+            },
+            "boundary_only_search_sufficient": {
+              "const": false
+            },
+            "lipschitz_certificate_status": {
+              "const": "not_issued_synthetic"
+            },
+            "branch_stability_evidence_status": {
+              "const": "not_issued_synthetic"
+            },
+            "budget_exhaustion_disposition": {
+              "const": "unqualified"
+            },
+            "global_bound_claim_status": {
+              "const": "conditional_on_valid_box_lipschitz_and_branch_evidence"
+            },
+            "full_order_confirmation_required": {
+              "const": true
+            },
+            "objective_normalization": {
+              "const": "declared_qoi_scale_and_fixed_positive_floor"
+            },
+            "reference_response_denominator_lower_bound_required": {
+              "const": true
+            },
+            "objective_sample_error_interval_required": {
+              "const": true
+            },
+            "sample_interval_semantics": {
+              "const": "max_zero_value_minus_abs_error_to_value_plus_abs_error"
+            },
+            "physical_sample_error_bound_status": {
+              "const": "not_issued_synthetic"
+            },
+            "convergence_flag_alone_means_zero_error": {
+              "const": false
+            }
+          }
+        }
+      }
+    },
+    "methodological_prior_art": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "semi_infinite_worst_case_scenario_generation",
+          "adaptive_symplectic_particle_vlasov_rom",
+          "dual_weighted_residual_goal_oriented_sampling",
+          "balanced_truncation_a_posteriori_error_bound"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "pulse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pulse_id",
+        "spatial_mode",
+        "kick_amplitude",
+        "phase_rad",
+        "application_time"
+      ],
+      "properties": {
+        "pulse_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spatial_mode": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kick_amplitude": {
+          "type": "number",
+          "minimum": 0
+        },
+        "phase_rad": {
+          "type": "number"
+        },
+        "application_time": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "trial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trial_id",
+        "pulses"
+      ],
+      "properties": {
+        "trial_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pulses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/pulse"
+          }
+        }
+      }
+    }
+  }
+}

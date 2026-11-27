@@ -1,0 +1,145 @@
+{
+  "schema_version": "0.1",
+  "record_status": "synthetic_known_answer_only",
+  "domain": {
+    "topology": "torus",
+    "minimum": 0,
+    "maximum": 1,
+    "unit": "normalized_physical_coordinate",
+    "domain_id": "unit-torus-v1"
+  },
+  "metric": {
+    "id": "wasserstein_1_circle_1d",
+    "definition": "physical_period_times_min_over_c_integral_0_1_abs(CDF_left-CDF_right-c) dx",
+    "scope": "one_dimensional_torus_geodesic_distance",
+    "mass_convention": "nonnegative_weights_normalized_to_probability"
+  },
+  "cases": [
+    {
+      "case_id": "periodic-endpoints-are-identified",
+      "transformation": "endpoint_identification",
+      "left": {
+        "positions": [
+          0
+        ],
+        "weights": [
+          1
+        ]
+      },
+      "right": {
+        "positions": [
+          1
+        ],
+        "weights": [
+          1
+        ]
+      },
+      "expected_w1": 0
+    },
+    {
+      "case_id": "shortest-geodesic-crosses-coordinate-seam",
+      "transformation": "shortest_seam_arc",
+      "left": {
+        "positions": [
+          0.95
+        ],
+        "weights": [
+          1
+        ]
+      },
+      "right": {
+        "positions": [
+          0.05
+        ],
+        "weights": [
+          1
+        ]
+      },
+      "expected_w1": 0.1
+    },
+    {
+      "case_id": "common-periodic-translation-preserves-distance",
+      "transformation": "common_translation",
+      "left": {
+        "positions": [
+          0.1,
+          0.4,
+          0.8
+        ],
+        "weights": [
+          0.2,
+          0.3,
+          0.5
+        ]
+      },
+      "right": {
+        "positions": [
+          0.2,
+          0.5,
+          0.9
+        ],
+        "weights": [
+          0.2,
+          0.3,
+          0.5
+        ]
+      },
+      "expected_w1": 0.1,
+      "translated_left": {
+        "positions": [
+          0.47,
+          0.77,
+          0.17
+        ],
+        "weights": [
+          0.2,
+          0.3,
+          0.5
+        ]
+      },
+      "translated_right": {
+        "positions": [
+          0.57,
+          0.87,
+          0.27
+        ],
+        "weights": [
+          0.2,
+          0.3,
+          0.5
+        ]
+      },
+      "translated_expected_w1": 0.1
+    },
+    {
+      "case_id": "geodesic-distance-scales-with-physical-period",
+      "transformation": "physical_period_scaling",
+      "domain_override": {
+        "minimum": -2,
+        "maximum": 3
+      },
+      "left": {
+        "positions": [
+          0.95
+        ],
+        "weights": [
+          1
+        ]
+      },
+      "right": {
+        "positions": [
+          2.45
+        ],
+        "weights": [
+          1
+        ]
+      },
+      "expected_w1": 1.5
+    }
+  ],
+  "claim_boundary": {
+    "no_field_operator_evaluated": true,
+    "no_physical_solver_run": true,
+    "not_a_global_field_stability_certificate": true
+  }
+}

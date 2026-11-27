@@ -1,0 +1,1312 @@
+name: Plasma Probe Contract
+
+on:
+  push:
+    branches:
+      - "research/plasma-adversarial-probe-contract-v0-1"
+    paths:
+      - "Cargo.lock"
+      - "crates/domains/symthaea-plasma-probes/**"
+      - "benchmarks/plasma/adversarial-probes/**"
+      - "benchmarks/plasma/rate-distortion/**"
+      - "benchmarks/plasma/topology-lifting/**"
+      - "benchmarks/plasma/state-equivalence/**"
+      - "benchmarks/plasma/kinetic-discrimination/**"
+      - "benchmarks/plasma/micro-macro/**"
+      - "benchmarks/plasma/control-interface/**"
+      - "benchmarks/plasma/adaptive-refinement/**"
+      - "benchmarks/plasma/positivity-projection/**"
+      - "benchmarks/plasma/measure-stability/**"
+      - "benchmarks/plasma/kinetic-information-return/**"
+      - "benchmarks/plasma/response-balanced/**"
+      - ".github/workflows/plasma-probes.yml"
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Cargo.lock"
+      - "crates/domains/symthaea-plasma-probes/**"
+      - "benchmarks/plasma/adversarial-probes/**"
+      - "benchmarks/plasma/rate-distortion/**"
+      - "benchmarks/plasma/topology-lifting/**"
+      - "benchmarks/plasma/state-equivalence/**"
+      - "benchmarks/plasma/kinetic-discrimination/**"
+      - "benchmarks/plasma/micro-macro/**"
+      - "benchmarks/plasma/control-interface/**"
+      - "benchmarks/plasma/adaptive-refinement/**"
+      - "benchmarks/plasma/positivity-projection/**"
+      - "benchmarks/plasma/measure-stability/**"
+      - "benchmarks/plasma/kinetic-information-return/**"
+      - "benchmarks/plasma/response-balanced/**"
+      - ".github/workflows/plasma-probes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plasma-probes-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate pulse contract and response Gramian primitives
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting without workspace discovery
+        run: |
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/lib.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/rbkr.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/pulse_map.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/velocity_kick_remap.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/challenge_search.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/response_balanced_contract_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/vpl_echo_contract_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/rbkr_public_api_smoke.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/pulse_map.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/response_weighted_refinement_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/positive_mass_projection_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/small_positive_response_qp_audit.rs
+
+      - name: Prepare isolated crate validation workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp_root="${RUNNER_TEMP}/plasma-probe-validation"
+          crate_dir="${tmp_root}/crates/domains/symthaea-plasma-probes"
+          mkdir -p "${crate_dir}/src/bin"
+          mkdir -p "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/rate-distortion/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/state-equivalence/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/kinetic-discrimination/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/micro-macro/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/control-interface/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/adaptive-refinement/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/positivity-projection/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/measure-stability/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/kresp-c-collisional/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures"
+          cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
+          cp crates/domains/symthaea-plasma-probes/src/validity_horizon.rs "${crate_dir}/src/validity_horizon.rs"
+          cp crates/domains/symthaea-plasma-probes/src/rbkr.rs "${crate_dir}/src/rbkr.rs"
+          cp crates/domains/symthaea-plasma-probes/src/pulse_map.rs "${crate_dir}/src/pulse_map.rs"
+          cp crates/domains/symthaea-plasma-probes/src/velocity_kick_remap.rs "${crate_dir}/src/velocity_kick_remap.rs"
+          cp crates/domains/symthaea-plasma-probes/src/challenge_search.rs "${crate_dir}/src/challenge_search.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs "${crate_dir}/src/bin/kird_point_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/response_weighted_refinement_audit.rs "${crate_dir}/src/bin/response_weighted_refinement_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/sensor_actuator_contract_audit.rs "${crate_dir}/src/bin/sensor_actuator_contract_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/positive_mass_projection_audit.rs "${crate_dir}/src/bin/positive_mass_projection_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/small_positive_response_qp_audit.rs "${crate_dir}/src/bin/small_positive_response_qp_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/response_balanced_contract_audit.rs "${crate_dir}/src/bin/response_balanced_contract_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/vpl_echo_contract_audit.rs "${crate_dir}/src/bin/vpl_echo_contract_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/rbkr_public_api_smoke.rs "${crate_dir}/src/bin/rbkr_public_api_smoke.rs"
+          cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures/"
+          cp benchmarks/plasma/adversarial-probes/response-weighted-refinement-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/adversarial-probes/"
+          cp benchmarks/plasma/adversarial-probes/fixtures/response-weighted-refinement-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/adversarial-probes/fixtures/"
+          cp benchmarks/plasma/rate-distortion/kird-point-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/rate-distortion/"
+          cp benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-point-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/rate-distortion/fixtures/"
+          cp benchmarks/plasma/rate-distortion/fixtures/synthetic-kird-certified-cover-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/rate-distortion/fixtures/"
+          cp benchmarks/plasma/topology-lifting/boundary-lift-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/"
+          cp benchmarks/plasma/topology-lifting/fixtures/topology-lift-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures/"
+          cp benchmarks/plasma/topology-lifting/weighted-fourier-measure-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/"
+          cp benchmarks/plasma/topology-lifting/fixtures/weighted-fourier-measure-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures/"
+          cp benchmarks/plasma/topology-lifting/weighted-measure-tail-stability-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/"
+          cp benchmarks/plasma/topology-lifting/fixtures/weighted-measure-tail-stability-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/topology-lifting/fixtures/"
+          cp benchmarks/plasma/state-equivalence/kinetic-response-signature-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/state-equivalence/"
+          cp benchmarks/plasma/state-equivalence/fixtures/nontransitive-response-triple-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/state-equivalence/fixtures/"
+          cp benchmarks/plasma/kinetic-discrimination/complex-response-eig-design-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-discrimination/"
+          cp benchmarks/plasma/kinetic-discrimination/fixtures/complex-response-eig-known-answers-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-discrimination/fixtures/"
+          cp benchmarks/plasma/micro-macro/micro-macro-scaling-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/micro-macro/"
+          cp benchmarks/plasma/micro-macro/fixtures/synthetic-micro-macro-contract-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/micro-macro/fixtures/"
+          cp benchmarks/plasma/control-interface/sensor-actuator-timing-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/"
+          cp benchmarks/plasma/control-interface/fixtures/synthetic-multirate-interface-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/fixtures/"
+          cp benchmarks/plasma/control-interface/scalar-unstable-mode-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/"
+          cp benchmarks/plasma/control-interface/fixtures/scalar-unstable-mode-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/fixtures/"
+          cp benchmarks/plasma/control-interface/oscillatory-unstable-mode-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/"
+          cp benchmarks/plasma/control-interface/fixtures/oscillatory-unstable-mode-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/fixtures/"
+          cp benchmarks/plasma/control-interface/coupled-unstable-mode-authority-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/"
+          cp benchmarks/plasma/control-interface/fixtures/coupled-unstable-mode-authority-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/control-interface/fixtures/"
+          cp benchmarks/plasma/adaptive-refinement/refinement-policy-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/adaptive-refinement/"
+          cp benchmarks/plasma/adaptive-refinement/fixtures/synthetic-refinement-cases-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/adaptive-refinement/fixtures/"
+          cp benchmarks/plasma/positivity-projection/positive-mass-projection-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/positivity-projection/"
+          cp benchmarks/plasma/positivity-projection/fixtures/negative-spectral-overshoot-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/positivity-projection/fixtures/"
+          cp benchmarks/plasma/positivity-projection/small-positive-response-qp-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/positivity-projection/"
+          cp benchmarks/plasma/positivity-projection/fixtures/three-cell-positive-response-qp-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/positivity-projection/fixtures/"
+          cp benchmarks/plasma/measure-stability/particle-measure-w1-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/measure-stability/"
+          cp benchmarks/plasma/measure-stability/fixtures/particle-measure-w1-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/measure-stability/fixtures/"
+          cp benchmarks/plasma/measure-stability/particle-measure-torus-w1-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/measure-stability/"
+          cp benchmarks/plasma/measure-stability/fixtures/particle-measure-torus-w1-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/measure-stability/fixtures/"
+          cp benchmarks/plasma/kinetic-information-return/kinetic-pulse-graph-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-information-return/"
+          cp benchmarks/plasma/kinetic-information-return/fixtures/kinetic-pulse-graph-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures/"
+          cp benchmarks/plasma/kinetic-information-return/path-response-signature-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-information-return/"
+          cp benchmarks/plasma/kinetic-information-return/fixtures/path-response-dispositions-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures/"
+          cp benchmarks/plasma/kinetic-information-return/operation-ledger-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-information-return/"
+          cp benchmarks/plasma/kinetic-information-return/fixtures/operation-ledger-known-answer-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures/"
+          cp benchmarks/plasma/response-balanced/response-balanced-experiment-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/"
+          cp benchmarks/plasma/response-balanced/fixtures/synthetic-kresp1-experiment-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/fixtures/"
+          cp benchmarks/plasma/response-balanced/kresp-c-collisional/kresp-c-vpd-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/kresp-c-collisional/"
+          cp benchmarks/plasma/response-balanced/kresp-c-collisional/fixtures/synthetic-vpd-drive-cohorts-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/kresp-c-collisional/fixtures/"
+          cp benchmarks/plasma/response-balanced/kresp-cl-coulomb/kresp-cl-vpl-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/"
+          cp benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/"
+          cp benchmarks/plasma/response-balanced/kresp-cl-coulomb/kresp-cl-vpl-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/"
+          cp benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/"
+          cat > "${crate_dir}/Cargo.toml" <<'EOF'
+          [package]
+          name = "symthaea-plasma-probes"
+          version = "0.1.0"
+          edition = "2024"
+          rust-version = "1.94"
+          publish = false
+
+          [workspace]
+
+          [dependencies]
+          blake3 = "=1.8.5"
+          serde = { version = "=1.0.228", features = ["derive"] }
+          serde_json = "=1.0.150"
+          thiserror = "=1.0.69"
+          EOF
+          cargo generate-lockfile --manifest-path "${crate_dir}/Cargo.toml"
+
+      - name: Run isolated unit tests against pinned dependency versions
+        run: cargo test --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml"
+
+      - name: Compile and run external RBKR public API smoke test
+        run: cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin rbkr_public_api_smoke
+
+      - name: Validate KIRD Draft 2020-12 schema and fixture
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/rate-distortion")
+          schema = json.loads((root / "kird-point-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-kird-point-v0.1.json").read_text())
+          certified = json.loads((root / "fixtures/synthetic-kird-certified-cover-v0.1.json").read_text())
+          validator = Draft202012Validator(schema)
+          Draft202012Validator.check_schema(schema)
+          validator.validate(fixture)
+          validator.validate(certified)
+          assert fixture["record_status"] == "synthetic_fixture_only"
+          assert fixture["provenance"]["physical_execution_authorized"] is False
+          assert certified["response_scope"]["coverage_kind"] == "certified_global"
+          assert certified["response_scope"]["global_normalized_error_bound"] == 0.75
+          invalid_physical = json.loads(json.dumps(fixture))
+          invalid_physical["record_status"] = "physical_measurement"
+          invalid_physical["provenance"]["physical_execution_authorized"] = True
+          assert not validator.is_valid(invalid_physical)
+          print("kird_schema_validation=PASS")
+          PY
+
+      - name: Validate topology-aware lifting Draft 2020-12 schema and fixture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/topology-lifting")
+          schema = json.loads((root / "boundary-lift-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/topology-lift-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          periodic, opened = fixture["cases"]
+          assert periodic["boundary"]["kind"] == "periodic"
+          assert periodic["physical_domain"]["topology"] == "torus"
+          assert periodic["physical_domain"]["maximum"] > periodic["physical_domain"]["minimum"]
+          assert periodic["coordinate_convention"]["wrap_modulo_one"] is True
+          assert periodic["lift"]["family"] == "periodic_fourier_characters"
+          assert periodic["lift"]["raw_coordinate_included"] is False
+          assert periodic["lift"]["max_harmonic"] <= 4096
+          assert opened["boundary"]["kind"] == "open"
+          assert opened["physical_domain"]["topology"] == "interval"
+          assert opened["physical_domain"]["maximum"] > opened["physical_domain"]["minimum"]
+          assert opened["coordinate_convention"]["wrap_modulo_one"] is False
+          assert opened["lift"]["family"] == "open_boundary_distances"
+          assert opened["lift"]["raw_coordinate_included"] is True
+          assert opened["lift"]["boundary_distances_included"] is True
+          assert fixture["claim_boundary"]["no_physical_plasma_run"] is True
+
+          measure_schema = json.loads((root / "weighted-fourier-measure-v0.1.schema.json").read_text())
+          measure = json.loads((root / "fixtures/weighted-fourier-measure-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(measure_schema)
+          Draft202012Validator(measure_schema).validate(measure)
+          assert len(measure["positions"]) == len(measure["weights"])
+          assert len(measure["positions"]) * measure["max_harmonic"] <= 16_777_216
+          assert sum(measure["weights"]) > 0
+          assert len(measure["expected_normalized_complex_moments"]) == measure["max_harmonic"]
+          assert measure["claim_boundary"]["finite_fourier_band_is_not_injective"] is True
+
+          tail_schema = json.loads((root / "weighted-measure-tail-stability-v0.1.schema.json").read_text())
+          tail = json.loads((root / "fixtures/weighted-measure-tail-stability-v0.1.json").read_text())
+          Draft202012Validator.check_schema(tail_schema)
+          Draft202012Validator(tail_schema).validate(tail)
+          assert len(tail["base_positions"]) == len(tail["base_weights"])
+          assert len(tail["augmented_positions"]) == len(tail["augmented_weights"])
+          assert tail["augmented_positions"][:-1] == tail["base_positions"]
+          assert abs(sum(tail["base_weights"]) - 1.0) < 1e-12
+          assert abs(tail["augmented_weights"][-1] - tail["outlier_mass"]) < 1e-24
+          epsilon = tail["outlier_mass"]
+          bound = 2 * epsilon / (1 + epsilon)
+          assert abs(bound - tail["mathematical_bound"]["expected_upper_bound"]) < 1e-24
+          assert tail["claim_boundary"]["low_mass_does_not_imply_dynamically_irrelevant"] is True
+          print("topology_lift_schema_validation=PASS")
+          print("weighted_fourier_measure_schema_validation=PASS")
+          print("weighted_measure_tail_stability_validation=PASS")
+          PY
+
+      - name: Validate KIRR pulse graph schema and sequence constraints
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/kinetic-information-return")
+          schema = json.loads((root / "kinetic-pulse-graph-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/kinetic-pulse-graph-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["cohort"]["collision_model"] == "collisionless"
+          assert fixture["cohort"]["boundary_topology"] == "periodic_torus"
+          paths = {path["path_id"]: path for path in fixture["paths"]}
+          assert len(paths) == 3
+          assert len(paths["baseline-no-intervention"]["pulses"]) == 0
+          assert len(paths["two-pulse-echo-anchor"]["pulses"]) == 2
+          assert len(paths["three-pulse-cascade"]["pulses"]) == 3
+          for path in fixture["paths"]:
+              times = [pulse["application_time"] for pulse in path["pulses"]]
+              assert times == sorted(times)
+              assert all(time < path["observation_end_time"] for time in times)
+              assert path["observation_end_time"] <= fixture["cohort"]["maximum_time"]
+              assert len({pulse["pulse_id"] for pulse in path["pulses"]}) == len(path["pulses"])
+          assert fixture["claim_boundary"]["no_vlasov_solver_executed"] is True
+          assert fixture["claim_boundary"]["no_echo_response_measured"] is True
+          print("kinetic_information_return_pulse_graph_validation=PASS")
+
+          response_schema = json.loads((root / "path-response-signature-v0.1.schema.json").read_text())
+          response_fixture = json.loads((root / "fixtures/path-response-dispositions-v0.1.json").read_text())
+          Draft202012Validator.check_schema(response_schema)
+          Draft202012Validator(response_schema).validate(response_fixture)
+          assert len(response_fixture["cases"]) == 5
+          expected_dispositions = {case["expected_disposition"] for case in response_fixture["cases"]}
+          assert expected_dispositions == {"PASS", "FAIL", "UNKNOWN", "UNSUPPORTED"}
+          path_map = {path["path_id"]: path for path in fixture["paths"]}
+          for case in response_fixture["cases"]:
+              path = path_map[case["sequence_path_id"]]
+              final_pulse_time = max(
+                  [pulse["application_time"] for pulse in path["pulses"]],
+                  default=0.0,
+              )
+              assert case["observation_end_time"] == path["observation_end_time"]
+              for signature_name in ("reference_signature", "candidate_signature"):
+                  signature = case[signature_name]
+                  assert signature["contract_id"]
+                  assert signature["qoi_ids"] and len(signature["qoi_ids"]) == len(signature["qoi_scales"])
+                  assert all(scale > 0 for scale in signature["qoi_scales"])
+                  assert signature["time_samples"] == sorted(signature["time_samples"])
+                  assert all(final_pulse_time <= time <= case["observation_end_time"] for time in signature["time_samples"])
+                  expected_entries = len(signature["qoi_ids"]) * len(signature["time_samples"])
+                  assert len(signature["responses"]) == expected_entries
+                  assert len(signature["branch_ids"]) == expected_entries
+          assert response_fixture["claim_boundary"]["no_solver_run"] is True
+          assert response_fixture["claim_boundary"]["no_echo_measured"] is True
+          print("kinetic_path_response_dispositions_validation=PASS")
+
+          ledger_schema = json.loads((root / "operation-ledger-v0.1.schema.json").read_text())
+          ledger_fixture = json.loads((root / "fixtures/operation-ledger-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(ledger_schema)
+          ledger_validator = Draft202012Validator(ledger_schema)
+          ledger_validator.validate(ledger_fixture)
+          assert len(ledger_fixture["ledgers"]) == 2
+          for ledger in ledger_fixture["ledgers"]:
+              times = [event["application_time"] for event in ledger["events"]]
+              assert times == sorted(times)
+              assert all(0 <= time <= ledger["maximum_time"] for time in times)
+              assert len({event["event_id"] for event in ledger["events"]}) == len(ledger["events"])
+              for event in ledger["events"]:
+                  if event["operation_class"] == "physical_collision":
+                      assert ledger["physical_model"] != "collisionless_vlasov"
+                      assert event["physical_entropy_sign_convention"] == "boltzmann_entropy_increase"
+                      assert "physical_entropy_production" in event
+                      assert "numerical_entropy_delta" not in event
+                      assert "discarded_effect_measure" not in event
+                  else:
+                      assert "physical_entropy_production" not in event
+                      assert "physical_entropy_sign_convention" not in event
+                  if event["declared_reversible"]:
+                      assert event.get("discarded_effect_measure", 0) == 0
+          invalid_collisionless = json.loads(json.dumps(ledger_fixture))
+          invalid_collisionless["ledgers"][0]["events"].append(
+              json.loads(json.dumps(ledger_fixture["ledgers"][1]["events"][0]))
+          )
+          assert not ledger_validator.is_valid(invalid_collisionless)
+          invalid_numerical = json.loads(json.dumps(ledger_fixture))
+          invalid_numerical["ledgers"][0]["events"][0]["physical_entropy_measure_id"] = "physical-entropy"
+          invalid_numerical["ledgers"][0]["events"][0]["physical_entropy_sign_convention"] = "boltzmann_entropy_increase"
+          invalid_numerical["ledgers"][0]["events"][0]["physical_entropy_production"] = 0.02
+          assert not ledger_validator.is_valid(invalid_numerical)
+          invalid_collisionless = json.loads(json.dumps(ledger_fixture))
+          invalid_collisionless["ledgers"][0]["events"].append(
+              json.loads(json.dumps(ledger_fixture["ledgers"][1]["events"][0]))
+          )
+          assert not ledger_validator.is_valid(invalid_collisionless)
+          print("kinetic_operation_ledger_validation=PASS")
+          PY
+
+      - name: Validate fixed-domain particle W1 schema and known answers
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/measure-stability")
+          schema = json.loads((root / "particle-measure-w1-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/particle-measure-w1-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["domain"]["topology"] == "interval"
+          assert fixture["domain"]["maximum"] > fixture["domain"]["minimum"]
+          assert fixture["metric"]["id"] == "wasserstein_1_interval_1d"
+          cases = {case["case_id"]: case for case in fixture["cases"]}
+          assert len(cases) == 4
+          assert cases["permutation-is-the-same-measure"]["expected_w1"] == 0.0
+          assert cases["co-located-split-merge-is-the-same-measure"]["expected_w1"] == 0.0
+          assert cases["particle-count-change-preserves-weighted-measure"]["expected_w1"] == 0.0
+          assert abs(cases["move-one-quarter-of-mass-by-one-tenth"]["expected_w1"] - 0.025) < 1e-15
+          for case in fixture["cases"]:
+              assert len(case["left"]["positions"]) == len(case["left"]["weights"])
+              assert len(case["right"]["positions"]) == len(case["right"]["weights"])
+              assert all(weight >= 0 for weight in case["left"]["weights"] + case["right"]["weights"])
+              assert abs(sum(case["left"]["weights"]) - 1.0) < 1e-12
+              assert abs(sum(case["right"]["weights"]) - 1.0) < 1e-12
+          assert fixture["claim_boundary"]["not_a_global_stability_certificate"] is True
+          print("particle_measure_w1_schema_validation=PASS")
+
+          torus_schema = json.loads((root / "particle-measure-torus-w1-v0.1.schema.json").read_text())
+          torus_fixture = json.loads((root / "fixtures/particle-measure-torus-w1-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(torus_schema)
+          Draft202012Validator(torus_schema).validate(torus_fixture)
+          assert torus_fixture["domain"]["topology"] == "torus"
+          assert torus_fixture["metric"]["id"] == "wasserstein_1_circle_1d"
+          torus_cases = {case["case_id"]: case for case in torus_fixture["cases"]}
+          assert torus_cases["periodic-endpoints-are-identified"]["expected_w1"] == 0.0
+          assert abs(torus_cases["shortest-geodesic-crosses-coordinate-seam"]["expected_w1"] - 0.1) < 1e-15
+          assert abs(torus_cases["common-periodic-translation-preserves-distance"]["expected_w1"] - 0.1) < 1e-15
+          assert abs(torus_cases["geodesic-distance-scales-with-physical-period"]["expected_w1"] - 1.5) < 1e-15
+          assert torus_fixture["claim_boundary"]["not_a_global_field_stability_certificate"] is True
+          print("particle_measure_torus_w1_schema_validation=PASS")
+          PY
+
+      - name: Validate intervention-equivalent kinetic state fixture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/state-equivalence")
+          schema = json.loads((root / "kinetic-response-signature-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/nontransitive-response-triple-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          comparisons = {
+              (item["left"], item["right"]): item
+              for item in fixture["expected_pairwise_comparisons"]
+          }
+          assert comparisons[("A", "B")]["normalized_rms_distance"] == 0.75
+          assert comparisons[("A", "B")]["maximum_normalized_entry_error"] == 0.75
+          assert comparisons[("A", "B")]["pairwise_compatible"] is True
+          assert comparisons[("B", "C")]["pairwise_compatible"] is True
+          assert comparisons[("A", "C")]["normalized_rms_distance"] == 1.5
+          assert comparisons[("A", "C")]["maximum_normalized_entry_error"] == 1.5
+          assert comparisons[("A", "C")]["pairwise_compatible"] is False
+          assert all(len(state["signature"]["qoi_scales"]) == len(state["signature"]["qoi_ids"]) for state in fixture["states"])
+          audit = fixture["expected_finite_class_audit"]
+          assert audit["compared_pair_count"] == 3
+          assert audit["compatible_pair_count"] == 2
+          assert audit["incompatible_pair_count"] == 1
+          assert audit["complete_response_coverage"] is True
+          assert audit["stable_branch_association"] is True
+          assert audit["within_finite_class_diameter"] is False
+          assert fixture["claim_boundary"]["approximate_pairwise_compatibility_is_not_transitive"] is True
+          assert fixture["claim_boundary"]["finite_cluster_requires_all_pairwise_comparisons"] is True
+          print("intervention_equivalent_state_schema_validation=PASS")
+          PY
+
+      - name: Validate kinetic state discrimination EIG schema and fixtures
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/kinetic-discrimination")
+          schema = json.loads((root / "complex-response-eig-design-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/complex-response-eig-known-answers-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          cases = {case["case_id"]: case for case in fixture["cases"]}
+          assert len(cases) == 4
+          assert cases["identical-predictions-zero-information"]["expected_information_gain_max_bits"] == 1e-12
+          assert cases["phase-only-separation"]["expected_information_gain_min_bits"] > 0.9
+          assert cases["high-noise-blurs-hypotheses"]["expected_information_gain_max_bits"] < 0.25
+          for case in fixture["cases"]:
+              assert all(h["branch_association_stable"] is True and h["response_branch_id"] for h in case["hypotheses"])
+          portfolio = fixture["portfolios"][0]
+          assert len(portfolio["candidate_designs"]) == 4
+          assert portfolio["expected_pareto_front_ids"] == ["weak-low-cost", "strong-low-cost"]
+          assert portfolio["expected_best_ratio_id"] == "strong-low-cost"
+          for candidate in portfolio["candidate_designs"]:
+              assert all(h["branch_association_stable"] is True and h["response_branch_id"] for h in candidate["hypotheses"])
+          assert fixture["claim_boundary"]["no_kinetic_forward_model_evaluated"] is True
+          print("kinetic_discrimination_eig_schema_validation=PASS")
+          PY
+
+      - name: Validate high-field VPFP micro-macro scaling schema and fixture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/micro-macro")
+          schema = json.loads((root / "micro-macro-scaling-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-micro-macro-contract-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["cohort"]["equation_id"] == "high_field_vlasov_poisson_fokker_planck"
+          assert fixture["macro_contract"]["retained_full_order"] is True
+          assert fixture["claim_boundary"]["asymptotic_preservation_claimed"] is False
+          print("micro_macro_schema_validation=PASS")
+          PY
+
+      - name: Validate multi-rate sensor and actuator interface schema
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/control-interface")
+          schema = json.loads((root / "sensor-actuator-timing-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-multirate-interface-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["controller"]["full_state_access"] is False
+          assert fixture["claim_boundary"]["stability_claimed"] is False
+          assert len(fixture["diagnostics"]) == 2
+          assert len(fixture["actuators"]) == 1
+          print("sensor_actuator_interface_schema_validation=PASS")
+          PY
+
+      - name: Validate response-aware adaptive refinement schema and known-answer cases
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/adaptive-refinement")
+          schema = json.loads((root / "refinement-policy-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-refinement-cases-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert len(fixture["cases"]) == 10
+          assert any(case["case_id"] == "late-response-arrives-after-refinement-deadline" and case["expected_qualification"] == "UnknownResponse" for case in fixture["cases"])
+          assert any(case["case_id"] == "unstable-response-branch-is-unknown" and case["expected_qualification"] == "UnknownResponse" for case in fixture["cases"])
+          paired = [case for case in fixture["cases"] if case.get("matched_pair_id") == "same-tail-different-response-risk"]
+          assert len(paired) == 2
+          assert paired[0]["spectral_tail_measure"] == paired[1]["spectral_tail_measure"]
+          assert paired[0]["response_risk_upper_bound"] < fixture["thresholds"]["response_risk_threshold"]
+          assert paired[1]["response_risk_upper_bound"] >= fixture["thresholds"]["response_risk_threshold"]
+          assert paired[0]["expected_decision"] == "Hold" and paired[1]["expected_decision"] == "Refine"
+          assert fixture["claim_boundary"]["spectral_solver_evaluated"] is False
+          print("adaptive_refinement_schema_validation=PASS")
+
+          probe_root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/adversarial-probes")
+          probe_schema = json.loads((probe_root / "response-weighted-refinement-v0.1.schema.json").read_text())
+          probe_fixture = json.loads((probe_root / "fixtures/response-weighted-refinement-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(probe_schema)
+          Draft202012Validator(probe_schema).validate(probe_fixture)
+          expected = {item["mode"]: item for item in probe_fixture["expected"]["decisions"]}
+          assert expected[1]["spectral_energy"] > expected[2]["spectral_energy"]
+          assert expected[1]["response_loss_bound"] < expected[2]["response_loss_bound"]
+          assert expected[1]["disposition"] == "discarded_within_budget"
+          assert expected[2]["disposition"] == "retained_budget_exceeded"
+          assert probe_fixture["claim_boundary"]["no_physical_solver_run"] is True
+          print("response_weighted_refinement_schema_validation=PASS")
+          PY
+
+      - name: Validate positivity-preserving mass projection schema and known answer
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/positivity-projection")
+          schema = json.loads((root / "positive-mass-projection-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/negative-spectral-overshoot-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert len(fixture["input_values"]) == len(fixture["cell_volumes"])
+          assert len(fixture["expected"]["projected_values"]) == len(fixture["input_values"])
+          assert min(fixture["input_values"]) < 0.0
+          assert min(fixture["expected"]["projected_values"]) >= 0.0
+          achieved = sum(v * x for v, x in zip(fixture["cell_volumes"], fixture["expected"]["projected_values"]))
+          assert abs(achieved - fixture["target_mass"]) < 1e-12
+          assert fixture["claim_boundary"]["mass_constraint_only"] is True
+          assert fixture["claim_boundary"]["does_not_claim_momentum_or_energy"] is True
+          print("positive_mass_projection_schema_validation=PASS")
+          PY
+
+      - name: Run positive mass projection audit fixture
+        run: |
+          manifest="${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml"
+          fixture="${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/positivity-projection/fixtures/negative-spectral-overshoot-known-answer-v0.1.json"
+          cargo run --locked --manifest-path "$manifest" --bin positive_mass_projection_audit -- "$fixture"
+
+      - name: Validate small positivity response QP schema and KKT known answer
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/positivity-projection")
+          schema = json.loads((root / "small-positive-response-qp-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/three-cell-positive-response-qp-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          expected = fixture["expected"]
+          assert expected["projected_values"] == [0.1, 0.4, 0.5]
+          assert abs(sum(f*v for f, v in zip(expected["projected_values"], fixture["cell_volumes"])) - fixture["target_mass"]) < 1e-12
+          assert abs(sum(f*c for f, c in zip(expected["projected_values"], fixture["response_coefficients"])) - fixture["target_response"]) < 1e-12
+          assert expected["maximum_primal_violation"] < 1e-12
+          assert expected["maximum_dual_violation"] < 1e-12
+          assert expected["maximum_stationarity_residual"] < 1e-12
+          assert expected["maximum_complementarity_residual"] < 1e-12
+          assert fixture["claim_boundary"]["not_a_general_multi_constraint_solver"] is True
+          print("small_positive_response_qp_schema_validation=PASS")
+          PY
+
+      - name: Run small positivity response QP audit fixture
+        run: |
+          manifest="${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml"
+          fixture="${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/positivity-projection/fixtures/three-cell-positive-response-qp-known-answer-v0.1.json"
+          cargo run --locked --manifest-path "$manifest" --bin small_positive_response_qp_audit -- "$fixture"
+
+      - name: Run sensor/actuator timing semantic audit
+        run: cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin sensor_actuator_contract_audit -- "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/control-interface/fixtures/synthetic-multirate-interface-v0.1.json"
+
+      - name: Run KIRD semantic audit fixtures
+        run: |
+          manifest="${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml"
+          fixture_root="${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/rate-distortion/fixtures"
+          cargo run --locked --manifest-path "$manifest" --bin kird_point_audit -- "$fixture_root/synthetic-kird-point-v0.1.json"
+          cargo run --locked --manifest-path "$manifest" --bin kird_point_audit -- "$fixture_root/synthetic-kird-certified-cover-v0.1.json"
+
+      - name: Run response-weighted refinement audit fixture
+        run: |
+          manifest="${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml"
+          fixture="${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/adversarial-probes/fixtures/response-weighted-refinement-known-answer-v0.1.json"
+          cargo run --locked --manifest-path "$manifest" --bin response_weighted_refinement_audit -- "$fixture"
+
+      - name: Validate instability-referenced sensor-actuator timing contract
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/control-interface")
+          schema = json.loads((root / "sensor-actuator-timing-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-multirate-interface-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema)
+          validator.validate(fixture)
+          assert fixture["controller"]["target_instability_frequency_hz"] == 5.0
+          assert fixture["controller"]["target_instability_efold_time_seconds"] == 0.1
+          assert all("bandwidth_hz" in item for item in fixture["diagnostics"])
+          invalid = copy.deepcopy(fixture)
+          invalid["controller"]["target_instability_frequency_hz"] = 0.0
+          assert not validator.is_valid(invalid)
+          invalid = copy.deepcopy(fixture)
+          del invalid["diagnostics"][0]["bandwidth_hz"]
+          assert not validator.is_valid(invalid)
+          print("sensor_actuator_timescale_schema_validation=PASS")
+          PY
+
+      - name: Run sensor-actuator timing semantic audit
+        run: |
+          manifest="${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml"
+          fixture="${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/control-interface/fixtures/synthetic-multirate-interface-v0.1.json"
+          cargo run --locked --manifest-path "$manifest" --bin sensor_actuator_contract_audit -- "$fixture"
+
+      - name: Validate scalar unstable-mode authority Draft 2020-12 contract
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/control-interface")
+          schema = json.loads((root / "scalar-unstable-mode-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/scalar-unstable-mode-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          known = fixture["known_answers"]
+          assert known["observation_sample_count"] == 5
+          assert known["actuator_command_count"] == 5
+          assert abs(known["observability_fisher_information"] - 2082.4542913757846) < 1e-9
+          assert abs(known["controllability_gramian"] - 1.3015339321098656) < 1e-12
+          assert known["minimum_required_observability_fisher_information"] == 1000.0
+          assert known["minimum_required_controllability_gramian"] == 1.0
+          assert fixture["controller"]["minimum_observability_fisher_information"] == 1000.0
+          assert fixture["controller"]["minimum_controllability_gramian"] == 1.0
+          assert known["mode_interface_qualified"] is True
+          assert fixture["claim_boundary"]["no_closed_loop_stability_claim"] is True
+          print("scalar_unstable_mode_schema_validation=PASS")
+          PY
+
+      - name: Validate phase-aware oscillatory unstable-mode schema and known answers
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/control-interface")
+          schema = json.loads((root / "oscillatory-unstable-mode-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/oscillatory-unstable-mode-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          known = fixture["known_answers"]
+          assert known["observation_sample_count"] == 5
+          assert known["actuator_command_count"] == 5
+          assert known["observability_min_eigenvalue"] > fixture["controller"]["minimum_observability_min_eigenvalue"]
+          assert known["controllability_min_eigenvalue"] > fixture["controller"]["minimum_controllability_min_eigenvalue"]
+          assert fixture["claim_boundary"]["no_closed_loop_stability_claim"] is True
+          print("oscillatory_unstable_mode_schema_validation=PASS")
+          PY
+
+      - name: Validate coupled unstable-mode authority schema and known answers
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/control-interface")
+          schema = json.loads((root / "coupled-unstable-mode-authority-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/coupled-unstable-mode-authority-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          cases = {case["case_id"]: case for case in fixture["cases"]}
+          positive = cases["positive-distinct-growth-two-channel-diagnostic-one-actuator"]["expected"]
+          sensor = cases["negative-collinear-diagnostics-after-delay"]["expected"]
+          actuator = cases["negative-rank-one-actuator-on-repeated-unstable-eigenspace"]["expected"]
+          assert positive["observable"] and positive["controllable"] and positive["authority_qualified"]
+          assert not sensor["observable"] and sensor["controllable"] and not sensor["authority_qualified"]
+          assert actuator["observable"] and not actuator["controllable"] and not actuator["authority_qualified"]
+          assert fixture["claim_boundary"]["no_closed_loop_stability_claim"] is True
+          print("coupled_mode_authority_schema_validation=PASS")
+          PY
+
+      - name: Validate response-balanced K-RESP-1 experiment contract
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced")
+          schema = json.loads((root / "response-balanced-experiment-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-kresp1-experiment-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema)
+          validator.validate(fixture)
+
+          cohort = fixture["cohort"]
+          checkpoint = fixture["frozen_checkpoint"]
+          pulse_family = fixture["pulse_family"]
+          split = fixture["split"]
+          horizon = fixture["prediction_horizon"]
+          assert cohort["spatial_domain"]["maximum"] > cohort["spatial_domain"]["minimum"]
+          assert cohort["velocity_domain"]["maximum"] > cohort["velocity_domain"]["minimum"]
+          assert cohort["state_metric_id"].strip()
+          assert cohort["state_coordinate_id"].strip()
+          linearization = fixture["linearization_contract"]
+          assert linearization["status"] == "synthetic_derivatives_not_computed"
+          assert linearization["derivative_source"] == "not_computed_synthetic"
+          assert linearization["future_solver_transition_jacobians_required"] is True
+          assert linearization["pulse_map_state_jacobian_required"] is True
+          assert linearization["pulse_map_parameter_jacobian_required"] is True
+          assert linearization["split_solver_composition_order_required"] is True
+          assert linearization["independent_finite_difference_cross_check_required"] is True
+          assert linearization["branch_change_disposition"] == "UNKNOWN_OR_HANDOFF"
+          assert linearization["pulse_application_time_jacobian_required"] is True
+          assert linearization["pulse_time_finite_difference_cross_check_required"] is True
+          assert linearization["pulse_time_sensitivity_convention"] == "scheduled_reset_D_R_f_minus_plus_R_t_minus_f_plus"
+          assert linearization["pulse_time_sensitivity_status"] == "synthetic_not_computed"
+          assert linearization["distribution_pulse_pullback_required"] is True
+          assert linearization["distribution_pulse_remap_mass_ledger_required"] is True
+          assert linearization["distribution_pulse_pullback_status"] == "first_order_piecewise_constant_module_only"
+          assert linearization["distribution_pulse_remap_jacobian_status"] == "fixed_topology_piecewise_constant_analytic_module_only"
+          assert linearization["distribution_pulse_remap_jacobian_finite_difference_required"] is True
+          assert linearization["distribution_pulse_remap_topology_change_disposition"] == "UNKNOWN_OR_HANDOFF"
+          assert linearization["distribution_pulse_boundary_outflow_disposition"] == "UNQUALIFIED_UNLESS_GRID_CONVERGENCE_OR_EXPLICIT_BOUNDARY_ERROR"
+          assert linearization["distribution_pulse_boundary_outflow_jacobian_required"] is True
+          assert linearization["distribution_pulse_boundary_outflow_finite_difference_required"] is True
+          assert linearization["distribution_pulse_boundary_outflow_jacobian_status"] == "fixed_topology_piecewise_constant_analytic_module_only"
+          assert linearization["distribution_pulse_spatial_integral_weights_required"] is True
+          assert linearization["distribution_pulse_unweighted_total_mass_interpretation"] == "unit_weight_row_sum_not_general_spatial_integral"
+          assert linearization["distribution_pulse_weighted_quadrature_api_status"] == "positive_spatial_weight_api_implemented_module_only"
+          assert horizon["start_time"] == checkpoint["time"]
+          assert checkpoint["first_pulse_applied"] is True
+          assert checkpoint["second_pulse_not_yet_applied"] is True
+          assert horizon["end_time"] <= cohort["maximum_time"]
+          assert pulse_family["maximum_application_time"] <= cohort["maximum_time"]
+
+          split_groups = {
+              "training": split["training"],
+              "validation": split["validation"],
+              "held_out": split["held_out"],
+          }
+          all_trial_ids = []
+          all_pulse_ids = []
+          for group_name, trials in split_groups.items():
+              for trial in trials:
+                  all_trial_ids.append(trial["trial_id"])
+                  assert len(trial["pulses"]) == 2, f"{group_name}/{trial['trial_id']}: K-RESP-1 requires exactly two pulses"
+                  times = [pulse["application_time"] for pulse in trial["pulses"]]
+                  assert times == sorted(times), f"{group_name}/{trial['trial_id']}: pulses must be time ordered"
+                  assert times[0] < checkpoint["time"] < times[1], f"{group_name}/{trial['trial_id']}: checkpoint must lie after pulse one and before pulse two"
+                  assert len({pulse["pulse_id"] for pulse in trial["pulses"]}) == len(trial["pulses"])
+                  for pulse in trial["pulses"]:
+                      all_pulse_ids.append(pulse["pulse_id"])
+                      assert pulse_family["allowed_spatial_mode"]["minimum"] <= pulse["spatial_mode"] <= pulse_family["allowed_spatial_mode"]["maximum"]
+                      assert pulse_family["allowed_kick_amplitude"]["minimum"] <= pulse["kick_amplitude"] <= pulse_family["allowed_kick_amplitude"]["maximum"]
+                      assert pulse_family["allowed_phase_rad"]["minimum"] <= pulse["phase_rad"] <= pulse_family["allowed_phase_rad"]["maximum"]
+                      assert pulse["application_time"] <= pulse_family["maximum_application_time"]
+                      assert pulse["application_time"] < horizon["end_time"]
+
+          assert len(all_trial_ids) == len(set(all_trial_ids)), "trial ids leak or duplicate across splits"
+          assert len(all_pulse_ids) == len(set(all_pulse_ids)), "pulse ids must be globally unique"
+
+          all_trials = [trial for trials in split_groups.values() for trial in trials]
+          first_pulse_signatures = {
+              (
+                  trial["pulses"][0]["spatial_mode"],
+                  trial["pulses"][0]["kick_amplitude"],
+                  trial["pulses"][0]["phase_rad"],
+                  trial["pulses"][0]["application_time"],
+              )
+              for trial in all_trials
+          }
+          assert len(first_pulse_signatures) == 1, "all paths must share the same first pulse/checkpoint history"
+
+          training_pulses = [trial["pulses"][1] for trial in split["training"]]
+          held_out_pulses = [trial["pulses"][1] for trial in split["held_out"]]
+          training_phases = {pulse["phase_rad"] for pulse in training_pulses}
+          training_amplitudes = {pulse["kick_amplitude"] for pulse in training_pulses}
+          training_modes = {pulse["spatial_mode"] for pulse in training_pulses}
+          training_separations = {
+              trial["pulses"][1]["application_time"] - trial["pulses"][0]["application_time"]
+              for trial in split["training"] if len(trial["pulses"]) == 2
+          }
+          assert any(pulse["phase_rad"] not in training_phases for pulse in held_out_pulses)
+          assert any(pulse["kick_amplitude"] not in training_amplitudes for pulse in held_out_pulses)
+          assert any(pulse["spatial_mode"] not in training_modes for pulse in held_out_pulses)
+          held_out_separations = {
+              trial["pulses"][1]["application_time"] - trial["pulses"][0]["application_time"]
+              for trial in split["held_out"] if len(trial["pulses"]) == 2
+          }
+          assert any(separation not in training_separations for separation in held_out_separations)
+
+          qoi_ids = {item["qoi_id"] for item in fixture["observables"]}
+          assert len(qoi_ids) == len(fixture["observables"])
+          assert set(fixture["reference_convergence"]["convergence_observables"]).issubset(qoi_ids)
+          required_comparators = {
+              "snapshot_pod", "padovan_nonintrusive_balancing", "time_windowed_pod",
+              "energy_windowed_pod", "conservative_fluid_kinetic_rom", "adaptive_hermite",
+              "adaptive_fourier", "tensor_network_vlasov_poisson",
+              "non_markovian_fno_closure", "full_order_reference"
+          }
+          assert required_comparators.issubset(set(fixture["comparators"]))
+          required_adjacent_methods = {
+              "adaptive_opinf_port", "adaptive_nitrom_port",
+              "adaptive_opinf_nitrom_hybrid_port", "symmetry_augmented_kinetic_closure",
+              "entropy_based_vlasov_poisson_dougherty_moment_port",
+              "adaptive_symplectic_particle_vlasov_rom_port",
+              "goal_oriented_dwr_hyperreduction_port",
+              "balanced_truncation_a_posteriori_bound_port"
+          }
+          assert required_adjacent_methods.issubset(set(fixture["adjacent_methods"]))
+          assert set(fixture["methodological_prior_art"]) == {
+              "semi_infinite_worst_case_scenario_generation",
+              "adaptive_symplectic_particle_vlasov_rom",
+              "dual_weighted_residual_goal_oriented_sampling",
+              "balanced_truncation_a_posteriori_error_bound"
+          }
+          assert set(fixture["resource_budget"]["comparison_modes"]) == {
+              "equal_rank", "equal_stored_bytes", "equal_end_to_end_wall_time"
+          }
+          assert fixture["success_targets"]["status"] == "prospective_only_not_achieved"
+          assert fixture["success_targets"]["all_targets_are_prospective"] is True
+          response_qualification = fixture["response_qualification"]
+          assert response_qualification["checkpoint_state_residual_required"] is True
+          assert response_qualification["future_pulse_injection_residual_required"] is True
+          assert response_qualification["nonlinear_full_order_response_required"] is True
+          assert set(response_qualification["risk_summary_metrics"]) == {"weighted_mean", "worst_case", "cvar"}
+          assert response_qualification["cvar_alpha"] == 0.9
+          assert response_qualification["residual_threshold_status"] == "calibrate_on_independently_converged_physical_reference"
+          scalar_search = response_qualification["scalar_separation_oracle"]
+          assert scalar_search["status"] == "design_only_not_executed"
+          assert scalar_search["method"] == "branch_conditioned_lipschitz_branch_and_bound_1d"
+          assert set(scalar_search["continuous_parameter_axes"]) == {
+              "pulse_phase", "kick_amplitude", "pulse_separation"
+          }
+          assert scalar_search["interior_search_required"] is True
+          assert scalar_search["boundary_only_search_sufficient"] is False
+          assert scalar_search["lipschitz_certificate_status"] == "not_issued_synthetic"
+          assert scalar_search["branch_stability_evidence_status"] == "not_issued_synthetic"
+          assert scalar_search["budget_exhaustion_disposition"] == "unqualified"
+          assert scalar_search["global_bound_claim_status"] == "conditional_on_valid_lipschitz_and_branch_evidence"
+          assert scalar_search["full_order_confirmation_required"] is True
+          assert scalar_search["objective_sample_error_interval_required"] is True
+          assert scalar_search["sample_interval_semantics"] == "max_zero_value_minus_abs_error_to_value_plus_error"
+          assert scalar_search["physical_sample_error_bound_status"] == "not_issued_synthetic"
+          assert scalar_search["convergence_flag_alone_means_zero_error"] is False
+          joint_search = response_qualification["joint_box_oracle"]
+          assert joint_search["status"] == "design_only_not_executed"
+          assert joint_search["method"] == "anisotropic_lipschitz_branch_and_bound_nd"
+          assert set(joint_search["continuous_parameter_axes"]) == {
+              "pulse_phase", "kick_amplitude", "pulse_separation"
+          }
+          assert joint_search["coordinate_lipschitz_semantics"] == "sum_i_L_i_abs_coordinate_delta_i"
+          assert joint_search["subdivision_policy"] == "largest_Li_times_half_width"
+          assert joint_search["interior_search_required"] is True
+          assert joint_search["boundary_only_search_sufficient"] is False
+          assert joint_search["lipschitz_certificate_status"] == "not_issued_synthetic"
+          assert joint_search["branch_stability_evidence_status"] == "not_issued_synthetic"
+          assert joint_search["budget_exhaustion_disposition"] == "unqualified"
+          assert joint_search["global_bound_claim_status"] == "conditional_on_valid_box_lipschitz_and_branch_evidence"
+          assert joint_search["full_order_confirmation_required"] is True
+          assert joint_search["objective_normalization"] == "declared_qoi_scale_and_fixed_positive_floor"
+          assert joint_search["reference_response_denominator_lower_bound_required"] is True
+          assert joint_search["objective_sample_error_interval_required"] is True
+          assert joint_search["sample_interval_semantics"] == "max_zero_value_minus_abs_error_to_value_plus_error"
+          assert joint_search["physical_sample_error_bound_status"] == "not_issued_synthetic"
+          assert joint_search["convergence_flag_alone_means_zero_error"] is False
+          assert fixture["claim_boundary"] == {
+              "physical_solver_executed": False,
+              "physical_response_measured": False,
+              "competitive_ranking_claimed": False,
+              "independent_reference_converged": False
+          }
+          print("response_balanced_kresp1_schema_validation=PASS")
+          print("response_balanced_split_and_coverage_validation=PASS")
+          print("response_balanced_claim_boundary_validation=PASS")
+          PY
+
+      - name: Validate separate collisional K-RESP-C contract
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-c-collisional")
+          schema = json.loads((root / "kresp-c-vpd-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-vpd-drive-cohorts-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+
+          assert fixture["equation"] == "periodic_1d1v_vlasov_poisson_dougherty"
+          assert fixture["benchmark_id"] == "KRESP-C-VPD-1D1V"
+          assert fixture["collision_model"]["invariants"] == ["mass", "momentum", "kinetic_energy"]
+          assert fixture["structure_contract"]["fallback_on_structure_failure"] == "full_order_collision_step"
+          cohorts = fixture["trajectory_cohorts"]
+          assert len({cohort["independent_initial_state_digest"] for cohort in cohorts}) == len(cohorts)
+          assert {cohort["split_role"] for cohort in cohorts} == {"training", "validation", "sealed_holdout"}
+          assert sum(cohort["split_role"] == "training" for cohort in cohorts) == 4
+          assert sum(cohort["split_role"] == "validation" for cohort in cohorts) == 2
+          assert sum(cohort["split_role"] == "sealed_holdout" for cohort in cohorts) == 3
+          assert {cohort["kind"] for cohort in cohorts if cohort["split_role"] == "sealed_holdout"} == {
+              "two_stream_relaxation", "sustained_heating", "drive_switching"
+          }
+          for cohort in cohorts:
+              assert cohort["collision_frequency"] > 0
+              assert cohort["end_time"] > 0
+              schedule = sorted(cohort["external_drive_schedule"], key=lambda segment: segment["start_time"])
+              assert schedule[0]["start_time"] == 0
+              assert schedule[-1]["end_time"] == cohort["end_time"]
+              assert all(left["end_time"] == right["start_time"] for left, right in zip(schedule, schedule[1:]))
+          drive_switch = next(item for item in cohorts if item["kind"] == "drive_switching")
+          assert [(x["start_time"], x["end_time"], x["amplitude"]) for x in drive_switch["external_drive_schedule"]] == [
+              (0, 4, 0.7), (4, 8, -0.7), (8, 12, 0)
+          ]
+          prior = fixture["published_prior_art_reference"]
+          assert prior["status"] == "literature_claim_not_reproduced_here"
+          assert prior["variables_per_cell"] == 13
+          assert prior["reported_speedup_min"] == 1.36 and prior["reported_speedup_max"] == 2.89
+          assert prior["reference_grid_transport_retained"] is True
+          assert fixture["claim_boundary"] == {
+              "physical_solver_executed": False,
+              "physical_trajectory_measured": False,
+              "entropy_guarantee_proved_for_this_implementation": False,
+              "competitive_result_reproduced": False
+          }
+          print("response_balanced_kresp_c_schema_validation=PASS")
+          print("response_balanced_kresp_c_cohort_and_structure_validation=PASS")
+          print("response_balanced_kresp_c_claim_boundary_validation=PASS")
+          PY
+
+      - name: Validate separate Coulomb Vlasov-Poisson-Landau K-RESP-CL contract
+        run: |
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb")
+          schema = json.loads((root / "kresp-cl-vpl-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-vpl-echo-growth-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+
+          assert fixture["equation"] == "vlasov_poisson_landau_coulomb"
+          assert fixture["collision_operator"] == "landau_coulomb"
+          assert fixture["benchmark_id"] == "KRESP-CL-VPL-3D3V"
+          assert fixture["domain"]["velocity_dimension"] == 3
+          assert len(fixture["domain"]["spatial_domain_lengths"]) == 3
+          assert all(length > 0 for length in fixture["domain"]["spatial_domain_lengths"])
+          assert fixture["prior_art"]["arxiv_id"] == "2611.20080"
+          assert fixture["prior_art"]["status"] == "literature_claim_not_reproduced_here"
+          scaling = fixture["perturbation_scaling"]
+          assert scaling["formula"] == "epsilon=c*nu^(1/3)*(log(1/nu))^p"
+          assert scaling["p_values_are_exploratory_not_source_theorem_constants"] is True
+          assert scaling["observation_horizon_fraction_of_nu_minus_one_third"] <= 1.0
+          assert scaling["maximum_initial_perturbation_amplitude"] == 0.1
+
+          groups = fixture["trajectory_cohorts"]
+          assert (len(groups["training"]), len(groups["validation"]), len(groups["sealed_holdout"])) == (3, 2, 3)
+          all_trajectories = groups["training"] + groups["validation"] + groups["sealed_holdout"]
+          assert len({item["trajectory_id"] for item in all_trajectories}) == len(all_trajectories)
+          assert len({item["initial_state_sha256"] for item in all_trajectories}) == len(all_trajectories)
+          assert {item["split_role"] for item in all_trajectories} == {"training", "validation", "sealed_holdout"}
+          for item in all_trajectories:
+              nu = item["collision_parameter_nu"]
+              c = item["prefactor_c"]
+              p = item["log_power_p"]
+              expected = c * nu ** (1.0 / 3.0) * math.log(1.0 / nu) ** p
+              assert math.isclose(item["computed_initial_perturbation_amplitude"], expected, rel_tol=1e-13, abs_tol=1e-15)
+              assert item["computed_initial_perturbation_amplitude"] <= scaling["maximum_initial_perturbation_amplitude"]
+              assert item["observation_horizon_fraction_of_nu_minus_one_third"] == scaling["observation_horizon_fraction_of_nu_minus_one_third"]
+              assert len(item["initial_spatial_modes"]) >= 2
+              assert all(len(mode) == 3 and any(component != 0 for component in mode) for mode in item["initial_spatial_modes"])
+              assert item["forward_initialization"] is True
+          assert fixture["reference_convergence"]["all_reference_trajectories_forward_integrated"] is True
+          assert fixture["claim_boundary"] == {
+              "physical_solver_executed": False,
+              "physical_echo_growth_measured": False,
+              "reference_converged": False,
+              "stability_theorem_proved_for_this_implementation": False,
+              "competitive_result_reproduced": False
+          }
+          print("kresp_cl_vpl_schema_validation=PASS")
+          print("kresp_cl_vpl_scaling_and_split_validation=PASS")
+          print("kresp_cl_vpl_forward_time_and_claim_boundary_validation=PASS")
+          PY
+
+      - name: Run Rust K-RESP-CL semantic contract auditor
+        run: |
+          cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin vpl_echo_contract_audit -- \
+            "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
+
+      - name: Challenge Rust K-RESP-CL auditor with negative controls
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation")
+          fixture_path = root / "benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
+          fixture = json.loads(fixture_path.read_text())
+          binaries = list(root.glob("**/debug/vpl_echo_contract_audit"))
+          assert binaries, "compiled K-RESP-CL auditor binary was not found"
+          binary = binaries[0]
+
+          def expect_rejection(name, mutate):
+              invalid = copy.deepcopy(fixture)
+              mutate(invalid)
+              with tempfile.TemporaryDirectory(prefix="kresp-cl-negative-") as directory:
+                  path = Path(directory) / (name + ".json")
+                  path.write_text(json.dumps(invalid, sort_keys=True))
+                  result = subprocess.run([str(binary), str(path)], capture_output=True, text=True)
+              assert result.returncode != 0, f"K-RESP-CL auditor accepted {name}: {result.stdout} {result.stderr}"
+              print(f"kresp_cl_negative_control_{name}=PASS")
+
+          expect_rejection("wrong-collision-operator", lambda value: value.__setitem__("collision_operator", "dougherty"))
+          expect_rejection("wrong-amplitude-scaling", lambda value: value["trajectory_cohorts"]["training"][0].__setitem__("computed_initial_perturbation_amplitude", 0.0))
+          expect_rejection("sealed-holdout-leak", lambda value: value["trajectory_cohorts"]["sealed_holdout"][0].__setitem__("split_role", "training"))
+          expect_rejection("reused-initial-state", lambda value: value["trajectory_cohorts"]["sealed_holdout"][0].__setitem__("initial_state_sha256", value["trajectory_cohorts"]["training"][0]["initial_state_sha256"]))
+          expect_rejection("backward-initialization", lambda value: value["trajectory_cohorts"]["training"][0].__setitem__("forward_initialization", False))
+          expect_rejection("physical-claim-laundering", lambda value: value["claim_boundary"].__setitem__("physical_echo_growth_measured", True))
+          PY
+
+      - name: Validate separate Coulomb Vlasov-Poisson-Landau K-RESP-CL contract
+        run: |
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb")
+          schema = json.loads((root / "kresp-cl-vpl-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-vpl-echo-growth-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+
+          assert fixture["equation"] == "vlasov_poisson_landau_coulomb"
+          assert fixture["collision_operator"] == "landau_coulomb"
+          assert fixture["benchmark_id"] == "KRESP-CL-VPL-3D3V"
+          assert fixture["prior_art"]["arxiv_id"] == "2611.20080"
+          assert fixture["prior_art"]["status"] == "literature_claim_not_reproduced_here"
+          scaling = fixture["perturbation_scaling"]
+          assert scaling["formula"] == "epsilon=c*nu^(1/3)*(log(1/nu))^p"
+          assert scaling["p_values_are_exploratory_not_source_theorem_constants"] is True
+          assert scaling["observation_horizon_fraction_of_nu_minus_one_third"] <= 1.0
+          assert scaling["maximum_initial_perturbation_amplitude"] == 0.1
+
+          groups = fixture["trajectory_cohorts"]
+          assert (len(groups["training"]), len(groups["validation"]), len(groups["sealed_holdout"])) == (3, 2, 3)
+          all_trajectories = groups["training"] + groups["validation"] + groups["sealed_holdout"]
+          assert len({item["trajectory_id"] for item in all_trajectories}) == len(all_trajectories)
+          assert len({item["initial_state_sha256"] for item in all_trajectories}) == len(all_trajectories)
+          assert {item["split_role"] for item in all_trajectories} == {"training", "validation", "sealed_holdout"}
+          for item in all_trajectories:
+              nu = item["collision_parameter_nu"]
+              c = item["prefactor_c"]
+              p = item["log_power_p"]
+              expected = c * nu ** (1.0 / 3.0) * math.log(1.0 / nu) ** p
+              assert math.isclose(item["computed_initial_perturbation_amplitude"], expected, rel_tol=1e-13, abs_tol=1e-15)
+              assert item["computed_initial_perturbation_amplitude"] <= scaling["maximum_initial_perturbation_amplitude"]
+              assert item["observation_horizon_fraction_of_nu_minus_one_third"] == scaling["observation_horizon_fraction_of_nu_minus_one_third"]
+              assert item["forward_initialization"] is True
+          assert fixture["reference_convergence"]["all_reference_trajectories_forward_integrated"] is True
+          assert fixture["claim_boundary"] == {
+              "physical_solver_executed": False,
+              "physical_echo_growth_measured": False,
+              "reference_converged": False,
+              "stability_theorem_proved_for_this_implementation": False,
+              "competitive_result_reproduced": False
+          }
+          print("kresp_cl_vpl_schema_validation=PASS")
+          print("kresp_cl_vpl_scaling_and_split_validation=PASS")
+          print("kresp_cl_vpl_forward_time_and_claim_boundary_validation=PASS")
+          PY
+
+      - name: Run Rust K-RESP-CL semantic contract auditor
+        run: |
+          cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin vpl_echo_contract_audit -- \
+            "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
+
+      - name: Challenge Rust K-RESP-CL auditor with negative controls
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation")
+          fixture_path = root / "benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
+          fixture = json.loads(fixture_path.read_text())
+          binaries = list(root.glob("**/debug/vpl_echo_contract_audit"))
+          assert binaries, "compiled K-RESP-CL auditor binary was not found"
+          binary = binaries[0]
+
+          def expect_rejection(name, mutate):
+              invalid = copy.deepcopy(fixture)
+              mutate(invalid)
+              with tempfile.TemporaryDirectory(prefix="kresp-cl-negative-") as directory:
+                  path = Path(directory) / (name + ".json")
+                  path.write_text(json.dumps(invalid, sort_keys=True))
+                  result = subprocess.run([str(binary), str(path)], capture_output=True, text=True)
+              assert result.returncode != 0, f"K-RESP-CL auditor accepted {name}: {result.stdout} {result.stderr}"
+              print(f"kresp_cl_negative_control_{name}=PASS")
+
+          expect_rejection("wrong-collision-operator", lambda value: value.__setitem__("collision_operator", "dougherty"))
+          expect_rejection("wrong-amplitude-scaling", lambda value: value["trajectory_cohorts"]["training"][0].__setitem__("computed_initial_perturbation_amplitude", 0.0))
+          expect_rejection("sealed-holdout-leak", lambda value: value["trajectory_cohorts"]["sealed_holdout"][0].__setitem__("split_role", "training"))
+          expect_rejection("reused-initial-state", lambda value: value["trajectory_cohorts"]["sealed_holdout"][0].__setitem__("initial_state_sha256", value["trajectory_cohorts"]["training"][0]["initial_state_sha256"]))
+          expect_rejection("backward-initialization", lambda value: value["trajectory_cohorts"]["training"][0].__setitem__("forward_initialization", False))
+          expect_rejection("physical-claim-laundering", lambda value: value["claim_boundary"].__setitem__("physical_echo_growth_measured", True))
+          PY
+
+      - name: Run Rust K-RESP semantic contract auditor
+        run: |
+          cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin response_balanced_contract_audit -- \
+            "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/response-balanced/fixtures/synthetic-kresp1-experiment-v0.1.json"
+
+      - name: Challenge Rust K-RESP auditor with negative controls
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation")
+          fixture_path = root / "benchmarks/plasma/response-balanced/fixtures/synthetic-kresp1-experiment-v0.1.json"
+          fixture = json.loads(fixture_path.read_text())
+          binaries = list(root.glob("**/debug/response_balanced_contract_audit"))
+          assert binaries, "compiled Rust semantic auditor binary was not found"
+          binary = binaries[0]
+
+          def expect_rejection(name, mutate):
+              invalid = copy.deepcopy(fixture)
+              mutate(invalid)
+              with tempfile.TemporaryDirectory(prefix="kresp1-negative-") as directory:
+                  path = Path(directory) / (name + ".json")
+                  path.write_text(json.dumps(invalid, sort_keys=True))
+                  result = subprocess.run([str(binary), str(path)], capture_output=True, text=True)
+              assert result.returncode != 0, f"Rust semantic auditor accepted negative control {name}: {result.stdout} {result.stderr}"
+              print(f"response_balanced_negative_control_{name}=PASS")
+
+          expect_rejection(
+              "first-pulse-history-leak",
+              lambda value: value["split"]["held_out"][0]["pulses"][0].__setitem__("phase_rad", 0.9),
+          )
+          expect_rejection(
+              "checkpoint-crossing",
+              lambda value: value["split"]["held_out"][0]["pulses"][1].__setitem__("application_time", 5.5),
+          )
+          expect_rejection(
+              "out-of-family-amplitude",
+              lambda value: value["split"]["held_out"][0]["pulses"][1].__setitem__("kick_amplitude", 0.03),
+          )
+          def remove_heldout_separation_coverage(value):
+              for trial in value["split"]["held_out"]:
+                  trial["pulses"][1]["application_time"] = 10.0
+          expect_rejection("no-unseen-separation", remove_heldout_separation_coverage)
+          expect_rejection(
+              "physical-claim-laundering",
+              lambda value: value["claim_boundary"].__setitem__("physical_response_measured", True),
+          )
+          expect_rejection(
+              "pulse-jacobian-bypass",
+              lambda value: value["linearization_contract"].__setitem__("pulse_map_parameter_jacobian_required", False),
+          )
+          expect_rejection(
+              "coordinate-identity-missing",
+              lambda value: value["cohort"].__setitem__("state_coordinate_id", ""),
+          )
+          expect_rejection(
+              "spatial-mass-weight-bypass",
+              lambda value: value["linearization_contract"].__setitem__("distribution_pulse_spatial_integral_weights_required", False),
+          )
+          expect_rejection(
+              "future-pulse-response-bypass",
+              lambda value: value["response_qualification"].__setitem__("future_pulse_injection_residual_required", False),
+          )
+          expect_rejection(
+              "joint-box-lipschitz-bypass",
+              lambda value: value["response_qualification"]["joint_box_oracle"].__setitem__("reference_response_denominator_lower_bound_required", False),
+          )
+          expect_rejection(
+              "joint-box-axis-omission",
+              lambda value: value["response_qualification"]["joint_box_oracle"].__setitem__("continuous_parameter_axes", ["pulse_phase"]),
+          )
+          expect_rejection(
+              "objective-error-interval-bypass",
+              lambda value: value["response_qualification"]["joint_box_oracle"].__setitem__("convergence_flag_alone_means_zero_error", True),
+          )
+          expect_rejection(
+              "split-id-duplication",
+              lambda value: value["split"]["held_out"][0].__setitem__("trial_id", value["split"]["training"][0]["trial_id"]),
+          )
+          PY
+
+      - name: Run strict Clippy
+        run: cargo clippy --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --all-targets -- -D warnings

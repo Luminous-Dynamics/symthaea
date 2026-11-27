@@ -1,0 +1,632 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/plasma/kresp-c-collisional-contract-v0.1.schema.json",
+  "title": "K-RESP-C Collisional Kinetic Response Benchmark Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_status",
+    "benchmark_id",
+    "equation",
+    "domain",
+    "collision_model",
+    "discretization",
+    "trajectory_cohorts",
+    "registered_qois",
+    "structure_contract",
+    "reduction_contract",
+    "separation_of_error",
+    "comparators",
+    "published_prior_art_reference",
+    "reference_convergence",
+    "matched_cost_modes",
+    "success_targets",
+    "claim_boundary",
+    "provenance",
+    "initial_condition_formula_id",
+    "external_field_formula_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "record_status": {
+      "const": "synthetic_benchmark_contract_only"
+    },
+    "benchmark_id": {
+      "const": "KRESP-C-VPD-1D1V"
+    },
+    "equation": {
+      "const": "periodic_1d1v_vlasov_poisson_dougherty"
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x_min",
+        "x_max",
+        "x_periodic",
+        "v_min",
+        "v_max",
+        "velocity_boundary_condition",
+        "time_unit"
+      ],
+      "properties": {
+        "x_min": {
+          "const": 0
+        },
+        "x_max": {
+          "const": 6.283185307179586
+        },
+        "x_periodic": {
+          "const": true
+        },
+        "v_min": {
+          "const": -12
+        },
+        "v_max": {
+          "const": 12
+        },
+        "velocity_boundary_condition": {
+          "const": "zero_velocity_flux"
+        },
+        "time_unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "collision_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operator",
+        "collision_frequency",
+        "self_consistent_temperature",
+        "invariants",
+        "entropy_functional"
+      ],
+      "properties": {
+        "operator": {
+          "const": "dougherty_fokker_planck"
+        },
+        "self_consistent_temperature": {
+          "const": true
+        },
+        "invariants": {
+          "const": [
+            "mass",
+            "momentum",
+            "kinetic_energy"
+          ]
+        },
+        "entropy_functional": {
+          "const": "boltzmann_h_negative_integral_f_log_f"
+        }
+      }
+    },
+    "discretization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "splitting",
+        "transport_scheme",
+        "spatial_cells",
+        "velocity_nodes",
+        "time_step",
+        "transport_reference_grid_retained"
+      ],
+      "properties": {
+        "splitting": {
+          "const": "strang_collision_half_transport_full_collision_half"
+        },
+        "transport_scheme": {
+          "const": "MUSCL"
+        },
+        "spatial_cells": {
+          "type": "integer",
+          "minimum": 8
+        },
+        "velocity_nodes": {
+          "type": "integer",
+          "minimum": 16
+        },
+        "time_step": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "transport_reference_grid_retained": {
+          "const": true
+        }
+      }
+    },
+    "trajectory_cohorts": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cohort_id",
+          "kind",
+          "end_time",
+          "external_drive_schedule",
+          "split_role",
+          "independent_initial_state_digest",
+          "initial_condition_parameters",
+          "collision_frequency"
+        ],
+        "properties": {
+          "cohort_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "two_stream_relaxation",
+              "sustained_heating",
+              "drive_switching",
+              "held_out_drive_waveform",
+              "held_out_collision_frequency"
+            ]
+          },
+          "end_time": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "external_drive_schedule": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start_time",
+                "end_time",
+                "amplitude",
+                "frequency"
+              ],
+              "properties": {
+                "start_time": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "end_time": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "amplitude": {
+                  "type": "number"
+                },
+                "frequency": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "split_role": {
+            "enum": [
+              "training",
+              "validation",
+              "sealed_holdout"
+            ]
+          },
+          "independent_initial_state_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "initial_condition_parameters": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "density_perturbation_amplitude",
+              "stream_speed",
+              "temperature_plus",
+              "temperature_minus",
+              "mixture_weight_mean",
+              "mixture_weight_amplitude",
+              "velocity_shift_amplitude"
+            ],
+            "properties": {
+              "density_perturbation_amplitude": {
+                "type": "number",
+                "minimum": 0
+              },
+              "stream_speed": {
+                "type": "number",
+                "minimum": 0
+              },
+              "temperature_plus": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "temperature_minus": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "mixture_weight_mean": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "mixture_weight_amplitude": {
+                "type": "number",
+                "minimum": 0
+              },
+              "velocity_shift_amplitude": {
+                "type": "number"
+              }
+            }
+          },
+          "collision_frequency": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "registered_qois": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "distribution_space_time_error",
+          "density_error",
+          "current_error",
+          "temperature_error",
+          "electric_field_error",
+          "third_central_moment_error",
+          "entropy_dissipation_residual",
+          "mass_drift",
+          "momentum_drift",
+          "kinetic_energy_drift",
+          "positivity_violation"
+        ]
+      }
+    },
+    "structure_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "positivity_required",
+        "local_mass_conservation_required",
+        "local_momentum_conservation_required",
+        "local_kinetic_energy_conservation_required",
+        "entropy_dissipation_required",
+        "positive_empirical_cubature_required",
+        "fallback_on_structure_failure"
+      ],
+      "properties": {
+        "positivity_required": {
+          "const": true
+        },
+        "local_mass_conservation_required": {
+          "const": true
+        },
+        "local_momentum_conservation_required": {
+          "const": true
+        },
+        "local_kinetic_energy_conservation_required": {
+          "const": true
+        },
+        "entropy_dissipation_required": {
+          "const": true
+        },
+        "positive_empirical_cubature_required": {
+          "const": true
+        },
+        "fallback_on_structure_failure": {
+          "const": "full_order_collision_step"
+        }
+      }
+    },
+    "reduction_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_moments_retained",
+        "basis_family",
+        "basis_updates_allowed_on",
+        "cubature_weight_constraint",
+        "maximum_variables_per_cell",
+        "representation_objective"
+      ],
+      "properties": {
+        "physical_moments_retained": {
+          "const": [
+            "density",
+            "mean_velocity",
+            "temperature"
+          ]
+        },
+        "basis_family": {
+          "enum": [
+            "entropy_exponential_family",
+            "rbkr_response_augmented_entropy_family",
+            "adaptive_hermite",
+            "micro_macro_pod"
+          ]
+        },
+        "basis_updates_allowed_on": {
+          "const": [
+            "training",
+            "development_challenge"
+          ]
+        },
+        "cubature_weight_constraint": {
+          "const": "strictly_positive"
+        },
+        "maximum_variables_per_cell": {
+          "type": "integer",
+          "minimum": 4
+        },
+        "representation_objective": {
+          "enum": [
+            "space_time_distribution_error",
+            "future_drive_response_error",
+            "joint_rate_distortion_and_drive_response"
+          ]
+        }
+      }
+    },
+    "separation_of_error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation_error_reported",
+        "evolution_error_reported",
+        "transport_error_reported",
+        "collision_hyperreduction_error_reported",
+        "same_grid_full_order_reference_required"
+      ],
+      "properties": {
+        "representation_error_reported": {
+          "const": true
+        },
+        "evolution_error_reported": {
+          "const": true
+        },
+        "transport_error_reported": {
+          "const": true
+        },
+        "collision_hyperreduction_error_reported": {
+          "const": true
+        },
+        "same_grid_full_order_reference_required": {
+          "const": true
+        }
+      }
+    },
+    "comparators": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "published_entropy_vpd_rom",
+          "entropy_vpd_without_posttraining",
+          "entropy_vpd_without_positive_cubature",
+          "snapshot_pod",
+          "adaptive_hermite",
+          "micro_macro_pod",
+          "full_order_vpd"
+        ]
+      }
+    },
+    "published_prior_art_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arxiv_id",
+        "published_methods",
+        "variables_per_cell",
+        "reported_distribution_error_percent_strict_upper",
+        "reported_speedup_min",
+        "reported_speedup_max",
+        "reference_grid_transport_retained",
+        "status",
+        "spatial_cells",
+        "time_step",
+        "velocity_node_counts_tested",
+        "timing_repetitions",
+        "timing_statistic",
+        "host_cpu",
+        "blas_threads",
+        "setup_included_in_timing",
+        "full_grid_muscl_transport_retained"
+      ],
+      "properties": {
+        "arxiv_id": {
+          "const": "2611.27904"
+        },
+        "published_methods": {
+          "const": [
+            "positive_exponential_moments",
+            "data_adapted_velocity_functions",
+            "dynamics_posttraining",
+            "positive_empirical_cubature"
+          ]
+        },
+        "variables_per_cell": {
+          "const": 13
+        },
+        "reported_distribution_error_percent_strict_upper": {
+          "const": 0.25
+        },
+        "reported_speedup_min": {
+          "const": 1.36
+        },
+        "reported_speedup_max": {
+          "const": 2.89
+        },
+        "reference_grid_transport_retained": {
+          "const": true
+        },
+        "status": {
+          "const": "literature_claim_not_reproduced_here"
+        },
+        "spatial_cells": {
+          "const": 64
+        },
+        "time_step": {
+          "const": 0.00125
+        },
+        "velocity_node_counts_tested": {
+          "const": [
+            128,
+            256,
+            512,
+            1024
+          ]
+        },
+        "timing_repetitions": {
+          "const": 3
+        },
+        "timing_statistic": {
+          "const": "median_with_min_max_range"
+        },
+        "host_cpu": {
+          "const": "AMD EPYC 9654"
+        },
+        "blas_threads": {
+          "const": 1
+        },
+        "setup_included_in_timing": {
+          "const": false
+        },
+        "full_grid_muscl_transport_retained": {
+          "const": true
+        }
+      }
+    },
+    "reference_convergence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spatial_refinement_levels",
+        "velocity_refinement_levels",
+        "time_refinement_levels",
+        "velocity_domain_extension_required",
+        "independent_reference_confirmation_required"
+      ],
+      "properties": {
+        "spatial_refinement_levels": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "velocity_refinement_levels": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "time_refinement_levels": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "velocity_domain_extension_required": {
+          "const": true
+        },
+        "independent_reference_confirmation_required": {
+          "const": true
+        }
+      }
+    },
+    "matched_cost_modes": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "equal_variables_per_cell",
+          "equal_total_stored_bytes",
+          "equal_end_to_end_wall_time",
+          "equal_full_order_solver_budget"
+        ]
+      }
+    },
+    "success_targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "structure_guarantees_must_match",
+        "distribution_error_must_be_below_published_reference",
+        "drive_response_improvement_required",
+        "all_claims_prospective"
+      ],
+      "properties": {
+        "status": {
+          "const": "prospective_only_not_achieved"
+        },
+        "structure_guarantees_must_match": {
+          "const": true
+        },
+        "distribution_error_must_be_below_published_reference": {
+          "const": true
+        },
+        "drive_response_improvement_required": {
+          "const": true
+        },
+        "all_claims_prospective": {
+          "const": true
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_solver_executed",
+        "physical_trajectory_measured",
+        "entropy_guarantee_proved_for_this_implementation",
+        "competitive_result_reproduced"
+      ],
+      "properties": {
+        "physical_solver_executed": {
+          "const": false
+        },
+        "physical_trajectory_measured": {
+          "const": false
+        },
+        "entropy_guarantee_proved_for_this_implementation": {
+          "const": false
+        },
+        "competitive_result_reproduced": {
+          "const": false
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_class",
+        "generator_seed",
+        "source_contract_refs"
+      ],
+      "properties": {
+        "fixture_class": {
+          "const": "synthetic_kresp_c_design_fixture_only"
+        },
+        "generator_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_contract_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "initial_condition_formula_id": {
+      "const": "two_stream_gaussian_mixture_density_weight_and_velocity_shift_v1"
+    },
+    "external_field_formula_id": {
+      "const": "sinusoidal_two_mode_external_field_v1"
+    }
+  }
+}

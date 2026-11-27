@@ -1,0 +1,511 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/kresp-cl-vpl-3d3v-contract-v0.1.schema.json",
+  "title": "K-RESP-CL Coulomb Vlasov-Poisson-Landau Echo Growth Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_status",
+    "benchmark_id",
+    "equation",
+    "collision_operator",
+    "equilibrium",
+    "domain",
+    "perturbation_scaling",
+    "trajectory_cohorts",
+    "registered_qois",
+    "structure_contract",
+    "reference_convergence",
+    "comparators",
+    "success_targets",
+    "claim_boundary",
+    "prior_art",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "record_status": {
+      "const": "synthetic_benchmark_contract_only"
+    },
+    "benchmark_id": {
+      "const": "KRESP-CL-VPL-3D3V"
+    },
+    "equation": {
+      "const": "vlasov_poisson_landau_coulomb"
+    },
+    "collision_operator": {
+      "const": "landau_coulomb"
+    },
+    "equilibrium": {
+      "const": "global_maxwellian"
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spatial_topology",
+        "spatial_domain_lengths",
+        "velocity_dimension",
+        "velocity_domain_model",
+        "velocity_cutoff",
+        "velocity_tail_extension_required",
+        "time_direction"
+      ],
+      "properties": {
+        "spatial_topology": {
+          "const": "periodic_torus"
+        },
+        "velocity_dimension": {
+          "const": 3
+        },
+        "velocity_domain_model": {
+          "const": "truncated_R3_cartesian_cube_with_decay_tail"
+        },
+        "velocity_cutoff": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "velocity_tail_extension_required": {
+          "const": true
+        },
+        "time_direction": {
+          "const": "forward_only_from_physical_initial_data"
+        },
+        "spatial_domain_lengths": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          ]
+        }
+      }
+    },
+    "perturbation_scaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "formula",
+        "collision_parameter_nu_range",
+        "prefactor_c_values",
+        "log_power_p_values",
+        "amplitude_is_computed_from_formula",
+        "log_argument",
+        "observation_horizon_fraction_of_nu_minus_one_third",
+        "p_values_are_exploratory_not_source_theorem_constants",
+        "maximum_initial_perturbation_amplitude"
+      ],
+      "properties": {
+        "formula": {
+          "const": "epsilon=c*nu^(1/3)*(log(1/nu))^p"
+        },
+        "collision_parameter_nu_range": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number",
+              "exclusiveMaximum": 1,
+              "minimum": 0.000001
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 0.0001
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "prefactor_c_values": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0.1
+          }
+        },
+        "log_power_p_values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.5
+          }
+        },
+        "amplitude_is_computed_from_formula": {
+          "const": true
+        },
+        "log_argument": {
+          "const": "1/nu"
+        },
+        "observation_horizon_fraction_of_nu_minus_one_third": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "p_values_are_exploratory_not_source_theorem_constants": {
+          "const": true
+        },
+        "maximum_initial_perturbation_amplitude": {
+          "const": 0.1
+        }
+      }
+    },
+    "trajectory_cohorts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "training",
+        "validation",
+        "sealed_holdout"
+      ],
+      "properties": {
+        "training": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/trajectory"
+          }
+        },
+        "validation": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/trajectory"
+          }
+        },
+        "sealed_holdout": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/trajectory"
+          }
+        }
+      }
+    },
+    "registered_qois": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "electric_field_mode_amplitude",
+          "electric_field_mode_phase",
+          "echo_cascade_peak_time",
+          "transport_profile_sobolev_norm",
+          "high_spatial_frequency_tail_energy",
+          "phase_space_filamentation_metric",
+          "collision_entropy_production",
+          "mass_drift",
+          "momentum_drift",
+          "kinetic_energy_drift",
+          "branch_identity"
+        ]
+      }
+    },
+    "structure_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mass_conservation_required",
+        "momentum_conservation_required",
+        "kinetic_energy_exchange_required",
+        "landau_entropy_dissipation_required",
+        "field_poisson_residual_required",
+        "positivity_required",
+        "full_order_fallback_on_unqualified_branch"
+      ],
+      "properties": {
+        "mass_conservation_required": {
+          "const": true
+        },
+        "momentum_conservation_required": {
+          "const": true
+        },
+        "kinetic_energy_exchange_required": {
+          "const": true
+        },
+        "landau_entropy_dissipation_required": {
+          "const": true
+        },
+        "field_poisson_residual_required": {
+          "const": true
+        },
+        "positivity_required": {
+          "const": true
+        },
+        "full_order_fallback_on_unqualified_branch": {
+          "const": true
+        }
+      }
+    },
+    "reference_convergence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spatial_refinement_levels",
+        "velocity_refinement_levels",
+        "time_refinement_levels",
+        "velocity_domain_extension_required",
+        "collision_operator_quadrature_refinement_required",
+        "independent_full_order_confirmation_required",
+        "all_reference_trajectories_forward_integrated"
+      ],
+      "properties": {
+        "spatial_refinement_levels": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "velocity_refinement_levels": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "time_refinement_levels": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "velocity_domain_extension_required": {
+          "const": true
+        },
+        "collision_operator_quadrature_refinement_required": {
+          "const": true
+        },
+        "independent_full_order_confirmation_required": {
+          "const": true
+        },
+        "all_reference_trajectories_forward_integrated": {
+          "const": true
+        }
+      }
+    },
+    "comparators": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "full_order_vlasov_poisson_landau",
+          "linearized_landau_reference",
+          "collisionless_vlasov_poisson_control",
+          "snapshot_pod",
+          "adaptive_hermite",
+          "response_balanced_kinetic_reduction",
+          "symplectic_particle_vlasov_rom",
+          "entropy_vpd_rom_not_same_equation"
+        ]
+      }
+    },
+    "success_targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "all_targets_are_prospective",
+        "echo_growth_before_enhanced_dissipation_scale_required",
+        "reduced_model_must_not_suppress_verified_echo_cascade",
+        "all_structure_gates_must_hold"
+      ],
+      "properties": {
+        "status": {
+          "const": "prospective_only_not_achieved"
+        },
+        "all_targets_are_prospective": {
+          "const": true
+        },
+        "echo_growth_before_enhanced_dissipation_scale_required": {
+          "const": true
+        },
+        "reduced_model_must_not_suppress_verified_echo_cascade": {
+          "const": true
+        },
+        "all_structure_gates_must_hold": {
+          "const": true
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_solver_executed",
+        "physical_echo_growth_measured",
+        "reference_converged",
+        "stability_theorem_proved_for_this_implementation",
+        "competitive_result_reproduced"
+      ],
+      "properties": {
+        "physical_solver_executed": {
+          "const": false
+        },
+        "physical_echo_growth_measured": {
+          "const": false
+        },
+        "reference_converged": {
+          "const": false
+        },
+        "stability_theorem_proved_for_this_implementation": {
+          "const": false
+        },
+        "competitive_result_reproduced": {
+          "const": false
+        }
+      }
+    },
+    "prior_art": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arxiv_id",
+        "source_date",
+        "source_claims",
+        "status"
+      ],
+      "properties": {
+        "arxiv_id": {
+          "const": "2611.20080"
+        },
+        "source_date": {
+          "const": "2026-11-15"
+        },
+        "source_claims": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "echo_growth_stable_under_linearized_operator_changes",
+              "echo_growth_stable_with_exact_evolving_background_coefficients",
+              "echo_growth_persists_under_nonlinear_perturbations",
+              "sobolev_norm_inflation_before_nu_minus_one_third_enhanced_dissipation_scale"
+            ]
+          }
+        },
+        "status": {
+          "const": "literature_claim_not_reproduced_here"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_class",
+        "generator_seed",
+        "source_refs",
+        "no_solver_execution"
+      ],
+      "properties": {
+        "fixture_class": {
+          "const": "synthetic_kresp_cl_design_fixture_only"
+        },
+        "generator_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_refs": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string"
+          }
+        },
+        "no_solver_execution": {
+          "const": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "trajectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trajectory_id",
+        "collision_parameter_nu",
+        "prefactor_c",
+        "log_power_p",
+        "computed_initial_perturbation_amplitude",
+        "initial_spatial_modes",
+        "echo_cascade_depth",
+        "observation_horizon_fraction_of_nu_minus_one_third",
+        "split_role",
+        "initial_state_sha256",
+        "forward_initialization"
+      ],
+      "properties": {
+        "trajectory_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "collision_parameter_nu": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "prefactor_c": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "log_power_p": {
+          "type": "number",
+          "minimum": 0
+        },
+        "computed_initial_perturbation_amplitude": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "initial_spatial_modes": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "echo_cascade_depth": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "observation_horizon_fraction_of_nu_minus_one_third": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "split_role": {
+          "enum": [
+            "training",
+            "validation",
+            "sealed_holdout"
+          ]
+        },
+        "initial_state_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "forward_initialization": {
+          "const": true
+        }
+      }
+    }
+  }
+}

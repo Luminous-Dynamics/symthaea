@@ -1,0 +1,341 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/kinetic-information-return/operation-ledger-v0.1.schema.json",
+  "title": "Kinetic Information Return operation ledger v0.1",
+  "description": "Chronological attribution of physical collision and numerical representation operations. It keeps physical entropy production distinct from numerical entropy changes and per-metric discarded effects.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_status",
+    "ledgers",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "record_status": {
+      "const": "synthetic_operation_ledger_contract_only"
+    },
+    "ledgers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "$ref": "#/$defs/ledger"
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_vlasov_solver_executed",
+        "no_entropy_production_measured",
+        "not_a_physical_irreversibility_budget"
+      ],
+      "properties": {
+        "no_vlasov_solver_executed": {
+          "const": true
+        },
+        "no_entropy_production_measured": {
+          "const": true
+        },
+        "not_a_physical_irreversibility_budget": {
+          "const": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ledger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ledger_id",
+        "physical_model",
+        "maximum_time",
+        "events"
+      ],
+      "properties": {
+        "ledger_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "physical_model": {
+          "enum": [
+            "collisionless_vlasov",
+            "vlasov_fokker_planck",
+            "vlasov_poisson_landau"
+          ]
+        },
+        "maximum_time": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "events": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "physical_model": {
+                "const": "collisionless_vlasov"
+              }
+            },
+            "required": [
+              "physical_model"
+            ]
+          },
+          "then": {
+            "properties": {
+              "events": {
+                "items": {
+                  "properties": {
+                    "operation_class": {
+                      "not": {
+                        "const": "physical_collision"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "operation_id",
+        "application_time",
+        "operation_class",
+        "state_before_sha256",
+        "state_after_sha256",
+        "declared_reversible"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "application_time": {
+          "type": "number",
+          "minimum": 0
+        },
+        "operation_class": {
+          "enum": [
+            "physical_collision",
+            "numerical_filter",
+            "spectral_truncation",
+            "hypercollision",
+            "projection",
+            "compression",
+            "basis_transition",
+            "coordinate_remap",
+            "fallback"
+          ]
+        },
+        "state_before_sha256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "state_after_sha256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "discarded_effect_metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "discarded_effect_measure": {
+          "type": "number",
+          "minimum": 0
+        },
+        "physical_entropy_measure_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "physical_entropy_production": {
+          "type": "number",
+          "minimum": 0
+        },
+        "numerical_entropy_measure_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "numerical_entropy_delta": {
+          "type": "number"
+        },
+        "energy_exchange_measure_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "energy_exchange": {
+          "type": "number"
+        },
+        "declared_reversible": {
+          "type": "boolean"
+        },
+        "physical_entropy_sign_convention": {
+          "const": "boltzmann_entropy_increase"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operation_class": {
+                "const": "physical_collision"
+              }
+            },
+            "required": [
+              "operation_class"
+            ]
+          },
+          "then": {
+            "required": [
+              "physical_entropy_measure_id",
+              "physical_entropy_sign_convention",
+              "physical_entropy_production"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "numerical_entropy_measure_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "numerical_entropy_delta"
+                  ]
+                },
+                {
+                  "required": [
+                    "discarded_effect_metric_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "discarded_effect_measure"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation_class": {
+                "enum": [
+                  "numerical_filter",
+                  "spectral_truncation",
+                  "hypercollision",
+                  "projection",
+                  "compression"
+                ]
+              }
+            },
+            "required": [
+              "operation_class"
+            ]
+          },
+          "then": {
+            "required": [
+              "discarded_effect_metric_id",
+              "discarded_effect_measure"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "physical_entropy_measure_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "physical_entropy_sign_convention"
+                  ]
+                },
+                {
+                  "required": [
+                    "physical_entropy_production"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation_class": {
+                "not": {
+                  "const": "physical_collision"
+                }
+              }
+            },
+            "required": [
+              "operation_class"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "physical_entropy_measure_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "physical_entropy_sign_convention"
+                  ]
+                },
+                {
+                  "required": [
+                    "physical_entropy_production"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "declared_reversible": {
+                "const": true
+              }
+            },
+            "required": [
+              "declared_reversible"
+            ]
+          },
+          "then": {
+            "properties": {
+              "discarded_effect_measure": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

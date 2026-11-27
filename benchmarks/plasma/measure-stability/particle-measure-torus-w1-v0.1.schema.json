@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/plasma/measure-stability/particle-measure-torus-w1-v0.1.schema.json",
+  "title": "Periodic one-dimensional particle measure W1 comparison v0.1",
+  "description": "Geodesic W1 on a one-dimensional torus with an explicit physical period. This does not certify field stability.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_status",
+    "domain",
+    "metric",
+    "cases",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "record_status": {
+      "const": "synthetic_known_answer_only"
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topology",
+        "minimum",
+        "maximum",
+        "unit",
+        "domain_id"
+      ],
+      "properties": {
+        "topology": {
+          "const": "torus"
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "definition",
+        "scope",
+        "mass_convention"
+      ],
+      "properties": {
+        "id": {
+          "const": "wasserstein_1_circle_1d"
+        },
+        "definition": {
+          "const": "physical_period_times_min_over_c_integral_0_1_abs(CDF_left-CDF_right-c) dx"
+        },
+        "scope": {
+          "const": "one_dimensional_torus_geodesic_distance"
+        },
+        "mass_convention": {
+          "const": "nonnegative_weights_normalized_to_probability"
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "transformation",
+          "left",
+          "right",
+          "expected_w1"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "transformation": {
+            "enum": [
+              "endpoint_identification",
+              "shortest_seam_arc",
+              "common_translation",
+              "physical_period_scaling"
+            ]
+          },
+          "left": {
+            "$ref": "#/$defs/measure"
+          },
+          "right": {
+            "$ref": "#/$defs/measure"
+          },
+          "expected_w1": {
+            "type": "number",
+            "minimum": 0
+          },
+          "domain_override": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "properties": {
+              "minimum": {
+                "type": "number"
+              },
+              "maximum": {
+                "type": "number"
+              }
+            }
+          },
+          "translated_left": {
+            "$ref": "#/$defs/measure"
+          },
+          "translated_right": {
+            "$ref": "#/$defs/measure"
+          },
+          "translated_expected_w1": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_field_operator_evaluated",
+        "no_physical_solver_run",
+        "not_a_global_field_stability_certificate"
+      ],
+      "properties": {
+        "no_field_operator_evaluated": {
+          "const": true
+        },
+        "no_physical_solver_run": {
+          "const": true
+        },
+        "not_a_global_field_stability_certificate": {
+          "const": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "measure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "positions",
+        "weights"
+      ],
+      "properties": {
+        "positions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000000,
+          "items": {
+            "type": "number"
+          }
+        },
+        "weights": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000000,
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}
