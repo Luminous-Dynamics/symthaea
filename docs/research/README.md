@@ -38,6 +38,7 @@ event contract.
 - [Scene frame schema](SYMTHAEA_EMBODIMENT_SCENE_SCHEMA_V1_2026-11-27.json)
 - [Scene frame fixtures](SYMTHAEA_EMBODIMENT_SCENE_FIXTURES_V1_2026-11-27.json)
 - [Presentation outcome receipts](SYMTHAEA_PRESENTATION_OUTCOME_RECEIPTS_V0_1_2026-11-27.md)
+- [Compositor presentation observer](SYMTHAEA_COMPOSITOR_PRESENTATION_OBSERVER_V0_1_2026-11-27.md)
 - [Presentation receipt schema](SYMTHAEA_PRESENTATION_RECEIPT_SCHEMA_V1_2026-11-27.json)
 - [Presentation receipt fixtures](SYMTHAEA_PRESENTATION_RECEIPT_FIXTURES_V1_2026-11-27.json)
 - [Presentation grant schema](SYMTHAEA_PRESENTATION_CONSENT_GRANT_SCHEMA_V1_2026-11-27.json)
