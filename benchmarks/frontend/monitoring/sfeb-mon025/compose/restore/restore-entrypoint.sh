@@ -4,7 +4,6 @@ set -eu
 : "${MON025_BACKUP_ID:?MON025_BACKUP_ID is required}"
 : "${MON025_RECOVERY_TARGET_LSN:?MON025_RECOVERY_TARGET_LSN is required}"
 : "${MON025_RECOVERY_TARGET_TIMELINE:?MON025_RECOVERY_TARGET_TIMELINE is required}"
-: "${MON025_SOURCE_DATA_DIR:?MON025_SOURCE_DATA_DIR is required}"
 
 case "$MON025_BACKUP_ID" in
     *[!A-Za-z0-9_-]*|'') echo "invalid backup ID" >&2; exit 64 ;;
@@ -38,7 +37,7 @@ cp -a "$BACKUP_DIR/." "$PGDATA/"
 chown -R postgres:postgres "$PGDATA"
 
 cat >> "$PGDATA/postgresql.auto.conf" <<EOF
-restore_command = 'cp $MON025_SOURCE_DATA_DIR/mon025-archive/%f %p'
+restore_command = 'cp /wal-archive/%f %p'
 recovery_target_lsn = '$MON025_RECOVERY_TARGET_LSN'
 recovery_target_timeline = '$MON025_RECOVERY_TARGET_TIMELINE'
 recovery_target_action = 'pause'
