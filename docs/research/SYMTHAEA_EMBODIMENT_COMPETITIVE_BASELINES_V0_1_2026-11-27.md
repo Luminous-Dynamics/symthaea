@@ -120,7 +120,7 @@ Sources:
 
 ### TurnBench — turn-taking quality, with a scoring warning
 
-TurnBench reports a 30-hour dual-channel held-out corpus with 154 dialogues, 106 actors, six conversation styles and triple annotation (Fleiss' κ = 0.78). The current v1 leaderboard shows high recall but materially different latency/FPR trade-offs: Kuroko is 0.983 / 0.065 / 619 ms; Neosapience Nunchi v2 is 0.959 / 0.064 / 254 ms.
+TurnBench reports a 30-hour dual-channel held-out corpus with 154 dialogues, 106 actors, six conversation styles and triple annotation (Fleiss' κ = 0.78). The current v1 leaderboard shows different trade-offs: Kuroko is 0.983 / 0.065 FPR / 619 ms; OpenYap Turn is 0.978 / 0.077 / 298 ms; p99lab turn-1-mini is 0.975 / 0.075 / 595 ms; Neosapience Nunchi v2 is 0.959 / 0.064 / 254 ms; FD-VAD is 0.826 / 0.049 / 1,025 ms.
 
 The maintainers explicitly document that v1 can reward multiple and late predictions and ranks by recall, allowing simple VAD rules to perform deceptively well. They describe a planned v2 using per-frame probabilities and fixed hidden decision points.
 
