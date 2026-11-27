@@ -1515,7 +1515,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn bootstrap_reports_declared_only_and_verified_materialization_separately() {
         let contrasts = vec![
             MatchedEvidenceContrastV1 {
