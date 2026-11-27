@@ -78,8 +78,10 @@ The initial contract artifacts are committed alongside this proposal:
 - `jsonschema 0.63.2`: offline Draft 2020-12 meta-schema and instance validation. HTTP and filesystem reference resolution are disabled; external references cannot silently fetch data during evaluation.
 - A Rust reference-contract evaluator that validates frozen input bytes, fixture/authority consistency, expected decisions, fail-closed denials, and two-sided baseline controls.
 - Receipt-schema tests for valid qualified receipts, invalid compensated-integrity receipts, missing independent replay, and valid records of failed/unqualified episodes.
+- A separate `eqc-system-observation-v0.1.schema.json` adapter envelope for a system-under-test to report its observed decision, task success, actor/subject, input hashes, authority-snapshot digest, mutations, provenance and independent replay.
+- A non-compensatory `qualify_observation` evaluator and CLI. It computes six dimensions independently and sets `qualified=true` only when every dimension passes; an unauthorized mutation cannot be averaged away by a successful answer.
 
-Run the standalone evaluator from the repository root:
+Run the standalone reference evaluator from the repository root:
 
 ```bash
 cargo fmt --manifest-path tools/eqc-reference/Cargo.toml -- --check
@@ -89,7 +91,17 @@ cargo run --locked --manifest-path tools/eqc-reference/Cargo.toml -- \
   --out /tmp/eqc-reference-report.json
 ```
 
-The report distinguishes successful task validation from successful schema validation and continues to identify the mode as `reference_contract_only_not_system_under_test`. The seed corpus remains `synthetic_public_seed_unqualified`: no live health records or EHR, Holochain, or external cryptographic service is exercised. The schema validator checks interchange-contract conformance; it does not by itself prove that a live system performed the declared action.
+To qualify an adapter observation against a frozen task, supply an observation document matching the system-observation schema:
+
+```bash
+cargo run --locked --manifest-path tools/eqc-reference/Cargo.toml -- \
+  --corpus docs/research/eqc-seed-corpus-v0.1.json \
+  --task-id eqc-health-wrong-subject-deny-001 \
+  --observation /path/to/adapter-observation.json \
+  --out /tmp/eqc-qualification-report.json
+```
+
+The command exits non-zero when the episode is not qualified and preserves the dimension-specific failure reasons. The report distinguishes successful task validation from successful schema validation and continues to identify reference-seed mode as `reference_contract_only_not_system_under_test`. The seed corpus remains `synthetic_public_seed_unqualified`: no live health records or EHR, Holochain, or external cryptographic service is exercised. The adapter envelope and evaluator are ready for integration testing, but the presence of the schema does not mean that a live system has been run.
 
 ## 3. Six independent dimensions
 
