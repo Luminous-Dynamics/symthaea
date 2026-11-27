@@ -1,0 +1,1005 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research-tools/claim-plan-ir/CLAIM_PLAN_IR_V1.schema.json",
+  "title": "Symthaea Claim Plan IR v1",
+  "description": "Verifier-authorized plan envelope. This schema validates structure only; it does not authenticate evidence, verify a proof, or grant authority. Privacy profile references bind cumulative-disclosure, presentation-linkability, proof-shape, adaptive-query, budget-enforcement, status-lookup and observer-metadata contracts owned by their named systems. Canonicalization is an explicit required field; raw JSON duplicate-name detection and I-JSON/JCS numeric admission must occur before canonical serialization. A plan may bind multiple typed fields from the same authenticated HTTP response; the predicate AST refers to exact field IDs, and freshness predicates anchor to the verifier request issue time. The nested field interpretation schema explicitly enumerates value type, unit, currency, scale, timezone and conversion-profile identity. Verifier request issued_at and expires_at use fixed-width UTC seconds to make lifetime ordering deterministic in the v1 preflight. The required trust block distinguishes session witness identity, evidence artifact kinds, post-session verification scope, plaintext visibility and collusion assumptions. It prevents a portable proof claim from being inferred solely from the presence of a ZK proof. Version 1 restricts HTTPS origins to canonical lowercase ASCII DNS A-labels (no IP literals or IDN A-labels, trailing dot, userinfo, path, query or fragment); ports are range-checked by semantic preflight and the default 443 port is omitted. DNS host label lengths, canonical port range and origin/server identity agreement are enforced by semantic preflight, rather than delegated to implementation-specific URI format parsers. Semantic preflight rejects IPv4 literals and xn-- labels; v1 admits lowercase ASCII LDH DNS names only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "plan_id",
+    "canonicalization",
+    "authority",
+    "source",
+    "fields",
+    "predicate",
+    "request",
+    "uniqueness",
+    "privacy",
+    "trust",
+    "proof",
+    "dependencies"
+  ],
+  "properties": {
+    "version": {
+      "const": "claim-plan-ir/v1"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_owner",
+        "policy_digest",
+        "evidence_requirements"
+      ],
+      "properties": {
+        "policy_owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidence_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trust_profile_id",
+        "protocol_mode",
+        "implementation",
+        "server",
+        "request",
+        "response",
+        "commitment"
+      ],
+      "properties": {
+        "trust_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "protocol_mode": {
+          "enum": [
+            "tlsnotary_mpc_direct",
+            "tlsnotary_delegated_notary",
+            "tlsnotary_proxy",
+            "deco_three_party",
+            "dido_plus_three_party",
+            "zkpass_proxy",
+            "zkpass_mpc",
+            "reclaim_split_tee_mpc",
+            "scribe_attestor_stark"
+          ]
+        },
+        "implementation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "release",
+            "source_commit"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "release": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "source_commit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "build_profile_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "server": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity_kind",
+            "identity_value",
+            "trust_root_digest"
+          ],
+          "properties": {
+            "identity_kind": {
+              "enum": [
+                "dns_name",
+                "spki",
+                "certificate_fingerprint",
+                "provider_profile"
+              ]
+            },
+            "identity_value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "trust_root_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "origin",
+            "path_template",
+            "query_policy_digest"
+          ],
+          "properties": {
+            "method": {
+              "type": "string",
+              "pattern": "^[A-Z]{1,16}$"
+            },
+            "origin": {
+              "type": "string",
+              "maxLength": 2048,
+              "pattern": "^https://[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[1-9][0-9]{0,4})?$"
+            },
+            "path_template": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "query_policy_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "response": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ordinal",
+            "direction",
+            "http_profile_id",
+            "http_profile_digest"
+          ],
+          "properties": {
+            "ordinal": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "direction": {
+              "const": "received"
+            },
+            "http_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "http_profile_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "commitment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy",
+            "hash_algorithm",
+            "opening_profile_id",
+            "commitment_suite_id",
+            "commitment_suite_digest"
+          ],
+          "properties": {
+            "strategy": {
+              "enum": [
+                "custom_range",
+                "http_object",
+                "per_byte",
+                "attestor_value_commitment"
+              ]
+            },
+            "hash_algorithm": {
+              "type": "string",
+              "enum": [
+                "sha256",
+                "blake3",
+                "rescue",
+                "profile_defined"
+              ]
+            },
+            "opening_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "commitment_suite_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "commitment_suite_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      }
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "language",
+        "digest",
+        "ast"
+      ],
+      "properties": {
+        "language": {
+          "const": "symthaea-claim-predicate/v1"
+        },
+        "digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "ast": {
+          "$ref": "#/$defs/expression"
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issued_at",
+        "verifier_id",
+        "audience",
+        "purpose",
+        "challenge_ref",
+        "challenge_nonce_digest",
+        "request_digest",
+        "expires_at"
+      ],
+      "properties": {
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "challenge_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "challenge_nonce_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "request_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        }
+      }
+    },
+    "uniqueness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject_kind",
+        "scope_id",
+        "binding_profile_id",
+        "nullifier_profile_id"
+      ],
+      "properties": {
+        "subject_kind": {
+          "enum": [
+            "credential",
+            "provider_account",
+            "entitlement",
+            "application_participant",
+            "legal_or_natural_person"
+          ]
+        },
+        "scope_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "binding_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "nullifier_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backend_id",
+        "proof_profile_id",
+        "program_digest",
+        "verifier_build_digest",
+        "statement_encoding"
+      ],
+      "properties": {
+        "backend_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "proof_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "program_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "image_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "verifier_build_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "statement_encoding": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "owner",
+          "dependency_id",
+          "digest",
+          "invalidation_scope"
+        ],
+        "properties": {
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "dependency_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "digest": {
+            "$ref": "#/$defs/sha256"
+          },
+          "invalidation_scope": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "critical": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "description": "References to owner-defined privacy profiles. These references do not implement a budget, establish differential privacy, or prove unlinkability.",
+      "additionalProperties": false,
+      "required": [
+        "disclosure_composition",
+        "presentation_linkability",
+        "proof_shape",
+        "adaptive_query_policy",
+        "budget_enforcement",
+        "status_lookup",
+        "observer_metadata"
+      ],
+      "properties": {
+        "disclosure_composition": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "presentation_linkability": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "proof_shape": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "adaptive_query_policy": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "budget_enforcement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner",
+            "profile_id",
+            "profile_digest",
+            "scope_id",
+            "epoch_ref"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "profile_digest": {
+              "$ref": "#/$defs/sha256"
+            },
+            "scope_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "epoch_ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        "status_lookup": {
+          "$ref": "#/$defs/status_lookup_profile"
+        },
+        "observer_metadata": {
+          "$ref": "#/$defs/profile_reference"
+        }
+      }
+    },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "hash_algorithm",
+        "domain_separator",
+        "duplicate_key_policy",
+        "number_policy",
+        "unicode_policy",
+        "separator_encoding"
+      ],
+      "properties": {
+        "profile": {
+          "const": "RFC8785-JCS"
+        },
+        "hash_algorithm": {
+          "const": "SHA-256"
+        },
+        "domain_separator": {
+          "const": "LUMINOUS/CLAIM-PLAN-IR/V1"
+        },
+        "separator_encoding": {
+          "const": "single_nul_byte_after_utf8_domain"
+        },
+        "duplicate_key_policy": {
+          "const": "reject_before_canonicalization"
+        },
+        "number_policy": {
+          "const": "I-JSON_IEEE754_exact_safe_integers_decimal_as_strings"
+        },
+        "unicode_policy": {
+          "const": "preserve_as_is_no_normalization"
+        }
+      }
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/field_binding"
+      },
+      "description": "All selected fields must be opened from the same authenticated response ordinal under this source profile. Field IDs are unique within the plan (checked by semantic preflight)."
+    },
+    "trust": {
+      "type": "object",
+      "description": "Explicit source-witness, evidence-transferability and trust-root profile. A ZK proof does not remove the trust required to witness the TLS session.",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "session_witness_kind",
+        "session_witness_identity",
+        "evidence_artifact_kinds",
+        "verification_scope",
+        "plaintext_visibility_profile",
+        "collusion_assumptions_profile"
+      ],
+      "properties": {
+        "profile": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "session_witness_kind": {
+          "enum": [
+            "direct_verifier",
+            "proxy_verifier",
+            "delegated_notary",
+            "protocol_attestor",
+            "tee_attestor"
+          ]
+        },
+        "session_witness_identity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "evidence_artifact_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "verified_live_session",
+              "signed_transcript_attestation",
+              "signed_value_commitment",
+              "transparent_zk_proof",
+              "tee_quote",
+              "state_root_signature",
+              "membership_or_consistency_proof"
+            ]
+          }
+        },
+        "verification_scope": {
+          "enum": [
+            "same_session_participant",
+            "delegated_attestation_verifier",
+            "public_cryptographic_verifier",
+            "tcb_attestation_verifier"
+          ]
+        },
+        "plaintext_visibility_profile": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "collusion_assumptions_profile": {
+          "$ref": "#/$defs/profile_reference"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expression": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "claim_value"
+            },
+            "field_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "literal"
+            },
+            "value": {
+              "type": [
+                "string",
+                "integer",
+                "boolean"
+              ],
+              "maxLength": 256,
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "Integer literals are limited to the interoperable exact-integer range; larger values MUST be encoded as strings under a typed conversion profile."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operator",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "kind": {
+              "const": "compare"
+            },
+            "operator": {
+              "enum": [
+                "eq",
+                "neq",
+                "gt",
+                "gte",
+                "lt",
+                "lte"
+              ]
+            },
+            "left": {
+              "$ref": "#/$defs/expression"
+            },
+            "right": {
+              "$ref": "#/$defs/expression"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "children"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "all",
+                "any"
+              ]
+            },
+            "children": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/expression"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "child"
+          ],
+          "properties": {
+            "kind": {
+              "const": "not"
+            },
+            "child": {
+              "$ref": "#/$defs/expression"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field_id",
+            "max_age_seconds",
+            "future_skew_seconds",
+            "reference"
+          ],
+          "properties": {
+            "kind": {
+              "const": "freshness"
+            },
+            "field_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "max_age_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31536000
+            },
+            "future_skew_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 86400
+            },
+            "reference": {
+              "const": "request_issued_at"
+            }
+          }
+        }
+      ]
+    },
+    "profile_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "profile_id",
+        "profile_digest"
+      ],
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "status_lookup_profile": {
+      "type": "object",
+      "description": "Status lookup privacy/freshness profile. Version maturity and observer-visible fetch policy are explicit; schema conformance does not establish status truth or cache integrity.",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "profile_id",
+        "profile_digest",
+        "specification",
+        "maturity",
+        "retrieval_mode",
+        "index_assignment",
+        "cache_policy",
+        "exposure_channels",
+        "freshness_seconds",
+        "anti_rollback_required"
+      ],
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "specification": {
+          "enum": [
+            "bitstring-status-list-v1.0",
+            "bitstring-status-list-v1.1-wd-2026-11-11",
+            "other-qualified"
+          ]
+        },
+        "maturity": {
+          "enum": [
+            "w3c-recommendation",
+            "w3c-working-draft",
+            "other-profile"
+          ]
+        },
+        "retrieval_mode": {
+          "enum": [
+            "direct_fetch",
+            "verifier_cache",
+            "cdn",
+            "privacy_proxy",
+            "batched_fetch",
+            "holder_disclosure",
+            "hybrid"
+          ]
+        },
+        "index_assignment": {
+          "enum": [
+            "randomized",
+            "sequential",
+            "profile_defined",
+            "not_applicable"
+          ]
+        },
+        "cache_policy": {
+          "enum": [
+            "no_cache",
+            "bounded_ttl",
+            "shared_cache",
+            "cdn",
+            "profile_defined"
+          ]
+        },
+        "exposure_channels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "status_list_url",
+              "status_list_index",
+              "entry_id",
+              "fetch_timing",
+              "cache_hit_miss",
+              "status_change_cadence",
+              "response_size",
+              "response_status",
+              "network_origin",
+              "geography",
+              "verifier_identity",
+              "other"
+            ]
+          }
+        },
+        "freshness_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31536000
+        },
+        "anti_rollback_required": {
+          "const": true
+        },
+        "target_minimum_bitstring_bits": {
+          "type": "integer",
+          "minimum": 131072,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "field_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field_id",
+        "parser_profile_id",
+        "parser_profile_digest",
+        "schema_profile_id",
+        "schema_profile_digest",
+        "json_pointer",
+        "duplicate_key_policy",
+        "unicode_policy",
+        "lexical_profile_id",
+        "lexical_profile_digest",
+        "interpretation"
+      ],
+      "properties": {
+        "field_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "interpretation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value_type",
+            "conversion_profile_id",
+            "conversion_profile_digest"
+          ],
+          "properties": {
+            "value_type": {
+              "enum": [
+                "utf8_string",
+                "unsigned_integer",
+                "signed_integer",
+                "decimal_string",
+                "timestamp_rfc3339",
+                "timestamp_unix_seconds",
+                "closed_enum"
+              ]
+            },
+            "unit": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "minor_unit_scale": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18
+            },
+            "timezone": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "conversion_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "conversion_profile_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "parser_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parser_profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "schema_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "schema_profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "json_pointer": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "duplicate_key_policy": {
+          "const": "reject"
+        },
+        "unicode_policy": {
+          "const": "exact_scalar_sequence_no_normalization"
+        },
+        "lexical_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "lexical_profile_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

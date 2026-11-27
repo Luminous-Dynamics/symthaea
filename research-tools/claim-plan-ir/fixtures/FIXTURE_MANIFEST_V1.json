@@ -1,0 +1,85 @@
+{
+  "version": "claim-plan-fixture-manifest/v1",
+  "purpose": "Synthetic-only multi-field claim plan, canonical-input, status privacy and semantic preflight fixtures. No cryptographic or issuer qualification is implied.",
+  "positive": [
+    {
+      "path": "positive_zar_balance_plan_v1.json",
+      "expected": "accept-structure-and-semantic-preflight",
+      "required": true,
+      "covers": [
+        "currency == ZAR",
+        "available_minor_units >= 100000",
+        "as_of fresh within 300 seconds of verifier request issued_at, with 30-second future skew"
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "path": "negative/unsafe_integer_literal.json",
+      "expected": "reject-raw-json-admission-before-schema",
+      "reason": "The strict parser rejects integers outside the JCS exact safe-integer range before a generic JSON value or canonicalizer can round or reinterpret them."
+    },
+    {
+      "path": "negative/status_version_maturity_mismatch.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "W3C Bitstring Status List v1.1 Working Draft cannot be labelled a W3C Recommendation."
+    },
+    {
+      "path": "negative/origin_contains_path.json",
+      "expected": "reject-json-schema",
+      "reason": "The source origin field must be an HTTPS origin, not a URL containing an application path."
+    },
+    {
+      "path": "negative/missing_status_anti_rollback.json",
+      "expected": "reject-json-schema",
+      "reason": "Status evidence profile must explicitly require anti-rollback checking."
+    },
+    {
+      "path": "negative/duplicate_member_name.raw.json",
+      "expected": "reject-raw-json-admission-before-schema",
+      "reason": "Duplicate JSON object member names violate the JCS/I-JSON input contract and cannot be safely detected after lossy object parsing."
+    },
+    {
+      "path": "negative/invalid_json_pointer_escape.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "RFC 6901 permits only ~0 and ~1 escapes in a JSON Pointer token; ~2 must reject before field selection."
+    },
+    {
+      "path": "negative/expiry_not_after_issued_at.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "A verifier challenge must expire strictly after its issue time; zero or negative validity windows are invalid."
+    },
+    {
+      "path": "negative/trust_scope_overclaim.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "A delegated TLSNotary notary attestation is not a self-contained public proof; its verification scope must retain the delegated notary trust assumption."
+    },
+    {
+      "path": "negative/https_origin_port_out_of_range.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "The canonical HTTPS origin port must be in the range 1..=65535; a five-digit lexical match is not sufficient."
+    },
+    {
+      "path": "negative/https_origin_explicit_default_port.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "Canonical HTTPS origin must omit default port 443."
+    },
+    {
+      "path": "negative/dns_server_identity_mismatch.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "When DNS server identity is the selected identity kind, it must exactly equal the canonical origin host."
+    },
+    {
+      "path": "negative/ipv4_origin_literal.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "The v1 canonical HTTPS origin profile admits lowercase ASCII DNS names only; IPv4/IPv6 address literals are outside the profile."
+    }
+  ],
+  "nonclaims": [
+    "The fixture uses synthetic identifiers and zero digests.",
+    "No TLS session or proof is present.",
+    "All profile IDs are test labels, not qualified profiles.",
+    "Schema shape is not policy correctness or authorization.",
+    "The plan binds three fields from one synthetic response; it does not yet prove their transcript openings or predicate."
+  ]
+}
