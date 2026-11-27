@@ -1,9 +1,9 @@
 {
   "schema_version": "mace_dsm_pair_manifest_v0_1",
   "run_id": "mace-dsm-six-episode-fixture-v0-1",
-  "source_revision": "780c6d1ed1eedf9d694b88ffe13c0056d2f3adfa",
-  "generator_sha256": "7938cb0226a877133cec776052a3cf8106b4a6d056a97d41a0066e4e0579d3b8",
-  "scenario_sha256": "9a5d74ac0822d213ca7dc98875bf508b23bbab89eda2fa16aec3a5ecfbef8cb2",
+  "source_revision": "4a713610d57993eef5e3eb7107770ebda133ecb4",
+  "generator_sha256": "cfb65adffc7dd8e3588cb18bd8440eb22d2c59c5490d3e8f013e79b15a1590b6",
+  "scenario_sha256": "2413071b4773f99c38f47694cb220aaa304d57f21005edc19e9aa38939d7083c",
   "arm_manifest_sha256": "9f49875e7cf1a9c2ae280a07ed4e0f7a2b8eeaf8fd797f127e0d932cc1713ec8",
   "episodes": [
     {
@@ -11,42 +11,42 @@
       "pair_block_id": "pair-temporal-0001",
       "world_cluster_id": "world-temporal-0001",
       "query_id": "query-temporal-0001",
-      "candidate_sha256": "fa128ffb896dfe3e12f53fe8e80449ced1cbf281e1d5524f336c23adcf9eb449"
+      "candidate_sha256": "c22963006472aa699d6a4781fcfc9ebdc219232b86fa4017cb29551065bb18f9"
     },
     {
       "episode_id": "contradiction/0001",
       "pair_block_id": "pair-conflict-0001",
       "world_cluster_id": "world-conflict-0001",
       "query_id": "query-conflict-0001",
-      "candidate_sha256": "f6bd98300cd3abad6aa7a80dd2d00ec60c59bdd232f6d945bfc83c5c034fabd5"
+      "candidate_sha256": "7ba55a2682a6d16212dd8da564dc8310751345d693710ab67e6db21b344c21aa"
     },
     {
       "episode_id": "revocation/0001",
       "pair_block_id": "pair-revocation-0001",
       "world_cluster_id": "world-revocation-0001",
       "query_id": "query-revocation-0001",
-      "candidate_sha256": "3c794e35f996592c54eeedaf1159e5bb3535abacdf20e1a85e345aad383801bb"
+      "candidate_sha256": "6bc8598048db47dc7e24ab444307584cdcc4fbd37665432edc7911e1c14c0d4d"
     },
     {
       "episode_id": "insufficient-evidence/0001",
       "pair_block_id": "pair-observation-0001",
       "world_cluster_id": "world-observation-0001",
       "query_id": "query-observation-0001",
-      "candidate_sha256": "c054943f275cee7b65eff1bc96932f38b15a2cc94f8f48c9c51d38a850589946"
+      "candidate_sha256": "fbff69abd7971e04b3bc56b6ef780016b581ba43071677ff1e14908c914e9d9f"
     },
     {
       "episode_id": "poisoning/0001",
       "pair_block_id": "pair-poisoning-0001",
       "world_cluster_id": "world-poisoning-0001",
       "query_id": "query-poisoning-0001",
-      "candidate_sha256": "0fe0544f3d726170bff16178c9ea75ca2e71d6f7fcbc51d578946e527f930d56"
+      "candidate_sha256": "c217e77ca8d115f1cced9daeb3c2f3608d75f35f23ccc57728351ad3b6cb3198"
     },
     {
       "episode_id": "decision-sufficient-compression/0001",
       "pair_block_id": "pair-compression-0001",
       "world_cluster_id": "world-compression-0001",
       "query_id": "query-compression-0001",
-      "candidate_sha256": "53199a91b909be94cb1301eac78064772bc52fdea2474db9f04830a1cf52430f"
+      "candidate_sha256": "368cea6cf2f09fcc09d0b8bfa484c203a49a21e5c1d44fec9c9af361dbc9f219"
     }
   ]
 }
