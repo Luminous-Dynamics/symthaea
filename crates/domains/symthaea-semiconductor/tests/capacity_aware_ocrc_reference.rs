@@ -28,6 +28,7 @@ fn policy(capacity: usize) -> CaoOcrcPolicyV1 {
         maximum_proxy_delay_rounds: 2,
         delay_assumption: CaoOcrcDelayAssumptionV1::ArbitraryBounded,
         feedback_delay_survival: None,
+        feedback_delay_law_manifest_sha256: None,
         population_scope: CaoOcrcPopulationScopeV1::QualifiedMeasuredStreamOnly,
         proxy_survival: vec![1.0, 0.5, 0.25],
     }
