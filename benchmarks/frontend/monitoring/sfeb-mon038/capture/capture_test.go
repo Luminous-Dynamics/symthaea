@@ -32,7 +32,7 @@ func fixture()Input{
   PartitionCaptures:[]PartitionCapture{
    {CaptureID:"capture-038-001",ClusterID:"kafka-cluster-1",Topic:"ledger",TopicID:"topic-id-ledger",Partition:0,
     StartOffset:100,EndOffsetExclusive:104,LogStartOffsetAtStart:50,LogStartOffsetAtEnd:50,
-    LastStableOffsetBefore:104,LastStableOffsetAfter:104,LeaderEpochBefore:3,LeaderEpochAfter:3,
+    LastStableOffsetBefore:104,LastStableOffsetAfter:104,HighWatermarkBefore:104,HighWatermarkAfter:104,LeaderEpochBefore:3,LeaderEpochAfter:3,
     IsolationLevel:"read_committed",CleanupPolicy:"delete",CaptureStartedAt:now.Add(-80*time.Second),CaptureCompletedAt:now.Add(-40*time.Second),CaptureComplete:true,
     Records:[]CapturedRecord{
      {Topic:"ledger",TopicID:"topic-id-ledger",Partition:0,Offset:100,RecordClass:"row_change",EventID:"row-1",TransactionID:"tx-1",DataCollection:"public.ledger",PayloadSHA256:da},
@@ -40,14 +40,14 @@ func fixture()Input{
     }},
    {CaptureID:"capture-038-001",ClusterID:"kafka-cluster-1",Topic:"ledger",TopicID:"topic-id-ledger",Partition:1,
     StartOffset:200,EndOffsetExclusive:202,LogStartOffsetAtStart:100,LogStartOffsetAtEnd:100,
-    LastStableOffsetBefore:202,LastStableOffsetAfter:202,LeaderEpochBefore:8,LeaderEpochAfter:8,
+    LastStableOffsetBefore:202,LastStableOffsetAfter:202,HighWatermarkBefore:202,HighWatermarkAfter:202,LeaderEpochBefore:8,LeaderEpochAfter:8,
     IsolationLevel:"read_committed",CleanupPolicy:"delete",CaptureStartedAt:now.Add(-80*time.Second),CaptureCompletedAt:now.Add(-40*time.Second),CaptureComplete:true,
     Records:[]CapturedRecord{
      {Topic:"ledger",TopicID:"topic-id-ledger",Partition:1,Offset:200,RecordClass:"row_change",EventID:"row-3",TransactionID:"tx-2",DataCollection:"public.ledger",PayloadSHA256:dc},
     }},
    {CaptureID:"capture-038-001",ClusterID:"kafka-cluster-1",Topic:"message",TopicID:"topic-id-message",Partition:0,
     StartOffset:40,EndOffsetExclusive:43,LogStartOffsetAtStart:0,LogStartOffsetAtEnd:0,
-    LastStableOffsetBefore:43,LastStableOffsetAfter:43,LeaderEpochBefore:5,LeaderEpochAfter:5,
+    LastStableOffsetBefore:43,LastStableOffsetAfter:43,HighWatermarkBefore:43,HighWatermarkAfter:43,LeaderEpochBefore:5,LeaderEpochAfter:5,
     IsolationLevel:"read_committed",CleanupPolicy:"delete",CaptureStartedAt:now.Add(-80*time.Second),CaptureCompletedAt:now.Add(-40*time.Second),CaptureComplete:true,
     Records:[]CapturedRecord{
      {Topic:"message",TopicID:"topic-id-message",Partition:0,Offset:40,RecordClass:"logical_message",EventID:"message-1",TransactionID:"tx-1",DataCollection:"LOGICAL_DECODING_MESSAGE",PayloadSHA256:dd},
@@ -80,7 +80,7 @@ func TestDuplicatePartitionRangeBlocks(t *testing.T){in:=fixture();in.PartitionC
 func TestPartitionOutsideDeclaredCountBlocks(t *testing.T){in:=fixture();in.PartitionCaptures[0].Partition=2;for i:=range in.PartitionCaptures[0].Records{in.PartitionCaptures[0].Records[i].Partition=2};in.BusinessEvents[0].Partition=2;in.BusinessEvents[1].Partition=2;refresh(&in);expect(t,in,Blocked)}
 func TestReadUncommittedCaptureBlocks(t *testing.T){in:=fixture();in.PartitionCaptures[0].IsolationLevel="read_uncommitted";refresh(&in);expect(t,in,Blocked)}
 func TestLastStableOffsetMustBeStable(t *testing.T){in:=fixture();in.PartitionCaptures[0].LastStableOffsetBefore=105;refresh(&in);expect(t,in,Indeterminate)}
-func TestRangeCannotEndBeforeLastStableOffset(t *testing.T){in:=fixture();in.PartitionCaptures[0].EndOffsetExclusive=103;in.PartitionCaptures[0].Records=in.PartitionCaptures[0].Records[:1];in.BusinessEvents=in.BusinessEvents[:3];refresh(&in);expect(t,in,Indeterminate)}
+func TestRangeCannotEndBeforeLastStableOffset(t *testing.T){in:=fixture();in.PartitionCaptures[0].EndOffsetExclusive=103;refresh(&in);expect(t,in,Indeterminate)}
 func TestRangeCannotExtendPastLastStableOffset(t *testing.T){in:=fixture();in.PartitionCaptures[0].EndOffsetExclusive=105;refresh(&in);expect(t,in,Blocked)}
 func TestLogStartAdvancingPastCaptureStartBlocks(t *testing.T){in:=fixture();in.PartitionCaptures[0].LogStartOffsetAtEnd=101;refresh(&in);expect(t,in,Blocked)}
 func TestCompactedTopicBlocksExactHistoryClaim(t *testing.T){in:=fixture();in.TopicInventory[0].CleanupPolicy="compact,delete";in.PartitionCaptures[0].CleanupPolicy="compact,delete";refresh(&in);expect(t,in,Blocked)}
@@ -121,7 +121,7 @@ func BenchmarkEvaluate10000Records256Partitions(b *testing.B){
  eventID:=0
  for partition:=0;partition<256;partition++{
   p:=PartitionCapture{CaptureID:in.CaptureID,ClusterID:"kafka-cluster-1",Topic:"ledger",TopicID:"topic-id-ledger",Partition:partition,
-   StartOffset:0,EndOffsetExclusive:40,LogStartOffsetAtStart:0,LogStartOffsetAtEnd:0,LastStableOffsetBefore:40,LastStableOffsetAfter:40,
+   StartOffset:0,EndOffsetExclusive:40,LogStartOffsetAtStart:0,LogStartOffsetAtEnd:0,LastStableOffsetBefore:40,LastStableOffsetAfter:40,HighWatermarkBefore:40,HighWatermarkAfter:40,
    LeaderEpochBefore:1,LeaderEpochAfter:1,IsolationLevel:"read_committed",CleanupPolicy:"delete",
    CaptureStartedAt:now.Add(-time.Minute),CaptureCompletedAt:now.Add(-time.Second),CaptureComplete:true}
   for i:=0;i<40;i++{eventID++;payload:=da;id:=fmt.Sprintf("e-%05d",eventID);p.Records=append(p.Records,CapturedRecord{Topic:"ledger",TopicID:"topic-id-ledger",Partition:partition,Offset:int64(i),RecordClass:"row_change",EventID:id,TransactionID:fmt.Sprintf("tx-%d",eventID),DataCollection:"public.ledger",PayloadSHA256:payload});in.BusinessEvents=append(in.BusinessEvents,BusinessEvent{EventID:id,TransactionID:fmt.Sprintf("tx-%d",eventID),Topic:"ledger",TopicID:"topic-id-ledger",Partition:partition,Offset:int64(i),RecordClass:"row_change",DataCollection:"public.ledger",PayloadSHA256:payload})}
