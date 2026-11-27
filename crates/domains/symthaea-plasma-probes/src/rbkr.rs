@@ -55,6 +55,10 @@ pub enum RbkrError {
     InvalidCOperator,
     #[error("response Gramian scenario set or coordinate contract is invalid")]
     InvalidScenarioSet,
+    #[error("only training scenarios may be aggregated into a response basis")]
+    NonTrainingScenarioForAggregation,
+    #[error("only development-challenge scenarios may drive basis enrichment")]
+    NonDevelopmentScenarioForEnrichment,
     #[error("response Gramian scenarios use different task contracts")]
     MixedScenarioContract,
     #[error("response Gramian scenarios use different checkpoints")]
@@ -98,6 +102,19 @@ pub enum FiniteHorizonGramianError {
     InvalidGramianFactor,
 }
 
+/// Role of a scenario in the train / validate / challenge / sealed-test protocol.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ResponseScenarioRole {
+    /// May contribute to the response-balanced training Gramian.
+    Training,
+    /// May be measured for hyperparameter / threshold selection, but not basis updates.
+    Validation,
+    /// May drive worst-response enrichment during development.
+    DevelopmentChallenge,
+    /// Blind final holdout: evaluation only, never construction or enrichment.
+    SealedHoldout,
+}
+
 /// One frozen physical trajectory / pulse scenario contributing to a task Gramian.
 ///
 /// All scenarios being aggregated must share the same task contract,
@@ -109,6 +126,7 @@ pub enum FiniteHorizonGramianError {
 #[derive(Clone, Copy, Debug)]
 pub struct ResponseGramianScenario<'a> {
     pub scenario_id: &'a str,
+    pub role: ResponseScenarioRole,
     /// SHA-256 of the frozen full-order trajectory and pulse path.
     pub trajectory_sha256: &'a str,
     pub task_contract_id: &'a str,
@@ -375,6 +393,9 @@ pub fn aggregate_response_gramians(
     let mut input_factor_count = 0_usize;
     let mut aggregate_factor_count = 0_usize;
     for scenario in scenarios {
+        if scenario.role != ResponseScenarioRole::Training {
+            return Err(RbkrError::NonTrainingScenarioForAggregation);
+        }
         if scenario.scenario_id.trim().is_empty() || !scenario_ids.insert(scenario.scenario_id) {
             return Err(RbkrError::InvalidScenarioSet);
         }
@@ -1115,7 +1136,7 @@ impl ResponseBalancedBasis {
     /// singular-value cutoff is relative to the Frobenius norm of Y^T X.
     /// This is a greedy scenario-specific enrichment, not a global min-max
     /// optimum or a nonlinear response guarantee.
-    pub fn enrich_from_scenario(
+    fn enrich_from_scenario(
         &mut self,
         reachability: &EmpiricalGramian,
         observability: &EmpiricalGramian,
@@ -1383,6 +1404,12 @@ impl ResponseBalancedBasis {
         config: RbkrConfig,
     ) -> Result<ResponseEnrichmentReceipt, RbkrError> {
         config.validate()?;
+        if scenarios
+            .iter()
+            .any(|scenario| scenario.role != ResponseScenarioRole::DevelopmentChallenge)
+        {
+            return Err(RbkrError::NonDevelopmentScenarioForEnrichment);
+        }
         let report = evaluate_response_scenario_residuals(self, scenarios, 0.9)?;
         let worst_index = report
             .scenarios
@@ -1874,6 +1901,8 @@ mod tests {
         let scenarios = [
             ResponseGramianScenario {
                 scenario_id: "common-storage",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "3333333333333333333333333333333333333333333333333333333333333333",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-storage",
@@ -1886,6 +1915,8 @@ mod tests {
             },
             ResponseGramianScenario {
                 scenario_id: "rare-storage",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "4444444444444444444444444444444444444444444444444444444444444444",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-storage",
@@ -1903,13 +1934,17 @@ mod tests {
         let mut basis =
             ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
                 .unwrap();
+        let development_scenarios = scenarios.map(|scenario| ResponseGramianScenario {
+            role: ResponseScenarioRole::DevelopmentChallenge,
+            ..scenario
+        });
         let before = basis.reduced_order();
         let mut config = RbkrConfig::new(2);
         // For n=2, current order 1 and candidate order 2 require
         // 4 + 8 = 12 live basis scalars, not merely 8 output scalars.
         config.maximum_basis_scalars = 8;
         assert_eq!(
-            basis.enrich_from_worst_scenario(&scenarios, config),
+            basis.enrich_from_worst_scenario(&development_scenarios, config),
             Err(RbkrError::BasisBudgetExceeded)
         );
         assert_eq!(basis.reduced_order(), before);
@@ -1924,6 +1959,8 @@ mod tests {
         let scenarios = [
             ResponseGramianScenario {
                 scenario_id: "common-response",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "1111111111111111111111111111111111111111111111111111111111111111",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-greedy",
@@ -1936,6 +1973,8 @@ mod tests {
             },
             ResponseGramianScenario {
                 scenario_id: "rare-response",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "2222222222222222222222222222222222222222222222222222222222222222",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-greedy",
@@ -1953,12 +1992,17 @@ mod tests {
         let mut basis =
             ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
                 .unwrap();
-        let before = evaluate_response_scenario_residuals(&basis, &scenarios, 0.9).unwrap();
+        let development_scenarios = scenarios.map(|scenario| ResponseGramianScenario {
+            role: ResponseScenarioRole::DevelopmentChallenge,
+            ..scenario
+        });
+        let before =
+            evaluate_response_scenario_residuals(&basis, &development_scenarios, 0.9).unwrap();
         assert!(before.scenarios[0].response_residual < 1.0e-10);
         assert!((before.scenarios[1].response_residual - 1.0).abs() < 1.0e-10);
 
         let receipt = basis
-            .enrich_from_worst_scenario(&scenarios, RbkrConfig::new(2))
+.enrich_from_worst_scenario(&development_scenarios, RbkrConfig::new(2))
             .unwrap();
         assert_eq!(receipt.scenario_id, "rare-response");
         assert_eq!(
@@ -1975,9 +2019,53 @@ mod tests {
         assert!(basis.biorthogonality_defect() < 1.0e-8);
         assert_eq!(basis.response_enrichment_singular_values().len(), 1);
 
-        let after = evaluate_response_scenario_residuals(&basis, &scenarios, 0.9).unwrap();
+        let after =
+            evaluate_response_scenario_residuals(&basis, &development_scenarios, 0.9).unwrap();
         assert!(after.worst_case < 1.0e-10);
         assert!(after.cvar < 1.0e-10);
+    }
+
+    #[test]
+    fn sealed_holdout_cannot_construct_or_enrich_a_response_basis() {
+        let reach = gramian(2, &[vec![1.0, 0.0]]);
+        let observe = gramian(2, &[vec![1.0, 0.0]]);
+        let holdout = ResponseGramianScenario {
+            scenario_id: "sealed-holdout",
+            role: ResponseScenarioRole::SealedHoldout,
+            trajectory_sha256: "9999999999999999999999999999999999999999999999999999999999999999",
+            task_contract_id: "kresp1-contract-v1",
+            checkpoint_id: "checkpoint-sealed",
+            checkpoint_sha256: "9999999999999999999999999999999999999999999999999999999999999999",
+            state_coordinate_id: "vlasov-1d1v-layout-v1",
+            state_metric_id: "metric-v1",
+            reachability: &reach,
+            observability: &observe,
+            scenario_weight: 1.0,
+        };
+        assert_eq!(
+            aggregate_response_gramians(
+                &[holdout],
+                ResponseGramianAggregationConfig::default(),
+            ),
+            Err(RbkrError::NonTrainingScenarioForAggregation)
+        );
+
+        let training_reach = gramian(2, &[vec![1.0, 0.0]]);
+        let training_observe = gramian(2, &[vec![1.0, 0.0]]);
+        let mut basis = ResponseBalancedBasis::from_empirical_gramians(
+            &training_reach,
+            &training_observe,
+            RbkrConfig::new(1),
+        )
+        .unwrap();
+        let original_order = basis.reduced_order();
+        let original_trial = basis.trial_basis().to_vec();
+        assert_eq!(
+            basis.enrich_from_worst_scenario(&[holdout], RbkrConfig::new(2)),
+            Err(RbkrError::NonDevelopmentScenarioForEnrichment)
+        );
+        assert_eq!(basis.reduced_order(), original_order);
+        assert_eq!(basis.trial_basis(), original_trial);
     }
 
     #[test]
@@ -1989,6 +2077,8 @@ mod tests {
         let scenarios = [
             ResponseGramianScenario {
                 scenario_id: "dominant-common-pulse",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
@@ -2001,6 +2091,8 @@ mod tests {
             },
             ResponseGramianScenario {
                 scenario_id: "rare-adversarial-pulse",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
@@ -2036,6 +2128,8 @@ mod tests {
         let scenarios = [
             ResponseGramianScenario {
                 scenario_id: "scenario-a",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-sha256-abc",
@@ -2048,6 +2142,8 @@ mod tests {
             },
             ResponseGramianScenario {
                 scenario_id: "scenario-b",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-sha256-abc",
@@ -2096,6 +2192,8 @@ mod tests {
         let scenarios = [
             ResponseGramianScenario {
                 scenario_id: "positive",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "1111111111111111111111111111111111111111111111111111111111111111",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
@@ -2108,6 +2206,8 @@ mod tests {
             },
             ResponseGramianScenario {
                 scenario_id: "zero-weight",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "2222222222222222222222222222222222222222222222222222222222222222",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
@@ -2137,6 +2237,8 @@ mod tests {
         let scenarios = [
             ResponseGramianScenario {
                 scenario_id: "large-weight-a",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
@@ -2149,6 +2251,8 @@ mod tests {
             },
             ResponseGramianScenario {
                 scenario_id: "large-weight-b",
+
+                role: ResponseScenarioRole::Training,
                 trajectory_sha256: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
                 task_contract_id: "kresp1-contract-v1",
                 checkpoint_id: "checkpoint-a",
@@ -2187,6 +2291,8 @@ mod tests {
         let observe = gramian(2, &[vec![1.0, 0.0]]);
         let scenario = ResponseGramianScenario {
             scenario_id: "scenario-empty",
+
+            role: ResponseScenarioRole::Training,
             trajectory_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             task_contract_id: "kresp1-contract-v1",
             checkpoint_id: "checkpoint-a",
@@ -2209,6 +2315,8 @@ mod tests {
         let observe = gramian(2, &[vec![1.0, 0.0]]);
         let base = ResponseGramianScenario {
             scenario_id: "scenario-base",
+
+            role: ResponseScenarioRole::Training,
             trajectory_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             task_contract_id: "kresp1-contract-v1",
             checkpoint_id: "checkpoint-a",
