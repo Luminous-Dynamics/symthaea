@@ -232,9 +232,19 @@ impl EpistemicLearner {
 
         self.outcomes.push_back(outcome);
 
-        // Trim old outcomes
+        // Bound history without allowing pending claims to evict measured
+        // outcomes. When full, discard the oldest unadjudicated record first;
+        // only evict an adjudicated record when no pending record remains.
         if self.outcomes.len() > 1000 {
-            self.outcomes.pop_front();
+            if let Some(index) = self
+                .outcomes
+                .iter()
+                .position(|record| record.was_correct.is_none())
+            {
+                self.outcomes.remove(index);
+            } else {
+                self.outcomes.pop_front();
+            }
         }
 
         // Update meta-phi only when a new adjudicated outcome reaches a
@@ -531,6 +541,40 @@ mod tests {
         assert!(
             learner.get_source_credibility("self-referential.example").is_none(),
             "unadjudicated predictions must not train source credibility"
+        );
+    }
+
+    #[test]
+    fn pending_outcomes_cannot_evict_adjudicated_calibration_history() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..10 {
+            learner
+                .record_outcome(make_outcome(
+                    "science",
+                    "adjudicated.example",
+                    index % 2 == 0,
+                ))
+                .unwrap();
+        }
+        for index in 0..1000 {
+            learner
+                .record_outcome(VerificationOutcome::unadjudicated(
+                    format!("Pending claim {index}"),
+                    "pending.example",
+                    ResearchSource::Web,
+                ))
+                .unwrap();
+        }
+
+        let stats = learner.stats();
+        assert_eq!(stats.total_outcomes, 1000);
+        assert_eq!(stats.adjudicated_outcomes, 10);
+        assert_eq!(stats.unadjudicated_outcomes, 990);
+        assert!(learner.is_ready());
+        assert_eq!(stats.accuracy, 0.5);
+        assert!(
+            learner.get_source_credibility("adjudicated.example").is_some(),
+            "pending records must not evict the measured source calibration"
         );
     }
 
