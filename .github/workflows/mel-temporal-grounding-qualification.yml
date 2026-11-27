@@ -9,6 +9,7 @@ on:
       - research/mel-multi-annotator-grounding-v1-20261124
       - research/mel-annotator-reliability-corpus-v1-20261125
       - research/mel-music-listen-bench-v1-20261126
+      - research/mel-music-performance-identity-v1-20261127
       - research/mel-temporal-unitizing-alpha-u-v1-20261126
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
@@ -231,6 +232,43 @@ jobs:
             and .transformations_authenticated == false
             and .model_invoked_by_evaluator == false
           ' "$RUNNER_TEMP/music-listen-bench-report.json" > /dev/null
+
+      - name: Replay property-relative performance identity triads when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/music_performance_identity.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-performance-identity-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-performance-identity.synthetic.json > "$RUNNER_TEMP/music-performance-identity-report.json"
+          jq -e '
+            .schema == "mel-music-performance-identity-report-v1"
+            and .benchmark_id == "MEL-PERFORMANCE-IDENTITY"
+            and .benchmark_version == "1.0"
+            and .overall.triads == 8
+            and .overall.clean.accuracy == 0.875
+            and .overall.performance_stay.accuracy == 0.875
+            and .overall.musical_flip.accuracy == 0.875
+            and .overall.performance_stay_false_difference_rate == 0.125
+            and .overall.musical_flip_miss_rate == 0.125
+            and .overall.clean_correct_triads == 7
+            and .overall.conditional_performance_stay_false_difference_rate > 0.14
+            and .overall.conditional_performance_stay_false_difference_rate < 0.15
+            and .overall.conditional_musical_flip_miss_rate > 0.14
+            and .overall.conditional_musical_flip_miss_rate < 0.15
+            and .overall.joint_clean_performance_stay_musical_flip_exact_rate == 0.625
+            and (.by_property | length) == 6
+            and (.by_performance_stay_factor | length) == 6
+            and (.by_musical_flip_factor | length) == 6
+            and (.by_performance_stay_performer | length) == 2
+            and (.by_performance_stay_take | length) == 2
+            and (.by_performance_stay_renderer | length) == 2
+            and .source_work_clusters == 8
+            and .performer_clusters == 2
+            and .confirmatory_source_work_floor_met == false
+            and .target_property_reference_authenticated == false
+            and .pairing_manifests_authenticated == false
+            and .audio_bytes_recomputed == false
+            and .population_confidence_interval_computed == false
+          ' "$RUNNER_TEMP/music-performance-identity-report.json" > /dev/null
 
       - name: Replay corrected multi-rater unitizing alpha-u corpus when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs') != ''
