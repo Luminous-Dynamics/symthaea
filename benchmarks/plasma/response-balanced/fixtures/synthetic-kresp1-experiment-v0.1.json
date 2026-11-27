@@ -331,7 +331,23 @@
     ],
     "cvar_alpha": 0.9,
     "residual_threshold_status": "calibrate_on_independently_converged_physical_reference",
-    "nonlinear_full_order_response_required": true
+    "nonlinear_full_order_response_required": true,
+    "scalar_separation_oracle": {
+      "status": "design_only_not_executed",
+      "method": "branch_conditioned_lipschitz_branch_and_bound_1d",
+      "continuous_parameter_axes": [
+        "pulse_phase",
+        "kick_amplitude",
+        "pulse_separation"
+      ],
+      "interior_search_required": true,
+      "boundary_only_search_sufficient": false,
+      "lipschitz_certificate_status": "not_issued_synthetic",
+      "branch_stability_evidence_status": "not_issued_synthetic",
+      "budget_exhaustion_disposition": "unqualified",
+      "global_bound_claim_status": "conditional_on_valid_lipschitz_and_branch_evidence",
+      "full_order_confirmation_required": true
+    }
   },
   "methodological_prior_art": [
     "semi_infinite_worst_case_scenario_generation",
