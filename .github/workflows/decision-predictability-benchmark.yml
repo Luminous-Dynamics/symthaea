@@ -32,7 +32,5 @@ jobs:
         run: cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets
       - name: Run AERB lost-ack robust value conformance example
         run: cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --example aerb_lost_ack
-      - name: Run AERB lost-ack robust value conformance example
-        run: cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --example aerb_lost_ack
       - name: Run strict Clippy
         run: cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets -- -D warnings
