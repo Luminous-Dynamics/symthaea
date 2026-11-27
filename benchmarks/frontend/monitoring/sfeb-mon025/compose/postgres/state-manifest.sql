@@ -28,7 +28,7 @@ schema_state AS (
 ),
 sequence_probe_state AS (
     SELECT encode(
-        digest(convert_to(coalesce(string_agg(to_jsonb(s)::text, E'\\n' ORDER BY id), ''), 'UTF8'), 'sha256'),
+        digest(convert_to(coalesce(string_agg(to_jsonb(s)::text, E'\n' ORDER BY id), ''), 'UTF8'), 'sha256'),
         'hex'
     ) AS digest
     FROM public.sequence_probe AS s
@@ -51,14 +51,14 @@ materialized_state AS (
 ),
 partition_rows_state AS (
     SELECT encode(
-        digest(convert_to(coalesce(string_agg(to_jsonb(p)::text, E'\\n' ORDER BY occurred_on, id), ''), 'UTF8'), 'sha256'),
+        digest(convert_to(coalesce(string_agg(to_jsonb(p)::text, E'\n' ORDER BY occurred_on, id), ''), 'UTF8'), 'sha256'),
         'hex'
     ) AS digest
     FROM public.ledger_partitioned AS p
 ),
 unlogged_state AS (
     SELECT encode(
-        digest(convert_to(coalesce(string_agg(to_jsonb(u)::text, E'\\n' ORDER BY cache_key), ''), 'UTF8'), 'sha256'),
+        digest(convert_to(coalesce(string_agg(to_jsonb(u)::text, E'\n' ORDER BY cache_key), ''), 'UTF8'), 'sha256'),
         'hex'
     ) AS digest
     FROM public.volatile_cache AS u
