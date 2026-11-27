@@ -587,7 +587,7 @@ fn validate_tracking(
                     }
                 }
                 FeedbackTrackingStateV1::UnlimitedForfeited => {
-                    if tracking.actual_feedback_delay_rounds.is_some()
+                    if tracking.action_receipt_sha256.is_none()
                         || tracking.tracking_slot_id.is_some()
                         || tracking.tracking_end_round.is_some()
                     {
@@ -610,6 +610,7 @@ fn validate_tracking(
             match tracking.state {
                 FeedbackTrackingStateV1::ProxyNotTracked => {
                     if tracking.proxy_delay_rounds != Some(-1)
+                        || tracking.action_receipt_sha256.is_none()
                         || tracking.tracking_slot_id.is_some()
                         || tracking.tracking_end_round.is_some()
                         || tracking.proxy_survival_probability.is_some()
@@ -621,7 +622,8 @@ fn validate_tracking(
                     }
                 }
                 FeedbackTrackingStateV1::CapacityDenied => {
-                    if !tracking.proxy_delay_rounds.is_some_and(|delay| delay >= 0)
+                    if !tracking.proxy_delay_rounds.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
+                        || tracking.action_receipt_sha256.is_none()
                         || tracking.tracking_slot_id.is_some()
                         || tracking.tracking_end_round.is_some()
                         || tracking.proxy_survival_probability.is_some()
@@ -656,7 +658,8 @@ fn validate_tracking(
                 FeedbackTrackingStateV1::Evicted => {
                     let proxy = tracking.proxy_delay_rounds;
                     let ended = tracking.tracking_end_round;
-                    if !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
+                    if tracking.action_receipt_sha256.is_none()
+                        || !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
                         || tracking.tracking_slot_id.is_none()
                         || !ended.is_some_and(|end| end >= row.round && end < row.round + proxy.unwrap_or(0) as u64)
                         || tracking.actual_feedback_delay_rounds.is_some_and(|actual| {
@@ -672,7 +675,8 @@ fn validate_tracking(
                 }
                 FeedbackTrackingStateV1::ProxyExpired => {
                     let proxy = tracking.proxy_delay_rounds;
-                    if !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
+                    if tracking.action_receipt_sha256.is_none()
+                        || !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
                         || tracking.tracking_slot_id.is_none()
                         || tracking.tracking_end_round
                             != Some(row.round.saturating_add(proxy.unwrap_or(0) as u64))
@@ -1126,9 +1130,14 @@ pub fn evaluate_observation_process_v1(
                     "audit observation exists without a declared independent audit design".into(),
                 )
             })?;
+            let operational_method = row
+                .acquisition
+                .operational_measurement_method_sha256
+                .as_deref();
             if audit.round_id != row.round_id
                 || row.qualification.state == K1QualificationStateV1::Eligible
                 || !valid_sha256(&audit.audit_measurement_receipt_sha256)
+                || operational_method == Some(design.reference_method_sha256.as_str())
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} audit record is misidentified, overlaps a qualified round, or has a malformed receipt",
@@ -1276,9 +1285,17 @@ mod tests {
                 proxy_survival_probability: None,
                 tracking_slot_id: None,
                 tracking_end_round: None,
-                action_receipt_sha256: (tracking == FeedbackTrackingStateV1::UnlimitedReceived
-                    && eligible)
-                    .then(|| digest('1')),
+                action_receipt_sha256: matches!(
+                tracking,
+                FeedbackTrackingStateV1::UnlimitedReceived
+                    | FeedbackTrackingStateV1::UnlimitedForfeited
+                    | FeedbackTrackingStateV1::ProxyNotTracked
+                    | FeedbackTrackingStateV1::CapacityDenied
+                    | FeedbackTrackingStateV1::Evicted
+                    | FeedbackTrackingStateV1::ProxyExpired
+                    | FeedbackTrackingStateV1::TrackedReceived
+            )
+            .then(|| digest('1')),
                 controller_update_applied: tracking == FeedbackTrackingStateV1::UnlimitedReceived
                     && eligible,
             },
@@ -1374,6 +1391,7 @@ mod tests {
             FeedbackTrackingStateV1::CapacityDenied,
         );
         denied.tracking.proxy_delay_rounds = Some(2);
+        denied.tracking.action_receipt_sha256 = Some(digest('1'));
         let data = input(
             ObservationRiskControllerV1::CapacityAwareOcrcBounded,
             vec![denied],
@@ -1479,6 +1497,7 @@ mod tests {
             confidence_delta: 0.05,
             independent_of_operational_qualification: true,
         });
+        data.independent_audit_design.as_mut().unwrap().reference_method_sha256 = digest('d');
         data.rounds[0].independent_audit = Some(IndependentAuditObservationV1 {
             round_id: 1,
             loss: 1.0,
