@@ -40,7 +40,7 @@ No guarantee transfers automatically to a new policy, score, hierarchy, source d
 
 ## Synthetic tests
 
-Ten deterministic tests cover the exact zero-violation bound and sample-size consequence, multiplicity conservatism, safe threshold selection, hard-gate dominance, risk-exceeds-target status, explicit parent fallback, shift and exchangeability suspension, hierarchy cycle/digest rejection, retrieve-more behavior, certificate-gated acceptance and tamper rejection.
+Eleven deterministic tests cover the exact zero-violation bound and sample-size consequence, multiplicity conservatism, safe threshold selection, hard-gate dominance, risk-exceeds-target status, explicit parent fallback, shift and exchangeability suspension, hierarchy cycle/digest rejection, retrieve-more behavior, certificate-gated acceptance and tamper rejection.
 
 ## Run
 
@@ -49,4 +49,4 @@ cargo test --manifest-path research/mace-selective-risk-calibrator-v0-1/Cargo.to
 cargo clippy --manifest-path research/mace-selective-risk-calibrator-v0-1/Cargo.toml --all-targets -- -D warnings
 ```
 
-This is an offline calibration kernel, not a production policy. Review its endpoint and assumptions before describing any MACE result as calibrated or certified.
+The manifest, group-certificate and decision-assessment digests are recomputable integrity commitments, not signatures. This is an offline calibration kernel, not a production policy. Review its endpoint and assumptions before describing any MACE result as calibrated or certified.
