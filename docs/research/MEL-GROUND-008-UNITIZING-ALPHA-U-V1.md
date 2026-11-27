@@ -110,6 +110,14 @@ Expected reference values:
 
 Other Rust tests cover identical two-rater unitizations, a one-category audio query, unanimous absence, disjoint unitizations, a one-rater invalid panel and overlapping/unsorted intervals.
 
+### Important metric property: scale sensitivity
+
+u-alpha is **not invariant** to a uniform change in continuum coordinate scale. Mathet, Widlöcher & Métivier explicitly study this in §6.1.6 and Figure 20 of their 2015 Computational Linguistics paper: u-alpha's squared-length disagreement changes under scaling, while their gamma positional dissimilarity is constructed to be scale-independent. The corrected unitizing-alpha family must therefore be interpreted with the continuum's declared timebase and duration; never compare u-alpha values computed in different coordinate units as though they were directly commensurate.
+
+The Rust tests now preserve observer-order invariance but intentionally assert the published Figure 12.11 example's scale response: multiplying every frame coordinate and the continuum length by seven moves nominal u-alpha from approximately 0.50998 to 0.50903 and binary u-alpha from approximately 0.41360 to 0.41246. This is a metric property, not an interval-mapping bug. Reports preserve the source sample rate and continuum frame count; comparative studies should keep the evaluation timebase fixed and stratify/report recording duration rather than treating a raw corpus mean as scale-neutral.
+
+A complementary scale-insensitive unitizing measure such as gamma is a candidate for a separately qualified comparison track. It must be implemented from its own published algorithm/reference implementation, not approximated by adjusting u-alpha.
+
 The CLI fixture includes a three-rater Present panel with disagreement, two preserved excluded records, a unanimous Absent panel, and an item with insufficient eligible raters. The fixture tests report structure and exclusion accounting; it is not musician data.
 
 ## 5. Aggregation and statistical limits
