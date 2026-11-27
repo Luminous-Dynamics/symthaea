@@ -897,12 +897,16 @@ jobs:
               "adaptive_opinf_port", "adaptive_nitrom_port",
               "adaptive_opinf_nitrom_hybrid_port", "symmetry_augmented_kinetic_closure",
               "entropy_based_vlasov_poisson_dougherty_moment_port",
-              "adaptive_symplectic_particle_vlasov_rom_port"
+              "adaptive_symplectic_particle_vlasov_rom_port",
+              "goal_oriented_dwr_hyperreduction_port",
+              "balanced_truncation_a_posteriori_bound_port"
           }
           assert required_adjacent_methods.issubset(set(fixture["adjacent_methods"]))
           assert set(fixture["methodological_prior_art"]) == {
               "semi_infinite_worst_case_scenario_generation",
-              "adaptive_symplectic_particle_vlasov_rom"
+              "adaptive_symplectic_particle_vlasov_rom",
+              "dual_weighted_residual_goal_oriented_sampling",
+              "balanced_truncation_a_posteriori_error_bound"
           }
           assert set(fixture["resource_budget"]["comparison_modes"]) == {
               "equal_rank", "equal_stored_bytes", "equal_end_to_end_wall_time"
