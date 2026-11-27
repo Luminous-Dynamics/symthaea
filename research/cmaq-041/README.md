@@ -27,7 +27,7 @@ All ten evidence digests must be 64-character lowercase hexadecimal SHA-256 valu
 
 Safe episodes must provide an exposure interval whose length equals the episode duration. Hazard episodes cannot contribute safe exposure. The exposure domain identifies one physical asset or simulator clock domain. The evaluator unions overlapping and adjacent intervals within each domain before summing exposure; duplicate or overlapping clips therefore cannot manufacture additional safe operating hours. Different domains (for example, different robots) contribute separate asset-hours. Use a stable domain ID that includes a clock epoch when a device clock can reset.
 
-Event timestamps are relative to the episode trace and must be within the trace. Exposure interval timestamps are absolute within their declared domain. Fallback completion requires a start. Fallback completion cannot precede start, and fallback cannot start before a recorded warning. A warning or fallback completion exactly at the deadline is late; timely intervention requires strictly positive lead time. Fallback completion requires a start. Fallback completion cannot precede start, and fallback cannot start before a recorded warning. A warning or fallback completion exactly at the deadline is late; timely intervention requires strictly positive lead time.
+Event timestamps are relative to the episode trace and must be within the trace. Exposure interval timestamps are absolute within their declared domain. Fallback completion requires a start. Fallback completion cannot precede start, and fallback cannot start before a recorded warning. A warning or fallback completion exactly at the deadline is late; timely intervention requires strictly positive lead time.
 
 ## Output scorecard
 
