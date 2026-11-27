@@ -30,5 +30,7 @@ jobs:
         run: cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
       - name: Run evaluator tests with locked dependencies
         run: cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets
+      - name: Run AERB sequential counterfactual-policy conformance example
+        run: cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --example aerb_sequential_policy
       - name: Run strict Clippy
         run: cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets -- -D warnings
