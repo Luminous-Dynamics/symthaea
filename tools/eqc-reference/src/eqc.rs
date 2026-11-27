@@ -776,10 +776,159 @@ mod tests {
         assert_eq!(report.reference_pass_count, 4);
         assert!(report.no_op_fails_positive_controls);
         assert!(report.allow_all_fails_negative_controls);
+        assert!(report.task_schema_validated);
+        assert!(report.receipt_schema_meta_validated);
         assert_eq!(
             report.evaluation_mode,
             "reference_contract_only_not_system_under_test"
         );
+    }
+
+    fn receipt_schema_validator() -> jsonschema::Validator {
+        let schema_path = repository_root()
+            .join("docs/research/eqc-run-receipt-v0.1.schema.json");
+        let schema = load_schema(&schema_path).expect("receipt schema meta-validates");
+        jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("receipt schema compiles offline")
+    }
+
+    fn valid_receipt() -> Value {
+        serde_json::json!({
+            "schema": "luminous.eqc.run-receipt.v0.1",
+            "run_id": "eqc-run-seed-001",
+            "task_id": "eqc-health-read-authorized-001",
+            "task_digest_sha256": "a".repeat(64),
+            "source_head": "b".repeat(40),
+            "system": {
+                "system_id": "eqc-reference",
+                "version": "0.1.0",
+                "harness_version": "0.1.0",
+                "model_id": null
+            },
+            "environment": {
+                "image_digest": "sha256:fixture-image",
+                "runtime": "rust-1.96.0",
+                "network_policy": "none",
+                "host": "linux-x86_64",
+                "cpu_model": null,
+                "gpu_model": null
+            },
+            "authority_snapshot_sha256": "c".repeat(64),
+            "policy_digest_sha256": "d".repeat(64),
+            "input_digests": [{
+                "input_id": "synthetic-consent-001",
+                "sha256": "e".repeat(64)
+            }],
+            "actions": [],
+            "observed_result": {
+                "disposition": "allow",
+                "state_mutation_count": 0,
+                "result_digest_sha256": "f".repeat(64)
+            },
+            "verifier": {
+                "verifier_id": "eqc-independent-seed-verifier",
+                "verifier_digest_sha256": "1".repeat(64),
+                "replay": "passed",
+                "independent": true,
+                "notes": "Synthetic schema fixture only"
+            },
+            "dimensions": {
+                "capability": true,
+                "authority": true,
+                "input_integrity": true,
+                "provenance": true,
+                "reproducibility": true,
+                "failure_containment": true
+            },
+            "qualified": true,
+            "timestamp": "2026-11-26T00:00:00Z"
+        })
+    }
+
+    #[test]
+    fn task_schema_accepts_all_public_seed_tasks() {
+        let root = repository_root();
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../../../docs/research/eqc-seed-corpus-v0.1.json"
+        ))
+        .expect("seed JSON parses");
+        let tasks = corpus["tasks"].as_array().expect("tasks array");
+        let schema = load_schema(&root.join("docs/research/eqc-task-v0.1.schema.json"))
+            .expect("task schema meta-validates");
+        let validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("task schema compiles offline");
+        assert_eq!(tasks.len(), 4);
+        for (index, task) in tasks.iter().enumerate() {
+            assert!(
+                validator.is_valid(task),
+                "public seed task {index} must satisfy the published task schema"
+            );
+        }
+    }
+
+    #[test]
+    fn task_schema_rejects_missing_digest_bound_inputs() {
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../../../docs/research/eqc-seed-corpus-v0.1.json"
+        ))
+        .expect("seed JSON parses");
+        let mut task = corpus["tasks"][0].clone();
+        task.as_object_mut()
+            .expect("task object")
+            .remove("input_refs");
+        assert!(!receipt_schema_validator().is_valid(&valid_receipt()) == false);
+        let root = repository_root();
+        let schema = load_schema(&root.join("docs/research/eqc-task-v0.1.schema.json"))
+            .expect("task schema meta-validates");
+        let validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("task schema compiles offline");
+        assert!(!validator.is_valid(&task));
+    }
+
+    #[test]
+    fn receipt_schema_accepts_a_fully_qualified_receipt() {
+        let validator = receipt_schema_validator();
+        assert!(validator.is_valid(&valid_receipt()));
+    }
+
+    #[test]
+    fn receipt_schema_rejects_compensated_integrity_failure() {
+        let validator = receipt_schema_validator();
+        let mut receipt = valid_receipt();
+        receipt["dimensions"]["authority"] = Value::Bool(false);
+        assert!(!validator.is_valid(&receipt));
+    }
+
+    #[test]
+    fn receipt_schema_rejects_qualification_without_independent_replay() {
+        let validator = receipt_schema_validator();
+        let mut receipt = valid_receipt();
+        receipt["verifier"]["independent"] = Value::Bool(false);
+        assert!(!validator.is_valid(&receipt));
+
+        receipt["verifier"]["independent"] = Value::Bool(true);
+        receipt["verifier"]["replay"] = Value::String("not_run".to_owned());
+        assert!(!validator.is_valid(&receipt));
+    }
+
+    #[test]
+    fn receipt_schema_allows_a_failed_unqualified_episode_to_be_recorded() {
+        let validator = receipt_schema_validator();
+        let mut receipt = valid_receipt();
+        receipt["qualified"] = Value::Bool(false);
+        receipt["dimensions"]["authority"] = Value::Bool(false);
+        receipt["verifier"]["independent"] = Value::Bool(false);
+        receipt["verifier"]["replay"] = Value::String("not_run".to_owned());
+        assert!(validator.is_valid(&receipt));
     }
 
     #[test]
