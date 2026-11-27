@@ -47,6 +47,12 @@ type SlotState struct {
 	StandbyReplayLSN *LSN
 }
 type DecodedEvent struct { ID,XID string; CommitLSN LSN; Ordinal uint32; PayloadDigest string }
+type Transaction struct {
+	XID string
+	State string // committed, aborted, prepared, committed_prepared, rolled_back_prepared
+	BeginLSN,CommitLSN,EndLSN LSN
+	EventIDs []string
+}
 type Manifest struct {
 	SourceEpoch string
 	TimelineID uint32
@@ -56,6 +62,7 @@ type Manifest struct {
 	StartExclusiveLSN,TerminalLSN,SnapshotConsistentPoint LSN
 	SnapshotDigest string
 	Events []DecodedEvent
+	Transactions []Transaction
 	Complete bool
 	DroppedEvents,QueueOverflowCount uint64
 	EvidenceThroughLSN,AcknowledgementRequestedLSN LSN
@@ -89,6 +96,7 @@ func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
 	if !profileOK(p){return out(Indeterminate,"source profile incomplete",c...)}
 	if !slotMatches(p,s)||m.SourceEpoch!=p.SourceEpoch||m.TimelineID!=p.TimelineID||m.SlotName!=p.SlotName||m.DatabaseOID!=p.DatabaseOID||m.PluginProfileDigest!=p.PluginProfileDigest||m.SchemaProfileDigest!=p.SchemaProfileDigest{return out(Denied,"capture source/slot/plugin/timeline profile mismatch",c...)}
 	if d,r:=slotHealth(s);d!=Qualified{return out(d,r,c...)}
+	if s.TwoPhase { return out(Indeterminate,"two-phase decoding is not qualified by this capture profile",c...) }
 	if m.SnapshotConsistentPoint!=*p.ConsistentPoint||m.SnapshotDigest!=p.SnapshotDigest{return out(Denied,"capture snapshot anchor mismatch",c...)}
 	if !m.Complete||m.DroppedEvents>0||m.QueueOverflowCount>0{return out(Indeterminate,"capture incomplete or reports dropped/overflowed events",c...)}
 	if !present(m.ManifestDigest)||!m.Witnessed{return out(Indeterminate,"capture manifest is not durably sealed/witnessed by the upstream custody boundary",c...)}
@@ -97,17 +105,57 @@ func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
 	if m.AcknowledgementRequestedLSN>m.EvidenceThroughLSN{return out(Denied,"requested acknowledgement advances beyond durable evidence",c...)}
 	if s.ConfirmedFlushLSN!=nil&&*s.ConfirmedFlushLSN>m.EvidenceThroughLSN{return out(Denied,"observed confirmed_flush_lsn exceeds durable evidence",c...)}
 	if *s.RestartLSN>m.StartExclusiveLSN{return out(Indeterminate,"slot restart_lsn is later than required capture start",c...)}
+	txByXID:=map[string]Transaction{}
+	for _,tx:=range m.Transactions {
+		if !present(tx.XID) { return out(Indeterminate,"transaction envelope missing XID",c...) }
+		if _,ok:=txByXID[tx.XID];ok { return out(Divergent,"duplicate transaction envelope: "+tx.XID,c...) }
+		if tx.BeginLSN>tx.CommitLSN||tx.CommitLSN>tx.EndLSN||tx.EndLSN>m.TerminalLSN {
+			return out(Denied,"transaction envelope has impossible begin/commit/end LSN ordering: "+tx.XID,c...)
+		}
+		switch tx.State {
+		case "committed","aborted":
+		case "prepared","committed_prepared","rolled_back_prepared":
+			return out(Indeterminate,"two-phase transaction state is outside the qualified v0.1 envelope: "+tx.XID,c...)
+		default:
+			return out(Indeterminate,"unknown or incomplete transaction terminal state: "+tx.XID,c...)
+		}
+		txByXID[tx.XID]=tx
+	}
 	seen:=map[string]DecodedEvent{}
-	var prev LSN;var prevXID string;var prevOrdinal uint32
-	for i,e:=range m.Events{
+	eventOwner:=map[string]string{}
+	ordinalByXID:=map[string][]uint32{}
+	var prev LSN
+	for _,e:=range m.Events{
 		if !present(e.ID,e.XID,e.PayloadDigest){return out(Indeterminate,"decoded event identity incomplete",c...)}
 		if prior,ok:=seen[e.ID];ok{if prior!=e{return out(Divergent,"same event identity has conflicting fields or payload: "+e.ID,c...)};continue}
 		if e.CommitLSN<=m.StartExclusiveLSN||e.CommitLSN>m.TerminalLSN{return out(Denied,"decoded event outside declared exclusive-start/terminal interval: "+e.ID,c...)}
-		if i>0&&e.CommitLSN<prev{return out(Denied,"decoded event LSN order regressed",c...)}
-		if i>0&&e.CommitLSN==prev&&e.XID==prevXID&&e.Ordinal<=prevOrdinal{return out(Denied,"per-transaction message ordinal is not strictly increasing",c...)}
-		seen[e.ID]=e;prev=e.CommitLSN;prevXID=e.XID;prevOrdinal=e.Ordinal
+		if len(seen)>0&&e.CommitLSN<prev{return out(Denied,"decoded event LSN order regressed",c...)}
+		tx,ok:=txByXID[e.XID]
+		if !ok{return out(Indeterminate,"decoded event has no complete transaction envelope: "+e.ID,c...)}
+		if tx.State!="committed"||tx.CommitLSN!=e.CommitLSN{return out(Denied,"row event is not bound to a committed transaction boundary: "+e.ID,c...)}
+		if owner,ok:=eventOwner[e.ID];ok&&owner!=e.XID{return out(Divergent,"event ID attributed to multiple transactions: "+e.ID,c...)}
+		eventOwner[e.ID]=e.XID
+		seen[e.ID]=e
+		ordinalByXID[e.XID]=append(ordinalByXID[e.XID],e.Ordinal)
+		prev=e.CommitLSN
 	}
-	return out(Qualified,"bounded logical-decoding interval is sealed; acknowledgement does not exceed durable evidence",c...)
+	for xid,tx:=range txByXID {
+		ids:=map[string]bool{}
+		for _,id:=range tx.EventIDs {
+			if ids[id]{return out(Divergent,"transaction envelope repeats event ID: "+id,c...)}
+			ids[id]=true
+			e,ok:=seen[id]
+			if !ok||e.XID!=xid{return out(Indeterminate,"transaction envelope/event membership mismatch: "+id,c...)}
+		}
+		for id,e:=range seen {
+			if e.XID==xid&&!ids[id]{return out(Indeterminate,"decoded event omitted from transaction envelope: "+id,c...)}
+		}
+		ords:=ordinalByXID[xid]
+		for i:=1;i<len(ords);i++{if ords[i]<=ords[i-1]{return out(Denied,"per-transaction message ordinal is not strictly increasing: "+xid,c...)}}
+		if tx.State=="aborted"&&len(ids)>0{return out(Denied,"aborted transaction envelope contains row events: "+xid,c...)}
+	}
+	for _,e:=range m.Events{if _,ok:=txByXID[e.XID];!ok{return out(Indeterminate,"decoded event has no transaction envelope: "+e.ID,c...)}}
+	return out(Qualified,"bounded logical-decoding interval is sealed with complete committed transaction envelopes; acknowledgement does not exceed durable evidence",c...)
 }
 func ValidateReplay(old,next Manifest)Result{
 	c:=[]string{"overlap-replay-reconciliation","no-unaccounted-range-gap"}
