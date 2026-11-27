@@ -915,6 +915,22 @@ pub fn advance_ca_ocrc_round_v1(
         } else {
             0.0
         };
+        if actual_delay > next.policy.maximum_proxy_delay_rounds {
+            feedback_receipts.push(make_feedback_receipt(
+                feedback,
+                CaoOcrcFeedbackDispositionV1::AlreadyExpired,
+                Some(CaoOcrcFeedbackReasonV1::PredictionReceiptMismatch),
+                Some(actual_delay),
+                Some(tracked_round.proxy_delay_rounds),
+                None,
+                None,
+                Some(round.prediction_receipt_sha256.clone()),
+                threshold_before,
+                threshold_before,
+            )?);
+            next.seen_feedback_idempotency_keys.insert(idempotency);
+            continue;
+        }
         let survival = next.policy.proxy_survival[actual_delay as usize];
         if survival <= 0.0 {
             feedback_receipts.push(make_feedback_receipt(
@@ -931,13 +947,22 @@ pub fn advance_ca_ocrc_round_v1(
             )?);
             continue;
         }
-        let inverse_weight = 1.0 / survival;
+        let feedback_observation_probability = q_g_for_policy(&next.policy)?;
+        if feedback_observation_probability <= 0.0 || !feedback_observation_probability.is_finite() {
+            return Err(CaoOcrcErrorV1(
+                "q_G must be finite and positive before stochastic feedback update".into(),
+            ));
+        }
+        let inverse_weight = 1.0 / (feedback_observation_probability * survival);
+        if !inverse_weight.is_finite() {
+            return Err(CaoOcrcErrorV1("two-level IPW weight is non-finite".into()));
+        }
         feedback_loss_weighted_sum += (loss - next.policy.target_risk) * inverse_weight;
         next.tracked_rounds.remove(&feedback.originating_round);
         next.accepted_label_revisions
             .insert(format!("{}:{}", feedback.label_id, feedback.label_revision));
         next.seen_feedback_idempotency_keys.insert(idempotency);
-        feedback_receipts.push(make_feedback_receipt(
+        let mut feedback_receipt = make_feedback_receipt(
             feedback,
             CaoOcrcFeedbackDispositionV1::ReceivedAndApplied,
             None,
@@ -948,7 +973,11 @@ pub fn advance_ca_ocrc_round_v1(
             Some(round.prediction_receipt_sha256.clone()),
             threshold_before,
             threshold_before + next.policy.learning_rate * feedback_loss_weighted_sum,
-        )?);
+        )?;
+        feedback_receipt.proxy_survival_probability = Some(survival);
+        feedback_receipt.feedback_observation_probability = Some(feedback_observation_probability);
+        feedback_receipt.receipt_sha256 = feedback_receipt_digest(&feedback_receipt)?;
+        feedback_receipts.push(feedback_receipt);
     }
 
     // 4. Add the trivial-set immediate loss and all received delayed feedback.
@@ -1142,6 +1171,11 @@ pub fn compute_ca_ocrc_risk_bound_v1(
     horizon_rounds: u64,
 ) -> Result<CaoOcrcRiskBoundV1, CaoOcrcErrorV1> {
     validate_policy(policy)?;
+    if policy.delay_assumption != CaoOcrcDelayAssumptionV1::ArbitraryBounded {
+        return Err(CaoOcrcErrorV1(
+            "Theorem 1/2 bounded-delay calculator accepts only ArbitraryBounded; use the stochastic theorem helper for IID G".into(),
+        ));
+    }
     if horizon_rounds == 0 {
         return Err(CaoOcrcErrorV1("risk-bound horizon must be positive".into()));
     }
