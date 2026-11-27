@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "stage": 1,
+  "designs": [
+    {
+      "design_id": "d-01",
+      "sequence": "AAAA"
+    },
+    {
+      "design_id": "d-02",
+      "sequence": "AAAC"
+    },
+    {
+      "design_id": "d-03",
+      "sequence": "AAAG"
+    }
+  ]
+}

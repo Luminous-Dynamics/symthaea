@@ -1,0 +1,442 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Autonomous Science Bench Lab API v1 public contract subset",
+  "description": "Structural schema for agent-visible campaign/status/catalog/job/error payloads consumed by the Symthaea read-only adapter. Semantic cross-field rules are enforced by the standalone Rust checker.",
+  "$defs": {
+    "CampaignCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "api_version",
+        "campaign_id",
+        "source",
+        "objective",
+        "design_id_field",
+        "measurements",
+        "stages",
+        "budget",
+        "deliverable"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "api_version": {
+          "const": 1
+        },
+        "campaign_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1
+        },
+        "design_id_field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "description",
+              "higher_is_better"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string"
+              },
+              "higher_is_better": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "kind": {
+                "enum": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stage",
+              "label",
+              "batch_size"
+            ],
+            "properties": {
+              "stage": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "label": {
+                "type": "string"
+              },
+              "batch_size": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "catalog_size": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "budget": {
+          "$ref": "#/$defs/Budget"
+        },
+        "deliverable": {
+          "$ref": "#/$defs/Deliverable"
+        },
+        "design_space": {
+          "$ref": "#/$defs/DesignSpace"
+        }
+      }
+    },
+    "Budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "total"
+      ],
+      "properties": {
+        "unit": {
+          "const": "measured designs"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "Deliverable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "format_version",
+        "max_bytes",
+        "input_field",
+        "description",
+        "requires"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "format_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "input_field": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "requires": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content": {
+          "const": "binary"
+        },
+        "requires_stages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "constraints": {
+          "type": "object"
+        }
+      }
+    },
+    "DesignSpace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "catalog",
+            "upload",
+            "grid"
+          ]
+        },
+        "shared_pool": {
+          "const": true
+        },
+        "format": {
+          "type": "string"
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "constraints": {
+          "type": "object"
+        },
+        "shape": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "id_format": {
+          "const": "r{row}c{col}"
+        },
+        "description": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "string"
+        }
+      }
+    },
+    "Status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "api_version",
+        "campaign_id",
+        "stages_total",
+        "stages_completed",
+        "next_stage",
+        "active_job",
+        "budget",
+        "deliverable_submitted"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "api_version": {
+          "const": 1
+        },
+        "campaign_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stages_total": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stages_completed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_stage": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "active_job": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "budget": {
+          "$ref": "#/$defs/StatusBudget"
+        },
+        "deliverable_submitted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "StatusBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "total",
+        "spent",
+        "remaining"
+      ],
+      "properties": {
+        "unit": {
+          "const": "measured designs"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "spent": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remaining": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "Catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "stage",
+        "designs"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "stage": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "designs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "JobStatus": {
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "failed"
+      ]
+    },
+    "Job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "stage",
+        "status",
+        "designs",
+        "results"
+      ],
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "$ref": "#/$defs/JobStatus"
+        },
+        "designs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "results": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "object"
+          }
+        },
+        "error": {
+          "type": "string"
+        }
+      }
+    },
+    "JobResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "job"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "replayed": {
+          "type": "boolean"
+        },
+        "job": {
+          "$ref": "#/$defs/Job"
+        }
+      }
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "error"
+      ],
+      "properties": {
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/CampaignCard"
+    },
+    {
+      "$ref": "#/$defs/Status"
+    },
+    {
+      "$ref": "#/$defs/Catalog"
+    },
+    {
+      "$ref": "#/$defs/JobResponse"
+    },
+    {
+      "$ref": "#/$defs/ErrorResponse"
+    }
+  ]
+}

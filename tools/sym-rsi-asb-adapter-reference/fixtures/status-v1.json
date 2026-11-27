@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "api_version": 1,
+  "campaign_id": "fixture/catalog-v1",
+  "stages_total": 2,
+  "stages_completed": 0,
+  "next_stage": 1,
+  "active_job": null,
+  "budget": {
+    "unit": "measured designs",
+    "total": 4,
+    "spent": 0,
+    "remaining": 4
+  },
+  "deliverable_submitted": false
+}

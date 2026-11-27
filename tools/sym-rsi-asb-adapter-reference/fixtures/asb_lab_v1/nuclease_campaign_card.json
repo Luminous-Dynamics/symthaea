@@ -1,0 +1,59 @@
+{
+  "ok": true,
+  "api_version": 1,
+  "campaign_id": "deepmind/nuclease-active-learning",
+  "source": "deepmind",
+  "objective": "Find nuclease variants with activity above the wild type over four screening rounds, then rank unseen variants by activity class.",
+  "design_id_field": "variant_id",
+  "measurements": [
+    {
+      "name": "activity_class",
+      "description": "Ordered catalytic activity call from droplet sorting: 0 non-functional, 1 above background, 2 above the wild type, 3 above the best known single substitution (A73R).",
+      "higher_is_better": true
+    }
+  ],
+  "stages": [
+    {
+      "stage": 1,
+      "label": "screening round 1",
+      "batch_size": 96,
+      "catalog_size": 20000
+    },
+    {
+      "stage": 2,
+      "label": "screening round 2",
+      "batch_size": 96,
+      "catalog_size": 20000
+    },
+    {
+      "stage": 3,
+      "label": "screening round 3",
+      "batch_size": 96,
+      "catalog_size": 20000
+    },
+    {
+      "stage": 4,
+      "label": "screening round 4",
+      "batch_size": 96,
+      "catalog_size": 20000
+    }
+  ],
+  "budget": {
+    "unit": "measured designs",
+    "total": 384
+  },
+  "deliverable": {
+    "kind": "js-predictor",
+    "format_version": 1,
+    "max_bytes": 4194304,
+    "input_field": "sequence",
+    "description": "UTF-8 JavaScript defining a deterministic, pointwise predict(sequence) that returns one finite number; larger means a higher predicted activity class",
+    "requires": "all stages completed"
+  },
+  "design_space": {
+    "kind": "catalog",
+    "shared_pool": true,
+    "description": "20000 nuclease variants carrying 2 to 11 substitutions; every round orders from the same pool and each variant may be screened at most once in the campaign",
+    "rules": "every stage orders from the same catalog; each design can be measured at most once"
+  }
+}
