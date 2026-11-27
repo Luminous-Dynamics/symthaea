@@ -60,6 +60,7 @@ The bound adapter also preserves a caller-supplied conditional context beside th
 - covariance/dynamics model identity/version;
 - the full conditioning-state identity/version (the caller must identify the scientific, common-cause and device-state assignment used to produce the conditional Gaussian);
 - common-cause identity/version;
+- separate reference-chain ancestry identity/version;
 - channel and device identities with each device evidence version;
 - **separate acquisition-window ID and start/end timestamps for each channel**, including overlapping or unequal windows;
 - per-channel calibration context and epoch;
