@@ -1,0 +1,110 @@
+name: EQC Standalone Reference Validation
+
+on:
+  push:
+    branches: [research/eqc-standalone-reference-2026-11-27]
+    paths:
+      - "research/eqc-reference/**"
+      - "docs/research/eqc-task-v0.1.schema.json"
+      - "docs/research/eqc-run-receipt-v0.1.schema.json"
+      - "docs/research/eqc-seed-corpus-v0.1.json"
+      - "docs/research/eqc-fixtures/**"
+      - ".github/workflows/eqc-standalone-reference.yml"
+  pull_request:
+    paths:
+      - "research/eqc-reference/**"
+      - "docs/research/eqc-task-v0.1.schema.json"
+      - "docs/research/eqc-run-receipt-v0.1.schema.json"
+      - "docs/research/eqc-seed-corpus-v0.1.json"
+      - "docs/research/eqc-fixtures/**"
+      - ".github/workflows/eqc-standalone-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: eqc-standalone-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  reference-seed:
+    name: Standalone Rust reference and negative controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: true
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format standalone package
+        run: cargo fmt --manifest-path research/eqc-reference/Cargo.toml -- --check
+
+      - name: Generate and persist the standalone lockfile once
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          manifest=research/eqc-reference/Cargo.toml
+          lock=research/eqc-reference/Cargo.lock
+          if [[ ! -f "$lock" ]]; then
+            cargo generate-lockfile --manifest-path "$manifest"
+            if [[ "$EVENT_NAME" != "push" || "$GITHUB_REF_NAME" != "research/eqc-standalone-reference-2026-11-27" ]]; then
+              echo "Lockfile absent on non-branch-push event; the owning branch push must persist it first." >&2
+              exit 1
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$lock"
+            git commit -m "chore(eqc): lock standalone reference dependencies"
+            git push origin HEAD:research/eqc-standalone-reference-2026-11-27
+          fi
+          test -s "$lock"
+
+      - name: Run standalone unit and negative-control tests
+        run: cargo test --locked --manifest-path research/eqc-reference/Cargo.toml
+
+      - name: Evaluate public synthetic seed
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path research/eqc-reference/Cargo.toml -- \
+            docs/research/eqc-seed-corpus-v0.1.json \
+            "$RUNNER_TEMP/eqc-reference-report.json"
+          jq -e '
+            .evaluation_mode == "reference_contract_only_not_system_under_test" and
+            .task_count == 4 and
+            .reference_pass_count == 4 and
+            .no_op_fails_positive_controls == true and
+            .allow_all_fails_negative_controls == true
+          ' "$RUNNER_TEMP/eqc-reference-report.json" >/dev/null
+          cat "$RUNNER_TEMP/eqc-reference-report.json"
+
+      - name: Preserve exact source and report evidence
+        run: |
+          {
+            echo "workflow_sha=$GITHUB_SHA"
+            echo "checked_out_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            sha256sum research/eqc-reference/Cargo.lock
+            sha256sum docs/research/eqc-seed-corpus-v0.1.json
+          } > "$RUNNER_TEMP/eqc-run-metadata.txt"
+
+      - name: Upload qualification artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eqc-standalone-reference-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            research/eqc-reference/Cargo.lock
+            ${{ runner.temp }}/eqc-reference-report.json
+            ${{ runner.temp }}/eqc-run-metadata.txt
+          if-no-files-found: error
+          retention-days: 90
