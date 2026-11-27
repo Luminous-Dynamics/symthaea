@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (family_reachability, family_observability) =
         aggregate_response_gramians(&[scenario], ResponseGramianAggregationConfig::default())?;
-    let basis = ResponseBalancedBasis::from_empirical_gramians(
+    let mut basis = ResponseBalancedBasis::from_empirical_gramians(
         &family_reachability,
         &family_observability,
         RbkrConfig::new(1),
