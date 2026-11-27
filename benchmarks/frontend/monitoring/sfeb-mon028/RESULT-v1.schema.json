@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon028-result-v1.schema.json",
+  "title": "MON-028 Candidate Campaign Results",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "campaign_id",
+    "benchmark_id",
+    "suite_sha256",
+    "fault_matrix_sha256",
+    "oracle_sha256",
+    "workload_sha256",
+    "environment_sha256",
+    "resource_budget_sha256",
+    "system_id",
+    "system_version",
+    "implementation_sha256",
+    "captured_at",
+    "observations"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon028-falsification-first-results-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "suite_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "fault_matrix_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "workload_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "resource_budget_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "system_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementation_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "replicate",
+          "execution"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "replicate": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "execution": {
+            "enum": [
+              "executed",
+              "skipped",
+              "timed_out",
+              "infrastructure_error"
+            ]
+          },
+          "observed": {
+            "enum": [
+              "qualified",
+              "blocked",
+              "indeterminate"
+            ]
+          },
+          "elapsed_ns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "peak_memory_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "result_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "error_code": {
+            "type": "string"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "execution": {
+                  "const": "executed"
+                }
+              },
+              "required": [
+                "execution"
+              ]
+            },
+            "then": {
+              "required": [
+                "observed",
+                "elapsed_ns",
+                "result_sha256",
+                "evidence_sha256"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "observed"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
