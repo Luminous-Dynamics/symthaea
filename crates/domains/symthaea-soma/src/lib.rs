@@ -34,6 +34,9 @@
 //! let result = engine.cycle("hello world");
 //! println!("Consciousness: {}", result.consciousness_level);
 //! ```
+//!
+//! Renderer permissions are separately enforced by `embodiment_policy`.
+//! Sensor capture permissions do not follow from presentation permissions.
 
 #![cfg_attr(
     not(any(feature = "native-ffi", feature = "litert", feature = "prism-search")),
@@ -47,8 +50,9 @@ pub use symthaea_spore::engine::SporeEngine;
 pub use symthaea_spore::engine::{CycleResult, EpistemicStatus};
 pub use symthaea_spore::persistence;
 
-// Renderer-neutral semantic events and canonical multi-form projections.
+// Renderer-neutral semantic events, projections, and fail-closed policy.
 pub mod embodiment_event;
+pub mod embodiment_policy;
 pub mod embodiment_projection;
 
 // Mobile embodiment modules (moved from spore)
