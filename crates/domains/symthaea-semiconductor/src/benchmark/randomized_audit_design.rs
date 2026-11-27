@@ -287,9 +287,12 @@ fn audit_union_pair_probability(
     let k = audit_capacity as f64;
     let no_audit_left = 1.0 - k / n;
     let no_audit_right = no_audit_left;
-    let no_audit_pair = ((population_size - audit_capacity)
-        * (population_size - audit_capacity - 1)) as f64
-        / (n * (n - 1.0));
+    let remaining_after_audit = population_size - audit_capacity;
+    let no_audit_pair = if remaining_after_audit < 2 {
+        0.0
+    } else {
+        (remaining_after_audit * (remaining_after_audit - 1)) as f64 / (n * (n - 1.0))
+    };
     let no_left = no_audit_left * (1.0 - left_target_probability);
     let no_right = no_audit_right * (1.0 - right_target_probability);
     let no_either = no_audit_pair
