@@ -3,7 +3,6 @@ package main
 import (
  "bytes"
  "encoding/json"
- "errors"
  "flag"
  "fmt"
  "io"
@@ -20,8 +19,7 @@ func main(){
  var in campaign.Input
  if err=dec.Decode(&in);err!=nil{fmt.Fprintln(os.Stderr,err);os.Exit(65)}
  var trailing any
- if err=dec.Decode(&trailing);err!=nil&&err.Error()!="EOF"{fmt.Fprintln(os.Stderr,errors.New("invalid trailing JSON"));os.Exit(65)}
- if err==nil{fmt.Fprintln(os.Stderr,"multiple JSON documents are not allowed");os.Exit(65)}
+ if err=dec.Decode(&trailing);err!=io.EOF{fmt.Fprintln(os.Stderr,"trailing or malformed JSON");os.Exit(65)}
  out:=campaign.Evaluate(in);encoded,err:=json.MarshalIndent(out,"","  ");if err!=nil{fmt.Fprintln(os.Stderr,err);os.Exit(70)}
  fmt.Println(string(encoded))
  if out.CampaignVerdict==campaign.Blocked{os.Exit(2)}
