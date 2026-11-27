@@ -1,7 +1,7 @@
 # MACE Decision-Sufficient Memory Benchmark
 
 **Version:** 0.1.0  
-**Status:** research protocol and seed fixtures authored; executable evaluator not yet implemented  
+**Status:** research protocol and candidate-only fixtures authored; dependency-free Rust paired evaluator core and LongMemEval-V2 LAFS helper pass exact-head Rust 1.96 validation (45 tests); benchmark execution and external result reproduction remain pending  
 **Tracking:** [issue #13893](https://github.com/Luminous-Dynamics/symthaea/issues/13893)
 
 ## Thesis
@@ -99,6 +99,7 @@ An episode is generated from a frozen world seed and contains:
 Each source event should retain, where available:
 
 - stable event and source identifiers;
+- source-family identity and canonical upstream-root digest where available (identifiers are lineage keys, not signatures or proof of statistical independence);
 - observed-at time and valid-from / valid-until interval;
 - source authority class and uncertainty declaration;
 - original claim or ordered content;
@@ -147,10 +148,10 @@ For each episode:
 1. Deliver source events in chronological order through the declared Add/ingest interface.
 2. Freeze the candidate memory state at the episode's query time.
 3. Submit the original decision query and declared evidence/observation budget.
-4. Accept ranked evidence IDs and content from the memory system.
-5. Resolve every returned ID independently against canonical source records.
-6. Pass only the admissible evidence packet to a frozen downstream decision policy.
-7. Score the chosen action using evaluator-private state and loss tables.
+4. Accept ranked `retrieved_evidence_ids` from the memory system.
+5. Resolve every returned ID independently against canonical source records; compute admissibility, source-family/root lineage and contradiction relationships evaluator-side.
+6. Pass a selected evidence packet to the frozen downstream decision policy and record its IDs separately as `decision_support_evidence_ids`. The selected set must be a unique subset of the retrieved set. The paired-score validator also rechecks that selected counts, precision/recall ratios, lineage counts and conflict metrics remain consistent with retrieved totals before a result enters cluster aggregation. The JSON contract is [candidate-run-v0.1.schema.json](schemas/candidate-run-v0.1.schema.json); the Rust scorer enforces the cross-field subset invariant that JSON Schema cannot express. When detailed cost provenance is available, use the V2 wrapper schema so each arm carries its own typed resource receipt. This records the policy input builder's selected IDs, not proof that a generative model attended to or cited each item; exact serialized-context exposure is a separate receipt requirement tracked by [#13722](https://github.com/Luminous-Dynamics/symthaea/issues/13722).
+7. Score the chosen action using evaluator-private state and loss tables. Keep retrieval precision/recall distinct from decision-support precision/recall.
 
 This separates the memory subsystem's evidence contribution from the downstream model's ability to answer. A later end-to-end agent experiment may be added, but it must be reported separately.
 
@@ -197,7 +198,10 @@ Do not collapse these dimensions into one unqualified score.
 
 ### Evidence quality
 
-- Valid-evidence precision and required-evidence recall, determined by independent resolution.
+- Retrieved-context admissible precision and required-evidence recall, determined by independent resolution.
+- Decision-support admissible precision and required-evidence recall, computed from the evidence IDs actually passed to the downstream policy.
+- Distinct source-family and upstream-root counts for both retrieval and decision-support sets, with unknown lineage counts. Repeated event records from the same root count as one root. Root IDs remain unauthenticated until independently verified.
+- Unresolved contradiction-pair count in retrieved context and decision-support context. In v0.2, any unresolved conflict in retrieved context blocks decision sufficiency because the protocol has no conflict-resolution receipt.
 - Stale-evidence action rate.
 - Supersession, revocation and correction propagation delay.
 - Contradiction detection and resolution accuracy.
@@ -236,6 +240,20 @@ Measure and report separately:
 
 Never label an estimate as measured cost. Cost-per-decision-gain and cost-per-valid-evidence result may be reported as derived metrics, with their components and assumptions visible.
 
+### Measurement integrity and receipt versions
+
+The Rust API and JSON contracts are versioned separately from the benchmark protocol:
+
+- **CandidateRun v1 / schema v0.1** records decision and evidence output without a measurement-aware resource receipt.
+- **CandidateRun v2 / schema v0.2** adds explicit measured, estimated, unknown and not-applicable states for byte quantities. Its phase-timing fields are mandatory integers and should only be used when the caller can provide a complete reconciled phase record.
+- **CandidateRun v3 / schema v0.3** keeps the same decision/evidence record and makes the entire phase-timing record nullable. `phases: null` means timing was not captured; a present phase object means measured non-overlapping phases whose sum must equal measured wall time. Measured zero is represented by a present all-zero object and is not equivalent to null.
+- Paired v3 timing deltas are emitted only when both arms have measured phase records. Two missing phase records remain Unknown; one measured and one missing record are Incomparable. The scorer never turns either state into a zero delta.
+- Measured cost, estimated cost, and resource byte quantities remain separate. A measured memory-arm value is not subtracted from an estimated no-memory value and presented as a measured saving.
+
+Use v3 for new research runs. Keep v1/v2 readers only for reproducibility of previously frozen artifacts.
+
+The Rust evaluator retains the existing `CostReceiptV1` contract for compatibility and adds `CostReceiptV2`, in which retained/index/network byte quantities carry an explicit `Measured`, `Estimated`, `Unknown` or `NotApplicable` state. A measured zero is `Some(0) + Measured`; unreported cost is `None + Unknown`, never numeric zero. Phase timings must still reconcile to wall time. The paired scorer exposes this through `CandidateRunV2` and `score_paired_v2`, binding one cost receipt to each memory/no-memory arm while leaving V1 APIs unchanged. External systems can use [candidate-run-v0.2.schema.json](schemas/candidate-run-v0.2.schema.json); cross-field and phase-reconciliation rules are enforced by the Rust evaluator. The paired result also reports resource deltas only when both arms provide comparable states: measured-to-measured and estimated-to-estimated are separate; mixed states are `Incomparable`; unknown/not-applicable remain non-numeric. No single weighted cost scalar is inferred.
+
 ## Research hypotheses
 
 - **H1 — qualification reduces stale-action harm:** adding provenance, validity and revocation gates to lexical retrieval reduces stale-evidence decisions under a matched retrieval budget.
@@ -246,7 +264,7 @@ Never label an estimate as measured cost. Cost-per-decision-gain and cost-per-va
 - **H6 — governance is part of capability:** poisoning resistance, deletion and isolation should predict downstream decision safety, not be treated as unrelated operational checkboxes.
 - **H7 — evidence has measurable causal influence:** leave-one-out interventions on returned evidence identify items whose presence improves or worsens the frozen downstream decision. The signal should remain reproducible under fixed reader, seed and evidence-resolution rules.
 
-These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator contains 20 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
+These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator now contains 36 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
 
 ## Baselines and industry comparison
 
@@ -259,6 +277,8 @@ The public AML Cycle 2 results provide the current competition reference:
 | Coding | InsightMem — 63.33% | MemoraX — 68.00% |
 
 Source: https://agentmemoryleaderboard.ai/results/cycle-2/
+
+The official results page identifies nine separate leaderboards and 289 track entries. The organizer's 19 November announcement reports 402 formal Full-evaluation tasks, 333 successful completions, 41 corrections during review, and 292 valid leaderboard records. Those are differently defined reporting units, not inconsistent counts of one population. Do not mix them when describing scale. Sources: https://agentmemoryleaderboard.ai/results/cycle-2/ and https://agentmemoryleaderboard.ai/blog?post=phase2-results-20261119.
 
 Initial AML goals remain at least three absolute points above the current open-source leader in each track: Textual 64.22, Multimodal 46.26, Coding 66.33%. These are proposed targets only. They are not DSM scores and not predictions.
 
@@ -275,6 +295,24 @@ The official Cycle 2 score breakdown suggests that the three tracks need differe
 The proposed advantage is not that HDC automatically solves these gaps. It is that typed temporal evidence, incremental update paths and explicit lineage give us testable hypotheses for addressing them. We should compare each intervention to a strong non-HDC baseline under the same model, evidence budget and query policy.
 
 The +3-point open-source goals are first external targets. The later stretch objective is to close the gap to the commercial leader without violating the academic model rules or sacrificing evidence governance.
+
+### Other external memory benchmark lanes
+
+These suites probe different capabilities and must be reported separately from AML and native DSM decision-regret values.
+
+| Benchmark | Published scope / reference | What MACE should test next | Proposed target (not a result) |
+|---|---|---|---|
+| LongMemEval-V2 | Current Small leaderboard: AgentRunbook-C v2 Online +2.823 LAFS, 75.6% accuracy / 130.5 s; Perpetual Recall V3 +1.096 LAFS, 53.2% / 1.96 s | Optimize the full accuracy–latency frontier; report LAFS, accuracy, latency and memory-query cost together | Target LAFS Gain ≥+3.123 with ≥75.6% accuracy at ≤60 s on the same tier/reader; stretch: improve frontier at every latency budget without reducing coverage |
+| AMA-Bench (ICML 2026) | Long-horizon agent trajectories; AMA-Agent reports 57.22% accuracy and +11.16 percentage points over its strongest matched baseline | Reproduce the official trajectory split and probe causal/objective transfer under held-out regimes | First exact replication; then +3 pp over the matched strongest baseline without additional hidden-state access |
+| MemoryArena (ICML 2026) | Multi-session Memory-Agent-Environment loops; its central claim is that memory retrieval and future task execution must be evaluated together | Compare end-task progress, constraint adherence and interaction cost across repeated sessions | +3 pp task success/progress at equal model, environment and interaction budget |
+| TimlMemBench (Findings EMNLP 2026) | 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases; canonical-pool and raw-native tracks | Preserve raw-native Add/ingest behaviour and split failure counts by revocation, scope, provenance, activation and restraint | ≥50% relative reduction in stale/revoked/scope-ineligible activation against the strongest matched baseline, with ≤1 pp answer-quality regression |
+| MemSecBench (2026 preprint) | 310 cases across 48 contexts; matched 24-configuration harness tracks write, persistence, execution and selective repair. The paper reports 84.2% malicious-memory persistence, 50.3% full Write→Execute success, and 56.1% selective repair | Reproduce the official Write–Execute–Forget checkpoints; measure benign-memory collateral damage as well as attack persistence, execution and repair | ≥50% relative reduction in full attack-chain success versus the strongest matched baseline; ≥90% selective repair of malicious memory with ≤1% benign-memory loss and zero unauthorized cross-scope actions in hard controls |
+| COLLABMEM (EMNLP 2026) | 58 scenarios/1,118 core probes; scaled split 174 scenarios/3,359 probes; TMS-GRAPH++ reports 69.6% non-Oracle average | Test role-filtered views, cross-role isolation, provenance routing and conflict updates under the official matched harness | +5 pp over the matched 69.6% reference and zero unauthorized cross-role disclosure in hard isolation cases |
+| Memora / FAMA (Findings ACL 2026) | Weeks-to-months personalized conversations; FAMA penalizes obsolete or invalidated memory reuse | Report official FAMA separately from decision regret; stress corrections, expiry and supersession | ≥50% relative reduction in invalid-memory reuse while preserving current-memory recall |
+| MEMORA-Bench (Findings EMNLP 2026) | 45-hour egocentric-video benchmark with retrospective memory faithfulness and prospective memory-grounded planning | Add an embodied lane with matched perception, typed spatial/object/action lineage and delayed planning goals | Reproduce the four-answer-model comparison, then target +3 pp prospective planning with non-inferior retrospective faithfulness |
+
+AMA-Bench's 57.22% result is from its own task mix and reader; COLLABMEM's 69.6% is its own non-Oracle multi-agent score. Neither number is directly comparable to AML's 0–100 track scores or MACE's integer decision-loss scale. For MemoryArena and MEMORA-Bench, report the official metrics and task conditions; the targets above are proposed experiments, not conversions into a shared score. LongMemEval-V2 uses its own LAFS Gain, integrating the reachable accuracy frontier over log-scaled latency budgets; +2.823 therefore is not a raw accuracy score and should not be ranked against 75.6% or AML's 69.26 as though they shared a scale. The public page currently lists three Small-tier submissions and no Medium-tier submissions; use the leaderboard's live state at the time of any formal run. Source: https://xiaowu0162.github.io/longmemeval-v2/
+
 
 The industry comparison must include both framework families and fixed baselines: lexical/vector hybrids, temporal or knowledge-graph memory, tiered episodic/semantic memory, reflection/consolidation systems and lifecycle-aware evidence models. Compare exact versions, models, prompts, budgets and evaluation procedures. A vendor feature list is not performance evidence.
 
@@ -323,6 +361,8 @@ The first gate is not a headline score. It is an honest, reproducible baseline:
 
 Only after the first complete baseline should we preregister numerical superiority targets. A plausible next target is a material reduction in stale-evidence regret versus the strongest matched non-MACE baseline, without sacrificing necessary-evidence recall or increasing p95 lifecycle cost. The exact threshold must be selected from baseline variance and a power analysis, not chosen after observing held-out results.
 
+For the native DSM programme, use a non-compensatory promotion rule rather than a weighted leaderboard score: (1) reproduce all matched baselines; (2) obtain a positive lower 95% world-cluster-bootstrap bound for mean paired memory gain; (3) keep the upper 95% bound on memory-induced harm below a preregistered threshold; (4) preserve required-evidence recall within a preregistered non-inferiority margin; and (5) pass every hard privacy, revocation, cross-scope and unauthorized-action control. A better average must never compensate for one critical security failure.
+
 For AML, keep the independent target of +3 absolute points over the published open-source leader as a stretch objective. A DSM result cannot be substituted for an AML result.
 
 ## Implementation sequence
@@ -338,15 +378,15 @@ For AML, keep the independent target of +3 absolute points over the published op
 
 - Build a dependency-light Rust finite-world generator and scorer.
 - Keep latent state, loss tables, admissibility/required-evidence labels and oracle selection evaluator-private and physically separate from candidate inputs.
-- Implement paired scoring, cluster identities, deterministic replay and digest-bound receipts. Implement deterministic cluster-bootstrap confidence intervals for mean paired gain and memory-induced harm rate.
+- Implement paired scoring, cluster identities, deterministic replay and digest-bound receipts. The Rust core now scores retrieved evidence separately from policy-input evidence, verifies selected IDs are a retrieved subset, reports source-family/root diversity plus unresolved retrieved conflicts, and revalidates paired-score partitions/ratios before cluster aggregation. Implement deterministic cluster-bootstrap confidence intervals for mean paired gain and memory-induced harm rate.
 - Add frozen-policy leave-one-out evidence interventions; treat interaction/Shapley analysis as a later extension.
-- Reject missing arms, unmatched pairs, duplicate event identities and invalid evidence references.
+- Reject missing arms, unmatched pairs, duplicate event identities and invalid evidence references. Add held-out tests for decision-support identity, common-root duplicates, unknown roots, and contradictions present in retrieved context but not selected for use.
 
 ### Phase 2 — MACE experiments
 
 - Connect the evaluator to the existing paired MACE intervention harness.
 - Compare no-memory, lexical, qualified-symbolic, static HDC, HDC-LTC and typed-content HDC.
-- Reuse phase-attributed cost receipts from the paired evaluator.
+- Reuse phase-attributed cost receipts from the paired evaluator; new runs should use CandidateRun v3 so missing phase instrumentation remains explicitly unknown and paired phase deltas are only computed from two measured receipts.
 - Add the oracle selector as a labelled upper bound.
 - Run ablations for freshness, authority, supersession, temporal routing and evidence verification.
 
@@ -370,10 +410,15 @@ For AML, keep the independent target of +3 absolute points over the published op
 
 - [PR #13836](https://github.com/Luminous-Dynamics/symthaea/pull/13836) improves paired experiment integrity, common-cause source identities, matched arms and qualification-aware symbolic retrieval.
 - [PR #13869](https://github.com/Luminous-Dynamics/symthaea/pull/13869) adds phase-attributed cost receipts.
+- The evaluator core now distinguishes retrieved evidence from decision-support evidence, scores source-family/root diversity, fails decision sufficiency on unresolved retrieved conflicts, and provides measurement-aware paired cost receipts. CandidateRun v3 makes missing phase timing explicit rather than encoding it as zero. See the `CandidateRunV1` and `RunScoreV1` contracts in `evaluator/src/lib.rs`.
 - [PR #13867](https://github.com/Luminous-Dynamics/symthaea/pull/13867), [PR #13871](https://github.com/Luminous-Dynamics/symthaea/pull/13871) and [PR #13873](https://github.com/Luminous-Dynamics/symthaea/pull/13873) form the durable Add/Search service workstream.
 - [Issue #13874](https://github.com/Luminous-Dynamics/symthaea/issues/13874) tracks encryption, retention and verifiable erasure.
 - [Issue #13875](https://github.com/Luminous-Dynamics/symthaea/issues/13875) tracks the official frozen Textual word counter.
 - [Issue #13893](https://github.com/Luminous-Dynamics/symthaea/issues/13893) tracks this research programme.
+- [PR #13935](https://github.com/Luminous-Dynamics/symthaea/pull/13935) adds retrieval-versus-decision-support scoring, source-family/root diversity and retrieved-conflict gates to the paired evaluator.
+- [Issue #13264](https://github.com/Luminous-Dynamics/symthaea/issues/13264) owns verified transitive dependency closure; the current direct-root counts are a precursor, not the completed lineage verifier.
+- [Issue #13332](https://github.com/Luminous-Dynamics/symthaea/issues/13332) owns group-conditional selective-risk calibration; deterministic hard gates do not themselves provide a calibrated risk guarantee.
+- [Issue #13287](https://github.com/Luminous-Dynamics/symthaea/issues/13287) owns independent candidate/evaluator custody; this paired evaluator remains diagnostic until that boundary is qualified.
 
 These are authored engineering changes and proposed research work. No DSM evaluator, benchmark score, AML Smoke pass, leaderboard improvement, production deployment or SOTA result is claimed by this protocol document.
 
@@ -383,6 +428,11 @@ These are authored engineering changes and proposed research work. No DSM evalua
 2. Agent Memory Leaderboard, Add/Search API guide: https://agentmemoryleaderboard.ai/api-guide
 3. Wu et al., LongMemEval-V2, 2026: https://xiaowu0162.github.io/longmemeval-v2/
 4. Zhou et al., TimlMemBench, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.507/
+5. Zhao et al., AMA-Bench, ICML 2026: https://proceedings.mlr.press/v306/zhao26bs.html
+6. He et al., MemoryArena, ICML 2026: https://proceedings.mlr.press/v306/he26am.html
+7. Wu et al., COLLABMEM, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.1194/
+8. Uddin et al., Memora / FAMA, Findings ACL 2026: https://aclanthology.org/2026.findings-acl.1337/
+9. Yu et al., MEMORA-Bench, Findings EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1211/
 5. Wu et al., LongMemEval, ICLR 2025: https://github.com/xiaowu0162/LongMemEval
 6. Tan et al., MemBench, Findings of ACL 2025: https://aclanthology.org/2025.findings-acl.989/
 7. Chen et al., MemSecBench, 2026 preprint: https://arxiv.org/abs/2607.27080

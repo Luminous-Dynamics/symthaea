@@ -1,0 +1,53 @@
+name: MACE DSM Reference Evaluator
+
+on:
+  push:
+    branches:
+      - research/mace-dsm-evidence-use-lineage-v0-2
+    paths:
+      - "research/mace-decision-sufficient-memory-bench-v0-1/**"
+      - ".github/workflows/mace-dsm-reference.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/mace-decision-sufficient-memory-bench-v0-1/**"
+      - ".github/workflows/mace-dsm-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluator:
+    name: Rust 1.96 paired decision and LAFS evaluator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+      - name: Compile exact-source dependency-free evaluator
+        run: |
+          rustc --edition=2024 --test \
+            research/mace-decision-sufficient-memory-bench-v0-1/evaluator/src/lib.rs \
+            -o /tmp/mace-dsm-reference
+      - name: Run paired decision, lifecycle-cost and LAFS controls
+        run: /tmp/mace-dsm-reference
+      - name: Parse candidate fixture JSONL and versioned schemas
+        run: |
+          set -euo pipefail
+          while IFS= read -r line; do
+            printf '%s\n' "$line" | python3 -m json.tool >/dev/null
+          done < research/mace-decision-sufficient-memory-bench-v0-1/fixtures/candidate-episodes-v0.1.jsonl
+          for schema in \
+            research/mace-decision-sufficient-memory-bench-v0-1/schemas/candidate-episode-v0.1.schema.json \
+            research/mace-decision-sufficient-memory-bench-v0-1/schemas/candidate-run-v0.1.schema.json \
+            research/mace-decision-sufficient-memory-bench-v0-1/schemas/candidate-run-v0.2.schema.json \
+            research/mace-decision-sufficient-memory-bench-v0-1/schemas/candidate-run-v0.3.schema.json
+          do
+            python3 -m json.tool "$schema" >/dev/null
+          done
