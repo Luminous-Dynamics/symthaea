@@ -127,13 +127,14 @@ DSM must keep these dimensions separate:
 1. **Decision regret:** realised evaluator loss minus the minimum loss over the declared action set.
 2. **Memory gain:** paired no-memory loss minus memory-arm loss.
 3. **Memory-induced harm:** fraction of paired episodes where memory increases loss versus no memory.
-4. **Decision sufficiency:** minimum-loss decision with all required evidence and no invalid selected evidence.
-5. **Evidence precision and required-evidence recall:** adjudicated against evaluator-private evidence requirements.
-6. **Stale/revoked/forbidden/untrusted use:** raw count and per-decision rate, by family.
-7. **Selective behaviour:** abstention and observation-request coverage, risk at each coverage level, and net decision value of observations.
-8. **Lifecycle latency:** time or event count to propagate correction, revocation and erasure through each derived projection.
-9. **Security:** cross-scope/cross-role disclosure, unauthorized activation, poisoning persistence, repair correctness and erased-memory resurrection.
-10. **Full lifecycle cost:** ingestion, model calls, indexing, retrieval, verification, maintenance, storage, network, deletion, p50/p95 latency, CPU, RAM and energy.
+4. **Decision sufficiency:** minimum-loss decision with all required evidence, no invalid evidence anywhere in retrieved context, and no unresolved contradiction. A future protocol may permit conflicts only with an explicit resolution receipt.
+5. **Evidence precision and required-evidence recall:** report retrieved-context precision separately from selected decision-support precision, adjudicated against evaluator-private evidence requirements.
+6. **Lineage diversity:** distinct source-family and upstream-root counts for retrieved and selected evidence, plus the number of events with unknown family/root. Do not equate root identifiers with authenticated independence; separately qualify the trust/attestation chain.
+7. **Stale/revoked/forbidden/untrusted use:** raw count and per-decision rate, by family, including records retrieved but not selected.
+8. **Selective behaviour:** abstention and observation-request coverage, risk at each coverage level, and net decision value of observations.
+9. **Lifecycle latency:** time or event count to propagate correction, revocation and erasure through each derived projection.
+10. **Security:** cross-scope/cross-role disclosure, unauthorized activation, poisoning persistence, repair correctness and erased-memory resurrection.
+11. **Full lifecycle cost:** ingestion, model calls, indexing, retrieval, verification, maintenance, storage, network, deletion, p50/p95 latency, CPU, RAM and energy.
 
 A composite score may be a secondary visualisation only after the weights, units and non-compensatory failure gates are public. One critical privacy or revocation failure must not be offset by a better retrieval score.
 
@@ -156,7 +157,7 @@ Minimum baseline family:
 - typed-content HDC;
 - oracle evidence selector (evaluator-only upper bound).
 
-Ablate evidence freshness, source authority, root independence, lineage, causal structure, typed fields, HDC dynamics, active observation, compression and local maintenance independently. Include negative controls for future-information access, evaluator leakage, wrong tenant, revoked source, stale summary, common-cause root duplication and erased-item resurrection.
+Ablate evidence freshness, source authority, source-family/root lineage, root-independence checks, causal structure, typed fields, HDC dynamics, active observation, compression and local maintenance independently. Include common-root duplicate controls where two source labels intentionally collapse to one upstream digest, and unknown-root controls where the system must not infer independence from different source names. Include negative controls for future-information access, evaluator leakage, wrong tenant, revoked source, stale summary, common-cause root duplication and erased-item resurrection.
 
 Report per-family distributions and confidence intervals. A mean alone can hide a spectacular worst-group failure. Include worst-group regret, harm rate and coverage. All thresholds and grader versions must be frozen before confirmatory runs.
 
