@@ -7,7 +7,7 @@
     {
       "id": "SURF-001",
       "family": "inventory",
-      "description": "All 12 default surface classes are enumerated with exact source/target scope digest.",
+      "description": "All 14 default surface classes are enumerated with exact source/target scope digest.",
       "expected_decision": "qualified",
       "reason_code": "complete_surface_inventory",
       "required_control": "continue",
