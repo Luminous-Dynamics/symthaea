@@ -121,10 +121,7 @@ fn is_canonical_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn family_matches_dependence_model(
-    family: MarginalFamilyV1,
-    model: DependenceModelV1,
-) -> bool {
+fn family_matches_dependence_model(family: MarginalFamilyV1, model: DependenceModelV1) -> bool {
     matches!(
         (family, model),
         (
