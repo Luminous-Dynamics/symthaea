@@ -97,7 +97,7 @@ Project targets (not results):
 - compare to the best matching full-duplex architecture/modality, not merely the highest overall row;
 - report every rubric axis, sample count, architecture, modality, weight availability and model/provider status.
 
-The current VideoFDB v1.4 snapshot is dated 2026-11-25 and lists 13 full-duplex and 3 cascaded entries. Tavus Griffin Lite leads the full-duplex perception bucket at 3.85/5 and 90.63% TOR alignment / 200 ms median latency; it leads full-duplex generation at 4.20/5 and 48.78% / 1,200 ms. Anam Cara-5 Preview leads overall perception at 3.87/5 and generation at 4.44/5, but is cascaded (perception 87.88% / 920 ms; generation 80.00% / 920 ms). The targets above are intentionally above the matched full-duplex reference; the separate cross-architecture stretch is explicitly labelled as such. Use official splits, preserve per-sample outputs, and do not tune on the evaluation set.
+The current VideoFDB v1.4 snapshot is dated 2026-11-25 and lists 13 total entries: 10 full-duplex and 3 cascaded. Tavus Griffin Lite leads the full-duplex perception bucket at 3.85/5 and 90.63% TOR alignment / 200 ms median latency; it leads full-duplex generation at 4.20/5 and 48.78% / 1,200 ms. Anam Cara-5 Preview leads overall perception at 3.87/5 and generation at 4.44/5, but is cascaded (perception 87.88% / 920 ms; generation 80.00% / 920 ms). The targets above are intentionally above the matched full-duplex reference; the separate cross-architecture stretch is explicitly labelled as such. Use official splits, preserve per-sample outputs, and do not tune on the evaluation set.
 
 ### E2 — Turn-taking and response timing
 
@@ -130,10 +130,15 @@ VideoFDB's audio-visual perception/generation protocol. It measures timing,
 spoken-task accuracy, whisper/volume control, and groundedness across 13
 scenarios (221 items per system in the published study).
 
-The November 2, 2026 preprint reports best tested dimension scores of 72% for
-spoken tasks, 86% for timing, 75% for whisper/volume, and 88% for groundedness;
-the best groundedness coherence score is 86/100. These results are specific to
-the dataset and sample; do not generalize them to all production interactions.
+The November 2, 2026 study reports 34–38 correct spoken items out of 50
+(68–76%) for the three hosted systems and the turn-based cascade; the six
+full-duplex systems have timing and spoken-task scores that are related but
+must be reported separately. The strongest published timing score is 86% for
+GPT-Live on the client clock (its server-clock reconstruction drops to 56%).
+Gemini Live whispers on 8/10 explicit requests, but only 2 of 35 whispered
+requests across all systems led to a quieter reply. Hosted-system groundedness
+falls between 67% and 88%. The benchmark reports dimensions separately; these
+figures are not a combined system score and are not universal rankings.
 
 Symthaea stretch targets on the same frozen protocol:
 - >= 80% spoken-task accuracy;
@@ -156,6 +161,7 @@ replace user-heard timing.
 
 References:
 - https://arxiv.org/abs/2611.02430
+- https://avera-labs.github.io/InteractionBench/
 - https://anam.ai/tools/latency-benchmark
 
 ### E3 — Cross-embodiment semantic consistency
