@@ -1,6 +1,6 @@
 # MON-023 — Restore-to-Serve Recovery Assurance
 
-**Status:** research contract and 38 scenario seeds; semantic Go reference and runtime adapters pending.
+**Status:** research contract, 38 scenario seeds, Go semantic evaluator and benchmark harness; exact-head execution and runtime adapters pending.
 
 MON-023 separates three claims: artifact validated, database recovered, and service recovered. A successful backup or restore command does not prove application recovery.
 
@@ -19,4 +19,4 @@ MON-023 separates three claims: artifact validated, database recovered, and serv
 MON-023 composes with those systems; it is not a replacement backup engine.
 
 ## Claim ceiling
-No live restore, RPO/RTO result, independent observer, production readiness or exact-head test is claimed. A successful artifact or database restore is not a service-recovered claim.
+No exact-head Go test/race/vet/fuzz or numeric benchmark is claimed. No live restore, RPO/RTO result, independent restore observer, production readiness or SOTA superiority is claimed. A successful artifact or database restore is not a service-recovered claim.
