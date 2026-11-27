@@ -115,6 +115,34 @@ impl FirstOrderResponseOu {
         ))
     }
 
+    /// Frequency response of the *commanded upstream input* through a
+    /// unit-DC-gain first-order physical relaxation (rate lambda) followed
+    /// by this first-order sensor (rate mu):
+    ///
+    /// H(s) = lambda*mu / ((s+lambda)*(s+mu)).
+    ///
+    /// The result is symmetric in lambda and mu. It is deliberately separate
+    /// from the sensor-inlet frequency response: upstream excitation cannot
+    /// label the two poles in this cascade without additional known structure.
+    pub fn upstream_relaxation_frequency_response(
+        &self,
+        angular_frequency: f64,
+    ) -> Result<(f64, f64), ResponseModelError> {
+        if !angular_frequency.is_finite() {
+            return Err(ResponseModelError::InvalidFrequency);
+        }
+        let physical_magnitude = self.lambda / self.lambda.hypot(angular_frequency);
+        let sensor_magnitude = self.mu / self.mu.hypot(angular_frequency);
+        let magnitude = physical_magnitude * sensor_magnitude;
+        let phase = -angular_frequency.atan2(self.lambda)
+            - angular_frequency.atan2(self.mu);
+        if magnitude.is_finite() && (0.0..=1.0).contains(&magnitude) && phase.is_finite() {
+            Ok((magnitude, phase))
+        } else {
+            Err(ResponseModelError::NumericalFailure)
+        }
+    }
+
     /// Stationary covariance of [x, z].
     ///
     /// P = [[var(x), cov(x,z)],
@@ -422,6 +450,18 @@ mod tests {
                 sensor_slow.sensor_autocovariance(elapsed).unwrap(),
                 2.0e-14,
             );
+        }
+    }
+
+    #[test]
+    fn upstream_first_order_cascade_frequency_response_is_pole_symmetric() {
+        let physical_slow = FirstOrderResponseOu::new(0.25, 9.0, 0.25).unwrap();
+        let sensor_slow = FirstOrderResponseOu::new(4.0, 144.0, 4.0).unwrap();
+        for omega in [0.0, 0.1, 0.5, 1.0, 4.0, 20.0] {
+            let a = physical_slow.upstream_relaxation_frequency_response(omega).unwrap();
+            let b = sensor_slow.upstream_relaxation_frequency_response(omega).unwrap();
+            close(a.0, b.0, 2.0e-15);
+            close(a.1, b.1, 2.0e-15);
         }
     }
 
