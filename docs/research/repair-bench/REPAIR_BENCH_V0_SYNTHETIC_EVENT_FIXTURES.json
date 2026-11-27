@@ -28,7 +28,7 @@
     "parser": {
       "id": "delimited-parser",
       "version": "0.9.0",
-      "decimal_policy": "round_to_integer"
+      "decimal_policy": "truncate_toward_zero"
     },
     "method": {
       "id": "temperature-mean",
