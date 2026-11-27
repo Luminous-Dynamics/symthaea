@@ -829,6 +829,63 @@ mod tests {
         assert!(
             (boundary_fd - analytic.total_boundary_outflow_d_phase_rad).abs() < 1.0e-7
         );
+
+        let position_plus = [positions[0] + step];
+        let position_minus = [positions[0] - step];
+        let plus = remap_distribution_after_velocity_kick_weighted(
+            &kick,
+            &position_plus,
+            &weights,
+            &edges,
+            &distribution,
+        )
+        .unwrap();
+        let minus = remap_distribution_after_velocity_kick_weighted(
+            &kick,
+            &position_minus,
+            &weights,
+            &edges,
+            &distribution,
+        )
+        .unwrap();
+        for cell in 0..16 {
+            let finite_difference =
+                (plus.distribution[0][cell] - minus.distribution[0][cell]) / (2.0 * step);
+            assert!(
+                (finite_difference
+                    - analytic.rows[0].distribution_wrt_spatial_position[cell])
+                    .abs()
+                    < 1.0e-7
+            );
+        }
+        let boundary_fd =
+            (plus.total_boundary_outflow - minus.total_boundary_outflow) / (2.0 * step);
+        assert!(
+            (boundary_fd - analytic.total_boundary_outflow_d_spatial_position[0]).abs()
+                < 1.0e-7
+        );
+
+        for source_cell in 0..16 {
+            let mut basis_distribution = vec![0.0; 16];
+            basis_distribution[source_cell] = 1.0;
+            let basis_distribution = vec![basis_distribution];
+            let remapped = remap_distribution_after_velocity_kick_weighted(
+                &kick,
+                &positions,
+                &weights,
+                &edges,
+                &basis_distribution,
+            )
+            .unwrap();
+            for target_cell in 0..16 {
+                assert!(
+                    (remapped.distribution[0][target_cell]
+                        - analytic.rows[0].distribution_wrt_input[target_cell][source_cell])
+                        .abs()
+                        < 1.0e-12
+                );
+            }
+        }
         assert!(analytic.minimum_topology_margin > config.topology_tolerance);
     }
 
