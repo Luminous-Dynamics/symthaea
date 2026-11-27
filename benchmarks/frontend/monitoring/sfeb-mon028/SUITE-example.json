@@ -1,0 +1,55 @@
+{
+  "profile": "mon028-falsification-first-suite-v1",
+  "version": "1.0.0",
+  "campaign_id": "mon-recovery-falsification-pilot-001",
+  "benchmark_id": "mon-recovery-e2e-v1",
+  "fault_matrix_sha256": "1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+  "oracle_sha256": "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+  "workload_sha256": "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c",
+  "environment_sha256": "4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d",
+  "resource_budget_sha256": "5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e",
+  "cases": [
+    {
+      "case_id": "positive-cdc-complete",
+      "fault_id": "FAULT-POS-CDC",
+      "family": "cdc-continuity",
+      "expected": "qualified",
+      "replicates": 30
+    },
+    {
+      "case_id": "positive-pitr-exact",
+      "fault_id": "FAULT-POS-PITR",
+      "family": "restore-correctness",
+      "expected": "qualified",
+      "replicates": 30
+    },
+    {
+      "case_id": "missing-cdc-event",
+      "fault_id": "FAULT-CDC-LOSS",
+      "family": "cdc-continuity",
+      "expected": "blocked",
+      "replicates": 30
+    },
+    {
+      "case_id": "timeline-fork-unwitnessed",
+      "fault_id": "FAULT-TIMELINE-FORK",
+      "family": "recovery-lineage",
+      "expected": "indeterminate",
+      "replicates": 30
+    },
+    {
+      "case_id": "stale-stale-endpoint",
+      "fault_id": "FAULT-STALE-ENDPOINT",
+      "family": "service-readiness",
+      "expected": "blocked",
+      "replicates": 30
+    },
+    {
+      "case_id": "unknown-signer",
+      "fault_id": "FAULT-UNKNOWN-SIGNER",
+      "family": "evidence-custody",
+      "expected": "indeterminate",
+      "replicates": 30
+    }
+  ]
+}

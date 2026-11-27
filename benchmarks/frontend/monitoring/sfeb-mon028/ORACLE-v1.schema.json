@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon028-oracle-v1.schema.json",
+  "title": "MON-028 Independent Ground-Truth Oracle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "source_fault_matrix_profile",
+    "authority",
+    "entries"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon028-independent-ground-truth-oracle-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "source_fault_matrix_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "fault_id",
+          "family",
+          "expected",
+          "rationale"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fault_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "enum": [
+              "qualified",
+              "blocked",
+              "indeterminate"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

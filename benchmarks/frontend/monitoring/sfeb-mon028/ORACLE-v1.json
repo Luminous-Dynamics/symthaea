@@ -1,0 +1,295 @@
+{
+  "profile": "mon028-independent-ground-truth-oracle-v1",
+  "version": "1.0.0",
+  "source_fault_matrix_profile": "mon025-live-recovery-challenge-v1",
+  "authority": "MON-028 benchmark authority; expected outcomes are separately adjudicated from the scenario preconditions/postconditions",
+  "entries": [
+    {
+      "case_id": "MON025-P001",
+      "fault_id": "MON025-P001",
+      "family": "end-to-end-recovery",
+      "expected": "qualified",
+      "rationale": "Baseline CDC capture, physical backup and same-major PITR with source/target truth comparison"
+    },
+    {
+      "case_id": "MON025-P002",
+      "fault_id": "MON025-P002",
+      "family": "cdc-continuity",
+      "expected": "qualified",
+      "rationale": "Exact replay with identical key, envelope and payload is deduplicated but recorded"
+    },
+    {
+      "case_id": "MON025-P003",
+      "fault_id": "MON025-P003",
+      "family": "scope-coverage",
+      "expected": "qualified",
+      "rationale": "Row-stream claim may pass only with exact explicit exclusion manifest"
+    },
+    {
+      "case_id": "MON025-N001",
+      "fault_id": "MON025-N001",
+      "family": "cdc-continuity",
+      "expected": "indeterminate",
+      "rationale": "Immediately after restart, continuity remains indeterminate until an independent event-set and offset reconciliation proves no loss or conflicting replay."
+    },
+    {
+      "case_id": "MON025-N002",
+      "fault_id": "MON025-N002",
+      "family": "transaction-closure",
+      "expected": "indeterminate",
+      "rationale": "A crash mid-transaction is indeterminate until transaction-envelope closure is independently reconciled; a proven missing member blocks."
+    },
+    {
+      "case_id": "MON025-N003",
+      "fault_id": "MON025-N003",
+      "family": "cdc-continuity",
+      "expected": "indeterminate",
+      "rationale": "Observed output and offset durability must be reconciled independently"
+    },
+    {
+      "case_id": "MON025-N004",
+      "fault_id": "MON025-N004",
+      "family": "cdc-continuity",
+      "expected": "indeterminate",
+      "rationale": "Restart and reconcile duplicate/replayed WAL before declaring continuity"
+    },
+    {
+      "case_id": "MON025-N005",
+      "fault_id": "MON025-N005",
+      "family": "cdc-continuity",
+      "expected": "blocked",
+      "rationale": "Same identity with conflicting content is divergence"
+    },
+    {
+      "case_id": "MON025-N006",
+      "fault_id": "MON025-N006",
+      "family": "cdc-continuity",
+      "expected": "blocked",
+      "rationale": "Source truth vs Kafka event set mismatch blocks continuity"
+    },
+    {
+      "case_id": "MON025-N007",
+      "fault_id": "MON025-N007",
+      "family": "transaction-closure",
+      "expected": "blocked",
+      "rationale": "Transaction envelope closure fails"
+    },
+    {
+      "case_id": "MON025-N008",
+      "fault_id": "MON025-N008",
+      "family": "scope-coverage",
+      "expected": "indeterminate",
+      "rationale": "Scope boundary must be updated and re-attested"
+    },
+    {
+      "case_id": "MON025-N009",
+      "fault_id": "MON025-N009",
+      "family": "scope-coverage",
+      "expected": "indeterminate",
+      "rationale": "DDL change must be surfaced by independent inventory evidence"
+    },
+    {
+      "case_id": "MON025-N010",
+      "fault_id": "MON025-N010",
+      "family": "scope-coverage",
+      "expected": "indeterminate",
+      "rationale": "Row stream cannot imply generated-column state coverage"
+    },
+    {
+      "case_id": "MON025-N011",
+      "fault_id": "MON025-N011",
+      "family": "scope-coverage",
+      "expected": "indeterminate",
+      "rationale": "Sequence state requires explicit synchronization/evidence"
+    },
+    {
+      "case_id": "MON025-N012",
+      "fault_id": "MON025-N012",
+      "family": "scope-coverage",
+      "expected": "indeterminate",
+      "rationale": "Large object digest mismatch blocks full-state claim"
+    },
+    {
+      "case_id": "MON025-N013",
+      "fault_id": "MON025-N013",
+      "family": "derived-state",
+      "expected": "blocked",
+      "rationale": "Recovered derived state must match declared refresh semantics"
+    },
+    {
+      "case_id": "MON025-N014",
+      "fault_id": "MON025-N014",
+      "family": "scope-coverage",
+      "expected": "indeterminate",
+      "rationale": "Do not infer WAL recoverability of unlogged relation contents"
+    },
+    {
+      "case_id": "MON025-N015",
+      "fault_id": "MON025-N015",
+      "family": "scope-coverage",
+      "expected": "indeterminate",
+      "rationale": "Inventory and schema/partition digests must change"
+    },
+    {
+      "case_id": "MON025-N016",
+      "fault_id": "MON025-N016",
+      "family": "recovery-correctness",
+      "expected": "blocked",
+      "rationale": "Requested PITR target is not reachable"
+    },
+    {
+      "case_id": "MON025-N017",
+      "fault_id": "MON025-N017",
+      "family": "recovery-correctness",
+      "expected": "blocked",
+      "rationale": "Recovered point must match exact requested target semantics"
+    },
+    {
+      "case_id": "MON025-N018",
+      "fault_id": "MON025-N018",
+      "family": "recovery-correctness",
+      "expected": "blocked",
+      "rationale": "No forward rounding beyond declared target"
+    },
+    {
+      "case_id": "MON025-N019",
+      "fault_id": "MON025-N019",
+      "family": "recovery-correctness",
+      "expected": "blocked",
+      "rationale": "Source lineage mismatch blocks"
+    },
+    {
+      "case_id": "MON025-N020",
+      "fault_id": "MON025-N020",
+      "family": "recovery-lineage",
+      "expected": "blocked",
+      "rationale": "No numeric-only LSN comparison across timelines"
+    },
+    {
+      "case_id": "MON025-N021",
+      "fault_id": "MON025-N021",
+      "family": "recovery-correctness",
+      "expected": "blocked",
+      "rationale": "Canonical surface digest comparison detects drift"
+    },
+    {
+      "case_id": "MON025-N022",
+      "fault_id": "MON025-N022",
+      "family": "service-readiness",
+      "expected": "blocked",
+      "rationale": "Database ready does not promote service ready"
+    },
+    {
+      "case_id": "MON025-N023",
+      "fault_id": "MON025-N023",
+      "family": "service-readiness",
+      "expected": "blocked",
+      "rationale": "Activation blocked against split-brain risk"
+    },
+    {
+      "case_id": "MON025-N024",
+      "fault_id": "MON025-N024",
+      "family": "service-readiness",
+      "expected": "blocked",
+      "rationale": "All stale endpoints must be fenced before activation"
+    },
+    {
+      "case_id": "MON025-N025",
+      "fault_id": "MON025-N025",
+      "family": "service-readiness",
+      "expected": "blocked",
+      "rationale": "Service readiness fails until write probe is rolled back and observed"
+    },
+    {
+      "case_id": "MON025-N026",
+      "fault_id": "MON025-N026",
+      "family": "service-readiness",
+      "expected": "blocked",
+      "rationale": "Activation-order invariant violated"
+    },
+    {
+      "case_id": "MON025-N027",
+      "fault_id": "MON025-N027",
+      "family": "authority-and-reconciliation",
+      "expected": "indeterminate",
+      "rationale": "No second mutation until original outcome is reconciled"
+    },
+    {
+      "case_id": "MON025-N028",
+      "fault_id": "MON025-N028",
+      "family": "independent-observer",
+      "expected": "indeterminate",
+      "rationale": "Independent verification claim is unsupported"
+    },
+    {
+      "case_id": "MON025-N029",
+      "fault_id": "MON025-N029",
+      "family": "time-bounds",
+      "expected": "indeterminate",
+      "rationale": "RPO/RTO upper bounds cannot be qualified"
+    },
+    {
+      "case_id": "MON025-N030",
+      "fault_id": "MON025-N030",
+      "family": "backup-integrity",
+      "expected": "blocked",
+      "rationale": "Integrity/restore check must fail closed"
+    },
+    {
+      "case_id": "MON025-N031",
+      "fault_id": "MON025-N031",
+      "family": "configuration-provenance",
+      "expected": "indeterminate",
+      "rationale": "Version and source-scope digest mismatch"
+    },
+    {
+      "case_id": "MON025-N032",
+      "fault_id": "MON025-N032",
+      "family": "compatibility",
+      "expected": "indeterminate",
+      "rationale": "Extension profile requires compatibility and full challenge requalification"
+    },
+    {
+      "case_id": "MON025-N033",
+      "fault_id": "MON025-N033",
+      "family": "compatibility",
+      "expected": "indeterminate",
+      "rationale": "New-series compatibility is not assumed from 4.3.1 test note"
+    },
+    {
+      "case_id": "MON025-N034",
+      "fault_id": "MON025-N034",
+      "family": "backup-integrity",
+      "expected": "blocked",
+      "rationale": "pgBackRest protocol requires exact version alignment"
+    },
+    {
+      "case_id": "MON025-N035",
+      "fault_id": "MON025-N035",
+      "family": "cdc-continuity",
+      "expected": "blocked",
+      "rationale": "The independent source SQL oracle must detect value divergence even when event counts and primary keys still match."
+    },
+    {
+      "case_id": "MON025-N036",
+      "fault_id": "MON025-N036",
+      "family": "transaction-closure",
+      "expected": "blocked",
+      "rationale": "A complete set of primary keys does not override a missing BEGIN/END witness, wrong END event_count or non-contiguous per-event ordering."
+    },
+    {
+      "case_id": "MON025-P004",
+      "fault_id": "MON025-P004",
+      "family": "transaction-closure",
+      "expected": "qualified",
+      "rationale": "Exact duplicate transaction envelopes are deduplicated and counted as replay, not mistaken for conflicting or missing boundaries."
+    },
+    {
+      "case_id": "MON025-N037",
+      "fault_id": "MON025-N037",
+      "family": "transaction-closure",
+      "expected": "blocked",
+      "rationale": "Conflicting boundary metadata under the same transaction ID is divergence even when row events match."
+    }
+  ]
+}

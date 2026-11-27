@@ -1,0 +1,287 @@
+{
+  "profile": "mon028-falsification-first-benchmark-v1",
+  "version": "1.0.0",
+  "classification": "synthetic-descriptive-seeds",
+  "scenarios": [
+    {
+      "id": "MON028-P001",
+      "class": "positive_control",
+      "name": "complete_valid_campaign",
+      "expected_outcome": "qualified",
+      "mutation": "all assigned observations execute and match the independent suite",
+      "notes": "Complete exact-match campaign must pass both safety and usefulness gates."
+    },
+    {
+      "id": "MON028-P002",
+      "class": "positive_control",
+      "name": "zero_false_qualifications_with_confidence_bound",
+      "expected_outcome": "qualified",
+      "mutation": "run 10000 independently sampled unsafe cases with no false-qualified outputs",
+      "notes": "Zero observed errors retain a nonzero Wilson upper confidence bound."
+    },
+    {
+      "id": "MON028-P003",
+      "class": "positive_control",
+      "name": "safe_indeterminate_on_known_blocked_case",
+      "expected_outcome": "blocked",
+      "mutation": "candidate reports indeterminate where oracle expected blocked",
+      "notes": "Safety gate may pass but exact usefulness/classification gate must fail."
+    },
+    {
+      "id": "MON028-N001",
+      "class": "negative_control",
+      "name": "false_qualified_blocked_case",
+      "expected_outcome": "blocked",
+      "mutation": "candidate reports qualified where oracle expected blocked",
+      "notes": "Any unsafe qualification fails the safety gate."
+    },
+    {
+      "id": "MON028-N002",
+      "class": "negative_control",
+      "name": "false_qualified_indeterminate_case",
+      "expected_outcome": "blocked",
+      "mutation": "candidate reports qualified where oracle expected indeterminate",
+      "notes": "Unknown evidence must never be promoted to qualified."
+    },
+    {
+      "id": "MON028-N003",
+      "class": "negative_control",
+      "name": "missing_assigned_replicate",
+      "expected_outcome": "incomplete",
+      "mutation": "omit one case/replicate pair from the candidate result",
+      "notes": "Missing observation makes the campaign incomplete."
+    },
+    {
+      "id": "MON028-N004",
+      "class": "negative_control",
+      "name": "skipped_replicate",
+      "expected_outcome": "incomplete",
+      "mutation": "record one case as skipped",
+      "notes": "Skipped cases remain in the denominator and prevent campaign completion."
+    },
+    {
+      "id": "MON028-N005",
+      "class": "negative_control",
+      "name": "timed_out_replicate",
+      "expected_outcome": "incomplete",
+      "mutation": "record a timeout with no observed verdict",
+      "notes": "Timeout is not success and cannot be silently dropped."
+    },
+    {
+      "id": "MON028-N006",
+      "class": "negative_control",
+      "name": "infrastructure_error_replicate",
+      "expected_outcome": "incomplete",
+      "mutation": "record failed experiment infrastructure",
+      "notes": "Infrastructure errors make campaign incomplete and must remain visible."
+    },
+    {
+      "id": "MON028-N007",
+      "class": "negative_control",
+      "name": "duplicate_case_replicate",
+      "expected_outcome": "blocked",
+      "mutation": "include two result records with the same case ID and replicate number",
+      "notes": "Duplicate observations make the result malformed."
+    },
+    {
+      "id": "MON028-N008",
+      "class": "negative_control",
+      "name": "unknown_candidate_case_id",
+      "expected_outcome": "blocked",
+      "mutation": "invent a result case not present in the independent suite",
+      "notes": "The candidate cannot enlarge or redefine the suite."
+    },
+    {
+      "id": "MON028-N009",
+      "class": "negative_control",
+      "name": "wrong_suite_digest",
+      "expected_outcome": "blocked",
+      "mutation": "supply result bound to another suite digest",
+      "notes": "Expected answers and case denominator are independently fixed."
+    },
+    {
+      "id": "MON028-N010",
+      "class": "negative_control",
+      "name": "wrong_oracle_digest",
+      "expected_outcome": "blocked",
+      "mutation": "use a candidate result with a different oracle digest",
+      "notes": "Oracle identity must match the signed benchmark suite."
+    },
+    {
+      "id": "MON028-N011",
+      "class": "negative_control",
+      "name": "easier_workload_digest",
+      "expected_outcome": "blocked",
+      "mutation": "use a lower-load workload while claiming a matched run",
+      "notes": "Matched comparisons require identical workload digest."
+    },
+    {
+      "id": "MON028-N012",
+      "class": "negative_control",
+      "name": "larger_resource_budget",
+      "expected_outcome": "blocked",
+      "mutation": "give candidate more CPU/memory than the baseline",
+      "notes": "A larger resource budget invalidates matched comparison."
+    },
+    {
+      "id": "MON028-N013",
+      "class": "negative_control",
+      "name": "different_environment",
+      "expected_outcome": "blocked",
+      "mutation": "run candidate on different hardware/environment profile",
+      "notes": "Performance comparisons require the same environment digest."
+    },
+    {
+      "id": "MON028-N014",
+      "class": "negative_control",
+      "name": "candidate_supplies_expected_verdict",
+      "expected_outcome": "blocked",
+      "mutation": "insert expected field into candidate observation",
+      "notes": "Result schema excludes expected answers; oracle remains external."
+    },
+    {
+      "id": "MON028-N015",
+      "class": "negative_control",
+      "name": "missing_positive_controls",
+      "expected_outcome": "blocked",
+      "mutation": "construct suite with no expected-qualified cases",
+      "notes": "A suite without positive controls is invalid."
+    },
+    {
+      "id": "MON028-N016",
+      "class": "negative_control",
+      "name": "missing_unsafe_controls",
+      "expected_outcome": "blocked",
+      "mutation": "construct suite containing only expected-qualified cases",
+      "notes": "A suite without blocked/indeterminate cases cannot measure false assurance."
+    },
+    {
+      "id": "MON028-N017",
+      "class": "negative_control",
+      "name": "duplicate_suite_case_id",
+      "expected_outcome": "blocked",
+      "mutation": "reuse a case ID with a different expected verdict",
+      "notes": "Case identity must be unique in the independent suite."
+    },
+    {
+      "id": "MON028-N018",
+      "class": "negative_control",
+      "name": "zero_replicate_count",
+      "expected_outcome": "blocked",
+      "mutation": "set a suite case replicate count to zero",
+      "notes": "Every case must have at least one assigned replicate."
+    },
+    {
+      "id": "MON028-N019",
+      "class": "negative_control",
+      "name": "executed_without_evidence_digest",
+      "expected_outcome": "blocked",
+      "mutation": "return a verdict without result/evidence digests",
+      "notes": "Executed observations must be evidence-addressable."
+    },
+    {
+      "id": "MON028-N020",
+      "class": "negative_control",
+      "name": "skipped_with_verdict",
+      "expected_outcome": "blocked",
+      "mutation": "attach an asserted verdict to a skipped or timed-out observation",
+      "notes": "Non-executed observations cannot carry a verdict."
+    },
+    {
+      "id": "MON028-N021",
+      "class": "negative_control",
+      "name": "positive_control_false_rejection",
+      "expected_outcome": "blocked",
+      "mutation": "candidate reports blocked or indeterminate for a valid positive control",
+      "notes": "The benchmark must measure usefulness as well as safety."
+    },
+    {
+      "id": "MON028-N022",
+      "class": "negative_control",
+      "name": "unmatched_replicate_pairing",
+      "expected_outcome": "blocked",
+      "mutation": "baseline and candidate have different completed case/replicate sets",
+      "notes": "Paired comparisons cannot omit hard cases from either system."
+    },
+    {
+      "id": "MON028-N023",
+      "class": "negative_control",
+      "name": "suite_order_change_without_semantic_change",
+      "expected_outcome": "qualified",
+      "mutation": "reorder case array while preserving all case definitions",
+      "notes": "Canonical suite digest must be invariant to case list presentation order."
+    },
+    {
+      "id": "MON028-N024",
+      "class": "negative_control",
+      "name": "false_blended_weighted_score",
+      "expected_outcome": "blocked",
+      "mutation": "candidate attempts to compensate false qualification with higher throughput",
+      "notes": "No aggregate score may trade away safety."
+    },
+    {
+      "id": "MON028-N025",
+      "class": "negative_control",
+      "name": "zero_unsafe_trial_denominator",
+      "expected_outcome": "indeterminate",
+      "mutation": "score a campaign without any executed unsafe test case",
+      "notes": "No false-qualification rate is inferred without an unsafe denominator."
+    },
+    {
+      "id": "MON028-P004",
+      "class": "positive_control",
+      "name": "complete_MON025_oracle_join",
+      "expected_outcome": "qualified",
+      "mutation": "generate a suite from the full 41-case matrix with every case matched to exactly one independent oracle entry",
+      "notes": "Suite generation retains all case IDs, families, replicate counts and raw source digests."
+    },
+    {
+      "id": "MON028-N026",
+      "class": "negative_control",
+      "name": "missing_oracle_case",
+      "expected_outcome": "blocked",
+      "mutation": "remove one oracle entry while leaving the MON-025 matrix unchanged",
+      "notes": "The generator must reject the incomplete oracle and not reduce the planned benchmark denominator."
+    },
+    {
+      "id": "MON028-N027",
+      "class": "negative_control",
+      "name": "oracle_expected_outcome_disagreement",
+      "expected_outcome": "blocked",
+      "mutation": "change an oracle verdict or matrix expected_outcome for one shared case ID",
+      "notes": "The generator fails closed when the two separately maintained declarations disagree."
+    },
+    {
+      "id": "MON028-N028",
+      "class": "negative_control",
+      "name": "duplicate_oracle_case_id",
+      "expected_outcome": "blocked",
+      "mutation": "repeat a case ID in the independent oracle with a second family or verdict",
+      "notes": "Duplicate oracle identity is ambiguous and must prevent suite creation."
+    },
+    {
+      "id": "MON028-N029",
+      "class": "negative_control",
+      "name": "extra_oracle_case_id",
+      "expected_outcome": "blocked",
+      "mutation": "add an oracle entry absent from the MON-025 fault matrix",
+      "notes": "The oracle and fault corpus must match exactly in both directions."
+    },
+    {
+      "id": "MON028-N030",
+      "class": "negative_control",
+      "name": "substituted_workload_environment_or_budget_profile",
+      "expected_outcome": "blocked",
+      "mutation": "supply a workload, environment or resource document with the wrong profile identity",
+      "notes": "A generated suite cannot claim a matched environment or resource envelope from a different profile type."
+    },
+    {
+      "id": "MON028-N031",
+      "class": "indeterminate_control",
+      "name": "example_environment_placeholders_not_replaced",
+      "expected_outcome": "indeterminate",
+      "mutation": "use the illustrative environment profile with REPLACE_WITH placeholders as a confirmatory run identity",
+      "notes": "An example profile is useful for a smoke build but cannot support confirmatory hardware or immutable-image claims until replaced with observed values."
+    }
+  ]
+}

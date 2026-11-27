@@ -1,0 +1,28 @@
+{
+  "profile": "mon028-resource-budget-profile-v1",
+  "version": "1.0.0",
+  "description": "Illustrative fixed resource ceiling; replace with enforced cgroup/container quotas and measured limits before confirmatory runs.",
+  "sut": {
+    "cpu_cores": 2,
+    "memory_bytes": 4294967296,
+    "pids_limit": 512
+  },
+  "postgres": {
+    "cpu_cores": 1,
+    "memory_bytes": 2147483648,
+    "disk_quota_bytes": 10737418240
+  },
+  "kafka_connect": {
+    "cpu_cores": 1,
+    "memory_bytes": 2147483648,
+    "disk_quota_bytes": 5368709120
+  },
+  "network": {
+    "egress_policy": "loopback-and-compose-network-only",
+    "bandwidth_limit_bytes_per_second": null
+  },
+  "observer": {
+    "cpu_cores": 1,
+    "memory_bytes": 1073741824
+  }
+}

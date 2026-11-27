@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "description",
+    "source",
+    "streaming",
+    "host",
+    "image_digests"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon028-environment-profile-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "postgresql_image",
+        "postgresql_version"
+      ],
+      "properties": {
+        "postgresql_image": {
+          "type": "string"
+        },
+        "postgresql_version": {
+          "type": "string"
+        }
+      }
+    },
+    "streaming": {
+      "type": "object",
+      "required": [
+        "kafka_image",
+        "kafka_version",
+        "debezium_image",
+        "debezium_version"
+      ],
+      "properties": {
+        "kafka_image": {
+          "type": "string"
+        },
+        "kafka_version": {
+          "type": "string"
+        },
+        "debezium_image": {
+          "type": "string"
+        },
+        "debezium_version": {
+          "type": "string"
+        }
+      }
+    },
+    "host": {
+      "type": "object",
+      "required": [
+        "operating_system",
+        "architecture",
+        "cpu_model",
+        "docker_engine_version",
+        "filesystem"
+      ],
+      "properties": {
+        "operating_system": {
+          "type": "string"
+        },
+        "architecture": {
+          "type": "string"
+        },
+        "cpu_model": {
+          "type": "string"
+        },
+        "docker_engine_version": {
+          "type": "string"
+        },
+        "filesystem": {
+          "type": "string"
+        }
+      }
+    },
+    "image_digests": {
+      "type": "object",
+      "required": [
+        "postgresql",
+        "kafka",
+        "debezium"
+      ],
+      "properties": {
+        "postgresql": {
+          "type": "string"
+        },
+        "kafka": {
+          "type": "string"
+        },
+        "debezium": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

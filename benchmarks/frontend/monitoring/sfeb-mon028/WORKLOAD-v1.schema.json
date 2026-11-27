@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "description",
+    "source",
+    "capture",
+    "recovery",
+    "duration_seconds"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon028-workload-profile-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "postgresql_major",
+        "transaction_shape",
+        "rows_per_transaction",
+        "deterministic_seed"
+      ],
+      "properties": {
+        "postgresql_major": {
+          "type": "string"
+        },
+        "transaction_shape": {
+          "type": "string"
+        },
+        "rows_per_transaction": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "generated_columns": {
+          "type": "boolean"
+        },
+        "include_sequence_probe": {
+          "type": "boolean"
+        },
+        "include_large_object_probe": {
+          "type": "boolean"
+        },
+        "include_partition_probe": {
+          "type": "boolean"
+        },
+        "deterministic_seed": {
+          "type": "string"
+        }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "required": [
+        "expected_unique_events_per_batch",
+        "connector_initial_snapshot_required",
+        "transaction_metadata_required",
+        "numeric_payload_compare"
+      ],
+      "properties": {
+        "expected_unique_events_per_batch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "connector_initial_snapshot_required": {
+          "type": "boolean"
+        },
+        "transaction_metadata_required": {
+          "type": "boolean"
+        },
+        "numeric_payload_compare": {
+          "enum": [
+            "exact-string"
+          ]
+        }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "required": [
+        "physical_base_backup",
+        "recovery_target_type",
+        "writers_quiesced_at_target_capture",
+        "expected_state_surfaces"
+      ],
+      "properties": {
+        "physical_base_backup": {
+          "type": "boolean"
+        },
+        "recovery_target_type": {
+          "const": "lsn-and-timeline"
+        },
+        "writers_quiesced_at_target_capture": {
+          "type": "boolean"
+        },
+        "expected_state_surfaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "duration_seconds": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
