@@ -98,6 +98,8 @@ pub enum AcquisitionOutcome {
     ExtractionFailed,
     BudgetExceeded,
     DuplicateSuppressed,
+    UrlPolicyRejected,
+    DnsPolicyRejected,
 }
 
 impl AcquisitionOutcome {
@@ -114,6 +116,8 @@ impl AcquisitionOutcome {
                 | Self::ReadFailed
                 | Self::ExtractionFailed
                 | Self::BudgetExceeded
+                | Self::UrlPolicyRejected
+                | Self::DnsPolicyRejected
         )
     }
 }
