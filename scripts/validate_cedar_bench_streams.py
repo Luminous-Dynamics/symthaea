@@ -26,7 +26,11 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 def validate(candidate_path: Path, audit_path: Path) -> None:
     candidates = read_jsonl(candidate_path)
     audits = read_jsonl(audit_path)
-    require(len(candidates) == len(audits) == 80, "expected 80 paired candidate/auditor trials")
+    expected_split = sys.argv[3] if len(sys.argv) > 3 else "all"
+    require(expected_split in {"train", "development", "sealed_test", "all"}, "invalid expected split")
+    expected_count = {"train": 40, "development": 20, "sealed_test": 20, "all": 80}[expected_split]
+    require(len(candidates) == len(audits) == expected_count,
+            f"expected {expected_count} paired trials for {expected_split}")
     candidate_ids = [row["task_id"] for row in candidates]
     audit_ids = [row["task_id"] for row in audits]
     require(len(set(candidate_ids)) == 80, "candidate task IDs must be unique")
@@ -44,6 +48,10 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
         audit = audit_by_id[task_id]
         require(not (forbidden_candidate_keys & set(candidate)),
                 f"{task_id}: candidate stream leaked auditor fields")
+        require(audit["split"] in {"train", "development", "sealed_test"},
+                f"{task_id}: invalid audit split")
+        require(expected_split == "all" or audit["split"] == expected_split,
+                f"{task_id}: audit split mismatch")
         require(audit["condition"] in {"baseline", "counterfactual", "placebo", "source_removed"},
                 f"{task_id}: invalid auditor condition")
         source_digests = {source["source_id"]: canonical_digest(source) for source in candidate["sources"]}
@@ -72,7 +80,8 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
                     f"{task_id}: removed source remains in candidate stream")
 
     templates = {audit["template_id"] for audit in audits}
-    require(len(templates) == 20, "expected all 20 CEDAR templates in generated streams")
+    expected_templates = {"train": 10, "development": 5, "sealed_test": 5, "all": 20}[expected_split]
+    require(len(templates) == expected_templates, f"expected {expected_templates} templates in split")
     conditions_per_template: dict[str, set[str]] = {}
     for audit in audits:
         conditions_per_template.setdefault(audit["template_id"], set()).add(audit["condition"])
@@ -84,7 +93,7 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
 
 def main() -> int:
     try:
-        require(len(sys.argv) == 3, "usage: validate_cedar_bench_streams.py candidate.jsonl auditor.jsonl")
+        require(len(sys.argv) in {3, 4}, "usage: validate_cedar_bench_streams.py candidate.jsonl auditor.jsonl [split]")
         validate(Path(sys.argv[1]), Path(sys.argv[2]))
         return 0
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
