@@ -1,6 +1,6 @@
 # MON-021 — PostgreSQL CDC Continuity Assurance
 
-**Status:** research contract, 34-case synthetic seed corpus and standard-library Go semantic prototype; live PostgreSQL 18 integration and independent qualification pending.
+**Status:** research contract, 44-case synthetic seed corpus and standard-library Go semantic prototype; live PostgreSQL 18/19 integration and independent qualification pending.
 
 MON-021 connects MON-016/017 bounded source capture with MON-013 destination readback by qualifying PostgreSQL logical-decoding continuity from an exported snapshot through WAL decoding, durable evidence persistence, acknowledgements and failover.
 
@@ -16,11 +16,14 @@ Can an independent verifier establish that a database snapshot and every logical
 - [BENCHMARKS-v0.1.md](./BENCHMARKS-v0.1.md) — local reference-package measurements and prospective targets.
 - [BENCHMARKS-v0.1.md](./BENCHMARKS-v0.1.md) — local preflight and exploratory measurements.
 
-## PostgreSQL 18 research basis
+## PostgreSQL 18/19 research basis
 
 - [Logical decoding concepts and replication slots](https://www.postgresql.org/docs/18/logicaldecoding-explanation.html).
 - [Replication-slot state](https://www.postgresql.org/docs/18/view-pg-replication-slots.html).
-- [Logical replication failover](https://www.postgresql.org/docs/18/logical-replication-failover.html).
+- [Logical replication failover, PostgreSQL 18](https://www.postgresql.org/docs/18/logical-replication-failover.html).
+- [PostgreSQL 19 release notes (2026-11-19)](https://www.postgresql.org/docs/19/release-19.html).
+- [PostgreSQL 19 sequence replication](https://www.postgresql.org/docs/19/logical-replication-sequences.html).
+- [PostgreSQL 19 WAIT FOR LSN](https://www.postgresql.org/docs/19/sql-wait.html).
 - [WAL/replication configuration](https://www.postgresql.org/docs/18/runtime-config-replication.html).
 - [Timeline history](https://www.postgresql.org/docs/18/continuous-archiving.html).
 
