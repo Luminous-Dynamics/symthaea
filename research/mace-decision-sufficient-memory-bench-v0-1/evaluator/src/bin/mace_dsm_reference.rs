@@ -450,9 +450,9 @@ fn score(
         let forbidden:BTreeSet<&str>=private.forbidden_evidence_ids.iter().map(String::as_str).collect();
         let event_ids:BTreeSet<&str>=record.episode.source_events.iter().map(|e|e.event_id.as_str()).collect();
         if required.len()!=private.required_evidence_ids.len()||forbidden.len()!=private.forbidden_evidence_ids.len()
-            ||required.iter().any(|x|!admissible.contains(**x))
-            ||forbidden.iter().any(|x|admissible.contains(**x))
-            ||required.iter().chain(forbidden.iter()).any(|x|!event_ids.contains(x)) {
+            ||required.iter().any(|x|!admissible.contains(*x))
+            ||forbidden.iter().any(|x|admissible.contains(*x))
+            ||required.iter().chain(forbidden.iter()).any(|x|!event_ids.contains(*x)) {
             return Err(format!("{id}: inconsistent private required/forbidden labels"));
         }
         let memory=responses.get(&(id.clone(),memory_id.to_owned())).ok_or_else(||format!("{id}: missing memory response"))?;
