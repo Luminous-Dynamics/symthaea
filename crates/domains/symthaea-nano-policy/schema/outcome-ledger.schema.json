@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-outcome-ledger:v1",
+  "title": "Nano benchmark post-outcome ledger",
+  "description": "Post-selection observations for independently evaluating policy outcomes. Do not pass this ledger to the selector.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "task_contract_sha256",
+    "evaluation_manifest_sha256",
+    "source_manifest_sha256",
+    "loss_name",
+    "loss_unit",
+    "success_threshold",
+    "query_budget",
+    "cost_unit",
+    "baseline_arm_id",
+    "minimum_success_rate_delta",
+    "minimum_success_auc_delta",
+    "minimum_best_loss_reduction",
+    "arms"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "nano-outcome-ledger-v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "task_contract_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "loss_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "loss_unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "success_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "query_budget": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "cost_unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "baseline_arm_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "minimum_success_rate_delta": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "minimum_success_auc_delta": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "arm_id",
+          "policy_id",
+          "policy_revision",
+          "run_manifest_sha256",
+          "selection_receipt_sha256",
+          "target_queries"
+        ],
+        "properties": {
+          "arm_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "policy_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "policy_revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "run_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "selection_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "target_queries": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "target_query_id",
+                "group_id",
+                "observations"
+              ],
+              "properties": {
+                "target_query_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "group_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "observations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "query_rank",
+                      "candidate_id",
+                      "status",
+                      "observation_artifact_sha256",
+                      "loss",
+                      "cost"
+                    ],
+                    "properties": {
+                      "query_rank": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "candidate_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "status": {
+                        "enum": [
+                          "evaluated",
+                          "invalid_candidate",
+                          "oracle_failed",
+                          "timeout"
+                        ]
+                      },
+                      "loss": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 1000000000000
+                      },
+                      "cost": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000000000000
+                      },
+                      "observation_artifact_sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$",
+                        "description": "SHA-256 of canonical synthetic-response bytes in test fixtures or exact raw oracle/failure receipt bytes in recorded runs."
+                      }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "status": {
+                              "const": "evaluated"
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ]
+                        },
+                        "then": {
+                          "properties": {
+                            "loss": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1000000000000
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "status": {
+                              "enum": [
+                                "invalid_candidate",
+                                "oracle_failed",
+                                "timeout"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ]
+                        },
+                        "then": {
+                          "properties": {
+                            "loss": {
+                              "type": "null"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "maxItems": 1000
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "minimum_best_loss_reduction": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000000000000,
+      "description": "Minimum practical reduction in the final-budget best loss; positive reported comparison delta means the candidate lowered loss."
+    },
+    "shift_manifest_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Optional SHA-256 of the separately verified nano-shift-manifest-v1 used to label the groups; omitted/null means this ledger is not shift-manifest-bound."
+    }
+  }
+}
