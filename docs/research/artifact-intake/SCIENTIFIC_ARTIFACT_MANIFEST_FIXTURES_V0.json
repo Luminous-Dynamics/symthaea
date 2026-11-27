@@ -67,7 +67,8 @@
         }
       },
       "fixture_artifact_bytes_utf8": "sample_id,temperature_C\nS001,21.50\n",
-      "fixture_derived_payload_utf8": "observation_id=study-row-0-temperature\nlocator=CSV_CELL|record=0|column=1|name=temperature_C|start=29|end=34\nraw_lexeme=21.50\nvalue_kind=DECIMAL\nunit=degC\n"
+      "fixture_derived_payload_utf8": "observation_id=study-row-0-temperature\nlocator=CSV_CELL|record=0|column=1|name=temperature_C|start=29|end=34\nraw_lexeme=21.50\nvalue_kind=DECIMAL\nunit=degC\n",
+      "policy_usable": true
     },
     {
       "case_id": "json_pointer_numeric",
@@ -129,7 +130,8 @@
         }
       },
       "fixture_artifact_bytes_utf8": "{\"results\":[{\"effect_estimate\":0.032}]}\n",
-      "fixture_derived_payload_utf8": "observation_id=results-effect-estimate\nlocator=JSON_POINTER|/results/0/effect_estimate\nraw_lexeme=0.032\nvalue_kind=DECIMAL\nunit=NULL\n"
+      "fixture_derived_payload_utf8": "observation_id=results-effect-estimate\nlocator=JSON_POINTER|/results/0/effect_estimate\nraw_lexeme=0.032\nvalue_kind=DECIMAL\nunit=NULL\n",
+      "policy_usable": true
     },
     {
       "case_id": "unsupported_pdf",
@@ -184,7 +186,8 @@
           }
         }
       },
-      "fixture_artifact_bytes_utf8": "%PDF-1.7\n% synthetic unsupported parser fixture\n"
+      "fixture_artifact_bytes_utf8": "%PDF-1.7\n% synthetic unsupported parser fixture\n",
+      "policy_usable": false
     },
     {
       "case_id": "receipt_digest_mismatch",
@@ -239,7 +242,8 @@
           }
         }
       },
-      "fixture_artifact_bytes_utf8": "{}\n"
+      "fixture_artifact_bytes_utf8": "{}\n",
+      "policy_usable": false
     },
     {
       "case_id": "malformed_csv_row_width",
@@ -294,7 +298,8 @@
           }
         }
       },
-      "fixture_artifact_bytes_utf8": "id,value\nA001,1,extra\n"
+      "fixture_artifact_bytes_utf8": "id,value\nA001,1,extra\n",
+      "policy_usable": false
     },
     {
       "case_id": "input_byte_limit",
@@ -349,7 +354,8 @@
           }
         }
       },
-      "fixture_artifact_bytes_utf8": "id,value\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\n"
+      "fixture_artifact_bytes_utf8": "id,value\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\n",
+      "policy_usable": false
     },
     {
       "case_id": "partial_csv_diagnostic_only",
@@ -420,7 +426,8 @@
         }
       },
       "fixture_artifact_bytes_utf8": "id,value\nA001,1\nA002,2,EXTRA\n",
-      "fixture_derived_payload_utf8": "observation_id=partial-row-0-value\nlocator=CSV_CELL|record=0|column=1|name=value|start=14|end=15\nraw_lexeme=1\nvalue_kind=INTEGER\nunit=NULL\n"
+      "fixture_derived_payload_utf8": "observation_id=partial-row-0-value\nlocator=CSV_CELL|record=0|column=1|name=value|start=14|end=15\nraw_lexeme=1\nvalue_kind=INTEGER\nunit=NULL\n",
+      "policy_usable": false
     }
   ],
   "cross_field_invariants": [
