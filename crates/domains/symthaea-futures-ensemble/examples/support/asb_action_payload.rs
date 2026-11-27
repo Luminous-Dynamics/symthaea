@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
+use super::scientific_decision_replay::PermittedActionOfferRef;
+
 pub const ASB_BATCH_PAYLOAD_SCHEMA_VERSION: u16 = 1;
 pub const ASB_LAB_API_VERSION: u32 = 1;
 
@@ -37,6 +39,7 @@ pub enum AsBenchPayloadError {
     UnsupportedSchemaVersion,
     UnsupportedLabApiVersion,
     InvalidManifestDigest,
+    EmptyOfferId,
     EmptyCampaignId,
     InvalidStage,
     EmptyDesignIdField,
@@ -106,6 +109,27 @@ impl AsBenchBatchPayloadV1 {
             }
         }
         Ok(())
+    }
+
+    /// Construct the payload binding for an existing upstream #11015 offer.
+    ///
+    /// The caller supplies the offer ID already issued by AgentView; this method never
+    /// creates or registers permission. It validates the exact batch before computing its
+    /// payload digest and pairing that digest with the upstream offer identity.
+    pub fn as_permitted_offer_ref(
+        &self,
+        upstream_offer_id: &str,
+        expected_batch_size: usize,
+        permitted_design_ids: &[String],
+    ) -> Result<PermittedActionOfferRef, AsBenchPayloadError> {
+        if upstream_offer_id.trim().is_empty() {
+            return Err(AsBenchPayloadError::EmptyOfferId);
+        }
+        self.validate(expected_batch_size, permitted_design_ids)?;
+        Ok(PermittedActionOfferRef {
+            offer_id: upstream_offer_id.to_owned(),
+            action_payload_sha256: self.payload_sha256()?,
+        })
     }
 
     /// SHA-256 over the exact versioned JSON request identity.
@@ -206,6 +230,27 @@ mod tests {
         assert_ne!(
             base.payload_sha256().unwrap(),
             other.payload_sha256().unwrap()
+        );
+    }
+
+    #[test]
+    fn binds_validated_batch_to_existing_upstream_offer() {
+        let payload = batch(&["variant-a", "variant-b"]);
+        let offer = payload
+            .as_permitted_offer_ref("agentview-offer-17", 2, &permitted())
+            .unwrap();
+        assert_eq!(offer.offer_id, "agentview-offer-17");
+        assert_eq!(offer.action_payload_sha256, payload.payload_sha256().unwrap());
+    }
+
+    #[test]
+    fn rejects_empty_upstream_offer_identity() {
+        let payload = batch(&["variant-a", "variant-b"]);
+        assert_eq!(
+            payload
+                .as_permitted_offer_ref(" ", 2, &permitted())
+                .unwrap_err(),
+            AsBenchPayloadError::EmptyOfferId
         );
     }
 
