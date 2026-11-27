@@ -34,6 +34,10 @@ pub enum PreviousOutcome {
 pub struct PortfolioPrefix {
     pub step: u32,
     pub context_scope_sha256: String,
+    /// Digest of the exact state observation to which this prefix applies.
+    pub state_evidence_sha256: String,
+    /// Receipt digest binding the independently computed reachable-set bound.
+    pub reachability_evidence_sha256: String,
     /// Upper bound supplied by an independent reachable-set adapter.
     pub reachable_error_bound_units: u64,
 }
@@ -130,8 +134,20 @@ pub fn assess_recovery_portfolio(
         if prefix.step as usize != index {
             return Err(PortfolioError::NonContiguousPrefixSequence);
         }
-        if !is_sha256_hex(&prefix.context_scope_sha256) {
-            return Err(PortfolioError::InvalidSha256("prefix.context_scope_sha256"));
+        for (field, digest) in [
+            ("prefix.context_scope_sha256", &prefix.context_scope_sha256),
+            (
+                "prefix.state_evidence_sha256",
+                &prefix.state_evidence_sha256,
+            ),
+            (
+                "prefix.reachability_evidence_sha256",
+                &prefix.reachability_evidence_sha256,
+            ),
+        ] {
+            if !is_sha256_hex(digest) {
+                return Err(PortfolioError::InvalidSha256(field));
+            }
         }
     }
 
@@ -193,8 +209,7 @@ pub fn assess_recovery_portfolio(
                     reassess_before_any_further_commitment: false,
                 }
             };
-            let (minimum, weakest_step) =
-                minimum_option_count_through(&per_prefix, last_safe);
+            let (minimum, weakest_step) = minimum_option_count_through(&per_prefix, last_safe);
             return Ok(assessment_from_options(
                 disposition,
                 required_independent_options,
@@ -209,17 +224,9 @@ pub fn assess_recovery_portfolio(
     }
 
     let (last_safe, reason, reassess) = if max_dwell <= final_step {
-        (
-            max_dwell,
-            PortfolioStopReason::MaximumDwellReached,
-            false,
-        )
+        (max_dwell, PortfolioStopReason::MaximumDwellReached, false)
     } else {
-        (
-            final_step,
-            PortfolioStopReason::PlannedSegmentEnded,
-            true,
-        )
+        (final_step, PortfolioStopReason::PlannedSegmentEnded, true)
     };
     let (minimum, weakest_step) = minimum_option_count_through(&per_prefix, last_safe);
     let disposition = PortfolioDisposition::CommitPrefix {
@@ -336,12 +343,16 @@ fn best_option_per_failure_domain(
     values
 }
 
-fn option_is_better(
-    candidate: &SelectedRecoveryOption,
-    current: &SelectedRecoveryOption,
-) -> bool {
-    (candidate.recovery_steps, candidate.recovery_energy_units, &candidate.profile_id)
-        < (current.recovery_steps, current.recovery_energy_units, &current.profile_id)
+fn option_is_better(candidate: &SelectedRecoveryOption, current: &SelectedRecoveryOption) -> bool {
+    (
+        candidate.recovery_steps,
+        candidate.recovery_energy_units,
+        &candidate.profile_id,
+    ) < (
+        current.recovery_steps,
+        current.recovery_energy_units,
+        &current.profile_id,
+    )
 }
 
 fn validate_request(request: &PortfolioRequest) -> Result<(), PortfolioError> {
@@ -371,8 +382,14 @@ fn validate_options(
             (&option.profile_sha256, "profile_sha256"),
             (&option.plant_model_sha256, "plant_model_sha256"),
             (&option.context_scope_sha256, "context_scope_sha256"),
-            (&option.recovery_controller_sha256, "recovery_controller_sha256"),
-            (&option.certificate_receipt_sha256, "certificate_receipt_sha256"),
+            (
+                &option.recovery_controller_sha256,
+                "recovery_controller_sha256",
+            ),
+            (
+                &option.certificate_receipt_sha256,
+                "certificate_receipt_sha256",
+            ),
             (&option.failure_domain_sha256, "failure_domain_sha256"),
         ] {
             if value.trim().is_empty() {
@@ -383,8 +400,14 @@ fn validate_options(
             ("profile_sha256", &option.profile_sha256),
             ("plant_model_sha256", &option.plant_model_sha256),
             ("context_scope_sha256", &option.context_scope_sha256),
-            ("recovery_controller_sha256", &option.recovery_controller_sha256),
-            ("certificate_receipt_sha256", &option.certificate_receipt_sha256),
+            (
+                "recovery_controller_sha256",
+                &option.recovery_controller_sha256,
+            ),
+            (
+                "certificate_receipt_sha256",
+                &option.certificate_receipt_sha256,
+            ),
             ("failure_domain_sha256", &option.failure_domain_sha256),
         ] {
             if !is_sha256_hex(digest) {
@@ -450,6 +473,8 @@ mod tests {
         PortfolioPrefix {
             step,
             context_scope_sha256: digest(context),
+            state_evidence_sha256: digest('d'),
+            reachability_evidence_sha256: digest('8'),
             reachable_error_bound_units: bound,
         }
     }
@@ -471,7 +496,10 @@ mod tests {
         let one = assess_recovery_portfolio(&options, &r, 1).unwrap();
         assert_eq!(one.minimum_independent_options_on_commitment, 1);
         let two = assess_recovery_portfolio(&options, &r, 2).unwrap();
-        assert_eq!(two.disposition, PortfolioDisposition::NoAdmissibleRecoveryPortfolio);
+        assert_eq!(
+            two.disposition,
+            PortfolioDisposition::NoAdmissibleRecoveryPortfolio
+        );
     }
 
     #[test]
@@ -507,7 +535,7 @@ mod tests {
     fn context_mismatch_removes_an_option_without_averaging() {
         let options = vec![
             option("covers", '1', 'c', 10, 4, 2, 2),
-            option("wrong-context", '2', 'x', 10, 4, 1, 1),
+            option("wrong-context", '2', 'f', 10, 4, 1, 1),
         ];
         let r = request(vec![prefix(0, 'c', 5)]);
         let assessment = assess_recovery_portfolio(&options, &r, 2).unwrap();
@@ -555,7 +583,10 @@ mod tests {
         let r = request(vec![prefix(0, 'c', 5)]);
         let assessment = assess_recovery_portfolio(&options, &r, 2).unwrap();
         assert_eq!(assessment.selected_options_at_switch.len(), 2);
-        assert_eq!(assessment.selected_options_at_switch[0].profile_id, "fast-a");
+        assert_eq!(
+            assessment.selected_options_at_switch[0].profile_id,
+            "fast-a"
+        );
         assert_eq!(
             assessment.selected_options_at_switch[1].profile_id,
             "slower-independent"

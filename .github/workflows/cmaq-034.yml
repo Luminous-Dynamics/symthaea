@@ -1,0 +1,41 @@
+name: CMAQ-034 quarantine recovery handoff
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-028/**"
+      - "research/cmaq-031/**"
+      - "research/cmaq-034/**"
+      - ".github/workflows/cmaq-034.yml"
+  push:
+    branches:
+      - "research/cmaq-034-*"
+    paths:
+      - "research/cmaq-028/**"
+      - "research/cmaq-031/**"
+      - "research/cmaq-034/**"
+      - ".github/workflows/cmaq-034.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-034-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  handoff:
+    name: quarantine-recovery-handoff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-034/Cargo.toml --all -- --check
+      - name: Run deterministic handoff tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-034/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-034/Cargo.toml --locked --all-targets -- -D warnings

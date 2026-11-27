@@ -1,0 +1,13 @@
+[package]
+name = "cmaq-034-quarantine-recovery-handoff"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Fail-closed transition from calibration quarantine to independent recovery portfolio"
+
+[dependencies]
+cmaq-028-recovery-portfolio = { path = "../cmaq-028" }
+cmaq-031-anytime-calibration-monitor = { path = "../cmaq-031" }
+
+[workspace]
