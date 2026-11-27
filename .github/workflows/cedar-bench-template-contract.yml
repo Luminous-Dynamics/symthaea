@@ -7,6 +7,7 @@ on:
       - "docs/research/cedar-bench/**"
       - "scripts/generate_cedar_bench.py"
       - "scripts/validate_cedar_bench_templates.py"
+      - "scripts/validate_cedar_bench_streams.py"
       - ".github/workflows/cedar-bench-template-contract.yml"
 
 permissions:
@@ -20,5 +21,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Validate CEDAR-Bench template corpus
+      - name: Validate CEDAR-Bench template corpus and source aliases
         run: python3 scripts/validate_cedar_bench_templates.py
+      - name: Generate isolated candidate and auditor streams
+        env:
+          # Public deterministic smoke seed only. Never use this seed for a scored evaluation.
+          CEDAR_BENCH_SEED: "CEDAR-BENCH-CI-SMOKE-SEED-2026-NOT-FOR-SCORES"
+        run: |
+          python3 scripts/generate_cedar_bench.py \
+            "$RUNNER_TEMP/cedar-candidate.jsonl" \
+            "$RUNNER_TEMP/cedar-auditor.jsonl"
+      - name: Verify separation, counts, digests and intervention parity
+        run: |
+          python3 scripts/validate_cedar_bench_streams.py \
+            "$RUNNER_TEMP/cedar-candidate.jsonl" \
+            "$RUNNER_TEMP/cedar-auditor.jsonl"
