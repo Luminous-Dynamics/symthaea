@@ -19,6 +19,8 @@ Run the synthetic six-annotator panel with:
 
 All annotator identities are represented by opaque digests in the fixture/report. Raw personal identifiers must not be placed in public benchmark artifacts.
 
+The evaluator recomputes each annotation_sha256 from a canonical record commitment containing query/audio identity, policy version, opaque annotator ID, state, intervals and status reason. It then recomputes annotation_manifest_sha256 over the scope plus a sorted list of annotator/record-digest pairs. Reordering the annotation array therefore does not change the manifest, while changing a record, policy or panel membership invalidates the old commitment. Reports distinguish these recomputed integrity checks from authenticated signatures/identity: both authentication flags remain false until the verifier/receipt chain is connected.
+
 
 The strict input envelope is also described by `schemas/mel-multi-annotator-temporal-grounding-v1.schema.json`; cross-record identity, state/interval semantics and digest uniqueness are enforced by the Rust adapter.
 
