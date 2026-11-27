@@ -241,9 +241,8 @@ func Evaluate(in Input)Result{
 
  type position struct{topic string;partition int;offset int64}
  capturedByPosition:=map[position]CapturedRecord{}
- rangeByPartition:=map[string]PartitionCapture{}
- topicIDByName:=map[string]string{}
- for _,t:=range in.TopicInventory{topicIDByName[t.ClusterID+"\x00"+t.Topic]=t.TopicID}
+ rangeByPartition:=map[partitionKey]PartitionCapture{}
+ type partitionKey struct{topic string; partition int}
  recordTotal:=0
  for _,p:=range in.PartitionCaptures{
   t,ok:=inventory[p.ClusterID+"\x00"+p.Topic]
@@ -252,7 +251,7 @@ func Evaluate(in Input)Result{
   if p.TopicID!=t.TopicID{f.block("topic_id_mismatch",p.Topic)}
   if p.BoundarySHA256!=in.BoundarySHA256||!validDigest(p.BoundarySHA256){f.block("partition_boundary_mismatch",p.Topic)}
   if p.Partition<0||p.Partition>=t.PartitionCount{f.block("partition_index_out_of_range",p.Topic)}
-  key:=p.Topic+"\x00"+string(rune(p.Partition))
+  key:=partitionKey{topic:p.Topic,partition:p.Partition}
   if _,exists:=rangeByPartition[key];exists{f.block("duplicate_partition_range",p.Topic)}
   rangeByPartition[key]=p
   if p.CleanupPolicy!="delete"{if strings.Contains(p.CleanupPolicy,"compact"){f.block("partition_compaction_enabled",p.Topic)}else{f.hold("partition_cleanup_policy_unknown",p.Topic)}}
@@ -295,12 +294,11 @@ func Evaluate(in Input)Result{
   }
  }
  if recordTotal>MaxRecords{f.block("captured_record_limit_exceeded","captured record count exceeds v1 limit")}
- for key,t:=range inventory{
+ for _,t:=range inventory{
   for part:=0;part<t.PartitionCount;part++{
-   pkey:=t.Topic+"\x00"+string(rune(part))
+   pkey:=partitionKey{topic:t.Topic,partition:part}
    if _,ok:=rangeByPartition[pkey];!ok{f.hold("partition_capture_missing",t.Topic+":"+itoa(part))}
   }
-  _=key
  }
  byBusinessPosition:=map[position]struct{}{}
  for _,e:=range in.BusinessEvents{
@@ -318,7 +316,7 @@ func Evaluate(in Input)Result{
   }
  }
  out.TopicCount=len(inventory)
- out.PartitionCount=len(in.PartitionCaptures)
+ out.PartitionCount=expectedPartitions
  out.VisibleRecordCount=recordTotal
  out.BusinessEventCount=len(in.BusinessEvents)
  for _,p:=range in.PartitionCaptures{
