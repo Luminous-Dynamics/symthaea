@@ -186,6 +186,7 @@ pub struct ObservationProcessTraceReportV1 {
     pub operational_selected_pending_count: usize,
     pub operational_measured_count: usize,
     pub operational_measurement_unavailable_count: usize,
+    pub operational_inclusion_probability_known_count: usize,
     pub k1_eligible_count: usize,
     pub k1_unknown_count: usize,
     pub k1_blocked_count: usize,
@@ -197,7 +198,11 @@ pub struct ObservationProcessTraceReportV1 {
     pub controller_evicted_count: usize,
     pub controller_not_admitted_count: usize,
     pub controller_immediate_trivial_count: usize,
+    pub audit_frame_count: usize,
+    pub audit_not_in_frame_count: usize,
     pub audit_not_selected_count: usize,
+    pub audit_selected_pending_count: usize,
+    pub audit_selected_count: usize,
     pub audit_measured_count: usize,
     pub audit_unavailable_count: usize,
     pub selection_risk_report_sha256: Option<String>,
@@ -1035,7 +1040,28 @@ pub fn evaluate_observation_process_trace_v1(
         controller_evicted_count: counts[12],
         controller_not_admitted_count: counts[13],
         controller_immediate_trivial_count: counts[14],
+        operational_inclusion_probability_known_count: input.rows.iter().filter(|row| {
+            row.operational.inclusion_probability.is_some()
+        }).count(),
+        audit_frame_count: input.rows.iter().filter(|row| {
+            row.operational.qualification_state != OperationalQualificationStateV1::Eligible
+                && input.audit_design.is_some()
+        }).count(),
+        audit_not_in_frame_count: input.rows.iter().filter(|row| {
+            row.audit.state == IndependentAuditStateV1::NotInAuditFrame
+        }).count(),
         audit_not_selected_count: counts[15],
+        audit_selected_pending_count: input.rows.iter().filter(|row| {
+            row.audit.state == IndependentAuditStateV1::SelectedPending
+        }).count(),
+        audit_selected_count: input.rows.iter().filter(|row| {
+            matches!(
+                row.audit.state,
+                IndependentAuditStateV1::SelectedPending
+                    | IndependentAuditStateV1::Measured
+                    | IndependentAuditStateV1::AuditUnavailable
+            )
+        }).count(),
         audit_measured_count: input.rows.iter().filter(|row| {
             row.audit.state == IndependentAuditStateV1::Measured
         }).count(),
@@ -1105,6 +1131,70 @@ mod tests {
                 archive_receipt_sha256: None,
             },
             row_sha256: String::new(),
+        };
+        row.row_sha256 = row_digest(&row).unwrap();
+        row
+    }
+
+    fn measured_row(
+        round_id: u64,
+        eligibility: LabelConsumptionEligibilityV1,
+    ) -> ObservationProcessRowV1 {
+        let mut row = base_row(round_id);
+        let label_id = format!("label-{round_id}");
+        let payload = digest('4');
+        let corrected_value = if eligibility == LabelConsumptionEligibilityV1::Blocked {
+            11.0
+        } else {
+            10.0
+        };
+        let uncertainty = if eligibility == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy {
+            Some(0.1)
+        } else {
+            None
+        };
+        let mut report = LabelConsumptionEligibilityReportV1 {
+            schema: "luminous.semi-bench.label-consumption-report.v1".into(),
+            label_id: label_id.clone(),
+            label_revision: 1,
+            measurement_event_id: row.measurement_event_id.clone(),
+            calibration_certificate_id: "cal-cert-1".into(),
+            frontier: LabelEvidenceFrontierV1::CurrentAtK1,
+            eligibility,
+            downstream_consumption_allowed:
+                eligibility == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            reasons: Vec::new(),
+            label_sha256: payload.clone(),
+            measurement_sha256: digest('5'),
+            qualified_corrected_value: corrected_value,
+            qualified_standard_uncertainty_upper_bound: uncertainty,
+            qualification_report_sha256: digest('6'),
+            requalification_report_sha256: digest('7'),
+            requalification_frontier_sha256: digest('8'),
+            source_authenticity_proven: false,
+            training_snapshot_mutated: false,
+            equipment_control_authority: false,
+            report_sha256: String::new(),
+        };
+        report.report_sha256 = label_report_digest(&report).unwrap();
+        row.operational = OperationalAcquisitionEvidenceV1 {
+            state: OperationalAcquisitionStateV1::Measured,
+            inclusion_probability: Some(0.1),
+            selection_design_sha256: Some(digest('9')),
+            measurement_system_sha256: Some(digest('a')),
+            label_id: Some(label_id),
+            label_revision: Some(1),
+            label_payload_sha256: Some(payload),
+            measurement_value: Some(10.0),
+            standard_uncertainty_upper_bound: uncertainty,
+            qualification_state: match eligibility {
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy => {
+                    OperationalQualificationStateV1::Eligible
+                }
+                LabelConsumptionEligibilityV1::Unknown => OperationalQualificationStateV1::Unknown,
+                LabelConsumptionEligibilityV1::Blocked => OperationalQualificationStateV1::Blocked,
+            },
+            k1_report: Some(report),
         };
         row.row_sha256 = row_digest(&row).unwrap();
         row
@@ -1197,6 +1287,117 @@ mod tests {
             value
         };
         assert!(evaluate_observation_process_trace_v1(&input).is_err());
+    }
+
+    #[test]
+    fn eligible_operational_label_can_update_tau_daci_only_with_matching_report() {
+        let mut row = measured_row(
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
+        row.controller = ControllerTrackingEvidenceV1 {
+            state: ControllerTrackingStateV1::ConsumedQualified,
+            prediction_receipt_sha256: Some(digest('b')),
+            feedback_receipt_sha256: Some(digest('c')),
+            degenerate_resolution_receipt_sha256: None,
+            feedback_update_applied: true,
+            actual_delay_steps: Some(2),
+            proxy_delay_steps: None,
+            proxy_survival_probability: None,
+        };
+        row.row_sha256 = row_digest(&row).unwrap();
+        let mut second = base_row(2);
+        second.controller = ControllerTrackingEvidenceV1 {
+            state: ControllerTrackingStateV1::Pending,
+            prediction_receipt_sha256: Some(digest('d')),
+            feedback_receipt_sha256: None,
+            degenerate_resolution_receipt_sha256: None,
+            feedback_update_applied: false,
+            actual_delay_steps: None,
+            proxy_delay_steps: None,
+            proxy_survival_probability: None,
+        };
+        second.row_sha256 = row_digest(&second).unwrap();
+
+        let mut value = input(vec![row, second], true);
+        value.controller = ObservationProcessControllerDeclarationV1 {
+            kind: OnlineControllerKindV1::TauDaci,
+            run_id: "tau-run-eligible".into(),
+            policy_sha256: Some(digest('e')),
+            delay_contract_sha256: Some(digest('f')),
+            maximum_delay_steps: Some(2),
+            tracking_capacity: None,
+        };
+        value.trace_sha256 = seal_observation_process_trace_v1(&value).unwrap();
+        let report = evaluate_observation_process_trace_v1(&value).unwrap();
+        assert_eq!(report.k1_eligible_count, 1);
+        assert_eq!(report.controller_consumed_qualified_count, 1);
+        assert_eq!(report.operational_inclusion_probability_known_count, 1);
+    }
+
+    #[test]
+    fn blocked_measured_label_can_be_recorded_but_never_consumed() {
+        let mut row = measured_row(1, LabelConsumptionEligibilityV1::Blocked);
+        row.controller = ControllerTrackingEvidenceV1 {
+            state: ControllerTrackingStateV1::ReceivedUnqualified,
+            prediction_receipt_sha256: Some(digest('b')),
+            feedback_receipt_sha256: Some(digest('c')),
+            degenerate_resolution_receipt_sha256: None,
+            feedback_update_applied: false,
+            actual_delay_steps: Some(2),
+            proxy_delay_steps: None,
+            proxy_survival_probability: None,
+        };
+        row.row_sha256 = row_digest(&row).unwrap();
+        let mut second = base_row(2);
+        second.controller.state = ControllerTrackingStateV1::Pending;
+        second.controller.prediction_receipt_sha256 = Some(digest('d'));
+        second.row_sha256 = row_digest(&second).unwrap();
+        let mut value = input(vec![row, second], true);
+        value.controller = ObservationProcessControllerDeclarationV1 {
+            kind: OnlineControllerKindV1::TauDaci,
+            run_id: "tau-run-blocked".into(),
+            policy_sha256: Some(digest('e')),
+            delay_contract_sha256: Some(digest('f')),
+            maximum_delay_steps: Some(2),
+            tracking_capacity: None,
+        };
+        value.trace_sha256 = seal_observation_process_trace_v1(&value).unwrap();
+        let report = evaluate_observation_process_trace_v1(&value).unwrap();
+        assert_eq!(report.k1_blocked_count, 1);
+        assert_eq!(report.controller_received_unqualified_count, 1);
+    }
+
+    #[test]
+    fn independent_audit_not_selected_still_requires_randomization_receipt() {
+        let mut value = input(vec![base_row(1), base_row(2)], true);
+        value.audit_design = Some(SelectionAuditDesignV1 {
+            schema: super::super::selection_risk_bounds::SELECTION_AUDIT_DESIGN_SCHEMA_V1.into(),
+            design_sha256: digest('a'),
+            randomization_provenance_sha256: digest('b'),
+            reference_method_sha256: digest('c'),
+            minimum_inclusion_probability: 0.10,
+            confidence_delta: 0.05,
+            independent_of_operational_qualification: true,
+        });
+        value.rows[0].audit = IndependentAuditEvidenceV1 {
+            state: IndependentAuditStateV1::NotSelected,
+            inclusion_probability: Some(0.2),
+            selection_receipt_sha256: Some(digest('d')),
+            measurement_receipt_sha256: None,
+            loss: None,
+            independently_archived: false,
+            archive_receipt_sha256: None,
+        };
+        for row in &mut value.rows {
+            row.row_sha256 = row_digest(row).unwrap();
+        }
+        value.trace_sha256 = seal_observation_process_trace_v1(&value).unwrap();
+        assert!(evaluate_observation_process_trace_v1(&value).is_ok());
+        value.rows[0].audit.selection_receipt_sha256 = None;
+        value.rows[0].row_sha256 = row_digest(&value.rows[0]).unwrap();
+        value.trace_sha256 = seal_observation_process_trace_v1(&value).unwrap();
+        assert!(evaluate_observation_process_trace_v1(&value).is_err());
     }
 
     #[test]
