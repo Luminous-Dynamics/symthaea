@@ -2,8 +2,9 @@
 
 use symthaea_semiconductor::benchmark::{
     CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_INPUT_SCHEMA_V1,
-    CaoOcrcAdmissionV1, CaoOcrcEngineV1, CaoOcrcFeedbackInputV1,
-    CaoOcrcGuaranteeStatusV1, CaoOcrcPolicyV1, CaoOcrcPopulationScopeV1,
+    CaoOcrcAdmissionV1, CaoOcrcDelayAssumptionV1, CaoOcrcEngineV1,
+    CaoOcrcFeedbackInputV1, CaoOcrcGuaranteeStatusV1, CaoOcrcPolicyV1,
+    CaoOcrcPopulationScopeV1,
     CaoOcrcRoundInputV1, CaoOcrcTrivialSetV1, LabelConsumptionEligibilityReportV1,
     LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1, advance_ca_ocrc_round_v1,
     create_ca_ocrc_engine_v1,
@@ -24,6 +25,9 @@ fn policy(capacity: usize) -> CaoOcrcPolicyV1 {
         initial_threshold: 0.5,
         tracking_capacity: capacity,
         maximum_feedback_delay_rounds: 2,
+        maximum_proxy_delay_rounds: 2,
+        delay_assumption: CaoOcrcDelayAssumptionV1::ArbitraryBounded,
+        feedback_delay_survival: None,
         population_scope: CaoOcrcPopulationScopeV1::QualifiedMeasuredStreamOnly,
         proxy_survival: vec![1.0, 0.5, 0.25],
     }
