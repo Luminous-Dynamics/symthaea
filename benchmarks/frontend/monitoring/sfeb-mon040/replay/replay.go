@@ -122,7 +122,8 @@ func binomialTail(n,k int,p float64)float64{
 	}
 	sum:=0.0
 	for _,v:=range terms{sum+=math.Exp(v-maxLog)}
-	return math.Exp(maxLog)*sum
+	v:=math.Exp(maxLog)*sum
+	if v>1{return 1};if v<0{return 0};return v
 }
 
 // OneSidedClopperPearsonLower returns the exact one-sided lower confidence
@@ -155,7 +156,7 @@ func Evaluate(in Input)Result{
 	if in.EvaluatedAt.IsZero(){f.hold("evaluation_time_missing")}
 	if !validDigest(in.ScenarioSHA256)||!validDigest(in.RecoveryBoundarySHA256){f.block("scenario_or_boundary_digest_invalid")}
 	if !validRevision(in.CodeRevision){f.block("code_revision_invalid")}
-	if in.FaultIDs==nil{f.block("fault_ids_missing")}else{ids:=append([]string{},in.FaultIDs...);for _,id:=range ids{if !validID(id){f.block("fault_id_invalid")}};sort.Strings(ids);for i:=1;i<len(ids);i++{if ids[i]==ids[i-1]{f.block("fault_ids_duplicated")}};if digestJSON(ids)!=in.FaultSetSHA256{f.block("fault_set_digest_mismatch")}}
+	if in.FaultIDs==nil||len(in.FaultIDs)==0{f.block("fault_ids_missing")}else{ids:=append([]string{},in.FaultIDs...);for _,id:=range ids{if !validID(id){f.block("fault_id_invalid")}};sort.Strings(ids);for i:=1;i<len(ids);i++{if ids[i]==ids[i-1]{f.block("fault_ids_duplicated")}};if digestJSON(ids)!=in.FaultSetSHA256{f.block("fault_set_digest_mismatch")}}
 	if !validDigest(in.FaultSetSHA256){f.block("fault_set_digest_invalid")}
 	if !validDigest(in.TargetFailureSignatureSHA256){f.block("target_failure_signature_invalid")}
 	if in.RequiredRuns<1||in.RequiredRuns>MaxRuns{f.block("required_run_count_out_of_range")}
