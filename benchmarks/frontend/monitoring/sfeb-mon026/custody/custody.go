@@ -79,6 +79,8 @@ type Policy struct {
 	ClockDomain           string
 	MaxClockUncertaintyNS int64
 	ExpectedPreviousRoot  string
+	ExpectedRunID         string
+	ExpectedSequence      uint64
 	TrustedKeys           map[string]ed25519.PublicKey
 }
 
@@ -203,6 +205,16 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 	if strings.TrimSpace(m.RunID) == "" {
 		addIndeterminate("run_id_missing")
 	}
+	if policy.ExpectedRunID == "" {
+		addIndeterminate("expected_run_id_unavailable")
+	} else if m.RunID != policy.ExpectedRunID {
+		addBlocked("run_id_mismatch")
+	}
+	if policy.ExpectedSequence == 0 {
+		addIndeterminate("expected_sequence_unavailable")
+	} else if m.Sequence != policy.ExpectedSequence {
+		addBlocked("sequence_mismatch")
+	}
 	if m.Sequence == 0 {
 		addBlocked("sequence_zero")
 	}
@@ -253,6 +265,7 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 		}
 	}
 
+	declaredPaths := make(map[string]struct{}, len(m.Artifacts))
 	validateArtifacts := func() {
 		seen := make(map[string]struct{}, len(m.Artifacts))
 		for _, a := range m.Artifacts {
@@ -265,6 +278,7 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 				continue
 			}
 			seen[a.Path] = struct{}{}
+			declaredPaths[a.Path] = struct{}{}
 
 			if strings.TrimSpace(a.MediaType) == "" || strings.TrimSpace(a.Role) == "" ||
 				strings.TrimSpace(a.Producer) == "" || strings.TrimSpace(a.CommandID) == "" ||
@@ -302,6 +316,13 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 		}
 	}
 	validateArtifacts()
+	if reason, isBlocked := verifyExactInventory(rootDir, declaredPaths); reason != "" {
+		if isBlocked {
+			addBlocked(reason)
+		} else {
+			addIndeterminate(reason)
+		}
+	}
 
 	if m.Sequence == 1 {
 		if m.PreviousRootSHA256 != "" {
@@ -455,6 +476,63 @@ func validateRelativePath(p string) error {
 		return ErrUnsafePath
 	}
 	return nil
+}
+
+
+func verifyExactInventory(rootDir string, declared map[string]struct{}) (string, bool) {
+	root, err := filepath.Abs(rootDir)
+	if err != nil {
+		return "bundle_root_unreadable", false
+	}
+	rootInfo, err := os.Lstat(root)
+	if err != nil || !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 {
+		return "bundle_root_invalid", true
+	}
+	var reason string
+	blocked := false
+	walkErr := filepath.WalkDir(root, func(current string, entry os.DirEntry, err error) error {
+		if err != nil {
+			reason = "bundle_inventory_unreadable"
+			return err
+		}
+		if current == root {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			reason = "unlisted_or_indirected_symlink"
+			blocked = true
+			return nil
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, statErr := entry.Info()
+		if statErr != nil {
+			reason = "bundle_inventory_unreadable"
+			return statErr
+		}
+		if !info.Mode().IsRegular() {
+			reason = "bundle_contains_nonregular_file"
+			blocked = true
+			return nil
+		}
+		relative, relErr := filepath.Rel(root, current)
+		if relErr != nil {
+			reason = "bundle_inventory_unreadable"
+			return relErr
+		}
+		relative = filepath.ToSlash(relative)
+		if _, ok := declared[relative]; !ok {
+			reason = "unlisted_artifact_file"
+			blocked = true
+			return nil
+		}
+		return nil
+	})
+	if walkErr != nil && reason == "" {
+		return "bundle_inventory_unreadable", false
+	}
+	return reason, blocked
 }
 
 func completeBoundary(s SourceBoundary) bool {
