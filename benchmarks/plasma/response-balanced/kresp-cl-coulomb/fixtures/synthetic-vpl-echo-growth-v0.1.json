@@ -17,17 +17,17 @@
   "perturbation_scaling": {
     "formula": "epsilon=c*nu^(1/3)*(log(1/nu))^p",
     "collision_parameter_nu_range": [
-      0.0001,
-      0.01
+      0.000001,
+      0.0001
     ],
     "prefactor_c_values": [
-      0.5,
-      1,
-      2
+      0.1,
+      0.25,
+      0.5
     ],
     "log_power_p_values": [
-      1,
-      2
+      0.25,
+      0.5
     ],
     "amplitude_is_computed_from_formula": true,
     "log_argument": "1/nu",
@@ -37,11 +37,11 @@
   "trajectory_cohorts": {
     "training": [
       {
-        "trajectory_id": "train-nu1e3-c1-p1",
-        "collision_parameter_nu": 0.001,
-        "prefactor_c": 1,
-        "log_power_p": 1,
-        "computed_initial_perturbation_amplitude": 0.6907755278982138,
+        "trajectory_id": "train-nu1e4-c025-p025",
+        "collision_parameter_nu": 0.0001,
+        "prefactor_c": 0.25,
+        "log_power_p": 0.25,
+        "computed_initial_perturbation_amplitude": 0.020215086096597695,
         "initial_spatial_modes": [
           8,
           16,
@@ -54,11 +54,11 @@
         "forward_initialization": true
       },
       {
-        "trajectory_id": "train-nu1e3-c05-p2",
-        "collision_parameter_nu": 0.001,
-        "prefactor_c": 0.5,
-        "log_power_p": 2,
-        "computed_initial_perturbation_amplitude": 2.3858541497152794,
+        "trajectory_id": "train-nu1e4-c01-p05",
+        "collision_parameter_nu": 0.0001,
+        "prefactor_c": 0.1,
+        "log_power_p": 0.5,
+        "computed_initial_perturbation_amplitude": 0.01408654563915038,
         "initial_spatial_modes": [
           8,
           24,
@@ -71,11 +71,11 @@
         "forward_initialization": true
       },
       {
-        "trajectory_id": "train-nu3e3-c1-p1",
-        "collision_parameter_nu": 0.003,
-        "prefactor_c": 1,
-        "log_power_p": 1,
-        "computed_initial_perturbation_amplitude": 0.83782339816347,
+        "trajectory_id": "train-nu1e5-c025-p025",
+        "collision_parameter_nu": 0.00001,
+        "prefactor_c": 0.25,
+        "log_power_p": 0.25,
+        "computed_initial_perturbation_amplitude": 0.009921327030898748,
         "initial_spatial_modes": [
           10,
           20,
@@ -90,15 +90,15 @@
     ],
     "validation": [
       {
-        "trajectory_id": "validation-nu1e3-c2-p1",
-        "collision_parameter_nu": 0.001,
-        "prefactor_c": 2,
-        "log_power_p": 1,
-        "computed_initial_perturbation_amplitude": 1.3815510557964277,
+        "trajectory_id": "validation-nu1e5-c05-p05",
+        "collision_parameter_nu": 0.00001,
+        "prefactor_c": 0.5,
+        "log_power_p": 0.5,
+        "computed_initial_perturbation_amplitude": 0.03655074085446903,
         "initial_spatial_modes": [
           8,
           16,
-          32
+          48
         ],
         "echo_cascade_depth": 3,
         "observation_horizon_fraction_of_nu_minus_one_third": 0.9,
@@ -107,11 +107,11 @@
         "forward_initialization": true
       },
       {
-        "trajectory_id": "validation-nu3e3-c1-p2",
-        "collision_parameter_nu": 0.003,
-        "prefactor_c": 1,
-        "log_power_p": 2,
-        "computed_initial_perturbation_amplitude": 4.8670359205624,
+        "trajectory_id": "validation-nu3e5-c025-p05",
+        "collision_parameter_nu": 0.00003,
+        "prefactor_c": 0.25,
+        "log_power_p": 0.5,
+        "computed_initial_perturbation_amplitude": 0.02506854206430621,
         "initial_spatial_modes": [
           10,
           30,
@@ -126,11 +126,11 @@
     ],
     "sealed_holdout": [
       {
-        "trajectory_id": "holdout-nu1e4-c1-p1",
-        "collision_parameter_nu": 0.0001,
-        "prefactor_c": 1,
-        "log_power_p": 1,
-        "computed_initial_perturbation_amplitude": 0.42750613024337625,
+        "trajectory_id": "holdout-nu1e6-c05-p05",
+        "collision_parameter_nu": 0.000001,
+        "prefactor_c": 0.5,
+        "log_power_p": 0.5,
+        "computed_initial_perturbation_amplitude": 0.018584610944249194,
         "initial_spatial_modes": [
           16,
           32,
@@ -143,11 +143,11 @@
         "forward_initialization": true
       },
       {
-        "trajectory_id": "holdout-nu1e4-c2-p2",
-        "collision_parameter_nu": 0.0001,
-        "prefactor_c": 2,
-        "log_power_p": 2,
-        "computed_initial_perturbation_amplitude": 7.874953941295755,
+        "trajectory_id": "holdout-nu1e6-c025-p025",
+        "collision_parameter_nu": 0.000001,
+        "prefactor_c": 0.25,
+        "log_power_p": 0.25,
+        "computed_initial_perturbation_amplitude": 0.004819830254304761,
         "initial_spatial_modes": [
           16,
           48,
@@ -160,11 +160,11 @@
         "forward_initialization": true
       },
       {
-        "trajectory_id": "holdout-nu1e2-c1-p1",
-        "collision_parameter_nu": 0.01,
-        "prefactor_c": 1,
-        "log_power_p": 1,
-        "computed_initial_perturbation_amplitude": 0.9921538402193327,
+        "trajectory_id": "holdout-nu1e4-c05-p05",
+        "collision_parameter_nu": 0.0001,
+        "prefactor_c": 0.5,
+        "log_power_p": 0.5,
+        "computed_initial_perturbation_amplitude": 0.0704327281957519,
         "initial_spatial_modes": [
           12,
           36,
