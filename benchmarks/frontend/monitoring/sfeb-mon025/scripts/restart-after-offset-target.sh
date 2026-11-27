@@ -9,7 +9,9 @@ ALLOW="$(printenv MON025_ALLOW_OFFSET_RESTART || true)"
   exit 64
 }
 [ -s "$RUN_DIR/proof.json" ] || { echo "verified proof.json is required" >&2; exit 66; }
-jq -e '.profile == "mon033-postgres-offset-target-v1" and .target_reached == true and .offset.lsn != null' "$RUN_DIR/proof.json" >/dev/null || {
+[ -s "$RUN_DIR/offsets.json" ] || { echo "raw offsets.json is required to bind proof to captured bytes" >&2; exit 66; }
+offsets_digest="$(sha256sum "$RUN_DIR/offsets.json" | awk '{print $1}')"
+jq -e --arg digest "$offsets_digest" '.profile == "mon033-postgres-offset-target-v1" and .target_reached == true and .offset.lsn != null and .offsets_sha256 == $digest' "$RUN_DIR/proof.json" >/dev/null || {
   echo "target proof invalid; refusing restart" >&2
   exit 65
 }
