@@ -1,6 +1,6 @@
 # SDCB bivariate Gaussian rectangle reference v1
 
-**Status:** bounded, two-channel numerical reference authored in Rust. Twenty-five tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
+**Status:** bounded, two-channel numerical reference authored in Rust. Twenty-six tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
 
 ## 1. Why this increment
 
@@ -50,7 +50,7 @@ This is a bounded bivariate support-aware method, not a general singular MVN alg
 
 ## 4. Joint categorical adapter
 
-The joint-bin function accepts ordered thresholds per channel and emits the complete row-major table for all finite bins. It enforces:
+The joint-bin function accepts ordered thresholds per channel and emits the complete row-major table for all finite bins. It preserves a per-cell diagnostics matrix aligned exactly with the probability table; each cell retains support rank, correlation/condition where defined, truncation allowance, outer quadrature refinement indicator and outer-integrand evaluation count. This prevents numerical metadata from being discarded when individual rectangles are assembled into a categorical likelihood. Error indicators remain diagnostics, not certified bounds. It enforces:
 - a bounded table size (at most 64 cells);
 - total probability within \(10^{-9}\) of one;
 - both row/column marginals agree with the #13944 scalar likelihood adapter within \(10^{-9}\).
@@ -93,7 +93,7 @@ These are mathematical numerical fixtures, not measured sensor probabilities. Or
 
 ## 6. Tests and limits
 
-The 25 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, duplicate-channel tables with zero off-diagonal support, perfect-anti-correlation tables with zero diagonal support, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, even-small-asymmetry rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, bound-context preservation/rejection (including per-channel window and calibration versions), and bounded evaluation, including a no-overrun check for the outer integrand-evaluation budget.
+The 26 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, duplicate-channel tables with zero off-diagonal support, perfect-anti-correlation tables with zero diagonal support, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, even-small-asymmetry rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, bound-context preservation/rejection (including per-channel window and calibration versions), per-cell diagnostic alignment, and bounded evaluation, including a no-overrun check for the outer integrand-evaluation budget.
 
 Not implemented:
 - trivariate or general n-variate integration;
