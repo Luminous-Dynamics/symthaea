@@ -55,6 +55,7 @@ pub mod embodiment_event;
 pub mod embodiment_policy;
 pub mod embodiment_projection;
 pub mod embodiment_receipt;
+pub mod embodiment_scene;
 
 // Mobile embodiment modules (moved from spore)
 pub mod ble_mesh;
