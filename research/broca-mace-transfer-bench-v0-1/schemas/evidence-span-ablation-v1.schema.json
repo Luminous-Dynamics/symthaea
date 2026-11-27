@@ -279,7 +279,11 @@
         "hard_gates_passed",
         "positive_utility_ci_lower_bound",
         "positive_regret_reduction_ci_lower_bound",
-        "canonical_sha256"
+        "canonical_sha256",
+        "stratum_utility_effect_ci95",
+        "stratum_regret_reduction_effects",
+        "stratum_regret_reduction_ci95",
+        "stratum_independent_profile_clusters"
       ],
       "properties": {
         "schema_version": {
@@ -382,6 +386,31 @@
         },
         "canonical_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "stratum_utility_effect_ci95": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ci"
+          }
+        },
+        "stratum_regret_reduction_effects": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "stratum_regret_reduction_ci95": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ci"
+          }
+        },
+        "stratum_independent_profile_clusters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
         }
       }
     }
