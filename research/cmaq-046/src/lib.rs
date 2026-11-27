@@ -4,7 +4,9 @@
 //!
 //! The null is an adaptive conditional-mean constraint:
 //!
-//!     E[r_t | F_{t-1}] ∈ S,
+//! ```text
+//! E[r_t | F_{t-1}] ∈ S
+//! ```
 //!
 //! where S is a frozen compact convex box. A predictable OCO normal w_t in the
 //! unit ball produces q_t = <w_t, r_t> - h_S(w_t). Under the null,
@@ -15,7 +17,6 @@
 //! The OCO regret diagnostic is kept distinct from the e-process guarantee.
 
 const BETTING_RATE: f64 = 0.5;
-const NEG_INFINITY: f64 = f64::NEG_INFINITY;
 const MAX_DIMENSION: usize = 1_024;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
