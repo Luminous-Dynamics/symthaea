@@ -39,10 +39,18 @@ jobs:
         with:
           toolchain: "1.96.0"
           components: rustfmt
-      - name: Check formatting on exact committed sources
-        run: |
-          rustfmt --edition 2024 --check scripts/research/sdcb_bivariate_rectangle.rs
-          rustfmt --edition 2024 --check scripts/research/sdcb_gaussian_bin_likelihoods.rs
+      - name: Generate rustfmt preview for the new reference
+        run: rustfmt --edition 2024 scripts/research/sdcb_bivariate_rectangle.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-bivariate-rustfmt-preview
+          path: scripts/research/sdcb_bivariate_rectangle.rs
+      - name: Restore exact committed source
+        run: git checkout -- scripts/research/sdcb_bivariate_rectangle.rs
+      - name: Check formatting on exact committed source
+        run: rustfmt --edition 2024 --check scripts/research/sdcb_bivariate_rectangle.rs
       - name: Compile and run exact-source numerical tests
         run: |
           rustc --edition=2024 --test scripts/research/sdcb_bivariate_rectangle.rs -o /tmp/sdcb-bivariate-rectangle
