@@ -67,9 +67,8 @@ fn normal_interval(lower: f64, upper: f64) -> Result<f64, RectangleError> {
     let lo = lower.max(-CUTOFF);
     let hi = upper.min(CUTOFF);
     if hi <= lo { return Ok(0.0); }
-    let row = univariate::gaussian_bin_likelihoods(0.0, 1.0, &[lo, hi])
+    let mass = univariate::standard_normal_interval_probability(lo, hi)
         .map_err(|_| RectangleError::NumericFailure)?;
-    let mass = row.probabilities[1];
     if mass.is_finite() && (0.0..=1.0).contains(&mass) {
         Ok(mass)
     } else {
