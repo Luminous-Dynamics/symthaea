@@ -122,6 +122,8 @@ pub struct Scorecard {
     pub overall: Metrics,
     /// Sorted by independently declared environment/scenario family ID.
     pub by_family: BTreeMap<String, Metrics>,
+    /// One row per CMAQ-036 effective dependency block for clustered analysis.
+    pub by_effective_block: BTreeMap<String, Metrics>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -242,11 +244,16 @@ pub fn evaluate(episodes: &[EpisodeTrace]) -> Result<Scorecard, EvaluationError>
 
     let mut overall = Accumulator::default();
     let mut by_family = BTreeMap::<String, Accumulator>::new();
+    let mut by_effective_block = BTreeMap::<String, Accumulator>::new();
 
     for episode in episodes {
         overall.add_episode(episode)?;
         by_family
             .entry(episode.family_id.clone())
+            .or_default()
+            .add_episode(episode)?;
+        by_effective_block
+            .entry(episode.evidence.effective_block_id.clone())
             .or_default()
             .add_episode(episode)?;
     }
@@ -256,6 +263,10 @@ pub fn evaluate(episodes: &[EpisodeTrace]) -> Result<Scorecard, EvaluationError>
         by_family: by_family
             .into_iter()
             .map(|(family, accumulator)| (family, accumulator.finish()))
+            .collect(),
+        by_effective_block: by_effective_block
+            .into_iter()
+            .map(|(block_id, accumulator)| (block_id, accumulator.finish()))
             .collect(),
     })
 }
@@ -503,6 +514,8 @@ mod tests {
         assert_eq!(score.by_family["highway"].timely_warnings, 1);
         assert_eq!(score.by_family["construction"].late_or_missing_warnings, 1);
         assert_eq!(score.by_family.len(), 2);
+        assert_eq!(score.by_effective_block["block-h1"].episodes, 1);
+        assert_eq!(score.by_effective_block["block-h2"].episodes, 1);
     }
 
     #[test]
@@ -514,6 +527,7 @@ mod tests {
         let score = evaluate(&[first, second]).unwrap();
         assert_eq!(score.overall.episodes, 2);
         assert_eq!(score.overall.effective_block_count, 1);
+        assert_eq!(score.by_effective_block["shared-drive-session"].episodes, 2);
     }
 
     #[test]
