@@ -153,9 +153,8 @@ pub use gated_streaming_adapter::{
 
 pub use context_residual_cohort::{
     CONTEXT_RESIDUAL_COHORT_SCHEMA_V1, CONTEXT_RESIDUAL_OBSERVATION_SCHEMA_V1,
-    CONTEXT_RESIDUAL_REPORT_SCHEMA_V1, ContextResidualCohortErrorV1,
-    ContextResidualCohortInputV1, ContextResidualCohortReportV1,
-    ContextResidualCohortStatusV1, ContextResidualObservationV1,
+    CONTEXT_RESIDUAL_REPORT_SCHEMA_V1, ContextResidualCohortErrorV1, ContextResidualCohortInputV1,
+    ContextResidualCohortReportV1, ContextResidualCohortStatusV1, ContextResidualObservationV1,
     evaluate_context_residual_cohort_v1, seal_context_residual_cohort_v1,
     seal_context_residual_observation_v1,
 };
