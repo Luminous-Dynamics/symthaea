@@ -211,6 +211,10 @@ func validateIndex(index InputIndex) error {
 			artifact.ClockUncertaintyNS < 0 {
 			return ErrInputInvalid
 		}
+		combined := combinedUncertaintyNS(artifact.ClockUncertaintyNS, index.ClockUncertaintyNS)
+		if artifact.CollectedAt.After(index.CapturedAt.Add(combined)) {
+			return ErrInputInvalid
+		}
 	}
 	return nil
 }
@@ -331,6 +335,20 @@ func completeBoundary(s custody.SourceBoundary) bool {
 	return s.IncidentID != "" && s.SourceClusterID != "" && s.Database != "" &&
 		s.SystemIdentifier != "" && s.TimelineID != "" && s.SnapshotID != "" &&
 		s.CaptureLSN != "" && validSHA256(s.ScopeDigest) && validSHA256(s.InventoryDigest)
+}
+
+
+func combinedUncertaintyNS(a, b int64) time.Duration {
+	maxDuration := time.Duration(1<<63 - 1)
+	if a < 0 || b < 0 {
+		return maxDuration
+	}
+	left := time.Duration(a)
+	right := time.Duration(b)
+	if left > maxDuration-right {
+		return maxDuration
+	}
+	return left + right
 }
 
 func validSHA256(value string) bool {
