@@ -20,9 +20,9 @@
         "media_type": "application/json",
         "source_id": "study-protocol-1",
         "source_status": "ACTIVE",
-        "raw_sha256": "c43c6caee65cde594eb0d9121a23f2c398f10eca7fa265beb746099dfb759ff3",
-        "raw_byte_length": 156,
-        "raw_bytes_utf8": "{\"protocol_version\":\"v1\",\"unit\":\"degC\",\"threshold_C\":20.0,\"comparison_rule\":\"at_or_above\",\"description\":\"baseline protocol\",\"source_id\":\"study-protocol-1\"}\n"
+        "raw_sha256": "1aac650894cd0b9738ba9e08d8699e00ff503a0b8a0e60c0c3ea2bc6964a95b7",
+        "raw_byte_length": 189,
+        "raw_bytes_utf8": "{\"protocol_version\":\"v1\",\"unit\":\"degC\",\"threshold_C\":20.0,\"comparison_rule\":\"at_or_above\",\"included_samples\":[\"S01\",\"S02\"],\"description\":\"baseline protocol\",\"source_id\":\"study-protocol-1\"}\n"
       }
     ],
     "parser": {
@@ -110,6 +110,20 @@
         },
         "raw_lexeme": "v1",
         "parsed_value": "v1"
+      },
+      {
+        "id": "obs_included_samples",
+        "artifact_id": "artifact:protocol.json",
+        "locator": {
+          "kind": "JSON_POINTER",
+          "pointer": "/included_samples"
+        },
+        "raw_lexeme": "[\"S01\",\"S02\"]",
+        "parsed_value": [
+          "S01",
+          "S02"
+        ],
+        "meaning": "included sample IDs for the temperature analysis"
       }
     ],
     "analysis_nodes": [
@@ -258,8 +272,23 @@
       [
         "claim_controls_zero",
         "decision_control_accept"
+      ],
+      [
+        "artifact:protocol.json",
+        "obs_included_samples"
+      ],
+      [
+        "obs_included_samples",
+        "analysis_mean_temperature"
       ]
-    ]
+    ],
+    "graph_counts": {
+      "observations": 7,
+      "analysis_nodes": 2,
+      "claims": 4,
+      "decisions": 2,
+      "total_nodes": 15
+    }
   },
   "events": [
     {
@@ -289,11 +318,13 @@
           "obs_temp_s02",
           "obs_control_s01",
           "obs_control_s02",
+          "obs_threshold",
+          "obs_protocol_version",
+          "obs_included_samples",
           "analysis_control_check",
           "claim_controls_zero",
-          "decision_control_accept",
-          "obs_threshold",
-          "claim_protocol_version"
+          "claim_protocol_version",
+          "decision_control_accept"
         ],
         "blocked": [],
         "unresolved": [],
@@ -309,8 +340,8 @@
         "target_artifact_id": "artifact:protocol.json",
         "json_pointer": "/description",
         "new_value": "updated wording only",
-        "new_artifact_sha256": "59a8988d231cfa406491cdd0febadaf8ff1f2fbb9003861851dbc69de9bcd28d",
-        "new_artifact_bytes_utf8": "{\"protocol_version\":\"v1\",\"unit\":\"degC\",\"threshold_C\":20.0,\"comparison_rule\":\"at_or_above\",\"description\":\"updated wording only\",\"source_id\":\"study-protocol-1\"}\n"
+        "new_artifact_sha256": "52403861845659ba7b2aaa198a1cb93f01fc9549af784083257a510e8bd3ee2b",
+        "new_artifact_bytes_utf8": "{\"protocol_version\":\"v1\",\"unit\":\"degC\",\"threshold_C\":20.0,\"comparison_rule\":\"at_or_above\",\"included_samples\":[\"S01\",\"S02\"],\"description\":\"updated wording only\",\"source_id\":\"study-protocol-1\"}\n"
       },
       "expected": {
         "reassessed_changed": [],
@@ -324,6 +355,7 @@
           "obs_control_s02",
           "obs_threshold",
           "obs_protocol_version",
+          "obs_included_samples",
           "analysis_mean_temperature",
           "analysis_control_check",
           "claim_mean_temperature",
@@ -346,23 +378,28 @@
       },
       "expected": {
         "reassessed_changed": [
+          "obs_temp_s01",
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "analysis_mean_temperature",
+          "analysis_control_check",
           "claim_mean_temperature",
           "claim_above_threshold",
-          "claim_controls_zero",
-          "analysis_mean_temperature",
-          "analysis_control_check"
+          "claim_controls_zero"
         ],
-        "reassessed_unchanged": [],
+        "reassessed_unchanged": [
+          "obs_threshold",
+          "obs_protocol_version",
+          "obs_included_samples",
+          "claim_protocol_version"
+        ],
         "blocked": [
           "decision_temperature_alert",
           "decision_control_accept"
         ],
         "unresolved": [],
-        "not_dependent": [
-          "obs_threshold",
-          "obs_protocol_version",
-          "claim_protocol_version"
-        ]
+        "not_dependent": []
       }
     },
     {
@@ -374,8 +411,8 @@
         "target_artifact_id": "artifact:protocol.json",
         "json_pointer": "/threshold_C",
         "new_value": 19.5,
-        "new_artifact_sha256": "12617ee0a4b724052d1f2a24e6118907f71bbe013afd749b30ab6fd8f97d3995",
-        "new_artifact_bytes_utf8": "{\"protocol_version\":\"v1\",\"unit\":\"degC\",\"threshold_C\":19.5,\"comparison_rule\":\"at_or_above\",\"description\":\"baseline protocol\",\"source_id\":\"study-protocol-1\"}\n"
+        "new_artifact_sha256": "2618a78e8476b6d2ef366bc85832be8a42f6d40383904c24087a117e70e27cef",
+        "new_artifact_bytes_utf8": "{\"protocol_version\":\"v1\",\"unit\":\"degC\",\"threshold_C\":19.5,\"comparison_rule\":\"at_or_above\",\"included_samples\":[\"S01\",\"S02\"],\"description\":\"baseline protocol\",\"source_id\":\"study-protocol-1\"}\n"
       },
       "expected": {
         "reassessed_changed": [
@@ -384,12 +421,18 @@
           "decision_temperature_alert"
         ],
         "reassessed_unchanged": [
+          "obs_temp_s01",
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "obs_protocol_version",
+          "obs_included_samples",
           "analysis_mean_temperature",
+          "analysis_control_check",
           "claim_mean_temperature",
           "claim_controls_zero",
-          "decision_control_accept",
-          "obs_protocol_version",
-          "claim_protocol_version"
+          "claim_protocol_version",
+          "decision_control_accept"
         ],
         "blocked": [],
         "unresolved": [],
@@ -419,11 +462,13 @@
           "obs_temp_s02",
           "obs_control_s01",
           "obs_control_s02",
+          "obs_threshold",
+          "obs_protocol_version",
+          "obs_included_samples",
           "analysis_control_check",
           "claim_controls_zero",
-          "decision_control_accept",
-          "obs_threshold",
-          "claim_protocol_version"
+          "claim_protocol_version",
+          "decision_control_accept"
         ],
         "blocked": [],
         "unresolved": [],
@@ -447,11 +492,19 @@
           "decision_temperature_alert"
         ],
         "reassessed_unchanged": [
+          "obs_temp_s01",
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "obs_threshold",
+          "obs_protocol_version",
+          "obs_included_samples",
           "analysis_mean_temperature",
+          "analysis_control_check",
           "claim_mean_temperature",
           "claim_controls_zero",
-          "decision_control_accept",
-          "claim_protocol_version"
+          "claim_protocol_version",
+          "decision_control_accept"
         ],
         "blocked": [],
         "unresolved": [],
@@ -474,19 +527,23 @@
       },
       "expected": {
         "reassessed_changed": [
-          "obs_temp_s01",
+          "obs_included_samples",
           "analysis_mean_temperature",
           "claim_mean_temperature"
         ],
         "reassessed_unchanged": [
+          "obs_temp_s01",
           "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
           "obs_threshold",
-          "claim_above_threshold",
-          "decision_temperature_alert",
+          "obs_protocol_version",
           "analysis_control_check",
+          "claim_above_threshold",
           "claim_controls_zero",
-          "decision_control_accept",
-          "claim_protocol_version"
+          "claim_protocol_version",
+          "decision_temperature_alert",
+          "decision_control_accept"
         ],
         "blocked": [],
         "unresolved": [],
@@ -507,9 +564,18 @@
       "expected": {
         "reassessed_changed": [],
         "reassessed_unchanged": [
+          "obs_temp_s01",
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "obs_threshold",
+          "obs_protocol_version",
+          "obs_included_samples",
+          "analysis_mean_temperature",
+          "analysis_control_check",
           "claim_controls_zero",
-          "decision_control_accept",
-          "claim_protocol_version"
+          "claim_protocol_version",
+          "decision_control_accept"
         ],
         "blocked": [],
         "unresolved": [
@@ -517,9 +583,7 @@
           "claim_above_threshold",
           "decision_temperature_alert"
         ],
-        "not_dependent": [
-          "analysis_mean_temperature"
-        ]
+        "not_dependent": []
       }
     },
     {
@@ -535,6 +599,15 @@
       "expected": {
         "reassessed_changed": [],
         "reassessed_unchanged": [
+          "obs_temp_s01",
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "obs_threshold",
+          "obs_protocol_version",
+          "obs_included_samples",
+          "analysis_mean_temperature",
+          "analysis_control_check",
           "claim_mean_temperature",
           "claim_above_threshold",
           "claim_controls_zero",
@@ -576,6 +649,9 @@
         "blocked": [],
         "unresolved": [],
         "not_dependent": [
+          "obs_threshold",
+          "obs_protocol_version",
+          "obs_included_samples",
           "claim_protocol_version"
         ]
       }
@@ -593,26 +669,26 @@
       "expected": {
         "reassessed_changed": [],
         "reassessed_unchanged": [
+          "obs_threshold",
+          "obs_protocol_version",
+          "obs_included_samples",
           "claim_protocol_version"
         ],
         "blocked": [
-          "claim_mean_temperature",
-          "claim_above_threshold",
-          "claim_controls_zero",
-          "decision_temperature_alert",
-          "decision_control_accept",
           "obs_temp_s01",
           "obs_temp_s02",
           "obs_control_s01",
           "obs_control_s02",
           "analysis_mean_temperature",
-          "analysis_control_check"
+          "analysis_control_check",
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "claim_controls_zero",
+          "decision_temperature_alert",
+          "decision_control_accept"
         ],
         "unresolved": [],
-        "not_dependent": [
-          "obs_threshold",
-          "obs_protocol_version"
-        ]
+        "not_dependent": []
       }
     },
     {
@@ -636,6 +712,7 @@
           "obs_control_s02",
           "obs_threshold",
           "obs_protocol_version",
+          "obs_included_samples",
           "analysis_mean_temperature",
           "analysis_control_check",
           "claim_mean_temperature",
@@ -644,9 +721,6 @@
           "claim_protocol_version",
           "decision_temperature_alert",
           "decision_control_accept"
-        ],
-        "ignored_untrusted": [
-          "untrusted-notice-001"
         ]
       }
     }
@@ -663,5 +737,5 @@
     "unavailable_update_reconciliation_rate",
     "all_in_detection_and_reconciliation_cost"
   ],
-  "protocol_note": "This first slice is a synthetic contract fixture. It is not an executed agent benchmark and its expected transitions require independent scientific and graph review before becoming gold labels."
+  "protocol_note": "This first slice is a synthetic contract fixture. It is not an executed agent benchmark and its expected transitions require independent scientific and graph review before becoming gold labels. Scope is an explicit baseline observation (included_samples), so scope-correction events have an auditable dependency edge into the analysis node."
 }
