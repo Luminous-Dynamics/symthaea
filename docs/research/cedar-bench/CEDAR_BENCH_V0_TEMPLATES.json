@@ -523,7 +523,8 @@
           "unit": "units",
           "aliases": [
             "/sources/0/body",
-            "/sources/1/body"
+            "/sources/1/body",
+            "/sources/2/body"
           ]
         }
       ],
