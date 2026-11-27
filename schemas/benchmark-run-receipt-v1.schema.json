@@ -1,0 +1,1012 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/benchmark-run-receipt-v1.schema.json",
+  "title": "Luminous Benchmark Run Receipt v1",
+  "description": "Machine-readable benchmark run claim; semantic count equations and cross-arm comparisons are checked by the Rust validator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "generated_at",
+    "evaluation_started_at",
+    "evaluation_completed_at",
+    "benchmark",
+    "system",
+    "target_scope",
+    "runner",
+    "comparison",
+    "task_universe",
+    "eligible_task_set_sha256",
+    "task_universe_sha256",
+    "task_results",
+    "grading_mode",
+    "accounting",
+    "budget_caps",
+    "actual_usage",
+    "unavailable_usage",
+    "official_score",
+    "derived_metrics",
+    "provenance"
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "disposition": {
+      "enum": [
+        "passed",
+        "failed",
+        "refused",
+        "abstained",
+        "unsupported",
+        "timed_out",
+        "tool_failed",
+        "ungraded"
+      ]
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_ms",
+        "cpu_time_ms",
+        "peak_memory_bytes",
+        "model_calls",
+        "input_tokens",
+        "output_tokens",
+        "tool_calls"
+      ],
+      "properties": {
+        "wall_time_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cpu_time_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "model_calls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "universe_count",
+        "eligible_count",
+        "excluded_count",
+        "attempted_count",
+        "not_attempted_count",
+        "in_progress_count",
+        "completed_count",
+        "graded_count",
+        "passed_count",
+        "failed_count",
+        "refused_count",
+        "abstained_count",
+        "unsupported_count",
+        "timed_out_count",
+        "tool_failed_count",
+        "ungraded_count"
+      ],
+      "properties": {
+        "universe_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "eligible_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "excluded_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "attempted_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "not_attempted_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "in_progress_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "completed_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "graded_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "passed_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "failed_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "refused_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "abstained_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "unsupported_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timed_out_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "tool_failed_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "ungraded_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "luminous.benchmark-run-receipt.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "revision",
+        "dataset_manifest_sha256",
+        "access_class",
+        "scoring_formula_id",
+        "grader_version",
+        "grader_output_sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "access_class": {
+          "enum": [
+            "public",
+            "authorized_private",
+            "synthetic",
+            "internal"
+          ]
+        },
+        "scoring_formula_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grader_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grader_output_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm",
+        "name",
+        "version",
+        "source_revision",
+        "executable_sha256",
+        "model_id",
+        "config_sha256",
+        "prompt_sha256"
+      ],
+      "properties": {
+        "arm": {
+          "enum": [
+            "REA_only",
+            "Symthaea_only",
+            "REA_plus_Symthaea",
+            "specialist_tools",
+            "combined_stack",
+            "human"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executable_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "config_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "prompt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "target_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "os",
+        "architecture",
+        "cohort"
+      ],
+      "properties": {
+        "platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "architecture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cohort": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image_sha256",
+        "host_os",
+        "host_architecture",
+        "network_policy"
+      ],
+      "properties": {
+        "image_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "host_os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host_architecture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "network_policy": {
+          "enum": [
+            "disabled",
+            "allowlisted",
+            "unrestricted",
+            "benchmark_managed"
+          ]
+        }
+      }
+    },
+    "comparison": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "protocol_sha256",
+        "eligible_task_set_sha256"
+      ],
+      "properties": {
+        "group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "eligible_task_set_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "task_universe": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "eligibility",
+          "exclusion"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "eligibility": {
+            "enum": [
+              "eligible",
+              "excluded"
+            ]
+          },
+          "exclusion": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "predeclared",
+              "reason",
+              "declared_at"
+            ],
+            "properties": {
+              "predeclared": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "declared_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "eligible_task_set_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task_universe_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "input_sha256",
+          "attempt_state",
+          "attempts",
+          "terminal_disposition",
+          "grade",
+          "tool_calls",
+          "model_calls",
+          "wall_time_ms",
+          "output_sha256"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "input_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "attempt_state": {
+            "enum": [
+              "not_attempted",
+              "in_progress",
+              "terminal"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "terminal_disposition": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/disposition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "grade": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "value",
+              "grader_version",
+              "grader_output_sha256"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "binary",
+                  "numeric",
+                  "categorical",
+                  "custom"
+                ]
+              },
+              "value": {
+                "type": [
+                  "boolean",
+                  "number",
+                  "string"
+                ]
+              },
+              "grader_version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "grader_output_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "tool_calls": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "model_calls": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "wall_time_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "output_sha256": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "grading_mode": {
+      "enum": [
+        "binary",
+        "numeric",
+        "categorical",
+        "custom"
+      ]
+    },
+    "accounting": {
+      "$ref": "#/$defs/accounting"
+    },
+    "budget_caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_ms",
+        "cpu_time_ms",
+        "peak_memory_bytes",
+        "model_calls",
+        "input_tokens",
+        "output_tokens",
+        "tool_calls"
+      ],
+      "properties": {
+        "wall_time_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cpu_time_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "model_calls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "actual_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_ms",
+        "cpu_time_ms",
+        "peak_memory_bytes",
+        "model_calls",
+        "input_tokens",
+        "output_tokens",
+        "tool_calls"
+      ],
+      "properties": {
+        "wall_time_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cpu_time_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "model_calls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "unavailable_usage": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "official_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "formula_version",
+        "value",
+        "unit",
+        "numerator",
+        "denominator",
+        "is_official",
+        "source_output_sha256",
+        "unavailable_reason"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formula_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "numerator": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "denominator": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "is_official": {
+          "type": "boolean",
+          "description": "True only when the value was emitted by the benchmark owner's official scoring system; false for derived-only or synthetic receipts."
+        },
+        "source_output_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 of the official grader output; must exactly match benchmark.grader_output_sha256 when is_official is true (semantic equality enforced by the Rust validator)."
+        },
+        "unavailable_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "value"
+            ]
+          },
+          "then": {
+            "properties": {
+              "numerator": {
+                "type": "null"
+              },
+              "denominator": {
+                "type": "null"
+              },
+              "unavailable_reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "denominator": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "unavailable_reason": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "is_official": {
+                "const": false
+              }
+            },
+            "required": [
+              "is_official"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "numerator": {
+                "type": "null"
+              },
+              "denominator": {
+                "type": "null"
+              },
+              "source_output_sha256": {
+                "type": "null"
+              },
+              "unavailable_reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "source_output_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "derived_metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "value",
+          "unit",
+          "formula",
+          "is_official",
+          "unavailable_reason"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "formula": {
+            "type": "string",
+            "minLength": 1
+          },
+          "is_official": {
+            "const": false
+          },
+          "unavailable_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_manifest_sha256",
+        "output_manifest_sha256",
+        "transcript_sha256"
+      ],
+      "properties": {
+        "input_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "output_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "transcript_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "evaluation_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "evaluation_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "benchmark": {
+            "properties": {
+              "access_class": {
+                "const": "synthetic"
+              }
+            },
+            "required": [
+              "access_class"
+            ]
+          }
+        },
+        "required": [
+          "benchmark"
+        ]
+      },
+      "then": {
+        "properties": {
+          "official_score": {
+            "properties": {
+              "is_official": {
+                "const": false
+              }
+            },
+            "required": [
+              "is_official"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+name: Benchmark Run Receipt Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "schemas/benchmark-run-receipt-v1.schema.json"
+      - "examples/benchmark-run-receipt-v1.synthetic.json"
+      - "docs/research/BENCHMARK_RUN_RECEIPT_V1.md"
+      - "tools/benchmark-run-receipt-harness/**"
+      - ".github/workflows/benchmark-run-receipt-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "schemas/benchmark-run-receipt-v1.schema.json"
+      - "examples/benchmark-run-receipt-v1.synthetic.json"
+      - "tools/benchmark-run-receipt-harness/**"
+      - ".github/workflows/benchmark-run-receipt-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmark-run-receipt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  receipt-validator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CARGO_BUILD_JOBS: 2
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Assert Rust toolchain
+        run: |
+          test "$(rustc --version | cut -d ' ' -f 2)" = "1.96.0"
+          cargo --version
+
+      - name: Set up isolated Python schema-audit environment
+        run: |
+          python3 -m venv "$RUNNER_TEMP/receipt-schema-venv"
+          "$RUNNER_TEMP/receipt-schema-venv/bin/python" -m pip install --disable-pip-version-check --no-deps -r tools/benchmark-run-receipt-harness/requirements-ci.txt
+          "$RUNNER_TEMP/receipt-schema-venv/bin/python" -c "from importlib.metadata import version; assert version('jsonschema') == '4.26.0'; assert version('attrs') == '26.1.0'; assert version('referencing') == '0.37.0'; assert version('rpds-py') == '2026.9.1'; assert version('typing-extensions') == '4.16.0'"
+
+      - name: Validate Draft 2020-12 schema and synthetic fixture
+        run: |
+          "$RUNNER_TEMP/receipt-schema-venv/bin/python" tools/benchmark-run-receipt-harness/validate_schema.py \
+            --schema schemas/benchmark-run-receipt-v1.schema.json \
+            --instance examples/benchmark-run-receipt-v1.synthetic.json
+
+      - name: Validate isolated locked harness metadata
+        run: |
+          cargo metadata \
+            --manifest-path tools/benchmark-run-receipt-harness/Cargo.toml \
+            --locked --no-deps --format-version 1 \
+            > "$RUNNER_TEMP/benchmark-receipt-metadata.json"
+
+      - name: Rust format check
+        run: cargo fmt --manifest-path tools/benchmark-run-receipt-harness/Cargo.toml -- --check
+
+      - name: Semantic accounting and anti-laundering tests
+        run: cargo test --manifest-path tools/benchmark-run-receipt-harness/Cargo.toml --locked
+
+      - name: Validate synthetic receipt and emit machine-readable report
+        run: |
+          cargo run --manifest-path tools/benchmark-run-receipt-harness/Cargo.toml --locked -- \
+            examples/benchmark-run-receipt-v1.synthetic.json \
+            > "$RUNNER_TEMP/benchmark-run-receipt-validation.json"
+          cat "$RUNNER_TEMP/benchmark-run-receipt-validation.json"
+          grep -F '"valid": true' "$RUNNER_TEMP/benchmark-run-receipt-validation.json"
+
+      - name: Upload validation report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: benchmark-run-receipt-validation
+          path: "${{ runner.temp }}/benchmark-run-receipt-validation.json"
+          if-no-files-found: error
+          retention-days: 14
