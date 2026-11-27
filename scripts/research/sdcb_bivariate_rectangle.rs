@@ -52,6 +52,9 @@ pub struct BivariateJointBins {
     pub second_channel_marginals: Vec<f64>,
     pub probability_sum: f64,
     pub marginalization_error: f64,
+    /// Per-outcome-cell quadrature diagnostics, aligned with probabilities.
+    /// Error indicators are diagnostics, not certified error bounds.
+    pub cell_diagnostics: Vec<Vec<BivariateRectangleEstimate>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -437,12 +440,17 @@ pub fn bivariate_gaussian_joint_bins(
     e2.push(f64::INFINITY);
 
     let mut probabilities = vec![vec![0.0; n2]; n1];
+    let mut cell_diagnostics = Vec::with_capacity(n1);
     for i in 0..n1 {
+        let mut diagnostic_row = Vec::with_capacity(n2);
         for j in 0..n2 {
-            probabilities[i][j] = bivariate_gaussian_rectangle(
+            let estimate = bivariate_gaussian_rectangle(
                 mean, covariance, [e1[i], e2[j]], [e1[i + 1], e2[j + 1]],
-            )?.probability;
+            )?;
+            probabilities[i][j] = estimate.probability;
+            diagnostic_row.push(estimate);
         }
+        cell_diagnostics.push(diagnostic_row);
     }
     let first_channel_marginals: Vec<f64> =
         probabilities.iter().map(|row| row.iter().sum()).collect();
@@ -466,7 +474,7 @@ pub fn bivariate_gaussian_joint_bins(
     }
     Ok(BivariateJointBins {
         probabilities, first_channel_marginals, second_channel_marginals,
-        probability_sum, marginalization_error,
+        probability_sum, marginalization_error, cell_diagnostics,
     })
 }
 
@@ -565,6 +573,27 @@ mod tests {
         close(r.probabilities[0][1], 0.14758361765043326, 2.0e-10);
         close(r.probability_sum, 1.0, 1.0e-9);
         assert!(r.marginalization_error < 1.0e-9);
+    }
+
+    #[test]
+    fn joint_bin_table_retains_per_cell_numerical_diagnostics() {
+        let result = bivariate_gaussian_joint_bins(
+            [0.0, 0.0], [[1.0, 0.6], [0.6, 1.0]], &[0.0], &[0.0],
+        ).unwrap();
+        assert_eq!(result.cell_diagnostics.len(), 2);
+        assert!(result.cell_diagnostics.iter().all(|row| row.len() == 2));
+        for i in 0..2 {
+            for j in 0..2 {
+                close(
+                    result.cell_diagnostics[i][j].probability,
+                    result.probabilities[i][j],
+                    0.0,
+                );
+                assert_eq!(result.cell_diagnostics[i][j].covariance_rank, 2);
+                assert!(result.cell_diagnostics[i][j].outer_integrand_evaluations <= MAX_OUTER_EVALUATIONS);
+                assert!(result.cell_diagnostics[i][j].outer_quadrature_error_indicator.is_finite());
+            }
+        }
     }
 
     #[test]
