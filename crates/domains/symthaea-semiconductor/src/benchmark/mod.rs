@@ -1,6 +1,7 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
+pub mod ca_ocrc_bounded;
 pub mod calibration_requalification;
 pub mod delayed_aci;
 pub mod dtco_manifest;
@@ -9,6 +10,7 @@ pub mod metrology_audit;
 pub mod metrology_qualification_gate;
 pub mod metrology_semantics;
 pub mod mf_acquisition;
+pub mod observation_process_ledger;
 pub mod pair_manifest;
 pub mod process_event_graph;
 pub mod secom_fold_preprocessor;
@@ -17,6 +19,7 @@ pub mod secom_missingness;
 pub mod secom_observation_drift;
 pub mod secom_raw;
 pub mod secom_tabular_baselines;
+pub mod selection_risk_bounds;
 pub mod split_manifest;
 pub mod stratified_repeat;
 pub mod vm_snapshot_dependency_impact;
@@ -151,4 +154,32 @@ pub use delayed_aci::{
     delayed_aci_finite_horizon_miscoverage_bound_v1, deliver_delayed_aci_label_v1,
     forfeit_due_delayed_aci_feedback_v1, issue_delayed_aci_prediction_v1,
     resolve_degenerate_aci_interval_v1,
+};
+
+pub use ca_ocrc_bounded::{
+    CA_OCRC_ENGINE_SCHEMA_V1, CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1,
+    CA_OCRC_PREDICTION_RECEIPT_SCHEMA_V1, CA_OCRC_PREDICTION_SCHEMA_V1,
+    CA_OCRC_ROUND_INPUT_SCHEMA_V1, CA_OCRC_ROUND_REPORT_SCHEMA_V1, CaOcrcEngineStateV1,
+    CaOcrcEngineV1, CaOcrcErrorV1, CaOcrcFeedbackDispositionV1, CaOcrcFeedbackResultV1,
+    CaOcrcLabelFeedbackV1, CaOcrcPolicyV1, CaOcrcPredictionInputV1, CaOcrcPredictionReceiptV1,
+    CaOcrcPredictionSetV1, CaOcrcReasonV1, CaOcrcRoundInputV1, CaOcrcRoundReportV1,
+    CaOcrcSetKindV1, CaOcrcTrackedEntryV1, close_ca_ocrc_feedback_horizon_v1,
+    create_ca_ocrc_engine_v1, optimal_arbitrary_delay_proxy_policy_v1, proxy_survival_vector,
+    proxy_tracking_load, seal_ca_ocrc_policy_v1, step_ca_ocrc_round_v1,
+};
+
+pub use selection_risk_bounds::{
+    IndependentAuditEstimateV1, IndependentAuditLossObservationV1, PopulationOutcomeStateV1,
+    QualifiedLossObservationV1, SELECTION_AUDIT_DESIGN_SCHEMA_V1, SELECTION_RISK_INPUT_SCHEMA_V1,
+    SELECTION_RISK_REPORT_SCHEMA_V1, SelectionAuditDesignV1, SelectionRiskErrorV1,
+    SelectionRiskInputV1, SelectionRiskReportV1, evaluate_selection_adjusted_population_risk_v1,
+};
+
+pub use observation_process_ledger::{
+    ControllerAssumptionStateV1, FeedbackTrackingRecordV1, FeedbackTrackingStateV1,
+    IndependentAuditObservationV1, K1QualificationRecordV1, K1QualificationStateV1,
+    OBSERVATION_PROCESS_REPORT_SCHEMA_V1, OBSERVATION_PROCESS_SCHEMA_V1, ObservationProcessErrorV1,
+    ObservationProcessFunnelV1, ObservationProcessInputV1, ObservationProcessReportV1,
+    ObservationProcessRoundV1, ObservationRiskControllerV1, PhysicalAcquisitionRecordV1,
+    PhysicalAcquisitionStateV1, PhysicalSelectionDesignKindV1, evaluate_observation_process_v1,
 };
