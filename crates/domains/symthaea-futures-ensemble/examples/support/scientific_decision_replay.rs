@@ -225,7 +225,10 @@ impl CandidateDecisionContext {
         }
         let computed_context_digest = self.canonical_context_sha256()?;
         if computed_context_digest != self.context_digest {
-            return Err("context_digest does not match the canonical candidate-visible decision context".into());
+            return Err(
+                "context_digest does not match the canonical candidate-visible decision context"
+                    .into(),
+            );
         }
         self.decision_objective.validate()?;
         if self.schema_version != SCHEMA_VERSION {
