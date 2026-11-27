@@ -497,11 +497,11 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_event_ids_are_rejected_across_the_corpus() {
+    fn duplicate_event_ids_are_rejected_within_a_trace() {
         let mut lines = fixture_lines();
         let mut first: Value = serde_json::from_str(&lines[0]).expect("JSON");
-        let _second: Value = serde_json::from_str(&lines[1]).expect("JSON");
-        first["events"][1]["event_id"] = first["events"][0]["event_id"].clone();
+        let duplicate_id = first["events"][0]["event_id"].clone();
+        first["events"][1]["event_id"] = duplicate_id;
         lines[0] = first.to_string();
         assert!(validate_corpus(&lines).is_err());
     }
