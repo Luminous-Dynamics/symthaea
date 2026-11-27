@@ -26,6 +26,13 @@ schema_state AS (
                         'ledger_partitioned_2026', 'ledger_partitioned_default',
                         'volatile_cache', 'large_object_ref', 'ledger_summary')
 ),
+sequence_probe_state AS (
+    SELECT encode(
+        digest(convert_to(coalesce(string_agg(to_jsonb(s)::text, E'\\n' ORDER BY id), ''), 'UTF8'), 'sha256'),
+        'hex'
+    ) AS digest
+    FROM public.sequence_probe AS s
+),
 sequence_state AS (
     SELECT jsonb_build_object('last_value', last_value, 'is_called', is_called) AS state
     FROM public.operation_sequence
@@ -94,6 +101,7 @@ SELECT jsonb_build_object(
     'ledger_digest', (SELECT digest FROM ledger_state),
     'schema_digest', (SELECT digest FROM schema_state),
     'sequence_state', (SELECT state FROM sequence_state),
+    'sequence_probe_digest', (SELECT digest FROM sequence_probe_state),
     'large_object_digest', (SELECT digest FROM large_object_state),
     'materialized_view_digest', (SELECT digest FROM materialized_state),
     'partition_state', (SELECT state FROM partition_state),
