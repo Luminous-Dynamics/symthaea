@@ -9,9 +9,9 @@
 //! continuous-time state-space implementation. It is not a production filter,
 //! a calibrated sensor model, a transport-delay model, or a validated enclosure.
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 const MAX_SCALED_TIME: f64 = 700.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResponseModelError {
     InvalidProcessDecayRate,
     InvalidProcessVariance,
@@ -120,12 +120,32 @@ impl FirstOrderResponseOu {
         let delta = m - l;
 
         let lower_left = if delta > 0.0 {
-            // m * exp(-l t) * (1 - exp(-delta t)) / delta
-            m * e_l * (-(-delta * t).exp_m1()) / delta
+            // m * exp(-l t) * (1 - exp(-delta t)) / delta.
+            // If delta*t underflows to zero while m*t is representable,
+            // use the repeated-root limit instead of losing the transition.
+            let gap_scaled = delta * t;
+            if gap_scaled == 0.0 && t > 0.0 {
+                let scaled = m * t;
+                if !scaled.is_finite() {
+                    return Err(ResponseModelError::NumericalFailure);
+                }
+                scaled * e_l
+            } else {
+                m * e_l * (-(-gap_scaled).exp_m1()) / delta
+            }
         } else if delta < 0.0 {
-            // m * exp(-m t) * (1 - exp(-(-delta) t)) / (-delta)
+            // m * exp(-m t) * (1 - exp(-(-delta) t)) / (-delta).
             let gap = -delta;
-            m * e_m * (-(-gap * t).exp_m1()) / gap
+            let gap_scaled = gap * t;
+            if gap_scaled == 0.0 && t > 0.0 {
+                let scaled = m * t;
+                if !scaled.is_finite() {
+                    return Err(ResponseModelError::NumericalFailure);
+                }
+                scaled * e_m
+            } else {
+                m * e_m * (-(-gap_scaled).exp_m1()) / gap
+            }
         } else {
             // The repeated-root term is (lambda*t)*exp(-lambda*t). If
             // lambda*t overflows, the exact term is far below binary64 range.
@@ -366,6 +386,16 @@ mod tests {
         let (magnitude, phase) = model.frequency_response(4.0).unwrap();
         close(magnitude, std::f64::consts::FRAC_1_SQRT_2, 2.0e-15);
         close(phase, -std::f64::consts::FRAC_PI_4, 2.0e-15);
+    }
+
+    #[test]
+    fn tiny_rate_gap_times_tiny_time_does_not_erase_transition() {
+        let model = FirstOrderResponseOu::new(1.0, 1.0, 1.0 / (1.0 + f64::EPSILON)).unwrap();
+        let t = 1.0e-310;
+        let transition = model.transition_matrix(t).unwrap();
+        let expected = t * (-t).exp();
+        assert!(transition[1][0] > 0.0);
+        close(transition[1][0], expected, 1.0e-323);
     }
 
     #[test]
