@@ -30,9 +30,12 @@ jobs:
         run: |
           python3 scripts/generate_cedar_bench.py \
             "$RUNNER_TEMP/cedar-candidate.jsonl" \
-            "$RUNNER_TEMP/cedar-auditor.jsonl"
+            "$RUNNER_TEMP/cedar-auditor.jsonl" \\
+            all \\
+            all \\
+            all
       - name: Verify separation, counts, digests and intervention parity
         run: |
           python3 scripts/validate_cedar_bench_streams.py \
             "$RUNNER_TEMP/cedar-candidate.jsonl" \
-            "$RUNNER_TEMP/cedar-auditor.jsonl"
+            "$RUNNER_TEMP/cedar-auditor.jsonl" all
