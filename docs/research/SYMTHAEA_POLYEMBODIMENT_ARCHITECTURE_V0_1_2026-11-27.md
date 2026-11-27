@@ -245,6 +245,29 @@ Accessibility requirements: keyboard and touch control, screen-reader descriptio
 - Add tests for ordering, expiry, duplicate, cancellation, malformed payload, privacy class, and unsupported event kinds.
 - Emit synthetic fixtures and a replayable event log.
 
+### P1 initial implementation record — 2026-11-27
+
+A renderer-independent event module has now been added in
+`crates/domains/symthaea-soma/src/embodiment_event.rs` and exported from
+`symthaea-soma`:
+
+- Typed event and payload enums for conversation, attention, expression,
+  uncertainty, evidence status, and user controls.
+- Single-event validation for schema version, identifiers, monotonic timestamp
+  encoding, expiry ordering, payload/event-kind agreement, inference confidence,
+  evidence receipt requirements, and valid control payloads.
+- Per-session stream validation for sequence continuity, duplicate identities,
+  session binding, future observations, expiry, and cancellation references.
+- No renderer, network, camera, microphone, GPU, or actuator dependencies.
+- Regression tests are authored, including stream-ordering negatives, expiry,
+  inference confidence, evidence receipts, cancellation, and JSON wire round-trip.
+
+**Qualification boundary:** this is implementation code, not a verified build.
+The exact branch has not yet been compiled or run through Cargo tests, CI, a JSON
+Schema validator, or device profiling. It has not been connected to a renderer.
+The event envelope does not itself authenticate source identity or authorize
+hardware actions; those remain separate policy and trust-boundary work.
+
 ### P2 — Canonical Living Constellation
 
 - Implement a low-cost procedural 2D/3D renderer driven only by the event contract.
