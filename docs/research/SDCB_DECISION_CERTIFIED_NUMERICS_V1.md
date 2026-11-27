@@ -127,7 +127,7 @@ Otherwise:
 This is numerical refinement, not a new experiment planner. #13567 remains the owner of policy-tree optimization, non-anticipativity, and resource budgets. #13739 remains the owner of selector benchmarking.
 
 
-## 5.1 Authored finite action-value enclosure reference
+## 5. Authored finite action-value enclosure reference
 
 `scripts/research/sdcb_decision_value_bounds.rs` implements the finite box-plus-normalization subproblem: given cell probability intervals `[l_i,u_i]`, and finite per-cell utilities `v_i`, bound
 
