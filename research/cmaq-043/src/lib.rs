@@ -111,10 +111,7 @@ impl BudgetPlan {
 
     /// Computes a local allocation without consuming it. Operational use
     /// should go through AllocationLedger::allocate_once.
-    pub fn allocation_for(
-        &self,
-        scope: &BudgetScope,
-    ) -> Result<AllocationReceipt, BudgetError> {
+    pub fn allocation_for(&self, scope: &BudgetScope) -> Result<AllocationReceipt, BudgetError> {
         validate_scope(scope)?;
 
         let factors = [
@@ -330,8 +327,7 @@ mod tests {
     use super::*;
 
     const PLAN_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const INVENTORY_SHA: &str =
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const INVENTORY_SHA: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
     fn plan() -> BudgetPlan {
         BudgetPlan::new(1, 20, PLAN_SHA.into(), INVENTORY_SHA.into()).unwrap()
@@ -349,10 +345,7 @@ mod tests {
         }
     }
 
-    fn add_fractions(
-        left: (u128, u128),
-        right: (u128, u128),
-    ) -> Result<(u128, u128), BudgetError> {
+    fn add_fractions(left: (u128, u128), right: (u128, u128)) -> Result<(u128, u128), BudgetError> {
         let common = gcd(left.1, right.1);
         let left_factor = right.1 / common;
         let right_factor = left.1 / common;
@@ -372,10 +365,7 @@ mod tests {
     fn bounded_weight_sum(max_index: u64) -> Result<(u128, u128), BudgetError> {
         let mut total = (0u128, 1u128);
         for index in 1..=max_index {
-            total = add_fractions(
-                total,
-                (1, telescoping_denominator(index)?),
-            )?;
+            total = add_fractions(total, (1, telescoping_denominator(index)?))?;
         }
         Ok(total)
     }
@@ -430,7 +420,10 @@ mod tests {
     #[test]
     fn local_allocation_is_exact_and_threshold_is_its_reciprocal() {
         let receipt = plan().allocation_for(&scope(1, 1, 1, "stream-1")).unwrap();
-        assert_eq!((receipt.alpha_numerator, receipt.alpha_denominator), (1, 160));
+        assert_eq!(
+            (receipt.alpha_numerator, receipt.alpha_denominator),
+            (1, 160)
+        );
         assert_eq!(receipt.ville_threshold_ratio(), (160, 1));
         assert!((receipt.log_ville_threshold() - 160.0f64.ln()).abs() < 1e-12);
         assert_eq!(receipt.rule_version, 1);
@@ -443,20 +436,23 @@ mod tests {
         let later_asset = plan.allocation_for(&scope(2, 1, 1, "stream-2")).unwrap();
         let later_channel = plan.allocation_for(&scope(1, 2, 1, "stream-3")).unwrap();
         let later_deployment = plan.allocation_for(&scope(1, 1, 2, "stream-4")).unwrap();
-        assert_eq!(
-            (first.alpha_numerator, first.alpha_denominator),
-            (1, 160)
-        );
+        assert_eq!((first.alpha_numerator, first.alpha_denominator), (1, 160));
         assert_eq!(
             (later_asset.alpha_numerator, later_asset.alpha_denominator),
             (1, 480)
         );
         assert_eq!(
-            (later_channel.alpha_numerator, later_channel.alpha_denominator),
+            (
+                later_channel.alpha_numerator,
+                later_channel.alpha_denominator
+            ),
             (1, 480)
         );
         assert_eq!(
-            (later_deployment.alpha_numerator, later_deployment.alpha_denominator),
+            (
+                later_deployment.alpha_numerator,
+                later_deployment.alpha_denominator
+            ),
             (1, 480)
         );
     }
@@ -488,7 +484,9 @@ mod tests {
     fn same_stream_id_cannot_claim_another_scope() {
         let plan = plan();
         let mut ledger = AllocationLedger::new(&plan);
-        ledger.allocate_once(&plan, &scope(1, 1, 1, "same-stream")).unwrap();
+        ledger
+            .allocate_once(&plan, &scope(1, 1, 1, "same-stream"))
+            .unwrap();
         assert_eq!(
             ledger.allocate_once(&plan, &scope(2, 1, 1, "same-stream")),
             Err(BudgetError::DuplicateStreamId)
@@ -498,8 +496,7 @@ mod tests {
     #[test]
     fn ledger_is_bound_to_exactly_one_budget_plan() {
         let first_plan = plan();
-        let other_plan =
-            BudgetPlan::new(1, 20, INVENTORY_SHA.into(), PLAN_SHA.into()).unwrap();
+        let other_plan = BudgetPlan::new(1, 20, INVENTORY_SHA.into(), PLAN_SHA.into()).unwrap();
         let mut ledger = AllocationLedger::new(&first_plan);
         assert_eq!(
             ledger.allocate_once(&other_plan, &scope(1, 1, 1, "stream")),
@@ -554,13 +551,7 @@ mod tests {
 
     #[test]
     fn arithmetic_overflow_fails_closed() {
-        let extreme = BudgetPlan::new(
-            1,
-            u128::MAX,
-            PLAN_SHA.into(),
-            INVENTORY_SHA.into(),
-        )
-        .unwrap();
+        let extreme = BudgetPlan::new(1, u128::MAX, PLAN_SHA.into(), INVENTORY_SHA.into()).unwrap();
         assert_eq!(
             extreme.allocation_for(&scope(u64::MAX, u64::MAX, u64::MAX, "overflow")),
             Err(BudgetError::ArithmeticOverflow)
