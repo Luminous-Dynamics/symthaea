@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/schemas/pair-manifest-v0.1.schema.json",
+  "title": "MACE DSM Evaluator-Private Pair and Cluster Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "source_revision",
+    "generator_sha256",
+    "scenario_sha256",
+    "arm_manifest_sha256",
+    "episodes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_dsm_pair_manifest_v0_1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "generator_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "scenario_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "arm_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "episodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "episode_id",
+          "pair_block_id",
+          "world_cluster_id",
+          "query_id",
+          "candidate_sha256"
+        ],
+        "properties": {
+          "episode_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "pair_block_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "world_cluster_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "query_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "candidate_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  }
+}
