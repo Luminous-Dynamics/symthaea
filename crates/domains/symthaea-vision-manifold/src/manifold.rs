@@ -612,8 +612,8 @@ impl VisionManifold {
         &mut self,
         target: symthaea_core::hdc::HdcDimensionality,
     ) -> Result<DilationEstimate, String> {
-        if self.observer_only && target.dimension() != self.config.hdc_dim {
-            return Err("HDC dimensionality is immutable in observer-only mode".to_string());
+        if self.observer_only {
+            return Err("HDC dilation is disabled in observer-only mode".to_string());
         }
         let estimate = self.estimate_dilation(target);
         let target_dim = estimate.target_dim;
@@ -2556,6 +2556,10 @@ impl VisionManifold {
 
     /// Set a custom transition model for mental simulation.
     pub fn set_transition_model(&mut self, model: Box<dyn TransitionModel>) {
+        if self.observer_only {
+            tracing::warn!("transition-model changes are disabled in observer-only mode");
+            return;
+        }
         self.transition_model = Some(model);
     }
 
@@ -8798,6 +8802,24 @@ mod tests {
 
         assert!(manifold.enable_observer_only().is_err());
         assert!(!manifold.is_observer_only());
+    }
+
+    #[test]
+    fn observer_only_rejects_hdc_dilation_and_transition_model_replacement() {
+        let mut manifold =
+            VisionManifold::try_new(VisionConfig::default(), 32, 32).unwrap();
+        manifold.enable_observer_only().unwrap();
+
+        assert!(
+            manifold
+                .try_dilate(symthaea_core::hdc::HdcDimensionality::Ultra)
+                .is_err()
+        );
+        let before_tau = manifold.current_tau();
+        manifold.set_transition_model(Box::new(FixedEquilibrium(ContinuousHV::zero(
+            manifold.hdc_dim(),
+        ))));
+        assert_eq!(manifold.current_tau(), before_tau);
     }
 
     // === Active Patch Count ===
