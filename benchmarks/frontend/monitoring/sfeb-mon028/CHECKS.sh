@@ -21,6 +21,7 @@ jq -e '.profile == "mon028-falsification-first-suite-v1" and (.cases | length >=
 jq -e '.profile == "mon028-falsification-first-benchmark-v1" and ([.scenarios[].id] | unique | length == (.scenarios | length))' "$ROOT/SCENARIOS-v1.json" >/dev/null
 jq -e '.properties.profile.const == "mon028-falsification-first-suite-v1"' "$ROOT/SUITE-v1.schema.json" >/dev/null
 jq -e '.properties.profile.const == "mon028-falsification-first-results-v1"' "$ROOT/RESULT-v1.schema.json" >/dev/null
+jq -e '.profile == "mon028-falsification-first-suite-v1" and ([.cases[] | select(.expected == "qualified")] | length > 0) and ([.cases[] | select(.expected != "qualified")] | length > 0)' "$ROOT/SUITE-example.json" >/dev/null
 
 cd "$MODULE"
 find . -type f -name '*.go' -print0 | xargs -0 gofmt -w
