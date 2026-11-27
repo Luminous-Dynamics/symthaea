@@ -131,7 +131,7 @@ impl FirstOrderResponseOu {
                 }
                 scaled * e_l
             } else {
-                m * e_l * (-(-gap_scaled).exp_m1()) / delta
+                m * e_l * ((-(-gap_scaled).exp_m1()) / delta)
             }
         } else if delta < 0.0 {
             // m * exp(-m t) * (1 - exp(-(-delta) t)) / (-delta).
@@ -144,7 +144,7 @@ impl FirstOrderResponseOu {
                 }
                 scaled * e_m
             } else {
-                m * e_m * (-(-gap_scaled).exp_m1()) / gap
+                m * e_m * ((-(-gap_scaled).exp_m1()) / gap)
             }
         } else {
             // The repeated-root term is (lambda*t)*exp(-lambda*t). If
@@ -396,6 +396,17 @@ mod tests {
         let expected = t * (-t).exp();
         assert!(transition[1][0] > 0.0);
         close(transition[1][0], expected, 1.0e-323);
+    }
+
+    #[test]
+    fn subnormal_rate_gap_avoids_intermediate_product_underflow() {
+        let mu = 1.0 / f64::MAX;
+        let lambda = mu.next_up();
+        let tau = 1.0 / mu;
+        let model = FirstOrderResponseOu::new(lambda, 1.0, tau).unwrap();
+        let transition = model.transition_matrix(1.0).unwrap();
+        assert!(transition[1][0] > 0.0);
+        close(transition[1][0], mu, mu * 1.0e-12);
     }
 
     #[test]
