@@ -12,12 +12,18 @@ This increment introduces a separate raw-text candidate-visible surface so lexic
 
 The standalone implementation is `research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs`.
 
-A source document carries:
-- stable candidate-visible `document_id`;
-- `scope_id` for tenant/run/purpose filtering;
-- `observed_at_ms` as knowledge/transaction time;
-- `valid_from_ms` and exclusive `valid_until_ms` as valid time;
-- verbatim source text.
+A source document carries the same candidate-visible event semantics as MACE Candidate Episode v0.1:
+- `document_id` is the exact event ID and the retrieval-to-decision join key;
+- `source_id` identifies the upstream source record;
+- `scope_id` carries tenant/run/purpose isolation;
+- `observed_at_ms` is knowledge/transaction time;
+- `valid_from_ms` and exclusive `valid_until_ms` carry valid time;
+- `authority_tier` and `uncertainty_ppm` are preserved, not used as hidden BM25 boosts;
+- `relation_to_parent` and `parent_event_ids` preserve asserts/supersedes/retracts/contradicts/derived-from lineage;
+- optional `source_family` and canonical lowercase SHA-256 `source_root_digest_sha256` preserve source-root metadata;
+- verbatim source text is ranked, not rewritten.
+
+The index exposes `resolve_source_event(document_id)`, allowing each returned BM25 hit to be resolved back to its exact event ID and full authority/lineage metadata. The downstream evidence qualifier remains the owner of admissibility decisions; BM25 does not treat a high lexical score as authority.
 
 A query carries `scope_id`, `as_of_ms`, free-text query and `top_k`. A record is eligible only when its scope matches, it was observed no later than the query cut, and its valid-time interval contains that cut.
 
@@ -47,11 +53,13 @@ It can compose lexical, entity, date or graph result lists, but this reference d
 
 ## Negative controls
 
-The Rust suite covers:
+The Rust suite now covers:
 - multi-term BM25 ranking and partial matches;
 - knowledge-time and valid-time cutoffs;
 - exclusive valid-until semantics;
 - scope isolation, including invariance of in-scope scores and bounded posting-visit counts when another scope gains documents;
+- retrieval-to-evidence resolution by exact event ID, preserving source ID, authority, uncertainty, parent relation, source family and source-root digest;
+- invalid uncertainty, malformed roots and self-parent/duplicate-parent rejection;
 - knowledge-time partitioning, including exclusion of a large set of future-observed records before posting traversal;
 - empty queries and zero top-k;
 - deterministic tie order independent of ingest order;
@@ -82,4 +90,4 @@ External anchors must remain track-specific. AML Cycle 2 publishes separate text
 
 ## Claim boundary and next work
 
-This increment establishes a transparent lexical comparator and validated time/scope filters. It does not reproduce Resurface/Khipu/InsightMem, does not establish an AML score, and does not show SOTA superiority. The next integration step is an adapter from the same canonical source-event projection used by the paired evaluator; until then, the BM25 run and paired decision run must be joined by exact document/source IDs and frozen source digests, not inferred from text similarity.
+This increment establishes a transparent lexical comparator, scope/knowledge-time partitioned worksets, and exact-ID provenance resolution for the same bitemporal source-event fields used by MACE Candidate Episode v0.1. It does not reproduce Resurface/Khipu/InsightMem, does not establish an AML score, and does not show SOTA superiority. The next integration step is an adapter from the same canonical source-event projection used by the paired evaluator; until then, the BM25 run and paired decision run must be joined by exact document/source IDs and frozen source digests, not inferred from text similarity.
