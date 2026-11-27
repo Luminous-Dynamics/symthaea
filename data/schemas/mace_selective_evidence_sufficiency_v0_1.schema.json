@@ -144,7 +144,8 @@
             "holm",
             "hierarchical_fallback",
             "other_preregistered",
-            "bonferroni_over_group_threshold_hypotheses"
+            "bonferroni_over_group_threshold_hypotheses",
+            "bonferroni_over_groups_fixed_sequence_over_thresholds"
           ]
         },
         "resampling_unit": {
@@ -167,7 +168,12 @@
           ]
         },
         "threshold_selection": {
-          "const": "calibration_split_only"
+          "type": "string",
+          "enum": [
+            "calibration_split_only",
+            "fixed_sequence_cluster_acceptance_prefix",
+            "simultaneous_bonferroni_on_calibration_split"
+          ]
         },
         "evaluator_custody": {
           "type": "string",
@@ -237,7 +243,8 @@
         "parent_fallback_certificate_sha256",
         "decision_policy_sha256",
         "sufficiency_score_definition_sha256",
-        "group_hierarchy_sha256"
+        "group_hierarchy_sha256",
+        "decision_coverage"
       ],
       "properties": {
         "schema_version": {
@@ -442,6 +449,16 @@
         },
         "group_hierarchy_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "decision_coverage": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk_bound"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "allOf": [
