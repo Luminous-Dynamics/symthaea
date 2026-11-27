@@ -256,7 +256,20 @@ impl FirstOrderResponseOu {
         if !elapsed_time.is_finite() || elapsed_time < 0.0 {
             return Err(ResponseModelError::InvalidElapsedTime);
         }
-        Ok(1.0 - (-self.mu * elapsed_time).exp())
+        let scaled = self.mu * elapsed_time;
+        if !scaled.is_finite() {
+            // The exact positive product exceeds binary64 range, so the
+            // normalized first-order step response rounds to one.
+            return Ok(1.0);
+        }
+        let residual = self.mu.mul_add(elapsed_time, -scaled);
+        let response = -(-scaled).exp_m1()
+            + (-scaled).exp() * (-(-residual).exp_m1());
+        if response.is_finite() && (0.0..=1.0).contains(&response) {
+            Ok(response)
+        } else {
+            Err(ResponseModelError::NumericalFailure)
+        }
     }
 
     /// Magnitude and phase (radians) of H(i*omega)=mu/(mu+i*omega).
@@ -434,6 +447,14 @@ mod tests {
         let model = FirstOrderResponseOu::new(0.8, 1.0, tau).unwrap();
         let t90 = tau * 10.0_f64.ln();
         close(model.normalized_step_response(t90).unwrap(), 0.9, 2.0e-15);
+    }
+
+    #[test]
+    fn step_response_retains_small_fractional_changes() {
+        let model = FirstOrderResponseOu::new(1.0, 1.0, 1.0).unwrap();
+        let elapsed = 1.0e-20;
+        let actual = model.normalized_step_response(elapsed).unwrap();
+        close(actual, 1.0e-20, 1.0e-35);
     }
 
     #[test]
