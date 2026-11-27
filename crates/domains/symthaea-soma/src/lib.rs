@@ -47,8 +47,9 @@ pub use symthaea_spore::engine::SporeEngine;
 pub use symthaea_spore::engine::{CycleResult, EpistemicStatus};
 pub use symthaea_spore::persistence;
 
-// Renderer-neutral semantic events for mobile and future multi-form embodiments.
+// Renderer-neutral semantic events and canonical multi-form projections.
 pub mod embodiment_event;
+pub mod embodiment_projection;
 
 // Mobile embodiment modules (moved from spore)
 pub mod ble_mesh;
