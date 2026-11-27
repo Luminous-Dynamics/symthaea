@@ -64,7 +64,7 @@ bash scripts/capture-state.sh 18 restore18 out/restore-state.json
 bash scripts/compare-state.sh out/source-state.json out/restore-state.json
 ```
 
-The source capture is a repeatable-read snapshot tied to `capture_lsn`, `timeline_id`, system identifier and capture time. Fixture writers must remain quiesced during capture. The target is restored to that LSN on that timeline and paused; the wait script also verifies the WAL filename's timeline prefix. RPO uses the recorded capture time and bounded clock uncertainty, not a comparison of unlike clocks.
+The source capture is a repeatable-read snapshot tied to `capture_lsn`, `timeline_id`, system identifier and capture time. The connector uses Debezium's string decimal mode so the independent SQL oracle can compare exact numeric values, not only event IDs and counts. Fixture writers must remain quiesced during capture. The target is restored to that LSN on that timeline and paused; the wait script also verifies the WAL filename's timeline prefix. RPO uses the recorded capture time and bounded clock uncertainty, not a comparison of unlike clocks.
 
 The comparison report checks source/target database identity, system identifier, timeline and recovery state, then reports every state surface separately. A difference (for example, unlogged data not restored by WAL replay) is an explicit coverage failure, not something to average away.
 
