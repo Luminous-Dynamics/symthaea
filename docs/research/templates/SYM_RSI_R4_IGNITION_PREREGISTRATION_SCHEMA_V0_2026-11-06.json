@@ -74,7 +74,7 @@
           "type": "string",
           "minLength": 1
         },
-        "preregistration_commit": {
+        "protocol_contract_commit": {
           "type": "string",
           "minLength": 1
         },
@@ -172,7 +172,7 @@
         "experiment_id",
         "protocol_version",
         "preregistered_at_utc",
-        "preregistration_commit",
+        "protocol_contract_commit",
         "reviewers",
         "claim_profile",
         "estimand"
