@@ -283,7 +283,8 @@
         "stratum_utility_effect_ci95",
         "stratum_regret_reduction_effects",
         "stratum_regret_reduction_ci95",
-        "stratum_independent_profile_clusters"
+        "stratum_independent_profile_clusters",
+        "stratum_confirmatory_cluster_floor_met"
       ],
       "properties": {
         "schema_version": {
@@ -390,7 +391,14 @@
         "stratum_utility_effect_ci95": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/ci"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ci"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "stratum_regret_reduction_effects": {
@@ -402,7 +410,14 @@
         "stratum_regret_reduction_ci95": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/ci"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ci"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "stratum_independent_profile_clusters": {
@@ -410,6 +425,12 @@
           "additionalProperties": {
             "type": "integer",
             "minimum": 1
+          }
+        },
+        "stratum_confirmatory_cluster_floor_met": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
           }
         }
       }
