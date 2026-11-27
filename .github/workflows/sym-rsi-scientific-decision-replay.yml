@@ -62,7 +62,7 @@ jobs:
             crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs \
             crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
-            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
+            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs \
             tools/sym-rsi-decision-replay-contract/src/lib.rs
       - name: Check formatting on committed sources
         run: |
@@ -70,7 +70,7 @@ jobs:
             crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs \
             crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
-            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
+            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs \
             tools/sym-rsi-decision-replay-contract/src/lib.rs
       - name: Run isolated decision and custody contract tests
         run: cargo test --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml
