@@ -163,6 +163,16 @@ A numerical speedup is only meaningful when the error tolerance and coverage are
 
 **Next experiments:** rare-tail probability sweeps; near-singular and ill-conditioned covariance; high/negative correlation; heterogeneous scales; permutation/order invariance; common-factor misspecification; block-length/coverage curves; synthetic distribution shift; and independent high-precision checks.
 
+#### Proposed SDCB qualification gates (not results)
+
+- **In-envelope coverage:** for each declared alpha (at least 0.10 and 0.05), every preregistered held-out in-envelope regime must have a cluster-aware 95% upper confidence bound on empirical miscoverage no greater than `alpha + 0.01`. Publish the lower bound too, so pathological over-conservatism is visible.
+- **Out-of-envelope rejection:** the upper 95% confidence bound on false-qualified rate must be below 1% on held-out regimes outside the declared envelope. Target at least 95% detection of material excursions and at most 5% false rejection inside the validated envelope.
+- **Model-misspecification controls:** test negative rho, changing lag structure, heavy tails, shared latent scales, multivariate/common-cause factors, abrupt and gradual shifts, missing observations and adversarial diagnostic contamination. Do not treat a scalar rho interval as a complete dependence description.
+- **Power and replication:** exploratory grids may use 2,500 trials to find failure modes; confirmatory conditions should use at least 50,000 independent trials per condition, fresh seed domains and a separate held-out regime set. For serial data, the resampling/confidence unit must be a world, path or independently generated campaign—not a time tick.
+- **Fail-closed runtime:** any interval partly outside the envelope, insufficient diagnostic sample, unknown model family, failed model adequacy, invalid custody or unsupported dependence state must be `Inconclusive` or `NotQualified`. It must not produce a positive engineering adequacy or downstream authorization.
+
+A fixed sample count is not itself proof of power. The trial design should calculate power and interval width for the smallest materially unsafe excursion before execution, then freeze the test set and analysis code.
+
 ### 4.2 MACE DSM — memory that measurably improves decisions
 
 | Dimension | Matched controls | Proposed target |
@@ -178,6 +188,23 @@ A numerical speedup is only meaningful when the error tolerance and coverage are
 | External retrieval track | AML Cycle 2 and LongMemEval-V2 | Official track-specific score/gain only after reproducing exact submission protocol |
 
 Do not set one arbitrary accuracy target before the memory adapter is integrated with raw trajectory data. First reproduce BM25 and RRF controls, then the best published baseline for each public task. The research contribution is the incremental decision value, reduction in harmful use, less retained context and lifecycle cost—not simply a new retriever name.
+
+#### Proposed competitive gates (not results)
+
+| Track | Current open reference | First surpass target | Commercial/stretch target |
+|---|---:|---:|---:|
+| AML Textual overall | Resurface 61.22 | ≥63.22 (+2.00 points) | ≥70.26 (above MemoraX 69.26) |
+| AML Multimodal overall | Khipu 43.26 | ≥45.26 (+2.00 points) | ≥54.68 (above MemoraX 53.68) |
+| AML Coding overall resolved | InsightMem 63.33% | ≥65.33% | ≥69.00% (above MemoraX 68.00%) |
+| LongMemEval-V2 LAFS | AgentRunbook-C v2 Online +2.823 | ≥+3.00 on the official held-out evaluation | Preserve ≥75.6% accuracy at ≤100s median query latency, then improve both |
+
+These are separate targets in separate scoring systems. For each AML track, first reproduce the named open-source leader with the exact submission version and metric, then require a paired/bootstrap 95% lower confidence bound above that leader before claiming a win. The commercial/stretch column is a second milestone, not an implied directly comparable target across tracks. For LongMemEval-V2, match the official fixed reader, context budget, task tier and latency measurement; publish all accuracy/latency operating points and full Insert, maintenance and storage cost. Do not treat +3.00 LAFS as an AML score.
+
+For native MACE decision value, use a separate preregistered evaluation: target at least **+5 percentage points in paired task success** over the strongest matched no-memory/BM25/dense baseline, with the paired 95% interval strictly above zero and **≥10% lower decision regret**. Retain all unsupported counterfactuals in the denominator. Report harmful-use and tail-harm rates separately; a mean gain cannot compensate for unauthorized use.
+
+For governed-memory and security tests, require **zero** unauthorized cross-scope retrieval, disclosure or mutation on the complete hard-negative suite; **100%** source-root resolution for accepted evidence; and no positive use after a confirmed revocation or expiry. On held-out poisoning tests, aim for an upper 95% confidence bound below **1%** successful unauthorized action, while reporting benign-memory retention and legitimate activation/abstention. This is intentionally stricter than answer accuracy: MemSecBench reports 84.2% malicious-memory persistence and 50.3% full Write–Execute chain success across its evaluated configurations, so persistence and downstream consequence must be separate metrics.
+
+For every numerical target, report the test set size, independent cluster unit, confidence method, hardware, inference model/version, prompt/reader digest, data version, and missing/unsupported count. Use episode/world/source-root clusters for uncertainty; individual ticks or repeated queries from one episode are not independent samples.
 
 ### 4.3 Scientific decision replay — research-policy quality
 
