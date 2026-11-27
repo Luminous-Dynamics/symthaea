@@ -1546,6 +1546,18 @@ mod tests {
         assert_eq!(receipt.received_feedback_receipts[0].disposition, CaoOcrcFeedbackDispositionV1::HeldUnknown);
         assert_eq!(engine.threshold, before);
         assert!(engine.tracked_rounds.contains_key(&1));
+        assert_eq!(
+            engine.guarantee_status,
+            CaoOcrcGuaranteeStatusV1::InvalidatedByK1QualificationFiltering
+        );
+        assert_eq!(
+            receipt.guarantee_status,
+            CaoOcrcGuaranteeStatusV1::InvalidatedByK1QualificationFiltering
+        );
+        assert_eq!(
+            receipt.population_scope,
+            CaoOcrcPopulationScopeV1::QualifiedMeasuredStreamOnly
+        );
     }
 
     #[test]
@@ -1760,6 +1772,66 @@ mod tests {
         assert_eq!(result.regime, CaoOcrcBoundRegimeV1::CapacityConstrainedTheoremOne);
         assert!(result.bound.is_some());
         assert!(!result.corollary_one_regime_applicable);
+    }
+
+    #[test]
+    fn capacity_above_delay_is_not_unlimited_ocrc_when_proxy_policy_drops_feedback() {
+        let policy = policy(4, 3, vec![1.0, 1.0, 0.8, 0.5]);
+        assert!(compute_ca_ocrc_risk_bound_v1(&policy, 100).is_err());
+    }
+
+    #[test]
+    fn full_capacity_bound_reports_the_declared_population_scope() {
+        let policy = policy(4, 3, full_tracking_proxy_survival_v1(3));
+        let result = compute_ca_ocrc_risk_bound_v1(&policy, 100).unwrap();
+        assert_eq!(
+            result.population_scope,
+            CaoOcrcPopulationScopeV1::QualifiedMeasuredStreamOnly
+        );
+    }
+
+    #[test]
+    fn out_of_bound_feedback_invalidates_the_conditional_risk_claim() {
+        let mut engine = engine(1, 2, vec![1.0, 1.0, 1.0]);
+        advance(
+            &mut engine,
+            &round(1, None, Some((0.0, 1.0)), Some(0.5)),
+            &[],
+        )
+        .unwrap();
+        advance(
+            &mut engine,
+            &round(2, None, Some((0.0, 1.0)), Some(0.5)),
+            &[],
+        )
+        .unwrap();
+        advance(
+            &mut engine,
+            &round(3, None, Some((0.0, 1.0)), Some(0.5)),
+            &[],
+        )
+        .unwrap();
+        let late = advance(
+            &mut engine,
+            &round(4, None, Some((0.0, 1.0)), Some(0.5)),
+            &[feedback(
+                1,
+                4,
+                2.0,
+                "label-late-bound",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            )],
+        )
+        .unwrap();
+        assert_eq!(
+            late.guarantee_status,
+            CaoOcrcGuaranteeStatusV1::InvalidatedByFeedbackDelayBound
+        );
+        assert_eq!(
+            engine.guarantee_status,
+            CaoOcrcGuaranteeStatusV1::InvalidatedByFeedbackDelayBound
+        );
     }
 
     #[test]
