@@ -17,7 +17,7 @@
       "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "clean": {
         "variant_id": "0-clean",
-        "audio_sha256": "01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+        "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
         "question": "Do these clips have the same queried musical property?",
         "question_sha256": "8bf4d082f7c1d83d6d9e7b4d2f597b97df6212a88597dd572cb3403114cdc533",
         "option_a_relation": "Same",
@@ -27,7 +27,7 @@
       },
       "flip": {
         "variant_id": "0-flip",
-        "audio_sha256": "02020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202",
+        "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "question": "Did the queried musical property change between the two clips?",
         "question_sha256": "ccfd9f89b176d4ccdd23572882f6c079279b4755eec8fa482dd225249501739a",
         "option_a_relation": "Same",
@@ -37,7 +37,7 @@
       },
       "stay": {
         "variant_id": "0-stay",
-        "audio_sha256": "03030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303",
+        "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
         "question": "Does the queried musical property remain the same despite the sound change?",
         "question_sha256": "3f08b80bd56c0bd5311a0a7064749c1ac89b587fb7171c0e4e9def95876fdbdc",
         "option_a_relation": "Same",
@@ -59,7 +59,7 @@
       "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "clean": {
         "variant_id": "1-clean",
-        "audio_sha256": "04040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404040404",
+        "audio_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
         "question": "Do these clips have the same queried musical property?",
         "question_sha256": "8bf4d082f7c1d83d6d9e7b4d2f597b97df6212a88597dd572cb3403114cdc533",
         "option_a_relation": "Same",
@@ -69,7 +69,7 @@
       },
       "flip": {
         "variant_id": "1-flip",
-        "audio_sha256": "05050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505",
+        "audio_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
         "question": "Did the queried musical property change between the two clips?",
         "question_sha256": "ccfd9f89b176d4ccdd23572882f6c079279b4755eec8fa482dd225249501739a",
         "option_a_relation": "Different",
@@ -79,7 +79,7 @@
       },
       "stay": {
         "variant_id": "1-stay",
-        "audio_sha256": "06060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606060606",
+        "audio_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
         "question": "Does the queried musical property remain the same despite the sound change?",
         "question_sha256": "3f08b80bd56c0bd5311a0a7064749c1ac89b587fb7171c0e4e9def95876fdbdc",
         "option_a_relation": "Same",
@@ -101,7 +101,7 @@
       "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "clean": {
         "variant_id": "2-clean",
-        "audio_sha256": "07070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707",
+        "audio_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
         "question": "Do these clips have the same queried musical property?",
         "question_sha256": "8bf4d082f7c1d83d6d9e7b4d2f597b97df6212a88597dd572cb3403114cdc533",
         "option_a_relation": "Same",
@@ -111,7 +111,7 @@
       },
       "flip": {
         "variant_id": "2-flip",
-        "audio_sha256": "08080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808080808",
+        "audio_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
         "question": "Did the queried musical property change between the two clips?",
         "question_sha256": "ccfd9f89b176d4ccdd23572882f6c079279b4755eec8fa482dd225249501739a",
         "option_a_relation": "Same",
@@ -121,7 +121,7 @@
       },
       "stay": {
         "variant_id": "2-stay",
-        "audio_sha256": "09090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909",
+        "audio_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
         "question": "Does the queried musical property remain the same despite the sound change?",
         "question_sha256": "3f08b80bd56c0bd5311a0a7064749c1ac89b587fb7171c0e4e9def95876fdbdc",
         "option_a_relation": "Same",
@@ -143,7 +143,7 @@
       "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "clean": {
         "variant_id": "3-clean",
-        "audio_sha256": "10101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010",
+        "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "question": "Do these clips have the same queried musical property?",
         "question_sha256": "8bf4d082f7c1d83d6d9e7b4d2f597b97df6212a88597dd572cb3403114cdc533",
         "option_a_relation": "Same",
@@ -153,7 +153,7 @@
       },
       "flip": {
         "variant_id": "3-flip",
-        "audio_sha256": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+        "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "question": "Did the queried musical property change between the two clips?",
         "question_sha256": "ccfd9f89b176d4ccdd23572882f6c079279b4755eec8fa482dd225249501739a",
         "option_a_relation": "Same",
@@ -163,7 +163,7 @@
       },
       "stay": {
         "variant_id": "3-stay",
-        "audio_sha256": "12121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212",
+        "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "question": "Does the queried musical property remain the same despite the sound change?",
         "question_sha256": "3f08b80bd56c0bd5311a0a7064749c1ac89b587fb7171c0e4e9def95876fdbdc",
         "option_a_relation": "Same",
