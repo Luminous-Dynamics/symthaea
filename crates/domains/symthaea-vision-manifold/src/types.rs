@@ -609,7 +609,7 @@ impl DilationEstimate {
 }
 
 /// Current serialized manifold checkpoint schema.
-pub const MANIFOLD_STATE_SCHEMA_VERSION: u32 = 9;
+pub const MANIFOLD_STATE_SCHEMA_VERSION: u32 = 10;
 
 fn legacy_manifold_state_schema_version() -> u32 {
     1
@@ -865,6 +865,9 @@ pub struct ManifoldState {
     /// Whether online learning was frozen at checkpoint time.
     #[serde(default)]
     pub learning_frozen: bool,
+    /// Whether the checkpoint was produced under the immutable observer-only profile.
+    #[serde(default)]
+    pub observer_only: bool,
     /// Last raw observation used by scene decoding and replay.
     #[serde(default)]
     pub last_observed_frame: Option<Vec<u8>>,
