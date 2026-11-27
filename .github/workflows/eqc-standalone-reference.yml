@@ -1,0 +1,122 @@
+name: EQC Standalone Reference Qualification
+
+on:
+  push:
+    branches: [research/eqc-standalone-rust-evaluator-2026-11-27]
+    paths:
+      - "research/eqc-rust/Cargo.toml"
+      - "research/eqc-rust/src/**"
+      - "research/eqc-rust/tests/**"
+      - "docs/research/eqc-task-v0.1.schema.json"
+      - "docs/research/eqc-run-receipt-v0.1.schema.json"
+      - "docs/research/eqc-seed-corpus-v0.1.json"
+      - "docs/research/eqc-fixtures/**"
+      - "docs/research/EVIDENCE_QUALIFIED_CAPABILITY_BENCHMARK_V0_1.md"
+      - ".github/workflows/eqc-standalone-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: eqc-standalone-reference
+  cancel-in-progress: false
+
+jobs:
+  qualify-seed:
+    name: Standalone Rust / Draft 2020-12 / reference controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: true
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Generate the standalone lockfile when schema validator is first added
+        run: |
+          set -euo pipefail
+          manifest=research/eqc-rust/Cargo.toml
+          lock=research/eqc-rust/Cargo.lock
+          if [[ ! -s "$lock" ]] || ! grep -q '^name = "jsonschema"$' "$lock"; then
+            cargo generate-lockfile --manifest-path "$manifest"
+          fi
+          test -s "$lock"
+          grep -q '^name = "jsonschema"$' "$lock"
+          grep -q '^version = "0.63.2"$' "$lock"
+
+      - name: Commit the updated lockfile on the owned branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/eqc-rust/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "Standalone lockfile already contains the pinned schema validator."
+          else
+            git commit -m "chore(eqc): lock Draft 2020-12 schema validator"
+            git push origin HEAD:research/eqc-standalone-rust-evaluator-2026-11-27
+          fi
+
+      - name: Validate JSON syntax and exact source metadata
+        run: |
+          set -euo pipefail
+          jq empty docs/research/eqc-task-v0.1.schema.json
+          jq empty docs/research/eqc-run-receipt-v0.1.schema.json
+          jq empty docs/research/eqc-seed-corpus-v0.1.json
+          jq empty docs/research/eqc-fixtures/consent-active-001.json
+          jq empty docs/research/eqc-fixtures/consent-revoked-001.json
+          jq empty docs/research/eqc-fixtures/challenge-consumed-001.json
+          jq empty docs/research/eqc-fixtures/run-receipt-reference-unqualified.json
+          {
+            echo "source_head=$GITHUB_SHA"
+            echo "checked_out_head=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "jsonschema=0.63.2"
+            echo "schema_draft=2020-12"
+            echo "schema_resolution=offline_no_remote_refs"
+          } | tee "$RUNNER_TEMP/eqc-metadata.txt"
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path research/eqc-rust/Cargo.toml -- --check
+
+      - name: Run reference, integrity and schema-conformance tests
+        run: |
+          set -euo pipefail
+          cargo test --locked --manifest-path research/eqc-rust/Cargo.toml \
+            2>&1 | tee "$RUNNER_TEMP/eqc-tests.log"
+
+      - name: Evaluate the public seed with the reference contract
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path research/eqc-rust/Cargo.toml -- \
+            eqc-validate \
+            --corpus docs/research/eqc-seed-corpus-v0.1.json \
+            --out "$RUNNER_TEMP/eqc-reference-report.json"
+          jq -e '
+            .evaluation_mode == "reference_contract_only_not_system_under_test" and
+            .task_count == 4 and
+            .reference_pass_count == 4 and
+            .no_op_fails_positive_controls == true and
+            .allow_all_fails_negative_controls == true
+          ' "$RUNNER_TEMP/eqc-reference-report.json" >/dev/null
+
+      - name: Preserve exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: eqc-standalone-reference-${{ github.sha }}
+          path: |
+            research/eqc-rust/Cargo.lock
+            ${{ runner.temp }}/eqc-metadata.txt
+            ${{ runner.temp }}/eqc-tests.log
+            ${{ runner.temp }}/eqc-reference-report.json
+          if-no-files-found: error
+          retention-days: 90

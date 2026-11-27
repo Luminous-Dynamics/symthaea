@@ -1,0 +1,13 @@
+{
+  "schema": "luminous.eqc.synthetic-consent.v0.1",
+  "consent_id": "synthetic-consent-revoked-001",
+  "principal_id": "synthetic-coordinator-01",
+  "subject_id": "synthetic-patient-001",
+  "status": "revoked",
+  "scopes": [
+    "patient:synthetic-patient-001:read"
+  ],
+  "valid_from": "2026-11-25T00:00:00Z",
+  "valid_until": "2026-11-27T00:00:00Z",
+  "revoked_at": "2026-11-25T12:00:00Z"
+}
