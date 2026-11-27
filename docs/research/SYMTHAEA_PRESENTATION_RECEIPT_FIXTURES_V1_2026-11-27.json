@@ -3,9 +3,10 @@
   "purpose": "Lifecycle sequence fixtures. Schema validation covers record shapes; phase ordering, exactly-one terminal outcome, per-clock monotonicity and digest verification are semantic ledger checks.",
   "positive": [
     {
-      "id": "observed_then_stopped",
+      "id": "authorization_submission_observed_then_stopped",
       "phases": [
         "permitted",
+        "authorized",
         "submitted",
         "observed",
         "stopped"
@@ -16,6 +17,7 @@
       "id": "unknown_then_observed_then_stopped",
       "phases": [
         "permitted",
+        "authorized",
         "submitted",
         "outcome_unknown",
         "observed",
@@ -27,6 +29,7 @@
       "id": "unknown_then_failed",
       "phases": [
         "permitted",
+        "authorized",
         "submitted",
         "outcome_unknown",
         "failed"
@@ -34,12 +37,21 @@
       "expected_terminal": "failed"
     },
     {
-      "id": "policy_denied_before_submission",
+      "id": "policy_denied_before_authorization",
       "phases": [
         "permitted",
         "not_submitted"
       ],
       "expected_terminal": "not_submitted"
+    },
+    {
+      "id": "adapter_rejected_after_authorization",
+      "phases": [
+        "permitted",
+        "authorized",
+        "failed"
+      ],
+      "expected_terminal": "failed"
     }
   ],
   "negative": [
@@ -47,6 +59,7 @@
       "id": "observed_without_submission",
       "phases": [
         "permitted",
+        "authorized",
         "observed"
       ],
       "expected_rejection": "invalid_transition"
@@ -55,6 +68,7 @@
       "id": "stopped_without_observation",
       "phases": [
         "permitted",
+        "authorized",
         "submitted",
         "stopped"
       ],
@@ -87,6 +101,7 @@
       "id": "unobserved_output_misreported_as_success",
       "phases": [
         "permitted",
+        "authorized",
         "submitted"
       ],
       "reported_terminal": "stopped",
