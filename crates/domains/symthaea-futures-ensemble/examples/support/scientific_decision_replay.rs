@@ -265,7 +265,7 @@ pub enum OutcomeStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ActionSupport { ObservedOutcome, NoObservedOutcome }
+pub enum ActionSupport { RecordedAction, NoRecordedAction }
 
 /// Evaluator-owned record. Never serialize this into candidate-process input.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -274,8 +274,8 @@ pub struct EvaluatorResolution {
     pub execution_status: ExecutionStatus,
     pub outcome_status: OutcomeStatus,
     pub action_support: ActionSupport,
-    pub observed_action_id: Option<String>,
-    pub observed_action_payload_digest: Option<String>,
+    pub recorded_action_id: Option<String>,
+    pub recorded_action_payload_digest: Option<String>,
     pub outcome_label: Option<String>,
     pub evaluator_evidence: Vec<EvidenceReference>,
     pub finalized_at_ms: Option<u64>,
@@ -340,37 +340,37 @@ impl EvaluatorResolution {
             }
             OutcomeStatus::UnsupportedCounterfactual => {
                 if self.execution_status != ExecutionStatus::NotStarted
-                    || self.action_support != ActionSupport::NoObservedOutcome
-                    || self.observed_action_id.is_some() || self.observed_action_payload_digest.is_some() || self.outcome_label.is_some()
+                    || self.action_support != ActionSupport::NoRecordedAction
+                    || self.recorded_action_id.is_some() || self.recorded_action_payload_digest.is_some() || self.outcome_label.is_some()
                     || !self.evaluator_evidence.is_empty() {
                     return Err("unsupported counterfactual cannot carry execution or fabricated outcome".into());
                 }
             }
             OutcomeStatus::NotRun => {
-                if self.action_support != ActionSupport::NoObservedOutcome
-                    || self.observed_action_id.is_some() || self.observed_action_payload_digest.is_some() || self.outcome_label.is_some()
+                if self.action_support != ActionSupport::NoRecordedAction
+                    || self.recorded_action_id.is_some() || self.recorded_action_payload_digest.is_some() || self.outcome_label.is_some()
                     || !self.evaluator_evidence.is_empty() {
-                    return Err("not-run cannot carry observed action or outcome".into());
+                    return Err("not-run cannot carry recorded action or outcome".into());
                 }
             }
             OutcomeStatus::InvalidExecution => {
                 if self.outcome_label.is_some() { return Err("invalid execution cannot carry scientific label".into()); }
-                if self.action_support == ActionSupport::ObservedOutcome {
+                if self.action_support == ActionSupport::RecordedAction {
                     self.require_action(&p.selected_action_id, &p.selected_action_payload_digest)?;
-                } else if self.observed_action_id.is_some() || self.observed_action_payload_digest.is_some() {
-                    return Err("unobserved action cannot have an action ID or payload digest".into());
+                } else if self.recorded_action_id.is_some() || self.recorded_action_payload_digest.is_some() {
+                    return Err("unrecorded action cannot have an action ID or payload digest".into());
                 }
             }
         }
         Ok(())
     }
     fn require_action(&self, expected_id: &str, expected_payload_digest: &str) -> Result<(), String> {
-        if self.action_support != ActionSupport::ObservedOutcome { return Err("observed action support required".into()); }
-        let actual_id = self.observed_action_id.as_deref().ok_or_else(|| "observed action ID required".to_string())?;
-        let actual_payload = self.observed_action_payload_digest.as_deref()
-            .ok_or_else(|| "observed action payload digest required".to_string())?;
+        if self.action_support != ActionSupport::RecordedAction { return Err("recorded action support required".into()); }
+        let actual_id = self.recorded_action_id.as_deref().ok_or_else(|| "recorded action ID required".to_string())?;
+        let actual_payload = self.recorded_action_payload_digest.as_deref()
+            .ok_or_else(|| "recorded action payload digest required".to_string())?;
         if actual_id != expected_id || actual_payload != expected_payload_digest {
-            return Err("observed action identity/payload differs from proposal".into());
+            return Err("recorded action identity/payload differs from proposal".into());
         }
         Ok(())
     }
@@ -443,8 +443,8 @@ mod tests {
     fn resolution(c: &CandidateDecisionContext) -> EvaluatorResolution {
         EvaluatorResolution {
             episode_id: c.episode_id.clone(), execution_status: ExecutionStatus::Completed,
-            outcome_status: OutcomeStatus::DelayedObserved, action_support: ActionSupport::ObservedOutcome,
-            observed_action_id: Some("a".into()), observed_action_payload_digest: Some("sha256:payload-a".into()),
+            outcome_status: OutcomeStatus::DelayedObserved, action_support: ActionSupport::RecordedAction,
+            recorded_action_id: Some("a".into()), recorded_action_payload_digest: Some("sha256:payload-a".into()),
             outcome_label: Some("yes".into()),
             evaluator_evidence: vec![EvidenceReference {
                 evidence_id: "result".into(), content_digest: "sha256:result".into(),
@@ -504,7 +504,7 @@ mod tests {
         let c = context();
         let p = proposal(&c);
         let mut r = resolution(&c);
-        r.observed_action_payload_digest = Some("sha256:different-batch".into());
+        r.recorded_action_payload_digest = Some("sha256:different-batch".into());
         assert!(r.validate_against(&c, &p).unwrap_err().contains("identity/payload differs"));
     }
 
@@ -512,8 +512,8 @@ mod tests {
     fn rejects_fabricated_unsupported_outcome() {
         let c = context(); let p = proposal(&c); let mut r = resolution(&c);
         r.execution_status = ExecutionStatus::NotStarted; r.outcome_status = OutcomeStatus::UnsupportedCounterfactual;
-        r.action_support = ActionSupport::NoObservedOutcome; r.observed_action_id = None;
-        r.observed_action_payload_digest = None;
+        r.action_support = ActionSupport::NoRecordedAction; r.recorded_action_id = None;
+        r.recorded_action_payload_digest = None;
         r.outcome_label = Some("yes".into()); r.evaluator_evidence.clear(); r.finalized_at_ms = None;
         assert!(r.validate_against(&c, &p).unwrap_err().contains("unsupported counterfactual"));
     }
