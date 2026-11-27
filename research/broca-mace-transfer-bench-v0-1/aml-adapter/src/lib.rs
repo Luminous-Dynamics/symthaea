@@ -22,7 +22,6 @@ pub mod mace_context_exposure_capture;
 pub mod durable_service;
 pub mod redb_store;
 pub mod http_service;
-pub mod http_service;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -36,6 +35,7 @@ pub mod http_service;
 
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
@@ -53,7 +53,7 @@ pub enum Track {
     Multimodal,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Role {
     User,
     Assistant,
