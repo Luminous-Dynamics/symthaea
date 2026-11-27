@@ -130,3 +130,28 @@ Prospective targets (not achieved): zero false service-recovered results on the 
 ## 11. Claim ceiling
 
 The semantic evaluator consumes normalized evidence. It does not run backup/restore, authenticate cryptography, start PostgreSQL, measure actual application availability, validate secrets or guarantee future operation. No live pgBackRest, AWS Backup, PostgreSQL or application recovery rehearsal is claimed.
+
+
+## 12. Semantic evaluator and execution status
+
+The standard-library Go module under restore-assurance/ consumes normalized evidence and distinguishes artifact_validated, database_recovered and service_recovered. It calculates conservative RPO and database/service RTO upper bounds from a common trusted clock domain and bounded uncertainty.
+
+For database recovery it checks:
+- exact source/database/restore-target identity and separate restore control root;
+- restore isolation, egress/production-write restrictions and scoped credentials;
+- consistency/catalog checks, actual target, lineage/timeline and recovery state;
+- MON-022 surface inventory digest, scope and full required surface count;
+- explicit RPO and database RTO objectives.
+
+For service recovery it additionally checks:
+- the plan's explicit surface claim scope;
+- every required dependency and version/evidence freshness;
+- application release and invariant-suite version;
+- a required read probe, a safe write/readback probe with rollback evidence, and at least one invariant probe;
+- independent service observer identity/membership;
+- old-primary and stale endpoint fencing;
+- ordering of database readiness, fencing, traffic enablement and service acceptance.
+
+A verified dependency that is explicitly unavailable or a required application probe that fails is denied. Missing, stale or unverified evidence remains indeterminate. A lower claim never implicitly upgrades to a higher claim.
+
+Current Go source includes 48 named tests, one fuzz target and dependency-count benchmarks. No exact-head Go test, race test, vet, fuzz run or numeric benchmark is claimed for the evolving branch; a fresh GitHub checkout could not be obtained in this environment. The scenario corpus is 38 descriptive seeds / 12 positive controls, not yet a frozen independently authored executable oracle set.
