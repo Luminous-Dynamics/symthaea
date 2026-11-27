@@ -1,0 +1,23 @@
+name: REPAIR-Bench Synthetic Event Contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/research/repair-bench/**"
+      - "scripts/validate_repair_bench_fixtures.py"
+      - ".github/workflows/repair-bench-fixture-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-events:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate byte identities, graph references and event consistency
+        run: python3 scripts/validate_repair_bench_fixtures.py
