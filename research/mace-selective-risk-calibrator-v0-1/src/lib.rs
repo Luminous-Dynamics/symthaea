@@ -408,10 +408,10 @@ fn threshold_stats(rows: &[&CalibrationExampleV1], threshold: f64, loss_limit: f
     let mut unsafe_clusters=0;
     let mut coverage_sum=0.0;
     let mut loss_sum=0.0;
-    for (_id,(total,accepted,unsafe,loss,count)) in &clusters {
+    for (_id,(total,accepted,unsafe_cluster,loss,count)) in &clusters {
         if *accepted>0 {
             accepted_clusters+=1;
-            unsafe_clusters+=usize::from(*unsafe);
+            unsafe_clusters+=usize::from(*unsafe_cluster);
             accepted_examples+=accepted;
             loss_sum+=loss/ *count as f64;
         }
