@@ -24,7 +24,7 @@ Compare end-to-end recovery assurance on a matched fault schedule. Do not compar
 | Missing or conflicting expected event IDs | 0 |
 | Unknown/failed prerequisite followed by service enable | 0 |
 | Full-state inventory accounting | 100% |
-| Recovery point correctness | exact target or explicit bounded gap; never silently rounded forward |
+| Recovery point correctness | exact requested LSN on the pinned timeline; never silently move to a later timeline/position |
 | RPO measurement | report p50/p95/p99 and worst-case upper bound |
 | Database-ready RTO | p50/p95/p99 and worst case, separate from service-ready |
 | Service-ready RTO | p50/p95/p99 and worst case, separate from database-ready |
@@ -45,7 +45,7 @@ Compare end-to-end recovery assurance on a matched fault schedule. Do not compar
 
 1. **Capture correctness:** expected unique event IDs, payload digest matches, duplicates, conflicting identities, missing IDs and transaction-envelope closure.
 2. **Capture performance:** event throughput, commit-to-Kafka latency p50/p95/p99, WAL retained bytes, slot lag, Kafka bytes, CPU, memory and disk I/O.
-3. **Recovery correctness:** requested vs achieved recovery point, database identity, timeline lineage and per-surface source/target digest comparison.
+3. **Recovery correctness:** requested vs achieved recovery LSN/timeline, database identity, timeline lineage and per-surface source/target digest comparison.
 4. **RPO:** incident upper time minus recovery-point lower time, with clock uncertainty.
 5. **RTO:** database-ready and service-ready measured independently, using bounded common clock domain.
 6. **Safety:** false-qualified, false-blocked and indeterminate outcomes; detection latency for each fault.
