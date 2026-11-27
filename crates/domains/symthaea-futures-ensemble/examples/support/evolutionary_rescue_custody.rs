@@ -14,8 +14,7 @@
 use serde::{Deserialize, Serialize};
 use symthaea_futures_symtropy::evolutionary_rescue::EvolutionaryRescueObservation;
 
-#[path = "evolutionary_rescue_common.rs"]
-mod common;
+use crate::common;
 
 pub const CAPSULE_SCHEMA_VERSION: u16 = 1;
 
@@ -194,10 +193,13 @@ pub fn verify_encoded_capsules(
         .map_err(|e| format!("decode candidate receipt: {e}"))?;
     let manifest: WorldCustodyManifest = serde_json::from_slice(&set.evaluator_manifest_json)
         .map_err(|e| format!("decode evaluator manifest: {e}"))?;
-    if receipt.candidate_capsule_blake3 != candidate_actual
+    if receipt.schema_version != CAPSULE_SCHEMA_VERSION
+        || manifest.schema_version != CAPSULE_SCHEMA_VERSION
+        || receipt.candidate_capsule_blake3 != candidate_actual
         || manifest.candidate_capsule_blake3 != candidate_actual
         || manifest.evaluator_capsule_blake3 != evaluator_actual
         || receipt.world_id != manifest.world_id
+        || receipt.observation_policy_id != manifest.observation_policy_id
     {
         return Err("capsule receipt/manifest linkage mismatch".into());
     }
@@ -346,8 +348,9 @@ mod tests {
         assert!(!receipt.contains("evaluator_capsule_blake3"));
         assert!(!receipt.contains("\"seed\""));
         let manifest = String::from_utf8(encoded.evaluator_manifest_json).unwrap();
-        assert!(manifest.contains("\"seed\":66") == false); // seed is evaluator-only; fixture seed is 11.
-        assert!(manifest.contains("\"seed\":11"));
+        let parsed_manifest: WorldCustodyManifest = serde_json::from_str(&manifest).unwrap();
+        assert_eq!(parsed_manifest.seed, 11);
+        assert_eq!(parsed_manifest.split, WorldSplit::HeldOut);
     }
 
     #[test]
