@@ -56,7 +56,8 @@ impl EvidencePairConstraintV1 {
                 EvidencePairReasonV1::DuplicateClaim => 7,
             },
         ]);
-        hex(h.finalize().as_slice())
+        let digest = h.finalize();
+    hex(&digest)
     }
     pub fn verify_integrity(&self) -> bool { self.canonical_sha256 == self.digest_without_commitment() }
     pub fn seal_integrity(&mut self) { self.canonical_sha256 = self.digest_without_commitment(); }
@@ -156,7 +157,8 @@ impl EvidenceSetSelectionReceiptV1 {
         h.update(self.total_token_cost.to_be_bytes());
         h.update(self.total_relevance_score_micros.to_be_bytes());
         h.update(self.max_token_cost.to_be_bytes());
-        hex(h.finalize().as_slice())
+        let digest = h.finalize();
+    hex(&digest)
     }
     pub fn verify_integrity(&self) -> bool { self.canonical_sha256 == self.digest_without_commitment() }
 }
@@ -193,7 +195,8 @@ impl EvidenceSetObstructionCertificateV1 {
         h.update([obstruction_code(self.reason)]);
         put_vec(&mut h, &self.blocking_evidence_ids);
         put_vec(&mut h, &self.blocking_constraint_ids);
-        hex(h.finalize().as_slice())
+        let digest = h.finalize();
+    hex(&digest)
     }
     pub fn verify_integrity(&self) -> bool { self.canonical_sha256 == self.digest_without_commitment() }
 }
@@ -221,11 +224,12 @@ fn context_digest(c: &EvidenceSetContextV1) -> String {
     put_text(&mut h, &c.constraint_policy_sha256); put_text(&mut h, &c.selection_policy_sha256);
     h.update([u8::from(c.require_complete_dependency_lineage)]);
     h.update(c.max_token_cost.to_be_bytes()); h.update((c.max_items as u64).to_be_bytes()); h.update((c.min_items as u64).to_be_bytes());
-    hex(h.finalize().as_slice())
+    let digest = h.finalize();
+    hex(&digest)
 }
 fn candidate_digest(candidates: &[EvidenceSetCandidateV1<'_>]) -> String {
     let mut values: Vec<_> = candidates.iter().collect();
-    values.sort_by(|a,b| a.evidence_id.cmp(b.evidence_id));
+    values.sort_by_key(|value| value.evidence_id);
     let mut h = Sha256::new(); h.update(b"luminous:mace:evidence-set-candidates:v1\0");
     h.update((values.len() as u64).to_be_bytes());
     for c in values {
@@ -235,15 +239,17 @@ fn candidate_digest(candidates: &[EvidenceSetCandidateV1<'_>]) -> String {
         h.update([u8::from(c.required)]); h.update(c.receipt.event_id.to_be_bytes());
         put_text(&mut h,&c.receipt.canonical_sha256);
     }
-    hex(h.finalize().as_slice())
+    let digest = h.finalize();
+    hex(&digest)
 }
 fn constraint_digest(constraints: &[EvidencePairConstraintV1]) -> String {
     let mut values: Vec<_> = constraints.iter().collect();
-    values.sort_by(|a,b| a.constraint_id.cmp(&b.constraint_id));
+    values.sort_by_key(|value| value.constraint_id.as_str());
     let mut h=Sha256::new(); h.update(b"luminous:mace:evidence-set-constraints:v1\0");
     h.update((values.len() as u64).to_be_bytes());
     for c in values { put_text(&mut h,&c.constraint_id); put_text(&mut h,&c.canonical_sha256); }
-    hex(h.finalize().as_slice())
+    let digest = h.finalize();
+    hex(&digest)
 }
 fn exclusion_code(v: CandidateExclusionReasonV1) -> u8 {
     match v {
@@ -457,7 +463,7 @@ pub fn select_evidence_set_v1(
     let selected_use_receipt_sha256:Vec<String>=selected_ids.iter().map(|id|{
         candidates[indices[id.as_str()]].receipt.canonical_sha256.clone()
     }).collect();
-    excluded.sort_by(|a,b|a.evidence_id.cmp(&b.evidence_id));
+    excluded.sort_by_key(|value| value.evidence_id.as_str());
     let mut selection=EvidenceSetSelectionReceiptV1{
         schema_version:EVIDENCE_SET_SCHEMA_V1.into(),context_sha256:ctx,candidate_set_sha256:cand,
         constraint_set_sha256:cons,constraint_policy_sha256:context.constraint_policy_sha256.clone(),
