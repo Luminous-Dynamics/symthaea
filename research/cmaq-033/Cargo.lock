@@ -1,0 +1,12 @@
+version = 4
+
+[[package]]
+name = "cmaq-031-anytime-calibration-monitor"
+version = "0.1.0"
+
+[[package]]
+name = "cmaq-033-prm-ons-monitor"
+version = "0.1.0"
+dependencies = [
+ "cmaq-031-anytime-calibration-monitor",
+]
