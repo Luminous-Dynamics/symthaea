@@ -21,6 +21,10 @@ use super::types::{
     AcquisitionOutcome, AcquisitionReceipt, AcquisitionStage, EpistemicStatus, ResearchSource,
     ResearchStatus, VerifiedClaim, WebResearchConfig, WebResearchReport, WebResearchResult,
 };
+use super::ssrf::{
+    GuardedDnsResolver, is_dns_policy_rejection, is_dns_policy_rejection_anyhow,
+    is_url_policy_rejection_anyhow, validate_request_url,
+};
 use super::verifier::{EpistemicVerifier, SourceEvidence, VerificationContext};
 
 const EXTRACTOR_VERSION: &str = "web-research-content-extractor-v1";
@@ -79,6 +83,9 @@ impl WebResearcher {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_millis(config.request_timeout_ms))
             .user_agent(&config.user_agent)
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
+            .dns_resolver(GuardedDnsResolver::system())
             .build()
             .context("Failed to create HTTP client")?;
 
@@ -524,21 +531,36 @@ impl WebResearcher {
                 }
                 Err(error) => {
                     let http_status = http_status_from_error(&error);
+                    let url_rejected = is_url_policy_rejection_anyhow(&error);
+                    let dns_rejected = is_dns_policy_rejection_anyhow(&error);
+                    let outcome = if http_status == Some(429) {
+                        AcquisitionOutcome::RateLimited
+                    } else if url_rejected {
+                        AcquisitionOutcome::UrlPolicyRejected
+                    } else if dns_rejected {
+                        AcquisitionOutcome::DnsPolicyRejected
+                    } else {
+                        AcquisitionOutcome::ProviderFailed
+                    };
                     let mut receipt = make_receipt(
                         query_rank,
                         None,
                         AcquisitionStage::SearchProvider,
                         query,
-                        if http_status == Some(429) {
-                            AcquisitionOutcome::RateLimited
-                        } else {
-                            AcquisitionOutcome::ProviderFailed
-                        },
+                        outcome,
                     );
                     receipt.provider = Some(provider.to_string());
                     receipt.requested_url = requested_url;
                     receipt.http_status = http_status;
-                    receipt.reason_code = Some("SEARCH_PROVIDER_FAILED".to_string());
+                    receipt.reason_code = Some(if url_rejected {
+                        "URL_POLICY_REJECTED".to_string()
+                    } else if dns_rejected {
+                        "DNS_POLICY_REJECTED".to_string()
+                    } else if http_status == Some(429) {
+                        "SEARCH_RATE_LIMITED".to_string()
+                    } else {
+                        "SEARCH_PROVIDER_FAILED".to_string()
+                    });
                     receipt.reason = Some(format!("{error:#}"));
                     receipt.elapsed_ms = elapsed_ms(started);
                     receipts.push(receipt);
@@ -728,11 +750,26 @@ impl WebResearcher {
             urls.extend(seeded_urls);
         }
 
-        // DuckDuckGo HTML fallback.
+        // DuckDuckGo HTML fallback. Fixed provider URLs still pass the common URL gate.
         let ddg_url = format!("https://html.duckduckgo.com/html/?q={}", encoded_query);
-        let started = Instant::now();
-        match self.client.get(&ddg_url).send().await {
+        if let Err(error) = validate_request_url(&ddg_url) {
+            let mut receipt = make_receipt(
+                query_rank,
+                None,
+                AcquisitionStage::DuckDuckGo,
+                query,
+                AcquisitionOutcome::UrlPolicyRejected,
+            );
+            receipt.provider = Some("duckduckgo-html".to_string());
+            receipt.requested_url = Some(ddg_url);
+            receipt.reason_code = Some("URL_POLICY_REJECTED".to_string());
+            receipt.reason = Some(error.to_string());
+            receipts.push(receipt);
+        } else {
+            let started = Instant::now();
+            match self.client.get(&ddg_url).send().await {
             Err(error) => {
+                let dns_rejected = is_dns_policy_rejection(&error);
                 let mut receipt = make_receipt(
                     query_rank,
                     None,
@@ -740,6 +777,8 @@ impl WebResearcher {
                     query,
                     if error.is_timeout() {
                         AcquisitionOutcome::Timeout
+                    } else if dns_rejected {
+                        AcquisitionOutcome::DnsPolicyRejected
                     } else {
                         AcquisitionOutcome::ProviderFailed
                     },
@@ -748,6 +787,8 @@ impl WebResearcher {
                 receipt.requested_url = Some(ddg_url);
                 receipt.reason_code = Some(if error.is_timeout() {
                     "SEARCH_TIMEOUT".to_string()
+                } else if dns_rejected {
+                    "DNS_POLICY_REJECTED".to_string()
                 } else {
                     "SEARCH_REQUEST_FAILED".to_string()
                 });
@@ -915,6 +956,8 @@ impl WebResearcher {
             }
         }
 
+        }
+
         // Preserve duplicate offers here so the global planner can emit one
         // DuplicateSuppressed receipt for each repeated URL in deterministic
         // query/provider order.
@@ -983,6 +1026,7 @@ impl WebResearcher {
             .search_endpoint
             .as_deref()
             .unwrap_or("https://google.serper.dev/search");
+        validate_request_url(endpoint)?;
 
         let body = serde_json::json!({
             "q": query,
@@ -1017,6 +1061,7 @@ impl WebResearcher {
             .as_deref()
             .unwrap_or("https://api.search.brave.com/res/v1/web/search");
         let url = format!("{endpoint}?q={}", urlencoding::encode(query));
+        validate_request_url(&url)?;
 
         let response = self
             .client
@@ -1046,6 +1091,7 @@ impl WebResearcher {
             endpoint,
             urlencoding::encode(query)
         );
+        validate_request_url(&url)?;
 
         let response = self
             .client
@@ -1085,6 +1131,7 @@ impl WebResearcher {
             "{}?search_query={}&id_list=&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
             self.config.arxiv_endpoint, encoded_query
         );
+        validate_request_url(&url)?;
 
         let response = self
             .client
@@ -1103,6 +1150,7 @@ impl WebResearcher {
         let endpoint = self.config.openreview_endpoint.trim_end_matches('/');
         let encoded_query = urlencoding::encode(query);
         let url = format!("{endpoint}?term={encoded_query}");
+        validate_request_url(&url)?;
 
         let mut request = self.client.get(url).header("Accept", "application/json")
             .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
@@ -1127,12 +1175,33 @@ impl WebResearcher {
     /// Fetch, capture and extract a page while preserving a complete attempt receipt.
     async fn fetch_and_extract_with_receipt(&self, candidate: PageCandidate) -> PageAcquisition {
         let started = Instant::now();
+        if let Err(error) = validate_request_url(&candidate.url) {
+            let mut receipt = make_receipt(
+                candidate.query_rank,
+                Some(candidate.source_rank),
+                AcquisitionStage::PageFetch,
+                &candidate.query,
+                AcquisitionOutcome::UrlPolicyRejected,
+            );
+            receipt.requested_url = Some(candidate.url.clone());
+            receipt.reason_code = Some("URL_POLICY_REJECTED".to_string());
+            receipt.reason = Some(error.to_string());
+            receipt.elapsed_ms = elapsed_ms(started);
+            return PageAcquisition {
+                candidate,
+                receipt,
+                extraction: None,
+            };
+        }
         let response = self.client.get(&candidate.url).send().await;
         let mut response = match response {
             Ok(response) => response,
             Err(error) => {
+                let dns_rejected = is_dns_policy_rejection(&error);
                 let outcome = if error.is_timeout() {
                     AcquisitionOutcome::Timeout
+                } else if dns_rejected {
+                    AcquisitionOutcome::DnsPolicyRejected
                 } else {
                     AcquisitionOutcome::ReadFailed
                 };
@@ -1146,6 +1215,8 @@ impl WebResearcher {
                 receipt.requested_url = Some(candidate.url.clone());
                 receipt.reason_code = Some(if error.is_timeout() {
                     "PAGE_FETCH_TIMEOUT".to_string()
+                } else if dns_rejected {
+                    "DNS_POLICY_REJECTED".to_string()
                 } else {
                     "PAGE_FETCH_REQUEST_FAILED".to_string()
                 });
