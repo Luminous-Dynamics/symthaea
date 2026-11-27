@@ -215,7 +215,7 @@ fn run_regime_experiment(
                         marginal,
                     ));
                 }
-                test_score = independent_block_score(&mut master, test_rho, block_len);
+                test_score = independent_block_score(&mut master, test_rho, block_len, marginal);
             }
             SamplingDesign::OneSerialPath => {
                 let mut stream = Ar1Stream::new(master.next_u64(), marginal);
@@ -223,7 +223,7 @@ fn run_regime_experiment(
                     calibration.push(stream.block_maximum(calibration_rho, block_len, embargo_gap));
                 }
                 // The regime changes only after the calibration prefix and
-                // declared embargo. Every one-step marginal remains N(0,1).
+                // declared embargo. Every one-step marginal remains fixed within the selected family.
                 test_score = stream.block_maximum(test_rho, block_len, 0);
             }
         }
@@ -323,7 +323,7 @@ fn print_report(report: &RegimeReport) {
 #[cfg(not(test))]
 fn main() {
     println!(
-        "design,calibration_rho,test_rho,block_len,embargo_gap,calibration_blocks,trials,seed,alarms,nominal_alpha,empirical_alarm_rate,wilson95_alarm_lower,wilson95_alarm_upper"
+        "marginal,design,calibration_rho,test_rho,block_len,embargo_gap,calibration_blocks,trials,seed,alarms,nominal_alpha,empirical_alarm_rate,wilson95_alarm_lower,wilson95_alarm_upper,empirical_coverage"
     );
     for report in run_suite(TRIALS) {
         print_report(&report);
@@ -353,6 +353,7 @@ mod tests {
     fn unchanged_marginals_can_produce_large_block_max_distribution_shift() {
         let forward = run_regime_experiment(
             SamplingDesign::IndependentBlocks,
+            MarginalFamily::Gaussian,
             0.05,
             0.95,
             32,
@@ -435,7 +436,8 @@ mod tests {
         let reports = run_suite(20);
         assert_eq!(
             reports.len(),
-            CALIBRATION_RHO_GRID.len()
+            2
+                * CALIBRATION_RHO_GRID.len()
                 * TEST_RHO_GRID.len()
                 * BLOCK_LENGTH_GRID.len()
                 * (1 + SERIAL_EMBARGO_GRID.len())
