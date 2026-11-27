@@ -58,6 +58,7 @@ pub struct ClusterBlockScore {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CalibrationManifest {
+    pub calibration_manifest_sha256: String,
     /// Cluster IDs used to fit model parameters.
     pub training_cluster_ids: Vec<String>,
     /// Cluster IDs used to choose/freeze any residual scale or normalization.
@@ -72,6 +73,7 @@ pub struct CalibrationManifest {
 pub struct QualifiedTrajectoryEnvelope {
     /// Sent to runtime only after the evidence-ingestion boundary authenticates the manifest.
     pub contract: CalibrationContract,
+    pub calibration_manifest_sha256: String,
     pub radius_units: u64,
     pub quantile_rank_one_based: usize,
     pub calibration_cluster_count: usize,
@@ -107,6 +109,7 @@ pub struct CandidateTrajectoryForecast {
 pub struct AppliedTrajectoryEnvelope {
     pub candidate_view_sha256: String,
     pub predicted_trajectory_sha256: String,
+    pub calibration_manifest_sha256: String,
     pub radius_units: u64,
     pub horizon_steps: u32,
     pub state_dimension: u32,
@@ -119,6 +122,7 @@ pub struct AppliedTrajectoryEnvelope {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CalibrationError {
     EmptyIdentity(&'static str),
+    EmptySplit(&'static str),
     InvalidSha256(&'static str),
     InvalidMiscoverage,
     InvalidBlockSpec(&'static str),
@@ -139,6 +143,9 @@ pub fn calibrate_cluster_trajectory_envelope(
     manifest: &CalibrationManifest,
 ) -> Result<CalibrationResult, CalibrationError> {
     validate_contract(&contract)?;
+    if !is_sha256_hex(&manifest.calibration_manifest_sha256) {
+        return Err(CalibrationError::InvalidSha256("calibration_manifest_sha256"));
+    }
     validate_split_manifest(manifest)?;
 
     if manifest.calibration_units.is_empty() {
@@ -201,6 +208,7 @@ pub fn calibrate_cluster_trajectory_envelope(
     Ok(CalibrationResult {
         envelope: QualifiedTrajectoryEnvelope {
             contract,
+            calibration_manifest_sha256: manifest.calibration_manifest_sha256.clone(),
             radius_units,
             quantile_rank_one_based: rank,
             calibration_cluster_count: scores.len(),
@@ -243,6 +251,7 @@ pub fn apply_trajectory_envelope(
     Ok(AppliedTrajectoryEnvelope {
         candidate_view_sha256: forecast.candidate_view_sha256.clone(),
         predicted_trajectory_sha256: forecast.predicted_trajectory_sha256.clone(),
+        calibration_manifest_sha256: calibration.calibration_manifest_sha256.clone(),
         radius_units: calibration.radius_units,
         horizon_steps: calibration.contract.block.horizon_steps,
         state_dimension: calibration.contract.block.state_dimension,
@@ -326,6 +335,15 @@ fn validate_contract(contract: &CalibrationContract) -> Result<(), CalibrationEr
 }
 
 fn validate_split_manifest(manifest: &CalibrationManifest) -> Result<(), CalibrationError> {
+    if manifest.training_cluster_ids.is_empty() {
+        return Err(CalibrationError::EmptySplit("training_cluster_ids"));
+    }
+    if manifest.scale_validation_cluster_ids.is_empty() {
+        return Err(CalibrationError::EmptySplit("scale_validation_cluster_ids"));
+    }
+    if manifest.held_out_evaluation_cluster_ids.is_empty() {
+        return Err(CalibrationError::EmptySplit("held_out_evaluation_cluster_ids"));
+    }
     let mut seen = HashSet::new();
     for id in &manifest.training_cluster_ids {
         insert_split_id(id, &mut seen)?;
@@ -448,6 +466,7 @@ mod tests {
 
     fn manifest(count: usize) -> CalibrationManifest {
         CalibrationManifest {
+            calibration_manifest_sha256: digest('7'),
             training_cluster_ids: vec!["training-cluster-1".into()],
             scale_validation_cluster_ids: vec!["validation-cluster-1".into()],
             held_out_evaluation_cluster_ids: vec!["evaluation-cluster-1".into()],
@@ -622,6 +641,7 @@ mod tests {
         assert_eq!(tube.action_query_cell_count, 3);
         assert_eq!(tube.candidate_view_sha256, digest('9'));
         assert_eq!(tube.predicted_trajectory_sha256, digest('8'));
+        assert_eq!(tube.calibration_manifest_sha256, digest('7'));
         assert_eq!(tube.nominal_coverage_numerator, 19);
         assert_eq!(tube.nominal_coverage_denominator, 20);
     }
