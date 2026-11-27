@@ -1,6 +1,6 @@
 # MON-036 — Recovery Evidence Continuity Contract v1
 
-**Profile:** \`mon036-recovery-evidence-continuity-input-v1\`  
+**Profile:** `mon036-recovery-evidence-continuity-input-v1`  
 **Status:** offline event-ledger verifier and selective claim-disposition evaluator implemented; signed change-feed adapters pending.
 
 ## Research question
@@ -25,10 +25,10 @@ Current dependency states are supplied separately. For every dependency supporti
 
 | Disposition | Rule | Consequential use |
 |---|---|---|
-| \`retain\` | No post-watermark event affects a support dependency; dependencies match current state; ledger is complete and fresh | Existing claim may remain usable within its original scope and expiry |
-| \`revalidate\` | A supported dependency/verifier changed, or claim evidence expired, and history coherently explains the state | Do not use old claim as current; perform a fresh check and issue new evidence lineage |
-| \`invalidate\` | Authority revoked, scope changed, contradiction recorded, event chain/digest malformed, impossible predecessor or ambiguous duplicate claim identity | Withdraw from current use; a new claim is required |
-| \`unresolved\` | Missing/incomplete ledger, missing state, unknown-impact event, untracked drift, watermark gap, expired ledger or incomplete support closure | Abstain and reconcile before any mutation or new claim |
+| `retain` | No post-watermark event affects a support dependency; dependencies match current state; ledger is complete and fresh | Existing claim may remain usable within its original scope and expiry |
+| `revalidate` | A supported dependency/verifier changed, or claim evidence expired, and history coherently explains the state | Do not use old claim as current; perform a fresh check and issue new evidence lineage |
+| `invalidate` | Authority revoked, scope changed, contradiction recorded, event chain/digest malformed, impossible predecessor or ambiguous duplicate claim identity | Withdraw from current use; a new claim is required |
+| `unresolved` | Missing/incomplete ledger, missing state, unknown-impact event, untracked drift, watermark gap, expired ledger or incomplete support closure | Abstain and reconcile before any mutation or new claim |
 
 Precedence: invalidate, then unresolved, then revalidate, then retain.
 
@@ -36,21 +36,21 @@ A dependency change does not invalidate every claim. Only claims whose support c
 
 ## Event semantics
 
-- \`dependency_changed\`: configuration/runtime identity changed; matching claims require revalidation.
-- \`verification_changed\`: verifier/evaluator/method revision changed; claims depending on that method require revalidation.
-- \`authority_revoked\`: targeted authority is revoked; supporting claims are invalidated.
-- \`scope_changed\`: scope of a premise changed; affected claims are invalidated.
-- \`contradiction\`: material contradiction is recorded; affected claims are invalidated.
-- \`unknown_change\`: impact is unknown for the targeted dependency or globally when no dependency is named; affected claims are unresolved.
+- `dependency_changed`: configuration/runtime identity changed; matching claims require revalidation.
+- `verification_changed`: verifier/evaluator/method revision changed; claims depending on that method require revalidation.
+- `authority_revoked`: targeted authority is revoked; supporting claims are invalidated.
+- `scope_changed`: scope of a premise changed; affected claims are invalidated.
+- `contradiction`: material contradiction is recorded; affected claims are invalidated.
+- `unknown_change`: impact is unknown for the targeted dependency or globally when no dependency is named; affected claims are unresolved.
 
-Events after the claim's \`observed_through_sequence\` are considered. A nonzero watermark must identify the exact event digest and that event must strictly precede the claim observation time. Sequence zero requires an empty digest.
+Events after the claim's `observed_through_sequence` are considered. A nonzero watermark must identify the exact event digest and that event must strictly precede the claim observation time. Sequence zero requires an empty digest.
 
 ## Integrity and freshness
 
 - V1 requires full event history from sequence 1; no checkpoint/truncation or suffix-only input is accepted.
 - Sequences are contiguous and strictly increasing.
-- Each \`previous_digest\` matches the prior event; each event digest is recalculated over the v1 payload with UTC RFC3339Nano time.
-- \`through_sequence\` and \`head_digest\` match the final event (or sequence 0 / empty digest for genesis).
+- Each `previous_digest` matches the prior event; each event digest is recalculated over the v1 payload with UTC RFC3339Nano time.
+- `through_sequence` and `head_digest` match the final event (or sequence 0 / empty digest for genesis).
 - Event IDs are unique. Events cannot be future-dated or occur after declared ledger capture.
 - Claim watermark matches its exact event. Ledger capture cannot predate claim observation.
 - Ledger snapshot must still be current at evaluation time.
@@ -67,13 +67,13 @@ The evaluator indexes events by dependency, so unrelated event history is not re
 
 ## CLI
 
-\`\`\`sh
+```sh
 cd benchmarks/frontend/monitoring/sfeb-mon036/continuity
 go run ./cmd/qualify --input INPUT-example.json
 bash CHECKS.sh
-\`\`\`
+```
 
-The CLI prints a structured result and exits 0 when the input is syntactically evaluated. Exit 0 does not mean every claim is retained or that recovery is qualified. Invalid JSON exits 65; missing \`--input\` exits 64.
+The CLI prints a structured result and exits 0 when the input is syntactically evaluated. Exit 0 does not mean every claim is retained or that recovery is qualified. Invalid JSON exits 65; missing `--input` exits 64.
 
 ## Adversarial controls
 
@@ -81,4 +81,4 @@ Tests cover unrelated changes, dependency/verifier updates, revocation, scope ch
 
 ## Limits
 
-No live PostgreSQL, Debezium, Kafka, pgBackRest, cloud control-plane or signer feed is connected. This package does not perform revalidation; it determines whether old evidence may be reused unchanged. The hash chain is not a signature, transparency log or proof of feed completeness. V1 requires full ledger history from genesis; trusted checkpoint anchoring is future work. The evaluator cannot prove that a support closure or dependency inventory is complete. No production recovery claim follows from \`retain\` alone; MON-024, MON-026 and domain verifiers remain required.
+No live PostgreSQL, Debezium, Kafka, pgBackRest, cloud control-plane or signer feed is connected. This package does not perform revalidation; it determines whether old evidence may be reused unchanged. The hash chain is not a signature, transparency log or proof of feed completeness. V1 requires full ledger history from genesis; trusted checkpoint anchoring is future work. The evaluator cannot prove that a support closure or dependency inventory is complete. No production recovery claim follows from `retain` alone; MON-024, MON-026 and domain verifiers remain required.
