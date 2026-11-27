@@ -1218,22 +1218,28 @@ mod tests {
     #[test]
     fn sample_must_match_the_committed_randomization_replay() {
         let mut input = make_input();
-        input.audited_clusters.swap(0, 1);
-        let selected = input.audited_clusters[0].cluster_id.clone();
-        let other = input.audited_clusters[1].cluster_id.clone();
-        input.audited_clusters[0].cluster_id = other;
-        input.audited_clusters[1].cluster_id = selected;
-        for record in &mut input.audited_clusters {
-            let frame_cluster = input
-                .frame
-                .clusters
-                .iter()
-                .find(|cluster| cluster.cluster_id == record.cluster_id)
-                .unwrap();
-            record.stratum_id = frame_cluster.stratum_id.clone();
-            record.cluster_audit_receipt_sha256 =
-                seal_cluster_audit_record_v1(record).unwrap();
-        }
+        let selected_small: BTreeSet<String> = input
+            .audited_clusters
+            .iter()
+            .filter(|record| record.stratum_id == "small")
+            .map(|record| record.cluster_id.clone())
+            .collect();
+        let replacement = input
+            .frame
+            .clusters
+            .iter()
+            .find(|cluster| {
+                cluster.stratum_id == "small" && !selected_small.contains(&cluster.cluster_id)
+            })
+            .unwrap()
+            .clone();
+        let replacement_record = make_record(&replacement, &vec![0.5; replacement.units.len()]);
+        let index = input
+            .audited_clusters
+            .iter()
+            .position(|record| record.stratum_id == "small")
+            .unwrap();
+        input.audited_clusters[index] = replacement_record;
         assert!(evaluate_cluster_audit_v1(&input).is_err());
     }
 
