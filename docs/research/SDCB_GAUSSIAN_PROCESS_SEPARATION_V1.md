@@ -282,3 +282,21 @@ The standards lane must pin the edition and the procedure actually executed.
 - PD CEN/TS 17660-2:2024 is listed as current for particulate-matter sensor performance. Its scope is individual low-cost sensor systems at fixed sites; it does not guarantee performance at other locations, different meteorological regimes, or long-term stability without ongoing quality-control strategies. It explicitly does not apply to sensor systems as part of a network, although it includes informative material on network nodes. See https://knowledge.bsigroup.com/products/air-quality-performance-evaluation-of-air-quality-sensor-systems-particulate-matter-in-ambient-air.
 
 **Architecture consequence:** SDCB should preserve a distinct device-conformance lane and a distinct network-decision-assurance lane. The first follows the licensed, version-pinned standard procedure. The second evaluates cross-device covariance, shared references/common causes, site/time transfer, calibration lineage, drift and terminal decision loss. Passing one lane does not imply passing the other. A standards edition being listed or tracked is not evidence that SDCB conforms to it; no conformance test is claimed here.
+
+
+## 13. Fixed-budget sampling-interval sensitivity
+
+The fixture now includes a second design comparison with a fixed 32 samples and readout-noise variance 0.1, while the sample interval varies. A 60-digit reference gives:
+
+| Sample interval | Observation horizon | KL(A || B) |
+|---:|---:|---:|
+| 0.1 | 3.1 | 0.000159870651 |
+| 0.25 | 7.75 | 0.000237458040 |
+| 0.5 | 15.5 | 0.000256833653 |
+| 1.0 | 31.0 | 0.000098327854 |
+| 2.0 | 62.0 | 0.000015743738 |
+| 4.0 | 124.0 | 0.000001879240 |
+
+The 0.5 interval has the largest KL among these six candidates in either direction. This illustrates a nontrivial co-design trade-off: samples that are too dense spend the fixed sample budget over too short an observation horizon, while samples that are too sparse miss the response dynamics. The result is only a finite-grid known answer—not a continuous optimum or a universal sampling rule.
+
+A real design tournament must preserve the entire resource vector. At a minimum, compare sample count, elapsed horizon, reference-instrument time, energy and compute. A design with greater KL but longer delay or greater lifecycle cost is not automatically preferable. The exact policy/decision value still belongs to #13567, and a learned design policy must be compared at equal feasible budgets.
