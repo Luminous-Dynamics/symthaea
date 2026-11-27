@@ -5,7 +5,12 @@ command -v go >/dev/null 2>&1 || { echo "go is required" >&2; exit 69; }
 command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 69; }
 jq -e '.profile == "mon036-recovery-evidence-continuity-input-v1" and .ledger.complete == true and (.claims|length)==2 and (.ledger.events|length)==1' "$ROOT/INPUT-example.json" >/dev/null
 jq -e '.properties.claims.maxItems == 10000 and .properties.current_states.maxItems == 250000 and .properties.ledger.maxItems == null' "$ROOT/INPUT-v1.schema.json" >/dev/null
-cd "$ROOT"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+cp "$ROOT"/go.mod "$ROOT"/*.go "$TMP"/
+cp -R "$ROOT"/cmd "$TMP"/
+cp "$ROOT/INPUT-example.json" "$ROOT/INPUT-v1.schema.json" "$TMP"/
+cd "$TMP"
 gofmt -w ./*.go ./cmd/qualify/*.go
 go vet ./...
 go test ./...

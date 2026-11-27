@@ -7,7 +7,12 @@ command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 69; }
 jq -e '.profile == "mon035-observer-independence-input-v1" and (.observers|length)==2 and (.nodes|length)>0' "$ROOT/INPUT-example.json" >/dev/null
 jq -e '.properties.observers.maxItems == 2 and (.properties.nodes.maxItems <= 50000)' "$ROOT/INPUT-v1.schema.json" >/dev/null
 
-cd "$ROOT"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+cp "$ROOT"/go.mod "$ROOT"/*.go "$TMP"/
+cp -R "$ROOT"/cmd "$TMP"/
+cp "$ROOT/INPUT-example.json" "$ROOT/INPUT-v1.schema.json" "$TMP"/
+cd "$TMP"
 gofmt -w ./*.go ./cmd/qualify/*.go
 
 go vet ./...

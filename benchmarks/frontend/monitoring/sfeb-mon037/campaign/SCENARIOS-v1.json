@@ -1,0 +1,196 @@
+{
+  "profile": "mon037-unified-recovery-scenarios-v1",
+  "version": "1.0.0",
+  "classification": "public_synthetic_development_corpus",
+  "scenarios": [
+    {
+      "id": "MON037-P001",
+      "classification": "positive_control",
+      "name": "clean_multi_topic_pitr",
+      "expected_component_outcome": "qualified",
+      "mutation": "Exact SQL truth, CDC event set and transaction closure"
+    },
+    {
+      "id": "MON037-P002",
+      "classification": "positive_control",
+      "name": "exact_replay_with_dedupe_proof",
+      "expected_component_outcome": "qualified",
+      "mutation": "Exact replay with independent idempotency proof"
+    },
+    {
+      "id": "MON037-P003",
+      "classification": "positive_control",
+      "name": "row_stream_explicit_scope",
+      "expected_component_outcome": "qualified",
+      "mutation": "Row-stream claim with explicit digest-bound exclusions"
+    },
+    {
+      "id": "MON037-N001",
+      "classification": "negative_control",
+      "name": "missing_acknowledged_event",
+      "expected_component_outcome": "blocked",
+      "mutation": "Remove one acknowledged event from observed topics"
+    },
+    {
+      "id": "MON037-N002",
+      "classification": "negative_control",
+      "name": "conflicting_event_identity_reuse",
+      "expected_component_outcome": "blocked",
+      "mutation": "Reuse an event ID with changed payload"
+    },
+    {
+      "id": "MON037-N003",
+      "classification": "negative_control",
+      "name": "exact_replay_without_dedupe_proof",
+      "expected_component_outcome": "indeterminate",
+      "mutation": "Exact duplicate has no consumer deduplication proof"
+    },
+    {
+      "id": "MON037-N004",
+      "classification": "negative_control",
+      "name": "transaction_end_event_count_mismatch",
+      "expected_component_outcome": "blocked",
+      "mutation": "END.event_count differs from member count"
+    },
+    {
+      "id": "MON037-N005",
+      "classification": "negative_control",
+      "name": "timeline_sibling_branch",
+      "expected_component_outcome": "blocked",
+      "mutation": "Target timeline is not in backup ancestry"
+    },
+    {
+      "id": "MON037-N006",
+      "classification": "negative_control",
+      "name": "shared_identity_provider",
+      "expected_component_outcome": "blocked",
+      "mutation": "Both observers share an identity provider"
+    },
+    {
+      "id": "MON037-N007",
+      "classification": "negative_control",
+      "name": "observer_inventory_incomplete",
+      "expected_component_outcome": "indeterminate",
+      "mutation": "One observer lacks a critical dependency class"
+    },
+    {
+      "id": "MON037-N008",
+      "classification": "negative_control",
+      "name": "connector_config_changed",
+      "expected_component_outcome": "indeterminate",
+      "mutation": "MON-036 disposition requires revalidation"
+    },
+    {
+      "id": "MON037-N009",
+      "classification": "negative_control",
+      "name": "signer_authority_revoked",
+      "expected_component_outcome": "blocked",
+      "mutation": "MON-036 invalidates evidence after revocation"
+    },
+    {
+      "id": "MON037-N010",
+      "classification": "negative_control",
+      "name": "event_ledger_gap",
+      "expected_component_outcome": "indeterminate",
+      "mutation": "Evidence continuity ledger has a sequence gap"
+    },
+    {
+      "id": "MON037-N011",
+      "classification": "negative_control",
+      "name": "offset_boundary_not_observed",
+      "expected_component_outcome": "indeterminate",
+      "mutation": "Exact MON-033 target was not reached"
+    },
+    {
+      "id": "MON037-N012",
+      "classification": "negative_control",
+      "name": "offset_proof_digest_invalid",
+      "expected_component_outcome": "blocked",
+      "mutation": "Raw offsets digest is invalid"
+    },
+    {
+      "id": "MON037-N013",
+      "classification": "negative_control",
+      "name": "surface_digest_mismatch",
+      "expected_component_outcome": "blocked",
+      "mutation": "One restored surface differs despite matching row counts"
+    },
+    {
+      "id": "MON037-N014",
+      "classification": "negative_control",
+      "name": "full_state_exclusion",
+      "expected_component_outcome": "blocked",
+      "mutation": "Full-state claim excludes a required surface"
+    },
+    {
+      "id": "MON037-N015",
+      "classification": "negative_control",
+      "name": "wal_archive_gap",
+      "expected_component_outcome": "blocked",
+      "mutation": "Requested recovery target is not reachable on target timeline"
+    },
+    {
+      "id": "MON037-N016",
+      "classification": "negative_control",
+      "name": "untracked_dependency_drift",
+      "expected_component_outcome": "indeterminate",
+      "mutation": "Dependency snapshot changed without a ledger event"
+    },
+    {
+      "id": "MON037-N017",
+      "classification": "negative_control",
+      "name": "multi_partition_order_ambiguous",
+      "expected_component_outcome": "indeterminate",
+      "mutation": "V1 refuses global ordering across multiple partitions"
+    },
+    {
+      "id": "MON037-N018",
+      "classification": "negative_control",
+      "name": "old_primary_unfenced",
+      "expected_component_outcome": "blocked",
+      "mutation": "Former primary still accepts writes"
+    },
+    {
+      "id": "MON037-N019",
+      "classification": "negative_control",
+      "name": "restore_dependency_unavailable",
+      "expected_component_outcome": "blocked",
+      "mutation": "Required application dependency unavailable"
+    },
+    {
+      "id": "MON037-N020",
+      "classification": "negative_control",
+      "name": "write_probe_not_rolled_back",
+      "expected_component_outcome": "blocked",
+      "mutation": "Application write/readback probe not rolled back"
+    },
+    {
+      "id": "MON037-N021",
+      "classification": "negative_control",
+      "name": "traffic_before_acceptance",
+      "expected_component_outcome": "blocked",
+      "mutation": "Traffic enabled before independent acceptance"
+    },
+    {
+      "id": "MON037-N022",
+      "classification": "negative_control",
+      "name": "synthetic_proof_promoted",
+      "expected_component_outcome": "blocked",
+      "mutation": "Synthetic proof graph claims production traffic eligibility"
+    },
+    {
+      "id": "MON037-N023",
+      "classification": "negative_control",
+      "name": "unknown_claim_disposition",
+      "expected_component_outcome": "indeterminate",
+      "mutation": "Continuity claim remains unresolved"
+    },
+    {
+      "id": "MON037-N024",
+      "classification": "negative_control",
+      "name": "runtime_attestation_missing",
+      "expected_component_outcome": "indeterminate",
+      "mutation": "Trusted runtime attestation adapter is not available"
+    }
+  ]
+}

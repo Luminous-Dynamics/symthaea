@@ -1,0 +1,641 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon037-unified-recovery-campaign-input-v1.schema.json",
+  "title": "MON-037 Unified Recovery Campaign Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "trial_id",
+    "scenario_id",
+    "mode",
+    "evaluated_at",
+    "offset_target_required",
+    "required_claim_ids",
+    "source_events",
+    "observed_events",
+    "topic_partitions",
+    "transactions",
+    "exact_replay_deduplication_proven",
+    "surface_scope",
+    "surfaces",
+    "restore_checks",
+    "traffic_currently_enabled",
+    "components",
+    "required_surface_ids",
+    "source_truth_complete",
+    "source_truth_manifest_sha256",
+    "observed_capture_complete",
+    "observed_capture_manifest_sha256",
+    "transaction_report_complete",
+    "transaction_report_sha256",
+    "surface_inventory_complete",
+    "surface_inventory_sha256",
+    "source_events_sha256",
+    "observed_events_sha256",
+    "transaction_proofs_sha256",
+    "topic_partitions_sha256",
+    "required_surface_ids_sha256",
+    "surface_assertions_sha256",
+    "source_truth_boundary_sha256",
+    "observed_capture_boundary_sha256",
+    "transaction_report_boundary_sha256",
+    "surface_inventory_boundary_sha256",
+    "mon034_boundary_sha256",
+    "mon035_boundary_sha256",
+    "mon036_boundary_sha256",
+    "mon024_boundary_sha256",
+    "recovery_boundary"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon037-unified-recovery-campaign-input-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "trial_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "mode": {
+      "enum": [
+        "offline_fixture",
+        "runtime_candidate"
+      ]
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "offset_target_required": {
+      "type": "boolean"
+    },
+    "offset_target": {
+      "enum": [
+        "lsn_events_processed_1",
+        "transactional_message"
+      ]
+    },
+    "required_claim_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "source_events": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/source_event"
+      }
+    },
+    "observed_events": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/observed_event"
+      }
+    },
+    "topic_partitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "topic",
+          "partition_count"
+        ],
+        "properties": {
+          "topic": {
+            "$ref": "#/$defs/identifier"
+          },
+          "partition_count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "transactions": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "transaction_id",
+          "expected_event_count",
+          "begin_observed",
+          "end_observed",
+          "end_event_count",
+          "data_collections"
+        ],
+        "properties": {
+          "transaction_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "expected_event_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "begin_observed": {
+            "type": "boolean"
+          },
+          "end_observed": {
+            "type": "boolean"
+          },
+          "end_event_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "data_collections": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "exact_replay_deduplication_proven": {
+      "type": "boolean"
+    },
+    "deduplication_proof_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "surface_scope": {
+      "enum": [
+        "full_state",
+        "row_stream"
+      ]
+    },
+    "surfaces": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "disposition"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "disposition": {
+            "enum": [
+              "covered",
+              "not_applicable",
+              "excluded",
+              "unknown"
+            ]
+          },
+          "source_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "restored_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "justification_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "exclusion_manifest_sha256": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      }
+    },
+    "restore_checks": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "passed",
+          "failed",
+          "unknown"
+        ]
+      }
+    },
+    "traffic_currently_enabled": {
+      "type": "boolean"
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mon034_timeline_result",
+        "mon035_observer_result",
+        "mon036_continuity_result",
+        "mon024_proof_graph_result"
+      ],
+      "properties": {
+        "mon033_offset_proof": {
+          "type": "object",
+          "required": [
+            "profile",
+            "version",
+            "target",
+            "target_reached",
+            "boundary_sha256"
+          ],
+          "properties": {
+            "profile": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "target": {
+              "enum": [
+                "lsn_events_processed_1",
+                "transactional_message"
+              ]
+            },
+            "target_reached": {
+              "type": "boolean"
+            },
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "offsets_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "captured_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "offset": {
+              "type": "object"
+            }
+          }
+        },
+        "mon034_timeline_result": {
+          "type": "object",
+          "required": [
+            "profile",
+            "version",
+            "boundary_sha256"
+          ],
+          "properties": {
+            "profile": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "result": {
+              "type": "object"
+            }
+          }
+        },
+        "mon035_observer_result": {
+          "type": "object",
+          "required": [
+            "profile",
+            "version",
+            "boundary_sha256"
+          ],
+          "properties": {
+            "profile": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "result": {
+              "type": "object"
+            }
+          }
+        },
+        "mon036_continuity_result": {
+          "type": "object",
+          "required": [
+            "profile",
+            "version",
+            "boundary_sha256"
+          ],
+          "properties": {
+            "profile": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "result": {
+              "type": "object"
+            }
+          }
+        },
+        "mon024_proof_graph_result": {
+          "type": "object",
+          "required": [
+            "profile",
+            "version",
+            "boundary_sha256"
+          ],
+          "properties": {
+            "profile": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "result": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "required_surface_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "source_truth_complete": {
+      "type": "boolean"
+    },
+    "source_truth_manifest_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "observed_capture_complete": {
+      "type": "boolean"
+    },
+    "observed_capture_manifest_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "transaction_report_complete": {
+      "type": "boolean"
+    },
+    "transaction_report_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "surface_inventory_complete": {
+      "type": "boolean"
+    },
+    "surface_inventory_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "source_events_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "observed_events_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "transaction_proofs_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "topic_partitions_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "required_surface_ids_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "surface_assertions_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "deduplication_coverage_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "source_truth_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "observed_capture_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "transaction_report_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "surface_inventory_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "mon034_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "mon035_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "mon036_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "mon024_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "mon033_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "recovery_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incident_id",
+        "claim_id",
+        "source_cluster_id",
+        "database",
+        "source_epoch",
+        "timeline_id",
+        "snapshot_id",
+        "terminal_position",
+        "scope_digest",
+        "inventory_digest"
+      ],
+      "properties": {
+        "incident_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "claim_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source_cluster_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "database": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source_epoch": {
+          "$ref": "#/$defs/identifier"
+        },
+        "timeline_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "snapshot_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "terminal_position": {
+          "$ref": "#/$defs/identifier"
+        },
+        "scope_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "inventory_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "exact_replay_deduplication_proven": {
+            "const": true
+          }
+        },
+        "required": [
+          "exact_replay_deduplication_proven"
+        ]
+      },
+      "then": {
+        "required": [
+          "deduplication_proof_sha256",
+          "deduplication_coverage_sha256"
+        ],
+        "properties": {
+          "deduplication_proof_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "deduplication_coverage_sha256": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "offset_target_required": {
+            "const": true
+          }
+        },
+        "required": [
+          "offset_target_required"
+        ]
+      },
+      "then": {
+        "required": [
+          "mon033_boundary_sha256"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^\\S(?:[^\\r\\n]*\\S)?$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "base_event": {
+      "type": "object",
+      "required": [
+        "event_id",
+        "transaction_id",
+        "topic",
+        "data_collection",
+        "operation",
+        "payload_sha256",
+        "total_order",
+        "collection_order"
+      ],
+      "properties": {
+        "event_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "transaction_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "topic": {
+          "$ref": "#/$defs/identifier"
+        },
+        "data_collection": {
+          "$ref": "#/$defs/identifier"
+        },
+        "operation": {
+          "$ref": "#/$defs/identifier"
+        },
+        "payload_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "total_order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "collection_order": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "source_event": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base_event"
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "observed_event": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base_event"
+        },
+        {
+          "type": "object",
+          "required": [
+            "partition",
+            "offset"
+          ],
+          "properties": {
+            "partition": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
