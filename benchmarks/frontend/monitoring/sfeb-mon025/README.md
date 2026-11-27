@@ -38,9 +38,9 @@ bash scripts/verify-transaction-metadata.sh 18 mon025-run-001 100
 
 To run the PostgreSQL 19 lane, use `bash scripts/labctl.sh up 19`, provision the connector role for major 19, register the connector, then verify the `baseline` snapshot before seeding. Do not run the two source majors under the same connector identity/slot simultaneously.
 
-The database fixture is initialized on first start from `compose/initdb/001-mon025-schema.sql`. The scripts are invoked with `bash` because repository file mode may not yet mark them executable.
+The database fixture is initialized on first start from `compose/initdb/001-mon025-schema.sql`. Each seed batch emits one transactional logical decoding message with prefix `mon025_transaction` in the same transaction as the ledger inserts; the connector is explicitly filtered to that prefix. The scripts are invoked with `bash` because repository file mode may not yet mark them executable.
 
-The lab binds exposed ports to loopback only. It is single-node and non-HA. Kafka replication factors are 1. It is not a production deployment template.
+The lab binds exposed ports to loopback only. It is single-node and non-HA. Kafka replication factors are 1; the ledger, logical-message and transaction topics must each have exactly one partition for this profile's per-topic order checks. It is not a production deployment template.
 
 ## Recovery drill
 
@@ -84,7 +84,7 @@ The Compose restore service remains isolated on loopback-only port 56418/56419. 
 - `compose/postgres/state-manifest.sql` — independent SQL manifest query for rows, schema, indexes, constraints, triggers, routines, extensions, sequences, large objects, views, partitions, unlogged data and authorization state.
 - `compose/restore/restore-entrypoint.sh` — isolated physical restore and PITR.
 - `scripts/` — static preflight, lifecycle, least-privilege connector provisioning, deterministic workload, independent CDC value readback, Debezium transaction-boundary verification, physical backup verification, WAL archive sealing, LSN/timeline recovery, wait/restore verification, per-surface comparison and opt-in fault injection.
-- `scripts/transaction-metadata-report.jq` and `scripts/test-transaction-metadata-order.sh` — independently runnable transaction-order adjudication filter and regression fixtures.
+- `scripts/transaction-metadata-report.jq`, `scripts/verify-transaction-metadata-multitopic.sh` and `scripts/test-transaction-metadata.sh` — composite XID correlation, row plus transactional logical-message closure and adversarial fixtures. The existing `verify-transaction-metadata.sh` and `test-transaction-metadata-order.sh` paths remain compatibility wrappers.
 - `BENCHMARKS-v0.1.md` — matched comparison protocol and targets.
 
 ## Execution status
