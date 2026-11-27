@@ -2002,7 +2002,7 @@ mod tests {
         assert!((before.scenarios[1].response_residual - 1.0).abs() < 1.0e-10);
 
         let receipt = basis
-.enrich_from_worst_scenario(&development_scenarios, RbkrConfig::new(2))
+            .enrich_from_worst_scenario(&development_scenarios, RbkrConfig::new(2))
             .unwrap();
         assert_eq!(receipt.scenario_id, "rare-response");
         assert_eq!(
@@ -2043,10 +2043,7 @@ mod tests {
             scenario_weight: 1.0,
         };
         assert_eq!(
-            aggregate_response_gramians(
-                &[holdout],
-                ResponseGramianAggregationConfig::default(),
-            ),
+            aggregate_response_gramians(&[holdout], ResponseGramianAggregationConfig::default(),),
             Err(RbkrError::NonTrainingScenarioForAggregation)
         );
 
