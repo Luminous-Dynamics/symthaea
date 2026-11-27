@@ -16,6 +16,7 @@ pub enum ResponseModelError {
     InvalidResponseTimeConstant,
     InvalidElapsedTime,
     InvalidFrequency,
+    NumericalFailure,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -148,6 +149,44 @@ impl FirstOrderResponseOu {
         Ok(self.future_past_cross_covariance(elapsed_time)?[1][1])
     }
 
+    /// Independently reduced convolution formula for Cov(z(t+h), z(t)), h >= 0.
+    ///
+    /// For h >= 0:
+    /// C_zz(h) = q * (mu*exp(-lambda*h) - lambda*exp(-mu*h)) / (mu-lambda)
+    /// with q = mu*process_variance/(lambda+mu). The implementation uses
+    /// exp_m1-based factorizations and the repeated-root limit to avoid
+    /// cancellation when the two rates are close.
+    ///
+    /// This serves as an independent analytic check on exp(Ah)P.
+    pub fn sensor_autocovariance_convolution(
+        &self,
+        elapsed_time: f64,
+    ) -> Result<f64, ResponseModelError> {
+        if !elapsed_time.is_finite() || elapsed_time < 0.0 {
+            return Err(ResponseModelError::InvalidElapsedTime);
+        }
+
+        let q = self.stationary_covariance()[1][1];
+        let h = elapsed_time;
+        let covariance = if self.mu > self.lambda {
+            let gap = self.mu - self.lambda;
+            let ratio = -(-gap * h).exp_m1() / gap;
+            q * (-self.lambda * h).exp() * (1.0 + self.lambda * ratio)
+        } else if self.mu < self.lambda {
+            let gap = self.lambda - self.mu;
+            let ratio = -(-gap * h).exp_m1() / gap;
+            q * (-self.mu * h).exp() * (1.0 + self.mu * ratio)
+        } else {
+            q * (-self.lambda * h).exp() * (1.0 + self.lambda * h)
+        };
+
+        if covariance.is_finite() && covariance >= 0.0 {
+            Ok(covariance)
+        } else {
+            Err(ResponseModelError::NumericalFailure)
+        }
+    }
+
     /// Normalized step response of the first-order instrument state.
     ///
     /// This is the response to a unit step in the latent measurand with the
@@ -227,6 +266,38 @@ mod tests {
         let actual = model.sensor_autocovariance(1.0).unwrap();
         let repeated_root_limit = (-1.0_f64).exp();
         close(actual, repeated_root_limit, 2.0e-12);
+    }
+
+    #[test]
+    fn direct_convolution_matches_state_space_across_rate_orderings() {
+        let cases = [
+            (1.0, 3.0, 0.5, 0.0),
+            (1.0, 3.0, 0.5, 0.25),
+            (1.0, 3.0, 0.5, 1.0),
+            (0.7, 2.3, 1.4, 2.0),
+            (2.0, 4.0, 0.5, 0.25),
+            (0.4, 1.7, 2.5, 7.0),
+        ];
+        for (lambda, variance, tau, elapsed) in cases {
+            let model = FirstOrderResponseOu::new(lambda, variance, tau).unwrap();
+            let state_space = model.sensor_autocovariance(elapsed).unwrap();
+            let convolution = model.sensor_autocovariance_convolution(elapsed).unwrap();
+            close(state_space, convolution, 5.0e-14);
+        }
+    }
+
+    #[test]
+    fn direct_convolution_matches_repeated_and_near_repeated_roots() {
+        for tau in [1.0, 1.0 / (1.0 + 1.0e-12), 1.0 / (1.0 - 1.0e-12)] {
+            let model = FirstOrderResponseOu::new(1.0, 1.0, tau).unwrap();
+            for elapsed in [0.0, 0.1, 1.0, 10.0] {
+                close(
+                    model.sensor_autocovariance_convolution(elapsed).unwrap(),
+                    model.sensor_autocovariance(elapsed).unwrap(),
+                    3.0e-12,
+                );
+            }
+        }
     }
 
     #[test]
