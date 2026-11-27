@@ -825,6 +825,26 @@ fn main(){if let Err(e)=run(){eprintln!("error: {e}");std::process::exit(2);}}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn pair_manifest_fixture_binds_every_episode_and_exact_arm_manifest(){
+        let pairs: PairManifest = serde_json::from_str(include_str!("../fixtures/pairs-v0.1.json")).unwrap();
+        let arm_bytes = include_str!("../fixtures/arms-v0.1.json");
+        let scenario_bytes = include_str!("../../fixtures/seed-v0.1.jsonl");
+        assert_eq!(pairs.schema_version, "mace_dsm_pair_manifest_v0_1");
+        assert_eq!(pairs.arm_manifest_sha256, digest(arm_bytes.as_bytes()));
+        assert_eq!(pairs.scenario_sha256, digest(scenario_bytes.as_bytes()));
+        assert_eq!(pairs.generator_sha256, digest(include_str!("main.rs").as_bytes()));
+        let mut seen = BTreeSet::new();
+        for line in scenario_bytes.lines() {
+            let episode: Episode = serde_json::from_str(line).unwrap();
+            validate_episode(&episode).unwrap();
+            let entry = pairs.episodes.iter().find(|entry| entry.episode_id == episode.episode_id).unwrap();
+            assert!(seen.insert(entry.episode_id.as_str()));
+            assert_eq!(entry.candidate_sha256,
+                candidate_digest(&episode.episode_id, episode.seed, &episode.family, &episode.candidate).unwrap());
+        }
+        assert_eq!(seen.len(), pairs.episodes.len());
+    }
+
     #[test] fn valid_time_is_half_open_and_observation_time_prevents_future_leakage(){
         let e=event("e".into(),"s".into(),15,10,Some(20),AuthorityTier::Verified,0,"c",Relation::Asserts,vec![]);
         assert!(!current_at(&e,14)); assert!(current_at(&e,15)); assert!(current_at(&e,19)); assert!(!current_at(&e,20));
