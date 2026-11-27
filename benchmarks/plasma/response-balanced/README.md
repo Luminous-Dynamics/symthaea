@@ -155,7 +155,19 @@ by integrating the overlap of each target velocity cell's preimage with the piec
 
 On a finite velocity interval, a shift can move physical mass outside the represented domain. The operator therefore returns a per-spatial-row and total ledger with mass before, mass after, boundary outflow, balance residual, and relative outflow. It never renormalizes the truncated result. A physical K-RESP run must either extend the velocity domain until pulse-induced outflow is negligible under an independently tested tolerance, or report the outflow as an unqualified boundary error; it cannot count the truncated remap as mass-conserving.
 
-This is deliberately a first-order piecewise-constant remap. It is not a high-order positivity-preserving reconstruction, does not evolve the Vlasov transport equation between pulses, and does not yet provide the distribution-space Jacobian. The single-particle state/control/time derivatives and the distribution remap are separate pieces of the future discrete pulse operator. Their composition and tangent/adjoint must be checked against the exact split solver.
+For a fixed overlap topology, \`linearize_velocity_kick_remap\` now exposes the exact derivative. The state Jacobian is the overlap fraction
+\[
+\frac{\partial \bar f_j^+}{\partial \bar f_k^-}
+=\frac{|[v_j,v_{j+1}]\cap[v_k+\delta v,v_{k+1}+\delta v]|}{\Delta v_j},
+\]
+and the shift derivative is the Leibniz boundary term
+\[
+\frac{\partial \bar f_j^+}{\partial \delta v}
+=\frac{f^-(v_j-\delta v)-f^-(v_{j+1}-\delta v)}{\Delta v_j}.
+\]
+The amplitude and phase derivatives follow by multiplying by \(\sin\theta\) and \(A\cos\theta\), respectively. The API refuses preimage boundaries within a declared topology tolerance of a velocity edge, returns the minimum topology margin, and enforces a peak-storage budget. A topology edge is a genuine nonsmooth point for this piecewise-constant remap; it must trigger a smaller perturbation / one-sided analysis or UNKNOWN, not a central-difference derivative.
+
+This is deliberately a first-order piecewise-constant remap. It is not a high-order positivity-preserving reconstruction and does not evolve the Vlasov transport equation between pulses. Its Jacobian is valid only within a fixed overlap topology and is not yet the derivative of a full coupled Vlasov split solver. The single-particle state/control/time derivatives and the distribution remap are separate pieces of the future discrete pulse operator. Their composition and tangent/adjoint must be checked against the exact split solver.
 
 Manufactured tests cover zero-kick identity, interior mass preservation, positive-kick upper-boundary outflow, negative-kick lower-boundary outflow, independent spatial-row ledgers, non-negativity, and invalid grid/shape/negative-data rejection. The external public-API smoke target now exercises a pulse followed by the remap.
 
