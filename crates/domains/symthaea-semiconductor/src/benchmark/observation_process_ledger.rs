@@ -1537,21 +1537,7 @@ mod tests {
         never_selected.acquisition.selected_at_round = Some(1);
         never_selected.acquisition.measured_at_unix_seconds = Some(115);
         never_selected.acquisition.operational_measurement_method_sha256 = Some(digest('0'));
-        assert!(
-            evaluate_observation_process_v1(&input(
-                ObservationRiskControllerV1::None,
-                vec![
-                    never_selected,
-                    row(
-                        2,
-                        PhysicalAcquisitionStateV1::Measured,
-                        K1QualificationStateV1::Eligible,
-                        FeedbackTrackingStateV1::NotApplicable,
-                    ),
-                ],
-            ))
-            .is_err()
-        );
+        assert!(validate_acquisition(&never_selected).is_err());
     }
 
     #[test]
