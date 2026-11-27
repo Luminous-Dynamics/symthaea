@@ -123,6 +123,8 @@ pub struct CalibrationClusterScore {
     pub independent_cluster_id: String,
     pub score_units: u64,
     pub block_manifest_sha256: String,
+    pub candidate_margin_block_sha256: String,
+    pub reference_margin_receipt_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -310,6 +312,8 @@ pub fn calibrate_recoverability_margin(
             independent_cluster_id: reference.independent_cluster_id.clone(),
             score_units: score,
             block_manifest_sha256: reference.block_manifest_sha256.clone(),
+            candidate_margin_block_sha256: reference.candidate_margin_block_sha256.clone(),
+            reference_margin_receipt_sha256: reference.reference_margin_receipt_sha256.clone(),
         });
         family_ids.insert(reference.environment_family_id.clone());
     }
@@ -855,6 +859,14 @@ mod tests {
             assert_eq!(
                 score.block_manifest_sha256,
                 unit.reference.block_manifest_sha256
+            );
+            assert_eq!(
+                score.candidate_margin_block_sha256,
+                unit.candidate.predicted_margin_block_sha256
+            );
+            assert_eq!(
+                score.reference_margin_receipt_sha256,
+                unit.reference.reference_margin_receipt_sha256
             );
             assert_eq!(
                 score.score_units,
