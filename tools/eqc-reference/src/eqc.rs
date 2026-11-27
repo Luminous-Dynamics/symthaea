@@ -181,8 +181,7 @@ pub fn validate_corpus_file(path: &Path, repository_root: &Path) -> anyhow::Resu
 }
 
 fn load_schema(path: &Path) -> anyhow::Result<Value> {
-    let bytes = fs::read(path)
-        .with_context(|| format!("read JSON Schema {}", path.display()))?;
+    let bytes = fs::read(path).with_context(|| format!("read JSON Schema {}", path.display()))?;
     let schema: Value = serde_json::from_slice(&bytes)
         .with_context(|| format!("parse JSON Schema {}", path.display()))?;
     jsonschema::meta::validate(&schema)
@@ -785,8 +784,7 @@ mod tests {
     }
 
     fn receipt_schema_validator() -> jsonschema::Validator {
-        let schema_path = repository_root()
-            .join("docs/research/eqc-run-receipt-v0.1.schema.json");
+        let schema_path = repository_root().join("docs/research/eqc-run-receipt-v0.1.schema.json");
         let schema = load_schema(&schema_path).expect("receipt schema meta-validates");
         jsonschema::options()
             .offline()
