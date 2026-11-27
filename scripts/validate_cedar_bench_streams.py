@@ -95,11 +95,33 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
     expected_templates = {"train": 10, "development": 5, "sealed_test": 5, "all": 20}[expected_split]
     require(len(templates) == expected_templates, f"expected {expected_templates} templates in split")
     conditions_per_template: dict[str, set[str]] = {}
+    audit_groups: dict[str, dict[str, dict[str, Any]]] = {}
     for audit in audits:
         conditions_per_template.setdefault(audit["template_id"], set()).add(audit["condition"])
+        audit_groups.setdefault(audit["template_id"], {})[audit["condition"]] = audit
+
     expected = {"baseline", "counterfactual", "placebo", "source_removed"}
     require(all(value == expected for value in conditions_per_template.values()),
             "each template must have all four paired conditions")
+    for template_id, group in audit_groups.items():
+        baseline = group["baseline"]
+        counterfactual = group["counterfactual"]
+        placebo = group["placebo"]
+        require(baseline["expected_answer"] != counterfactual["expected_answer"],
+                f"{template_id}: counterfactual did not change the answer oracle")
+        require(baseline["expected_answer"] == placebo["expected_answer"],
+                f"{template_id}: placebo intervention changed the answer oracle")
+        require(baseline["citation_contract"] == counterfactual["citation_contract"]
+                == placebo["citation_contract"],
+                f"{template_id}: non-removal intervention changed citation eligibility")
+        removed = group["source_removed"]
+        require(set(removed["citation_contract"]["allowed_citation_source_ids"])
+                <= set(removed["source_digests"]),
+                f"{template_id}: source-removal citation contract names a missing source")
+        require(removed["expected_answer"].get("answerable") is False
+                or template_id in {"CEDAR-08", "CEDAR-15"},
+                f"{template_id}: source removal unexpectedly preserves an answer")
+
     print(f"CEDAR-Bench {expected_split} streams: {expected_count}/{expected_count} candidate and auditor trials align; no condition/gold leakage detected")
 
 
