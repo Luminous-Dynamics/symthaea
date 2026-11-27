@@ -21,6 +21,16 @@ use crate::streaming_session::{
 const MAX_PROJECTIONS_V1: usize = 1_000_000;
 const MAX_PROJECTION_ID_BYTES_V1: usize = 512;
 const MAX_DEPENDENCIES_V1: usize = 100_000;
+const METAMEMORY_ATTRIBUTES_V1: [&str; 8] = [
+    "lifecycle_status",
+    "projection_kind",
+    "built_at_sequence",
+    "source_dependency_count",
+    "parent_dependency_count",
+    "invalidation_receipt_present",
+    "replacement_link_present",
+    "erasure_receipt_present",
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DerivedProjectionKindV1 {
@@ -246,6 +256,8 @@ pub struct StoreMetamemorySummaryV1 {
     pub projection_index_sequence: u64,
     pub active_source_event_count: u64,
     pub projection_count: u64,
+    /// Metadata attribute names available to an authorized store-state reader.
+    pub available_attributes: Vec<String>,
     pub status_counts: Vec<DerivedProjectionStatusCountV1>,
     pub kind_counts: Vec<DerivedProjectionKindCountV1>,
     pub ledger_snapshot_sha256: String,
@@ -289,6 +301,8 @@ impl StoreMetamemorySummaryV1 {
         self.schema_version == 1
             && self.status_counts.len() == 7
             && self.kind_counts.len() == 7
+            && self.available_attributes.iter().map(String::as_str)
+                .eq(METAMEMORY_ATTRIBUTES_V1)
             && self.ledger_sequence == self.projection_index_sequence
             && self.projection_count <= MAX_PROJECTIONS_V1 as u64
             && valid_digest(&self.scope_commitment_sha256)
@@ -422,6 +436,8 @@ impl DerivedProjectionIndexV1 {
             projection_index_sequence: self.last_sequence,
             active_source_event_count: ledger_snapshot.messages.len() as u64,
             projection_count: self.projections.len() as u64,
+            available_attributes: METAMEMORY_ATTRIBUTES_V1.iter()
+                .map(|name| (*name).to_owned()).collect(),
             status_counts,
             kind_counts,
             ledger_snapshot_sha256: ledger_snapshot.snapshot_sha256,
@@ -791,6 +807,7 @@ fn metamemory_summary_digest(summary: &StoreMetamemorySummaryV1) -> String {
     h.update(summary.projection_index_sequence.to_be_bytes());
     h.update(summary.active_source_event_count.to_be_bytes());
     h.update(summary.projection_count.to_be_bytes());
+    hash_strings(&mut h, &summary.available_attributes);
     hash_field(&mut h, &summary.ledger_snapshot_sha256);
     hash_field(&mut h, &summary.projection_index_state_sha256);
     h.update((summary.status_counts.len() as u64).to_be_bytes());
@@ -994,6 +1011,9 @@ mod tests {
         assert!(summary.verify_integrity());
         assert_eq!(summary.status_counts.len(), 7);
         assert_eq!(summary.kind_counts.len(), 7);
+        assert_eq!(summary.available_attributes.len(), 8);
+        assert!(summary.available_attributes.contains(&"lifecycle_status".to_owned()));
+        assert!(summary.verify_integrity());
     }
 
     #[test]
@@ -1054,6 +1074,10 @@ mod tests {
         let mut altered = summary.clone();
         altered.active_source_event_count += 1;
         assert!(!altered.verify_integrity());
+
+        let mut altered_attributes = summary.clone();
+        altered_attributes.available_attributes.pop();
+        assert!(!altered_attributes.verify_integrity());
 
         let wrong_scope = DerivedProjectionIndexV1::new("other-user", "session-1").unwrap();
         assert_eq!(
