@@ -6,8 +6,8 @@
 use std::collections::HashSet;
 
 use cmaq_031_anytime_calibration_monitor::{
-    AnytimeCalibrationMonitor, CalibrationRankReference, CalibrationRankScore,
-    DeploymentRankObservation, MonitorUpdate, PreviousOutcome,
+    centered_rank_payoff, AnytimeCalibrationMonitor, CalibrationRankReference,
+    CalibrationRankScore, DeploymentRankObservation, MonitorUpdate, PreviousOutcome, RankFeature,
 };
 use cmaq_033_prm_ons_monitor::{OnsPredictiveRankMonitor, OnsUpdate};
 
@@ -170,20 +170,124 @@ impl MethodSummary {
     }
 }
 
+/// Fixed-bet control using exactly the ONS Order + Dispersion features.
+/// This separates the effect of adaptive betting from the effect of feature count.
+#[derive(Clone, Debug, PartialEq)]
+struct MatchedFixedBetMonitor {
+    calibration_count: usize,
+    alpha_numerator: u32,
+    alpha_denominator: u32,
+    rank_counts: Vec<u64>,
+    observations_seen: u64,
+    log_wealth: [f64; 2],
+    quarantined: bool,
+}
+
+impl MatchedFixedBetMonitor {
+    fn new(
+        calibration_count: usize,
+        alpha_numerator: u32,
+        alpha_denominator: u32,
+    ) -> Result<Self, String> {
+        if calibration_count == 0
+            || alpha_numerator == 0
+            || alpha_denominator == 0
+            || alpha_numerator >= alpha_denominator
+        {
+            return Err("invalid matched fixed-bet configuration".into());
+        }
+        Ok(Self {
+            calibration_count,
+            alpha_numerator,
+            alpha_denominator,
+            rank_counts: vec![0; calibration_count + 1],
+            observations_seen: 0,
+            log_wealth: [0.0; 2],
+            quarantined: false,
+        })
+    }
+
+    fn observe_rank(&mut self, rank_one_based: usize) -> Result<bool, String> {
+        if self.quarantined {
+            return Err("matched fixed-bet monitor already quarantined".into());
+        }
+        if rank_one_based == 0 || rank_one_based > self.calibration_count + 1 {
+            return Err("invalid rank for matched fixed-bet monitor".into());
+        }
+        let next_seen = self
+            .observations_seen
+            .checked_add(1)
+            .ok_or_else(|| "matched fixed-bet observation counter overflow".to_string())?;
+        let mut next_log_wealth = self.log_wealth;
+
+        for (index, feature) in [RankFeature::UpperOrder, RankFeature::TailDispersion]
+            .into_iter()
+            .enumerate()
+        {
+            let payoff = centered_rank_payoff(
+                self.calibration_count,
+                &self.rank_counts,
+                next_seen,
+                rank_one_based,
+                feature,
+            )
+            .map_err(|error| format!("matched fixed-bet payoff: {error:?}"))?;
+            let factor = 1.0 + 0.5 * payoff;
+            if !factor.is_finite() || factor < 0.5 || !payoff.is_finite() {
+                return Err("invalid matched fixed-bet e-process factor".into());
+            }
+            next_log_wealth[index] += factor.ln();
+            if !next_log_wealth[index].is_finite() {
+                return Err("matched fixed-bet log wealth overflow".into());
+            }
+        }
+
+        let max_log = next_log_wealth[0].max(next_log_wealth[1]);
+        let log_mixture = max_log
+            + (((next_log_wealth[0] - max_log).exp()
+                + (next_log_wealth[1] - max_log).exp())
+                / 2.0)
+                .ln();
+        if !log_mixture.is_finite() {
+            return Err("matched fixed-bet mixture wealth overflow".into());
+        }
+
+        let index = rank_one_based - 1;
+        let next_count = self.rank_counts[index]
+            .checked_add(1)
+            .ok_or_else(|| "matched fixed-bet rank counter overflow".to_string())?;
+        self.rank_counts[index] = next_count;
+        self.observations_seen = next_seen;
+        self.log_wealth = next_log_wealth;
+
+        let threshold =
+            (f64::from(self.alpha_denominator) / f64::from(self.alpha_numerator)).ln();
+        if log_mixture >= threshold {
+            self.quarantined = true;
+        }
+        Ok(self.quarantined)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScenarioSummary {
     pub scenario: Scenario,
-    pub fixed_bet: MethodSummary,
+    pub fixed_four: MethodSummary,
+    pub fixed_two: MethodSummary,
     pub ons: MethodSummary,
-    pub ons_wins: usize,
-    pub fixed_bet_wins: usize,
-    pub paired_ties: usize,
+    pub ons_wins_vs_fixed_two: usize,
+    pub fixed_two_wins: usize,
+    pub ties_vs_fixed_two: usize,
+    pub ons_wins_vs_fixed_four: usize,
+    pub fixed_four_wins: usize,
+    pub ties_vs_fixed_four: usize,
 }
 
 impl ScenarioSummary {
-    pub fn csv_rows(&self) -> [String; 2] {
+    pub fn csv_rows(&self) -> [String; 3] {
         [
-            format_method_row(self.scenario, &self.fixed_bet),
+            format_method_row(self.scenario, &self.fixed_four),
+            format_method_row(self.scenario, &self.fixed_two),
             format_method_row(self.scenario, &self.ons),
         ]
     }
@@ -194,60 +298,101 @@ pub fn run_scenario(
     scenario: Scenario,
 ) -> Result<ScenarioSummary, String> {
     let config = config.validate()?;
-    let mut fixed_bet = MethodSummary {
-        method: "cmaq031_fixed_bet",
+    let mut fixed_four = MethodSummary {
+        method: "cmaq031_fixed_four_features",
+        alarm_delays: Vec::new(),
+        replications: config.replications,
+        horizon: config.horizon,
+    };
+    let mut fixed_two = MethodSummary {
+        method: "cmaq035_fixed_two_features",
         alarm_delays: Vec::new(),
         replications: config.replications,
         horizon: config.horizon,
     };
     let mut ons = MethodSummary {
-        method: "cmaq033_ons",
+        method: "cmaq033_ons_two_features",
         alarm_delays: Vec::new(),
         replications: config.replications,
         horizon: config.horizon,
     };
-    let mut ons_wins = 0;
-    let mut fixed_bet_wins = 0;
-    let mut paired_ties = 0;
+    let mut ons_wins_vs_fixed_two = 0;
+    let mut fixed_two_wins = 0;
+    let mut ties_vs_fixed_two = 0;
+    let mut ons_wins_vs_fixed_four = 0;
+    let mut fixed_four_wins = 0;
+    let mut ties_vs_fixed_four = 0;
 
     for replication in 0..config.replications {
         let replication_seed = config
             .seed
             .wrapping_add(scenario.stream_id())
             .wrapping_add((replication as u64).wrapping_mul(0xD1342543DE82EF95));
-        let (fixed_delay, ons_delay) = run_pair(replication_seed, config.horizon, scenario)?;
-        if let Some(delay) = fixed_delay {
-            fixed_bet.alarm_delays.push(delay);
+        let (four_delay, two_delay, ons_delay) =
+            run_pair(replication_seed, config.horizon, scenario)?;
+        if let Some(delay) = four_delay {
+            fixed_four.alarm_delays.push(delay);
+        }
+        if let Some(delay) = two_delay {
+            fixed_two.alarm_delays.push(delay);
         }
         if let Some(delay) = ons_delay {
             ons.alarm_delays.push(delay);
         }
+
         if scenario != Scenario::Null {
-            match (fixed_delay, ons_delay) {
-                (Some(fixed), Some(adaptive)) if adaptive < fixed => ons_wins += 1,
-                (Some(fixed), Some(adaptive)) if fixed < adaptive => fixed_bet_wins += 1,
-                (Some(_), None) => fixed_bet_wins += 1,
-                (None, Some(_)) => ons_wins += 1,
-                _ => paired_ties += 1,
-            }
+            compare_delays(
+                ons_delay,
+                two_delay,
+                &mut ons_wins_vs_fixed_two,
+                &mut fixed_two_wins,
+                &mut ties_vs_fixed_two,
+            );
+            compare_delays(
+                ons_delay,
+                four_delay,
+                &mut ons_wins_vs_fixed_four,
+                &mut fixed_four_wins,
+                &mut ties_vs_fixed_four,
+            );
         }
     }
 
     Ok(ScenarioSummary {
         scenario,
-        fixed_bet,
+        fixed_four,
+        fixed_two,
         ons,
-        ons_wins,
-        fixed_bet_wins,
-        paired_ties,
+        ons_wins_vs_fixed_two,
+        fixed_two_wins,
+        ties_vs_fixed_two,
+        ons_wins_vs_fixed_four,
+        fixed_four_wins,
+        ties_vs_fixed_four,
     })
+}
+
+fn compare_delays(
+    ons_delay: Option<usize>,
+    fixed_delay: Option<usize>,
+    ons_wins: &mut usize,
+    fixed_wins: &mut usize,
+    ties: &mut usize,
+) {
+    match (ons_delay, fixed_delay) {
+        (Some(ons), Some(fixed)) if ons < fixed => *ons_wins += 1,
+        (Some(ons), Some(fixed)) if fixed < ons => *fixed_wins += 1,
+        (Some(_), None) => *ons_wins += 1,
+        (None, Some(_)) => *fixed_wins += 1,
+        _ => *ties += 1,
+    }
 }
 
 fn run_pair(
     seed: u64,
     horizon: usize,
     scenario: Scenario,
-) -> Result<(Option<usize>, Option<usize>), String> {
+) -> Result<(Option<usize>, Option<usize>, Option<usize>), String> {
     // Deterministic domain separation prevents accidental stream reuse in the
     // simulation. Neither generator is cryptographic.
     let mut score_rng = SplitMix64::new(seed ^ 0x53434F52455F524E);
@@ -273,21 +418,27 @@ fn run_pair(
         scope_sha256: SCOPE_SHA256.to_string(),
         scores: scores.clone(),
     };
-    let mut fixed_monitor =
+    let mut fixed_four_monitor =
         AnytimeCalibrationMonitor::new(reference, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)
-            .map_err(|error| format!("fixed monitor init: {error:?}"))?;
+            .map_err(|error| format!("fixed four-feature monitor init: {error:?}"))?;
+    let mut fixed_two_monitor = MatchedFixedBetMonitor::new(
+        CALIBRATION_COUNT,
+        ALPHA_NUMERATOR,
+        ALPHA_DENOMINATOR,
+    )?;
     let mut ons_monitor =
         OnsPredictiveRankMonitor::new(CALIBRATION_COUNT, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)
             .map_err(|error| format!("ONS monitor init: {error:?}"))?;
 
-    let mut fixed_delay = None;
+    let mut four_delay = None;
+    let mut two_delay = None;
     let mut ons_delay = None;
     for step in 1..=horizon {
         let score = scenario.sample(&mut score_rng);
         let tie_key = unique_tie_key(&mut tie_rng, &mut used_tie_keys);
         let rank = rank_against_fixed_reference(&scores, score, tie_key);
 
-        if fixed_delay.is_none() {
+        if four_delay.is_none() {
             let observation = DeploymentRankObservation {
                 previous_outcome: PreviousOutcome::Reconciled,
                 calibration_profile_sha256: PROFILE_SHA256.to_string(),
@@ -300,11 +451,11 @@ fn run_pair(
                 aggregate_score_receipt_sha256: digest_u64(seed ^ step as u64 ^ 0x41474753434F52),
                 tie_break_receipt_sha256: digest_u64(seed ^ step as u64 ^ 0x54494542524543),
             };
-            match fixed_monitor
+            match fixed_four_monitor
                 .observe(observation)
-                .map_err(|error| format!("fixed monitor observe: {error:?}"))?
+                .map_err(|error| format!("fixed four-feature monitor observe: {error:?}"))?
             {
-                MonitorUpdate::Quarantined { .. } => fixed_delay = Some(step),
+                MonitorUpdate::Quarantined { .. } => four_delay = Some(step),
                 MonitorUpdate::Accepted { .. } => {}
                 MonitorUpdate::BlockedUntilReconciliation | MonitorUpdate::SkippedNotExecuted => {
                     return Err("reconciled synthetic event was unexpectedly skipped".into());
@@ -312,6 +463,9 @@ fn run_pair(
             }
         }
 
+        if two_delay.is_none() && fixed_two_monitor.observe_rank(rank)? {
+            two_delay = Some(step);
+        }
         if ons_delay.is_none() {
             match ons_monitor
                 .observe_rank(rank)
@@ -322,11 +476,11 @@ fn run_pair(
             }
         }
 
-        if fixed_delay.is_some() && ons_delay.is_some() {
+        if four_delay.is_some() && two_delay.is_some() && ons_delay.is_some() {
             break;
         }
     }
-    Ok((fixed_delay, ons_delay))
+    Ok((four_delay, two_delay, ons_delay))
 }
 
 fn rank_against_fixed_reference(
@@ -445,11 +599,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("#paired,null,comparison=not_applicable");
         } else {
             println!(
-                "#paired,{},ons_wins={},fixed_wins={},ties={}",
+                "#paired,{},ons_vs_fixed_two_wins={},fixed_two_wins={},ties={}",
                 result.scenario.as_str(),
-                result.ons_wins,
-                result.fixed_bet_wins,
-                result.paired_ties
+                result.ons_wins_vs_fixed_two,
+                result.fixed_two_wins,
+                result.ties_vs_fixed_two
+            );
+            println!(
+                "#paired,{},ons_vs_fixed_four_wins={},fixed_four_wins={},ties={}",
+                result.scenario.as_str(),
+                result.ons_wins_vs_fixed_four,
+                result.fixed_four_wins,
+                result.ties_vs_fixed_four
             );
         }
     }
