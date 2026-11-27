@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea/embodiment-scene-v1.json",
+  "title": "Symthaea Embodiment Scene Frame v1",
+  "description": "Renderer-facing declarative scene. It carries a canonical cue digest but deliberately excludes raw evidence-reference identifiers and semantic target payloads.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "session_id",
+    "clock_domain_id",
+    "event_id",
+    "canonical_cue_digest",
+    "grant_id",
+    "sequence",
+    "event_kind",
+    "semantic_key",
+    "form",
+    "motion_mode",
+    "epistemic_status",
+    "privacy_class",
+    "source",
+    "observed_at_monotonic_ns",
+    "expires_at_monotonic_ns",
+    "accessible_description",
+    "elements"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.embodiment-scene.v1"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "canonical_cue_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "grant_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "event_kind": {
+      "type": "string",
+      "enum": [
+        "conversation.listening",
+        "conversation.speaking",
+        "conversation.turn_state",
+        "conversation.backchannel",
+        "attention.focus",
+        "expression.intent",
+        "cognition.uncertainty",
+        "evidence.status",
+        "user.control"
+      ]
+    },
+    "semantic_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "form": {
+      "type": "string",
+      "enum": [
+        "living_constellation",
+        "puppet_theatre",
+        "mycelial_being",
+        "swarm",
+        "living_instrument",
+        "hearth_companion",
+        "cognitive_mandala"
+      ]
+    },
+    "motion_mode": {
+      "type": "string",
+      "enum": [
+        "dynamic",
+        "static"
+      ]
+    },
+    "epistemic_status": {
+      "type": "string",
+      "enum": [
+        "measured",
+        "derived",
+        "inferred",
+        "proposed",
+        "presentation_only"
+      ]
+    },
+    "privacy_class": {
+      "type": "string",
+      "enum": [
+        "public",
+        "local_sensitive",
+        "restricted"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "instance_id"
+      ],
+      "properties": {
+        "component": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "instance_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "source_event_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "build_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        }
+      }
+    },
+    "observed_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "accessible_description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "elements": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "glyph",
+          "weight",
+          "motion"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "core",
+              "connection",
+              "turn_state",
+              "backchannel",
+              "attention",
+              "expression",
+              "alternative",
+              "evidence",
+              "user_control"
+            ]
+          },
+          "glyph": {
+            "type": "string",
+            "enum": [
+              "star_node",
+              "filament",
+              "orbit",
+              "marionette_joint",
+              "puppet_thread",
+              "hypha_node",
+              "hypha",
+              "particle",
+              "particle_trail",
+              "resonator",
+              "string_line",
+              "ember",
+              "hearth_arc",
+              "mandala_center",
+              "radial_line",
+              "marker",
+              "branch",
+              "label_anchor"
+            ]
+          },
+          "weight": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "motion": {
+            "type": "string",
+            "enum": [
+              "static",
+              "pulse",
+              "flow",
+              "radiate"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
