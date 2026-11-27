@@ -237,6 +237,7 @@ pub fn audit_performance_invariance_case(
     let mut item_ids = BTreeSet::new();
     let mut pair_ids = BTreeSet::new();
     let mut source_lineages = BTreeSet::new();
+    let mut variant_ids = BTreeSet::new();
     let mut composition_lineages = BTreeMap::<&str, &str>::new();
     let mut audio_lineages = BTreeMap::<&str, &str>::new();
     let mut scored = Vec::with_capacity(case.triads.len());
@@ -244,6 +245,17 @@ pub fn audit_performance_invariance_case(
 
     for (index, triad) in case.triads.iter().enumerate() {
         validate_triad(triad, index)?;
+        for variant_id in [
+            triad.clean.answer.variant_id.as_str(),
+            triad.performance_stay.answer.variant_id.as_str(),
+            triad.musical_flip.answer.variant_id.as_str(),
+        ] {
+            if !variant_ids.insert(variant_id) {
+                return Err(format!(
+                    "triads[{index}] repeats a variant ID across the evaluation run"
+                ));
+            }
+        }
         if triad.model_identity_sha256 != first.model_identity_sha256
             || triad.system_prompt_sha256 != first.system_prompt_sha256
             || triad.runtime_identity_sha256 != first.runtime_identity_sha256
@@ -1101,6 +1113,53 @@ mod tests {
         )]);
         input.triads[0].performance_stay.answer.audio_sha256 =
             input.triads[0].clean.answer.audio_sha256.clone();
+        assert!(audit_performance_invariance_case(&input).is_err());
+    }
+
+    #[test]
+    fn model_runtime_and_variant_identities_are_run_consistent() {
+        let first = triad(
+            "run-first",
+            MusicalTargetPropertyV1::ChordQuality,
+            PerformanceVariationFactorV1::DifferentTake,
+            MusicalChangeFactorV1::ChordQuality,
+            true,
+            true,
+        );
+        let mut second = triad(
+            "run-second",
+            MusicalTargetPropertyV1::ChordQuality,
+            PerformanceVariationFactorV1::DifferentTake,
+            MusicalChangeFactorV1::ChordQuality,
+            true,
+            true,
+        );
+        second.source_lineage_sha256 = digest('9');
+        second.composition_sha256 = digest('8');
+        second.clean.answer.audio_sha256 = digest('1');
+        second.performance_stay.answer.audio_sha256 = digest('2');
+        second.musical_flip.answer.audio_sha256 = digest('3');
+        second.runtime_identity_sha256 = digest('7');
+        assert!(audit_performance_invariance_case(&case(vec![first.clone(), second.clone()])).is_err());
+
+        second.runtime_identity_sha256 = first.runtime_identity_sha256.clone();
+        second.clean.answer.variant_id = first.clean.answer.variant_id.clone();
+        assert!(audit_performance_invariance_case(&case(vec![first, second])).is_err());
+    }
+
+    #[test]
+    fn question_text_must_remain_identical_across_the_matched_triad() {
+        let mut input = case(vec![triad(
+            "question-scope",
+            MusicalTargetPropertyV1::RelativeIntervalSequence,
+            PerformanceVariationFactorV1::GlobalTransposition,
+            MusicalChangeFactorV1::MelodicInterval,
+            true,
+            true,
+        )]);
+        input.triads[0].musical_flip.answer.question = "Is the chord quality the same?".into();
+        input.triads[0].musical_flip.answer.question_sha256 =
+            sha256_hex(input.triads[0].musical_flip.answer.question.as_bytes());
         assert!(audit_performance_invariance_case(&input).is_err());
     }
 
