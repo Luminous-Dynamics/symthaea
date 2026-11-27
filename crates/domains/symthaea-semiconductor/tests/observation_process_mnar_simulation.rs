@@ -159,6 +159,7 @@ fn proxy_delay_survival(actual_delay: u64) -> f64 {
 
 fn make_row(
     round_id: usize,
+    stratum: usize,
     true_loss: f64,
     selected: bool,
     measurement_succeeded: bool,
@@ -207,6 +208,7 @@ fn make_row(
         event_time_unix_seconds: event_time,
         prediction_time_unix_seconds: prediction_time,
         clock_domain_id: "synthetic-fab-clock".into(),
+        context_stratum_id: Some(format!("tool-chamber-stratum-{stratum}")),
         acquisition: PhysicalAcquisitionRecordV1 {
             state: acquired_state,
             selection_design_kind: PhysicalSelectionDesignKindV1::RandomizedKnownInclusionProbability,
@@ -389,6 +391,7 @@ fn simulate(root_seed: u64, regime: MissingnessRegime) -> SimulationOutput {
 
         rows.push(make_row(
             round_id,
+            stratum,
             true_loss,
             selected,
             measurement_succeeded,
