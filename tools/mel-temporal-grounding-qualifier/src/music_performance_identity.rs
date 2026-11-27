@@ -1235,7 +1235,7 @@ mod tests {
         assert!(audit_musical_performance_identity(&case(vec![changed_performance])).is_err());
 
         let mut changed_renderer = item;
-        changed_renderer.musical_flip.renderer_identity_sha256 = digest('6');
+        changed_renderer.musical_flip.renderer_identity_sha256 = digest('0');
         assert!(audit_musical_performance_identity(&case(vec![changed_renderer])).is_err());
     }
 
