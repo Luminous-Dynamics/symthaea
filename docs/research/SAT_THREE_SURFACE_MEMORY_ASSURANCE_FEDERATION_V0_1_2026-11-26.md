@@ -103,7 +103,7 @@ SAT should join stages through stable event and memory-record identities, but re
 - a T10 pass is not proof of cache/replica/archive deletion;
 - a cryptographic digest is not issuer authenticity, authority, semantic truth or source independence.
 
-Reuse, rather than duplicate, the existing MACE adversarial memory lifecycle work for L1/L2/L3 attacks, derived-memory propagation, counterfactual influence, selective repair and residual influence. Reuse SAT external-effect receipts for independently reconciled sink outcomes. The federation layer should only map those records into a common run manifest and preserve their native scoring.
+Machine-readable lifecycle join: [SAT Memory Lifecycle Causal Trace v0.1](SAT_MEMORY_LIFECYCLE_CAUSAL_TRACE_V0_1_2026-11-27.md) and its schema/fixtures define event ordering, evidence observers, claim scope, positive and benign controls, adaptive-round metadata, and counterfactual memory interventions. The seven public fixture rows are synthetic and not executed. The trace contract preserves each native security metric and does not issue a blended score.\n\nReuse, rather than duplicate, the existing MACE adversarial memory lifecycle work for L1/L2/L3 attacks, derived-memory propagation, counterfactual influence, selective repair and residual influence. Reuse SAT external-effect receipts for independently reconciled sink outcomes. The federation layer should only map those records into a common run manifest and preserve their native scoring.
 
 ## 5. Matched benign operation is a first-class measurement
 
