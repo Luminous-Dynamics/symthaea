@@ -317,5 +317,7 @@
         }
       }
     }
-  ]
+  ],
+  "split": "SyntheticRendered",
+  "source_permissions_manifest_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
 }
