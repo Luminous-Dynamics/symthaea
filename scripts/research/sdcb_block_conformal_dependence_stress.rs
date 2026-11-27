@@ -125,10 +125,11 @@ fn wilson_interval(successes: u64, trials: u64) -> (f64, f64) {
     let z2 = WILSON_Z * WILSON_Z;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let half_width = WILSON_Z
-        * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt())
-        / denominator;
-    ((center - half_width).max(0.0), (center + half_width).min(1.0))
+    let half_width = WILSON_Z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
+    (
+        (center - half_width).max(0.0),
+        (center + half_width).min(1.0),
+    )
 }
 
 fn conformal_p_value(calibration_scores: &[f64], test_score: f64) -> f64 {
@@ -224,9 +225,7 @@ fn run_suite(trials: u64) -> Vec<CoverageReport> {
                 block_len,
                 gap,
                 trials,
-                0x5344_4342_1000_0000
-                    ^ ((block_len as u64) << 16)
-                    ^ gap as u64,
+                0x5344_4342_1000_0000 ^ ((block_len as u64) << 16) ^ gap as u64,
             ));
         }
     }
