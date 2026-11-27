@@ -273,16 +273,15 @@ pub fn update_models(
     robust_support_ids: &[String],
 ) -> Result<ModelAveragingReport, Error> {
     let factors = validate_models(models, observation, robust_support_ids)?;
-    let mut log_likelihoods = Vec::with_capacity(models.len());
+    let mut log_densities = Vec::with_capacity(models.len());
+    let mut log_weights = Vec::with_capacity(models.len());
     let mut posterior_means = Vec::with_capacity(models.len());
     let mut posterior_variances = Vec::with_capacity(models.len());
 
     for (model, lower) in models.iter().zip(&factors) {
         let (log_likelihood, solved_innovation) =
             log_predictive_density(observation, model, lower)?;
-        let ( _, solved_cross) = log_predictive_density(
-            &model.predictive_mean, model, lower
-        )?;
+        let solved_cross = solve_cholesky(lower, &model.theta_observation_covariance)?;
         let mean_update: f64 = model.theta_observation_covariance.iter()
             .zip(&solved_innovation).map(|(a, b)| a * b).sum();
         let explained_variance: f64 = model.theta_observation_covariance.iter()
@@ -297,7 +296,8 @@ pub fn update_models(
             return Err(Error::NumericFailure);
         }
 
-        log_likelihoods.push(if model.prior_weight > 0.0 {
+        log_densities.push(log_likelihood);
+        log_weights.push(if model.prior_weight > 0.0 {
             model.prior_weight.ln() + log_likelihood
         } else {
             f64::NEG_INFINITY
@@ -306,7 +306,7 @@ pub fn update_models(
         posterior_variances.push(posterior_variance.max(0.0));
     }
 
-    let posterior_weights = posterior_weighted(&log_likelihoods)?;
+    let posterior_weights = posterior_weighted(&log_weights)?;
     let mixture_mean: f64 = posterior_weights.iter()
         .zip(&posterior_means).map(|(w, mean)| w * mean).sum();
     let within_variance: f64 = posterior_weights.iter()
@@ -326,9 +326,7 @@ pub fn update_models(
         ModelPosterior {
             model_id: model.model_id.clone(),
             prior_weight: model.prior_weight,
-            log_predictive_density: log_likelihoods[i] - if model.prior_weight > 0.0 {
-                model.prior_weight.ln()
-            } else { 0.0 },
+            log_predictive_density: log_densities[i],
             posterior_weight: posterior_weights[i],
             theta_posterior_mean: posterior_means[i],
             theta_posterior_variance: posterior_variances[i],
