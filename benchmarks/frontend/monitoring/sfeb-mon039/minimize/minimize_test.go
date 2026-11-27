@@ -21,7 +21,7 @@ func testDigest(s string) string {
 func makeObservation(ids []string, verdict Verdict, signature string, revision string, complete bool) Observation {
 	canonical, ok := canonicalFaults(ids)
 	if !ok { panic("invalid test fault IDs") }
-	return Observation{
+	o := Observation{
 		FaultIDs: canonical,
 		TrialID: "trial-039-001",
 		FaultSetSHA256: FaultSetDigest(canonical),
@@ -31,9 +31,10 @@ func makeObservation(ids []string, verdict Verdict, signature string, revision s
 		ObservedAt: evaluatedAt.Add(-time.Minute),
 		Verdict: verdict,
 		FailureSignatureSHA256: signature,
-		OutcomeReceiptSHA256: testDigest("receipt:"+FaultSetDigest(canonical)+":"+string(verdict)+":"+signature),
 		Complete: complete,
 	}
+	o.OutcomeReceiptSHA256 = ObservationReceiptDigest(o)
+	return o
 }
 func baseInput(faults []string, observations []Observation) Input {
 	return Input{
