@@ -87,6 +87,22 @@ pub enum CaoOcrcFeedbackReasonV1 {
     PredictionIntervalInvalid,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CaoOcrcPopulationScopeV1 {
+    QualifiedMeasuredStreamOnly,
+    FullPredictionPopulation,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CaoOcrcGuaranteeStatusV1 {
+    ConditionalOnDeclaredPaperAssumptions,
+    InvalidatedByK1QualificationFiltering,
+    InvalidatedByFeedbackDelayBound,
+    InvalidatedByMalformedFeedbackEvidence,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CaoOcrcPolicyV1 {
     pub schema: String,
@@ -98,6 +114,9 @@ pub struct CaoOcrcPolicyV1 {
     pub initial_threshold: f64,
     pub tracking_capacity: usize,
     pub maximum_feedback_delay_rounds: u64,
+    /// Declared estimand population. This is metadata, not proof that the
+    /// selected sequence represents all production wafers.
+    pub population_scope: CaoOcrcPopulationScopeV1,
     /// Survival values F(a)=P[proxy_delay >= a] for a=0..d_max.
     /// F(-1)=1 is implicit.
     pub proxy_survival: Vec<f64>,
@@ -206,6 +225,8 @@ pub struct CaoOcrcRoundReceiptV1 {
     pub sample_id: String,
     pub threshold_before: f64,
     pub threshold_after: f64,
+    pub population_scope: CaoOcrcPopulationScopeV1,
+    pub guarantee_status: CaoOcrcGuaranteeStatusV1,
     pub trivial_loss: Option<f64>,
     pub proxy_uniform_draw: Option<f64>,
     pub selected_proxy_delay_rounds: i64,
@@ -229,6 +250,7 @@ pub struct CaoOcrcEngineV1 {
     pub policy_sha256: String,
     pub proxy_survival_sha256: String,
     pub threshold: f64,
+    pub guarantee_status: CaoOcrcGuaranteeStatusV1,
     pub next_round_index: u64,
     pub tracked_rounds: BTreeMap<u64, CaoOcrcTrackedRoundV1>,
     /// Retained immutable prediction evidence, including non-admitted rounds,
@@ -409,6 +431,7 @@ pub fn create_ca_ocrc_engine_v1(
         engine_id: engine_id.into(),
         clock_domain_id: clock_domain_id.into(),
         threshold: policy.initial_threshold,
+        guarantee_status: CaoOcrcGuaranteeStatusV1::ConditionalOnDeclaredPaperAssumptions,
         policy,
         policy_sha256,
         proxy_survival_sha256,
@@ -555,6 +578,7 @@ pub fn advance_ca_ocrc_round_v1(
     let mut next = engine.clone();
     let tracking_before = engine_tracking_digest(&engine.tracked_rounds, engine.threshold)?;
     let threshold_before = next.threshold;
+    let mut guarantee_status = next.guarantee_status;
 
     // 1. Evict only if the proxy horizon is strictly before the current round.
     let expired: Vec<u64> = next
@@ -721,6 +745,17 @@ pub fn advance_ca_ocrc_round_v1(
         };
         let actual_delay = input.round_index.saturating_sub(feedback.originating_round);
         if let Some(reason) = validate_feedback(feedback, round, &next, actual_delay)? {
+            guarantee_status = match reason {
+                CaoOcrcFeedbackReasonV1::FeedbackDelayOutOfPolicy => {
+                    CaoOcrcGuaranteeStatusV1::InvalidatedByFeedbackDelayBound
+                }
+                CaoOcrcFeedbackReasonV1::LabelNotCurrentK1
+                | CaoOcrcFeedbackReasonV1::LabelNotEligible
+                | CaoOcrcFeedbackReasonV1::DownstreamConsumptionNotAllowed => {
+                    CaoOcrcGuaranteeStatusV1::InvalidatedByK1QualificationFiltering
+                }
+                _ => CaoOcrcGuaranteeStatusV1::InvalidatedByMalformedFeedbackEvidence,
+            };
             let disposition = match (
                 feedback.eligibility_report.eligibility,
                 reason,
@@ -845,6 +880,7 @@ pub fn advance_ca_ocrc_round_v1(
         return Err(CaoOcrcErrorV1("CA-OCRC threshold update is non-finite".into()));
     }
     next.threshold = threshold_after;
+    next.guarantee_status = guarantee_status;
     next.next_round_index = next
         .next_round_index
         .checked_add(1)
@@ -865,6 +901,8 @@ pub fn advance_ca_ocrc_round_v1(
         evicted_round_ids: expired.clone(),
         expired_feedback_round_ids: expired,
         received_feedback_receipts: feedback_receipts,
+        population_scope: next.policy.population_scope,
+        guarantee_status,
         policy_sha256: next.policy_sha256.clone(),
         tracking_state_before_sha256: tracking_before,
         tracking_state_after_sha256: tracking_after,
@@ -1002,6 +1040,7 @@ pub struct CaoOcrcRiskBoundV1 {
     pub learning_rate: f64,
     pub tracking_capacity: usize,
     pub maximum_delay_rounds: u64,
+    pub population_scope: CaoOcrcPopulationScopeV1,
     pub tracking_load: Option<f64>,
     pub minimum_proxy_survival: Option<f64>,
     pub bound: Option<f64>,
