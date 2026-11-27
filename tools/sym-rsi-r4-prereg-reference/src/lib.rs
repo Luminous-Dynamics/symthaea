@@ -1041,10 +1041,10 @@ fn check_authority_and_claims(report: &mut ValidationReport, root: &Value) {
         Some(raw) if !raw.trim().is_empty() => {
             for item in raw.split(',') {
                 let claim = item.trim();
-                if !claim_flags.contains(&claim) {
-                    report.issue("UNKNOWN_SELECTED_CLAIM", claim);
-                } else if !declared_claims.insert(claim.to_owned()) {
+                if !declared_claims.insert(claim.to_owned()) {
                     report.issue("DUPLICATE_SELECTED_CLAIM", claim);
+                } else if !claim_flags.contains(&claim) {
+                    report.issue("UNKNOWN_SELECTED_CLAIM", claim);
                 }
             }
         }
