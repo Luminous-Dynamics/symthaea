@@ -107,3 +107,18 @@ Before this becomes the complete #12546 benchmark:
 Resource dimensions are comparable only when units, measurement boundaries, hardware and workloads match. This crate does not measure physical energy or hardware performance. Expected information gain about hidden state is reported separately from EVSI; a probe can reduce entropy without changing the optimal decision. The prior-free robust module is a different estimand again: it reports a guaranteed worst-case loss reduction over declared outcome-support sets, not an expectation.
 
 No output from this crate establishes SOTA, physical reliability, causal reconstruction or consciousness.
+
+
+## AERB sequential counterfactual-policy example
+
+The example `examples/aerb_sequential_policy.rs` maps the eight AERB ambiguous command histories and the existing illustrative loss table into the prior-free finite-horizon sequential oracle.
+
+It demonstrates an adaptive policy rather than a fixed probe list:
+- Request an endpoint-journal observation first.
+- Request effect-and-scope reconciliation **only** when the journal outcome leaves the no-effect and open-world-residual hypotheses together.
+- Stop and hold on branches where a follow-up cannot strictly improve worst-case terminal loss.
+- Recommend a fresh attempt only on the evaluator branch whose synthetic support is independently closed to the two NoEffect histories; this remains a non-authorizing terminal disposition, not an execution command.
+
+The example compares the dynamic programme with the separately written exhaustive policy-tree enumerator, checks the conditional branch and terminal loss, and retains a separate per-path resource receipt. It executes no probe, retry or physical robot action. The hidden support sets and oracle policy tree are evaluator-only and must not be exposed to a candidate process.
+
+This is an integration/conformance example over a synthetic process model. It does not qualify the sequential oracle until the exact-head Rust 1.96 formatting, test and strict-Clippy gates pass, and it is not a physical or benchmark-performance result.
