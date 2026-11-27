@@ -334,3 +334,27 @@ func TestValidChainedBundleQualifies(t *testing.T) {
 		t.Fatalf("expected valid chained bundle, got %+v", r)
 	}
 }
+
+func TestOldArtifactIsIndeterminateEvenWhenBundleIsFresh(t *testing.T) {
+	root, m, _, private, policy := testFixture(t)
+	m.Artifacts[0].CollectedAt = policy.Now.Add(-2 * time.Hour)
+	if err := SignManifest(&m, "custody-key-1", private); err != nil {
+		t.Fatal(err)
+	}
+	r := VerifyBundle(root, m, policy)
+	if r.Verdict != VerdictIndeterminate || !hasReason(r, "artifact_expired") {
+		t.Fatalf("old artifact must not inherit freshness from new manifest: %+v", r)
+	}
+}
+
+func TestFutureArtifactCollectionTimeIsIndeterminate(t *testing.T) {
+	root, m, _, private, policy := testFixture(t)
+	m.Artifacts[0].CollectedAt = policy.Now.Add(time.Hour)
+	if err := SignManifest(&m, "custody-key-1", private); err != nil {
+		t.Fatal(err)
+	}
+	r := VerifyBundle(root, m, policy)
+	if r.Verdict != VerdictIndeterminate || !hasReason(r, "artifact_collection_time_in_future") {
+		t.Fatalf("future artifact time must remain indeterminate: %+v", r)
+	}
+}
