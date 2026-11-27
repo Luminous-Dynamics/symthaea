@@ -107,7 +107,7 @@ Do not claim one universal scientific-agent SOTA. Compare each capability agains
 - **Scientific conclusion synthesis:** SciConBench fixed-core and rolling panels. Proposed stretch: factual F1 ≥0.40 on the same fixed core, with the lower 95% confidence bound above the matched reference; human-audited critical errors reported separately.
 - **Workflow completion:** FrontierChallenge and SCI-AGENT-EXAM. Keep full-pass and Pass@0.95 separate; a completion declaration is admissible only when every required artifact/verifier gate has a receipt.
 - **Research execution and learning:** Autonomous Science Bench. Treat the current 18-trial pool as a pilot; proposed stretch is ≥15/18 matched trial resolutions with no task below 2/3, but require a larger confirmatory task set before claiming a statistically stable lead.
-- **Method fidelity:** ABE-Ralph-style audit. Require 100% accounting for named dataset versions, preprocessing, baseline, compute, required architecture and metrics; any undeclared substitution is a hard failure even if the resulting score looks strong.
+- **Method fidelity:** METHODE-Bench / ABE-Ralph-style audit. Require 100% accounting for named dataset versions, split, preprocessing fit scope, required components, exact baseline and metric definitions, budgets and outputs; undeclared extra or substituted components are hard failures even if the script exits successfully.
 - **Evidence lifecycle:** REPAIR-Bench and CEDAR-Bench. Target ≥98% dependency recall, ≥95% attribution precision, ≥98% placebo stability, zero silent retention of a known-invalidated sole-support conclusion, and complete event/denominator accounting.
 - **Artifact fidelity:** Scientific Artifact Intake. Require exact raw digest, parser/config digest, byte-span correctness and resource-cap receipts for every observation admitted to analysis.
 
@@ -155,6 +155,20 @@ Primary references:
 - Correction Reach (11 Nov 2026): https://doi.org/10.3390/publications14040078
 - Scientific knowledge graphs and dynamic evidence (2026): https://doi.org/10.1093/nsr/nwag140
 - Functionality–Evidence–Validation framework for agentic bioinformatics (25 Nov 2026): https://doi.org/10.1093/bib/bbag650
+
+## Experimental method fidelity: METHODE-Bench
+
+A scientific workflow can execute successfully while failing to reproduce the experiment it claims to implement. The new [METHODE-Bench issue #14020](https://github.com/Luminous-Dynamics/symthaea/issues/14020) and [draft Rust contract PR #14022](https://github.com/Luminous-Dynamics/symthaea/pull/14022) make method fidelity an independent conformance axis. The first harness binds the reviewed method to exact dataset/split, preprocessing, component, baseline, metric, budget, output and replay identities. It classifies a declared exploratory deviation separately from faithful reproduction and unresolved execution.
+
+This is directly motivated by ABE-Ralph's experimental-fidelity audit and the observed ASI-Bench B1→B2 drop. ABE-Ralph reports silent dataset/budget changes and component substitutions in tested long-horizon reproductions; ASI-Bench's 10 Nov 2026 aggregate reported a 21.76-point mean drop from full-procedure B1 to method-specified/implementation-open B2 (55.60 versus 33.84). The task-set ID is not supplied in that snapshot, so this is a directional reference, not a reproducible causal estimate or a Symthaea result.
+
+The first Rust harness is a typed receipt auditor, not a method executor or truth oracle. Its 20 deterministic conformance tests do not demonstrate agent performance. The next evaluation should compare direct B2 implementation, a structured checklist, and a typed method contract with independent replay under identical model/runtime/tool/resource budgets. Report method fidelity, scientific-result validity, full task completion and unsupported completion claims separately.
+
+Primary references:
+- ABE-Ralph, *Beyond Execution: Auditing Experimental Fidelity in LLM-Driven Scientific Research*: https://arxiv.org/abs/2608.26753
+- ASI-Bench leaderboard and methodology (10 Nov 2026 snapshot): https://asibench.apexin.ai/leaderboard/
+- FrontierChallenge, full workflow completion and completion calibration: https://arxiv.org/abs/2608.24979
+- ScienceAgentBench expert-validated task set and verified split: https://github.com/OSU-NLP-Group/ScienceAgentBench
 
 ## Counterfactual evidence dependence: CEDAR-Bench
 
