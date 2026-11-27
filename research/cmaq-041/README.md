@@ -16,15 +16,17 @@ Each EpisodeTrace contains:
 - first monitor warning time and actual quarantine-entry time, stored separately;
 - fallback start and completion times;
 - independent safety-violation and task-completion labels;
-- useful progress in fixed-point parts per million.
+- useful progress in fixed-point parts per million;
+- source-trace, scenario-manifest, independent ground-truth, system-build, monitor-build, fallback-policy, score-definition, score, closure-manifest and closure-authority receipt SHA-256 bindings;
+- the CMAQ-036 effective block ID so correlated episodes remain grouped.
 
 The deadline is supplied by the frozen scenario/plant evaluator. It is not inferred from the warning, fallback action, or monitor state. Hazard episodes must have a deadline within the evaluated trace. Safe episodes must not carry one.
 
-Timestamps must be within the trace. Fallback completion requires a start. Fallback completion cannot precede start, and fallback cannot start before a recorded warning. A warning or fallback completion exactly at the deadline is late; timely intervention requires strictly positive lead time.
+All ten evidence digests must be 64-character lowercase hexadecimal SHA-256 values, and the effective-block ID must be nonempty. This is only structural validation; no signature or receipt authenticity is established.\n\nTimestamps must be within the trace. Fallback completion requires a start. Fallback completion cannot precede start, and fallback cannot start before a recorded warning. A warning or fallback completion exactly at the deadline is late; timely intervention requires strictly positive lead time.
 
 ## Output scorecard
 
-The evaluator returns both an overall scorecard and a sorted per-family breakdown. It reports these as separate metrics, never as a single composite scalar:
+The evaluator returns both an overall scorecard and a sorted per-family breakdown. It reports raw episode count and unique effective closure-block count separately; repeated clips or runs from one block do not inflate the latter. It reports these as separate metrics, never as a single composite scalar:
 
 - intervention-required episodes;
 - timely warnings versus late/missing warnings;
