@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/mace-decision-sufficient-memory-bench-v0-1/schemas/candidate-run-v0.1.schema.json",
+  "title": "MACE DSM Candidate Run v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_id",
+    "system_id",
+    "downstream_policy_digest",
+    "decision_seed",
+    "chosen_action",
+    "retrieved_evidence_ids",
+    "decision_support_evidence_ids"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_dsm_candidate_run_v0_1"
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "system_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "downstream_policy_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "chosen_action": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "retrieved_evidence_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 1000,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "decision_support_evidence_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 1000,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "decision_support_evidence_ids": {
+          "items": {}
+        }
+      },
+      "description": "Every decision-support ID must be a member of retrieved_evidence_ids; enforce this cross-field subset rule in the Rust scorer."
+    }
+  ]
+}
