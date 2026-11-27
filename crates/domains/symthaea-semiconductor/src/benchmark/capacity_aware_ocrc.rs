@@ -103,6 +103,13 @@ pub enum CaoOcrcGuaranteeStatusV1 {
     InvalidatedByMalformedFeedbackEvidence,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CaoOcrcDelayAssumptionV1 {
+    ArbitraryBounded,
+    IidStochastic,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CaoOcrcPolicyV1 {
     pub schema: String,
@@ -113,11 +120,19 @@ pub struct CaoOcrcPolicyV1 {
     pub score_upper_bound: f64,
     pub initial_threshold: f64,
     pub tracking_capacity: usize,
+    /// Maximum support of the actual feedback-delay distribution d_t.
     pub maximum_feedback_delay_rounds: u64,
+    /// Maximum age for which a prediction may be retained by the proxy policy.
+    /// This may be less than the actual feedback-delay support in IID mode.
+    pub maximum_proxy_delay_rounds: u64,
+    pub delay_assumption: CaoOcrcDelayAssumptionV1,
+    /// True-delay survival G(a)=P[d_t>=a], indexed from 0 through d_max+1.
+    /// Required only for the IID stochastic-delay mode; G(0)=1 and G(d_max+1)=0.
+    pub feedback_delay_survival: Option<Vec<f64>>,
     /// Declared estimand population. This is metadata, not proof that the
     /// selected sequence represents all production wafers.
     pub population_scope: CaoOcrcPopulationScopeV1,
-    /// Survival values F(a)=P[proxy_delay >= a] for a=0..d_max.
+    /// Survival values F(a)=P[proxy_delay >= a] for a=0..dbar_max.
     /// F(-1)=1 is implicit.
     pub proxy_survival: Vec<f64>,
 }
@@ -335,10 +350,10 @@ fn round_receipt_digest(
     json_sha256(&canonical)
 }
 
-fn validate_proxy_survival(values: &[f64], d_max: u64) -> Result<(), CaoOcrcErrorV1> {
-    if values.len() != d_max as usize + 1 {
+fn validate_proxy_survival(values: &[f64], proxy_max: u64) -> Result<(), CaoOcrcErrorV1> {
+    if values.len() != proxy_max as usize + 1 {
         return Err(CaoOcrcErrorV1(
-            "proxy survival vector length must equal d_max + 1".into(),
+            "proxy survival vector length must equal dbar_max + 1".into(),
         ));
     }
     if values.iter().any(|value| !value.is_finite() || !(0.0..=1.0).contains(value)) {
@@ -353,7 +368,7 @@ fn validate_proxy_survival(values: &[f64], d_max: u64) -> Result<(), CaoOcrcErro
     }
     if values.last().copied().unwrap_or(0.0) <= 0.0 {
         return Err(CaoOcrcErrorV1(
-            "F(d_max) must be positive to support every bounded actual delay".into(),
+            "F(dbar_max) must be positive to support the declared proxy horizon".into(),
         ));
     }
     Ok(())
@@ -375,7 +390,64 @@ fn validate_policy(policy: &CaoOcrcPolicyV1) -> Result<(), CaoOcrcErrorV1> {
     {
         return Err(CaoOcrcErrorV1("CA-OCRC policy parameters are invalid".into()));
     }
-    validate_proxy_survival(&policy.proxy_survival, policy.maximum_feedback_delay_rounds)
+    if policy.maximum_proxy_delay_rounds > policy.maximum_feedback_delay_rounds {
+        return Err(CaoOcrcErrorV1(
+            "maximum proxy delay cannot exceed maximum actual feedback delay".into(),
+        ));
+    }
+    validate_proxy_survival(&policy.proxy_survival, policy.maximum_proxy_delay_rounds)?;
+    match policy.delay_assumption {
+        CaoOcrcDelayAssumptionV1::ArbitraryBounded => {
+            if policy.maximum_proxy_delay_rounds != policy.maximum_feedback_delay_rounds
+                || policy.feedback_delay_survival.is_some()
+            {
+                return Err(CaoOcrcErrorV1(
+                    "arbitrary bounded mode requires dbar_max=d_max and no IID G profile".into(),
+                ));
+            }
+        }
+        CaoOcrcDelayAssumptionV1::IidStochastic => {
+            let survival = policy.feedback_delay_survival.as_ref().ok_or_else(|| {
+                CaoOcrcErrorV1("IID stochastic mode requires a declared true-delay survival G".into())
+            })?;
+            let expected_len = policy.maximum_feedback_delay_rounds as usize + 2;
+            if survival.len() != expected_len
+                || survival.iter().any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+                || survival.windows(2).any(|window| window[0] < window[1])
+                || survival.first().copied() != Some(1.0)
+                || survival.last().copied() != Some(0.0)
+            {
+                return Err(CaoOcrcErrorV1(
+                    "G must be a non-increasing survival vector on [0,d_max+1], with G(0)=1 and G(d_max+1)=0".into(),
+                ));
+            }
+            if q_g_for_policy(policy)? <= 0.0 {
+                return Err(CaoOcrcErrorV1(
+                    "q_G(dbar_max) must be positive; proxy horizon must include possible actual delays".into(),
+                ));
+            }
+            let pmf_at_proxy_max = survival[policy.maximum_proxy_delay_rounds as usize]
+                - survival[policy.maximum_proxy_delay_rounds as usize + 1];
+            if pmf_at_proxy_max <= 0.0 {
+                return Err(CaoOcrcErrorV1(
+                    "dbar_max must be a supported actual delay with positive probability under G".into(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn q_g_for_policy(policy: &CaoOcrcPolicyV1) -> Result<f64, CaoOcrcErrorV1> {
+    match policy.delay_assumption {
+        CaoOcrcDelayAssumptionV1::ArbitraryBounded => Ok(1.0),
+        CaoOcrcDelayAssumptionV1::IidStochastic => {
+            let survival = policy.feedback_delay_survival.as_ref().ok_or_else(|| {
+                CaoOcrcErrorV1("IID stochastic mode is missing G".into())
+            })?;
+            Ok(1.0 - survival[policy.maximum_proxy_delay_rounds as usize + 1])
+        }
+    }
 }
 
 fn sample_proxy_delay(survival: &[f64], uniform: f64) -> Result<i64, CaoOcrcErrorV1> {
