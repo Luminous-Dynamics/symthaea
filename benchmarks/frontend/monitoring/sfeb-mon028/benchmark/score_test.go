@@ -200,3 +200,22 @@ func FuzzPairKeyDeterministic(f *testing.F) {
 		if first!=second { t.Fatalf("pair key not deterministic") }
 	})
 }
+
+func TestPerFamilyFalseQualificationBreakdown(t *testing.T) {
+	s:=testSuite()
+	r:=testResult(t,s,"family-check")
+	for i:=range r.Observations {
+		if r.Observations[i].CaseID=="negative" && r.Observations[i].Replicate==1 {
+			r.Observations[i].Observed=Qualified
+		}
+	}
+	score,err:=ScoreRun(s,r)
+	if err!=nil { t.Fatal(err) }
+	var continuity *FamilyScore
+	for i:=range score.FamilyBreakdown {
+		if score.FamilyBreakdown[i].Family=="continuity" { continuity=&score.FamilyBreakdown[i] }
+	}
+	if continuity==nil || continuity.FalseQualified!=1 || continuity.UnsafeExecuted!=2 {
+		t.Fatalf("per-family unsafe acceptance not reported: %+v",score.FamilyBreakdown)
+	}
+}
