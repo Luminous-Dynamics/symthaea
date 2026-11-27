@@ -1,0 +1,659 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark": "REPAIR-Bench",
+  "fixture_class": "synthetic_contract_only",
+  "claim_boundary": "Synthetic event fixtures define expected dependency and reassessment behavior. They are not parser executions, scientific measurements, real retraction cases or benchmark results.",
+  "baseline": {
+    "baseline_id": "two-sample-temperature-v0",
+    "artifacts": [
+      {
+        "artifact_id": "artifact:data.csv",
+        "media_type": "text/csv",
+        "source_id": "study-data-1",
+        "source_status": "ACTIVE",
+        "raw_sha256": "fa6fb7ff6f2102bbca4b6b5b6d6a0aa76b34105b128aaf9a8fe3a21b2d9f2584",
+        "raw_byte_length": 54,
+        "raw_bytes_utf8": "sample_id,temperature_C,control\nS01,21.5,0\nS02,19.0,0\n"
+      },
+      {
+        "artifact_id": "artifact:protocol.json",
+        "media_type": "application/json",
+        "source_id": "study-protocol-1",
+        "source_status": "ACTIVE",
+        "raw_sha256": "c43c6caee65cde594eb0d9121a23f2c398f10eca7fa265beb746099dfb759ff3",
+        "raw_byte_length": 156,
+        "raw_bytes_utf8": "{\"protocol_version\":\"v1\",\"unit\":\"degC\",\"threshold_C\":20.0,\"comparison_rule\":\"at_or_above\",\"description\":\"baseline protocol\",\"source_id\":\"study-protocol-1\"}\n"
+      }
+    ],
+    "parser": {
+      "id": "delimited-parser",
+      "version": "0.9.0",
+      "decimal_policy": "round_to_integer"
+    },
+    "method": {
+      "id": "temperature-mean",
+      "version": "mean-v1",
+      "comparison_implementation": "strict_greater_than"
+    },
+    "observations": [
+      {
+        "id": "obs_temp_s01",
+        "artifact_id": "artifact:data.csv",
+        "locator": {
+          "kind": "CSV_CELL",
+          "record_index": 0,
+          "column_name": "temperature_C",
+          "byte_start": 38,
+          "byte_end": 42
+        },
+        "raw_lexeme": "21.5",
+        "parsed_value": 21,
+        "unit": "degC"
+      },
+      {
+        "id": "obs_temp_s02",
+        "artifact_id": "artifact:data.csv",
+        "locator": {
+          "kind": "CSV_CELL",
+          "record_index": 1,
+          "column_name": "temperature_C",
+          "byte_start": 48,
+          "byte_end": 52
+        },
+        "raw_lexeme": "19.0",
+        "parsed_value": 19,
+        "unit": "degC"
+      },
+      {
+        "id": "obs_control_s01",
+        "artifact_id": "artifact:data.csv",
+        "locator": {
+          "kind": "CSV_CELL",
+          "record_index": 0,
+          "column_name": "control",
+          "byte_start": 43,
+          "byte_end": 44
+        },
+        "raw_lexeme": "0",
+        "parsed_value": 0
+      },
+      {
+        "id": "obs_control_s02",
+        "artifact_id": "artifact:data.csv",
+        "locator": {
+          "kind": "CSV_CELL",
+          "record_index": 1,
+          "column_name": "control",
+          "byte_start": 53,
+          "byte_end": 54
+        },
+        "raw_lexeme": "0",
+        "parsed_value": 0
+      },
+      {
+        "id": "obs_threshold",
+        "artifact_id": "artifact:protocol.json",
+        "locator": {
+          "kind": "JSON_POINTER",
+          "pointer": "/threshold_C"
+        },
+        "raw_lexeme": "20.0",
+        "parsed_value": 20,
+        "unit": "degC"
+      },
+      {
+        "id": "obs_protocol_version",
+        "artifact_id": "artifact:protocol.json",
+        "locator": {
+          "kind": "JSON_POINTER",
+          "pointer": "/protocol_version"
+        },
+        "raw_lexeme": "v1",
+        "parsed_value": "v1"
+      }
+    ],
+    "analysis_nodes": [
+      {
+        "id": "analysis_mean_temperature",
+        "method_id": "temperature-mean",
+        "input_observations": [
+          "obs_temp_s01",
+          "obs_temp_s02"
+        ],
+        "output": {
+          "value": 20,
+          "unit": "degC"
+        },
+        "expected_semantics": "arithmetic mean over in-scope observations"
+      },
+      {
+        "id": "analysis_control_check",
+        "method_id": "control-zero-check",
+        "input_observations": [
+          "obs_control_s01",
+          "obs_control_s02"
+        ],
+        "output": {
+          "all_zero": true
+        },
+        "expected_semantics": "every in-scope control flag equals zero"
+      }
+    ],
+    "claims": [
+      {
+        "id": "claim_mean_temperature",
+        "text": "The two-sample mean temperature is 20.0 degC",
+        "status": "SUPPORTED",
+        "depends_on": [
+          "analysis_mean_temperature"
+        ]
+      },
+      {
+        "id": "claim_above_threshold",
+        "text": "The mean temperature is at or above the protocol threshold",
+        "status": "REFUTED",
+        "depends_on": [
+          "analysis_mean_temperature",
+          "obs_threshold"
+        ]
+      },
+      {
+        "id": "claim_controls_zero",
+        "text": "Both control flags are zero",
+        "status": "SUPPORTED",
+        "depends_on": [
+          "analysis_control_check"
+        ]
+      },
+      {
+        "id": "claim_protocol_version",
+        "text": "The protocol version is v1",
+        "status": "SUPPORTED",
+        "depends_on": [
+          "obs_protocol_version"
+        ]
+      }
+    ],
+    "decisions": [
+      {
+        "id": "decision_temperature_alert",
+        "value": "NO_ALERT",
+        "depends_on": [
+          "claim_above_threshold"
+        ]
+      },
+      {
+        "id": "decision_control_accept",
+        "value": "ACCEPT_CONTROL_SCREEN",
+        "depends_on": [
+          "claim_controls_zero"
+        ]
+      }
+    ],
+    "edges": [
+      [
+        "artifact:data.csv",
+        "obs_temp_s01"
+      ],
+      [
+        "artifact:data.csv",
+        "obs_temp_s02"
+      ],
+      [
+        "artifact:data.csv",
+        "obs_control_s01"
+      ],
+      [
+        "artifact:data.csv",
+        "obs_control_s02"
+      ],
+      [
+        "artifact:protocol.json",
+        "obs_threshold"
+      ],
+      [
+        "artifact:protocol.json",
+        "obs_protocol_version"
+      ],
+      [
+        "obs_temp_s01",
+        "analysis_mean_temperature"
+      ],
+      [
+        "obs_temp_s02",
+        "analysis_mean_temperature"
+      ],
+      [
+        "analysis_mean_temperature",
+        "claim_mean_temperature"
+      ],
+      [
+        "claim_mean_temperature",
+        "claim_above_threshold"
+      ],
+      [
+        "obs_threshold",
+        "claim_above_threshold"
+      ],
+      [
+        "obs_control_s01",
+        "analysis_control_check"
+      ],
+      [
+        "obs_control_s02",
+        "analysis_control_check"
+      ],
+      [
+        "analysis_control_check",
+        "claim_controls_zero"
+      ],
+      [
+        "obs_protocol_version",
+        "claim_protocol_version"
+      ],
+      [
+        "claim_above_threshold",
+        "decision_temperature_alert"
+      ],
+      [
+        "claim_controls_zero",
+        "decision_control_accept"
+      ]
+    ]
+  },
+  "events": [
+    {
+      "event_id": "E01",
+      "event_type": "RAW_DATA_CORRECTION",
+      "description": "Correct S01 temperature from 21.5 to 22.5; threshold decision crosses.",
+      "mutation": {
+        "operation": "REPLACE_CSV_CELL",
+        "target_artifact_id": "artifact:data.csv",
+        "locator": {
+          "record_index": 0,
+          "column_name": "temperature_C"
+        },
+        "new_value_lexeme": "22.5",
+        "new_artifact_sha256": "868583be9a93d07bec21c66feffb52e2f207e4261bff18f4f85cebb9b23aa7a1",
+        "new_artifact_bytes_utf8": "sample_id,temperature_C,control\nS01,22.5,0\nS02,19.0,0\n"
+      },
+      "expected": {
+        "reassessed_changed": [
+          "obs_temp_s01",
+          "analysis_mean_temperature",
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "decision_temperature_alert"
+        ],
+        "reassessed_unchanged": [
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "analysis_control_check",
+          "claim_controls_zero",
+          "decision_control_accept",
+          "obs_threshold",
+          "claim_protocol_version"
+        ],
+        "blocked": [],
+        "unresolved": [],
+        "not_dependent": []
+      }
+    },
+    {
+      "event_id": "E02",
+      "event_type": "NON_MATERIAL_SOURCE_UPDATE",
+      "description": "Change only a protocol description field not used by any observation, method, claim or decision.",
+      "mutation": {
+        "operation": "REPLACE_JSON_FIELD",
+        "target_artifact_id": "artifact:protocol.json",
+        "json_pointer": "/description",
+        "new_value": "updated wording only",
+        "new_artifact_sha256": "59a8988d231cfa406491cdd0febadaf8ff1f2fbb9003861851dbc69de9bcd28d",
+        "new_artifact_bytes_utf8": "{\"protocol_version\":\"v1\",\"unit\":\"degC\",\"threshold_C\":20.0,\"comparison_rule\":\"at_or_above\",\"description\":\"updated wording only\",\"source_id\":\"study-protocol-1\"}\n"
+      },
+      "expected": {
+        "reassessed_changed": [],
+        "reassessed_unchanged": [],
+        "blocked": [],
+        "unresolved": [],
+        "not_dependent": [
+          "obs_temp_s01",
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "obs_threshold",
+          "obs_protocol_version",
+          "analysis_mean_temperature",
+          "analysis_control_check",
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "claim_controls_zero",
+          "claim_protocol_version",
+          "decision_temperature_alert",
+          "decision_control_accept"
+        ]
+      }
+    },
+    {
+      "event_id": "E03",
+      "event_type": "SOURCE_RETRACTION",
+      "description": "Retract the data source after the baseline conclusions were recorded.",
+      "mutation": {
+        "operation": "SET_SOURCE_STATUS",
+        "target_artifact_id": "artifact:data.csv",
+        "new_source_status": "RETRACTED"
+      },
+      "expected": {
+        "reassessed_changed": [
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "claim_controls_zero"
+        ],
+        "reassessed_unchanged": [
+          "claim_protocol_version"
+        ],
+        "blocked": [
+          "decision_temperature_alert",
+          "decision_control_accept"
+        ],
+        "unresolved": [],
+        "not_dependent": [
+          "obs_threshold",
+          "obs_protocol_version",
+          "claim_protocol_version"
+        ]
+      }
+    },
+    {
+      "event_id": "E04",
+      "event_type": "THRESHOLD_CORRECTION",
+      "description": "Correct protocol threshold from 20.0 to 19.5; the baseline mean remains unchanged but the threshold claim changes.",
+      "mutation": {
+        "operation": "REPLACE_JSON_FIELD",
+        "target_artifact_id": "artifact:protocol.json",
+        "json_pointer": "/threshold_C",
+        "new_value": 19.5,
+        "new_artifact_sha256": "12617ee0a4b724052d1f2a24e6118907f71bbe013afd749b30ab6fd8f97d3995",
+        "new_artifact_bytes_utf8": "{\"protocol_version\":\"v1\",\"unit\":\"degC\",\"threshold_C\":19.5,\"comparison_rule\":\"at_or_above\",\"description\":\"baseline protocol\",\"source_id\":\"study-protocol-1\"}\n"
+      },
+      "expected": {
+        "reassessed_changed": [
+          "obs_threshold",
+          "claim_above_threshold",
+          "decision_temperature_alert"
+        ],
+        "reassessed_unchanged": [
+          "analysis_mean_temperature",
+          "claim_mean_temperature",
+          "claim_controls_zero",
+          "decision_control_accept",
+          "obs_protocol_version",
+          "claim_protocol_version"
+        ],
+        "blocked": [],
+        "unresolved": [],
+        "not_dependent": []
+      }
+    },
+    {
+      "event_id": "E05",
+      "event_type": "PARSER_CORRECTION",
+      "description": "Correct parser decimal handling; the raw artifact is unchanged but 21.5 must no longer be rounded to 21.",
+      "mutation": {
+        "operation": "UPDATE_PARSER_VERSION",
+        "parser_id": "delimited-parser",
+        "old_version": "0.9.0",
+        "new_version": "1.0.0",
+        "new_decimal_policy": "preserve_decimal_lexeme"
+      },
+      "expected": {
+        "reassessed_changed": [
+          "obs_temp_s01",
+          "analysis_mean_temperature",
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "decision_temperature_alert"
+        ],
+        "reassessed_unchanged": [
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "analysis_control_check",
+          "claim_controls_zero",
+          "decision_control_accept",
+          "obs_threshold",
+          "claim_protocol_version"
+        ],
+        "blocked": [],
+        "unresolved": [],
+        "not_dependent": []
+      }
+    },
+    {
+      "event_id": "E06",
+      "event_type": "METHOD_CORRECTION",
+      "description": "Correct comparison implementation from strict greater-than to the protocol's at-or-above rule; mean equals threshold in the baseline.",
+      "mutation": {
+        "operation": "UPDATE_METHOD_VERSION",
+        "method_id": "temperature-mean",
+        "old_version": "mean-v1",
+        "new_version": "mean-v2",
+        "new_comparison_implementation": "greater_than_or_equal"
+      },
+      "expected": {
+        "reassessed_changed": [
+          "claim_above_threshold",
+          "decision_temperature_alert"
+        ],
+        "reassessed_unchanged": [
+          "analysis_mean_temperature",
+          "claim_mean_temperature",
+          "claim_controls_zero",
+          "decision_control_accept",
+          "claim_protocol_version"
+        ],
+        "blocked": [],
+        "unresolved": [],
+        "not_dependent": []
+      }
+    },
+    {
+      "event_id": "E07",
+      "event_type": "SCOPE_CORRECTION",
+      "description": "Correct the protocol's in-scope sample set to S02 only; the mean falls below threshold.",
+      "mutation": {
+        "operation": "REPLACE_JSON_FIELD",
+        "target_artifact_id": "artifact:protocol.json",
+        "json_pointer": "/included_samples",
+        "new_value": [
+          "S02"
+        ],
+        "new_artifact_sha256": "4095d85d6607294741479da4e171b68dbee2d32926d8f0bc5b9b8c71e022baf8",
+        "new_artifact_bytes_utf8": "{\"protocol_version\":\"v1\",\"unit\":\"degC\",\"threshold_C\":20.0,\"comparison_rule\":\"at_or_above\",\"included_samples\":[\"S02\"],\"description\":\"baseline protocol\",\"source_id\":\"study-protocol-1\"}\n"
+      },
+      "expected": {
+        "reassessed_changed": [
+          "analysis_mean_temperature",
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "decision_temperature_alert"
+        ],
+        "reassessed_unchanged": [
+          "analysis_control_check",
+          "claim_controls_zero",
+          "decision_control_accept",
+          "obs_threshold",
+          "claim_protocol_version"
+        ],
+        "blocked": [],
+        "unresolved": [],
+        "not_dependent": []
+      }
+    },
+    {
+      "event_id": "E08",
+      "event_type": "CONTRADICTORY_SOURCE",
+      "description": "Add an independent source reporting materially lower temperatures; preserve conflict rather than replacing the original observation.",
+      "mutation": {
+        "operation": "ADD_SOURCE",
+        "new_source_id": "independent-lab-2",
+        "new_artifact_sha256": "0c01b683c5f97f25fdee68a8edc04d417f2c769bd76380ba02b6b8e5226adc76",
+        "new_artifact_bytes_utf8": "sample_id,temperature_C\nS01,17.0\nS02,18.0\n",
+        "relation_to_existing": "INDEPENDENT_CONTRADICTORY_EVIDENCE"
+      },
+      "expected": {
+        "reassessed_changed": [],
+        "reassessed_unchanged": [
+          "claim_controls_zero",
+          "decision_control_accept",
+          "claim_protocol_version"
+        ],
+        "blocked": [],
+        "unresolved": [
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "decision_temperature_alert"
+        ],
+        "not_dependent": [
+          "analysis_mean_temperature"
+        ]
+      }
+    },
+    {
+      "event_id": "E09",
+      "event_type": "DUPLICATE_ORIGIN_MIRROR",
+      "description": "Add a mirror URL with identical bytes and the same source origin; it must not count as independent corroboration.",
+      "mutation": {
+        "operation": "ADD_MIRROR",
+        "target_artifact_id": "artifact:data.csv",
+        "mirror_sha256": "fa6fb7ff6f2102bbca4b6b5b6d6a0aa76b34105b128aaf9a8fe3a21b2d9f2584",
+        "origin_source_id": "study-data-1"
+      },
+      "expected": {
+        "reassessed_changed": [],
+        "reassessed_unchanged": [
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "claim_controls_zero",
+          "claim_protocol_version",
+          "decision_temperature_alert",
+          "decision_control_accept"
+        ],
+        "blocked": [],
+        "unresolved": [],
+        "not_dependent": []
+      }
+    },
+    {
+      "event_id": "E10",
+      "event_type": "SEMANTICALLY_EQUIVALENT_ARTIFACT_VERSION",
+      "description": "Reorder CSV rows at the same URL. Raw digest changes, but typed observations and conclusions are semantically equivalent.",
+      "mutation": {
+        "operation": "REPLACE_RAW_BYTES",
+        "target_artifact_id": "artifact:data.csv",
+        "new_artifact_sha256": "9202ce4eb8d057115a372a5bd106e0185bf37671f7414b04ad62079670663e30",
+        "new_artifact_bytes_utf8": "sample_id,temperature_C,control\nS02,19.0,0\nS01,21.5,0\n",
+        "semantic_expectation": "ROW_ORDER_INVARIANT"
+      },
+      "expected": {
+        "reassessed_changed": [],
+        "reassessed_unchanged": [
+          "obs_temp_s01",
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "analysis_mean_temperature",
+          "analysis_control_check",
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "claim_controls_zero",
+          "decision_temperature_alert",
+          "decision_control_accept"
+        ],
+        "blocked": [],
+        "unresolved": [],
+        "not_dependent": [
+          "claim_protocol_version"
+        ]
+      }
+    },
+    {
+      "event_id": "E11",
+      "event_type": "CORRECTION_UNAVAILABLE",
+      "description": "A trusted source announces a correction but the correction payload cannot be acquired or parsed.",
+      "mutation": {
+        "operation": "CORRECTION_NOTICE_ONLY",
+        "target_artifact_id": "artifact:data.csv",
+        "payload_available": false,
+        "notice_receipt_id": "notice-receipt-001"
+      },
+      "expected": {
+        "reassessed_changed": [],
+        "reassessed_unchanged": [
+          "claim_protocol_version"
+        ],
+        "blocked": [
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "claim_controls_zero",
+          "decision_temperature_alert",
+          "decision_control_accept"
+        ],
+        "unresolved": [],
+        "not_dependent": [
+          "obs_threshold",
+          "obs_protocol_version"
+        ]
+      }
+    },
+    {
+      "event_id": "E12",
+      "event_type": "UNTRUSTED_CORRECTION_NOTICE",
+      "description": "A malformed or unauthenticated notice attempts to mutate accepted evidence; it must be recorded but must not change source state.",
+      "mutation": {
+        "operation": "REJECT_NOTICE",
+        "signature_valid": false,
+        "notice_id": "untrusted-notice-001"
+      },
+      "expected": {
+        "reassessed_changed": [],
+        "reassessed_unchanged": [],
+        "blocked": [],
+        "unresolved": [],
+        "not_dependent": [
+          "obs_temp_s01",
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "obs_threshold",
+          "obs_protocol_version",
+          "analysis_mean_temperature",
+          "analysis_control_check",
+          "claim_mean_temperature",
+          "claim_above_threshold",
+          "claim_controls_zero",
+          "claim_protocol_version",
+          "decision_temperature_alert",
+          "decision_control_accept"
+        ],
+        "ignored_untrusted": [
+          "untrusted-notice-001"
+        ]
+      }
+    }
+  ],
+  "metrics": [
+    "affected_assertion_precision_recall",
+    "dependency_closure_completeness",
+    "correction_reach_documented_reassessment_rate",
+    "changed_vs_unchanged_decision_accuracy",
+    "stale_conclusion_use_rate",
+    "collateral_invalidation_rate",
+    "deterministic_replay_agreement",
+    "historical_version_preservation",
+    "unavailable_update_reconciliation_rate",
+    "all_in_detection_and_reconciliation_cost"
+  ],
+  "protocol_note": "This first slice is a synthetic contract fixture. It is not an executed agent benchmark and its expected transitions require independent scientific and graph review before becoming gold labels."
+}
