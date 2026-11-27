@@ -102,7 +102,7 @@ fn parse_config() -> Result<Config, String> {
 }
 
 fn draw_predictive_rank(rng: &mut SplitMix64, counts: &[u64]) -> usize {
-    let total: u64 = counts.iter().map(|count| count + 1).sum();
+    let total: u64 = counts.iter().map(|count| *count + 1).sum();
     let mut draw = rng.below(total);
     for (index, count) in counts.iter().enumerate() {
         let bucket_mass = count + 1;
@@ -198,7 +198,7 @@ fn run_replication(
             Scenario::DelayedTrimodal => draw_trimodal_rank(&mut rng),
         };
         let count = &mut urn_counts[rank - 1];
-        *count = count
+        *count = (*count)
             .checked_add(1)
             .ok_or_else(|| "probe urn counter overflow".to_string())?;
 
@@ -259,9 +259,9 @@ fn median_delay(alarms: &[Option<usize>], shift_after: Option<usize>) -> Option<
     let mut delays = alarms
         .iter()
         .filter_map(|time| {
-            time.and_then(|alarm| {
+            time.as_ref().and_then(|alarm| {
                 let origin = shift_after.unwrap_or(0);
-                (alarm > origin).then_some(alarm - origin)
+                (*alarm > origin).then_some(*alarm - origin)
             })
         })
         .collect::<Vec<_>>();
