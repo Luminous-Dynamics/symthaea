@@ -650,7 +650,8 @@
         "cvar_alpha",
         "residual_threshold_status",
         "nonlinear_full_order_response_required",
-        "scalar_separation_oracle"
+        "scalar_separation_oracle",
+        "joint_box_oracle"
       ],
       "properties": {
         "checkpoint_state_residual_required": {
@@ -733,6 +734,80 @@
               "const": "conditional_on_valid_lipschitz_and_branch_evidence"
             },
             "full_order_confirmation_required": {
+              "const": true
+            }
+          }
+        },
+        "joint_box_oracle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "method",
+            "continuous_parameter_axes",
+            "coordinate_lipschitz_semantics",
+            "subdivision_policy",
+            "interior_search_required",
+            "boundary_only_search_sufficient",
+            "lipschitz_certificate_status",
+            "branch_stability_evidence_status",
+            "budget_exhaustion_disposition",
+            "global_bound_claim_status",
+            "full_order_confirmation_required",
+            "objective_normalization",
+            "reference_response_denominator_lower_bound_required"
+          ],
+          "properties": {
+            "status": {
+              "const": "design_only_not_executed"
+            },
+            "method": {
+              "const": "anisotropic_lipschitz_branch_and_bound_nd"
+            },
+            "continuous_parameter_axes": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 3,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pulse_phase",
+                  "kick_amplitude",
+                  "pulse_separation"
+                ]
+              }
+            },
+            "coordinate_lipschitz_semantics": {
+              "const": "sum_i_L_i_abs_coordinate_delta_i"
+            },
+            "subdivision_policy": {
+              "const": "largest_Li_times_half_width"
+            },
+            "interior_search_required": {
+              "const": true
+            },
+            "boundary_only_search_sufficient": {
+              "const": false
+            },
+            "lipschitz_certificate_status": {
+              "const": "not_issued_synthetic"
+            },
+            "branch_stability_evidence_status": {
+              "const": "not_issued_synthetic"
+            },
+            "budget_exhaustion_disposition": {
+              "const": "unqualified"
+            },
+            "global_bound_claim_status": {
+              "const": "conditional_on_valid_box_lipschitz_and_branch_evidence"
+            },
+            "full_order_confirmation_required": {
+              "const": true
+            },
+            "objective_normalization": {
+              "const": "declared_qoi_scale_and_fixed_positive_floor"
+            },
+            "reference_response_denominator_lower_bound_required": {
               "const": true
             }
           }
