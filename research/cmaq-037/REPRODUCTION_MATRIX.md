@@ -121,7 +121,7 @@ The paper proves anytime false-alarm control for its CCTM construction and gives
 
 CMAQ-040 is a separate composition experiment: it applies a heavy-tailed mixture over possible restart times to fixed-bet predictive-rank Haar components, with a finite pre-registered betting-rate grid. Each feature/rate/direction account is itself a predictive-rank e-process; the restart mixture is a normalized mixture of those processes. This is not a reproduction of the paper's Dirichlet universal portfolio, does not inherit its optimality theorem, and should not be called parameter-free. Its purpose is to test whether feature-space coverage and late-onset adaptation compose effectively under the exact PRM null.
 
-The late-shift matrix must include shift times 0, 100, 500, 2,000 and 8,000, and report delay from the true shift time—not from stream start. Report null wealth and false alarms over the *entire* deployment horizon, not just post-change windows. Use a long null prelude to detect performance degradation that short-horizon synthetic tests cannot expose.
+The late-shift matrix must include shift times 0, 125, 250, 500, 1,000, 2,000, 4,000 and 8,000, matching the PF-CCTM ImageNet-C protocol, and report delay from the true shift time—not from stream start. Report null wealth and false alarms over the *entire* deployment horizon, not just post-change windows. Use a long null prelude to detect performance degradation that short-horizon synthetic tests cannot expose.
 
 ## PF-CCTM reproduction target and caveats
 
