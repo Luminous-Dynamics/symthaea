@@ -129,6 +129,9 @@ pub struct CaoOcrcPolicyV1 {
     /// True-delay survival G(a)=P[d_t>=a], indexed from 0 through d_max+1.
     /// Required only for the IID stochastic-delay mode; G(0)=1 and G(d_max+1)=0.
     pub feedback_delay_survival: Option<Vec<f64>>,
+    /// Content-addressed evidence manifest for the declared IID delay law.
+    /// This binds the source window, units, scope and estimation procedure.
+    pub feedback_delay_law_manifest_sha256: Option<String>,
     /// Declared estimand population. This is metadata, not proof that the
     /// selected sequence represents all production wafers.
     pub population_scope: CaoOcrcPopulationScopeV1,
@@ -407,6 +410,7 @@ fn validate_policy(policy: &CaoOcrcPolicyV1) -> Result<(), CaoOcrcErrorV1> {
         CaoOcrcDelayAssumptionV1::ArbitraryBounded => {
             if policy.maximum_proxy_delay_rounds != policy.maximum_feedback_delay_rounds
                 || policy.feedback_delay_survival.is_some()
+                || policy.feedback_delay_law_manifest_sha256.is_some()
             {
                 return Err(CaoOcrcErrorV1(
                     "arbitrary bounded mode requires dbar_max=d_max and no IID G profile".into(),
@@ -417,6 +421,15 @@ fn validate_policy(policy: &CaoOcrcPolicyV1) -> Result<(), CaoOcrcErrorV1> {
             let survival = policy.feedback_delay_survival.as_ref().ok_or_else(|| {
                 CaoOcrcErrorV1("IID stochastic mode requires a declared true-delay survival G".into())
             })?;
+            if policy
+                .feedback_delay_law_manifest_sha256
+                .as_deref()
+                .is_none_or(|digest| !valid_sha256(digest))
+            {
+                return Err(CaoOcrcErrorV1(
+                    "IID stochastic mode requires a valid delay-law evidence manifest digest".into(),
+                ));
+            }
             let expected_len = policy.maximum_feedback_delay_rounds as usize + 2;
             if survival.len() != expected_len
                 || survival.iter().any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
@@ -1655,6 +1668,7 @@ mod tests {
             maximum_proxy_delay_rounds: d_max,
             delay_assumption: CaoOcrcDelayAssumptionV1::ArbitraryBounded,
             feedback_delay_survival: None,
+            feedback_delay_law_manifest_sha256: None,
             population_scope: CaoOcrcPopulationScopeV1::QualifiedMeasuredStreamOnly,
             proxy_survival: survival,
         }
