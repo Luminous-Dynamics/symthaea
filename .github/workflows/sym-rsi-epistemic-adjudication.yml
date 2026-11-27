@@ -9,6 +9,7 @@ on:
       - "src/web_research/types.rs"
       - "src/web_research/meta_learning.rs"
       - "src/web_research/selective_prediction.rs"
+      - "src/web_research/selective_observation.rs"
       - "src/web_research/mod.rs"
       - "tests/epistemic_consciousness_tests.rs"
       - "tools/sym-rsi-epistemic-adjudication/**"
@@ -19,6 +20,7 @@ on:
       - "src/web_research/types.rs"
       - "src/web_research/meta_learning.rs"
       - "src/web_research/selective_prediction.rs"
+      - "src/web_research/selective_observation.rs"
       - "src/web_research/mod.rs"
       - "tests/epistemic_consciousness_tests.rs"
       - "tools/sym-rsi-epistemic-adjudication/**"
@@ -47,6 +49,7 @@ jobs:
             src/web_research/types.rs \
             src/web_research/meta_learning.rs \
             src/web_research/selective_prediction.rs \
+            src/web_research/selective_observation.rs \
             src/web_research/mod.rs \
             tests/epistemic_consciousness_tests.rs \
             tools/sym-rsi-epistemic-adjudication/src/lib.rs
@@ -59,6 +62,7 @@ jobs:
             src/web_research/types.rs
             src/web_research/meta_learning.rs
             src/web_research/selective_prediction.rs
+            src/web_research/selective_observation.rs
             src/web_research/mod.rs
             tests/epistemic_consciousness_tests.rs
             tools/sym-rsi-epistemic-adjudication/src/lib.rs
@@ -68,6 +72,7 @@ jobs:
             src/web_research/types.rs \
             src/web_research/meta_learning.rs \
             src/web_research/selective_prediction.rs \
+            src/web_research/selective_observation.rs \
             src/web_research/mod.rs \
             tests/epistemic_consciousness_tests.rs \
             tools/sym-rsi-epistemic-adjudication/src/lib.rs
@@ -77,6 +82,7 @@ jobs:
             src/web_research/types.rs \
             src/web_research/meta_learning.rs \
             src/web_research/selective_prediction.rs \
+            src/web_research/selective_observation.rs \
             src/web_research/mod.rs \
             tests/epistemic_consciousness_tests.rs \
             tools/sym-rsi-epistemic-adjudication/src/lib.rs
