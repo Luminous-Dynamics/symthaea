@@ -268,6 +268,53 @@ Schema validator, or device profiling. It has not been connected to a renderer.
 The event envelope does not itself authenticate source identity or authorize
 hardware actions; those remain separate policy and trust-boundary work.
 
+### P0 inventory finding — Soma Android demo source
+
+The current `symthaea-soma/android/demo/src/main` tree contains the manifest and
+Android resources/layouts, but no Java/Kotlin source files. The layout references
+custom classes including `ParticleFieldView`, `ConsciousnessMandalaView`, and
+`ConsciousnessGardenView`; their class definitions were not found in that demo
+source tree. The layout also contains an empty `avatarRow` container, not a
+verified working avatar selector. Treat this as a UI/resource shell until the
+actual app source set and build target are located. Do not build the renderer
+assuming these views already exist.
+
+### P1.1 — Canonical semantic projection and deterministic replay
+
+A second renderer-neutral module has been added:
+`crates/domains/symthaea-soma/src/embodiment_projection.rs`.
+
+- Defines the seven planned embodiment form identifiers.
+- Converts typed events into a single canonical semantic-cue vocabulary.
+- Keeps epistemic status, confidence, evidence references, privacy class,
+  source identity, event identity, and time provenance with the cue.
+- Provides an accessible text alternative that describes reported events
+  without inventing emotion or claiming that a requested action completed.
+- Replays ordered event traces without a GPU, renderer, microphone, camera,
+  or network and can project the same canonical cue to each form identifier.
+- Tests deterministic replay, sequence preservation, invalid trace rejection,
+  and equality of cue semantics across all seven forms.
+
+This is a semantic projection and replay harness, not a visual renderer. The
+form IDs are present; no Bevy scene, puppet rig, or animation implementation is
+claimed.
+
+### P1 protocol hardening — 2026-11-27
+
+The event contract now additionally:
+- binds monotonic timestamps to an opaque clock-domain epoch and rejects mixed
+  clock domains within one session;
+- caps a session at 65,536 accepted events, requiring a new session epoch at the
+  bound so replay-protection memory cannot grow without limit;
+- records accepted cancellations, exposes `is_cancelled`, and rejects repeated
+  cancellation of the same event;
+- validates action-specific control payloads so a pause cannot smuggle a form,
+  cancel target, or intensity field.
+
+The caller-supplied `now_monotonic_ns` must come from the event's clock domain.
+Cross-device replay requires an explicit clock synchronization/mapping protocol;
+raw monotonic timestamps from different processes or devices must not be compared.
+
 ### P2 — Canonical Living Constellation
 
 - Implement a low-cost procedural 2D/3D renderer driven only by the event contract.
