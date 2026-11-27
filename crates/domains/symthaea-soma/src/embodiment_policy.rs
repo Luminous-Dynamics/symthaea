@@ -133,6 +133,8 @@ pub enum PolicyError {
     InvalidIntensity,
     EmptyFormGrant,
     DuplicateFormGrant,
+    GrantIdReused,
+    GrantHistoryCapacityReached,
     CancellationCapacityReached,
 }
 
@@ -165,6 +167,9 @@ pub struct PresentationPolicy {
     session_id: String,
     clock_domain_id: String,
     grants: Vec<ConsentGrant>,
+    /// Never forget a grant version within this policy session; otherwise a
+    /// stale identifier could be reused and make an old permit live again.
+    seen_grant_ids: HashSet<String>,
     cancelled_event_ids: HashSet<String>,
     paused: bool,
     reduced_motion: bool,
@@ -183,6 +188,7 @@ impl PresentationPolicy {
             session_id,
             clock_domain_id,
             grants: Vec::new(),
+            seen_grant_ids: HashSet::new(),
             cancelled_event_ids: HashSet::new(),
             paused: true,
             reduced_motion: true,
@@ -207,6 +213,12 @@ impl PresentationPolicy {
             return Err(PolicyError::ClockDomainMismatch);
         }
         validate_identifier(&grant.grant_id)?;
+        if self.seen_grant_ids.contains(&grant.grant_id) {
+            return Err(PolicyError::GrantIdReused);
+        }
+        if self.seen_grant_ids.len() >= 65_536 {
+            return Err(PolicyError::GrantHistoryCapacityReached);
+        }
         validate_identifier(&grant.session_id)?;
         validate_identifier(&grant.clock_domain_id)?;
 
@@ -234,6 +246,7 @@ impl PresentationPolicy {
         self.grants.retain(|existing| {
             existing.channel != grant.channel || existing.destination != grant.destination
         });
+        self.seen_grant_ids.insert(grant.grant_id.clone());
         self.grants.push(grant);
         Ok(())
     }
@@ -863,6 +876,33 @@ mod tests {
             policy.grant(grant, "200", CLOCK),
             Err(PolicyError::ClockDomainMismatch)
         );
+    }
+
+    #[test]
+    fn grant_ids_cannot_be_reused_within_one_policy_session() {
+        let mut policy = policy_with_grant(
+            PrivacyClass::Public,
+            OutputChannel::Visual,
+            OutputDestination::LocalPrivate,
+        );
+        assert_eq!(
+            policy.grant(
+                ConsentGrant {
+                    grant_id: "grant-v1".to_owned(),
+                    session_id: SESSION.to_owned(),
+                    clock_domain_id: CLOCK.to_owned(),
+                    channel: OutputChannel::Visual,
+                    destination: OutputDestination::LocalPrivate,
+                    allowed_forms: vec![EmbodimentForm::LivingConstellation],
+                    expires_at_monotonic_ns: "850".to_owned(),
+                    max_intensity: 0.25,
+                },
+                "201",
+                CLOCK,
+            ),
+            Err(PolicyError::GrantIdReused)
+        );
+        assert_eq!(policy.grant_count(), 1);
     }
 
     #[test]
