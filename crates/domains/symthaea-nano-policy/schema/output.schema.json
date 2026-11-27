@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-selection-output-v1",
+  "title": "Symthaea nano-policy selector output",
+  "description": "Selection receipt from the deterministic research-only selector. Scores are Euclidean descriptor or normalized Symthaea BinaryHV Hamming-distance diagnostics, not probabilities or physical properties.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "input_schema_version",
+    "policy_version",
+    "input_blake3",
+    "policy",
+    "candidate_count",
+    "feature_count",
+    "budget_requested",
+    "already_selected",
+    "normalization",
+    "selected"
+  ],
+  "properties": {
+    "input_schema_version": {
+      "const": "nano-selection-input-v1"
+    },
+    "policy_version": {
+      "const": "nano-selector-v2"
+    },
+    "policy": {
+      "enum": [
+        "maximin",
+        "hdc_maximin",
+        "random"
+      ]
+    },
+    "candidate_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "feature_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096
+    },
+    "budget_requested": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "already_selected": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "normalization": {
+      "enum": [
+        "per_feature_min_max_over_candidate_pool",
+        "per_feature_min_max_then_symthaea_binary_hdc_256_levels",
+        "not_used_by_random_policy"
+      ]
+    },
+    "selected": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "rank",
+          "score_kind",
+          "score"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "score_kind": {
+            "enum": [
+              "distance_to_pool_centroid",
+              "min_distance_to_selected",
+              "hdc_distance_to_pool_bundle",
+              "hdc_min_distance_to_selected",
+              "random_order"
+            ]
+          },
+          "score": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "input_blake3": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "BLAKE3 digest of the exact raw request bytes, including whitespace"
+    }
+  },
+  "$comment": "The CLI includes input_blake3 over the exact raw request bytes but does not include an output digest; orchestration should also hash the exact response bytes. Runtime consumers must verify selected.length equals budget_requested, IDs are unique and drawn from the candidate pool, and score/score_kind match the policy.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "policy": {
+            "const": "maximin"
+          }
+        },
+        "required": [
+          "policy"
+        ]
+      },
+      "then": {
+        "properties": {
+          "selected": {
+            "items": {
+              "properties": {
+                "score": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "score_kind": {
+                  "enum": [
+                    "distance_to_pool_centroid",
+                    "min_distance_to_selected"
+                  ]
+                }
+              },
+              "required": [
+                "score",
+                "score_kind"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "policy": {
+            "const": "random"
+          }
+        },
+        "required": [
+          "policy"
+        ]
+      },
+      "then": {
+        "properties": {
+          "selected": {
+            "items": {
+              "properties": {
+                "score": {
+                  "type": "null"
+                },
+                "score_kind": {
+                  "const": "random_order"
+                }
+              },
+              "required": [
+                "score",
+                "score_kind"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "policy": {
+            "const": "hdc_maximin"
+          }
+        },
+        "required": [
+          "policy"
+        ]
+      },
+      "then": {
+        "properties": {
+          "selected": {
+            "items": {
+              "properties": {
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "score_kind": {
+                  "enum": [
+                    "hdc_distance_to_pool_bundle",
+                    "hdc_min_distance_to_selected"
+                  ]
+                }
+              },
+              "required": [
+                "score",
+                "score_kind"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+name: Nano policy targeted checks
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-nano-policy/**"
+      - "Cargo.lock"
+      - ".github/workflows/nano-policy.yml"
+  push:
+    branches:
+      - "research/nano-budgeted-selector-rust"
+    paths:
+      - "crates/domains/symthaea-nano-policy/**"
+      - "Cargo.lock"
+      - ".github/workflows/nano-policy.yml"
+  workflow_dispatch:
+    inputs:
+      run_profile:
+        description: "Run hardware-specific synthetic selector profiling (not a scientific benchmark)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Format, tests, and lint (targeted crate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify formatting
+        run: cargo fmt --package symthaea-nano-policy -- --check
+
+      - name: Run unit tests
+        run: cargo test -p symthaea-nano-policy --locked
+
+      - name: Run maximin stdin/stdout smoke fixture
+        run: |
+          cargo run -p symthaea-nano-policy --locked -- < crates/domains/symthaea-nano-policy/fixtures/smoke-request.json > /tmp/nano-policy-response.json
+          jq -e '(.selected | map(.id)) == ["a", "d"] and (.input_blake3 | test("^[a-f0-9]{64}$"))' /tmp/nano-policy-response.json
+
+      - name: Run Symthaea HDC stdin/stdout smoke fixture
+        run: |
+          cargo run -p symthaea-nano-policy --locked -- < crates/domains/symthaea-nano-policy/fixtures/hdc-smoke-request.json > /tmp/nano-policy-hdc-response.json
+          jq -e '.policy == "hdc_maximin" and (.selected | length == 2) and (([.selected[].id] | unique | length) == 2) and all(.selected[]; .score >= 0 and .score <= 1) and (.input_blake3 | test("^[a-f0-9]{64}$"))' /tmp/nano-policy-hdc-response.json
+
+      - name: Run Clippy
+        run: cargo clippy -p symthaea-nano-policy --all-targets --locked -- -D warnings
+
+      - name: Run optional synthetic scaling profile
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile }}
+        run: |
+          cargo test -p symthaea-nano-policy --locked --no-run
+          test_bin="$(find target/debug/deps -maxdepth 1 -type f -executable -name 'symthaea_nano_policy-*' -print | head -n 1)"
+          test -n "$test_bin"
+          /usr/bin/time -v "$test_bin" manual_profile_selector_scaling --ignored --nocapture
