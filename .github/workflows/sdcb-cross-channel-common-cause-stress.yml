@@ -52,9 +52,12 @@ jobs:
           rustc --edition=2024 -D warnings scripts/research/sdcb_cross_channel_common_cause_stress.rs -o /tmp/sdcb-cross-channel
           /tmp/sdcb-cross-channel > /tmp/sdcb-cross-channel-report.csv
           test "$(wc -l < /tmp/sdcb-cross-channel-report.csv)" -eq 25
-          python3 -m json.tool <(printf '{"rows": %s}' "$(($(wc -l < /tmp/sdcb-cross-channel-report.csv)-1))") >/dev/null
+          printf '{"source_commit":"%s","rustc":"%s","rows":24,"trials_per_condition":2500,"total_trials":60000}\n' "$(git rev-parse HEAD)" "$(rustc --version)" > /tmp/sdcb-cross-channel-manifest.json
+          python3 -m json.tool /tmp/sdcb-cross-channel-manifest.json >/dev/null
       - name: Upload report and manifest
         uses: actions/upload-artifact@v4
         with:
           name: sdcb-cross-channel-common-cause-report
-          path: /tmp/sdcb-cross-channel-report.csv
+          path: |
+            /tmp/sdcb-cross-channel-report.csv
+            /tmp/sdcb-cross-channel-manifest.json
