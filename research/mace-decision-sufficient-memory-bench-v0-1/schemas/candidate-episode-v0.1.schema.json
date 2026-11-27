@@ -41,7 +41,9 @@
         "decision_sufficient_compression",
         "streaming_update",
         "forgetting_replay",
-        "scope_isolation"
+        "scope_isolation",
+        "cross_lingual_provenance",
+        "representation_migration"
       ]
     },
     "query_time_ms": {
