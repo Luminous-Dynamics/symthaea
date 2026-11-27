@@ -522,6 +522,71 @@ fn audit(fixture: &Value) -> Result<(), String> {
         }
     }
 
+    let joint_search = field(response_qualification, "joint_box_oracle")?;
+    require_string(joint_search, "status", "design_only_not_executed")?;
+    require_string(
+        joint_search,
+        "method",
+        "anisotropic_lipschitz_branch_and_bound_nd",
+    )?;
+    require_string(
+        joint_search,
+        "coordinate_lipschitz_semantics",
+        "sum_i_L_i_abs_coordinate_delta_i",
+    )?;
+    require_string(
+        joint_search,
+        "subdivision_policy",
+        "largest_Li_times_half_width",
+    )?;
+    require_string(
+        joint_search,
+        "lipschitz_certificate_status",
+        "not_issued_synthetic",
+    )?;
+    require_string(
+        joint_search,
+        "branch_stability_evidence_status",
+        "not_issued_synthetic",
+    )?;
+    require_string(
+        joint_search,
+        "budget_exhaustion_disposition",
+        "unqualified",
+    )?;
+    require_string(
+        joint_search,
+        "global_bound_claim_status",
+        "conditional_on_valid_box_lipschitz_and_branch_evidence",
+    )?;
+    require_string(
+        joint_search,
+        "objective_normalization",
+        "declared_qoi_scale_and_fixed_positive_floor",
+    )?;
+    if !boolean(joint_search, "interior_search_required")?
+        || boolean(joint_search, "boundary_only_search_sufficient")?
+        || !boolean(joint_search, "full_order_confirmation_required")?
+        || !boolean(
+            joint_search,
+            "reference_response_denominator_lower_bound_required",
+        )?
+    {
+        return Err(
+            "joint response-box search must retain interior, full-order and denominator gates"
+                .to_owned(),
+        );
+    }
+    let joint_axes = string_array(joint_search, "continuous_parameter_axes")?;
+    if joint_axes.len() < 2 || joint_axes.len() > 3 {
+        return Err("joint response-box search requires two or three axes".to_owned());
+    }
+    for axis in ["pulse_phase", "kick_amplitude", "pulse_separation"] {
+        if !joint_axes.iter().any(|value| value == axis) {
+            return Err(format!("joint response-box axis {axis} is missing"));
+        }
+    }
+
     let resources = field(fixture, "resource_budget")?;
     for comparison in [
         "equal_rank",
