@@ -230,10 +230,11 @@ pub fn evaluate_selective_observation(
     }
     if design.mechanism
         == AdjudicationSamplingMechanism::KnownPropensityConditionalOnPrelabelHistory
-        && design
-            .prelabel_conditioning_variables
-            .iter()
-            .any(|value| value.trim().is_empty())
+        && (design.prelabel_conditioning_variables.is_empty()
+            || design
+                .prelabel_conditioning_variables
+                .iter()
+                .any(|value| value.trim().is_empty()))
     {
         return Err(SelectiveObservationError::EmptyConditioningVariable);
     }
@@ -767,7 +768,7 @@ mod tests {
         ];
         let report = evaluate_selective_observation(&records, &design(), &config()).unwrap();
         assert!(!report.diagnostics.positive_support_for_entire_cohort);
-        assert_eq!(report.population_report, None);
+        assert!(report.population_report.is_none());
         assert!(report.unavailable_reason.unwrap().contains("not identifiable"));
     }
 
@@ -792,7 +793,7 @@ mod tests {
     fn weighted_risk_can_exceed_one_and_is_never_clipped() {
         let records = vec![
             observed(prediction("a", 0.9, true, Some(false)), Some(0.1)),
-            observed(prediction("b", 0.2, true, None), Some(1.0)),
+            observed(prediction("b", 0.2, true, None), Some(0.5)),
         ];
         let report = evaluate_selective_observation(&records, &design(), &config()).unwrap();
         let point = report.population_report.unwrap().always_answer;
