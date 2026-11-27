@@ -4,13 +4,17 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="$ROOT/compose/compose.yaml"
 ENV_FILE="$ROOT/.env"
-PROJECT="mon025"
+PROJECT="${COMPOSE_PROJECT_NAME:-mon025}"
 DC=(docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --project-directory "$ROOT/compose")
 MAJOR="${1:-18}"
 ACTION="${2:-}"
 case "$MAJOR" in 18|19) ;; *) echo "usage: $0 18|19 connect-kill|broker-kill|postgres-kill|connect-restart|broker-restart|postgres-restart" >&2; exit 64 ;; esac
 [ "${MON025_ALLOW_FAULT_INJECTION:-}" = "YES" ] || { echo "Refusing fault injection. Set MON025_ALLOW_FAULT_INJECTION=YES for this disposable lab." >&2; exit 77; }
 [ -f "$ENV_FILE" ] || { echo ".env is required" >&2; exit 66; }
+# shellcheck disable=SC1090
+set -a; . "$ENV_FILE"; set +a
+PROJECT="${COMPOSE_PROJECT_NAME:-mon025}"
+DC=(docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --project-directory "$ROOT/compose")
 
 case "$ACTION" in
   connect-kill) service=connect; operation=kill ;;
