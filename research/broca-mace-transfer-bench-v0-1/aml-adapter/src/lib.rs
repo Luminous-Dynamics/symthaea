@@ -773,6 +773,7 @@ impl AddIdempotencyLedger {
                 Err(AmlReject::RequestIdPayloadConflict)
             }
             Some((_, Some(_))) => Err(AmlReject::AddAlreadyCompleted),
+            Some((_, None)) => Err(AmlReject::RequestIdPayloadConflict),
             None => Err(AmlReject::UnknownRequestId),
         }
     }
