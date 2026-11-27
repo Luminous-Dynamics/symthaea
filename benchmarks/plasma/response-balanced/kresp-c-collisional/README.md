@@ -53,7 +53,7 @@ E_{\rm ext}(t,x)=A_{\rm ext}(t)
 \]
 The discrete reference uses collision half-step / transport full-step / collision half-step Strang splitting. The published timing cohort uses MUSCL transport on the full velocity grid.
 
-The synthetic fixture records training, validation and sealed-holdout cohorts corresponding to two-stream relaxation, sustained heating and drive switching. The drive-switching test reverses the forcing from \(+0.7\) to \(-0.7\) at \(t=4\), then removes it at \(t=8\), ending at \(t=12\). The exact published parameter sets and initial-state hashes must be used when reproducing prior results; the synthetic digests here are schema placeholders, not physical states.
+The synthetic fixture records all four published training parameter sets, both validation parameter sets, and all three sealed test regimes (two-stream relaxation, sustained heating and drive switching). CI enforces the 4/2/3 split counts and checks that none of the sealed test regimes can drift into training. The drive-switching test reverses the forcing from \(+0.7\) to \(-0.7\) at \(t=4\), then removes it at \(t=8\), ending at \(t=12\). The exact published parameter sets and initial-state hashes must be used when reproducing prior results; the synthetic digests here are schema placeholders, not physical states.
 
 Machine-readable contract:
 - [Draft 2020-12 K-RESP-C schema](kresp-c-vpd-contract-v0.1.schema.json)
