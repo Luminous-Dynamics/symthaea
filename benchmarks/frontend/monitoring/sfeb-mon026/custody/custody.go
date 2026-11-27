@@ -168,13 +168,10 @@ func SignManifest(m *Manifest, keyID string, privateKey ed25519.PrivateKey) erro
 		return err
 	}
 	m.RootSHA256 = root
-	msg := signatureMessage(root)
+	m.Signature = Signature{Algorithm: "Ed25519", KeyID: keyID}
+	msg := signatureMessage(root, m.Signature.Algorithm, keyID)
 	sig := ed25519.Sign(privateKey, msg)
-	m.Signature = Signature{
-		Algorithm: "Ed25519",
-		KeyID:     keyID,
-		Value:     base64.StdEncoding.EncodeToString(sig),
-	}
+	m.Signature.Value = base64.StdEncoding.EncodeToString(sig)
 	return nil
 }
 
@@ -228,7 +225,7 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 	if policy.Now.IsZero() || policy.MaxAge <= 0 {
 		addIndeterminate("freshness_policy_missing")
 	}
-	if policy.ClockDomain == "" || policy.MaxClockUncertaintyNS <= 0 {
+	if policy.ClockDomain == "" || policy.MaxClockUncertaintyNS < 0 {
 		addIndeterminate("clock_policy_missing")
 	}
 	if m.ClockDomain == "" || m.ClockUncertaintyNS < 0 {
@@ -334,8 +331,7 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 	} else {
 		if !validSHA256(m.PreviousRootSHA256) {
 			addIndeterminate("previous_root_missing_or_malformed")
-		}
-		if policy.ExpectedPreviousRoot == "" {
+		} else if policy.ExpectedPreviousRoot == "" {
 			addIndeterminate("expected_previous_root_unavailable")
 		} else if !strings.EqualFold(m.PreviousRootSHA256, policy.ExpectedPreviousRoot) {
 			addBlocked("previous_root_mismatch")
@@ -343,12 +339,10 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 	}
 
 	result.SignerKeyID = m.Signature.KeyID
-	if m.Signature.Algorithm != "Ed25519" {
-		if m.Signature.Algorithm == "" || m.Signature.Value == "" || m.Signature.KeyID == "" {
-			addIndeterminate("signature_missing")
-		} else {
-			addBlocked("unsupported_signature_algorithm")
-		}
+	if m.Signature.Algorithm == "" || m.Signature.Value == "" || m.Signature.KeyID == "" {
+		addIndeterminate("signature_missing")
+	} else if m.Signature.Algorithm != "Ed25519" {
+		addBlocked("unsupported_signature_algorithm")
 	} else {
 		pub, ok := policy.TrustedKeys[m.Signature.KeyID]
 		if !ok {
@@ -359,7 +353,7 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 			sig, decodeErr := base64.StdEncoding.DecodeString(m.Signature.Value)
 			if decodeErr != nil || len(sig) != ed25519.SignatureSize {
 				addBlocked("signature_encoding_invalid")
-			} else if root == "" || !ed25519.Verify(pub, signatureMessage(root), sig) {
+			} else if root == "" || !ed25519.Verify(pub, signatureMessage(root, m.Signature.Algorithm, m.Signature.KeyID), sig) {
 				addBlocked("signature_invalid")
 			}
 		}
@@ -549,8 +543,8 @@ func validSHA256(s string) bool {
 	return err == nil
 }
 
-func signatureMessage(root string) []byte {
-	return []byte(signatureDomain + strings.ToLower(root))
+func signatureMessage(root, algorithm, keyID string) []byte {
+	return []byte(signatureDomain + algorithm + "\x00" + keyID + "\x00" + strings.ToLower(root))
 }
 
 func writeString(h hash.Hash, value string) {
