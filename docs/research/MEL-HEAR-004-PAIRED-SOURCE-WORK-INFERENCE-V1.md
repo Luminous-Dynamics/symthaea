@@ -44,6 +44,8 @@ Improvement sign is consistent:
 
 The implementation uses a fixed-seed SplitMix64 sampler and an interpolated percentile interval. The PRNG is for reproducible resampling only, not cryptographic security.
 
+**Independence assumption:** this v1 resamples source works as the independent clusters. That is not sufficient when the same performers contribute to multiple source-work clusters and induce correlated outcomes. A confirmatory study must either use a sampling/split design with performer-disjoint independent work clusters or introduce a separately qualified crossed/multiway work×performer inference method. Do not interpret a source-work-only interval as population uncertainty when performer dependence is unmodeled.
+
 The initial policy requires at least 30 distinct source-work clusters and at least 100 bootstrap replicates. The synthetic harness uses 2,000 replicates. Production studies should preregister a larger replicate count, seed, confidence level and multiplicity policy before looking at candidate outcomes.
 
 ## 4. Exact pairing gate
@@ -61,6 +63,8 @@ Only model/prompt/runtime/decoding identities and model answers may differ. Miss
 ## 5. What the report means
 
 The report contains baseline and candidate cluster-average point estimates plus three separate paired candidate-improvement intervals. No composite score can hide a STAY/FLIP trade-off.
+
+Intervals in this v1 are **pointwise percentile intervals**, not simultaneous family-wise confidence guarantees. A confirmatory study must pre-register its primary endpoint and multiplicity adjustment across primary outcomes/strata; selecting the best-performing property after observing the results is not a valid superiority test.
 
 It also emits separate source-work-clustered slices:
 - by target property;
