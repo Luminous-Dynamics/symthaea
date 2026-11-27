@@ -11,6 +11,7 @@ pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
+pub mod realized_coverage_backtest;
 pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
 pub mod secom_missingness;
@@ -148,4 +149,13 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use realized_coverage_backtest::{
+    REALIZED_COVERAGE_BACKTEST_SCHEMA_V1, REALIZED_COVERAGE_OBSERVATION_SCHEMA_V1,
+    REALIZED_COVERAGE_POLICY_SCHEMA_V1, REALIZED_COVERAGE_REPORT_SCHEMA_V1,
+    CoverageAssumptionStateV1, CoverageBacktestInputV1, CoverageBacktestStatusV1,
+    CoverageEstimandV1, CoverageExclusionReasonV1, CoverageInferenceMethodV1,
+    RealizedCoverageBacktestErrorV1, RealizedCoverageObservationV1, RealizedCoveragePolicyV1,
+    RealizedCoverageReportV1, evaluate_realized_coverage_backtest_v1,
 };
