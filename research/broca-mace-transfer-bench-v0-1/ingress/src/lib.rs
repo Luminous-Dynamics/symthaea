@@ -10,7 +10,12 @@
 pub mod claims;
 pub mod providers;
 mod evidence_use;
-pub use evidence_use::{revalidate_for_use_v1, EvidenceUseContextV1, EvidenceUseReceiptV1, EvidenceUseRejectV1};
+pub use evidence_use::{
+    link_verified_evidence_to_decision_v1, revalidate_for_use_v1,
+    ContextEvidenceSpanV1, DecisionEvidenceUseContextV1, DecisionEvidenceUseLinkV1,
+    DecisionEvidenceUseLinkRejectV1, EvidenceUseContextV1, EvidenceUseReceiptV1,
+    EvidenceUseRejectV1,
+};
 
 use std::collections::{BTreeMap, BTreeSet};
 
