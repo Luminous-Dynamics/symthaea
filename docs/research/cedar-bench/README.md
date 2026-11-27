@@ -13,6 +13,7 @@ The benchmark is motivated by Abbas, Zia and Windridge, “Cited but Unused: Par
 - CEDAR_BENCH_V0_TEMPLATES.json — 20 synthetic task templates, source aliases and intervention definitions.
 - scripts/generate_cedar_bench.py — expands templates using a per-run secret seed; writes candidate inputs and auditor key to separate files.
 - scripts/validate_cedar_bench_templates.py — standard-library-only template contract checker.
+- scripts/validate_cedar_bench_streams.py — checks generated candidate/auditor stream separation, source hashes and paired intervention semantics.
 
 ## Separation of duties
 
