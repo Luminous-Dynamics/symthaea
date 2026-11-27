@@ -1593,6 +1593,7 @@ mod tests {
             ObservationRiskControllerV1::CapacityAwareOcrcBounded,
             vec![first, second],
         );
+        data.tracking_capacity = Some(1);
         data.closeout_round = 2;
         data.source_ledger_sha256 = json_sha256(&canonical_rounds(&data.rounds)).unwrap();
         let report = evaluate_observation_process_v1(&data).unwrap();
@@ -1753,8 +1754,8 @@ mod tests {
             ObservationRiskControllerV1::None,
             vec![row(
                 1,
-                PhysicalAcquisitionStateV1::MeasurementUnavailable,
-                K1QualificationStateV1::NotApplicable,
+                PhysicalAcquisitionStateV1::Measured,
+                K1QualificationStateV1::Unknown,
                 FeedbackTrackingStateV1::NotApplicable,
             )],
         );
@@ -1762,7 +1763,7 @@ mod tests {
             schema: super::super::selection_risk_bounds::SELECTION_AUDIT_DESIGN_SCHEMA_V1.into(),
             design_sha256: digest('9'),
             randomization_provenance_sha256: digest('a'),
-            reference_method_sha256: digest('d'),
+            reference_method_sha256: digest('0'),
             minimum_inclusion_probability: 1.0,
             confidence_delta: 0.05,
             independent_of_operational_qualification: true,
