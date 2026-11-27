@@ -1,0 +1,294 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:symthaea:benchmark-license-manifest:v1",
+  "title": "Symthaea benchmark dataset license and provenance manifest v1",
+  "description": "Machine-readable record of dataset rights, intended use, access approval and retention. Runtime policy must compare intended_use with approved_intended_uses and permitted_operations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "dataset_id",
+    "dataset_version",
+    "dataset_manifest_digest",
+    "source_uri",
+    "rights_holder",
+    "license_id",
+    "license_version",
+    "access_status",
+    "approved_intended_uses",
+    "permitted_operations",
+    "intended_use",
+    "commercial_use_authorized",
+    "training_use_authorized",
+    "derivative_media_authorized",
+    "redistribution_authorized",
+    "publication_authorized",
+    "raw_media_stored_in_repo",
+    "model_terms_ref",
+    "retention_policy_ref",
+    "deletion_policy_ref"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.benchmark-license-manifest.v1"
+    },
+    "dataset_id": {
+      "$ref": "#/$defs/id"
+    },
+    "dataset_version": {
+      "$ref": "#/$defs/id"
+    },
+    "dataset_manifest_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "source_uri": {
+      "type": "string",
+      "format": "uri",
+      "maxLength": 2048
+    },
+    "rights_holder": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "license_id": {
+      "$ref": "#/$defs/id"
+    },
+    "license_version": {
+      "$ref": "#/$defs/id"
+    },
+    "access_status": {
+      "enum": [
+        "pending",
+        "approved",
+        "revoked",
+        "expired"
+      ]
+    },
+    "access_grant_ref": {
+      "$ref": "#/$defs/id"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "approved_intended_uses": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "noncommercial_research",
+          "academic_publication",
+          "commercial_evaluation",
+          "commercial_development",
+          "training",
+          "public_marketing"
+        ]
+      }
+    },
+    "permitted_operations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "evaluation",
+          "training",
+          "derivative_media",
+          "redistribution",
+          "publication",
+          "commercial_use"
+        ]
+      }
+    },
+    "intended_use": {
+      "enum": [
+        "noncommercial_research",
+        "academic_publication",
+        "commercial_evaluation",
+        "commercial_development",
+        "training",
+        "public_marketing"
+      ]
+    },
+    "commercial_use_authorized": {
+      "type": "boolean"
+    },
+    "training_use_authorized": {
+      "type": "boolean"
+    },
+    "derivative_media_authorized": {
+      "type": "boolean"
+    },
+    "redistribution_authorized": {
+      "type": "boolean"
+    },
+    "publication_authorized": {
+      "type": "boolean"
+    },
+    "permitted_transformations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "none",
+          "annotation_only",
+          "trim",
+          "resample",
+          "normalization",
+          "temporal_shuffle",
+          "counterfactual_visual_substitution"
+        ]
+      }
+    },
+    "raw_media_stored_in_repo": {
+      "const": false
+    },
+    "model_terms_ref": {
+      "$ref": "#/$defs/id"
+    },
+    "retention_policy_ref": {
+      "$ref": "#/$defs/id"
+    },
+    "deletion_policy_ref": {
+      "$ref": "#/$defs/id"
+    },
+    "approval_record_ref": {
+      "$ref": "#/$defs/id"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "access_status": {
+            "const": "approved"
+          }
+        },
+        "required": [
+          "access_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "access_grant_ref",
+          "approved_at",
+          "approval_record_ref"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "intended_use": {
+            "enum": [
+              "commercial_evaluation",
+              "commercial_development",
+              "public_marketing"
+            ]
+          }
+        },
+        "required": [
+          "intended_use"
+        ]
+      },
+      "then": {
+        "properties": {
+          "commercial_use_authorized": {
+            "const": true
+          },
+          "permitted_operations": {
+            "contains": {
+              "const": "commercial_use"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "intended_use": {
+            "const": "training"
+          }
+        },
+        "required": [
+          "intended_use"
+        ]
+      },
+      "then": {
+        "properties": {
+          "training_use_authorized": {
+            "const": true
+          },
+          "permitted_operations": {
+            "contains": {
+              "const": "training"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "derivative_media_authorized": {
+            "const": true
+          }
+        },
+        "required": [
+          "derivative_media_authorized"
+        ]
+      },
+      "then": {
+        "properties": {
+          "permitted_operations": {
+            "contains": {
+              "const": "derivative_media"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "redistribution_authorized": {
+            "const": true
+          }
+        },
+        "required": [
+          "redistribution_authorized"
+        ]
+      },
+      "then": {
+        "properties": {
+          "permitted_operations": {
+            "contains": {
+              "const": "redistribution"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
