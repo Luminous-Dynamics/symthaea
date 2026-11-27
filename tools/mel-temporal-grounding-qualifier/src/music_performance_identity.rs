@@ -451,6 +451,21 @@ pub fn audit_musical_performance_identity(
     })
 }
 
+fn canonical_property_question_v1(property: MusicalIdentityPropertyV1) -> &'static str {
+    match property {
+        MusicalIdentityPropertyV1::ChordQuality => "Is the chord quality the same?",
+        MusicalIdentityPropertyV1::RootPitchClass => "Is the root pitch class the same?",
+        MusicalIdentityPropertyV1::Voicing => "Is the voicing the same?",
+        MusicalIdentityPropertyV1::RelativeIntervalSequence => {
+            "Is the relative interval sequence the same?"
+        }
+        MusicalIdentityPropertyV1::MelodicContour => "Is the melodic contour the same?",
+        MusicalIdentityPropertyV1::RhythmicRatio => "Is the rhythmic ratio pattern the same?",
+        MusicalIdentityPropertyV1::PulseRate => "Is the pulse rate the same?",
+        MusicalIdentityPropertyV1::InstrumentFamily => "Is the instrument family the same?",
+    }
+}
+
 fn validate_triad(triad: &MusicalPerformanceIdentityTriadV1, index: usize) -> Result<(), String> {
     require_text(&triad.item_id, &format!("triads[{index}].item_id"))?;
     require_text(&triad.pair_id, &format!("triads[{index}].pair_id"))?;
@@ -516,6 +531,14 @@ fn validate_triad(triad: &MusicalPerformanceIdentityTriadV1, index: usize) -> Re
     {
         return Err(format!(
             "triads[{index}] CLEAN, performance-STAY and musical-FLIP must use identical question bytes"
+        ));
+    }
+
+    let required_question = canonical_property_question_v1(triad.target_property);
+    if triad.clean.response.question != required_question {
+        return Err(format!(
+            "triads[{index}] question must identify target property {:?} with canonical question {:?}",
+            triad.target_property, required_question
         ));
     }
 
@@ -999,7 +1022,7 @@ mod tests {
         stay_factor: PerformanceStayFactorV1,
         flip_factor: MusicalFlipFactorV1,
     ) -> MusicalPerformanceIdentityTriadV1 {
-        let clean = variant(
+        let mut clean = variant(
             "clean",
             VariantSeed {
                 audio: '1',
@@ -1017,7 +1040,7 @@ mod tests {
             PerformanceStayFactorV1::DifferentRendererSamePerformance => ('2', '3', '4', 'a'),
             _ => ('7', '8', '4', '6'),
         };
-        let performance_stay = variant(
+        let mut performance_stay = variant(
             "performance-stay",
             VariantSeed {
                 audio: 'b',
@@ -1035,7 +1058,7 @@ mod tests {
         } else {
             '5'
         };
-        let musical_flip = variant(
+        let mut musical_flip = variant(
             "musical-flip",
             VariantSeed {
                 audio: 'd',
@@ -1048,6 +1071,16 @@ mod tests {
             MusicalRelationV1::Different,
             MusicListenAnswerV1::ChoiceB,
         );
+        let question = canonical_property_question_v1(property);
+        let question_sha256 = sha256_hex(question.as_bytes());
+        for response in [
+            &mut clean.response,
+            &mut performance_stay.response,
+            &mut musical_flip.response,
+        ] {
+            response.question = question.to_string();
+            response.question_sha256 = question_sha256.clone();
+        }
         MusicalPerformanceIdentityTriadV1 {
             item_id: format!("item-{property:?}-{stay_factor:?}"),
             pair_id: format!("pair-{property:?}-{stay_factor:?}"),
@@ -1190,6 +1223,87 @@ mod tests {
         flip_prompt_drift.musical_flip.response.question_sha256 =
             sha256_hex(flip_prompt_drift.musical_flip.response.question.as_bytes());
         assert!(audit_musical_performance_identity(&case(vec![flip_prompt_drift])).is_err());
+    }
+
+    #[test]
+    fn every_target_property_has_an_explicit_canonical_question() {
+        let cases = [
+            (
+                MusicalIdentityPropertyV1::ChordQuality,
+                PerformanceStayFactorV1::DifferentTakeSamePerformer,
+                MusicalFlipFactorV1::ChordQualityChange,
+                "Is the chord quality the same?",
+            ),
+            (
+                MusicalIdentityPropertyV1::RootPitchClass,
+                PerformanceStayFactorV1::DifferentTakeSamePerformer,
+                MusicalFlipFactorV1::RootPitchClassChange,
+                "Is the root pitch class the same?",
+            ),
+            (
+                MusicalIdentityPropertyV1::Voicing,
+                PerformanceStayFactorV1::DifferentTakeSamePerformer,
+                MusicalFlipFactorV1::VoicingChange,
+                "Is the voicing the same?",
+            ),
+            (
+                MusicalIdentityPropertyV1::RelativeIntervalSequence,
+                PerformanceStayFactorV1::DifferentTakeSamePerformer,
+                MusicalFlipFactorV1::RelativeIntervalSequenceChange,
+                "Is the relative interval sequence the same?",
+            ),
+            (
+                MusicalIdentityPropertyV1::MelodicContour,
+                PerformanceStayFactorV1::DifferentTakeSamePerformer,
+                MusicalFlipFactorV1::MelodicContourChange,
+                "Is the melodic contour the same?",
+            ),
+            (
+                MusicalIdentityPropertyV1::RhythmicRatio,
+                PerformanceStayFactorV1::DifferentTempoSameRhythmicRatio,
+                MusicalFlipFactorV1::RhythmicRatioChange,
+                "Is the rhythmic ratio pattern the same?",
+            ),
+            (
+                MusicalIdentityPropertyV1::PulseRate,
+                PerformanceStayFactorV1::DifferentTakeSamePerformer,
+                MusicalFlipFactorV1::PulseRateChange,
+                "Is the pulse rate the same?",
+            ),
+            (
+                MusicalIdentityPropertyV1::InstrumentFamily,
+                PerformanceStayFactorV1::DifferentTakeSamePerformer,
+                MusicalFlipFactorV1::InstrumentFamilyChange,
+                "Is the instrument family the same?",
+            ),
+        ];
+        for (property, stay, flip, question) in cases {
+            let item = triad(property, stay, flip);
+            assert_eq!(item.clean.response.question, question);
+            assert_eq!(item.performance_stay.response.question, question);
+            assert_eq!(item.musical_flip.response.question, question);
+            assert!(audit_musical_performance_identity(&case(vec![item])).is_ok());
+        }
+    }
+
+    #[test]
+    fn rehashed_but_wrong_target_property_question_is_rejected() {
+        let mut item = triad(
+            MusicalIdentityPropertyV1::ChordQuality,
+            PerformanceStayFactorV1::DifferentTakeSamePerformer,
+            MusicalFlipFactorV1::ChordQualityChange,
+        );
+        let wrong = "Is the root pitch class the same?".to_string();
+        let wrong_hash = sha256_hex(wrong.as_bytes());
+        for variant in [
+            &mut item.clean,
+            &mut item.performance_stay,
+            &mut item.musical_flip,
+        ] {
+            variant.response.question = wrong.clone();
+            variant.response.question_sha256 = wrong_hash.clone();
+        }
+        assert!(audit_musical_performance_identity(&case(vec![item])).is_err());
     }
 
     #[test]
