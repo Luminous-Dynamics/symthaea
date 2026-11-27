@@ -267,6 +267,7 @@ pub fn evaluate_paired(
         }
         if block.alpha_numerator != contract.alpha_numerator
             || block.alpha_denominator != contract.alpha_denominator
+            || block.score_definition_sha256 != contract.score_definition_sha256
             || block.calibration_reference_sha256 != contract.calibration_reference_sha256
             || block.tie_protocol_sha256 != contract.tie_protocol_sha256
         {
@@ -647,7 +648,12 @@ mod tests {
         PairedBlockOutcome {
             effective_block_id: id.into(),
             scenario_family: family.into(),
-            source_pair_sha256: SHA_A.into(),
+            source_pair_sha256: format!(
+                "{:064x}",
+                id.bytes().fold(0u64, |accumulator, byte| {
+                    accumulator.wrapping_mul(257).wrapping_add(u64::from(byte))
+                })
+            ),
             scenario_manifest_sha256: SHA_B.into(),
             ground_truth_receipt_sha256: SHA_A.into(),
             score_definition_sha256: SHA_C.into(),
