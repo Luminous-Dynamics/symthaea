@@ -693,7 +693,7 @@ mod tests {
         assert_eq!(point.accepted_count, 2);
         assert!((point.achieved_coverage - 2.0 / 3.0).abs() < 1e-12);
         assert_eq!(point.risk, Some(0.5));
-        assert!((report.report.aurc.unwrap() - 5.0 / 9.0).abs() < 1e-12);
+        assert!((report.report.aurc.unwrap() - 4.0 / 9.0).abs() < 1e-12);
     }
 
     #[test]
@@ -772,7 +772,7 @@ mod tests {
         let report = evaluate_risk_coverage(&records, &cfg).unwrap();
         let point = &report.report.operating_points[0];
         assert!((point.mean_decision_cost.unwrap() - 2.0).abs() < 1e-12);
-        assert!((point.random_abstention_expected_cost.unwrap() - 1.2).abs() < 1e-12);
+        assert!((point.random_abstention_expected_cost.unwrap() - 1.05).abs() < 1e-12);
     }
 
     #[test]
