@@ -135,7 +135,7 @@ fn fixture(observations: Vec<ContextResidualObservationV1>) -> ContextResidualCo
 fn independent_median(values: &mut [f64]) -> f64 {
     values.sort_by(f64::total_cmp);
     let mid = values.len() / 2;
-    if values.len() % 2 == 0 {
+    if values.len().is_multiple_of(2) {
         values[mid - 1] / 2.0 + values[mid] / 2.0
     } else {
         values[mid]
