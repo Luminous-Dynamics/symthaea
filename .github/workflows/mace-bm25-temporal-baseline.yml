@@ -31,9 +31,18 @@ jobs:
         with:
           toolchain: "1.96.0"
           components: rustfmt
+      - name: Generate rustfmt preview
+        run: rustfmt --edition 2024 research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mace-bm25-rustfmt-preview
+          path: research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs
+      - name: Restore exact committed source
+        run: git checkout -- research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs
       - name: Check formatting on exact committed source
-        run: |
-          rustfmt --edition 2024 --check research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs
+        run: rustfmt --edition 2024 --check research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs
       - name: Compile and run exact-source baseline tests
         run: |
           rustc --edition=2024 --test research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs -o /tmp/mace-bm25-temporal
