@@ -8,7 +8,7 @@ This first slice operationalizes the two-phase evaluation in issue #13926: freez
 
 ## Files
 
-- REPAIR_BENCH_V0_SYNTHETIC_EVENT_FIXTURES.json — one baseline graph with byte-pinned input artifacts, 14 dependency nodes, and 12 independent change events.
+- REPAIR_BENCH_V0_SYNTHETIC_EVENT_FIXTURES.json — one baseline graph with byte-pinned input artifacts, 15 dependency nodes, and 12 independent change events.
 - scripts/validate_repair_bench_fixtures.py — standard-library-only consistency validator, run by .github/workflows/repair-bench-fixture-contract.yml.
 
 ## Fixture properties
@@ -33,3 +33,7 @@ The artifact byte strings and SHA-256 values are included so a later harness can
 ## Claim boundary
 
 This file does not implement update propagation, graph invalidation, parser execution, replay, or a benchmark scorer. No scientific accuracy, correction-reach, SOTA or production claim is made.
+
+## Explicit scope lineage
+
+The baseline protocol now explicitly lists `included_samples` as a located JSON observation, with an edge into `analysis_mean_temperature`. This ensures the scope-correction event is not able to change an analysis through an undeclared input. The validator requires every event's changed/unchanged/blocked/unresolved/non-dependent outcome sets to form a disjoint partition of all 15 graph nodes.
