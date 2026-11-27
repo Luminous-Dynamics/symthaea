@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luminousdynamics.io/schemas/kresp-cl-vpl-contract-v0.1.schema.json",
+  "$id": "https://luminousdynamics.io/schemas/kresp-cl-vpl-3d3v-contract-v0.1.schema.json",
   "title": "K-RESP-CL Coulomb Vlasov-Poisson-Landau Echo Growth Contract",
   "type": "object",
   "additionalProperties": false,
@@ -31,7 +31,7 @@
       "const": "synthetic_benchmark_contract_only"
     },
     "benchmark_id": {
-      "const": "KRESP-CL-VPL-1D1V"
+      "const": "KRESP-CL-VPL-3D3V"
     },
     "equation": {
       "const": "vlasov_poisson_landau_coulomb"
@@ -58,15 +58,11 @@
         "spatial_topology": {
           "const": "periodic_torus"
         },
-        "spatial_domain_length": {
-          "type": "number",
-          "exclusiveMinimum": 0
-        },
         "velocity_dimension": {
-          "const": 1
+          "const": 3
         },
         "velocity_domain_model": {
-          "const": "truncated_real_line_with_decay_tail"
+          "const": "truncated_R3_cartesian_cube_with_decay_tail"
         },
         "velocity_cutoff": {
           "type": "number",
@@ -77,6 +73,25 @@
         },
         "time_direction": {
           "const": "forward_only_from_physical_initial_data"
+        },
+        "spatial_domain_lengths": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          ]
         }
       }
     },
@@ -459,8 +474,12 @@
           "minItems": 2,
           "uniqueItems": true,
           "items": {
-            "type": "integer",
-            "minimum": 1
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "integer"
+            }
           }
         },
         "echo_cascade_depth": {
