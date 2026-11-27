@@ -58,7 +58,7 @@ func TestConflictingDuplicateIdentityBlocks(t *testing.T){in:=fixture();e:=in.Ob
 func TestExactReplayRequiresDeduplicationProof(t *testing.T){
  in:=fixture();e:=in.ObservedEvents[0];e.Offset=11;in.ObservedEvents=append(in.ObservedEvents,e)
  expect(t,in,Indeterminate)
- in.ExactReplayDeduplicationProven=true;expect(t,in,Qualified)
+ in.ExactReplayDeduplicationProven=true;in.DeduplicationProofSHA256=dc;expect(t,in,Qualified)
  got:=Evaluate(in);if got.Reconciliation.DuplicateReplays!=1{t.Fatalf("duplicate replay count lost: %+v",got.Reconciliation)}
 }
 func TestPayloadMismatchBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].PayloadSHA256=dc;expect(t,in,Blocked)}
@@ -128,7 +128,7 @@ func BenchmarkEvaluate1000Events100Transactions(b *testing.B){
  for tx:=0;tx<100;tx++{
   counts:=map[string]int{"public.ledger":0,"LOGICAL_DECODING_MESSAGE":0}
   for n:=0;n<10;n++{topic:="ledger";collection:="public.ledger";if n%2==1{topic="message";collection="LOGICAL_DECODING_MESSAGE"};counts[collection]++
-   e:=Event{EventID:fmt.Sprintf("e-%03d-%02d",tx,n),TransactionID:fmt.Sprintf("tx-%03d",tx),Topic:topic,DataCollection:collection,Operation:"INSERT",PayloadSHA256:da,TotalOrder:n+1,CollectionOrder:counts[topic],Partition:0,Offset:int64(tx*10+n)}
+   e:=Event{EventID:fmt.Sprintf("e-%03d-%02d",tx,n),TransactionID:fmt.Sprintf("tx-%03d",tx),Topic:topic,DataCollection:collection,Operation:"INSERT",PayloadSHA256:da,TotalOrder:n+1,CollectionOrder:counts[collection],Partition:0,Offset:int64(tx*10+n)}
    in.SourceEvents=append(in.SourceEvents,e);in.ObservedEvents=append(in.ObservedEvents,e)
   }
   in.Transactions=append(in.Transactions,TransactionProof{TransactionID:fmt.Sprintf("tx-%03d",tx),ExpectedEventCount:10,BeginObserved:true,EndObserved:true,EndEventCount:10,DataCollections:counts})
