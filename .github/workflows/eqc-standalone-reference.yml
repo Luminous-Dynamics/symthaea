@@ -2,9 +2,10 @@ name: EQC Standalone Reference Qualification
 
 on:
   push:
-    branches: [research/eqc-standalone-rust-evaluator-2026-11-27]
+    branches: [research/eqc-standalone-main-v0-1-2026-11-27]
     paths:
       - "research/eqc-rust/Cargo.toml"
+      - "research/eqc-rust/Cargo.lock"
       - "research/eqc-rust/src/**"
       - "research/eqc-rust/tests/**"
       - "docs/research/eqc-task-v0.1.schema.json"
