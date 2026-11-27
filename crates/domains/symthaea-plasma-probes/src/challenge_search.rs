@@ -480,7 +480,11 @@ mod tests {
                 .zip(heights)
                 .map(|(center, height)| height - lipschitz * (parameter - center).abs())
                 .fold(0.0_f64, f64::max);
-            Ok(ChallengeObjectiveSample::new(value, "stable-multi-peak", true))
+            Ok(ChallengeObjectiveSample::new(
+                value,
+                "stable-multi-peak",
+                true,
+            ))
         };
         let config = ScalarChallengeSearchConfig::new(
             0.0,
@@ -499,9 +503,7 @@ mod tests {
                 centers
                     .iter()
                     .zip(heights)
-                    .map(|(center, height)| {
-                        height - lipschitz * (parameter - center).abs()
-                    })
+                    .map(|(center, height)| height - lipschitz * (parameter - center).abs())
                     .fold(0.0_f64, f64::max)
             })
             .fold(0.0_f64, f64::max);
