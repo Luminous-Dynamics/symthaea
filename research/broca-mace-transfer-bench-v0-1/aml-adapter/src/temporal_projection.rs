@@ -372,6 +372,25 @@ impl DerivedProjectionIndexV1 {
     pub fn len(&self) -> usize { self.projections.len() }
     pub fn is_empty(&self) -> bool { self.projections.is_empty() }
 
+    /// Verify a previously issued summary against the current authoritative
+    /// ledger and this exact projection-index instance. Unlike
+    /// `summary.verify_integrity()`, this also detects an old but internally
+    /// self-consistent snapshot.
+    pub fn verify_metamemory_summary(
+        &self,
+        ledger: &StreamingSessionLedgerV1,
+        summary: &StoreMetamemorySummaryV1,
+    ) -> Result<(), TemporalProjectionRejectV1> {
+        if !summary.verify_integrity() {
+            return Err(TemporalProjectionRejectV1::MetamemorySummaryIntegrityFailure);
+        }
+        let current = self.metamemory_summary(ledger)?;
+        if &current != summary {
+            return Err(TemporalProjectionRejectV1::MetamemorySummaryIntegrityFailure);
+        }
+        Ok(())
+    }
+
     /// Produce a value-free store-state summary for this exact ledger/index
     /// sequence. Refuses to summarize when the projection index is behind or
     /// bound to a different session.
@@ -1052,6 +1071,44 @@ mod tests {
         overflowing.status_counts[0].count = u64::MAX;
         overflowing.status_counts[1].count = 1;
         assert!(!overflowing.verify_integrity());
+    }
+
+    #[test]
+    fn metamemory_verifier_accepts_exact_current_snapshot() {
+        let ledger = ledger();
+        let index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let summary = index.metamemory_summary(&ledger).unwrap();
+        assert_eq!(index.verify_metamemory_summary(&ledger, &summary), Ok(()));
+    }
+
+    #[test]
+    fn metamemory_verifier_rejects_internally_valid_but_stale_snapshot() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let stale = index.metamemory_summary(&ledger).unwrap();
+        assert!(stale.verify_integrity());
+
+        let receipt = ledger.apply(append("event-2", 2, 200, "new source"), 1_100)
+            .unwrap().receipt;
+        index.apply_transition(&ledger, &receipt).unwrap();
+        assert_eq!(
+            index.verify_metamemory_summary(&ledger, &stale),
+            Err(TemporalProjectionRejectV1::MetamemorySummaryIntegrityFailure)
+        );
+    }
+
+    #[test]
+    fn metamemory_verifier_rejects_tampering_even_after_the_caller_reseals_a_digest() {
+        let ledger = ledger();
+        let index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let mut forged = index.metamemory_summary(&ledger).unwrap();
+        forged.active_source_event_count += 1;
+        forged.summary_sha256 = metamemory_summary_digest(&forged);
+        assert!(forged.verify_integrity());
+        assert_eq!(
+            index.verify_metamemory_summary(&ledger, &forged),
+            Err(TemporalProjectionRejectV1::MetamemorySummaryIntegrityFailure)
+        );
     }
 
     #[test]
