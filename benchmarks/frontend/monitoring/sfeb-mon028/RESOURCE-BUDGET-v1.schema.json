@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "description",
+    "sut",
+    "postgres",
+    "kafka_connect",
+    "network",
+    "observer"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon028-resource-budget-profile-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sut": {
+      "type": "object",
+      "required": [
+        "cpu_cores",
+        "memory_bytes",
+        "pids_limit"
+      ],
+      "properties": {
+        "cpu_cores": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pids_limit": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "postgres": {
+      "type": "object",
+      "required": [
+        "cpu_cores",
+        "memory_bytes",
+        "disk_quota_bytes"
+      ],
+      "properties": {
+        "cpu_cores": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "disk_quota_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "kafka_connect": {
+      "type": "object",
+      "required": [
+        "cpu_cores",
+        "memory_bytes",
+        "disk_quota_bytes"
+      ],
+      "properties": {
+        "cpu_cores": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "disk_quota_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "required": [
+        "egress_policy"
+      ],
+      "properties": {
+        "egress_policy": {
+          "type": "string"
+        },
+        "bandwidth_limit_bytes_per_second": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "observer": {
+      "type": "object",
+      "required": [
+        "cpu_cores",
+        "memory_bytes"
+      ],
+      "properties": {
+        "cpu_cores": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
