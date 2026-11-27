@@ -10,12 +10,14 @@ on:
       - research/mel-annotator-reliability-corpus-v1-20261125
       - research/mel-music-listen-bench-v1-20261126
       - research/mel-music-performance-identity-v1-20261127
+      - research/mel-performance-identity-inference-v3-20261127
       - research/mel-temporal-unitizing-alpha-u-v1-20261126
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
       - "tools/mel-temporal-grounding-qualifier/**"
       - "docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md"
+      - "docs/research/MEL-HEAR-004-PAIRED-SOURCE-WORK-INFERENCE-V1.md"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/mel-temporal-grounding-qualification.yml"
@@ -26,6 +28,7 @@ on:
       - research/mel-ground-temporal-evaluator-v1-20261103
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
       - research/mel-music-listen-bench-v1-20261126
+      - research/mel-music-performance-identity-v1-20261127
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -286,6 +289,54 @@ jobs:
             and .population_confidence_interval_computed == false
           ' "$RUNNER_TEMP/music-performance-identity-report.json" > /dev/null
 
+      - name: Replay paired source-work-clustered performance identity comparison when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/music_performance_identity_inference.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-performance-identity-compare -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-performance-identity-comparison.synthetic.json > "$RUNNER_TEMP/music-performance-identity-comparison-report.json"
+          jq -e '
+            .schema == "mel-music-performance-identity-comparison-report-v1"
+            and .bootstrap_method == "paired-source-work-cluster-percentile-bootstrap-v1"
+            and .status == "SourceWorkClusterFloorMet"
+            and .item_count == 30
+            and .source_work_clusters == 30
+            and .minimum_source_work_clusters == 30
+            and (.by_target_property | length) == 1
+            and .by_target_property[0].target_property == "ChordQuality"
+            and .by_target_property[0].source_work_clusters == 30
+            and .by_target_property[0].status == "SourceWorkClusterFloorMet"
+            and (.by_performance_stay_factor | length) == 1
+            and .by_performance_stay_factor[0].performance_stay_factor == "DifferentTakeSamePerformer"
+            and .by_performance_stay_factor[0].source_work_clusters == 30
+            and (.by_musical_flip_factor | length) == 1
+            and .by_musical_flip_factor[0].musical_flip_factor == "ChordQualityChange"
+            and .by_musical_flip_factor[0].source_work_clusters == 30
+            and .bootstrap_replicates == 2000
+            and .bootstrap_seed == 20261127
+            and .performance_stay_false_difference.estimate.baseline == 0.5
+            and .performance_stay_false_difference.estimate.candidate > 0.266
+            and .performance_stay_false_difference.estimate.candidate < 0.267
+            and .performance_stay_false_difference.estimate.candidate_improvement > 0.233
+            and .performance_stay_false_difference.estimate.candidate_improvement < 0.234
+            and .performance_stay_false_difference.candidate_improvement_interval != null
+            and .musical_flip_miss.estimate.baseline > 0.199
+            and .musical_flip_miss.estimate.baseline < 0.201
+            and .musical_flip_miss.estimate.candidate > 0.099
+            and .musical_flip_miss.estimate.candidate < 0.101
+            and .musical_flip_miss.candidate_improvement_interval != null
+            and .joint_exact.estimate.baseline == 0.4
+            and .joint_exact.estimate.candidate == 0.7
+            and .joint_exact.estimate.candidate_improvement > 0.299999
+            and .joint_exact.estimate.candidate_improvement < 0.300001
+            and .joint_exact.candidate_improvement_interval != null
+            and .source_work_lineage_authenticated == false
+            and .target_property_annotations_authenticated == false
+            and .audio_bytes_recomputed == false
+            and .model_invoked_by_evaluator == false
+            and .population_generalization_established == false
+          ' "$RUNNER_TEMP/music-performance-identity-comparison-report.json" > /dev/null
+
       - name: Replay corrected multi-rater unitizing alpha-u corpus when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs') != ''
         shell: bash
@@ -399,6 +450,16 @@ jobs:
             cp docs/research/MEL-HEAR-002-PROPERTY-RELATIVE-MUSIC-PERFORMANCE-IDENTITY-V1.md "$evidence/"
             if [[ -f "$RUNNER_TEMP/music-performance-identity-report.json" ]]; then
               cp "$RUNNER_TEMP/music-performance-identity-report.json" "$evidence/"
+            fi
+          fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/music_performance_identity_inference.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/music_performance_identity_inference.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-music-performance-identity-compare.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-music-performance-identity-comparison.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-music-performance-identity-comparison-v1.schema.json "$evidence/"
+            cp docs/research/MEL-HEAR-004-PAIRED-SOURCE-WORK-INFERENCE-V1.md "$evidence/"
+            if [[ -f "$RUNNER_TEMP/music-performance-identity-comparison-report.json" ]]; then
+              cp "$RUNNER_TEMP/music-performance-identity-comparison-report.json" "$evidence/"
             fi
           fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs ]]; then
