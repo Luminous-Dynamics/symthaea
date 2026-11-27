@@ -314,13 +314,14 @@ Not implemented or not yet verified:
 - integration with existing ledger/archive/receipts/attestation;
 - executable replay policy, live-fidelity audit, external benchmark runner or R4.
 
-Verification boundary (exact PR head `8ded8dfd46b0053259b2aea859e94eecffc091ad`):
-- Focused Rust 1.96 PR and push workflow runs both succeeded.
+Verification boundary (exact PR head `067cca73ebb7cab162d146342ed41927a94a3087`):
+- Focused Rust 1.96 PR and push workflow runs both succeeded after the standalone dependency lockfile was committed.
 - `rustfmt --check` passed for all included production support modules and the standalone harness.
-- Standalone harness compiled the production support-module source against shape-matched domain shims and passed **29/29 tests**: 15 decision-contract, 9 custody/prefix and 5 AS-Bench payload tests.
-- Strict Clippy for all standalone harness targets passed.
+- Standalone harness ran with `--locked`, compiled the production support-module source against shape-matched domain shims, and passed **29/29 tests**: 15 decision-contract, 9 custody/prefix and 5 AS-Bench payload tests.
+- Strict Clippy with `--locked` for all standalone harness targets passed.
+- The lockfile is committed at `tools/sym-rsi-decision-replay-contract/Cargo.lock` (30 registry/workspace package entries).
 - This is isolated schema/custody/adapter-contract qualification only. It does not establish integration with the real `symthaea-futures-symtropy` crate, a full workspace build, or compilation of the capsule-materializer example; its two output-root tests remain outside the standalone harness.
 - The ten-world materializer has not been run. No OS/service-level access controls, separate evaluator process, live AS-Bench campaign, external benchmark reproduction, scientific-quality result, SOTA result or R4 qualification is claimed.
 - Broad workspace CI and benchmark workflows were skipped by repository policy. The root workspace also currently cannot be enumerated by Cargo because its `crates/core/*` glob includes a missing `crates/core/symthaea/Cargo.toml`; the standalone harness intentionally avoids masking that repository-level problem.
 
-Do not merge or promote on schema tests alone. The next technical gates are a committed nested Cargo.lock, production-crate integration after workspace closure repair, actual filesystem/service custody, and an executed AS-Bench campaign.
+Do not merge or promote on schema tests alone. The next technical gates are production-crate integration after workspace closure repair, actual filesystem/service custody, execution of the ten-world materializer, and an AS-Bench campaign.
