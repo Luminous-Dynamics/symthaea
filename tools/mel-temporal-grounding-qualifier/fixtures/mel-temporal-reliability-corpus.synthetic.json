@@ -1,0 +1,145 @@
+{
+  "schema": "mel-temporal-reliability-corpus-v1",
+  "annotation_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "minimum_annotators_per_item": 2,
+  "items": [
+    {
+      "item_id": "item-001",
+      "source_work_cluster_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "query_id": "query-001",
+      "query_text": "Identify every piano entrance",
+      "artifact": {
+        "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 480000
+      },
+      "annotation_policy_version": "music-temporal-policy-v1",
+      "annotations": [
+        {
+          "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "annotation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 100,
+              "end_frame": 200
+            }
+          ],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "annotation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 102,
+              "end_frame": 202
+            }
+          ],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "annotation_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "state": "Present",
+          "intervals": [
+            {
+              "start_frame": 110,
+              "end_frame": 210
+            }
+          ],
+          "status_reason": null
+        }
+      ]
+    },
+    {
+      "item_id": "item-002",
+      "source_work_cluster_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "query_id": "query-002",
+      "query_text": "Identify every string entrance",
+      "artifact": {
+        "audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 480000
+      },
+      "annotation_policy_version": "music-temporal-policy-v1",
+      "annotations": [
+        {
+          "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "annotation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "state": "Absent",
+          "intervals": [],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "annotation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "state": "Ambiguous",
+          "intervals": [],
+          "status_reason": "gradual string pad onset has no stable boundary"
+        }
+      ]
+    },
+    {
+      "item_id": "item-003",
+      "source_work_cluster_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "query_id": "query-003",
+      "query_text": "Identify every vocal entrance",
+      "artifact": {
+        "audio_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 480000
+      },
+      "annotation_policy_version": "music-temporal-policy-v1",
+      "annotations": [
+        {
+          "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "annotation_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+          "state": "Absent",
+          "intervals": [],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "annotation_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+          "state": "Ambiguous",
+          "intervals": [],
+          "status_reason": "masked vocal-like texture cannot be distinguished reliably"
+        }
+      ]
+    },
+    {
+      "item_id": "item-004",
+      "source_work_cluster_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "query_id": "query-004",
+      "query_text": "Identify every percussion entrance",
+      "artifact": {
+        "audio_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "total_frames": 480000
+      },
+      "annotation_policy_version": "music-temporal-policy-v1",
+      "annotations": [
+        {
+          "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "annotation_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "state": "Absent",
+          "intervals": [],
+          "status_reason": null
+        },
+        {
+          "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "annotation_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "state": "Absent",
+          "intervals": [],
+          "status_reason": null
+        }
+      ]
+    }
+  ]
+}

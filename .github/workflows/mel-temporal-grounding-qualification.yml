@@ -4,7 +4,12 @@ on:
   push:
     branches:
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
+      - research/mel-multi-annotator-grounding-v1-20261124
       - research/mel-temporal-revision-audit-v1-20261124
+      - research/mel-multi-annotator-grounding-v1-20261124
+      - research/mel-annotator-reliability-corpus-v1-20261125
+      - research/mel-music-listen-bench-v1-20261126
+      - research/mel-temporal-unitizing-alpha-u-v1-20261126
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -13,6 +18,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/mel-temporal-grounding-qualification.yml"
+      - ".github/scripts/check-workflow-draft-safety.py"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
@@ -56,7 +62,7 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check exact-source harness formatting
+      - name: Check committed Rust 1.96 formatting
         run: cargo +1.96.0 fmt --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --check
 
       - name: Verify committed lock and workspace resolution
@@ -70,6 +76,200 @@ jobs:
 
       - name: Warnings-denied Clippy on exact production source
         run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --all-targets -- -D warnings
+
+      - name: Replay multi-annotator temporal-grounding panel when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-multi-annotator-grounding-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-multi-annotator-temporal.synthetic.json > "$RUNNER_TEMP/multi-annotator-report.json"
+          jq -e '
+            .schema == "mel-multi-annotator-grounding-report-v1"
+            and .summary.panel_size == 6
+            and .summary.scored_annotators == 4
+            and .summary.abstained_predictions == 0
+            and .summary.parse_failure_predictions == 0
+            and .summary.prediction_coverage == 1.0
+            and .summary.present_prediction_coverage == 1.0
+            and .summary.absent_prediction_coverage == 1.0
+            and .summary.present_annotators == 3
+            and .summary.absent_annotators == 1
+            and .summary.ambiguous_exclusions == 1
+            and .summary.not_estimable_exclusions == 1
+            and .summary.present_exact_count_accuracy > 0.66
+            and .summary.present_exact_count_accuracy < 0.67
+            and .summary.annotated_occurrence_count_min == 1
+            and .summary.annotated_occurrence_count_max == 2
+            and .summary.one_to_many_annotators == 2
+            and .summary.one_to_many_mean_count_gated_f1 == 1.0
+            and .summary.unanimous_correct_across_scored_annotators == false
+            and (.event_reference_boundary_distributions | length) == 2
+            and .event_reference_boundary_distributions[0].matching_annotators == 3
+            and .event_reference_boundary_distributions[0].start_spread_frames == 5
+            and .event_reference_boundary_distributions[1].matching_annotators == 2
+            and .event_reference_boundary_distributions[1].present_annotators == 3
+            and (.unmatched_prediction_indices | length) == 0
+            and (.annotator_results | length) == 6
+            and (.pairwise_annotation_concordance | length) == 15
+            and .summary.pairwise_annotation_pairs == 15
+            and .summary.pairwise_disposition_agreement_rate == 0.2
+            and .summary.pairwise_present_present_pairs == 3
+            and .summary.pairwise_present_exact_count_agreement > 0.33
+            and .summary.pairwise_present_exact_count_agreement < 0.34
+            and .summary.pairwise_present_symmetric_event_f1 > 0.77
+            and .summary.pairwise_present_symmetric_event_f1 < 0.78
+            and .pairwise_inter_annotator_agreement_computed == false
+            and .annotation_record_digests_recomputed == true
+            and .annotation_manifest_digest_recomputed == true
+            and .annotation_manifest_authenticated == false
+            and .annotator_receipts_authenticated == false
+            and .model_confidence_calibration_computed == false
+            and .synthetic_consensus_ground_truth_created == false
+            and .population_confidence_interval_computed == false
+          ' "$RUNNER_TEMP/multi-annotator-report.json" > /dev/null
+
+      - name: Replay corpus-level multi-annotator reliability when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-reliability-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-corpus.synthetic.json > "$RUNNER_TEMP/temporal-reliability-report.json"
+          jq -e '
+            .schema == "mel-temporal-annotation-reliability-report-v1"
+            and .item_count == 4
+            and .source_work_clusters == 3
+            and .total_annotation_records == 9
+            and .disposition_alpha.ratings == 9
+            and .disposition_alpha.observed_disagreement > 0.44
+            and .disposition_alpha.observed_disagreement < 0.45
+            and .disposition_alpha.expected_disagreement > 0.72
+            and .disposition_alpha.expected_disagreement < 0.73
+            and .disposition_alpha.alpha > 0.38
+            and .disposition_alpha.alpha < 0.39
+            and (.pairwise_by_iou_threshold | length) == 4
+            and .pairwise_by_iou_threshold[0].symmetric_event_f1_mean == 1.0
+            and .pairwise_by_iou_threshold[2].symmetric_event_f1_mean == 1.0
+            and .pairwise_by_iou_threshold[3].symmetric_event_f1_mean > 0.33
+            and .pairwise_by_iou_threshold[3].symmetric_event_f1_mean < 0.34
+            and .consensus_ground_truth_created == false
+            and .model_performance_scored == false
+            and .population_confidence_interval_computed == false
+            and .source_work_bootstrap_computed == false
+          ' "$RUNNER_TEMP/temporal-reliability-report.json" > /dev/null
+
+      - name: Replay MusicListenBench CLEAN-FLIP-STAY triads when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/music_listen_bench.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-listen-bench-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-listen-bench.synthetic.json > "$RUNNER_TEMP/music-listen-bench-report.json"
+          jq -e '
+            .schema == "mel-music-listen-bench-report-v1"
+            and .benchmark_id == "MusicListenBench"
+            and .benchmark_version == "1.0"
+            and .overall.triads == 4
+            and .overall.clean.accuracy == 0.75
+            and .overall.flip.accuracy == 0.75
+            and .overall.stay.accuracy == 1.0
+            and .overall.clean.incorrect == 1
+            and .overall.flip.unparseable == 1
+            and .overall.flip_miss_rate == 0.25
+            and .overall.stay_false_flip_rate == 0.0
+            and .overall.clean_correct_triads == 3
+            and .overall.conditional_flip_miss_rate > 0.333
+            and .overall.conditional_flip_miss_rate < 0.334
+            and .overall.conditional_stay_false_flip_rate == 0.0
+            and .overall.accuracy_flip_stay == 0.875
+            and .overall.joint_clean_flip_stay_exact_rate == 0.5
+            and (.by_task | length) == 4
+            and (.by_flip_factor | length) == 4
+            and (.by_stay_factor | length) == 4
+            and .source_lineage_count == 2
+            and .confirmatory_lineage_floor_met == false
+            and .audio_bytes_recomputed == false
+            and .transformations_authenticated == false
+            and .model_invoked_by_evaluator == false
+          ' "$RUNNER_TEMP/music-listen-bench-report.json" > /dev/null
+
+      - name: Replay MusicListenBench CLEAN-FLIP-STAY triads when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/music_listen_bench.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-listen-bench-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-listen-bench.synthetic.json > "$RUNNER_TEMP/music-listen-bench-report.json"
+          jq -e '
+            .schema == "mel-music-listen-bench-report-v1"
+            and .benchmark_id == "MusicListenBench"
+            and .benchmark_version == "1.0"
+            and (.dataset_revision_sha256 | length) == 64
+            and (.official_scorer_revision_sha256 | length) == 64
+            and .overall.triads == 4
+            and .overall.clean.accuracy == 0.75
+            and .overall.flip.accuracy == 0.75
+            and .overall.stay.accuracy == 1.0
+            and .overall.clean.incorrect == 1
+            and .overall.clean.choice_a == 3
+            and .overall.clean.choice_b == 1
+            and .overall.clean.choice_a_rate_among_answered == 0.75
+            and .overall.flip.choice_a == 1
+            and .overall.flip.choice_b == 2
+            and .overall.flip.choice_a_rate_among_answered > 0.33
+            and .overall.flip.choice_a_rate_among_answered < 0.34
+            and .overall.stay.choice_a_rate_among_answered == 1.0
+            and .overall.flip.unparseable == 1
+            and .overall.flip_miss_rate == 0.25
+            and .overall.stay_false_flip_rate == 0.0
+            and .overall.clean_correct_triads == 3
+            and .overall.conditional_flip_miss_rate > 0.333
+            and .overall.conditional_flip_miss_rate < 0.334
+            and .overall.conditional_stay_false_flip_rate == 0.0
+            and .overall.accuracy_flip_stay == 0.875
+            and .overall.joint_clean_flip_stay_exact_rate == 0.5
+            and (.by_task | length) == 4
+            and (.by_flip_factor | length) == 4
+            and (.by_stay_factor | length) == 4
+            and .source_lineage_count == 2
+            and .confirmatory_lineage_floor_met == false
+            and .audio_bytes_recomputed == false
+            and .transformations_authenticated == false
+            and .model_invoked_by_evaluator == false
+          ' "$RUNNER_TEMP/music-listen-bench-report.json" > /dev/null
+
+      - name: Replay corrected multi-rater unitizing alpha-u corpus when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-temporal-unitizing-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-unitizing-alpha-u.synthetic.json > "$RUNNER_TEMP/temporal-unitizing-report.json"
+          jq -e '
+            .schema == "mel-temporal-unitizing-alpha-u-report-v1"
+            and .evaluator_version == "mel-temporal-unitizing-alpha-u-v1"
+            and .summary.item_count == 3
+            and .summary.scored_item_count == 2
+            and .summary.insufficient_eligible_items == 1
+            and .summary.total_annotation_records == 11
+            and .summary.total_eligible_unitizations == 7
+            and .summary.excluded_ambiguous == 2
+            and .summary.excluded_not_estimable == 2
+            and .summary.source_work_clusters == 2
+            and .item_results[0].status == "Scored"
+            and .item_results[0].eligible_unitizers == 3
+            and .item_results[0].coefficients.u_alpha_nominal != null
+            and .item_results[0].coefficients.u_alpha_binary != null
+            and .item_results[1].status == "Scored"
+            and .item_results[1].coefficients.u_alpha_nominal == 1.0
+            and .item_results[1].coefficients.u_alpha_binary == 1.0
+            and .item_results[1].coefficients.cu_alpha_nominal == null
+            and .item_results[2].status == "InsufficientEligibleUnitizers"
+            and .item_results[2].eligible_unitizers == 1
+            and .unitizing_alpha_computed == true
+            and .consensus_ground_truth_created == false
+            and .pooled_continuum_alpha_computed == false
+            and .population_confidence_interval_computed == false
+            and .source_work_bootstrap_computed == false
+            and .model_performance_scored == false
+            and .annotation_receipts_authenticated == false
+          ' "$RUNNER_TEMP/temporal-unitizing-report.json" > /dev/null
 
       - name: Replay paired temporal revision when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs') != ''
@@ -130,6 +330,53 @@ jobs:
           cp crates/domains/symthaea-muse/src/temporal_grounding.rs "$evidence/"
           cp crates/domains/symthaea-muse/src/evidence_digest.rs "$evidence/"
           cp docs/research/MEL-GROUND-001-TEMPORAL-GROUNDING-SCORER-V1.md "$evidence/"
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/music_listen_bench.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/music_listen_bench.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-music-listen-bench-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-music-listen-bench.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-music-listen-bench-case-v1.schema.json "$evidence/"
+            cp docs/research/MEL-HEAR-001-MUSICLISTENBENCH-ADAPTER-V1.md "$evidence/"
+            if [[ -f "$RUNNER_TEMP/music-listen-bench-report.json" ]]; then
+              cp "$RUNNER_TEMP/music-listen-bench-report.json" "$evidence/"
+            fi
+          fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-unitizing-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-unitizing-alpha-u.synthetic.json "$evidence/"
+            cp docs/research/MEL-GROUND-008-UNITIZING-ALPHA-U-V1.md "$evidence/"
+            if [[ -f "$RUNNER_TEMP/temporal-unitizing-report.json" ]]; then
+              cp "$RUNNER_TEMP/temporal-unitizing-report.json" "$evidence/"
+            fi
+          fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_reliability.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-reliability-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-reliability-corpus.synthetic.json "$evidence/"
+            if [[ -f "$RUNNER_TEMP/temporal-reliability-report.json" ]]; then
+              cp "$RUNNER_TEMP/temporal-reliability-report.json" "$evidence/"
+            fi
+          fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-unitizing-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-temporal-unitizing-alpha-u.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-temporal-unitizing-alpha-u-corpus-v1.schema.json "$evidence/"
+            cp docs/research/MEL-GROUND-008-UNITIZING-ALPHA-U-V1.md "$evidence/"
+            if [[ -f "$RUNNER_TEMP/temporal-unitizing-report.json" ]]; then
+              cp "$RUNNER_TEMP/temporal-unitizing-report.json" "$evidence/"
+            fi
+          fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/temporal_consensus.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-multi-annotator-grounding-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-multi-annotator-temporal.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-multi-annotator-temporal-grounding-v1.schema.json "$evidence/"
+            cp docs/research/MEL-GROUND-006-MULTI-ANNOTATOR-TEMPORAL-GROUNDING-V1.md "$evidence/"
+            if [[ -f "$RUNNER_TEMP/multi-annotator-report.json" ]]; then
+              cp "$RUNNER_TEMP/multi-annotator-report.json" "$evidence/"
+            fi
+          fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/temporal_revision.rs "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-temporal-revision-audit.rs "$evidence/"

@@ -1,0 +1,109 @@
+{
+  "schema": "mel-multi-annotator-temporal-grounding-v1",
+  "query_id": "query-piano-entry-001",
+  "query_text": "Identify every piano entrance in the recording.",
+  "artifact": {
+    "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sample_rate_hz": 48000,
+    "channels": 2,
+    "total_frames": 2880000
+  },
+  "annotation_policy_version": "mel-musician-annotation-v1",
+  "annotation_manifest_sha256": "b4a7a4f3e1a45e7b7666e7ad92c3679237c3e2cea10f0e7e761bf58c44256c41",
+  "minimum_annotator_count": 3,
+  "plan": {
+    "evaluator_version": "mel-temporal-grounding-evaluator-v1",
+    "minimum_interval_iou": 0.5
+  },
+  "prediction": {
+    "schema_version": "mel-temporal-grounding-v1",
+    "query_id": "query-piano-entry-001",
+    "artifact": {
+      "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 2880000
+    },
+    "state": {
+      "Occurrences": {
+        "intervals": [
+          {
+            "start_frame": 100,
+            "end_frame": 200
+          },
+          {
+            "start_frame": 500,
+            "end_frame": 600
+          }
+        ]
+      }
+    }
+  },
+  "annotations": [
+    {
+      "annotator_id_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "annotation_sha256": "2d4d10f23796c480930167031603ad01d41a2e215c8f08331877e65438d14708",
+      "state": "Present",
+      "intervals": [
+        {
+          "start_frame": 100,
+          "end_frame": 200
+        },
+        {
+          "start_frame": 500,
+          "end_frame": 600
+        }
+      ],
+      "status_reason": null
+    },
+    {
+      "annotator_id_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "annotation_sha256": "e14e965460cc72b7af91ae89728e904b5d8edd7170d51fc117a6e96c1898f330",
+      "state": "Present",
+      "intervals": [
+        {
+          "start_frame": 105,
+          "end_frame": 205
+        },
+        {
+          "start_frame": 505,
+          "end_frame": 605
+        }
+      ],
+      "status_reason": null
+    },
+    {
+      "annotator_id_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "annotation_sha256": "bb6d8bf143c49e6ca86ebad6be0eaf9c7db33a614fe7d4fdfa5dbff6011aeaf1",
+      "state": "Present",
+      "intervals": [
+        {
+          "start_frame": 100,
+          "end_frame": 200
+        }
+      ],
+      "status_reason": null
+    },
+    {
+      "annotator_id_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "annotation_sha256": "79c4d14a1620bc56ccd948453d640187c45cfc0d1915b08f35efa0f216829be0",
+      "state": "Absent",
+      "intervals": [],
+      "status_reason": null
+    },
+    {
+      "annotator_id_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "annotation_sha256": "7da97bf47daefa256a87c65982010da5bf169a06145cc03f40955eae95a34d04",
+      "state": "Ambiguous",
+      "intervals": [],
+      "status_reason": "gradual onset; annotators disagree whether this constitutes a distinct entrance"
+    },
+    {
+      "annotator_id_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "annotation_sha256": "4a5ae4007575bdf934569e185ebbada3910bc2e708d959d1aed88cfc051fc089",
+      "state": "NotEstimable",
+      "intervals": [],
+      "status_reason": "masking prevents a reliable judgement"
+    }
+  ]
+}
