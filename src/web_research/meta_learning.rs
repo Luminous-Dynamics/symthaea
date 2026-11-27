@@ -356,6 +356,18 @@ impl EpistemicLearner {
         correct as f32 / adjudicated.len() as f32
     }
 
+    /// Number of adjudicated outcomes with a valid probability forecast.
+    fn calibration_outcome_count(&self) -> usize {
+        self.outcomes
+            .iter()
+            .filter(|outcome| {
+                outcome.was_correct.is_some()
+                    && outcome.predicted_confidence.is_finite()
+                    && (0.0..=1.0).contains(&outcome.predicted_confidence)
+            })
+            .count()
+    }
+
     /// Mean Brier score over independently adjudicated outcomes only.
     ///
     /// Returns None until at least one valid adjudicated probability is available.
@@ -465,6 +477,7 @@ impl EpistemicLearner {
             adjudicated_outcomes,
             unadjudicated_outcomes: self.outcomes.len() - adjudicated_outcomes,
             accuracy: self.calculate_overall_accuracy(),
+            calibration_outcomes: self.calibration_outcome_count(),
             brier_score: self.calculate_brier_score(),
             expected_calibration_error: self.calculate_expected_calibration_error(),
             source_count: self.source_credibility.len(),
@@ -527,6 +540,8 @@ pub struct LearnerStats {
     pub unadjudicated_outcomes: usize,
     /// Accuracy over adjudicated outcomes only; 0.5 is the neutral prior when none exist
     pub accuracy: f32,
+    /// Adjudicated probability forecasts included in Brier/ECE calculations
+    pub calibration_outcomes: usize,
     /// Mean Brier score over adjudicated outcomes; None when no valid labels exist
     pub brier_score: Option<f32>,
     /// Ten-bin expected calibration error over adjudicated outcomes
@@ -692,12 +707,12 @@ mod tests {
         for index in 0..10 {
             let correct = index < 8;
             let outcome = make_outcome("science", "calibration.example", correct)
-                .with_confidence(0.8);
+                .with_confidence(0.9);
             learner.record_outcome(outcome).unwrap();
         }
         let baseline = learner.stats();
-        assert!((baseline.brier_score.unwrap() - 0.16).abs() < 1e-6);
-        assert!(baseline.expected_calibration_error.unwrap().abs() < 1e-6);
+        assert!((baseline.brier_score.unwrap() - 0.17).abs() < 1e-6);
+        assert!((baseline.expected_calibration_error.unwrap() - 0.1).abs() < 1e-6);
 
         learner
             .record_outcome(
@@ -710,11 +725,33 @@ mod tests {
             )
             .unwrap();
         let with_pending = learner.stats();
+        assert_eq!(with_pending.calibration_outcomes, baseline.calibration_outcomes);
         assert_eq!(with_pending.brier_score, baseline.brier_score);
         assert_eq!(
             with_pending.expected_calibration_error,
             baseline.expected_calibration_error
         );
+    }
+
+    #[test]
+    fn malformed_confidence_is_excluded_from_calibration_scores() {
+        let mut learner = EpistemicLearner::new();
+        learner
+            .record_outcome(VerificationOutcome {
+                claim: "Invalid confidence".to_owned(),
+                source_domain: "invalid.example".to_owned(),
+                source_type: ResearchSource::Web,
+                was_correct: Some(true),
+                predicted_confidence: f32::NAN,
+                domain: "science".to_owned(),
+            })
+            .unwrap();
+
+        let stats = learner.stats();
+        assert_eq!(stats.adjudicated_outcomes, 1);
+        assert_eq!(stats.calibration_outcomes, 0);
+        assert_eq!(stats.brier_score, None);
+        assert_eq!(stats.expected_calibration_error, None);
     }
 
     #[test]
