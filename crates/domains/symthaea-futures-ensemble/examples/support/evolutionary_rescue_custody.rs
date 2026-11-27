@@ -5,7 +5,7 @@
 //!
 //! The source SerializedWorld is an offline research artifact containing both observations and
 //! evaluator truth. This adapter projects exactly one permitted observation stream into a
-//! candidate capsule and keeps the trajectory, privileged observations, seed and split in an
+//! replay archive and keeps the trajectory, privileged observations, seed and split in an
 //! evaluator-only capsule/manifest.
 //!
 //! Digests identify serialized bytes; they are not signatures, proof of truth, or access control.
@@ -52,7 +52,8 @@ pub enum WorldSplit {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CandidateObservationCapsule {
+/// Custodian-only full observation stream. Never pass this archive wholesale to a candidate.
+pub struct ReplayObservationArchive {
     pub schema_version: u16,
     pub world_id: String,
     pub world_format_version: String,
@@ -61,11 +62,11 @@ pub struct CandidateObservationCapsule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CandidateCapsuleReceipt {
+pub struct ReplayArchiveReceipt {
     pub schema_version: u16,
     pub world_id: String,
     pub observation_policy_id: String,
-    pub candidate_capsule_blake3: String,
+    pub replay_archive_blake3: String,
 }
 
 /// Evaluator-only material. Never pass this struct or its serialized bytes to candidate code.
@@ -93,17 +94,17 @@ pub struct WorldCustodyManifest {
     pub split: WorldSplit,
     pub seed: u64,
     pub observation_policy_id: String,
-    pub candidate_capsule_blake3: String,
+    pub replay_archive_blake3: String,
     pub evaluator_capsule_blake3: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EncodedCapsuleSet {
-    pub candidate_capsule_json: Vec<u8>,
-    pub candidate_receipt_json: Vec<u8>,
+pub struct EncodedReplayArtifacts {
+    pub replay_archive_json: Vec<u8>,
+    pub replay_receipt_json: Vec<u8>,
     pub evaluator_capsule_json: Vec<u8>,
     pub evaluator_manifest_json: Vec<u8>,
-    pub candidate_digest: String,
+    pub replay_digest: String,
     pub evaluator_digest: String,
 }
 
@@ -113,12 +114,12 @@ pub fn encode_world(
     split: WorldSplit,
     view: ObservationView,
     source_commit: &str,
-) -> Result<EncodedCapsuleSet, String> {
+) -> Result<EncodedReplayArtifacts, String> {
     validate_world(world, view)?;
     require_nonempty("world_id", world_id)?;
     validate_commit_sha(source_commit)?;
 
-    let candidate = CandidateObservationCapsule {
+    let candidate = ReplayObservationArchive {
         schema_version: CAPSULE_SCHEMA_VERSION,
         world_id: world_id.to_owned(),
         world_format_version: world.format_version.clone(),
@@ -137,18 +138,18 @@ pub fn encode_world(
         trait_level_just_before_extinction: world.trait_level_just_before_extinction,
     };
 
-    let candidate_capsule_json = serde_json::to_vec(&candidate)
-        .map_err(|e| format!("serialize candidate capsule: {e}"))?;
+    let replay_archive_json = serde_json::to_vec(&candidate)
+        .map_err(|e| format!("serialize replay archive: {e}"))?;
     let evaluator_capsule_json = serde_json::to_vec(&evaluator)
         .map_err(|e| format!("serialize evaluator capsule: {e}"))?;
-    let candidate_digest = blake3::hash(&candidate_capsule_json).to_hex().to_string();
+    let replay_digest = blake3::hash(&replay_archive_json).to_hex().to_string();
     let evaluator_digest = blake3::hash(&evaluator_capsule_json).to_hex().to_string();
 
-    let receipt = CandidateCapsuleReceipt {
+    let receipt = ReplayArchiveReceipt {
         schema_version: CAPSULE_SCHEMA_VERSION,
         world_id: world_id.to_owned(),
         observation_policy_id: view.policy_id().to_owned(),
-        candidate_capsule_blake3: candidate_digest.clone(),
+        replay_archive_blake3: replay_digest.clone(),
     };
     let manifest = WorldCustodyManifest {
         schema_version: CAPSULE_SCHEMA_VERSION,
@@ -158,51 +159,51 @@ pub fn encode_world(
         split,
         seed: world.seed,
         observation_policy_id: view.policy_id().to_owned(),
-        candidate_capsule_blake3: candidate_digest.clone(),
+        replay_archive_blake3: replay_digest.clone(),
         evaluator_capsule_blake3: evaluator_digest.clone(),
     };
 
-    Ok(EncodedCapsuleSet {
-        candidate_capsule_json,
-        candidate_receipt_json: serde_json::to_vec(&receipt)
+    Ok(EncodedReplayArtifacts {
+        replay_archive_json,
+        replay_receipt_json: serde_json::to_vec(&receipt)
             .map_err(|e| format!("serialize candidate receipt: {e}"))?,
         evaluator_capsule_json,
         evaluator_manifest_json: serde_json::to_vec(&manifest)
             .map_err(|e| format!("serialize evaluator manifest: {e}"))?,
-        candidate_digest,
+        replay_digest,
         evaluator_digest,
     })
 }
 
 /// Recomputes and verifies the evaluator's digest links. Call this before opening a world for
 /// scoring. It deliberately operates on exact serialized bytes, not parsed/reformatted JSON.
-pub fn verify_encoded_capsules(
-    set: &EncodedCapsuleSet,
-    expected_candidate_digest: &str,
+pub fn verify_encoded_replay_artifacts(
+    set: &EncodedReplayArtifacts,
+    expected_replay_digest: &str,
     expected_evaluator_digest: &str,
 ) -> Result<(), String> {
-    let candidate_actual = blake3::hash(&set.candidate_capsule_json).to_hex().to_string();
+    let replay_actual = blake3::hash(&set.replay_archive_json).to_hex().to_string();
     let evaluator_actual = blake3::hash(&set.evaluator_capsule_json).to_hex().to_string();
-    if candidate_actual != expected_candidate_digest || candidate_actual != set.candidate_digest {
-        return Err("candidate capsule digest mismatch".into());
+    if replay_actual != expected_replay_digest || replay_actual != set.replay_digest {
+        return Err("replay archive digest mismatch".into());
     }
     if evaluator_actual != expected_evaluator_digest || evaluator_actual != set.evaluator_digest {
         return Err("evaluator capsule digest mismatch".into());
     }
-    let receipt: CandidateCapsuleReceipt = serde_json::from_slice(&set.candidate_receipt_json)
+    let receipt: ReplayArchiveReceipt = serde_json::from_slice(&set.replay_receipt_json)
         .map_err(|e| format!("decode candidate receipt: {e}"))?;
     let manifest: WorldCustodyManifest = serde_json::from_slice(&set.evaluator_manifest_json)
         .map_err(|e| format!("decode evaluator manifest: {e}"))?;
-    let candidate: CandidateObservationCapsule = serde_json::from_slice(&set.candidate_capsule_json)
-        .map_err(|e| format!("decode candidate capsule: {e}"))?;
+    let candidate: ReplayObservationArchive = serde_json::from_slice(&set.replay_archive_json)
+        .map_err(|e| format!("decode replay archive: {e}"))?;
     let evaluator: EvaluatorOutcomeCapsule = serde_json::from_slice(&set.evaluator_capsule_json)
         .map_err(|e| format!("decode evaluator capsule: {e}"))?;
     if receipt.schema_version != CAPSULE_SCHEMA_VERSION
         || manifest.schema_version != CAPSULE_SCHEMA_VERSION
         || candidate.schema_version != CAPSULE_SCHEMA_VERSION
         || evaluator.schema_version != CAPSULE_SCHEMA_VERSION
-        || receipt.candidate_capsule_blake3 != candidate_actual
-        || manifest.candidate_capsule_blake3 != candidate_actual
+        || receipt.replay_archive_blake3 != replay_actual
+        || manifest.replay_archive_blake3 != replay_actual
         || manifest.evaluator_capsule_blake3 != evaluator_actual
         || receipt.world_id != manifest.world_id
         || candidate.world_id != manifest.world_id
@@ -342,9 +343,9 @@ mod tests {
             WorldSplit::Training, ObservationView::Census,
             "0123456789abcdef0123456789abcdef01234567",
         ).unwrap();
-        let json = String::from_utf8(encoded.candidate_capsule_json).unwrap();
+        let json = String::from_utf8(encoded.replay_archive_json).unwrap();
         for forbidden in ["\"seed\"", "\"trajectory_collapsed\"", "\"privileged_observations\"", "\"first_extinction_tick\"", "\"split\""] {
-            assert!(!json.contains(forbidden), "candidate capsule leaked {forbidden}");
+            assert!(!json.contains(forbidden), "replay archive leaked {forbidden}");
         }
         assert!(json.contains("population_census_v1"));
     }
@@ -355,8 +356,8 @@ mod tests {
             &world(), "world-opaque-1", WorldSplit::HeldOut,
             ObservationView::NoisyTrait, "0123456789abcdef0123456789abcdef01234567",
         ).unwrap();
-        verify_encoded_capsules(&encoded, &encoded.candidate_digest, &encoded.evaluator_digest).unwrap();
-        let receipt = String::from_utf8(encoded.candidate_receipt_json).unwrap();
+        verify_encoded_replay_artifacts(&encoded, &encoded.replay_digest, &encoded.evaluator_digest).unwrap();
+        let receipt = String::from_utf8(encoded.replay_receipt_json).unwrap();
         assert!(!receipt.contains("evaluator_capsule_blake3"));
         assert!(!receipt.contains("\"seed\""));
         let manifest = String::from_utf8(encoded.evaluator_manifest_json).unwrap();
@@ -405,8 +406,8 @@ mod tests {
             serde_json::from_slice(&encoded.evaluator_manifest_json).unwrap();
         manifest.world_id = "different-world".into();
         encoded.evaluator_manifest_json = serde_json::to_vec(&manifest).unwrap();
-        assert!(verify_encoded_capsules(
-            &encoded, &encoded.candidate_digest, &encoded.evaluator_digest,
+        assert!(verify_encoded_replay_artifacts(
+            &encoded, &encoded.replay_digest, &encoded.evaluator_digest,
         ).unwrap_err().contains("linkage mismatch"));
     }
 
@@ -417,8 +418,8 @@ mod tests {
             "0123456789abcdef0123456789abcdef01234567",
         ).unwrap();
         encoded.evaluator_capsule_json.push(b' ');
-        assert!(verify_encoded_capsules(
-            &encoded, &encoded.candidate_digest, &encoded.evaluator_digest,
+        assert!(verify_encoded_replay_artifacts(
+            &encoded, &encoded.replay_digest, &encoded.evaluator_digest,
         ).unwrap_err().contains("evaluator capsule digest mismatch"));
     }
 }
