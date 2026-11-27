@@ -1,6 +1,6 @@
 # SDCB block-conformal open-world adequacy calibration v1
 
-**Status:** exact finite-rank diagnostic. Eight Rust tests are authored but not compiled or executed here. A false-alarm guarantee applies only under the declared exchangeability assumptions; no real-data calibration or time-series validity claim is made.
+**Status:** exact finite-rank diagnostic. Eleven Rust tests are authored; the focused Rust 1.96 workflow is the execution gate. A false-alarm guarantee applies only under the declared exchangeability assumptions; no real-data calibration or time-series validity claim is made.
 
 ## 1. Why this improves the fixed-threshold gate
 
@@ -30,7 +30,7 @@ p_*=\frac{1+\sum_{b=1}^n\mathbf 1\{A_b\ge A_*\}}{n+1}.
 
 Flag the model set as out-of-envelope only when \(p_*\le\alpha\). Ties are counted conservatively. The minimum attainable non-randomized p-value is \(1/(n+1)\); the implementation reports whether the available calibration sample can resolve the requested \(\alpha\).
 
-The calibration and test unit must use exactly the same model-set digest, scoring-protocol digest, observation units/transformation, and block construction. Otherwise the rank comparison is rejected.
+The calibration and test unit must use exactly the same canonical lowercase 64-character SHA-256 model-set digest, scoring-protocol digest, observation units/transformation, and block construction. Malformed or merely descriptive strings are rejected; otherwise the rank comparison is rejected.
 
 ## 3. Guarantee and its limits
 
@@ -50,12 +50,12 @@ Recent time-series conformal theory explicitly studies dependence-adjusted cover
 
 At each adaptive stage, the scoring function and model-set digest are frozen. This reference requires:
 - a distinct calibration epoch ID at every stage;
-- no reuse of calibration-unit IDs consumed at earlier stages;
-- no reuse of the current test unit as a calibration unit;
+- no reuse of any previously consumed calibration or test unit as either calibration or test data at a later stage;
+- no overlap between the current calibration fold and current test unit;
 - no use of the test score to fit or tune the model/scoring protocol;
 - explicit propagation of the consumed epoch/unit IDs to the next stage.
 
-The helper is pure: it reports which IDs must be consumed; the caller must preserve this ledger. A future integration should bind fold receipts to the SDCB/EGBT evidence version and replay.
+The helper is pure: it reports the union of calibration-unit IDs and the evaluated test-unit ID as `consumed_unit_ids`, plus the consumed calibration epoch. The caller must preserve the complete ledger. This prevents a test episode from being recycled into a later adaptive calibration fold. A future integration should bind fold receipts to the SDCB/EGBT evidence version and replay.
 
 ## 5. Frozen fixture
 
@@ -72,7 +72,7 @@ This is a constructed rank fixture, not a sensor-data result.
 - Exact agreement with independent rank enumeration.
 - Conservative tie handling.
 - Zero calibration/test ID overlap.
-- Zero cross-stage epoch/unit reuse.
+- Zero cross-stage epoch/unit reuse, including test-to-calibration recycling.
 - Zero scoring-protocol or model-set digest mismatch acceptance.
 - Empirical false-alarm rate at or below nominal alpha on independent exchangeable held-out episodes, with binomial confidence intervals.
 - Under dependent time-series tasks, do not claim the exchangeable-block guarantee; compare against dependence-aware methods and report coverage/error bounds, block size, and drift sensitivity.
