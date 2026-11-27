@@ -72,7 +72,7 @@ The initial contract artifacts are committed alongside this proposal:
 
 - `eqc-task-v0.1.schema.json`: versioned task/authority/request/expected-outcome contract.
 - `eqc-run-receipt-v0.1.schema.json`: source-head, environment, action, replay, independent-verifier and qualification receipt.
-- `eqc-seed-corpus-v0.1.json`: four synthetic public episodes covering an authorized read, wrong-subject denial, revoked-authority denial, and replayed-challenge denial.
+- `eqc-seed-corpus-v0.1.json`: six synthetic public episodes covering an authorized read, wrong-subject denial, revoked-authority denial, and replayed-challenge denial.
 - `eqc-fixtures/*.json`: three synthetic consent/challenge artifacts; task manifests bind them to byte-level SHA-256 digests.
 - `research/eqc-reference` standalone Rust CLI: a Rust reference-contract evaluator that validates the frozen inputs, expected decisions, zero-side-effect denials, and two-sided baseline controls.
 
