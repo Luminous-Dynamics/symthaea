@@ -183,6 +183,10 @@ jobs:
           jq -e '
             .schema == "mel-performance-invariance-report-v1"
             and .benchmark_id == "Melothaea-Performance-Identity"
+            and .split == "SyntheticRendered"
+            and (.source_permissions_manifest_sha256 | length) == 64
+            and .source_permission_receipts_authenticated == false
+            and .overall.target_property == null
             and .overall.triads == 6
             and .overall.clean.accuracy == 1.0
             and .overall.performance_stay.accuracy > 0.83
