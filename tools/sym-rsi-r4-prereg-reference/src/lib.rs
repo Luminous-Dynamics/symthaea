@@ -135,7 +135,10 @@ fn check_arm_bindings(report: &mut ValidationReport, root: &Value) {
         return;
     };
     if arms.len() != 2 {
-        report.issue("ARM_COUNT", format!("expected exactly two arms, found {}", arms.len()));
+        report.issue(
+            "ARM_COUNT",
+            format!("expected exactly two arms, found {}", arms.len()),
+        );
         return;
     }
 
@@ -170,7 +173,10 @@ fn check_arm_bindings(report: &mut ValidationReport, root: &Value) {
         }
     }
     if seen != expected.keys().map(|value| (*value).to_owned()).collect() {
-        report.issue("ARM_SET_MISMATCH", "expected evolved_outer_loop and reference_outer_loop");
+        report.issue(
+            "ARM_SET_MISMATCH",
+            "expected evolved_outer_loop and reference_outer_loop",
+        );
     }
 
     let left_backend = string_at(
@@ -192,7 +198,10 @@ fn check_arm_bindings(report: &mut ValidationReport, root: &Value) {
         ],
     );
     if !non_empty(left_backend) || left_backend != right_backend {
-        report.issue("BACKEND_MISMATCH", "both researcher arms must use the same model/backend version");
+        report.issue(
+            "BACKEND_MISMATCH",
+            "both researcher arms must use the same model/backend version",
+        );
     }
     let identity_fields = [
         "artifact_digest",
@@ -204,10 +213,20 @@ fn check_arm_bindings(report: &mut ValidationReport, root: &Value) {
     let identities_equal = identity_fields.iter().all(|field| {
         string_at(
             root,
-            &["starting_state", "outer_loop_arms", "evolved_researcher", field],
+            &[
+                "starting_state",
+                "outer_loop_arms",
+                "evolved_researcher",
+                field,
+            ],
         ) == string_at(
             root,
-            &["starting_state", "outer_loop_arms", "reference_researcher", field],
+            &[
+                "starting_state",
+                "outer_loop_arms",
+                "reference_researcher",
+                field,
+            ],
         )
     });
     if identities_equal {
@@ -231,7 +250,11 @@ fn check_arm_bindings(report: &mut ValidationReport, root: &Value) {
     require_sha256(
         report,
         root,
-        &["starting_state", "outer_loop_arms", "shared_frozen_context_digest"],
+        &[
+            "starting_state",
+            "outer_loop_arms",
+            "shared_frozen_context_digest",
+        ],
     );
 
     for arm in ["evolved_researcher", "reference_researcher"] {
@@ -251,7 +274,12 @@ fn check_arm_bindings(report: &mut ValidationReport, root: &Value) {
         require_string(
             report,
             root,
-            &["starting_state", "outer_loop_arms", arm, "lineage_evidence_ref"],
+            &[
+                "starting_state",
+                "outer_loop_arms",
+                arm,
+                "lineage_evidence_ref",
+            ],
         );
     }
     for field in [
@@ -261,12 +289,20 @@ fn check_arm_bindings(report: &mut ValidationReport, root: &Value) {
         "checkpoint_digest",
         "memory_research_state_digest",
     ] {
-        require_sha256(report, root, &["starting_state", "shared_inner_agent", field]);
+        require_sha256(
+            report,
+            root,
+            &["starting_state", "shared_inner_agent", field],
+        );
     }
     require_string(
         report,
         root,
-        &["starting_state", "shared_inner_agent", "source_build_evidence_ref"],
+        &[
+            "starting_state",
+            "shared_inner_agent",
+            "source_build_evidence_ref",
+        ],
     );
 }
 
@@ -283,9 +319,17 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
     ] {
         require_string(report, root, &["research_state_continuity", field]);
     }
-    if string_at(root, &["research_state_continuity", "state_snapshot_digest"])
-        != string_at(root, &["starting_state", "shared_inner_agent", "memory_research_state_digest"])
-    {
+    if string_at(
+        root,
+        &["research_state_continuity", "state_snapshot_digest"],
+    ) != string_at(
+        root,
+        &[
+            "starting_state",
+            "shared_inner_agent",
+            "memory_research_state_digest",
+        ],
+    ) {
         report.issue(
             "STATE_SNAPSHOT_START_MISMATCH",
             "research-state continuity snapshot must identify the exact starting inner-agent research state",
@@ -303,10 +347,19 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
         "inclusive_cost_and_retry_record",
         "open_question_and_next_test",
     ];
-    let observed_records: BTreeSet<String> = at(root, &["research_state_continuity", "required_record_types"])
-        .and_then(Value::as_array)
-        .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
-        .unwrap_or_default();
+    let observed_records: BTreeSet<String> = at(
+        root,
+        &["research_state_continuity", "required_record_types"],
+    )
+    .and_then(Value::as_array)
+    .map(|items| {
+        items
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect()
+    })
+    .unwrap_or_default();
     for record_type in required_record_types {
         if !observed_records.contains(record_type) {
             report.issue("STATE_RECORD_TYPE_MISSING", record_type);
@@ -320,10 +373,17 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
         "shuffled_verified_state",
         "accepted_findings_only",
     ];
-    let observed_ablations: BTreeSet<String> = at(root, &["research_state_continuity", "ablation_arms"])
-        .and_then(Value::as_array)
-        .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
-        .unwrap_or_default();
+    let observed_ablations: BTreeSet<String> =
+        at(root, &["research_state_continuity", "ablation_arms"])
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default();
     for arm in required_ablations {
         if !observed_ablations.contains(arm) {
             report.issue("STATE_ABLATION_MISSING", arm);
@@ -343,7 +403,13 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
     ];
     let observed_metrics: BTreeSet<String> = at(root, &["research_state_continuity", "metrics"])
         .and_then(Value::as_array)
-        .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
         .unwrap_or_default();
     for metric in required_metrics {
         if !observed_metrics.contains(metric) {
@@ -352,7 +418,10 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
     }
     let route_scope = at(root, &["research_state_continuity", "scope_routing"]);
     if route_scope.is_none() {
-        report.issue("STATE_SCOPE_ROUTING_MISSING", "research_state_continuity.scope_routing");
+        report.issue(
+            "STATE_SCOPE_ROUTING_MISSING",
+            "research_state_continuity.scope_routing",
+        );
     }
     for field in [
         "scope_descriptor_schema_digest",
@@ -369,12 +438,20 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
     require_string(
         report,
         root,
-        &["research_state_continuity", "scope_routing", "router_access_audit_ref"],
+        &[
+            "research_state_continuity",
+            "scope_routing",
+            "router_access_audit_ref",
+        ],
     );
     require_string(
         report,
         root,
-        &["research_state_continuity", "scope_routing", "sharing_policy"],
+        &[
+            "research_state_continuity",
+            "scope_routing",
+            "sharing_policy",
+        ],
     );
     for field in [
         "router_cannot_read_cluster_contents",
@@ -396,11 +473,23 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
         "shuffled_scope_routing",
         "oracle_scope_assignment",
     ];
-    let observed_scope_ablations: BTreeSet<String> =
-        at(root, &["research_state_continuity", "scope_routing", "required_ablation_arms"])
-            .and_then(Value::as_array)
-            .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
-            .unwrap_or_default();
+    let observed_scope_ablations: BTreeSet<String> = at(
+        root,
+        &[
+            "research_state_continuity",
+            "scope_routing",
+            "required_ablation_arms",
+        ],
+    )
+    .and_then(Value::as_array)
+    .map(|items| {
+        items
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect()
+    })
+    .unwrap_or_default();
     for arm in required_scope_ablations {
         if !observed_scope_ablations.contains(arm) {
             report.issue("STATE_SCOPE_ABLATION_MISSING", arm);
@@ -412,11 +501,23 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
         "unreceipted_cross_cluster_transfer",
         "hidden_task_label_routing",
     ];
-    let observed_scope_failures: BTreeSet<String> =
-        at(root, &["research_state_continuity", "scope_routing", "prohibited_failure_modes"])
-            .and_then(Value::as_array)
-            .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
-            .unwrap_or_default();
+    let observed_scope_failures: BTreeSet<String> = at(
+        root,
+        &[
+            "research_state_continuity",
+            "scope_routing",
+            "prohibited_failure_modes",
+        ],
+    )
+    .and_then(Value::as_array)
+    .map(|items| {
+        items
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect()
+    })
+    .unwrap_or_default();
     for failure in required_scope_failures {
         if !observed_scope_failures.contains(failure) {
             report.issue("STATE_SCOPE_FAILURE_MODE_MISSING", failure);
@@ -472,34 +573,60 @@ fn required_bool_at(root: &Value, path: &[&str]) -> Result<bool, String> {
 /// object-map iteration order. Arm bindings refer to this digest; they are not
 /// included in the preimage, avoiding a recursive hash.
 pub fn canonical_budget_envelope_sha256(root: &Value) -> Result<String, String> {
-    let budget = at(root, &["budget"])
-        .ok_or_else(|| "budget object is missing".to_owned())?;
+    let budget = at(root, &["budget"]).ok_or_else(|| "budget object is missing".to_owned())?;
     let caps = CanonicalBudgetCapsV1 {
-        model_inference_tokens: required_nonempty_string_at(budget, &["per_arm_caps", "model_inference_tokens"] )?,
-        model_training_compute: required_nonempty_string_at(budget, &["per_arm_caps", "model_training_compute"] )?,
-        accelerator_hours_by_type: required_nonempty_string_at(budget, &["per_arm_caps", "accelerator_hours_by_type"] )?,
-        cpu_hours: required_nonempty_string_at(budget, &["per_arm_caps", "cpu_hours"] )?,
-        evaluator_calls: required_nonempty_string_at(budget, &["per_arm_caps", "evaluator_calls"] )?,
-        candidate_builds_and_executions: required_nonempty_string_at(budget, &["per_arm_caps", "candidate_builds_and_executions"] )?,
-        retries: required_nonempty_string_at(budget, &["per_arm_caps", "retries"] )?,
-        wall_clock: required_nonempty_string_at(budget, &["per_arm_caps", "wall_clock"] )?,
-        peak_memory: required_nonempty_string_at(budget, &["per_arm_caps", "peak_memory"] )?,
-        energy: required_nonempty_string_at(budget, &["per_arm_caps", "energy"] )?,
-        human_active_minutes: required_nonempty_string_at(budget, &["per_arm_caps", "human_active_minutes"] )?,
-        human_review_and_rework_minutes: required_nonempty_string_at(budget, &["per_arm_caps", "human_review_and_rework_minutes"] )?,
+        model_inference_tokens: required_nonempty_string_at(
+            budget,
+            &["per_arm_caps", "model_inference_tokens"],
+        )?,
+        model_training_compute: required_nonempty_string_at(
+            budget,
+            &["per_arm_caps", "model_training_compute"],
+        )?,
+        accelerator_hours_by_type: required_nonempty_string_at(
+            budget,
+            &["per_arm_caps", "accelerator_hours_by_type"],
+        )?,
+        cpu_hours: required_nonempty_string_at(budget, &["per_arm_caps", "cpu_hours"])?,
+        evaluator_calls: required_nonempty_string_at(budget, &["per_arm_caps", "evaluator_calls"])?,
+        candidate_builds_and_executions: required_nonempty_string_at(
+            budget,
+            &["per_arm_caps", "candidate_builds_and_executions"],
+        )?,
+        retries: required_nonempty_string_at(budget, &["per_arm_caps", "retries"])?,
+        wall_clock: required_nonempty_string_at(budget, &["per_arm_caps", "wall_clock"])?,
+        peak_memory: required_nonempty_string_at(budget, &["per_arm_caps", "peak_memory"])?,
+        energy: required_nonempty_string_at(budget, &["per_arm_caps", "energy"])?,
+        human_active_minutes: required_nonempty_string_at(
+            budget,
+            &["per_arm_caps", "human_active_minutes"],
+        )?,
+        human_review_and_rework_minutes: required_nonempty_string_at(
+            budget,
+            &["per_arm_caps", "human_review_and_rework_minutes"],
+        )?,
     };
     let canonical = CanonicalBudgetEnvelopeV1 {
         domain: "symthaea.r4.inclusive-budget-envelope",
         schema_version: 1,
-        accounting_boundary: required_nonempty_string_at(budget, &["accounting_boundary"] )?,
-        total_budget: required_nonempty_string_at(budget, &["total_budget"] )?,
-        currency_and_price_basis: required_nonempty_string_at(budget, &["currency_and_price_basis"] )?,
+        accounting_boundary: required_nonempty_string_at(budget, &["accounting_boundary"])?,
+        total_budget: required_nonempty_string_at(budget, &["total_budget"])?,
+        currency_and_price_basis: required_nonempty_string_at(
+            budget,
+            &["currency_and_price_basis"],
+        )?,
         per_arm_caps: caps,
-        failure_accounting: required_nonempty_string_at(budget, &["failure_accounting"] )?,
-        same_envelope_for_all_arms: required_bool_at(budget, &["same_envelope_for_all_arms"] )?,
-        inclusive_cost_boundary: required_bool_at(budget, &["inclusive_cost_boundary"] )?,
-        includes_failed_invalid_retries: required_bool_at(budget, &["includes_failed_invalid_retries"] )?,
-        includes_human_review_and_rework: required_bool_at(budget, &["includes_human_review_and_rework"] )?,
+        failure_accounting: required_nonempty_string_at(budget, &["failure_accounting"])?,
+        same_envelope_for_all_arms: required_bool_at(budget, &["same_envelope_for_all_arms"])?,
+        inclusive_cost_boundary: required_bool_at(budget, &["inclusive_cost_boundary"])?,
+        includes_failed_invalid_retries: required_bool_at(
+            budget,
+            &["includes_failed_invalid_retries"],
+        )?,
+        includes_human_review_and_rework: required_bool_at(
+            budget,
+            &["includes_human_review_and_rework"],
+        )?,
     };
     let bytes = serde_json::to_vec(&canonical)
         .map_err(|error| format!("serialize canonical budget envelope: {error}"))?;
@@ -519,12 +646,7 @@ fn check_budget(report: &mut ValidationReport, root: &Value) {
 
     let shared = string_at(root, &["budget", "shared_envelope_digest"]);
     for arm in ["evolved_outer_loop", "reference_outer_loop"] {
-        let binding = [
-            "budget",
-            "arm_budget_bindings",
-            arm,
-            "envelope_digest",
-        ];
+        let binding = ["budget", "arm_budget_bindings", arm, "envelope_digest"];
         require_sha256(report, root, &binding);
         if string_at(root, &binding) != shared {
             report.issue("UNEQUAL_ARM_BUDGET", arm);
@@ -541,7 +663,10 @@ fn check_budget(report: &mut ValidationReport, root: &Value) {
     require_string(report, root, &["budget", "accounting_boundary"]);
 
     let Some(caps) = at(root, &["budget", "per_arm_caps"]).and_then(Value::as_object) else {
-        report.issue("BUDGET_CAPS_MISSING", "budget.per_arm_caps must be an object");
+        report.issue(
+            "BUDGET_CAPS_MISSING",
+            "budget.per_arm_caps must be an object",
+        );
         return;
     };
     let required_caps = [
@@ -579,8 +704,16 @@ fn check_splits(report: &mut ValidationReport, root: &Value) {
     let paths: [&[&str]; 4] = [
         &["splits", "discovery", "manifest_digest"],
         &["splits", "validation", "manifest_digest"],
-        &["splits", "sealed_confirmation", "manifest_digest_commitment"],
-        &["splits", "fresh_family_transfer", "manifest_digest_commitment"],
+        &[
+            "splits",
+            "sealed_confirmation",
+            "manifest_digest_commitment",
+        ],
+        &[
+            "splits",
+            "fresh_family_transfer",
+            "manifest_digest_commitment",
+        ],
     ];
     let mut digests = BTreeSet::new();
     for path in paths {
@@ -592,7 +725,10 @@ fn check_splits(report: &mut ValidationReport, root: &Value) {
         }
     }
     if digests.len() != 4 {
-        report.issue("SPLIT_SET_INCOMPLETE", "four distinct split identities are required");
+        report.issue(
+            "SPLIT_SET_INCOMPLETE",
+            "four distinct split identities are required",
+        );
     }
 
     require_string(
@@ -612,7 +748,10 @@ fn check_splits(report: &mut ValidationReport, root: &Value) {
     );
     if string_at(root, &["splits", "disjointness_audit", "overlap_unit"])
         != Some("task_instance_id_and_task_family_id")
-        || integer_at(root, &["splits", "disjointness_audit", "expected_overlap_count"]) != Some(0)
+        || integer_at(
+            root,
+            &["splits", "disjointness_audit", "expected_overlap_count"],
+        ) != Some(0)
     {
         report.issue(
             "SPLIT_DISJOINTNESS_NOT_DECLARED",
@@ -620,15 +759,15 @@ fn check_splits(report: &mut ValidationReport, root: &Value) {
         );
     }
 
+    require_string(report, root, &["splits", "validation", "custodian"]);
     require_string(
         report,
         root,
-        &["splits", "validation", "custodian"],
-    );
-    require_string(
-        report,
-        root,
-        &["splits", "sealed_confirmation", "custodian_independent_of_candidate"],
+        &[
+            "splits",
+            "sealed_confirmation",
+            "custodian_independent_of_candidate",
+        ],
     );
     require_string(
         report,
@@ -638,7 +777,11 @@ fn check_splits(report: &mut ValidationReport, root: &Value) {
     require_string(
         report,
         root,
-        &["splits", "fresh_family_transfer", "custodian_independent_of_candidate"],
+        &[
+            "splits",
+            "fresh_family_transfer",
+            "custodian_independent_of_candidate",
+        ],
     );
     require_bool(
         report,
@@ -658,15 +801,17 @@ fn check_splits(report: &mut ValidationReport, root: &Value) {
         root,
         &["task_population", "licensing_and_data_rights_review_ref"],
     );
-    let domains = at(root, &["task_population", "capability_domains"])
-        .and_then(Value::as_array);
+    let domains = at(root, &["task_population", "capability_domains"]).and_then(Value::as_array);
     if !domains.is_some_and(|items| {
         !items.is_empty()
             && items
                 .iter()
                 .all(|item| item.as_str().is_some_and(|name| !name.trim().is_empty()))
     }) {
-        report.issue("CAPABILITY_DOMAINS_MISSING", "at least one non-empty capability domain is required");
+        report.issue(
+            "CAPABILITY_DOMAINS_MISSING",
+            "at least one non-empty capability domain is required",
+        );
     }
     for field in [
         "workspace_mount_audit_ref",
@@ -687,8 +832,18 @@ fn check_evaluator(report: &mut ValidationReport, root: &Value) {
     ] {
         require_sha256(report, root, &["evaluator_binding", field]);
     }
-    require_bool(report, root, &["evaluator_binding", "shared_across_arms"], true);
-    require_bool(report, root, &["evaluator_binding", "candidate_write_access"], false);
+    require_bool(
+        report,
+        root,
+        &["evaluator_binding", "shared_across_arms"],
+        true,
+    );
+    require_bool(
+        report,
+        root,
+        &["evaluator_binding", "candidate_write_access"],
+        false,
+    );
     require_bool(
         report,
         root,
@@ -698,29 +853,56 @@ fn check_evaluator(report: &mut ValidationReport, root: &Value) {
 }
 
 fn check_replication_and_rounds(report: &mut ValidationReport, root: &Value) {
-    if integer_at(root, &["seed_and_replication_plan", "paired_pilot_seed_count"])
-        .unwrap_or(0)
+    if integer_at(
+        root,
+        &["seed_and_replication_plan", "paired_pilot_seed_count"],
+    )
+    .unwrap_or(0)
         < 5
     {
-        report.issue("PILOT_SEED_FLOOR", "paired pilot must contain at least five seeds");
+        report.issue(
+            "PILOT_SEED_FLOOR",
+            "paired pilot must contain at least five seeds",
+        );
     }
-    if integer_at(root, &["seed_and_replication_plan", "independent_full_loop_reruns_required"])
-        .unwrap_or(0)
+    if integer_at(
+        root,
+        &[
+            "seed_and_replication_plan",
+            "independent_full_loop_reruns_required",
+        ],
+    )
+    .unwrap_or(0)
         < 2
     {
-        report.issue("FULL_LOOP_RERUN_FLOOR", "at least two independent full-loop reruns are required");
+        report.issue(
+            "FULL_LOOP_RERUN_FLOOR",
+            "at least two independent full-loop reruns are required",
+        );
     }
-    if integer_at(root, &["seed_and_replication_plan", "confirmatory_seed_count"])
-        .unwrap_or(0)
+    if integer_at(
+        root,
+        &["seed_and_replication_plan", "confirmatory_seed_count"],
+    )
+    .unwrap_or(0)
         == 0
     {
-        report.issue("CONFIRMATORY_SEEDS_UNSET", "confirmatory seed count must be a positive frozen integer");
+        report.issue(
+            "CONFIRMATORY_SEEDS_UNSET",
+            "confirmatory seed count must be a positive frozen integer",
+        );
     }
-    if integer_at(root, &["seed_and_replication_plan", "minimum_complete_outer_cycles"])
-        .unwrap_or(0)
+    if integer_at(
+        root,
+        &["seed_and_replication_plan", "minimum_complete_outer_cycles"],
+    )
+    .unwrap_or(0)
         < 2
     {
-        report.issue("OUTER_CYCLE_FLOOR", "at least two complete outer cycles are required for recursive progress");
+        report.issue(
+            "OUTER_CYCLE_FLOOR",
+            "at least two complete outer cycles are required for recursive progress",
+        );
     }
     require_bool(
         report,
@@ -730,9 +912,17 @@ fn check_replication_and_rounds(report: &mut ValidationReport, root: &Value) {
     );
 
     if integer_at(root, &["rounds", "planned_outer_loop_steps"]).unwrap_or(0) == 0 {
-        report.issue("ROUND_COUNT_UNSET", "planned outer-loop steps must be positive and frozen");
+        report.issue(
+            "ROUND_COUNT_UNSET",
+            "planned outer-loop steps must be positive and frozen",
+        );
     }
-    require_bool(report, root, &["rounds", "per_round_reporting_required"], true);
+    require_bool(
+        report,
+        root,
+        &["rounds", "per_round_reporting_required"],
+        true,
+    );
     let required = [
         "development score and objective",
         "independent audit score and objective",
@@ -746,7 +936,13 @@ fn check_replication_and_rounds(report: &mut ValidationReport, root: &Value) {
     ];
     let present: BTreeSet<String> = at(root, &["rounds", "per_round_fields"])
         .and_then(Value::as_array)
-        .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
         .unwrap_or_default();
     for field in required {
         if !present.contains(field) {
@@ -797,7 +993,10 @@ fn check_controls_and_analysis(report: &mut ValidationReport, root: &Value) {
     }
     let commit = string_at(root, &["analysis_plan", "analysis_code_commit"]);
     if !commit.is_some_and(|value| is_lower_hex(value, 40)) {
-        report.issue("ANALYSIS_COMMIT_INVALID", "analysis_code_commit must be a frozen 40-character lowercase commit SHA");
+        report.issue(
+            "ANALYSIS_COMMIT_INVALID",
+            "analysis_code_commit must be a frozen 40-character lowercase commit SHA",
+        );
     }
     for field in [
         "claim_index_required",
@@ -842,10 +1041,10 @@ fn check_authority_and_claims(report: &mut ValidationReport, root: &Value) {
         Some(raw) if !raw.trim().is_empty() => {
             for item in raw.split(',') {
                 let claim = item.trim();
-                if !declared_claims.insert(claim.to_owned()) {
-                    report.issue("DUPLICATE_SELECTED_CLAIM", claim);
-                } else if !claim_flags.contains(&claim) {
+                if !claim_flags.contains(&claim) {
                     report.issue("UNKNOWN_SELECTED_CLAIM", claim);
+                } else if !declared_claims.insert(claim.to_owned()) {
+                    report.issue("DUPLICATE_SELECTED_CLAIM", claim);
                 }
             }
         }
@@ -909,19 +1108,33 @@ fn check_authority_and_claims(report: &mut ValidationReport, root: &Value) {
             })
             .unwrap_or_default();
         if domains.len() < 2 {
-            report.issue("CROSS_DOMAIN_POPULATION_TOO_SMALL", "cross-domain transfer requires at least two distinct declared domains");
+            report.issue(
+                "CROSS_DOMAIN_POPULATION_TOO_SMALL",
+                "cross-domain transfer requires at least two distinct declared domains",
+            );
         }
     }
     require_string(report, root, &["experiment", "estimand", "primary_outcome"]);
-    require_string(report, root, &["experiment", "estimand", "target_population"]);
-    require_string(report, root, &["experiment", "estimand", "practical_effect_threshold"]);
+    require_string(
+        report,
+        root,
+        &["experiment", "estimand", "target_population"],
+    );
+    require_string(
+        report,
+        root,
+        &["experiment", "estimand", "practical_effect_threshold"],
+    );
 }
 
 pub fn validate_preregistration(root: &Value) -> ValidationReport {
     let mut report = ValidationReport::new();
 
     if string_at(root, &["schema_version"]) != Some(SCHEMA_VERSION) {
-        report.issue("SCHEMA_VERSION_MISMATCH", "unsupported or missing schema_version");
+        report.issue(
+            "SCHEMA_VERSION_MISMATCH",
+            "unsupported or missing schema_version",
+        );
     }
     if string_at(root, &["document_status"]) != Some("PREREGISTERED") {
         report.issue(
@@ -955,7 +1168,10 @@ pub fn validate_preregistration(root: &Value) -> ValidationReport {
     if !string_at(root, &["experiment", "preregistered_at_utc"])
         .is_some_and(|value| value.ends_with('Z'))
     {
-        report.issue("PREREGISTRATION_TIME_INVALID", "preregistered_at_utc must be UTC and end in Z");
+        report.issue(
+            "PREREGISTRATION_TIME_INVALID",
+            "preregistered_at_utc must be UTC and end in Z",
+        );
     }
 
     check_arm_bindings(&mut report, root);
@@ -1014,7 +1230,9 @@ mod tests {
     }
 
     fn valid_specimen() -> Value {
-        let source = include_str!("../../../docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json");
+        let source = include_str!(
+            "../../../docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json"
+        );
         let mut value: Value = serde_json::from_str(source).expect("template JSON parses");
         let mut next_digest = 1_u64;
         fill_placeholders(&mut value, "", &mut next_digest);
@@ -1026,8 +1244,8 @@ mod tests {
             Value::Number(10_u64.into());
         value["rounds"]["planned_outer_loop_steps"] = Value::Number(4_u64.into());
 
-        let shared_budget = canonical_budget_envelope_sha256(&value)
-            .expect("synthetic budget envelope serializes");
+        let shared_budget =
+            canonical_budget_envelope_sha256(&value).expect("synthetic budget envelope serializes");
         value["budget"]["shared_envelope_digest"] = Value::String(shared_budget.clone());
         value["budget"]["arm_budget_bindings"]["evolved_outer_loop"]["envelope_digest"] =
             Value::String(shared_budget.clone());
@@ -1053,8 +1271,18 @@ mod tests {
             serde_json::from_str(include_str!("../../../docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json")).expect("template JSON parses");
         let report = validate_preregistration(&template);
         assert!(!report.ready_for_independent_review);
-        assert!(report.issues.iter().any(|issue| issue.starts_with("DOCUMENT_NOT_FROZEN")));
-        assert!(report.issues.iter().any(|issue| issue.starts_with("UNRESOLVED_PLACEHOLDER")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("DOCUMENT_NOT_FROZEN"))
+        );
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("UNRESOLVED_PLACEHOLDER"))
+        );
     }
 
     #[test]
@@ -1077,8 +1305,18 @@ mod tests {
         value["experiment"]["claim_profile"]["selected_claims"] =
             Value::String("phantom,phantom".to_owned());
         let report = validate_preregistration(&value);
-        assert!(report.issues.iter().any(|issue| issue.starts_with("UNKNOWN_SELECTED_CLAIM")));
-        assert!(report.issues.iter().any(|issue| issue.starts_with("DUPLICATE_SELECTED_CLAIM")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("UNKNOWN_SELECTED_CLAIM"))
+        );
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("DUPLICATE_SELECTED_CLAIM"))
+        );
     }
 
     #[test]
@@ -1086,10 +1324,12 @@ mod tests {
         let mut value = valid_specimen();
         value["experiment"]["claim_profile"]["product_improvement"] = Value::Bool(true);
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("SELECTED_CLAIMS_MISMATCH")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("SELECTED_CLAIMS_MISMATCH"))
+        );
     }
 
     #[test]
@@ -1097,10 +1337,12 @@ mod tests {
         let mut value = valid_specimen();
         value["experiment"]["protocol_contract_commit"] = Value::String(String::new());
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("PROTOCOL_CONTRACT_COMMIT_INVALID")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("PROTOCOL_CONTRACT_COMMIT_INVALID"))
+        );
     }
 
     #[test]
@@ -1109,7 +1351,12 @@ mod tests {
         value["arms"][1]["inner_agent_start_ref"] =
             Value::String("starting_state.other_candidate".to_owned());
         let report = validate_preregistration(&value);
-        assert!(report.issues.iter().any(|issue| issue.starts_with("START_REFERENCE_MISMATCH")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("START_REFERENCE_MISMATCH"))
+        );
     }
 
     #[test]
@@ -1118,10 +1365,12 @@ mod tests {
         value["research_state_continuity"]["scope_routing"]["router_cannot_read_cluster_contents"] =
             Value::Bool(false);
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("BOOLEAN_GUARDRAIL_MISMATCH")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("BOOLEAN_GUARDRAIL_MISMATCH"))
+        );
     }
 
     #[test]
@@ -1132,10 +1381,12 @@ mod tests {
             .expect("scope ablation array")
             .retain(|item| item != "shuffled_scope_routing");
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("STATE_SCOPE_ABLATION_MISSING")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("STATE_SCOPE_ABLATION_MISSING"))
+        );
     }
 
     #[test]
@@ -1144,22 +1395,25 @@ mod tests {
         value["research_state_continuity"]["scope_routing"]["router_access_audit_ref"] =
             Value::String(String::new());
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.contains("router_access_audit_ref")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("router_access_audit_ref"))
+        );
     }
 
     #[test]
     fn rejects_research_state_snapshot_mismatch() {
         let mut value = valid_specimen();
-        value["research_state_continuity"]["state_snapshot_digest"] =
-            Value::String("f".repeat(64));
+        value["research_state_continuity"]["state_snapshot_digest"] = Value::String("f".repeat(64));
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("STATE_SNAPSHOT_START_MISMATCH")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("STATE_SNAPSHOT_START_MISMATCH"))
+        );
     }
 
     #[test]
@@ -1168,10 +1422,12 @@ mod tests {
         value["research_state_continuity"]["cold_restart_restore_test_ref"] =
             Value::String(String::new());
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.contains("cold_restart_restore_test_ref")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("cold_restart_restore_test_ref"))
+        );
     }
 
     #[test]
@@ -1182,10 +1438,12 @@ mod tests {
             .expect("record type array")
             .retain(|item| item != "rejected_hypothesis");
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("STATE_RECORD_TYPE_MISSING")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("STATE_RECORD_TYPE_MISSING"))
+        );
     }
 
     #[test]
@@ -1196,10 +1454,12 @@ mod tests {
             .expect("ablation array")
             .retain(|item| item != "untyped_history");
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("STATE_ABLATION_MISSING")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("STATE_ABLATION_MISSING"))
+        );
     }
 
     #[test]
@@ -1208,10 +1468,12 @@ mod tests {
         let evolved = value["starting_state"]["outer_loop_arms"]["evolved_researcher"].clone();
         value["starting_state"]["outer_loop_arms"]["reference_researcher"] = evolved;
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("IDENTICAL_OUTER_RESEARCHERS")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("IDENTICAL_OUTER_RESEARCHERS"))
+        );
     }
 
     #[test]
@@ -1220,22 +1482,25 @@ mod tests {
         value["splits"]["fresh_family_transfer"]["custodian_independent_of_candidate"] =
             Value::String(String::new());
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("REQUIRED_STRING_MISSING")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("REQUIRED_STRING_MISSING"))
+        );
     }
 
     #[test]
     fn rejects_missing_task_family_manifest() {
         let mut value = valid_specimen();
-        value["task_population"]["task_family_manifest_digest"] =
-            Value::String(String::new());
+        value["task_population"]["task_family_manifest_digest"] = Value::String(String::new());
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("INVALID_SHA256")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("INVALID_SHA256"))
+        );
     }
 
     #[test]
@@ -1244,19 +1509,25 @@ mod tests {
         value["budget"]["arm_budget_bindings"]["reference_outer_loop"]["envelope_digest"] =
             Value::String("f".repeat(64));
         let report = validate_preregistration(&value);
-        assert!(report.issues.iter().any(|issue| issue.starts_with("UNEQUAL_ARM_BUDGET")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("UNEQUAL_ARM_BUDGET"))
+        );
     }
 
     #[test]
     fn rejects_budget_cap_substitution_without_digest_update() {
         let mut value = valid_specimen();
-        value["budget"]["per_arm_caps"]["evaluator_calls"] =
-            Value::String("999999".to_owned());
+        value["budget"]["per_arm_caps"]["evaluator_calls"] = Value::String("999999".to_owned());
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("BUDGET_ENVELOPE_DIGEST_MISMATCH")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("BUDGET_ENVELOPE_DIGEST_MISMATCH"))
+        );
     }
 
     #[test]
@@ -1265,7 +1536,12 @@ mod tests {
         let discovery_digest = value["splits"]["discovery"]["manifest_digest"].clone();
         value["splits"]["validation"]["manifest_digest"] = discovery_digest;
         let report = validate_preregistration(&value);
-        assert!(report.issues.iter().any(|issue| issue.starts_with("SPLIT_IDENTITY_COLLISION")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("SPLIT_IDENTITY_COLLISION"))
+        );
     }
 
     #[test]
@@ -1274,7 +1550,12 @@ mod tests {
         value["evaluator_binding"]["shared_across_arms"] = Value::Bool(false);
         value["evaluator_binding"]["candidate_write_access"] = Value::Bool(true);
         let report = validate_preregistration(&value);
-        assert!(report.issues.iter().any(|issue| issue.starts_with("BOOLEAN_GUARDRAIL_MISMATCH")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("BOOLEAN_GUARDRAIL_MISMATCH"))
+        );
     }
 
     #[test]
@@ -1285,7 +1566,12 @@ mod tests {
             .expect("controls array")
             .retain(|item| item["control_id"] != "noop_or_null");
         let report = validate_preregistration(&value);
-        assert!(report.issues.iter().any(|issue| issue.starts_with("REQUIRED_CONTROL_MISSING")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("REQUIRED_CONTROL_MISSING"))
+        );
     }
 
     #[test]
@@ -1293,10 +1579,12 @@ mod tests {
         let mut value = valid_specimen();
         value["experiment"]["claim_profile"]["recursive_progress"] = Value::Bool(true);
         let report = validate_preregistration(&value);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.starts_with("RECURSIVE_PROGRESS_CLAIM_DEPENDENCY")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("RECURSIVE_PROGRESS_CLAIM_DEPENDENCY"))
+        );
     }
 
     #[test]
@@ -1308,8 +1596,14 @@ mod tests {
         value["experiment"]["claim_profile"]["matched_budget_better_improver"] = Value::Bool(true);
         value["experiment"]["claim_profile"]["outer_loop_ignition"] = Value::Bool(true);
         value["experiment"]["claim_profile"]["fresh_family_transfer"] = Value::Bool(true);
-        value["seed_and_replication_plan"]["minimum_complete_outer_cycles"] = Value::Number(1.into());
+        value["seed_and_replication_plan"]["minimum_complete_outer_cycles"] =
+            Value::Number(1.into());
         let report = validate_preregistration(&value);
-        assert!(report.issues.iter().any(|issue| issue.starts_with("OUTER_CYCLE_FLOOR")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("OUTER_CYCLE_FLOOR"))
+        );
     }
 }
