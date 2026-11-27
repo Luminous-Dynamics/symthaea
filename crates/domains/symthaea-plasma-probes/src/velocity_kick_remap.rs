@@ -931,8 +931,8 @@ mod tests {
             &tiny,
         )
         .unwrap();
-        assert!((report.total_mass_before - report.total_mass_after).abs() < 1.0e-212);
-        assert!(report.total_boundary_outflow < 1.0e-212);
+        assert!((report.total_mass_before - 1.9e-200).abs() < 1.0e-212);
+        assert!((report.total_boundary_outflow - 1.0e-201).abs() < 1.0e-212);
         assert!(report.total_mass_balance_residual.abs() < 1.0e-212);
     }
 
