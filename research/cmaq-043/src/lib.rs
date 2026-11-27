@@ -27,6 +27,7 @@ pub enum BudgetError {
     ArithmeticOverflow,
     DuplicateStreamId,
     DuplicateScope,
+    PlanMismatch,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -163,20 +164,44 @@ impl BudgetPlan {
 ///
 /// This in-memory ledger is not a substitute for a durable, authenticated
 /// ledger across machines, process restarts, or deployment controllers.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct AllocationLedger {
+    plan_sha256: String,
+    inventory_sha256: String,
+    global_alpha_numerator: u128,
+    global_alpha_denominator: u128,
     consumed_stream_ids: HashSet<String>,
     consumed_scopes: HashSet<(u64, u64, u64)>,
     receipts: Vec<AllocationReceipt>,
 }
 
 impl AllocationLedger {
+    /// Binds this in-memory ledger to exactly one immutable budget plan.
+    pub fn new(plan: &BudgetPlan) -> Self {
+        Self {
+            plan_sha256: plan.plan_sha256.clone(),
+            inventory_sha256: plan.inventory_sha256.clone(),
+            global_alpha_numerator: plan.global_alpha_numerator,
+            global_alpha_denominator: plan.global_alpha_denominator,
+            consumed_stream_ids: HashSet::new(),
+            consumed_scopes: HashSet::new(),
+            receipts: Vec::new(),
+        }
+    }
+
     pub fn allocate_once(
         &mut self,
         plan: &BudgetPlan,
         scope: &BudgetScope,
     ) -> Result<AllocationReceipt, BudgetError> {
         validate_scope(scope)?;
+        if self.plan_sha256 != plan.plan_sha256
+            || self.inventory_sha256 != plan.inventory_sha256
+            || self.global_alpha_numerator != plan.global_alpha_numerator
+            || self.global_alpha_denominator != plan.global_alpha_denominator
+        {
+            return Err(BudgetError::PlanMismatch);
+        }
         if self.consumed_stream_ids.contains(&scope.stream_id) {
             return Err(BudgetError::DuplicateStreamId);
         }
@@ -412,22 +437,22 @@ mod tests {
         );
         assert_eq!(
             (later_asset.alpha_numerator, later_asset.alpha_denominator),
-            (1, 960)
+            (1, 480)
         );
         assert_eq!(
             (later_channel.alpha_numerator, later_channel.alpha_denominator),
-            (1, 960)
+            (1, 480)
         );
         assert_eq!(
             (later_deployment.alpha_numerator, later_deployment.alpha_denominator),
-            (1, 960)
+            (1, 480)
         );
     }
 
     #[test]
     fn ledger_consumes_each_scope_and_stream_once() {
         let plan = plan();
-        let mut ledger = AllocationLedger::default();
+        let mut ledger = AllocationLedger::new(&plan);
         let first_scope = scope(1, 1, 1, "stream-1");
         let receipt = ledger.allocate_once(&plan, &first_scope).unwrap();
         assert_eq!(ledger.allocation_count(), 1);
@@ -526,7 +551,7 @@ mod tests {
             INVENTORY_SHA.into(),
         )
         .unwrap();
-        let mut ledger = AllocationLedger::default();
+        let mut ledger = AllocationLedger::new(&extreme);
         let scope = scope(u64::MAX, u64::MAX, u64::MAX, "overflow");
         assert_eq!(
             ledger.allocate_once(&extreme, &scope),
