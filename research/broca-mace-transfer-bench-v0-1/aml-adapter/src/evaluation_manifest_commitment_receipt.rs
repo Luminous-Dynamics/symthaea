@@ -790,7 +790,6 @@ mod tests {
             fixture.verify(250, &expected, &AcceptLog),
             Err(EvaluationManifestCommitmentReceiptRejectV1::WitnessCommitmentAfterCandidateAccess)
         );
-        expected.candidate_access_started_unix = 150;
     }
 
     #[test]
@@ -808,7 +807,7 @@ mod tests {
     fn invalid_append_only_log_proof_is_rejected() {
         let fixture = fixture();
         assert_eq!(
-            fixture.verify(250, &fixture.expected, &RejectLog),
+            fixture.verify(250, &fixture.expected(), &RejectLog),
             Err(EvaluationManifestCommitmentReceiptRejectV1::LogVerificationRejected(
                 ManifestWitnessLogRejectV1::InclusionProofInvalid
             ))
@@ -844,7 +843,7 @@ mod tests {
         // Re-sign so the only expected failure is the trusted-time boundary.
         fixture.resign();
         assert_eq!(
-            fixture.verify(250, &fixture.expected, &AcceptLog),
+            fixture.verify(250, &fixture.expected(), &AcceptLog),
             Err(EvaluationManifestCommitmentReceiptRejectV1::WitnessIssuedInFuture)
         );
     }
