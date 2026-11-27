@@ -343,7 +343,7 @@ Initial research target:
 
 References:
 - https://heartbeat-challenge.github.io/
-- https://github.com/ (official baseline repository link is published on the challenge site)
+- https://github.com/heartbeat-challenge/HEARTBEAT_challenge_baseline/
 - Internal evaluator: MEL-RTI-001, docs/research/MEL-RTI-001-STREAMING-TURNTAKING-SCORER-V1.md
 
 No HEARTBEAT dataset has been downloaded, no official baseline has been run, and no leaderboard score is claimed.
