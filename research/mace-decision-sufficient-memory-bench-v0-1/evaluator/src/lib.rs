@@ -198,16 +198,17 @@ pub struct PhaseTimingsV1 {
     pub wall_ns: u64,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ResourceMeasurementStatusV1 {
     Measured,
     Estimated,
+    #[default]
     Unknown,
     NotApplicable,
 }
 
 /// A byte quantity that cannot silently turn an unreported value into zero.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ResourceQuantityV1 {
     pub value: Option<u64>,
     pub status: ResourceMeasurementStatusV1,
@@ -226,7 +227,7 @@ impl ResourceQuantityV1 {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CostReceiptV1 {
     pub phases: PhaseTimingsV1,
     /// Monotonic, measured resource cost in an implementation-defined unit.
