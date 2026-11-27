@@ -11,7 +11,8 @@ case "$MAJOR" in 18|19) ;; *) echo "usage: $0 18|19" >&2; exit 64 ;; esac
 [ -f "$ENV_FILE" ] || { echo ".env is required" >&2; exit 66; }
 # shellcheck disable=SC1090
 set -a; . "$ENV_FILE"; set +a
-: "${MON025_DB_PASSWORD:?Set MON025_DB_PASSWORD in .env}"
+: "${MON025_CONNECTOR_DB_USER:?Set MON025_CONNECTOR_DB_USER in .env}"
+: "${MON025_CONNECTOR_DB_PASSWORD:?Set MON025_CONNECTOR_DB_PASSWORD in .env}"
 CONNECT_URL="${MON025_CONNECT_URL:-http://127.0.0.1:8083}"
 PG_SERVICE="postgres$MAJOR"
 CONNECTOR_NAME="mon025-pg-source"
@@ -21,8 +22,8 @@ TOPIC_PREFIX="mon025_pg$MAJOR"
 curl -fsS "$CONNECT_URL/" >/dev/null
 config="$(jq -n \
   --arg host "$PG_SERVICE" \
-  --arg user "${MON025_DB_USER:-mon025}" \
-  --arg password "$MON025_DB_PASSWORD" \
+  --arg user "$MON025_CONNECTOR_DB_USER" \
+  --arg password "$MON025_CONNECTOR_DB_PASSWORD" \
   --arg database "${MON025_DB_NAME:-mon025}" \
   --arg slot "$SLOT_NAME" \
   --arg topic "$TOPIC_PREFIX" \
