@@ -820,8 +820,8 @@ mod tests {
         assert_eq!(report.mean_decision_change_rate, 1.0);
         assert_eq!(report.stratum_utility_effects["standard"], 0.3);
         assert_eq!(report.stratum_utility_effects["sparse"], 0.3);
-        assert!(report.stratum_utility_effect_ci95["standard"].lower > 0.0);
-        assert!(report.stratum_regret_reduction_ci95["sparse"].lower > 0.0);
+        assert!(report.stratum_utility_effect_ci95["standard"].is_some_and(|ci| ci.lower > 0.0));
+        assert!(report.stratum_regret_reduction_ci95["sparse"].is_some_and(|ci| ci.lower > 0.0));
         assert_eq!(report.stratum_independent_profile_clusters["standard"], 2);
         assert_eq!(report.stratum_independent_profile_clusters["sparse"], 2);
         assert_eq!(report.stratum_confirmatory_cluster_floor_met["standard"], false);
