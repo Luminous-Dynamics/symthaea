@@ -80,6 +80,10 @@ pub struct PresentationPermit {
     pub session_id: String,
     pub clock_domain_id: String,
     pub event_id: String,
+    pub issued_at_monotonic_ns: String,
+    /// Minimum of event expiry and grant expiry at decision time.
+    pub expires_at_monotonic_ns: String,
+    pub requested_intensity: f32,
     pub sequence: u64,
     pub event_kind: EventKind,
     pub source: EventSource,
@@ -103,6 +107,7 @@ pub enum PolicyError {
     InvalidIntensity,
     EmptyFormGrant,
     DuplicateFormGrant,
+    CancellationCapacityReached,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -116,6 +121,7 @@ pub enum DenialReason {
     EventExpired,
     NoMatchingGrant,
     GrantExpired,
+    PermitExpired,
     FormNotGranted,
     RestrictedPrivacy,
     SensitiveDataNeedsPrivateDestination,
@@ -223,6 +229,11 @@ impl PresentationPolicy {
     /// Mark an event cancelled so no later request can present it.
     pub fn cancel_event(&mut self, event_id: &str) -> Result<(), PolicyError> {
         validate_identifier(event_id)?;
+        if !self.cancelled_event_ids.contains(event_id)
+            && self.cancelled_event_ids.len() >= 65_536
+        {
+            return Err(PolicyError::CancellationCapacityReached);
+        }
         self.cancelled_event_ids.insert(event_id.to_owned());
         Ok(())
     }
@@ -289,10 +300,9 @@ impl PresentationPolicy {
             })
             .ok_or(DenialReason::NoMatchingGrant)?;
 
-        if parse_monotonic_ns(&grant.expires_at_monotonic_ns)
-            .map_err(|_| DenialReason::InvalidTimestamp)?
-            <= now
-        {
+        let grant_expires = parse_monotonic_ns(&grant.expires_at_monotonic_ns)
+            .map_err(|_| DenialReason::InvalidTimestamp)?;
+        if grant_expires <= now {
             return Err(DenialReason::GrantExpired);
         }
         if !grant.allowed_forms.contains(&request.form) {
@@ -303,6 +313,9 @@ impl PresentationPolicy {
             session_id: cue.session_id.clone(),
             clock_domain_id: cue.clock_domain_id.clone(),
             event_id: cue.event_id.clone(),
+            issued_at_monotonic_ns: now_monotonic_ns.to_owned(),
+            expires_at_monotonic_ns: event_expires.min(grant_expires).to_string(),
+            requested_intensity: request.requested_intensity,
             sequence: cue.sequence,
             event_kind: cue.event_kind,
             source: cue.source.clone(),
@@ -321,6 +334,88 @@ impl PresentationPolicy {
             effective_intensity: request.requested_intensity.min(grant.max_intensity),
             semantic_key: cue.semantic.semantic_key().to_owned(),
         })
+    }
+
+    /// Revalidate a previously issued permit immediately before renderer
+    /// submission. Pause, cancellation, grant revocation/narrowing, reduced
+    /// motion, and expiry are re-applied at this final boundary.
+    ///
+    /// This is still a local policy check, not a cryptographic anti-replay
+    /// token. Keep permits process-local and do not serialize them as proof.
+    pub fn recheck_permit(
+        &self,
+        permit: &PresentationPermit,
+        now_monotonic_ns: &str,
+        now_clock_domain_id: &str,
+    ) -> Result<PresentationPermit, DenialReason> {
+        if self.paused {
+            return Err(DenialReason::Paused);
+        }
+        if permit.session_id != self.session_id {
+            return Err(DenialReason::SessionMismatch);
+        }
+        if now_clock_domain_id != self.clock_domain_id
+            || permit.clock_domain_id != self.clock_domain_id
+        {
+            return Err(DenialReason::ClockDomainMismatch);
+        }
+        if self.cancelled_event_ids.contains(&permit.event_id) {
+            return Err(DenialReason::Cancelled);
+        }
+
+        let now = parse_monotonic_ns(now_monotonic_ns)
+            .map_err(|_| DenialReason::InvalidTimestamp)?;
+        let issued = parse_monotonic_ns(&permit.issued_at_monotonic_ns)
+            .map_err(|_| DenialReason::InvalidTimestamp)?;
+        let permit_expires = parse_monotonic_ns(&permit.expires_at_monotonic_ns)
+            .map_err(|_| DenialReason::InvalidTimestamp)?;
+        if issued > now {
+            return Err(DenialReason::EventObservedInFuture);
+        }
+        if permit_expires <= now {
+            return Err(DenialReason::PermitExpired);
+        }
+        if !permit.requested_intensity.is_finite()
+            || !(0.0..=1.0).contains(&permit.requested_intensity)
+        {
+            return Err(DenialReason::InvalidIntensity);
+        }
+        if permit.privacy_class == PrivacyClass::Restricted {
+            return Err(DenialReason::RestrictedPrivacy);
+        }
+        if permit.privacy_class == PrivacyClass::LocalSensitive
+            && permit.destination != OutputDestination::LocalPrivate
+        {
+            return Err(DenialReason::SensitiveDataNeedsPrivateDestination);
+        }
+
+        let grant = self
+            .grants
+            .iter()
+            .find(|grant| {
+                grant.channel == permit.channel && grant.destination == permit.destination
+            })
+            .ok_or(DenialReason::NoMatchingGrant)?;
+        if !grant.allowed_forms.contains(&permit.form) {
+            return Err(DenialReason::FormNotGranted);
+        }
+        let grant_expires = parse_monotonic_ns(&grant.expires_at_monotonic_ns)
+            .map_err(|_| DenialReason::InvalidTimestamp)?;
+        if grant_expires <= now {
+            return Err(DenialReason::GrantExpired);
+        }
+
+        let mut refreshed = permit.clone();
+        refreshed.expires_at_monotonic_ns = permit_expires.min(grant_expires).to_string();
+        refreshed.effective_intensity =
+            permit.requested_intensity.min(grant.max_intensity);
+        refreshed.motion_mode =
+            if permit.channel == OutputChannel::Visual && self.reduced_motion {
+                MotionMode::Static
+            } else {
+                MotionMode::Dynamic
+            };
+        Ok(refreshed)
     }
 
     pub fn is_paused(&self) -> bool {
@@ -603,6 +698,72 @@ mod tests {
                 "clock:other-epoch",
             ),
             Err(DenialReason::ClockDomainMismatch)
+        );
+    }
+
+    #[test]
+    fn recheck_denies_permit_after_channel_revocation() {
+        let mut policy = policy_with_grant(
+            PrivacyClass::Public,
+            OutputChannel::Visual,
+            OutputDestination::LocalPrivate,
+        );
+        let permit = policy
+            .evaluate(
+                &cue(PrivacyClass::Public),
+                &request(OutputChannel::Visual, OutputDestination::LocalPrivate),
+                "200",
+                CLOCK,
+            )
+            .unwrap();
+        policy.revoke_channel(OutputChannel::Visual);
+        assert_eq!(
+            policy.recheck_permit(&permit, "201", CLOCK),
+            Err(DenialReason::NoMatchingGrant)
+        );
+    }
+
+    #[test]
+    fn recheck_applies_new_reduced_motion_state_before_submission() {
+        let mut policy = policy_with_grant(
+            PrivacyClass::Public,
+            OutputChannel::Visual,
+            OutputDestination::LocalPrivate,
+        );
+        policy.set_reduced_motion(false);
+        let permit = policy
+            .evaluate(
+                &cue(PrivacyClass::Public),
+                &request(OutputChannel::Visual, OutputDestination::LocalPrivate),
+                "200",
+                CLOCK,
+            )
+            .unwrap();
+        assert_eq!(permit.motion_mode, MotionMode::Dynamic);
+        policy.set_reduced_motion(true);
+        let refreshed = policy.recheck_permit(&permit, "201", CLOCK).unwrap();
+        assert_eq!(refreshed.motion_mode, MotionMode::Static);
+    }
+
+    #[test]
+    fn permit_expiry_is_the_earlier_of_event_and_grant_expiry() {
+        let policy = policy_with_grant(
+            PrivacyClass::Public,
+            OutputChannel::Visual,
+            OutputDestination::LocalPrivate,
+        );
+        let permit = policy
+            .evaluate(
+                &cue(PrivacyClass::Public),
+                &request(OutputChannel::Visual, OutputDestination::LocalPrivate),
+                "200",
+                CLOCK,
+            )
+            .unwrap();
+        assert_eq!(permit.expires_at_monotonic_ns, "900");
+        assert_eq!(
+            policy.recheck_permit(&permit, "900", CLOCK),
+            Err(DenialReason::PermitExpired)
         );
     }
 
