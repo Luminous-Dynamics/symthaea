@@ -33,13 +33,13 @@ It does not sign or certify the bundle.
 
 ## 4. Signing request
 
-The signing request includes profile/version, run ID, sequence, root SHA-256, algorithm, key ID and the exact domain-separated message bytes in base64.
+The signing request includes profile/version, deterministic request ID, run ID, sequence, root SHA-256, algorithm, key ID and the exact domain-separated message bytes in base64. The request ID is an idempotency key derived from run ID, sequence, root and key ID.
 
 The external signer must:
 - authenticate the requesting identity and its authorization to sign this specific run/sequence/root;
 - check key status and allowed algorithm;
 - sign only the supplied message, without reserializing or reconstructing it;
-- return a detached envelope with the same algorithm/key ID and a base64 Ed25519 signature;
+- return a detached envelope with the same request ID, run ID, sequence, root, algorithm/key ID and a base64 Ed25519 signature;
 - record signer audit evidence separately.
 
 A signing service should reject duplicate request IDs or use a durable idempotency record to avoid ambiguous repeated operations.
