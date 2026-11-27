@@ -38,7 +38,7 @@ jobs:
           jq empty docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json
           jq empty docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_SCHEMA_V0_2026-11-06.json
       - name: Check formatting
-        run: cargo fmt --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
+        run: cargo fmt --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
       - name: Run semantic validator tests
         run: cargo test --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml
       - name: Run strict Clippy
