@@ -11,28 +11,28 @@
       "pair_block_id": "pair-temporal-0001",
       "world_cluster_id": "world-temporal-0001",
       "query_id": "query-temporal-0001",
-      "candidate_sha256": "6fc25a0187df2ff4e3e2a699c9e86cd418195ad0feb286da2e25a15f27aae2f6"
+      "candidate_sha256": "fa128ffb896dfe3e12f53fe8e80449ced1cbf281e1d5524f336c23adcf9eb449"
     },
     {
       "episode_id": "contradiction/0001",
       "pair_block_id": "pair-conflict-0001",
       "world_cluster_id": "world-conflict-0001",
       "query_id": "query-conflict-0001",
-      "candidate_sha256": "ee39f155b2b30b11411215c07a63fb8728cdce91770703cfa60b5a795ec8e7a4"
+      "candidate_sha256": "f6bd98300cd3abad6aa7a80dd2d00ec60c59bdd232f6d945bfc83c5c034fabd5"
     },
     {
       "episode_id": "revocation/0001",
       "pair_block_id": "pair-revocation-0001",
       "world_cluster_id": "world-revocation-0001",
       "query_id": "query-revocation-0001",
-      "candidate_sha256": "a97df1fb65e613265a345b8605766a1269f8b5e25188b28305941da326887158"
+      "candidate_sha256": "3c794e35f996592c54eeedaf1159e5bb3535abacdf20e1a85e345aad383801bb"
     },
     {
       "episode_id": "insufficient-evidence/0001",
       "pair_block_id": "pair-observation-0001",
       "world_cluster_id": "world-observation-0001",
       "query_id": "query-observation-0001",
-      "candidate_sha256": "d3abb5636d6439d3dbba15de260e32a9d1096aa107fdebcea4f9398661ffed78"
+      "candidate_sha256": "c054943f275cee7b65eff1bc96932f38b15a2cc94f8f48c9c51d38a850589946"
     },
     {
       "episode_id": "poisoning/0001",
