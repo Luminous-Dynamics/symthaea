@@ -82,6 +82,7 @@ services:
       - pg18_source_data:/var/lib/postgresql
       - pg18_backups:/backups
       - ./postgres:/lab/postgres:ro
+      - ./initdb:/docker-entrypoint-initdb.d:ro
       - ./postgres/source-entrypoint.sh:/lab/source-entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/lab/source-entrypoint.sh"]
     healthcheck:
@@ -124,6 +125,7 @@ services:
       - pg19_source_data:/var/lib/postgresql
       - pg19_backups:/backups
       - ./postgres:/lab/postgres:ro
+      - ./initdb:/docker-entrypoint-initdb.d:ro
       - ./postgres/source-entrypoint.sh:/lab/source-entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/lab/source-entrypoint.sh"]
     healthcheck:
@@ -156,6 +158,7 @@ services:
       - pg18_restore_data:/var/lib/postgresql
       - ./restore/restore-entrypoint.sh:/lab/restore-entrypoint.sh:ro
       - ./postgres:/lab/postgres:ro
+      - ./initdb:/docker-entrypoint-initdb.d:ro
     depends_on:
       postgres18:
         condition: service_healthy
