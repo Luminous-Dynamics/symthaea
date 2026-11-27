@@ -314,6 +314,22 @@
       "expected_outcome": "blocked",
       "injection": "alter Debezium END event_count or omit one row event from a multi-row transaction",
       "notes": "A complete set of primary keys does not override a missing BEGIN/END witness, wrong END event_count or non-contiguous per-event ordering."
+    },
+    {
+      "id": "MON025-P004",
+      "class": "positive_control",
+      "name": "exact_transaction_boundary_replay",
+      "expected_outcome": "qualified",
+      "injection": "replay byte-identical BEGIN and END transaction topic records while retaining the original records",
+      "notes": "Exact duplicate transaction envelopes are deduplicated and counted as replay, not mistaken for conflicting or missing boundaries."
+    },
+    {
+      "id": "MON025-N037",
+      "class": "negative_control",
+      "name": "conflicting_transaction_boundary_replay",
+      "expected_outcome": "blocked",
+      "injection": "reuse one transaction ID with a changed BEGIN or END payload, including a changed END event_count",
+      "notes": "Conflicting boundary metadata under the same transaction ID is divergence even when row events match."
     }
   ]
 }
