@@ -844,7 +844,11 @@ impl ResponseBalancedBasis {
         // and n reachability factors.
         let per_pair_work = observe_count
             .checked_mul(16)
-            .and_then(|value| reach_count.checked_mul(8).and_then(|right| value.checked_add(right)))
+            .and_then(|value| {
+                reach_count
+                    .checked_mul(8)
+                    .and_then(|right| value.checked_add(right))
+            })
             .and_then(|value| value.checked_add(64))
             .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
         let jacobi_work = pairs
@@ -1177,7 +1181,11 @@ impl ResponseBalancedBasis {
             .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
         let per_pair_work = observe_count
             .checked_mul(16)
-            .and_then(|value| reach_count.checked_mul(8).and_then(|right| value.checked_add(right)))
+            .and_then(|value| {
+                reach_count
+                    .checked_mul(8)
+                    .and_then(|right| value.checked_add(right))
+            })
             .and_then(|value| value.checked_add(64))
             .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
         let jacobi_work = pairs
@@ -1939,17 +1947,12 @@ mod tests {
                 scenario_weight: 0.49,
             },
         ];
-        let (reach, observe) = aggregate_response_gramians(
-            &scenarios,
-            ResponseGramianAggregationConfig::default(),
-        )
-        .unwrap();
-        let mut basis = ResponseBalancedBasis::from_empirical_gramians(
-            &reach,
-            &observe,
-            RbkrConfig::new(1),
-        )
-        .unwrap();
+        let (reach, observe) =
+            aggregate_response_gramians(&scenarios, ResponseGramianAggregationConfig::default())
+                .unwrap();
+        let mut basis =
+            ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
+                .unwrap();
         let before = evaluate_response_scenario_residuals(&basis, &scenarios, 0.9).unwrap();
         assert!(before.scenarios[0].response_residual < 1.0e-10);
         assert!((before.scenarios[1].response_residual - 1.0).abs() < 1.0e-10);
