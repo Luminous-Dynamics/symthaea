@@ -475,6 +475,16 @@ mod tests {
         assert!(second.normal[0] > 0.0);
         assert_eq!(second.action_id, "sensor-x-positive");
         assert!(second.action_support_value <= second.target_support_value + SUPPORT_TOLERANCE);
+        let selected = monitor
+            .catalog()
+            .actions()
+            .iter()
+            .find(|action| action.action_id == second.action_id)
+            .unwrap();
+        // The action box is not globally contained in S; it is safe in this
+        // particular predictable supporting direction only.
+        assert!(selected.null_mean_box.lower()[0] < -0.05);
+        assert!(second.normal[0] > 0.0);
     }
 
     #[test]
@@ -655,6 +665,25 @@ mod tests {
         );
         assert_eq!(monitor.observations_seen(), 1);
         assert_eq!(monitor.pending_action(), None);
+    }
+
+    #[test]
+    fn quarantine_disables_future_action_proposals() {
+        let mut monitor = controlled();
+        for _ in 0..200 {
+            if monitor.is_quarantined() {
+                break;
+            }
+            let plan = monitor.propose_action().unwrap();
+            monitor
+                .reconcile_action_result(&plan, &plan.action_id, &[0.6, 0.6])
+                .unwrap();
+        }
+        assert!(monitor.is_quarantined());
+        assert_eq!(
+            monitor.propose_action(),
+            Err(ControlledError::MonitorQuarantined)
+        );
     }
 
     #[test]
