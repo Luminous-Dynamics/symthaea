@@ -37,6 +37,21 @@ jobs:
         run: |
           jq empty docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json
           jq empty docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_SCHEMA_V0_2026-11-06.json
+      - name: Generate rustfmt preview
+        run: cargo fmt --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r4-prereg-rustfmt-preview
+          path: |
+            tools/sym-rsi-r4-prereg-reference/src/lib.rs
+            tools/sym-rsi-r4-prereg-reference/src/main.rs
+      - name: Restore exact committed sources
+        run: |
+          git checkout -- \
+            tools/sym-rsi-r4-prereg-reference/src/lib.rs \
+            tools/sym-rsi-r4-prereg-reference/src/main.rs
       - name: Check formatting
         run: cargo fmt --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
       - name: Run semantic validator tests
