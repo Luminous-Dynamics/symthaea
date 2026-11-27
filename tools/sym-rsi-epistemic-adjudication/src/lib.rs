@@ -17,6 +17,9 @@ pub mod meta_learning;
 #[path = "../../../src/web_research/selective_prediction.rs"]
 pub mod selective_prediction;
 
+#[path = "../../../src/web_research/selective_observation.rs"]
+pub mod selective_observation;
+
 #[cfg(test)]
 mod compatibility_tests {
     use super::types::{ResearchSource, VerificationOutcome};
