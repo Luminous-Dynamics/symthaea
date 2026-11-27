@@ -7,7 +7,7 @@ license = "AGPL-3.0-or-later"
 description = "Fail-closed transition from calibration quarantine to independent recovery portfolio"
 
 [dependencies]
-cmaq-028-recovery-option-portfolio = { path = "../cmaq-028" }
+cmaq-028-recovery-portfolio = { path = "../cmaq-028" }
 cmaq-031-anytime-calibration-monitor = { path = "../cmaq-031" }
 
 [workspace]
