@@ -234,13 +234,23 @@ impl EventPayload {
 
     fn validate(&self, evidence_refs: &[String]) -> Result<(), EventValidationError> {
         match self {
-            Self::Listening(_) | Self::TurnState(_) => Ok(()),
+            Self::Listening(_) => Ok(()),
+            Self::TurnState(value) => {
+                if let Some(target) = value.target.as_deref() {
+                    validate_identifier("turn target", target)?;
+                }
+                Ok(())
+            },
             Self::Speaking(value) => {
-                validate_identifier("segment_id", &value.segment_id)
+                validate_identifier("segment_id", &value.segment_id)?;
+                if let Some(text_ref) = value.text_ref.as_deref() {
+                    validate_identifier_max("text_ref", text_ref, 256)?;
+                }
+                Ok(())
             }
             Self::Backchannel(value) => validate_unit_interval(value.intensity),
             Self::AttentionFocus(value) => {
-                validate_identifier("attention target", &value.target)?;
+                validate_identifier_max("attention target", &value.target, 256)?;
                 if let Some(strength) = value.strength {
                     validate_unit_interval(strength)?;
                 }
@@ -248,11 +258,11 @@ impl EventPayload {
             }
             Self::ExpressionIntent(value) => validate_unit_interval(value.intensity),
             Self::Uncertainty(value) => {
-                validate_identifier("uncertainty subject", &value.subject)?;
+                validate_identifier_max("uncertainty subject", &value.subject, 256)?;
                 validate_unit_interval(value.level)
             }
             Self::EvidenceStatus(value) => {
-                validate_identifier("evidence subject", &value.subject_id)?;
+                validate_identifier_max("evidence subject", &value.subject_id, 256)?;
                 if value.status == EvidenceState::Supported {
                     if value.verifier_receipt_ref.as_deref().map_or(true, str::is_empty)
                         || evidence_refs.is_empty()
@@ -369,7 +379,7 @@ impl EmbodimentEvent {
             return Err(EventValidationError::TooManyEvidenceReferences);
         }
         for reference in &self.evidence_refs {
-            validate_identifier("evidence_ref", reference)?;
+            validate_identifier_max("evidence_ref", reference, 256)?;
         }
 
         self.payload.validate(&self.evidence_refs)?;
@@ -505,8 +515,16 @@ pub enum EventValidationError {
 }
 
 fn validate_identifier(field: &'static str, value: &str) -> Result<(), EventValidationError> {
+    validate_identifier_max(field, value, 128)
+}
+
+fn validate_identifier_max(
+    field: &'static str,
+    value: &str,
+    max_len: usize,
+) -> Result<(), EventValidationError> {
     if value.is_empty()
-        || value.len() > 256
+        || value.len() > max_len
         || !value
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
