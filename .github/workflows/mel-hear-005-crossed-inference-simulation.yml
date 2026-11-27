@@ -40,3 +40,10 @@ jobs:
           set -euo pipefail
           python research/mel-hear-005/simulate_crossed_bootstrap.py > "$RUNNER_TEMP/simulation-v0.json"
           diff -u research/mel-hear-005/simulation-v0.json "$RUNNER_TEMP/simulation-v0.json"
+
+      - name: Replay performer-axis support sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          python research/mel-hear-005/simulate_performer_axis_sweep.py > "$RUNNER_TEMP/performer-axis-sweep-v0.json"
+          diff -u research/mel-hear-005/performer-axis-sweep-v0.json "$RUNNER_TEMP/performer-axis-sweep-v0.json"
