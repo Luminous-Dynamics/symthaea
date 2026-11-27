@@ -141,7 +141,7 @@ services:
     entrypoint: ["/bin/sh", "/lab/restore-entrypoint.sh"]
     command: ["postgres", "-c", "hot_standby=on"]
     environment:
-      PGDATA: /var/lib/postgresql/19/docker
+      PGDATA: /var/lib/postgresql/18/docker
       MON025_SOURCE_DATA_DIR: /source-data/18/docker
       POSTGRES_USER: ${MON025_DB_USER:-mon025}
       POSTGRES_PASSWORD: ${MON025_DB_PASSWORD:?Set MON025_DB_PASSWORD in .env}
