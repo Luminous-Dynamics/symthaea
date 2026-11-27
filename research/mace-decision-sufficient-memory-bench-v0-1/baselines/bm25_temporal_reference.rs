@@ -55,7 +55,8 @@ pub struct RetrievalHitV1 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RetrievalWorkV1 {
     pub eligible_document_count: u64,
-    pub postings_visited: u64,
+    /// Eligible posting rows used for scoring; excludes other scopes and future records.
+    pub eligible_postings_scored: u64,
     pub scored_document_count: u64,
 }
 
@@ -85,7 +86,6 @@ pub enum BaselineErrorV1 {
 #[derive(Clone, Debug)]
 struct PreparedDocument {
     document: SourceDocumentV1,
-    term_frequencies: BTreeMap<String, u32>,
     token_count: u64,
 }
 
@@ -183,7 +183,6 @@ impl Bm25IndexV1 {
             }
             prepared.push(PreparedDocument {
                 document,
-                term_frequencies,
                 token_count,
             });
         }
@@ -241,7 +240,7 @@ impl Bm25IndexV1 {
                                 && d.valid_until_ms.is_none_or(|end| query.as_of_ms < end)
                         })
                         .count() as u64,
-                    postings_visited: 0,
+                    eligible_postings_scored: 0,
                     scored_document_count: 0,
                 },
             });
@@ -264,7 +263,7 @@ impl Bm25IndexV1 {
                 hits: Vec::new(),
                 work: RetrievalWorkV1 {
                     eligible_document_count: 0,
-                    postings_visited: 0,
+                    eligible_postings_scored: 0,
                     scored_document_count: 0,
                 },
             });
@@ -279,7 +278,7 @@ impl Bm25IndexV1 {
             .sum();
         let average_length = total_tokens as f64 / eligible_count as f64;
         let mut scores = vec![0.0_f64; self.documents.len()];
-        let mut postings_visited = 0_u64;
+        let mut eligible_postings_scored = 0_u64;
 
         if average_length > 0.0 {
             for (term, query_frequency) in query_terms {
@@ -297,10 +296,10 @@ impl Bm25IndexV1 {
                 let df = document_frequency as f64;
                 let inverse_document_frequency = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
                 for (index, frequency) in postings {
-                    postings_visited = postings_visited.saturating_add(1);
                     if !eligible[*index] {
                         continue;
                     }
+                    eligible_postings_scored = eligible_postings_scored.saturating_add(1);
                     let tf = f64::from(*frequency);
                     let length = self.documents[*index].token_count as f64;
                     let normalization = tf
@@ -348,7 +347,7 @@ impl Bm25IndexV1 {
             hits,
             work: RetrievalWorkV1 {
                 eligible_document_count: eligible_count as u64,
-                postings_visited,
+                eligible_postings_scored,
                 scored_document_count,
             },
         })
