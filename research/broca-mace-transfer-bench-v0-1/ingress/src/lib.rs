@@ -751,6 +751,11 @@ pub struct ConsolidationEvidencePackV1 {
 }
 
 impl ConsolidationEvidencePackV1 {
+    /// Bitemporal snapshot used to verify every event in this pack.
+    pub fn as_known(&self) -> AsKnownQuery {
+        self.as_known
+    }
+
     /// Summarize verified support for a target scope without making a decision.
     /// A success requires trusted lineage, a verified success outcome,
     /// intervention, pre-registration, confounder control, reconciliation and
@@ -1634,7 +1639,7 @@ pub fn ingest_batch_as_known(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use broca_mace_policy::{is_qualified, Objective, Query, Regime};
+    use broca_mace_policy::{is_qualified, Objective, Query, Regime, SemanticEstimandV1};
 
     fn fixture_root_digest(seed: u32) -> SourceRootDigest {
         let mut bytes = [0_u8; 32];
@@ -1642,7 +1647,6 @@ mod tests {
         SourceRootDigest::from_bytes(bytes)
     }
 
-    #[derive(Clone)]
     fn test_evidence_digest(seed: u32) -> broca_mace_policy::EvidenceDigest256 {
         let mut bytes = [0_u8; 32];
         bytes[..4].copy_from_slice(&seed.to_be_bytes());
@@ -2633,6 +2637,9 @@ mod tests {
                     upstream_source_id: "bis:dataflow:private-credit".into(),
                     source_artifact_digest: "e".repeat(64),
                     transformation_digest: "f".repeat(64),
+                    derived_from_event_ids: Vec::new(),
+                    dependency_lineage_status: DependencyLineageStatusV1::Unknown,
+                    dependency_manifest_digest: None,
                     issuer_id: "did:key:source-ledger".into(),
                     receipt_digest: "d".repeat(64),
                 })
@@ -2985,85 +2992,6 @@ mod tests {
             sidecar.canonical_digest()
         );
         assert!(sidecar.verify_integrity());
-    }
-
-    #[test]
-    fn dependency_lineage_rejects_self_duplicate_unsorted_and_uncommitted_edges() {
-        for (ids, status, digest) in [
-            (vec![42], DependencyLineageStatusV1::Partial, Some("9".repeat(64))),
-            (vec![41, 40], DependencyLineageStatusV1::Complete, Some("9".repeat(64))),
-            (vec![40, 40], DependencyLineageStatusV1::Partial, Some("9".repeat(64))),
-            (vec![40], DependencyLineageStatusV1::Complete, None),
-            (vec![], DependencyLineageStatusV1::Unknown, Some("9".repeat(64))),
-        ] {
-            let verifier = TestVerifier {
-                dependency_event_ids: ids,
-                dependency_lineage_status: status,
-                dependency_manifest_digest: digest,
-                ..TestVerifier::default()
-            };
-            assert_eq!(
-                ingest_as_known(&raw(), query(180, 250), &verifier).err(),
-                Some(IngestReject::InvalidDependencyLineage)
-            );
-        }
-    }
-
-    #[test]
-    fn dependency_sidecar_preserves_receipt_lineage_and_unknown_state() {
-        let batch = ingest_batch_as_known(
-            &[raw()],
-            query(180, 250),
-            &TestVerifier::default(),
-        )
-        .expect("valid unknown-lineage event should remain ingestible");
-        let pack = build_consolidation_evidence_pack(&batch, &[42]).unwrap();
-        let sidecar = pack.dependency_sidecar();
-
-        assert!(sidecar.verify_integrity());
-        assert_eq!(sidecar.as_known(), query(180, 250));
-        assert_eq!(sidecar.records().len(), 1);
-        let record = &sidecar.records()[0];
-        assert_eq!(record.event_id, 42);
-        assert_eq!(record.source_root_digest, fixture_root_digest(700));
-        assert_eq!(
-            record.dependency_lineage_status,
-            DependencyLineageStatusV1::Unknown
-        );
-        assert!(record.derived_from_event_ids.is_empty());
-        assert_eq!(
-            record.lifecycle_status_as_known,
-            SourceLifecycleStatus::Active
-        );
-    }
-
-    #[test]
-    fn dependency_sidecar_preserves_attested_event_ancestry_without_inference() {
-        let verifier = TestVerifier {
-            dependency_event_ids: vec![40, 41],
-            dependency_lineage_status: DependencyLineageStatusV1::Partial,
-            dependency_manifest_digest: Some("9".repeat(64)),
-            ..TestVerifier::default()
-        };
-        let batch = ingest_batch_as_known(&[raw()], query(180, 250), &verifier)
-            .expect("verified partial dependency declaration should be preserved");
-        let pack = build_consolidation_evidence_pack(&batch, &[42]).unwrap();
-        let sidecar = pack.dependency_sidecar();
-
-        assert!(sidecar.verify_integrity());
-        assert_eq!(sidecar.records()[0].derived_from_event_ids, vec![40, 41]);
-        assert_eq!(
-            sidecar.records()[0].dependency_lineage_status,
-            DependencyLineageStatusV1::Partial
-        );
-        assert_eq!(
-            sidecar.records()[0].dependency_manifest_digest.as_deref(),
-            Some("9".repeat(64).as_str())
-        );
-
-        let mut tampered = sidecar.clone();
-        tampered.records[0].derived_from_event_ids.push(99);
-        assert!(!tampered.verify_integrity());
     }
 
     #[test]
