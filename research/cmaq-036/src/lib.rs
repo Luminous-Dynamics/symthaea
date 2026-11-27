@@ -238,7 +238,10 @@ pub fn build_common_cause_closure(
     let mut components = BTreeMap::<String, Vec<usize>>::new();
     for index in 0..units.len() {
         let root = union_find.find(index);
-        components.entry(unit_ids[root].clone()).or_default().push(index);
+        components
+            .entry(unit_ids[root].clone())
+            .or_default()
+            .push(index);
     }
 
     let mut blocks = Vec::with_capacity(components.len());
@@ -290,9 +293,7 @@ pub fn build_common_cause_closure(
         });
     }
 
-    blocks.sort_by(|left, right| {
-        (left.split, &left.block_id).cmp(&(right.split, &right.block_id))
-    });
+    blocks.sort_by(|left, right| (left.split, &left.block_id).cmp(&(right.split, &right.block_id)));
 
     let mut split_counts = Vec::new();
     for split in EvidenceSplit::ALL {
@@ -411,11 +412,7 @@ mod tests {
                 30,
                 '5',
                 'c',
-                vec![key(
-                    DependenceKind::CollectionSession,
-                    "session-7",
-                    '4',
-                )],
+                vec![key(DependenceKind::CollectionSession, "session-7", '4')],
             ),
             unit(
                 "episode-d",
@@ -573,24 +570,8 @@ mod tests {
     #[test]
     fn distinct_units_remain_distinct_when_no_causes_overlap() {
         let units = vec![
-            unit(
-                "a",
-                "ca",
-                EvidenceSplit::Calibration,
-                1,
-                '1',
-                'a',
-                vec![],
-            ),
-            unit(
-                "b",
-                "cb",
-                EvidenceSplit::Calibration,
-                2,
-                '2',
-                'b',
-                vec![],
-            ),
+            unit("a", "ca", EvidenceSplit::Calibration, 1, '1', 'a', vec![]),
+            unit("b", "cb", EvidenceSplit::Calibration, 2, '2', 'b', vec![]),
         ];
         let result = build_common_cause_closure(&digest('f'), &units).unwrap();
         assert_eq!(result.calibration_effective_block_count, 2);
