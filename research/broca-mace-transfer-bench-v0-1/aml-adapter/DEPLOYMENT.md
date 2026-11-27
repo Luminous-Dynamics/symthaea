@@ -72,7 +72,7 @@ The server uses the fixed track setting at deployment time; no request `track` f
 
 Add preserves `request_id`, `user_id`, `session_id`, message order, Unix-millisecond `timestamp`, and ordered multimodal text/image parts. The existing storage coordinator must verify the durable receipt, read every visible ID back under the exact user scope, verify source request identity and payload digest, and finalize the idempotency row before returning HTTP 200.
 
-Search uses the same `user_id` scope and returns ranked stored memories. It does not generate a final answer. The platform performs Answer/Score. Textual and Multimodal Search are capped at `top_k=100`; Coding Search is capped at `top_k=1,000`. The configured track determines the ceiling; clients cannot override it. The current redb backend uses deterministic BM25 lexical retrieval; it is an internal baseline, not a dense-embedding or SOTA result.
+Search uses the same `user_id` scope and returns ranked stored memories. It does not generate a final answer. The platform performs Answer/Score. Formal external Search evaluations use `top_k=100` across Textual, Coding and Multimodal tracks. The configured track determines content validation, not a higher result-count ceiling. The current redb backend uses deterministic BM25 lexical retrieval; it is an internal baseline, not a dense-embedding or SOTA result.
 
 ## Known restrictions and non-claims
 
