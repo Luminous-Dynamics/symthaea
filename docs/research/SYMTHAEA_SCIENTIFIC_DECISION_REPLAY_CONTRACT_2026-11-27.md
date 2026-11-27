@@ -316,11 +316,11 @@ Implemented in this branch:
 - outcome distribution, full randomized action propensities over action/payload identities, exact selected-payload binding and causal-design declarations;
 - versioned AS-Bench batch payload SHA-256 over campaign, stage, manifest, ID field and exact ordered design IDs;
 - evaluator-owned resolution and distinct execution/outcome states;
-- validation for look-ahead evidence, action support, unsupported counterfactuals, delayed/censored/indeterminate outcomes and cost completeness;
-- fifteen authored decision-contract tests;
+- validation for look-ahead evidence, unique decision-evidence IDs, action support, unsupported counterfactuals, delayed/censored/indeterminate outcomes and cost completeness;
+- nineteen authored decision-contract tests, including canonical candidate-context integrity and duplicate-evidence negative controls;
 - custodian-only replay-archive/evaluator projection, BLAKE3 digests, opaque IDs, empty/disjoint-root checks, no-overwrite writes, manifest-last materialization and disk-readback checks;
 - decision-time observation-prefix builder with digest and out-of-range rejection;
-- nine authored custody/prefix tests, seven AS-Bench payload/offer-binding tests, two materializer output-root tests and a capsule materializer example (33 authored unit tests across the new Rust files; 31 are covered by the standalone harness and the two materializer tests still await the production-example workspace build).
+- nine authored custody/prefix tests, seven AS-Bench payload/offer-binding tests, two materializer output-root tests and a capsule materializer example (37 authored unit tests across the new Rust files; 35 are covered by the standalone harness and the two materializer tests still await the production-example workspace build).
 
 Not implemented or not yet verified:
 - the ten worlds have not been generated or split in this environment; the existing source seed split is public and is not a sealed confirmatory split;
@@ -330,10 +330,11 @@ Not implemented or not yet verified:
 - executable replay policy, live-fidelity audit, external benchmark runner or R4.
 
 Follow-on candidate-context integrity gate:
-- The candidate-visible context digest was added after the last confirmed green head `bddab8d62ebd9afb1df4a8863371385d60b9a386`; the standalone harness therefore has 34 authored tests, not 33.
+- The candidate-visible context digest was added after the last confirmed green head `bddab8d62ebd9afb1df4a8863371385d60b9a386`; it raised the harness to 34 authored tests. A further guard rejects duplicate evidence IDs, raising the current harness to 35 authored tests (19 decision-contract, 9 custody/prefix, 7 AS-Bench).
 - The first follow-on run passed rustfmt but reported 32/34 tests because two negative tests changed a context field while retaining the previous context digest. The digest guard correctly rejected those stale specimens before the tests reached their intended semantic assertions.
 - Those tests now recompute the canonical context digest after the mutation, ensuring they test the look-ahead and decision-objective guards rather than the earlier digest guard.
-- The exact current PR head is `371a9f6ac1f381954d408ba78ec0691380d1e494`; focused Rust 1.96 run 84 is queued. No 34/34 or Clippy pass is claimed for this follow-on until that run completes.
+- Duplicate evidence identifiers are now rejected before decision scoring, with a negative test that recomputes the context digest so the uniqueness guard is reached.
+- The exact current PR head is `4dafba8e5ed6b6c7567a2cb9c33d3f0f9711c893`; the previously queued run 84 predates the duplicate-evidence change, and a fresh exact-head result has not yet been observed. No 35/35 or Clippy pass is claimed for this follow-on.
 
 Verification boundary (exact tested code head `bddab8d62ebd9afb1df4a8863371385d60b9a386`):
 - Focused Rust 1.96 PR and push workflow runs both succeeded after the standalone dependency lockfile was committed.
