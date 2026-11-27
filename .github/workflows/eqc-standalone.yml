@@ -10,7 +10,7 @@ on:
       - "docs/research/EVIDENCE_QUALIFIED_CAPABILITY_BENCHMARK_V0_1.md"
       - ".github/workflows/eqc-standalone.yml"
   pull_request:
-    branches: [main]
+    branches: [main, fix/workspace-exclude-empty-core-symthaea-2026-11-21]
     paths:
       - "tools/eqc-reference/**"
       - "docs/research/eqc-*.json"
