@@ -128,9 +128,7 @@ fn wilson_interval(successes: u64, trials: u64) -> (f64, f64) {
     let z2 = WILSON_Z * WILSON_Z;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let half_width = WILSON_Z
-        * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt())
-        / denominator;
+    let half_width = WILSON_Z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
     (
         (center - half_width).max(0.0),
         (center + half_width).min(1.0),
@@ -186,11 +184,7 @@ fn run_regime_experiment(
             SamplingDesign::OneSerialPath => {
                 let mut stream = Ar1Stream::new(master.next_u64());
                 for _ in 0..CALIBRATION_BLOCKS {
-                    calibration.push(stream.block_maximum(
-                        calibration_rho,
-                        block_len,
-                        embargo_gap,
-                    ));
+                    calibration.push(stream.block_maximum(calibration_rho, block_len, embargo_gap));
                 }
                 // The regime changes only after the calibration prefix and
                 // declared embargo. Every one-step marginal remains N(0,1).
