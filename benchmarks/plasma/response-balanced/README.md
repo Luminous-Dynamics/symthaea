@@ -115,6 +115,36 @@ A_r=W_r^TAV_r,\qquad B_r=W_r^TB,\qquad C_r=CV_r.
 
 Here \(V_r^{(s)}\) and \(U_r^{(s)}\) are the retained right and left singular vectors of the factor-space matrix \(H\). The singular values rank directions by combined empirical reachability and observability, not by instantaneous energy alone.
 
+## Executable sinusoidal pulse-map tangent
+
+The v1 AKPD contract fixes the instantaneous intervention:
+\[
+v^+(x)=v^-(x)+A\sin\theta(x),\qquad
+\theta(x)=2\pi m\frac{x-x_{\min}}{L}+\phi,\qquad x^+=x^-.
+\]
+The new Rust module \`crates/domains/symthaea-plasma-probes/src/pulse_map.rs\` implements this exact single-particle canonical map. It exposes the state Jacobian
+\[
+D_z\mathcal K=
+\begin{bmatrix}
+1&0\\
+A(2\pi m/L)\cos\theta&1
+\end{bmatrix},
+\qquad \det(D_z\mathcal K)=1,
+\]
+and control-parameter Jacobian
+\[
+D_{(A,\phi)}(x^+,v^+)=
+\begin{bmatrix}
+0&0\\
+\sin\theta&A\cos\theta
+\end{bmatrix}.
+\]
+It also reports the per-unit-mass kinetic-energy exchange \(\tfrac12[(v^+)^2-(v^-)^2]\). Because this is an external impulse, kinetic energy and momentum are not constrained to remain invariant across the pulse; their measured pre/post changes belong in the intervention-energy ledger.
+
+Manufactured Rust tests cover the exact map, unit determinant / symplectic defect, amplitude and phase derivatives, central finite-difference cross-checks, periodic translation, energy exchange, the zero-amplitude boundary and fail-closed inputs. The external RBKR public-API smoke binary also imports and exercises this pulse-map API.
+
+**Scope boundary:** this is the single-particle canonical map and its local derivatives. It does not yet implement the distribution pullback / velocity-grid interpolation, the complete Vlasov split integrator, the saltation derivative with respect to intervention application time, or the full solver tangent/adjoint. Integer spatial mode is discrete and is not differentiated. The future finite-horizon A-sequence must compose this map Jacobian in the exact solver split order; pulse-time sensitivity needs a separate hybrid-event derivative or must be excluded from the local derivative contract and probed independently by finite differences.
+
 For the first time-varying checkpoint formulation, the past and future Gramians must share one checkpoint coordinate system. With transitions defined by \(x_{k+1}=A_kx_k+B_ku_k\), the reachability factor for a past input channel is
 \[
 X_{k,j}=\Phi(t_c,t_{k+1})B_{k,:,j}/\sqrt{R_{k,j}},
