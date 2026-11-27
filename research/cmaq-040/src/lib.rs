@@ -122,10 +122,7 @@ impl RestartedRankSpectrumMonitor {
         if calibration_count == 0 {
             return Err(RestartError::InvalidCalibrationCount);
         }
-        if alpha_numerator == 0
-            || alpha_denominator == 0
-            || alpha_numerator >= alpha_denominator
-        {
+        if alpha_numerator == 0 || alpha_denominator == 0 || alpha_numerator >= alpha_denominator {
             return Err(RestartError::InvalidMiscoverage);
         }
 
@@ -251,10 +248,7 @@ impl RestartedRankSpectrumMonitor {
     ///
     /// The rank-count and wealth state are committed only after every component
     /// and the final log-mixture have passed validation.
-    pub fn observe_rank(
-        &mut self,
-        rank_one_based: usize,
-    ) -> Result<RestartUpdate, RestartError> {
+    pub fn observe_rank(&mut self, rank_one_based: usize) -> Result<RestartUpdate, RestartError> {
         if self.quarantined {
             return Err(RestartError::AlreadyQuarantined);
         }
@@ -313,8 +307,7 @@ impl RestartedRankSpectrumMonitor {
 
             // New mass pi_t enters in cash immediately before round t. A zero
             // factor maps active wealth to zero; -infinity is a valid log state.
-            let active_before_bet =
-                log_add_exp(component.log_active_wealth, log_start_mass);
+            let active_before_bet = log_add_exp(component.log_active_wealth, log_start_mass);
             let next_active = if factor <= 0.0 {
                 NEG_INFINITY
             } else {
@@ -326,12 +319,8 @@ impl RestartedRankSpectrumMonitor {
             next_active_wealths.push(next_active);
         }
 
-        let log_mixture = self.log_mixture_from_active(
-            &next_active_wealths,
-            log_residual_mass,
-        )?;
-        let threshold =
-            (f64::from(self.alpha_denominator) / f64::from(self.alpha_numerator)).ln();
+        let log_mixture = self.log_mixture_from_active(&next_active_wealths, log_residual_mass)?;
+        let threshold = (f64::from(self.alpha_denominator) / f64::from(self.alpha_numerator)).ln();
         if !log_mixture.is_finite() || !threshold.is_finite() {
             return Err(RestartError::ArithmeticOverflow);
         }
@@ -456,9 +445,8 @@ fn centered_payoff_from_prefix(
         .checked_sub(negative_mass)
         .ok_or(RestartError::ArithmeticOverflow)?;
     let observed_code = contrast.code_for_rank(rank_one_based);
-    let centered = (observed_code as f64
-        - expected_code_numerator as f64 / total_i128 as f64)
-        * 0.5;
+    let centered =
+        (observed_code as f64 - expected_code_numerator as f64 / total_i128 as f64) * 0.5;
     if !centered.is_finite() {
         return Err(RestartError::ArithmeticOverflow);
     }
@@ -547,14 +535,7 @@ mod tests {
         let mut weighted_payoff = 0.0;
         for rank in 1..=16 {
             let mass = (prefix[rank] - prefix[rank - 1]) as f64 / denominator;
-            let payoff = centered_payoff_from_prefix(
-                15,
-                contrast,
-                rank,
-                t,
-                &prefix,
-            )
-            .unwrap();
+            let payoff = centered_payoff_from_prefix(15, contrast, rank, t, &prefix).unwrap();
             weighted_payoff += mass * payoff;
         }
         assert!(weighted_payoff.abs() < 1e-12);
@@ -566,16 +547,9 @@ mod tests {
         let prefix = (0..=16).map(|value| value as i128).collect::<Vec<_>>();
         for component in &monitor.components {
             for rank in 1..=16 {
-                let payoff = centered_payoff_from_prefix(
-                    15,
-                    &component.contrast,
-                    rank,
-                    1,
-                    &prefix,
-                )
-                .unwrap();
-                let factor =
-                    1.0 + component.betting_rate * payoff * f64::from(component.direction);
+                let payoff =
+                    centered_payoff_from_prefix(15, &component.contrast, rank, 1, &prefix).unwrap();
+                let factor = 1.0 + component.betting_rate * payoff * f64::from(component.direction);
                 assert!(factor >= -1e-12);
             }
         }
@@ -585,7 +559,10 @@ mod tests {
     fn valid_observation_updates_all_restart_accounts_atomically() {
         let mut monitor = make_monitor();
         let update = monitor.observe_rank(16).unwrap();
-        assert!(matches!(update, RestartUpdate::Accepted { .. } | RestartUpdate::Quarantined { .. }));
+        assert!(matches!(
+            update,
+            RestartUpdate::Accepted { .. } | RestartUpdate::Quarantined { .. }
+        ));
         assert_eq!(monitor.observations_seen(), 1);
         assert_eq!(monitor.rank_counts[15], 1);
         assert!(monitor.log_mixture_wealth().unwrap().is_finite());
@@ -614,7 +591,7 @@ mod tests {
     }
 
     #[test]
-    fn zero_factor_is_represented_as_zero_wealth_without_nan() {
+    fn log_domain_represents_zero_accounts_and_enforces_quarantine() {
         assert_eq!(log_add_exp(NEG_INFINITY, NEG_INFINITY), NEG_INFINITY);
         let mut monitor = make_monitor();
         // Force a valid, very high pre-existing e-value to exercise thresholding
