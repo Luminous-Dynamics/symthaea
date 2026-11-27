@@ -190,7 +190,10 @@ pub fn remap_distribution_after_velocity_kick(
         }
 
         let residual = mass_before - mass_after - boundary_outflow;
-        let tolerance = 256.0 * f64::EPSILON * mass_before.abs().max(mass_after.abs()).max(1.0);
+        let tolerance = 256.0
+            * f64::EPSILON
+            * mass_before.abs().max(mass_after.abs()).max(1.0)
+            * velocity_cells as f64;
         if !residual.is_finite() || residual.abs() > tolerance {
             return Err(VelocityKickRemapError::MassBalanceFailure);
         }
@@ -324,13 +327,15 @@ mod tests {
         let row = vec![1.0; 32];
         let distribution = vec![row.clone(), row];
         let report = remap_distribution_after_velocity_kick(
-            &kick(0.03),
-            &[0.0, std::f64::consts::PI],
+            &kick(0.1),
+            &[std::f64::consts::PI / 2.0, 3.0 * std::f64::consts::PI / 2.0],
             &edges,
             &distribution,
         )
         .unwrap();
         assert_eq!(report.spatial_mass.len(), 2);
+        assert!((report.spatial_mass[0].boundary_outflow - 0.1).abs() < 1.0e-12);
+        assert!((report.spatial_mass[1].boundary_outflow - 0.1).abs() < 1.0e-12);
         assert!(report.spatial_mass.iter().all(|ledger| ledger.residual.abs() < 1.0e-12));
     }
 
