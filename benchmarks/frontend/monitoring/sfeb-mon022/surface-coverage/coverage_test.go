@@ -20,7 +20,7 @@ func base() Request {
 	}
 }
 func ev(id,surface string,mode Mode,scope string) Attestation {
-	return Attestation{ID:id,SurfaceID:surface,Mode:mode,SourceSystem:"pg-source",TargetSystem:"pg-target",SourceControlRoot:"source-admin",TargetControlRoot:"target-admin",ScopeDigest:scope,SourceStateDigest:"state-v1",TargetStateDigest:"state-v1",MethodProfileDigest:"method-v1",EvidenceDigest:"evidence-"+id,Verified:true,Complete:true,ObservedAt:50,FreshUntil:200}
+	return Attestation{ID:id,SurfaceID:surface,Mode:mode,SourceSystem:"pg-source",TargetSystem:"pg-target",SourceControlRoot:"source-admin",TargetControlRoot:"target-admin",InventoryDigest:"inventory-v1",ScopeDigest:scope,SourceStateDigest:"state-v1",TargetStateDigest:"state-v1",StateDigestProfile:"canonical-state-v1",MethodProfileDigest:"method-v1",EvidenceDigest:"evidence-"+id,EvidenceSubjectID:id,EvidenceProfile:"mon022-surface-coverage-attestation-v1",Verified:true,Complete:true,ObservedAt:50,FreshUntil:200}
 }
 func independent(id,surface,scope string) Attestation {
 	a:=ev(id,surface,IndependentComparison,scope)
@@ -145,4 +145,17 @@ func FuzzSurfaceScopeIdentity(f *testing.F) {
 		out:=Evaluate(r)
 		if actual!="rows-scope" && out.Decision==Qualified { t.Fatal("mismatched surface scope qualified") }
 	})
+}
+
+func TestAttestationFromPriorInventoryIndeterminate(t *testing.T) {
+	r:=base();addFullStateEvidence(&r);r.Attestations[0].InventoryDigest="old-inventory";check(t,Evaluate(r),Indeterminate)
+}
+func TestAttestationEvidenceSubjectMismatchIndeterminate(t *testing.T) {
+	r:=base();addFullStateEvidence(&r);r.Attestations[0].EvidenceSubjectID="other";check(t,Evaluate(r),Indeterminate)
+}
+func TestAttestationEvidenceProfileMismatchIndeterminate(t *testing.T) {
+	r:=base();addFullStateEvidence(&r);r.Attestations[0].EvidenceProfile="old-profile";check(t,Evaluate(r),Indeterminate)
+}
+func TestStateDigestProfileRequired(t *testing.T) {
+	r:=base();addFullStateEvidence(&r);r.Attestations[0].StateDigestProfile="";check(t,Evaluate(r),Indeterminate)
 }
