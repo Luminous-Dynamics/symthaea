@@ -1,0 +1,32 @@
+{
+  "schema_version": "sdcb_covariance_model_mixture.expected.v1",
+  "observation": [
+    0.5
+  ],
+  "components": [
+    {
+      "model_id": "fast-drift",
+      "posterior_weight": 0.7560919066448245,
+      "theta_posterior_mean": 0.4,
+      "theta_posterior_variance": 1.36,
+      "log_predictive_density": -1.0439385332046727
+    },
+    {
+      "model_id": "slow-drift",
+      "posterior_weight": 0.2439080933551755,
+      "theta_posterior_mean": 1.75,
+      "theta_posterior_variance": 2.5,
+      "log_predictive_density": -1.3280121234846454
+    }
+  ],
+  "mixture_theta_mean": 0.729275926029487,
+  "within_model_variance": 1.6380552264249,
+  "between_model_variance": 0.3360998646772312,
+  "total_mixture_variance": 1.9741550911021313,
+  "robust_support_ids": [
+    "fast-drift",
+    "slow-drift"
+  ],
+  "robust_worst_case_squared_error_at_mixture_mean": 3.5418776351829613,
+  "claim_boundary": "Constructed finite Gaussian fixture, not physical sensor data."
+}

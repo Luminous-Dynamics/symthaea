@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/SDCB_COVARIANCE_MODEL_MIXTURE_V1.schema.json",
+  "title": "SDCB covariance model mixture fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation",
+    "models",
+    "robust_support_ids"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sdcb_covariance_model_mixture.v1"
+    },
+    "observation": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number"
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_id",
+          "prior_weight",
+          "theta_mean",
+          "theta_variance",
+          "predictive_mean",
+          "innovation_covariance",
+          "theta_observation_covariance"
+        ],
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prior_weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "theta_mean": {
+            "type": "number"
+          },
+          "theta_variance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "predictive_mean": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number"
+            }
+          },
+          "innovation_covariance": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "theta_observation_covariance": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "robust_support_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
