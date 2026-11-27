@@ -7,7 +7,7 @@
 //! musical property. It does not authenticate audio bytes, performers, takes,
 //! or human annotations.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -237,6 +237,8 @@ pub fn audit_performance_invariance_case(
     let mut item_ids = BTreeSet::new();
     let mut pair_ids = BTreeSet::new();
     let mut source_lineages = BTreeSet::new();
+    let mut composition_lineages = BTreeMap::<&str, &str>::new();
+    let mut audio_lineages = BTreeMap::<&str, &str>::new();
     let mut scored = Vec::with_capacity(case.triads.len());
     let mut results = Vec::with_capacity(case.triads.len());
 
@@ -257,7 +259,30 @@ pub fn audit_performance_invariance_case(
         if !pair_ids.insert(triad.pair_id.as_str()) {
             return Err(format!("duplicate pair_id in triads[{index}]"));
         }
-        source_lineages.insert(triad.source_lineage_sha256.as_str());
+        let lineage = triad.source_lineage_sha256.as_str();
+        let composition = triad.composition_sha256.as_str();
+        source_lineages.insert(lineage);
+        if let Some(existing_lineage) = composition_lineages.insert(composition, lineage)
+            && existing_lineage != lineage
+        {
+            return Err(format!(
+                "triads[{index}] reuses a composition digest across different source-work lineages"
+            ));
+        }
+        for variant in [
+            &triad.clean.answer,
+            &triad.performance_stay.answer,
+            &triad.musical_flip.answer,
+        ] {
+            if let Some(existing_lineage) =
+                audio_lineages.insert(variant.audio_sha256.as_str(), lineage)
+                && existing_lineage != lineage
+            {
+                return Err(format!(
+                    "triads[{index}] reuses an audio digest across different source-work lineages"
+                ));
+            }
+        }
 
         let clean = score_variant(&triad.clean.answer);
         let performance_stay = score_variant(&triad.performance_stay.answer);
@@ -1080,6 +1105,34 @@ mod tests {
     }
 
     #[test]
+    fn audio_and_composition_digests_cannot_cross_source_work_lineages() {
+        let first = triad(
+            "source-a",
+            MusicalTargetPropertyV1::ChordQuality,
+            PerformanceVariationFactorV1::DifferentTake,
+            MusicalChangeFactorV1::ChordQuality,
+            true,
+            true,
+        );
+        let mut second = triad(
+            "source-b",
+            MusicalTargetPropertyV1::ChordQuality,
+            PerformanceVariationFactorV1::DifferentTake,
+            MusicalChangeFactorV1::ChordQuality,
+            true,
+            true,
+        );
+        second.source_lineage_sha256 = digest('9');
+        assert!(audit_performance_invariance_case(&case(vec![first.clone(), second.clone()])).is_err());
+
+        second.composition_sha256 = digest('8');
+        second.clean.answer.audio_sha256 = digest('8');
+        second.performance_stay.answer.audio_sha256 = digest('9');
+        second.musical_flip.answer.audio_sha256 = digest('a');
+        assert!(audit_performance_invariance_case(&case(vec![first, second])).is_err());
+    }
+
+    #[test]
     fn duplicate_item_and_pair_ids_are_rejected() {
         let first = triad(
             "duplicate-id",
@@ -1194,9 +1247,9 @@ mod tests {
         assert_eq!(report.by_target_property.len(), 3);
         assert_eq!(report.by_performance_factor.len(), 3);
         assert_eq!(report.by_musical_flip_factor.len(), 3);
-        assert_eq!(report.by_target_property[0].target_property, MusicalTargetPropertyV1::ChordQuality);
-        assert_eq!(report.by_target_property[1].target_property, MusicalTargetPropertyV1::RootPitchClass);
-        assert_eq!(report.by_target_property[2].target_property, MusicalTargetPropertyV1::RelativeIntervalSequence);
+        assert_eq!(report.by_target_property[0].target_property, Some(MusicalTargetPropertyV1::ChordQuality));
+        assert_eq!(report.by_target_property[1].target_property, Some(MusicalTargetPropertyV1::RootPitchClass));
+        assert_eq!(report.by_target_property[2].target_property, Some(MusicalTargetPropertyV1::RelativeIntervalSequence));
         assert_eq!(report.source_lineage_count, 1);
         assert!(!report.confirmatory_lineage_floor_met);
     }
