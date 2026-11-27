@@ -514,12 +514,15 @@ fn terminal_minimax(
     best.ok_or(SequentialOracleError::EmptyDecisionSet)
 }
 
+type FeasibleActionState = (BTreeMap<String, u64>, u64);
+type FeasibleActionResult = Result<Option<FeasibleActionState>, SequentialOracleError>;
+
 fn feasible_action(
     problem: &SequentialRobustProblem,
     action: &SequentialAction,
     remaining_budget: &BTreeMap<String, u64>,
     current_step: u64,
-) -> Result<Option<(BTreeMap<String, u64>, u64)>, SequentialOracleError> {
+) -> FeasibleActionResult {
     let next_step = current_step
         .checked_add(action.result_delay_steps)
         .ok_or(SequentialOracleError::TimeOverflow)?;
@@ -812,7 +815,7 @@ fn enumeration_feasible_action(
     action: &SequentialAction,
     remaining_budget: &BTreeMap<String, u64>,
     current_step: u64,
-) -> Result<Option<(BTreeMap<String, u64>, u64)>, SequentialOracleError> {
+) -> FeasibleActionResult {
     let completed_at = current_step
         .checked_add(action.result_delay_steps)
         .ok_or(SequentialOracleError::TimeOverflow)?;
