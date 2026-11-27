@@ -24,7 +24,8 @@
       "verdict": "qualified",
       "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
       "outcome_receipt_sha256": "d311d7105e2bf0c5ced8876e58bacebb23a91408ce2386967b5ff603de84fc80",
-      "complete": true
+      "complete": true,
+      "trial_id": "trial-039-001"
     },
     {
       "fault_ids": [
@@ -38,7 +39,8 @@
       "verdict": "qualified",
       "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
       "outcome_receipt_sha256": "ed6b745a481d343c067509e0709f6ff8c7b73d82f456e2efe446af97b7f7c900",
-      "complete": true
+      "complete": true,
+      "trial_id": "trial-039-001"
     },
     {
       "fault_ids": [
@@ -52,7 +54,8 @@
       "verdict": "qualified",
       "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
       "outcome_receipt_sha256": "fc977c634398d8d6245b9d06396e958859b153b7850bd2e73e83550c3001db84",
-      "complete": true
+      "complete": true,
+      "trial_id": "trial-039-001"
     },
     {
       "fault_ids": [
@@ -67,7 +70,8 @@
       "verdict": "qualified",
       "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
       "outcome_receipt_sha256": "36fe9cc845d9d24fd344d15bbeaee838a9423863206bdd5ec646a930a4c9129a",
-      "complete": true
+      "complete": true,
+      "trial_id": "trial-039-001"
     },
     {
       "fault_ids": [
@@ -81,7 +85,8 @@
       "verdict": "qualified",
       "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
       "outcome_receipt_sha256": "47e505839b4548e44d1133035e43196ef431c312b2523c67537310d18be9b37f",
-      "complete": true
+      "complete": true,
+      "trial_id": "trial-039-001"
     },
     {
       "fault_ids": [
@@ -96,7 +101,8 @@
       "verdict": "blocked",
       "failure_signature_sha256": "30100eb79964719053a37a1ef7fe2be0e9290f7639284a848565a99dc77ffa5e",
       "outcome_receipt_sha256": "5bdb8daa4eeb57e211603e016e019048ac5ed2ba2d0f69b44279631741bcd1e5",
-      "complete": true
+      "complete": true,
+      "trial_id": "trial-039-001"
     },
     {
       "fault_ids": [
@@ -111,7 +117,8 @@
       "verdict": "qualified",
       "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
       "outcome_receipt_sha256": "44f33cf20cf870d725ae71b16ad79db26cdd3184b08a05bc85c0ec4188baa87a",
-      "complete": true
+      "complete": true,
+      "trial_id": "trial-039-001"
     },
     {
       "fault_ids": [
@@ -127,7 +134,8 @@
       "verdict": "blocked",
       "failure_signature_sha256": "30100eb79964719053a37a1ef7fe2be0e9290f7639284a848565a99dc77ffa5e",
       "outcome_receipt_sha256": "b8a24e8a32c7e6abc6099061cd030649e166108cc760d5943781d6eceabbcf63",
-      "complete": true
+      "complete": true,
+      "trial_id": "trial-039-001"
     }
   ]
 }
