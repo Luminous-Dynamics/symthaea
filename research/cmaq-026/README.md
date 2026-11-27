@@ -25,6 +25,8 @@ All action losses and probe costs use one explicit non-negative loss unit define
 
 The no-probe baseline is the minimum over single actions of their worst-case regret across worlds, restricted to actions that satisfy hard invariants in every world.
 
+The v0.1 scorer requires at least one common invariant-safe action across the finite world set (normally an explicit no-mutation/hold fallback). If none exists, it returns `NoCommonInvariantSafeAction` rather than inventing a safe baseline or averaging away the conflict. This is a fail-closed boundary; modelling emergency-stop dynamics and cases with no common safe action is a later extension.
+
 For a candidate probe, compute the worst-case regret of its observation-conditioned action policy and add the probe cost:
 
 `probe_adjusted_regret = worst_case_policy_regret + probe_cost`
