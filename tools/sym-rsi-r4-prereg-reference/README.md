@@ -9,7 +9,7 @@ The `experiment.protocol_contract_commit` field identifies the exact protocol/ch
 ## Run
 
 ```sh
-cargo fmt --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
+cargo fmt --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
 cargo clippy --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml --all-targets -- -D warnings
 cargo test --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml
 cargo run --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json
