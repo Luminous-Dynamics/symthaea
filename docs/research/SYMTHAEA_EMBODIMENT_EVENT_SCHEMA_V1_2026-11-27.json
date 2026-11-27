@@ -75,22 +75,26 @@
         "component": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
         },
         "instance_id": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
         },
         "source_event_id": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
         },
         "build_id": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
         }
       }
     },
@@ -116,7 +120,8 @@
       "items": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 256
+        "maxLength": 256,
+        "pattern": "^[A-Za-z0-9._:-]+$"
       }
     },
     "privacy_class": {
@@ -206,7 +211,8 @@
               },
               "text_ref": {
                 "type": "string",
-                "maxLength": 256
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9._:-]+$"
               }
             }
           }
@@ -244,7 +250,8 @@
               },
               "target": {
                 "type": "string",
-                "maxLength": 128
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._:-]+$"
               }
             }
           }
@@ -523,7 +530,8 @@
               },
               "form_id": {
                 "type": "string",
-                "maxLength": 128
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._:-]+$"
               },
               "enabled": {
                 "type": "boolean"
