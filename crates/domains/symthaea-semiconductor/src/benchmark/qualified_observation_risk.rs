@@ -704,6 +704,22 @@ mod tests {
     }
 
     #[test]
+    fn pending_qualification_is_separate_from_unknown_and_remains_in_bounds() {
+        let units = vec![
+            qualified_unit(1, 0.0, false),
+            missing_unit(2, MetrologyQualificationStatusV1::Pending, true, true),
+            missing_unit(3, MetrologyQualificationStatusV1::Unknown, true, true),
+        ];
+        let report = compute_qualified_observation_risk_v1(&input(units, assumptions(false)))
+            .unwrap();
+        assert!((report.pending_qualification_fraction - 1.0 / 3.0).abs() < 1.0e-12);
+        assert!((report.unknown_fraction - 1.0 / 3.0).abs() < 1.0e-12);
+        assert_eq!(report.worst_case_bounds.observed_qualified_units, 1);
+        assert_eq!(report.worst_case_bounds.missing_or_unqualified_units, 2);
+        assert!((report.worst_case_bounds.upper_bound - 2.0 / 3.0).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn complete_population_returns_exact_risk_not_an_ipw_claim() {
         let units = vec![
             qualified_unit(1, 1.0, true),
