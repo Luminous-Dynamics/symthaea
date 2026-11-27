@@ -5,6 +5,7 @@ on:
     branches:
       - research/web-research-adjudication-guard-2026-11-27
       - research/epistemic-selective-risk-coverage-v1
+      - research/epistemic-selective-observation-v1
     paths:
       - "src/web_research/types.rs"
       - "src/web_research/meta_learning.rs"
