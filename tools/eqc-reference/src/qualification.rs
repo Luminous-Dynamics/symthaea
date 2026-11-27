@@ -440,6 +440,9 @@ mod tests {
         let observation = valid_observation(&task);
         let report = qualify_observation(&task, &observation).unwrap();
         assert!(report.qualified);
+        assert!(report.dimensions.budget_compliance);
+        assert_eq!(report.resource_usage["human_interventions"], 0);
+        assert!(report.resource_usage["energy_millijoules"].is_null());
         assert!(report.reasons.is_empty());
     }
 
@@ -480,6 +483,16 @@ mod tests {
         let mut observation = valid_observation(&task);
         observation["resource_usage"]["network_bytes"] = json!(1);
         observation["resource_usage"]["network_endpoints"] = json!(["https://example.invalid"]);
+        let report = qualify_observation(&task, &observation).unwrap();
+        assert!(!report.dimensions.budget_compliance);
+        assert!(!report.qualified);
+    }
+
+    #[test]
+    fn unsupported_network_budget_modes_fail_closed() {
+        let mut task = task();
+        task["resource_budget"]["network_policy"] = json!("declared_endpoints_only");
+        let observation = valid_observation(&task);
         let report = qualify_observation(&task, &observation).unwrap();
         assert!(!report.dimensions.budget_compliance);
         assert!(!report.qualified);
