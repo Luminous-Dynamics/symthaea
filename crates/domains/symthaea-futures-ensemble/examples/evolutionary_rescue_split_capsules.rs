@@ -50,10 +50,18 @@ fn run() -> Result<(), String> {
         other => return Err(format!("unknown observation view {other}")),
     };
 
-    fs::create_dir_all(&replay_root)
-        .map_err(|e| format!("create replay archive directory {}: {e}", replay_root.display()))?;
-    fs::create_dir_all(&evaluator_root)
-        .map_err(|e| format!("create evaluator directory {}: {e}", evaluator_root.display()))?;
+    fs::create_dir_all(&replay_root).map_err(|e| {
+        format!(
+            "create replay archive directory {}: {e}",
+            replay_root.display()
+        )
+    })?;
+    fs::create_dir_all(&evaluator_root).map_err(|e| {
+        format!(
+            "create evaluator directory {}: {e}",
+            evaluator_root.display()
+        )
+    })?;
     ensure_disjoint_roots(&replay_root, &evaluator_root)?;
 
     let replay_root = fs::canonicalize(&replay_root)
@@ -66,7 +74,10 @@ fn run() -> Result<(), String> {
 
     let mut generated = 0usize;
     for (split, seeds) in [
-        (custody::WorldSplit::Training, common::TRAIN_SEEDS.as_slice()),
+        (
+            custody::WorldSplit::Training,
+            common::TRAIN_SEEDS.as_slice(),
+        ),
         (custody::WorldSplit::HeldOut, common::TEST_SEEDS.as_slice()),
     ] {
         for &seed in seeds {
@@ -80,11 +91,11 @@ fn run() -> Result<(), String> {
             }
 
             let world_id = uuid::Uuid::new_v4().to_string();
-            let encoded = custody::encode_world(
-                &world, &world_id, split, view, source_commit,
-            )?;
+            let encoded = custody::encode_world(&world, &world_id, split, view, source_commit)?;
             custody::verify_encoded_replay_artifacts(
-                &encoded, &encoded.replay_digest, &encoded.evaluator_digest,
+                &encoded,
+                &encoded.replay_digest,
+                &encoded.evaluator_digest,
             )?;
 
             write_new(
@@ -107,24 +118,34 @@ fn run() -> Result<(), String> {
             )?;
 
             let disk_set = custody::EncodedReplayArtifacts {
-                replay_archive_json: fs::read(replay_root.join(format!("{world_id}.observations.json")))
-                    .map_err(|e| format!("read back replay archive {world_id}: {e}"))?,
+                replay_archive_json: fs::read(
+                    replay_root.join(format!("{world_id}.observations.json")),
+                )
+                .map_err(|e| format!("read back replay archive {world_id}: {e}"))?,
                 replay_receipt_json: fs::read(replay_root.join(format!("{world_id}.receipt.json")))
                     .map_err(|e| format!("read back replay archive receipt {world_id}: {e}"))?,
-                evaluator_capsule_json: fs::read(evaluator_root.join(format!("{world_id}.outcomes.json")))
-                    .map_err(|e| format!("read back evaluator capsule {world_id}: {e}"))?,
-                evaluator_manifest_json: fs::read(evaluator_root.join(format!("{world_id}.manifest.json")))
-                    .map_err(|e| format!("read back evaluator manifest {world_id}: {e}"))?,
+                evaluator_capsule_json: fs::read(
+                    evaluator_root.join(format!("{world_id}.outcomes.json")),
+                )
+                .map_err(|e| format!("read back evaluator capsule {world_id}: {e}"))?,
+                evaluator_manifest_json: fs::read(
+                    evaluator_root.join(format!("{world_id}.manifest.json")),
+                )
+                .map_err(|e| format!("read back evaluator manifest {world_id}: {e}"))?,
                 replay_digest: encoded.replay_digest.clone(),
                 evaluator_digest: encoded.evaluator_digest.clone(),
             };
             custody::verify_encoded_replay_artifacts(
-                &disk_set, &encoded.replay_digest, &encoded.evaluator_digest,
+                &disk_set,
+                &encoded.replay_digest,
+                &encoded.evaluator_digest,
             )?;
 
             println!(
                 "materialized world_id={world_id} observation_policy={} replay_digest={} evaluator_digest={}",
-                view.policy_id(), encoded.replay_digest, encoded.evaluator_digest
+                view.policy_id(),
+                encoded.replay_digest,
+                encoded.evaluator_digest
             );
             generated += 1;
         }
@@ -140,10 +161,8 @@ fn run() -> Result<(), String> {
 }
 
 fn ensure_disjoint_roots(candidate: &Path, evaluator: &Path) -> Result<(), String> {
-    let c = fs::canonicalize(candidate)
-        .map_err(|e| format!("canonicalize replay root: {e}"))?;
-    let e = fs::canonicalize(evaluator)
-        .map_err(|e| format!("canonicalize evaluator root: {e}"))?;
+    let c = fs::canonicalize(candidate).map_err(|e| format!("canonicalize replay root: {e}"))?;
+    let e = fs::canonicalize(evaluator).map_err(|e| format!("canonicalize evaluator root: {e}"))?;
     if c == e || c.starts_with(&e) || e.starts_with(&c) {
         return Err("replay and evaluator roots must be distinct and non-overlapping".into());
     }
@@ -180,7 +199,11 @@ mod tests {
         let root = std::env::temp_dir().join(format!("symthaea-custody-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join("partial.json"), b"partial").unwrap();
-        assert!(ensure_empty_root(&root).unwrap_err().contains("must be empty"));
+        assert!(
+            ensure_empty_root(&root)
+                .unwrap_err()
+                .contains("must be empty")
+        );
         fs::remove_dir_all(&root).unwrap();
     }
 }
