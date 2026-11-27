@@ -560,13 +560,7 @@ mod tests {
 
     #[test]
     fn ledger_does_not_mutate_on_allocation_overflow() {
-        let extreme = BudgetPlan::new(
-            1,
-            u128::MAX,
-            PLAN_SHA.into(),
-            INVENTORY_SHA.into(),
-        )
-        .unwrap();
+        let extreme = BudgetPlan::new(1, u128::MAX, PLAN_SHA.into(), INVENTORY_SHA.into()).unwrap();
         let mut ledger = AllocationLedger::new(&extreme);
         let scope = scope(u64::MAX, u64::MAX, u64::MAX, "overflow");
         assert_eq!(
