@@ -2058,6 +2058,9 @@ mod tests {
             RbkrConfig::new(1),
         )
         .unwrap();
+        let holdout_report = evaluate_response_scenario_residuals(&basis, &[holdout], 0.9).unwrap();
+        assert_eq!(holdout_report.scenarios.len(), 1);
+        assert_eq!(holdout_report.scenarios[0].scenario_id, "sealed-holdout");
         let original_order = basis.reduced_order();
         let original_trial = basis.trial_basis().to_vec();
         assert_eq!(
