@@ -214,6 +214,6 @@ It:
 
 The receipt ledger now rejects `AdapterCallback` as evidence for both Observed and Stopped. Compositor and external-observer sources remain distinct from adapter submission acknowledgements.
 
-Ten observer regression tests and one additional receipt-source regression test are authored, not compiled or executed. The Wayland protocol adapter, protocol capability discovery, real compositor callback, separate observer process, receipt persistence, and named-device runtime qualification are not implemented yet.
+Thirteen observer regression tests and one additional receipt-source regression test are authored, not compiled or executed. A normalizer now converts the raw Wayland presented timestamp words, refresh interval, sequence words, output ID (when supplied by sync_output), and raw flags into the internal feedback event, with checked timestamp overflow and nanosecond validation. The Wayland protocol adapter, protocol capability discovery, real compositor callback, separate observer process, receipt persistence, and named-device runtime qualification are not implemented yet.
 
 The observer proves a compositor-reported presentation event, not that a human looked at or understood the frame. This increment intentionally does not claim that presentation of a later frame proves the earlier frame has stopped; Stopped remains a separately qualified evidence requirement.
