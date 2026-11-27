@@ -263,7 +263,10 @@ fn validate_closure_structure(closure: &ClosureManifest) -> Result<(), ClosureBr
         if block.block_id.trim().is_empty()
             || block.member_unit_ids.is_empty()
             || block.member_unit_ids.first().map(String::as_str) != Some(block.block_id.as_str())
-            || block.member_unit_ids.iter().any(|member| member.trim().is_empty())
+            || block
+                .member_unit_ids
+                .iter()
+                .any(|member| member.trim().is_empty())
         {
             return Err(ClosureBridgeError::InvalidBlockIdentity);
         }
