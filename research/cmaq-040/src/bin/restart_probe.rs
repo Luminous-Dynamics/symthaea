@@ -91,7 +91,9 @@ fn parse_config() -> Result<Config, String> {
     let shift_after = usize::try_from(parse(3, "400", "shift_after")?)
         .map_err(|_| "shift_after exceeds usize".to_string())?;
     if replications == 0 || horizon == 0 || shift_after >= horizon {
-        return Err("replications and horizon must be positive; shift_after must be below horizon".into());
+        return Err(
+            "replications and horizon must be positive; shift_after must be below horizon".into(),
+        );
     }
     Ok(Config {
         replications,
@@ -126,10 +128,7 @@ fn draw_trimodal_rank(rng: &mut SplitMix64) -> usize {
     unreachable!("trimodal draw is bounded by total mass")
 }
 
-fn observe_fixed(
-    monitor: &mut RankSpectrumMonitor,
-    rank: usize,
-) -> Result<Option<usize>, String> {
+fn observe_fixed(monitor: &mut RankSpectrumMonitor, rank: usize) -> Result<Option<usize>, String> {
     match monitor
         .observe_rank(rank)
         .map_err(|error| format!("CMAQ-038 update failed: {error:?}"))?
@@ -173,18 +172,11 @@ fn run_replication(
         });
     let mut rng = SplitMix64::new(scenario_seed);
     let mut urn_counts = vec![0u64; CALIBRATION_COUNT + 1];
-    let mut fixed = RankSpectrumMonitor::new(
-        CALIBRATION_COUNT,
-        ALPHA_NUMERATOR,
-        ALPHA_DENOMINATOR,
-    )
-    .map_err(|error| format!("CMAQ-038 construction failed: {error:?}"))?;
-    let mut restarted = RestartedRankSpectrumMonitor::new(
-        CALIBRATION_COUNT,
-        ALPHA_NUMERATOR,
-        ALPHA_DENOMINATOR,
-    )
-    .map_err(|error| format!("CMAQ-040 construction failed: {error:?}"))?;
+    let mut fixed = RankSpectrumMonitor::new(CALIBRATION_COUNT, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)
+        .map_err(|error| format!("CMAQ-038 construction failed: {error:?}"))?;
+    let mut restarted =
+        RestartedRankSpectrumMonitor::new(CALIBRATION_COUNT, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)
+            .map_err(|error| format!("CMAQ-040 construction failed: {error:?}"))?;
 
     let mut fixed_alarm = None;
     let mut restarted_alarm = None;
