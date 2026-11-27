@@ -522,10 +522,15 @@ fn validate_client_request_body(
         return Err("client request body semantics differ from the exact evidence manifest".into());
     }
     if request.audio_windows.len() != manifest.windows.len() {
-        return Err("client request body window count differs from materialized evidence windows".into());
+        return Err(
+            "client request body window count differs from materialized evidence windows".into(),
+        );
     }
-    for (index, (request_window, manifest_window)) in
-        request.audio_windows.iter().zip(&manifest.windows).enumerate()
+    for (index, (request_window, manifest_window)) in request
+        .audio_windows
+        .iter()
+        .zip(&manifest.windows)
+        .enumerate()
     {
         if request_window.window_id != manifest_window.window_id
             || request_window.start_frame != manifest_window.start_frame
@@ -666,8 +671,7 @@ mod tests {
 
     fn request_body_with_target_audio(target_audio_sha256: &str) -> Vec<u8> {
         let mut body: serde_json::Value = serde_json::from_slice(REQUEST_BODY).unwrap();
-        body["target_audio_sha256"] =
-            serde_json::Value::String(target_audio_sha256.to_owned());
+        body["target_audio_sha256"] = serde_json::Value::String(target_audio_sha256.to_owned());
         serde_json::to_vec(&body).unwrap()
     }
 
@@ -814,10 +818,10 @@ mod tests {
     #[test]
     fn request_body_json_must_match_target_and_selected_materialized_windows() {
         let manifest = manifest();
-        let mut request: serde_json::Value =
-            serde_json::from_slice(REQUEST_BODY).unwrap();
-        request["target_audio_sha256"] =
-            serde_json::Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into());
+        let mut request: serde_json::Value = serde_json::from_slice(REQUEST_BODY).unwrap();
+        request["target_audio_sha256"] = serde_json::Value::String(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+        );
         let unrelated = serde_json::to_vec(&request).unwrap();
         let mut forged = manifest;
         forged.request_body.body_sha256 = sha256_hex(&unrelated);
@@ -858,15 +862,16 @@ mod tests {
         input.target_audio_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
         input.context.context_manifest_sha256 = context_digest(&input).unwrap();
-        let mut altered_request: serde_json::Value =
-            serde_json::from_slice(REQUEST_BODY).unwrap();
+        let mut altered_request: serde_json::Value = serde_json::from_slice(REQUEST_BODY).unwrap();
         altered_request["target_audio_sha256"] =
             serde_json::Value::String(input.target_audio_sha256.clone());
         let altered_request = serde_json::to_vec(&altered_request).unwrap();
         input.request_body.body_sha256 = sha256_hex(&altered_request);
         input.request_body.byte_length = altered_request.len() as u64;
         input.context.context_manifest_sha256 = context_digest(&input).unwrap();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, &altered_request).is_ok());
+        assert!(
+            verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, &altered_request).is_ok()
+        );
     }
 
     #[test]
@@ -878,7 +883,9 @@ mod tests {
         let altered_request = request_body_with_target_audio(&input.target_audio_sha256);
         bind_request_body(&mut input, &altered_request);
         // A distinct audio digest is not enough when source-work lineage is unchanged.
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, &altered_request).is_err());
+        assert!(
+            verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, &altered_request).is_err()
+        );
 
         input = manifest();
         input.evidence_condition = EvidenceConditionV1::YokedRetrieved;
@@ -894,7 +901,9 @@ mod tests {
         input.source_lineage_id = "synthetic-yoked-source-lineage-001".into();
         let altered_request = request_body_with_target_audio(&input.target_audio_sha256);
         bind_request_body(&mut input, &altered_request);
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, &altered_request).is_ok());
+        assert!(
+            verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, &altered_request).is_ok()
+        );
     }
 
     #[test]
