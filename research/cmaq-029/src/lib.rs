@@ -144,7 +144,9 @@ pub fn calibrate_cluster_trajectory_envelope(
 ) -> Result<CalibrationResult, CalibrationError> {
     validate_contract(&contract)?;
     if !is_sha256_hex(&manifest.calibration_manifest_sha256) {
-        return Err(CalibrationError::InvalidSha256("calibration_manifest_sha256"));
+        return Err(CalibrationError::InvalidSha256(
+            "calibration_manifest_sha256",
+        ));
     }
     validate_split_manifest(manifest)?;
 
@@ -231,13 +233,17 @@ pub fn apply_trajectory_envelope(
         return Err(CalibrationError::InvalidSha256("candidate_view_sha256"));
     }
     if !is_sha256_hex(&forecast.predicted_trajectory_sha256) {
-        return Err(CalibrationError::InvalidSha256("predicted_trajectory_sha256"));
+        return Err(CalibrationError::InvalidSha256(
+            "predicted_trajectory_sha256",
+        ));
     }
     if forecast.contract_sha256 != calibration.contract.contract_sha256 {
         return Err(CalibrationError::RuntimeScopeMismatch("contract_sha256"));
     }
     if forecast.source_manifest_sha256 != calibration.contract.source_manifest_sha256 {
-        return Err(CalibrationError::RuntimeScopeMismatch("source_manifest_sha256"));
+        return Err(CalibrationError::RuntimeScopeMismatch(
+            "source_manifest_sha256",
+        ));
     }
     if forecast.candidate_checkpoint_sha256 != calibration.contract.candidate_checkpoint_sha256 {
         return Err(CalibrationError::RuntimeScopeMismatch(
@@ -245,7 +251,9 @@ pub fn apply_trajectory_envelope(
         ));
     }
     if forecast.block != calibration.contract.block {
-        return Err(CalibrationError::RuntimeScopeMismatch("trajectory_block_spec"));
+        return Err(CalibrationError::RuntimeScopeMismatch(
+            "trajectory_block_spec",
+        ));
     }
 
     Ok(AppliedTrajectoryEnvelope {
@@ -268,10 +276,7 @@ pub fn finite_sample_quantile_rank(
     alpha_numerator: u32,
     alpha_denominator: u32,
 ) -> Result<usize, CalibrationError> {
-    if alpha_denominator == 0
-        || alpha_numerator == 0
-        || alpha_numerator >= alpha_denominator
-    {
+    if alpha_denominator == 0 || alpha_numerator == 0 || alpha_numerator >= alpha_denominator {
         return Err(CalibrationError::InvalidMiscoverage);
     }
     let n_plus_one = (calibration_clusters as u128)
@@ -297,10 +302,7 @@ fn validate_contract(contract: &CalibrationContract) -> Result<(), CalibrationEr
             &contract.candidate_checkpoint_sha256,
             "candidate_checkpoint_sha256",
         ),
-        (
-            &contract.block.context_scope_sha256,
-            "context_scope_sha256",
-        ),
+        (&contract.block.context_scope_sha256, "context_scope_sha256"),
         (&contract.block.state_metric_sha256, "state_metric_sha256"),
         (
             &contract.block.selection_protocol_sha256,
@@ -342,7 +344,9 @@ fn validate_split_manifest(manifest: &CalibrationManifest) -> Result<(), Calibra
         return Err(CalibrationError::EmptySplit("scale_validation_cluster_ids"));
     }
     if manifest.held_out_evaluation_cluster_ids.is_empty() {
-        return Err(CalibrationError::EmptySplit("held_out_evaluation_cluster_ids"));
+        return Err(CalibrationError::EmptySplit(
+            "held_out_evaluation_cluster_ids",
+        ));
     }
     let mut seen = HashSet::new();
     for id in &manifest.training_cluster_ids {
@@ -402,7 +406,9 @@ fn validate_unit_inventory(
         ));
     }
     if unit.horizon_steps != block.horizon_steps {
-        return Err(CalibrationError::InvalidCalibrationInventory("horizon_steps"));
+        return Err(CalibrationError::InvalidCalibrationInventory(
+            "horizon_steps",
+        ));
     }
     if unit.state_dimension != block.state_dimension {
         return Err(CalibrationError::InvalidCalibrationInventory(
@@ -632,7 +638,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn empty_scale_validation_split_is_rejected() {
         let mut m = manifest(19);
@@ -649,7 +654,9 @@ mod tests {
         m.calibration_manifest_sha256 = "unsealed".into();
         assert_eq!(
             calibrate_cluster_trajectory_envelope(contract(), &m),
-            Err(CalibrationError::InvalidSha256("calibration_manifest_sha256"))
+            Err(CalibrationError::InvalidSha256(
+                "calibration_manifest_sha256"
+            ))
         );
     }
 
