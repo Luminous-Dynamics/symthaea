@@ -107,6 +107,7 @@ pub enum TemporalProjectionRejectV1 {
     InvalidReplacement,
     ReplacementAlreadyLinked,
     AlreadyErased,
+    MetamemorySummaryIntegrityFailure,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -218,6 +219,79 @@ pub enum ProjectionRegisterStatusV1 {
     IdempotentReplay,
 }
 
+/// One value-free lifecycle-status aggregate in a store metamemory snapshot.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DerivedProjectionStatusCountV1 {
+    pub status: DerivedProjectionStatusV1,
+    pub count: u64,
+}
+
+/// One value-free projection-kind aggregate in a store metamemory snapshot.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DerivedProjectionKindCountV1 {
+    pub kind: DerivedProjectionKindV1,
+    pub count: u64,
+}
+
+/// Value-free, integrity-committed view of a single temporal memory store.
+///
+/// It deliberately excludes record IDs, source text, content digests and user
+/// supplied values. Scope authorization must still be performed by the caller
+/// before exposing even aggregate counts to an agent or another tenant.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StoreMetamemorySummaryV1 {
+    pub schema_version: u16,
+    pub scope_commitment_sha256: String,
+    pub ledger_sequence: u64,
+    pub projection_index_sequence: u64,
+    pub active_source_event_count: u64,
+    pub projection_count: u64,
+    pub status_counts: Vec<DerivedProjectionStatusCountV1>,
+    pub kind_counts: Vec<DerivedProjectionKindCountV1>,
+    pub ledger_snapshot_sha256: String,
+    pub projection_index_state_sha256: String,
+    pub summary_sha256: String,
+}
+
+impl StoreMetamemorySummaryV1 {
+    /// Verifies the snapshot's internal commitment and count invariants.
+    /// This does not establish freshness against a newer external ledger head.
+    pub fn verify_integrity(&self) -> bool {
+        self.schema_version == 1
+            && self.status_counts.len() == 7
+            && self.kind_counts.len() == 7
+            && self.ledger_sequence == self.projection_index_sequence
+            && valid_digest(&self.scope_commitment_sha256)
+            && valid_digest(&self.ledger_snapshot_sha256)
+            && valid_digest(&self.projection_index_state_sha256)
+            && self.status_counts.iter().map(|item| item.count).sum::<u64>()
+                == self.projection_count
+            && self.kind_counts.iter().map(|item| item.count).sum::<u64>()
+                == self.projection_count
+            && self.summary_sha256 == metamemory_summary_digest(self)
+    }
+
+    pub fn current_projection_count(&self) -> u64 {
+        self.status_counts.iter()
+            .find(|item| item.status == DerivedProjectionStatusV1::Current)
+            .map(|item| item.count)
+            .unwrap_or(0)
+    }
+
+    pub fn unresolved_projection_count(&self) -> u64 {
+        self.status_counts.iter()
+            .filter(|item| matches!(
+                item.status,
+                DerivedProjectionStatusV1::Stale
+                    | DerivedProjectionStatusV1::Quarantined
+                    | DerivedProjectionStatusV1::Revoked
+                    | DerivedProjectionStatusV1::ErasureRequested
+            ))
+            .map(|item| item.count)
+            .sum()
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DerivedProjectionIndexV1 {
     user_id: String,
@@ -253,6 +327,80 @@ impl DerivedProjectionIndexV1 {
     pub fn last_sequence(&self) -> u64 { self.last_sequence }
     pub fn len(&self) -> usize { self.projections.len() }
     pub fn is_empty(&self) -> bool { self.projections.is_empty() }
+
+    /// Produce a value-free store-state summary for this exact ledger/index
+    /// sequence. Refuses to summarize when the projection index is behind or
+    /// bound to a different session.
+    pub fn metamemory_summary(
+        &self,
+        ledger: &StreamingSessionLedgerV1,
+    ) -> Result<StoreMetamemorySummaryV1, TemporalProjectionRejectV1> {
+        if ledger.user_id() != self.user_id || ledger.session_id() != self.session_id {
+            return Err(TemporalProjectionRejectV1::WrongSession);
+        }
+        if self.last_sequence != ledger.last_sequence() {
+            return Err(TemporalProjectionRejectV1::SequenceGap {
+                expected: self.last_sequence,
+                actual: ledger.last_sequence(),
+            });
+        }
+
+        let ledger_snapshot = ledger.snapshot();
+        let status_order = [
+            DerivedProjectionStatusV1::Current,
+            DerivedProjectionStatusV1::Stale,
+            DerivedProjectionStatusV1::Quarantined,
+            DerivedProjectionStatusV1::Revoked,
+            DerivedProjectionStatusV1::ErasureRequested,
+            DerivedProjectionStatusV1::Rebuilt,
+            DerivedProjectionStatusV1::Erased,
+        ];
+        let kind_order = [
+            DerivedProjectionKindV1::Summary,
+            DerivedProjectionKindV1::Embedding,
+            DerivedProjectionKindV1::PreferenceModel,
+            DerivedProjectionKindV1::Plan,
+            DerivedProjectionKindV1::FactIndex,
+            DerivedProjectionKindV1::AnswerCache,
+            DerivedProjectionKindV1::Other,
+        ];
+        let status_counts = status_order.into_iter().map(|status| {
+            DerivedProjectionStatusCountV1 {
+                status,
+                count: self.projections.values()
+                    .filter(|projection| projection.status == status).count() as u64,
+            }
+        }).collect::<Vec<_>>();
+        let kind_counts = kind_order.into_iter().map(|kind| {
+            DerivedProjectionKindCountV1 {
+                kind,
+                count: self.projections.values()
+                    .filter(|projection| projection.kind == kind).count() as u64,
+            }
+        }).collect::<Vec<_>>();
+
+        let mut scope_hasher = Sha256::new();
+        scope_hasher.update(b"luminous:mace:metamemory-scope:v1\\0");
+        hash_field(&mut scope_hasher, &self.user_id);
+        hash_field(&mut scope_hasher, &self.session_id);
+        let scope_commitment_sha256 = hex_digest(&scope_hasher.finalize());
+
+        let mut summary = StoreMetamemorySummaryV1 {
+            schema_version: 1,
+            scope_commitment_sha256,
+            ledger_sequence: ledger.last_sequence(),
+            projection_index_sequence: self.last_sequence,
+            active_source_event_count: ledger_snapshot.messages.len() as u64,
+            projection_count: self.projections.len() as u64,
+            status_counts,
+            kind_counts,
+            ledger_snapshot_sha256: ledger_snapshot.snapshot_sha256,
+            projection_index_state_sha256: self.state_sha256(),
+            summary_sha256: String::new(),
+        };
+        summary.summary_sha256 = metamemory_summary_digest(&summary);
+        Ok(summary)
+    }
 
     pub fn projection(&self, projection_id: &str) -> Option<&DerivedMemoryProjectionV1> {
         self.projections.get(projection_id)
@@ -604,6 +752,30 @@ impl DerivedProjectionIndexV1 {
     }
 }
 
+fn metamemory_summary_digest(summary: &StoreMetamemorySummaryV1) -> String {
+    let mut h = Sha256::new();
+    h.update(b"luminous:mace:store-metamemory-summary:v1\\0");
+    h.update(summary.schema_version.to_be_bytes());
+    hash_field(&mut h, &summary.scope_commitment_sha256);
+    h.update(summary.ledger_sequence.to_be_bytes());
+    h.update(summary.projection_index_sequence.to_be_bytes());
+    h.update(summary.active_source_event_count.to_be_bytes());
+    h.update(summary.projection_count.to_be_bytes());
+    hash_field(&mut h, &summary.ledger_snapshot_sha256);
+    hash_field(&mut h, &summary.projection_index_state_sha256);
+    h.update((summary.status_counts.len() as u64).to_be_bytes());
+    for item in &summary.status_counts {
+        h.update([item.status.tag()]);
+        h.update(item.count.to_be_bytes());
+    }
+    h.update((summary.kind_counts.len() as u64).to_be_bytes());
+    for item in &summary.kind_counts {
+        h.update([item.kind.tag()]);
+        h.update(item.count.to_be_bytes());
+    }
+    hex_digest(&h.finalize())
+}
+
 fn validate_projection_spec(spec: &DerivedProjectionSpecV1) -> Result<(), TemporalProjectionRejectV1> {
     if !valid_atom(&spec.projection_id, MAX_PROJECTION_ID_BYTES_V1) {
         return Err(TemporalProjectionRejectV1::InvalidProjectionId);
@@ -777,6 +949,71 @@ mod tests {
                 message: message("turn-1", 100, "corrected source fact"),
             },
         }
+    }
+
+    #[test]
+    fn metamemory_summary_is_value_free_and_matches_exact_store_counts() {
+        let ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let summary = index.metamemory_summary(&ledger).unwrap();
+        assert_eq!(summary.schema_version, 1);
+        assert_eq!(summary.active_source_event_count, 1);
+        assert_eq!(summary.projection_count, 0);
+        assert_eq!(summary.current_projection_count(), 0);
+        assert_eq!(summary.unresolved_projection_count(), 0);
+        assert!(summary.verify_integrity());
+        assert_eq!(summary.status_counts.len(), 7);
+        assert_eq!(summary.kind_counts.len(), 7);
+    }
+
+    #[test]
+    fn metamemory_summary_counts_stale_and_current_projections_separately() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        index.register_projection(&ledger, spec("summary-old", 1, &["event-1"], &[])).unwrap();
+        let receipt = ledger.apply(correction(2), 1_100).unwrap().receipt;
+        index.apply_transition(&ledger, &receipt).unwrap();
+        index.register_projection(&ledger, spec("summary-new", 2, &["event-2"], &[])).unwrap();
+
+        let summary = index.metamemory_summary(&ledger).unwrap();
+        assert_eq!(summary.projection_count, 2);
+        assert_eq!(summary.current_projection_count(), 1);
+        assert_eq!(summary.unresolved_projection_count(), 1);
+        assert_eq!(
+            summary.status_counts.iter()
+                .find(|item| item.status == DerivedProjectionStatusV1::Stale)
+                .unwrap().count,
+            1
+        );
+        assert!(summary.verify_integrity());
+    }
+
+    #[test]
+    fn metamemory_summary_refuses_to_hide_projection_index_lag() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        index.register_projection(&ledger, spec("summary-old", 1, &["event-1"], &[])).unwrap();
+        ledger.apply(correction(2), 1_100).unwrap();
+        assert_eq!(
+            index.metamemory_summary(&ledger),
+            Err(TemporalProjectionRejectV1::SequenceGap { expected: 1, actual: 2 })
+        );
+    }
+
+    #[test]
+    fn metamemory_summary_rejects_wrong_scope_and_tampered_counts() {
+        let ledger = ledger();
+        let index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let summary = index.metamemory_summary(&ledger).unwrap();
+        let mut altered = summary.clone();
+        altered.active_source_event_count += 1;
+        assert!(!altered.verify_integrity());
+
+        let wrong_scope = DerivedProjectionIndexV1::new("other-user", "session-1").unwrap();
+        assert_eq!(
+            wrong_scope.metamemory_summary(&ledger),
+            Err(TemporalProjectionRejectV1::WrongSession)
+        );
     }
 
     #[test]
