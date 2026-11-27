@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -53,6 +54,11 @@ func run() int {
 	var manifest custody.Manifest
 	if err := decoder.Decode(&manifest); err != nil {
 		fmt.Fprintf(os.Stderr, "decode manifest: %v\n", err)
+		return 65
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		fmt.Fprintln(os.Stderr, "manifest must contain exactly one JSON object")
 		return 65
 	}
 
