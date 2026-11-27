@@ -45,9 +45,14 @@ Fixtures cover:
 - superseding/cancel events;
 - unknown event kind and schema version;
 - invalid confidence and privacy class;
-- renderer crash/restart and reconnect.
+- renderer crash/restart and reconnect;
+- mixed clock domains and mismatched caller clock identity;
+- per-session event-budget exhaustion;
+- duplicate cancellation and cancellation of an unknown event;
+- action-specific control payloads containing forbidden extra fields;
+- privacy-labelled cues and redaction of generic accessibility text.
 
-**Hard gate:** 100% expected outcomes on deterministic positive and negative controls; zero accepted stale, replayed, cross-session, or causally backdated events. Invalid traces are excluded from quality averages and reported separately.
+**Hard gate:** 100% expected outcomes on deterministic positive and negative controls; zero accepted stale, replayed, cross-session, mixed-clock, over-budget, or causally backdated events. Invalid traces are excluded from quality averages and reported separately.
 
 ### E1 — Full-duplex conversational behavior
 
