@@ -51,11 +51,7 @@ fn prediction(sequence: u64, event: &str) -> StreamingPredictionReceiptV1 {
     receipt
 }
 
-fn eligibility(
-    sequence: u64,
-    event: &str,
-    outcome: f64,
-) -> LabelConsumptionEligibilityReportV1 {
+fn eligibility(sequence: u64, event: &str, outcome: f64) -> LabelConsumptionEligibilityReportV1 {
     let mut report = LabelConsumptionEligibilityReportV1 {
         schema: "luminous.semi-bench.label-consumption-report.v1".into(),
         label_id: format!("label-{sequence}"),
@@ -140,8 +136,8 @@ fn independent_hac_formula_matches_reported_bartlett_standard_error() {
 
     let mean = misses.iter().sum::<f64>() / misses.len() as f64;
     let centered = misses.map(|value| value - mean);
-    let gamma_zero = centered.iter().map(|value| value * value).sum::<f64>()
-        / centered.len() as f64;
+    let gamma_zero =
+        centered.iter().map(|value| value * value).sum::<f64>() / centered.len() as f64;
     let gamma_one = centered
         .iter()
         .skip(1)
@@ -153,9 +149,7 @@ fn independent_hac_formula_matches_reported_bartlett_standard_error() {
 
     assert_eq!(report.status, CoverageBacktestStatusV1::Complete);
     assert_eq!(report.estimand, CoverageEstimandV1::QualifiedObservedStream);
-    assert!(
-        (report.hac_standard_error.unwrap() - independent_oracle_se).abs() < 1.0e-12
-    );
+    assert!((report.hac_standard_error.unwrap() - independent_oracle_se).abs() < 1.0e-12);
     assert!(!report.iid_inference_claimed);
     assert!(!report.population_claim_authorized_by_qualified_subset_alone);
 }
@@ -169,8 +163,5 @@ fn positive_clustered_misses_produce_larger_hac_than_iid_standard_error() {
         .map(|(i, value)| observation(i as u64 + 1, *value))
         .collect::<Vec<_>>();
     let report = evaluate_realized_coverage_backtest_v1(&input(rows, 1)).unwrap();
-    assert!(
-        report.hac_standard_error.unwrap()
-            > report.iid_standard_error_diagnostic.unwrap()
-    );
+    assert!(report.hac_standard_error.unwrap() > report.iid_standard_error_diagnostic.unwrap());
 }
