@@ -46,8 +46,8 @@ A digest proves byte identity, not truth, independence, access control or correc
 ## 3. Contract prototype
 
 The new support module defines:
-- CandidateDecisionContext: decision-time evidence, permitted action set, context digest, budget, deadline, and a digest-bound decision objective (valuation mode, declared utility unit and loss-table reference where applicable). It also carries the canonical SHA-256 identities supplied by #13665/#11015: exact serialized ResearchState, evidence prefix, and permitted-action-offer list. These are upstream references, not a duplicated evidence graph or action-offer authority.
-- DecisionProposal: selected action identity, digest of the exact selected action payload (for example, the submitted design batch), prospective probability distribution, policy lineage, assignment mechanism and causal-design declaration.
+- CandidateDecisionContext: decision-time evidence, exact upstream offer IDs paired with their payload SHA-256 digests, context digest, budget, deadline, and a digest-bound decision objective (valuation mode, declared utility unit and loss-table reference where applicable). It also carries the canonical SHA-256 identities supplied by #13665/#11015: exact serialized ResearchState, evidence prefix, and permitted-action-offer list. These are upstream references, not a duplicated evidence graph or action-offer authority.
+- DecisionProposal: selected upstream offer ID, exact payload digest (which must match the upstream offer projection) (for example, the submitted design batch), prospective probability distribution, policy lineage, assignment mechanism and causal-design declaration.
 - EvaluatorResolution: evaluator-owned execution status, outcome-resolution state, recorded action ID plus exact payload digest, upstream execution/job receipt reference, evidence references and actual-cost completeness. `ActionSupport::RecordedAction` means the submitted action/payload was recorded; it does not imply that the scientific outcome has resolved. A recorded external action requires a nonempty upstream receipt reference; `not_run` and unsupported counterfactual states must not carry one.
 
 Candidate-visible types do not contain ground truth or future outcome labels. EvaluatorResolution is separate and must not be serialized into the candidate process input stream.
@@ -57,7 +57,8 @@ Validation covers:
 - referenced evidence artifact digests use the same explicit SHA-256 encoding;
 - no evidence became available after decision time;
 - every decision is bound to a frozen downstream decision/loss contract; raw entropy or information gain is not substituted for decision value;
-- selected actions belong to the permitted set;
+- selected action ID and exact payload digest must match one of the upstream #11015 AgentView offers;
+- randomized policy probability mass covers every permitted offer exactly once, including its exact payload digest;
 - the exact selected action payload digest is bound through later result resolution;
 - prospective probabilities sum exactly to one million parts per million;
 - randomized assignment records a complete probability distribution over permitted action identities and exact payload digests, with nonzero propensity for the selected action;
@@ -301,10 +302,10 @@ Implemented in this branch:
 - versioned AS-Bench batch payload SHA-256 over campaign, stage, manifest, ID field and exact ordered design IDs;
 - evaluator-owned resolution and distinct execution/outcome states;
 - validation for look-ahead evidence, action support, unsupported counterfactuals, delayed/censored/indeterminate outcomes and cost completeness;
-- fourteen authored decision-contract tests;
+- fifteen authored decision-contract tests;
 - custodian-only replay-archive/evaluator projection, BLAKE3 digests, opaque IDs, empty/disjoint-root checks, no-overwrite writes, manifest-last materialization and disk-readback checks;
 - decision-time observation-prefix builder with digest and out-of-range rejection;
-- nine authored custody/prefix tests, five AS-Bench payload tests, two materializer output-root tests and a capsule materializer example (30 authored unit tests across the new Rust files; 28 are covered by the standalone harness and the two materializer tests still await the production-example workspace build).
+- nine authored custody/prefix tests, five AS-Bench payload tests, two materializer output-root tests and a capsule materializer example (31 authored unit tests across the new Rust files; 29 are covered by the standalone harness and the two materializer tests still await the production-example workspace build).
 
 Not implemented or not yet verified:
 - the ten worlds have not been generated or split in this environment; the existing source seed split is public and is not a sealed confirmatory split;
