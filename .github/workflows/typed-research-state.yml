@@ -30,6 +30,14 @@ jobs:
           components: clippy, rustfmt
       - name: Check formatting
         run: cargo fmt --manifest-path research/typed-research-state/Cargo.toml -- --check
+      - name: Diagnose locked dependency graph without relaxing --locked
+        continue-on-error: true
+        run: |
+          lock=research/typed-research-state/Cargo.lock
+          cp "$lock" /tmp/typed-research-state-committed.lock
+          trap 'cp /tmp/typed-research-state-committed.lock "$lock"' EXIT
+          cargo generate-lockfile --manifest-path research/typed-research-state/Cargo.toml --offline
+          diff -u /tmp/typed-research-state-committed.lock "$lock" || true
       - name: Run locked validator tests
         run: cargo test --manifest-path research/typed-research-state/Cargo.toml --locked --all-targets
       - name: Run ResearchState examples

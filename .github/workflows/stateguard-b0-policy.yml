@@ -30,13 +30,25 @@ jobs:
           components: clippy, rustfmt
       - name: Check formatting
         run: cargo fmt --manifest-path research/stateguard-b0-policy/Cargo.toml -- --check
+      - name: Diagnose locked dependency graph without relaxing qualification
+        continue-on-error: true
+        run: |
+          lock=research/stateguard-b0-policy/Cargo.lock
+          cp "$lock" /tmp/stateguard-committed.lock
+          trap 'cp /tmp/stateguard-committed.lock "$lock"' EXIT
+          cargo generate-lockfile --manifest-path research/stateguard-b0-policy/Cargo.toml
+          diff -u /tmp/stateguard-committed.lock "$lock" || true
       - name: Run locked policy tests
         run: cargo test --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets
-      - name: Run synthetic policy input
+      - name: Reject synthetic fixture at production CLI
         run: |
-          cargo run --manifest-path research/stateguard-b0-policy/Cargo.toml --locked -- research/stateguard-b0-policy/fixtures/policy-input-synthetic-example-v0.1.json > /tmp/stateguard-decision.json
-          cat /tmp/stateguard-decision.json
-          jq -e '.disposition == "SELECTED" and .selected_offer_id == "classify-claim-a-ev-a1" and .selected_action_kind == "CLASSIFY_CLAIM_SOURCE"' /tmp/stateguard-decision.json
+          if cargo run --manifest-path research/stateguard-b0-policy/Cargo.toml --locked -- research/stateguard-b0-policy/fixtures/policy-input-synthetic-example-v0.1.json > /tmp/stateguard-decision.json 2> /tmp/stateguard-error.txt; then
+            echo "production CLI unexpectedly accepted a synthetic ResearchState" >&2
+            cat /tmp/stateguard-decision.json
+            exit 1
+          fi
+          cat /tmp/stateguard-error.txt
+          grep -F "synthetic ResearchState is not admissible at the production policy entrypoint" /tmp/stateguard-error.txt
       - name: Run strict Clippy
         run: cargo clippy --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets -- -D warnings
 

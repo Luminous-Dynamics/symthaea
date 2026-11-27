@@ -43,7 +43,7 @@ The caller must record these unchanged in the existing #11015 prospective trace.
 
 - `schemas/policy-input-v0.1.schema.json`: strict candidate input schema.
 - `schemas/policy-decision-v0.1.schema.json`: strict decision output schema.
-- `fixtures/policy-input-synthetic-example-v0.1.json`: replayable public-state input; expected to select the permitted claim-classification offer.
+- `fixtures/policy-input-synthetic-example-v0.1.json`: explicitly synthetic conformance input; it is consumed only by unit tests and must be rejected by the production CLI.
 - `src/lib.rs`: deterministic policy and 21 synthetic unit tests.
 - `src/bin/decide.rs`: JSON-in / JSON-out CLI.
 - `Cargo.lock`: pinned dependencies, including the typed ResearchState contract from the stacked base PR.
@@ -63,6 +63,12 @@ cargo clippy --manifest-path research/stateguard-b0-policy/Cargo.toml --locked -
 Before a claim-source relation can drive a decision, StateGuard requires the related artifact to be CAPTURED, have CLEAN integrity status, and have correction status NONE. FETCHED is not CAPTURED. UNKNOWN integrity/correction state and corrected/retracted/superseded sources require verification or recapture first.
 
 When a conflict requires an independent source, StateGuard selects only an upstream offer explicitly typed as SEEK_INDEPENDENT_SOURCE. The executor/custody owner must actually enforce and record source-family independence; StateGuard does not infer independence from a different URL or domain and does not create a lineage record itself.
+
+## Production-origin boundary
+
+The public `decide()` and JSON CLI entry points accept only a ResearchState whose declared origin is `PRODUCTION_PUBLIC_STATE`. The synthetic conformance fixture is deliberately rejected by the production CLI. Unit tests use a private helper to exercise the synthetic known-answer policy path without exposing a synthetic-mode command-line switch.
+
+This is an accidental-misuse guard, not authentication of the origin marker. The production AgentView adapter must still bind the projected state to its authorized upstream episode and evidence receipts; changing a JSON status field is not proof of provenance.
 
 ## Qualification and claim boundary
 

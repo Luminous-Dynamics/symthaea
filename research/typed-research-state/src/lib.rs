@@ -120,7 +120,11 @@ fn digest_string(
 ) -> Option<String> {
     let value = string(map, key, path, issues)?;
     if !is_digest(value) {
-        issue(issues, format!("{path}.{key}"), "expected lowercase SHA-256 hex");
+        issue(
+            issues,
+            format!("{path}.{key}"),
+            "expected lowercase SHA-256 hex",
+        );
         None
     } else {
         Some(value.to_owned())
@@ -218,7 +222,11 @@ fn validate_evidence(
     digest_string(map, "artifact_sha256", &path, issues);
     if let Some(source) = string(map, "canonical_source_ref", &path, issues) {
         if !(source.starts_with("https://") || source.starts_with("http://")) {
-            issue(issues, format!("{path}.canonical_source_ref"), "source URI must use HTTP(S)");
+            issue(
+                issues,
+                format!("{path}.canonical_source_ref"),
+                "source URI must use HTTP(S)",
+            );
         }
     }
     for key in ["published_at", "captured_at"] {
@@ -234,7 +242,12 @@ fn validate_evidence(
         if let Some(lineage) = object(lineage_value, &format!("{path}.source_lineage"), issues) {
             match lineage.get("status").and_then(Value::as_str) {
                 Some("UNKNOWN") => {
-                    exact_keys(lineage, &["status"], &format!("{path}.source_lineage"), issues);
+                    exact_keys(
+                        lineage,
+                        &["status"],
+                        &format!("{path}.source_lineage"),
+                        issues,
+                    );
                 }
                 Some("KNOWN") => {
                     exact_keys(
@@ -243,8 +256,13 @@ fn validate_evidence(
                         &format!("{path}.source_lineage"),
                         issues,
                     );
-                    family = string(lineage, "family_ref", &format!("{path}.source_lineage"), issues)
-                        .map(str::to_owned);
+                    family = string(
+                        lineage,
+                        "family_ref",
+                        &format!("{path}.source_lineage"),
+                        issues,
+                    )
+                    .map(str::to_owned);
                 }
                 _ => issue(
                     issues,
@@ -254,7 +272,11 @@ fn validate_evidence(
             }
         }
     } else {
-        issue(issues, format!("{path}.source_lineage"), "missing source lineage state");
+        issue(
+            issues,
+            format!("{path}.source_lineage"),
+            "missing source lineage state",
+        );
     }
 
     if let Some(role) = string(map, "source_role", &path, issues) {
@@ -264,22 +286,46 @@ fn validate_evidence(
     }
     if let Some(state) = string(map, "integrity_status", &path, issues) {
         if !["UNKNOWN", "CLEAN", "COMPROMISED", "MISSING"].contains(&state) {
-            issue(issues, format!("{path}.integrity_status"), "unknown integrity state");
+            issue(
+                issues,
+                format!("{path}.integrity_status"),
+                "unknown integrity state",
+            );
         }
     }
     if let Some(state) = string(map, "correction_status", &path, issues) {
         if !["UNKNOWN", "NONE", "CORRECTED", "RETRACTED", "SUPERSEDED"].contains(&state) {
-            issue(issues, format!("{path}.correction_status"), "unknown correction state");
+            issue(
+                issues,
+                format!("{path}.correction_status"),
+                "unknown correction state",
+            );
         }
     }
     if let Some(state) = string(map, "retrieval_state", &path, issues) {
-        if !["NOT_FOUND", "FETCHED", "CAPTURED", "DIGEST_MISMATCH", "UNATTRIBUTED"].contains(&state) {
-            issue(issues, format!("{path}.retrieval_state"), "unknown retrieval state");
+        if ![
+            "NOT_FOUND",
+            "FETCHED",
+            "CAPTURED",
+            "DIGEST_MISMATCH",
+            "UNATTRIBUTED",
+        ]
+        .contains(&state)
+        {
+            issue(
+                issues,
+                format!("{path}.retrieval_state"),
+                "unknown retrieval state",
+            );
         }
     }
     if let Some(id) = id {
         if ids.insert(id.clone(), family).is_some() {
-            issue(issues, format!("{path}.evidence_id"), "duplicate evidence ID");
+            issue(
+                issues,
+                format!("{path}.evidence_id"),
+                "duplicate evidence ID",
+            );
         }
     }
 }
@@ -309,11 +355,19 @@ fn validate_classifier(
     digest_string(map, "output_digest", path, issues);
     let confidence = map.get("confidence").and_then(Value::as_f64);
     if !confidence.is_some_and(|value| value.is_finite() && (0.0..=1.0).contains(&value)) {
-        issue(issues, format!("{path}.confidence"), "classifier confidence must be finite and in [0,1]");
+        issue(
+            issues,
+            format!("{path}.confidence"),
+            "classifier confidence must be finite and in [0,1]",
+        );
     }
     if let Some(time) = string(map, "emitted_at", path, issues) {
         if !valid_time(time) {
-            issue(issues, format!("{path}.emitted_at"), "invalid RFC3339 timestamp");
+            issue(
+                issues,
+                format!("{path}.emitted_at"),
+                "invalid RFC3339 timestamp",
+            );
         }
     }
     let actual_prefix = digest_string(map, "evidence_prefix_sha256", path, issues);
@@ -378,12 +432,23 @@ fn validate_relation(
     ];
     exact_keys(map, KEYS, &path, issues);
     if string(map, "claim_id", &path, issues) != Some(context.claim_id) {
-        issue(issues, format!("{path}.claim_id"), "relation claim_id must match containing claim");
+        issue(
+            issues,
+            format!("{path}.claim_id"),
+            "relation claim_id must match containing claim",
+        );
     }
     let evidence_id = string(map, "evidence_id", &path, issues).map(str::to_owned);
-    let family = evidence_id.as_ref().and_then(|id| context.evidence_ids.get(id)).cloned();
+    let family = evidence_id
+        .as_ref()
+        .and_then(|id| context.evidence_ids.get(id))
+        .cloned();
     if family.is_none() {
-        issue(issues, format!("{path}.evidence_id"), "relation references missing evidence");
+        issue(
+            issues,
+            format!("{path}.evidence_id"),
+            "relation references missing evidence",
+        );
     }
     let relation = string(map, "relation", &path, issues);
     if let Some(relation) = relation {
@@ -397,7 +462,11 @@ fn validate_relation(
         ]
         .contains(&relation)
         {
-            issue(issues, format!("{path}.relation"), "unknown claim-source relation");
+            issue(
+                issues,
+                format!("{path}.relation"),
+                "unknown claim-source relation",
+            );
         }
         // Known lineage uses the authoritative source-family reference.
         // Unknown lineage still remains a distinct observed source for conflict
@@ -406,8 +475,11 @@ fn validate_relation(
             Some(Some(value)) => Some(value.clone()),
             _ => None,
         };
-        let origin = known_family
-            .or_else(|| evidence_id.as_ref().map(|id| format!("unknown-origin:{id}")));
+        let origin = known_family.or_else(|| {
+            evidence_id
+                .as_ref()
+                .map(|id| format!("unknown-origin:{id}"))
+        });
         if relation == "SUPPORTS" {
             if let Some(origin) = origin.as_ref() {
                 context.supports.insert(origin.clone());
@@ -420,7 +492,11 @@ fn validate_relation(
         }
     }
 
-    match (relation, map.get("classifier_provenance"), map.get("quote_span")) {
+    match (
+        relation,
+        map.get("classifier_provenance"),
+        map.get("quote_span"),
+    ) {
         (Some("UNCLASSIFIED"), Some(Value::Null), Some(Value::Null)) => {}
         (Some("UNCLASSIFIED"), _, _) => issue(
             issues,
@@ -474,9 +550,18 @@ fn validate_adjudication(
     exact_keys(map, KEYS, path, issues);
     match map.get("status").and_then(Value::as_str) {
         Some("NOT_ADJUDICATED") => {
-            for key in ["result", "authority_id", "evidence_reference", "adjudicated_at"] {
+            for key in [
+                "result",
+                "authority_id",
+                "evidence_reference",
+                "adjudicated_at",
+            ] {
                 if map.get(key) != Some(&Value::Null) {
-                    issue(issues, format!("{path}.{key}"), "NOT_ADJUDICATED requires null fields");
+                    issue(
+                        issues,
+                        format!("{path}.{key}"),
+                        "NOT_ADJUDICATED requires null fields",
+                    );
                 }
             }
             (false, None)
@@ -486,7 +571,11 @@ fn validate_adjudication(
             if !result.as_deref().is_some_and(|value| {
                 ["SUPPORTED", "REFUTED", "MIXED", "UNDECIDABLE"].contains(&value)
             }) {
-                issue(issues, format!("{path}.result"), "unknown adjudication result");
+                issue(
+                    issues,
+                    format!("{path}.result"),
+                    "unknown adjudication result",
+                );
             }
             let authority = string(map, "authority_id", path, issues).map(str::to_owned);
             if let Some(authority) = authority.as_ref() {
@@ -501,13 +590,21 @@ fn validate_adjudication(
             string(map, "evidence_reference", path, issues);
             if let Some(time) = string(map, "adjudicated_at", path, issues) {
                 if !valid_time(time) {
-                    issue(issues, format!("{path}.adjudicated_at"), "invalid RFC3339 timestamp");
+                    issue(
+                        issues,
+                        format!("{path}.adjudicated_at"),
+                        "invalid RFC3339 timestamp",
+                    );
                 }
             }
             (true, result)
         }
         _ => {
-            issue(issues, format!("{path}.status"), "adjudication status must be ADJUDICATED or NOT_ADJUDICATED");
+            issue(
+                issues,
+                format!("{path}.status"),
+                "adjudication status must be ADJUDICATED or NOT_ADJUDICATED",
+            );
             (false, None)
         }
     }
@@ -545,16 +642,28 @@ fn validate_usability(
         ]
         .contains(&value)
     }) {
-        issue(issues, format!("{path}.status"), "unknown decision-usability status");
+        issue(
+            issues,
+            format!("{path}.status"),
+            "unknown decision-usability status",
+        );
     }
     if string(map, "decision_scope_id", path, issues) != Some(context.decision_id) {
-        issue(issues, format!("{path}.decision_scope_id"), "usability must be scoped to the active decision");
+        issue(
+            issues,
+            format!("{path}.decision_scope_id"),
+            "usability must be scoped to the active decision",
+        );
     }
     string(map, "policy_id", path, issues);
     if let Some(codes) = array(map, "reason_codes", path, issues) {
         for (index, code) in codes.iter().enumerate() {
             if code.as_str().is_none_or(|value| value.trim().is_empty()) {
-                issue(issues, format!("{path}.reason_codes[{index}]"), "reason code must be non-empty");
+                issue(
+                    issues,
+                    format!("{path}.reason_codes[{index}]"),
+                    "reason code must be non-empty",
+                );
             }
         }
     }
@@ -566,7 +675,11 @@ fn validate_usability(
         );
     }
     if status == Some("SUFFICIENT") && context.has_conflict {
-        issue(issues, format!("{path}.status"), "conflicting support/refutation cannot be decision-sufficient");
+        issue(
+            issues,
+            format!("{path}.status"),
+            "conflicting support/refutation cannot be decision-sufficient",
+        );
     }
     if status == Some("SUFFICIENT")
         && ["HIGH", "CRITICAL"].contains(&context.risk_class)
@@ -651,7 +764,11 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
     if string(root, "schema_version", "$", &mut issues)
         != Some("symthaea-public-research-state-v0.1")
     {
-        issue(&mut issues, "$.schema_version", "unsupported schema version");
+        issue(
+            &mut issues,
+            "$.schema_version",
+            "unsupported schema version",
+        );
     }
     if !string(root, "status", "$", &mut issues).is_some_and(|status| {
         [
@@ -675,21 +792,39 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
     };
     exact_keys(
         prefix,
-        &["prefix_id", "prefix_sha256", "lineage_snapshot_ref", "sequence_number"],
+        &[
+            "prefix_id",
+            "prefix_sha256",
+            "lineage_snapshot_ref",
+            "sequence_number",
+        ],
         "$.evidence_prefix",
         &mut issues,
     );
     string(prefix, "prefix_id", "$.evidence_prefix", &mut issues);
     let prefix_sha256 = digest_string(prefix, "prefix_sha256", "$.evidence_prefix", &mut issues)
         .unwrap_or_default();
-    string(prefix, "lineage_snapshot_ref", "$.evidence_prefix", &mut issues);
+    string(
+        prefix,
+        "lineage_snapshot_ref",
+        "$.evidence_prefix",
+        &mut issues,
+    );
     let sequence_number = prefix.get("sequence_number").and_then(Value::as_u64);
     if sequence_number.is_none() {
-        issue(&mut issues, "$.evidence_prefix.sequence_number", "expected non-negative sequence number");
+        issue(
+            &mut issues,
+            "$.evidence_prefix.sequence_number",
+            "expected non-negative sequence number",
+        );
     }
 
     let Some(decision_value) = root.get("decision_context") else {
-        issue(&mut issues, "$.decision_context", "missing decision context");
+        issue(
+            &mut issues,
+            "$.decision_context",
+            "missing decision context",
+        );
         return Err(issues);
     };
     let Some(decision) = object(decision_value, "$.decision_context", &mut issues) else {
@@ -705,16 +840,29 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
         .unwrap_or_default()
         .to_owned();
     string(decision, "question", "$.decision_context", &mut issues);
-    if let Some(time) = string(decision, "reference_time", "$.decision_context", &mut issues) {
+    if let Some(time) = string(
+        decision,
+        "reference_time",
+        "$.decision_context",
+        &mut issues,
+    ) {
         if !valid_time(time) {
-            issue(&mut issues, "$.decision_context.reference_time", "invalid RFC3339 timestamp");
+            issue(
+                &mut issues,
+                "$.decision_context.reference_time",
+                "invalid RFC3339 timestamp",
+            );
         }
     }
     let risk_class = string(decision, "risk_class", "$.decision_context", &mut issues)
         .unwrap_or_default()
         .to_owned();
     if !["LOW", "MODERATE", "HIGH", "CRITICAL"].contains(&risk_class.as_str()) {
-        issue(&mut issues, "$.decision_context.risk_class", "unknown risk class");
+        issue(
+            &mut issues,
+            "$.decision_context.risk_class",
+            "unknown risk class",
+        );
     }
 
     let Some(evidence) = array(root, "evidence", "$", &mut issues) else {
@@ -766,7 +914,11 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
             .unwrap_or_default()
             .to_owned();
         if !claim_ids.insert(claim_id.clone()) {
-            issue(&mut issues, format!("{path}.claim_id"), "duplicate claim ID");
+            issue(
+                &mut issues,
+                format!("{path}.claim_id"),
+                "duplicate claim ID",
+            );
         }
         let statement = string(claim, "statement", &path, &mut issues).unwrap_or_default();
         if let Some(scope_value) = claim.get("scope") {
@@ -784,20 +936,24 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
                 }
             }
         } else {
-            issue(&mut issues, format!("{path}.scope"), "claim scope is required");
+            issue(
+                &mut issues,
+                format!("{path}.scope"),
+                "claim scope is required",
+            );
         }
-        let reference_time = string(claim, "reference_time", &path, &mut issues).unwrap_or_default();
+        let reference_time =
+            string(claim, "reference_time", &path, &mut issues).unwrap_or_default();
         if !valid_time(reference_time) {
-            issue(&mut issues, format!("{path}.reference_time"), "invalid RFC3339 timestamp");
+            issue(
+                &mut issues,
+                format!("{path}.reference_time"),
+                "invalid RFC3339 timestamp",
+            );
         }
         let null_scope = Value::Null;
         let scope_value = claim.get("scope").unwrap_or(&null_scope);
-        let claim_sha256 = scoped_claim_sha256(
-            &claim_id,
-            statement,
-            scope_value,
-            reference_time,
-        );
+        let claim_sha256 = scoped_claim_sha256(&claim_id, statement, scope_value, reference_time);
 
         let mut pair_ids = HashSet::new();
         let mut classifier_ids = HashSet::new();
@@ -837,9 +993,15 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
         let adjudication_path = format!("{path}.truth_adjudication");
         let adjudication = claim.get("truth_adjudication");
         let (adjudicated, result) = match adjudication {
-            Some(value) => validate_adjudication(value, &adjudication_path, &classifier_ids, &mut issues),
+            Some(value) => {
+                validate_adjudication(value, &adjudication_path, &classifier_ids, &mut issues)
+            }
             None => {
-                issue(&mut issues, &adjudication_path, "truth adjudication field is required");
+                issue(
+                    &mut issues,
+                    &adjudication_path,
+                    "truth adjudication field is required",
+                );
                 (false, None)
             }
         };
@@ -861,7 +1023,11 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
                 &mut issues,
             );
         } else {
-            issue(&mut issues, format!("{path}.decision_usability"), "decision usability is required");
+            issue(
+                &mut issues,
+                format!("{path}.decision_usability"),
+                "decision usability is required",
+            );
         }
     }
 
@@ -894,19 +1060,34 @@ pub fn validate_examples() -> Result<ExamplesReport, Vec<ValidationIssue>> {
     };
     exact_keys(
         root,
-        &["schema_version", "status", "created_at", "issue", "owner", "examples"],
+        &[
+            "schema_version",
+            "status",
+            "created_at",
+            "issue",
+            "owner",
+            "examples",
+        ],
         "examples",
         &mut issues,
     );
     if string(root, "schema_version", "examples", &mut issues)
         != Some("symthaea-public-research-state-v0.1")
     {
-        issue(&mut issues, "examples.schema_version", "unexpected example schema");
+        issue(
+            &mut issues,
+            "examples.schema_version",
+            "unexpected example schema",
+        );
     }
     if string(root, "status", "examples", &mut issues)
         != Some("SYNTHETIC_CONFORMANCE_EXAMPLES_NOT_PRODUCTION_STATE")
     {
-        issue(&mut issues, "examples.status", "examples must remain synthetic");
+        issue(
+            &mut issues,
+            "examples.status",
+            "examples must remain synthetic",
+        );
     }
     string(root, "created_at", "examples", &mut issues);
     string(root, "owner", "examples", &mut issues);
@@ -917,7 +1098,11 @@ pub fn validate_examples() -> Result<ExamplesReport, Vec<ValidationIssue>> {
         return Err(issues);
     };
     if examples.len() < 4 {
-        issue(&mut issues, "examples.examples", "at least four conformance examples are required");
+        issue(
+            &mut issues,
+            "examples.examples",
+            "at least four conformance examples are required",
+        );
     }
 
     let mut ids = HashSet::new();
@@ -932,7 +1117,11 @@ pub fn validate_examples() -> Result<ExamplesReport, Vec<ValidationIssue>> {
         exact_keys(map, &["fixture_id", "state"], &path, &mut issues);
         if let Some(id) = string(map, "fixture_id", &path, &mut issues) {
             if !ids.insert(id.to_owned()) {
-                issue(&mut issues, format!("{path}.fixture_id"), "duplicate example ID");
+                issue(
+                    &mut issues,
+                    format!("{path}.fixture_id"),
+                    "duplicate example ID",
+                );
             }
         }
         if let Some(state) = map.get("state") {
@@ -953,7 +1142,11 @@ pub fn validate_examples() -> Result<ExamplesReport, Vec<ValidationIssue>> {
                 }
             }
         } else {
-            issue(&mut issues, format!("{path}.state"), "state object is required");
+            issue(
+                &mut issues,
+                format!("{path}.state"),
+                "state object is required",
+            );
         }
     }
 
@@ -1142,8 +1335,7 @@ mod tests {
             .as_array_mut()
             .unwrap()
             .push(second_relation);
-        state["claims"][0]["decision_usability"]["status"] =
-            Value::String("SUFFICIENT".to_owned());
+        state["claims"][0]["decision_usability"]["status"] = Value::String("SUFFICIENT".to_owned());
 
         assert!(validate_state(&state.to_string()).is_err());
     }
@@ -1151,8 +1343,7 @@ mod tests {
     #[test]
     fn unclassified_retrieval_cannot_be_marked_sufficient() {
         let mut state = first_state();
-        state["claims"][0]["decision_usability"]["status"] =
-            Value::String("SUFFICIENT".to_owned());
+        state["claims"][0]["decision_usability"]["status"] = Value::String("SUFFICIENT".to_owned());
         assert!(validate_state(&state.to_string()).is_err());
     }
 
