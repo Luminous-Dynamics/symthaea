@@ -117,13 +117,22 @@ impl fmt::Display for UrlPolicyRejection {
                 f.write_str("URL_POLICY_REJECTED: embedded URL credentials are forbidden")
             }
             Self::DisallowedPort(port) => {
-                write!(f, "URL_POLICY_REJECTED: destination port {port} is not allowed")
+                write!(
+                    f,
+                    "URL_POLICY_REJECTED: destination port {port} is not allowed"
+                )
             }
             Self::LocalOnlyHostname(host) => {
-                write!(f, "URL_POLICY_REJECTED: local-only hostname {host} is forbidden")
+                write!(
+                    f,
+                    "URL_POLICY_REJECTED: local-only hostname {host} is forbidden"
+                )
             }
             Self::ForbiddenIpLiteral(ip) => {
-                write!(f, "URL_POLICY_REJECTED: non-public IP literal {ip} is forbidden")
+                write!(
+                    f,
+                    "URL_POLICY_REJECTED: non-public IP literal {ip} is forbidden"
+                )
             }
         }
     }
@@ -138,7 +147,11 @@ pub struct RedirectPolicyRejection {
 
 impl fmt::Display for RedirectPolicyRejection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "REDIRECT_REJECTED: HTTP {} redirect was not followed", self.status)
+        write!(
+            f,
+            "REDIRECT_REJECTED: HTTP {} redirect was not followed",
+            self.status
+        )
     }
 }
 
@@ -158,10 +171,16 @@ impl fmt::Display for DnsPolicyRejection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LocalOnlyHostname(host) => {
-                write!(f, "DNS_POLICY_REJECTED: local-only hostname {host} is forbidden")
+                write!(
+                    f,
+                    "DNS_POLICY_REJECTED: local-only hostname {host} is forbidden"
+                )
             }
             Self::EmptyAnswerSet(host) => {
-                write!(f, "DNS_POLICY_REJECTED: {host} returned no destination addresses")
+                write!(
+                    f,
+                    "DNS_POLICY_REJECTED: {host} returned no destination addresses"
+                )
             }
             Self::NonPublicAnswerSet {
                 hostname,
@@ -179,7 +198,8 @@ impl Error for DnsPolicyRejection {}
 /// URL-level checks catch IP literals (which do not pass through DNS), credentials,
 /// local-only hostnames, unsupported schemes and non-default destination ports.
 pub fn validate_request_url(input: &str) -> Result<Url, UrlPolicyRejection> {
-    let url = Url::parse(input).map_err(|error| UrlPolicyRejection::InvalidUrl(error.to_string()))?;
+    let url =
+        Url::parse(input).map_err(|error| UrlPolicyRejection::InvalidUrl(error.to_string()))?;
     let expected_port = match url.scheme() {
         "http" => 80,
         "https" => 443,
@@ -211,7 +231,11 @@ pub fn validate_request_url(input: &str) -> Result<Url, UrlPolicyRejection> {
             return Err(UrlPolicyRejection::LocalOnlyHostname(host.to_string()));
         }
         Some(_) => {}
-        None => return Err(UrlPolicyRejection::InvalidUrl("URL has no host".to_string())),
+        None => {
+            return Err(UrlPolicyRejection::InvalidUrl(
+                "URL has no host".to_string(),
+            ));
+        }
     }
 
     Ok(url)
@@ -219,9 +243,9 @@ pub fn validate_request_url(input: &str) -> Result<Url, UrlPolicyRejection> {
 
 fn is_local_only_hostname(hostname: &str) -> bool {
     let normalized = hostname.trim_end_matches('.').to_ascii_lowercase();
-    LOCAL_HOST_SUFFIXES.iter().any(|suffix| {
-        normalized == *suffix || normalized.ends_with(&format!(".{suffix}"))
-    })
+    LOCAL_HOST_SUFFIXES
+        .iter()
+        .any(|suffix| normalized == *suffix || normalized.ends_with(&format!(".{suffix}")))
 }
 
 /// Conservative destination allow policy.
@@ -233,14 +257,19 @@ fn is_local_only_hostname(hostname: &str) -> bool {
 pub fn is_public_destination(address: IpAddr) -> bool {
     match address {
         IpAddr::V4(ip) => {
-            if ip.is_private() || ip.is_loopback() || ip.is_link_local()
-                || ip.is_unspecified() || ip.is_multicast()
+            if ip.is_private()
+                || ip.is_loopback()
+                || ip.is_link_local()
+                || ip.is_unspecified()
+                || ip.is_multicast()
                 || ip == Ipv4Addr::BROADCAST
             {
                 return false;
             }
             !IPV4_SPECIAL_USE.iter().any(|(network, prefix)| {
-                network.parse::<Ipv4Addr>().is_ok_and(|base| ipv4_in_prefix(ip, base, *prefix))
+                network
+                    .parse::<Ipv4Addr>()
+                    .is_ok_and(|base| ipv4_in_prefix(ip, base, *prefix))
             })
         }
         IpAddr::V6(ip) => {
@@ -250,7 +279,9 @@ pub fn is_public_destination(address: IpAddr) -> bool {
                 return false;
             }
             !IPV6_SPECIAL_USE.iter().any(|(network, prefix)| {
-                network.parse::<Ipv6Addr>().is_ok_and(|base| ipv6_in_prefix(ip, base, *prefix))
+                network
+                    .parse::<Ipv6Addr>()
+                    .is_ok_and(|base| ipv6_in_prefix(ip, base, *prefix))
             }) && value != 0
         }
     }
@@ -272,8 +303,7 @@ fn ipv6_in_prefix(address: Ipv6Addr, network: Ipv6Addr, prefix: u8) -> bool {
     (u128::from(address) & mask) == (u128::from(network) & mask)
 }
 
-pub type LookupFuture =
-    Pin<Box<dyn Future<Output = io::Result<Vec<SocketAddr>>> + Send + 'static>>;
+pub type LookupFuture = Pin<Box<dyn Future<Output = io::Result<Vec<SocketAddr>>> + Send + 'static>>;
 
 /// Injectable raw hostname lookup. Implementations must return the complete A/AAAA
 /// answer set for one lookup attempt, not a pre-filtered subset.
@@ -325,7 +355,9 @@ impl Resolve for GuardedDnsResolver {
         let lookup = self.lookup.clone();
         Box::pin(async move {
             if is_local_only_hostname(&hostname) {
-                return Err(Box::new(DnsPolicyRejection::LocalOnlyHostname(hostname)) as ResolverError);
+                return Err(
+                    Box::new(DnsPolicyRejection::LocalOnlyHostname(hostname)) as ResolverError
+                );
             }
 
             let addresses = lookup.lookup(hostname.clone()).await?;
@@ -353,12 +385,16 @@ impl Resolve for GuardedDnsResolver {
 
 /// Classify typed URL-policy failures carried through anyhow context.
 pub fn is_url_policy_rejection_anyhow(error: &anyhow::Error) -> bool {
-    error.chain().any(|cause| cause.downcast_ref::<UrlPolicyRejection>().is_some())
+    error
+        .chain()
+        .any(|cause| cause.downcast_ref::<UrlPolicyRejection>().is_some())
 }
 
 /// Classify typed DNS-policy failures carried through anyhow context.
 pub fn is_dns_policy_rejection_anyhow(error: &anyhow::Error) -> bool {
-    error.chain().any(|cause| cause.downcast_ref::<DnsPolicyRejection>().is_some())
+    error
+        .chain()
+        .any(|cause| cause.downcast_ref::<DnsPolicyRejection>().is_some())
 }
 
 /// Refuse every 3xx response consistently. The client is configured with
@@ -376,7 +412,9 @@ pub fn reject_redirect_response(response: reqwest::Response) -> anyhow::Result<r
 
 /// Classify typed redirect rejections carried through anyhow context.
 pub fn is_redirect_policy_rejection_anyhow(error: &anyhow::Error) -> bool {
-    error.chain().any(|cause| cause.downcast_ref::<RedirectPolicyRejection>().is_some())
+    error
+        .chain()
+        .any(|cause| cause.downcast_ref::<RedirectPolicyRejection>().is_some())
 }
 
 /// Used to classify policy failures in the acquisition receipt without turning
@@ -414,7 +452,12 @@ mod tests {
 
     impl HostLookup for StubLookup {
         fn lookup(&self, _hostname: String) -> LookupFuture {
-            let result = self.answers.lock().expect("stub lock").pop_front().unwrap_or_default();
+            let result = self
+                .answers
+                .lock()
+                .expect("stub lock")
+                .pop_front()
+                .unwrap_or_default();
             Box::pin(async move { Ok(result) })
         }
     }
@@ -432,23 +475,35 @@ mod tests {
     }
 
     fn socket(address: &str) -> SocketAddr {
-        format!("{address}:0").parse().expect("valid socket address")
+        format!("{address}:0")
+            .parse()
+            .expect("valid socket address")
     }
 
     fn last_ipv4(network: Ipv4Addr, prefix: u8) -> Ipv4Addr {
-        let mask = if prefix == 0 { 0 } else { u32::MAX << (32 - u32::from(prefix)) };
+        let mask = if prefix == 0 {
+            0
+        } else {
+            u32::MAX << (32 - u32::from(prefix))
+        };
         Ipv4Addr::from(u32::from(network) | !mask)
     }
 
     fn last_ipv6(network: Ipv6Addr, prefix: u8) -> Ipv6Addr {
-        let mask = if prefix == 0 { 0 } else { u128::MAX << (128 - u32::from(prefix)) };
+        let mask = if prefix == 0 {
+            0
+        } else {
+            u128::MAX << (128 - u32::from(prefix))
+        };
         Ipv6Addr::from(u128::from(network) | !mask)
     }
 
     #[test]
     fn allows_global_unicast_v4_and_v6() {
         assert!(is_public_destination("8.8.8.8".parse().unwrap()));
-        assert!(is_public_destination("2606:4700:4700::1111".parse().unwrap()));
+        assert!(is_public_destination(
+            "2606:4700:4700::1111".parse().unwrap()
+        ));
     }
 
     #[test]
@@ -456,8 +511,14 @@ mod tests {
         for (network, prefix) in IPV4_SPECIAL_USE {
             let address = network.parse::<Ipv4Addr>().unwrap();
             let last = last_ipv4(address, *prefix);
-            assert!(!is_public_destination(IpAddr::V4(address)), "start {network}/{prefix}");
-            assert!(!is_public_destination(IpAddr::V4(last)), "end {network}/{prefix}: {last}");
+            assert!(
+                !is_public_destination(IpAddr::V4(address)),
+                "start {network}/{prefix}"
+            );
+            assert!(
+                !is_public_destination(IpAddr::V4(last)),
+                "end {network}/{prefix}: {last}"
+            );
         }
     }
 
@@ -466,8 +527,14 @@ mod tests {
         for (network, prefix) in IPV6_SPECIAL_USE {
             let address = network.parse::<Ipv6Addr>().unwrap();
             let last = last_ipv6(address, *prefix);
-            assert!(!is_public_destination(IpAddr::V6(address)), "start {network}/{prefix}");
-            assert!(!is_public_destination(IpAddr::V6(last)), "end {network}/{prefix}: {last}");
+            assert!(
+                !is_public_destination(IpAddr::V6(address)),
+                "start {network}/{prefix}"
+            );
+            assert!(
+                !is_public_destination(IpAddr::V6(last)),
+                "end {network}/{prefix}: {last}"
+            );
         }
         assert!(!is_public_destination("ff02::1".parse().unwrap()));
         assert!(!is_public_destination("fe80::1".parse().unwrap()));
@@ -478,7 +545,8 @@ mod tests {
     #[tokio::test]
     async fn pins_exact_validated_public_dns_answer_set() {
         let expected = vec![socket("8.8.8.8"), socket("1.1.1.1")];
-        let resolver = GuardedDnsResolver::with_lookup(StubLookup::with_answers(vec![expected.clone()]));
+        let resolver =
+            GuardedDnsResolver::with_lookup(StubLookup::with_answers(vec![expected.clone()]));
         let actual = resolve(&resolver, "public.example").await.unwrap();
         assert_eq!(actual, expected);
     }
@@ -507,18 +575,28 @@ mod tests {
     #[tokio::test]
     async fn rejects_empty_answer_set() {
         let resolver = GuardedDnsResolver::with_lookup(StubLookup::with_answers(vec![Vec::new()]));
-        assert!(resolve(&resolver, "empty.example").await.unwrap_err().contains("DNS_POLICY_REJECTED"));
+        assert!(
+            resolve(&resolver, "empty.example")
+                .await
+                .unwrap_err()
+                .contains("DNS_POLICY_REJECTED")
+        );
     }
 
     #[tokio::test]
     async fn validates_each_resolution_attempt_against_dns_rebinding() {
-        let answers = vec![
-            vec![socket("8.8.8.8")],
-            vec![socket("127.0.0.1")],
-        ];
+        let answers = vec![vec![socket("8.8.8.8")], vec![socket("127.0.0.1")]];
         let resolver = GuardedDnsResolver::with_lookup(StubLookup::with_answers(answers));
-        assert_eq!(resolve(&resolver, "rebind.example").await.unwrap(), vec![socket("8.8.8.8")]);
-        assert!(resolve(&resolver, "rebind.example").await.unwrap_err().contains("DNS_POLICY_REJECTED"));
+        assert_eq!(
+            resolve(&resolver, "rebind.example").await.unwrap(),
+            vec![socket("8.8.8.8")]
+        );
+        assert!(
+            resolve(&resolver, "rebind.example")
+                .await
+                .unwrap_err()
+                .contains("DNS_POLICY_REJECTED")
+        );
     }
 
     #[test]
