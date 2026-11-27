@@ -9,8 +9,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::music_performance_identity::{
-    MusicalPerformanceIdentityCaseV1, MusicalPerformanceIdentityReportV1,
-    MusicalIdentityTriadResultV1, audit_musical_performance_identity,
+    MusicalIdentityTriadResultV1, MusicalPerformanceIdentityCaseV1,
+    MusicalPerformanceIdentityReportV1, audit_musical_performance_identity,
 };
 
 const CASE_SCHEMA_V1: &str = "mel-music-performance-identity-comparison-v1";
@@ -140,7 +140,10 @@ pub fn audit_paired_musical_identity_comparison(
     case: &PairedMusicalIdentityComparisonCaseV1,
 ) -> Result<PairedMusicalIdentityComparisonReportV1, String> {
     if case.schema != CASE_SCHEMA_V1 {
-        return Err(format!("unsupported paired comparison schema: {}", case.schema));
+        return Err(format!(
+            "unsupported paired comparison schema: {}",
+            case.schema
+        ));
     }
     validate_policy(&case.inference_policy)?;
     validate_pair_structure(&case.baseline, &case.candidate)?;
@@ -154,11 +157,7 @@ pub fn audit_paired_musical_identity_comparison(
 
     let baseline_results = index_results(&baseline_report)?;
     let candidate_results = index_results(&candidate_report)?;
-    let clusters = paired_cluster_outcomes(
-        &baseline_results,
-        &candidate_results,
-        &case.baseline,
-    )?;
+    let clusters = paired_cluster_outcomes(&baseline_results, &candidate_results, &case.baseline)?;
     let cluster_count = clusters.len();
     if cluster_count == 0 {
         return Err("paired comparison has no source-work clusters".into());
@@ -236,9 +235,7 @@ fn validate_policy(policy: &PairedInferencePolicyV1) -> Result<(), String> {
     if !(100..=100_000).contains(&policy.bootstrap_replicates) {
         return Err("bootstrap_replicates must be between 100 and 100000".into());
     }
-    if !policy.confidence_level.is_finite()
-        || !(0.80..0.999).contains(&policy.confidence_level)
-    {
+    if !policy.confidence_level.is_finite() || !(0.80..0.999).contains(&policy.confidence_level) {
         return Err("confidence_level must be finite and in [0.80, 0.999)".into());
     }
     Ok(())
@@ -298,11 +295,17 @@ fn validate_pair_structure(
 
 fn triad_map<'a>(
     case: &'a MusicalPerformanceIdentityCaseV1,
-) -> Result<BTreeMap<&'a str, &'a crate::music_performance_identity::MusicalPerformanceIdentityTriadV1>, String> {
+) -> Result<
+    BTreeMap<&'a str, &'a crate::music_performance_identity::MusicalPerformanceIdentityTriadV1>,
+    String,
+> {
     let mut output = BTreeMap::new();
     for triad in &case.triads {
         if output.insert(triad.item_id.as_str(), triad).is_some() {
-            return Err(format!("duplicate item_id in paired comparison: {}", triad.item_id));
+            return Err(format!(
+                "duplicate item_id in paired comparison: {}",
+                triad.item_id
+            ));
         }
     }
     Ok(output)
@@ -334,7 +337,10 @@ fn index_results<'a>(
     let mut output = BTreeMap::new();
     for result in &report.triad_results {
         if output.insert(result.item_id.as_str(), result).is_some() {
-            return Err(format!("reducer returned duplicate item_id: {}", result.item_id));
+            return Err(format!(
+                "reducer returned duplicate item_id: {}",
+                result.item_id
+            ));
         }
     }
     Ok(output)
@@ -360,7 +366,9 @@ fn paired_cluster_outcomes(
                 != candidate_result.source_work_lineage_sha256
             || baseline_result.target_property != candidate_result.target_property
         {
-            return Err(format!("paired reducer result identity mismatch for item {item_id}"));
+            return Err(format!(
+                "paired reducer result identity mismatch for item {item_id}"
+            ));
         }
         let triad = case_items
             .get(item_id)
@@ -369,12 +377,36 @@ fn paired_cluster_outcomes(
             .entry(triad.source_work_lineage_sha256.as_str())
             .or_default()
             .push(ClusterOutcomes {
-                baseline_stay_error: if baseline_result.performance_stay_correct { 0.0 } else { 1.0 },
-                candidate_stay_error: if candidate_result.performance_stay_correct { 0.0 } else { 1.0 },
-                baseline_flip_error: if baseline_result.musical_flip_correct { 0.0 } else { 1.0 },
-                candidate_flip_error: if candidate_result.musical_flip_correct { 0.0 } else { 1.0 },
-                baseline_joint_exact: if baseline_result.joint_exact { 1.0 } else { 0.0 },
-                candidate_joint_exact: if candidate_result.joint_exact { 1.0 } else { 0.0 },
+                baseline_stay_error: if baseline_result.performance_stay_correct {
+                    0.0
+                } else {
+                    1.0
+                },
+                candidate_stay_error: if candidate_result.performance_stay_correct {
+                    0.0
+                } else {
+                    1.0
+                },
+                baseline_flip_error: if baseline_result.musical_flip_correct {
+                    0.0
+                } else {
+                    1.0
+                },
+                candidate_flip_error: if candidate_result.musical_flip_correct {
+                    0.0
+                } else {
+                    1.0
+                },
+                baseline_joint_exact: if baseline_result.joint_exact {
+                    1.0
+                } else {
+                    0.0
+                },
+                candidate_joint_exact: if candidate_result.joint_exact {
+                    1.0
+                } else {
+                    0.0
+                },
             });
     }
 
@@ -386,11 +418,15 @@ fn paired_cluster_outcomes(
         }
         output.push(ClusterOutcomes {
             baseline_stay_error: values.iter().map(|v| v.baseline_stay_error).sum::<f64>() / count,
-            candidate_stay_error: values.iter().map(|v| v.candidate_stay_error).sum::<f64>() / count,
+            candidate_stay_error: values.iter().map(|v| v.candidate_stay_error).sum::<f64>()
+                / count,
             baseline_flip_error: values.iter().map(|v| v.baseline_flip_error).sum::<f64>() / count,
-            candidate_flip_error: values.iter().map(|v| v.candidate_flip_error).sum::<f64>() / count,
-            baseline_joint_exact: values.iter().map(|v| v.baseline_joint_exact).sum::<f64>() / count,
-            candidate_joint_exact: values.iter().map(|v| v.candidate_joint_exact).sum::<f64>() / count,
+            candidate_flip_error: values.iter().map(|v| v.candidate_flip_error).sum::<f64>()
+                / count,
+            baseline_joint_exact: values.iter().map(|v| v.baseline_joint_exact).sum::<f64>()
+                / count,
+            candidate_joint_exact: values.iter().map(|v| v.candidate_joint_exact).sum::<f64>()
+                / count,
         });
     }
     Ok(output)
@@ -398,18 +434,16 @@ fn paired_cluster_outcomes(
 
 fn summarize_cluster_means(clusters: &[ClusterOutcomes]) -> PointEstimates {
     let count = clusters.len() as f64;
-    let baseline_stay_error =
-        clusters.iter().map(|v| v.baseline_stay_error).sum::<f64>() / count;
-    let candidate_stay_error =
-        clusters.iter().map(|v| v.candidate_stay_error).sum::<f64>() / count;
-    let baseline_flip_error =
-        clusters.iter().map(|v| v.baseline_flip_error).sum::<f64>() / count;
-    let candidate_flip_error =
-        clusters.iter().map(|v| v.candidate_flip_error).sum::<f64>() / count;
-    let baseline_joint_exact =
-        clusters.iter().map(|v| v.baseline_joint_exact).sum::<f64>() / count;
-    let candidate_joint_exact =
-        clusters.iter().map(|v| v.candidate_joint_exact).sum::<f64>() / count;
+    let baseline_stay_error = clusters.iter().map(|v| v.baseline_stay_error).sum::<f64>() / count;
+    let candidate_stay_error = clusters.iter().map(|v| v.candidate_stay_error).sum::<f64>() / count;
+    let baseline_flip_error = clusters.iter().map(|v| v.baseline_flip_error).sum::<f64>() / count;
+    let candidate_flip_error = clusters.iter().map(|v| v.candidate_flip_error).sum::<f64>() / count;
+    let baseline_joint_exact = clusters.iter().map(|v| v.baseline_joint_exact).sum::<f64>() / count;
+    let candidate_joint_exact = clusters
+        .iter()
+        .map(|v| v.candidate_joint_exact)
+        .sum::<f64>()
+        / count;
     PointEstimates {
         baseline_stay_error,
         candidate_stay_error,
@@ -426,7 +460,14 @@ fn summarize_cluster_means(clusters: &[ClusterOutcomes]) -> PointEstimates {
 fn bootstrap_intervals(
     clusters: &[ClusterOutcomes],
     policy: &PairedInferencePolicyV1,
-) -> Result<(PercentileIntervalV1, PercentileIntervalV1, PercentileIntervalV1), String> {
+) -> Result<
+    (
+        PercentileIntervalV1,
+        PercentileIntervalV1,
+        PercentileIntervalV1,
+    ),
+    String,
+> {
     let cluster_count = u64::try_from(clusters.len())
         .map_err(|_| "source-work cluster count exceeds RNG range".to_string())?;
     if cluster_count == 0 {
@@ -525,21 +566,42 @@ mod tests {
     use super::*;
 
     fn fixture() -> PairedMusicalIdentityComparisonCaseV1 {
-        serde_json::from_str(include_str!("../fixtures/mel-music-performance-identity-comparison.synthetic.json"))
-            .expect("checked-in paired comparison fixture must parse")
+        serde_json::from_str(include_str!(
+            "../fixtures/mel-music-performance-identity-comparison.synthetic.json"
+        ))
+        .expect("checked-in paired comparison fixture must parse")
     }
 
     #[test]
     fn paired_cluster_bootstrap_reports_three_noncollapsed_metrics() {
         let report = audit_paired_musical_identity_comparison(&fixture()).unwrap();
-        assert_eq!(report.status, PairedInferenceStatusV1::SourceWorkClusterFloorMet);
+        assert_eq!(
+            report.status,
+            PairedInferenceStatusV1::SourceWorkClusterFloorMet
+        );
         assert_eq!(report.item_count, 30);
         assert_eq!(report.source_work_clusters, 30);
-        assert!(report.performance_stay_false_difference.estimate.candidate_improvement > 0.0);
+        assert!(
+            report
+                .performance_stay_false_difference
+                .estimate
+                .candidate_improvement
+                > 0.0
+        );
         assert!(report.musical_flip_miss.estimate.candidate_improvement > 0.0);
         assert!(report.joint_exact.estimate.candidate_improvement > 0.0);
-        assert!(report.performance_stay_false_difference.candidate_improvement_interval.is_some());
-        assert!(report.musical_flip_miss.candidate_improvement_interval.is_some());
+        assert!(
+            report
+                .performance_stay_false_difference
+                .candidate_improvement_interval
+                .is_some()
+        );
+        assert!(
+            report
+                .musical_flip_miss
+                .candidate_improvement_interval
+                .is_some()
+        );
         assert!(report.joint_exact.candidate_improvement_interval.is_some());
         assert!(!report.source_work_lineage_authenticated);
         assert!(!report.target_property_annotations_authenticated);
@@ -553,15 +615,31 @@ mod tests {
         let first = audit_paired_musical_identity_comparison(&input).unwrap();
         let second = audit_paired_musical_identity_comparison(&input).unwrap();
         assert_eq!(first, second);
-        assert_eq!(first.performance_stay_false_difference.estimate.candidate_improvement, 0.0);
+        assert_eq!(
+            first
+                .performance_stay_false_difference
+                .estimate
+                .candidate_improvement,
+            0.0
+        );
         assert_eq!(first.musical_flip_miss.estimate.candidate_improvement, 0.0);
         assert_eq!(first.joint_exact.estimate.candidate_improvement, 0.0);
         assert_eq!(
-            first.performance_stay_false_difference.candidate_improvement_interval.as_ref().unwrap().lower,
+            first
+                .performance_stay_false_difference
+                .candidate_improvement_interval
+                .as_ref()
+                .unwrap()
+                .lower,
             0.0
         );
         assert_eq!(
-            first.performance_stay_false_difference.candidate_improvement_interval.as_ref().unwrap().upper,
+            first
+                .performance_stay_false_difference
+                .candidate_improvement_interval
+                .as_ref()
+                .unwrap()
+                .upper,
             0.0
         );
     }
@@ -579,13 +657,11 @@ mod tests {
     #[test]
     fn audio_or_lineage_substitution_is_rejected_before_bootstrap() {
         let mut input = fixture();
-        input.candidate.triads[0].clean.response.audio_sha256 =
-            "f".repeat(64);
+        input.candidate.triads[0].clean.response.audio_sha256 = "f".repeat(64);
         assert!(audit_paired_musical_identity_comparison(&input).is_err());
 
         let mut input = fixture();
-        input.candidate.triads[0].source_work_lineage_sha256 =
-            "e".repeat(64);
+        input.candidate.triads[0].source_work_lineage_sha256 = "e".repeat(64);
         assert!(audit_paired_musical_identity_comparison(&input).is_err());
     }
 
@@ -605,8 +681,7 @@ mod tests {
         candidate_extra.target_property_reference_sha256 =
             baseline_extra.target_property_reference_sha256.clone();
         baseline_extra.pairing_manifest_sha256 = "2".repeat(64);
-        candidate_extra.pairing_manifest_sha256 =
-            baseline_extra.pairing_manifest_sha256.clone();
+        candidate_extra.pairing_manifest_sha256 = baseline_extra.pairing_manifest_sha256.clone();
         for (index, (left, right)) in [
             (&mut baseline_extra.clean, &mut candidate_extra.clean),
             (
@@ -661,9 +736,22 @@ mod tests {
         input.candidate.triads.pop();
         let report = audit_paired_musical_identity_comparison(&input).unwrap();
         assert_eq!(report.source_work_clusters, 29);
-        assert_eq!(report.status, PairedInferenceStatusV1::InsufficientSourceWorkClusters);
-        assert!(report.performance_stay_false_difference.candidate_improvement_interval.is_none());
-        assert!(report.musical_flip_miss.candidate_improvement_interval.is_none());
+        assert_eq!(
+            report.status,
+            PairedInferenceStatusV1::InsufficientSourceWorkClusters
+        );
+        assert!(
+            report
+                .performance_stay_false_difference
+                .candidate_improvement_interval
+                .is_none()
+        );
+        assert!(
+            report
+                .musical_flip_miss
+                .candidate_improvement_interval
+                .is_none()
+        );
         assert!(report.joint_exact.candidate_improvement_interval.is_none());
     }
 }
