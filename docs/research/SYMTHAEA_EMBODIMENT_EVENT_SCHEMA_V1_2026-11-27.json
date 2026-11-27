@@ -1,0 +1,520 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea.embodiment-event.v1.schema.json",
+  "title": "Symthaea Embodiment Event v1",
+  "description": "Renderer-neutral, provenance-bearing event envelope. Cross-event ordering, expiry, cancellation and authorization invariants require a semantic validator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "session_id",
+    "event_id",
+    "sequence",
+    "observed_at_monotonic_ns",
+    "expires_at_monotonic_ns",
+    "event_kind",
+    "payload",
+    "source",
+    "epistemic_status",
+    "privacy_class"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.embodiment-event.v1"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "observed_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "event_kind": {
+      "type": "string",
+      "enum": [
+        "conversation.listening",
+        "conversation.speaking",
+        "conversation.turn_state",
+        "conversation.backchannel",
+        "attention.focus",
+        "expression.intent",
+        "cognition.uncertainty",
+        "evidence.status",
+        "user.control"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "instance_id"
+      ],
+      "properties": {
+        "component": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "instance_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "build_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "epistemic_status": {
+      "type": "string",
+      "enum": [
+        "measured",
+        "derived",
+        "inferred",
+        "proposed",
+        "presentation_only"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "evidence_refs": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "privacy_class": {
+      "type": "string",
+      "enum": [
+        "public",
+        "local_sensitive",
+        "restricted"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "epistemic_status": {
+            "const": "inferred"
+          }
+        },
+        "required": [
+          "epistemic_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "confidence"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "conversation.listening"
+          }
+        },
+        "required": [
+          "event_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "active"
+            ],
+            "properties": {
+              "active": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "conversation.speaking"
+          }
+        },
+        "required": [
+          "event_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "active",
+              "segment_id"
+            ],
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "segment_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "text_ref": {
+                "type": "string",
+                "maxLength": 256
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "conversation.turn_state"
+          }
+        },
+        "required": [
+          "event_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "state"
+            ],
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "wait",
+                  "respond",
+                  "continue",
+                  "yield"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "maxLength": 128
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "conversation.backchannel"
+          }
+        },
+        "required": [
+          "event_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "signal",
+              "intensity"
+            ],
+            "properties": {
+              "signal": {
+                "type": "string",
+                "enum": [
+                  "vocal_ack",
+                  "visual_ack",
+                  "gesture_ack"
+                ]
+              },
+              "intensity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "attention.focus"
+          }
+        },
+        "required": [
+          "event_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target"
+            ],
+            "properties": {
+              "target": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "expression.intent"
+          }
+        },
+        "required": [
+          "event_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "intent",
+              "intensity"
+            ],
+            "properties": {
+              "intent": {
+                "type": "string",
+                "enum": [
+                  "explain",
+                  "invite",
+                  "caution",
+                  "celebrate",
+                  "reflect",
+                  "question",
+                  "neutral",
+                  "transition"
+                ]
+              },
+              "intensity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "light",
+                  "particle",
+                  "gesture",
+                  "sound",
+                  "haptic",
+                  "spatial"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "cognition.uncertainty"
+          }
+        },
+        "required": [
+          "event_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "subject",
+              "level"
+            ],
+            "properties": {
+              "subject": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "level": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "calibration_ref": {
+                "type": "string",
+                "maxLength": 256
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "evidence.status"
+          }
+        },
+        "required": [
+          "event_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "subject_id",
+              "status"
+            ],
+            "properties": {
+              "subject_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "unverified",
+                  "supported",
+                  "stale",
+                  "contradicted",
+                  "unavailable"
+                ]
+              },
+              "verifier_receipt_ref": {
+                "type": "string",
+                "maxLength": 256
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "user.control"
+          }
+        },
+        "required": [
+          "event_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "pause",
+                  "cancel",
+                  "choose_form",
+                  "set_reduced_motion",
+                  "set_intensity"
+                ]
+              },
+              "form_id": {
+                "type": "string",
+                "maxLength": 128
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "intensity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
