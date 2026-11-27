@@ -23,6 +23,7 @@ CMAQ-035 established an internal comparison between fixed and ONS betting. CMAQ-
 | Paired effective-block inference | CMAQ-044: H+1 miss penalty, matched baseline/candidate deltas, block bootstrap, family breakdown and false events/hour | Statistical comparison layer; bootstrap conditional on representative/exchangeable effective blocks |
 | Conditional rank dependence | CMAQ-045: predictable history contexts × full dyadic rank spectrum | Targets temporal dependence with marginal rank invariance; finite context portfolio only |
 | Convex-target approachability | CMAQ-046: predictable OCO separator × support-function residual × conditional-mean e-process | Adaptive conditional-mean null; distinct from exchangeable PRM/CCTM; fixed-bet subset |
+| Controlled Blackwell action selection | CMAQ-047: OCO witness chooses from action-specific null-safe diagnostics using support-halfspace eligibility | Adaptive controlled experiment arm; requires authenticated action-conditional mean contracts and one-use outcome reconciliation |
 | CS-risk | Anytime confidence-sequence monitor of a matched running/rolling average risk | Complementary estimand, not a like-for-like per-instance drift detector |
 
 Do not implement CCTM by multiplying repeated marginal conformal p-values or by using a rolling empirical breach rate. Implement its actual conditional calibration and martingale construction from the reference paper/code.
