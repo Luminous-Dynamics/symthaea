@@ -1,0 +1,17 @@
+version = 4
+
+[[package]]
+name = "cmaq-031-anytime-calibration-monitor"
+version = "0.1.0"
+
+[[package]]
+name = "cmaq-036-common-cause-closure"
+version = "0.1.0"
+
+[[package]]
+name = "cmaq-039-closure-gated-rank-reference"
+version = "0.1.0"
+dependencies = [
+ "cmaq-031-anytime-calibration-monitor",
+ "cmaq-036-common-cause-closure",
+]
