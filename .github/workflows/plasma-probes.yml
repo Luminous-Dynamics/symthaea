@@ -811,7 +811,9 @@ jobs:
           assert linearization["distribution_pulse_pullback_required"] is True
           assert linearization["distribution_pulse_remap_mass_ledger_required"] is True
           assert linearization["distribution_pulse_pullback_status"] == "first_order_piecewise_constant_module_only"
-          assert linearization["distribution_pulse_remap_jacobian_status"] == "not_implemented_solver_adapter_required"
+          assert linearization["distribution_pulse_remap_jacobian_status"] == "fixed_topology_piecewise_constant_analytic_module_only"
+          assert linearization["distribution_pulse_remap_jacobian_finite_difference_required"] is True
+          assert linearization["distribution_pulse_remap_topology_change_disposition"] == "UNKNOWN_OR_HANDOFF"
           assert linearization["distribution_pulse_boundary_outflow_disposition"] == "UNQUALIFIED_UNLESS_GRID_CONVERGENCE_OR_EXPLICIT_BOUNDARY_ERROR"
           assert horizon["start_time"] == checkpoint["time"]
           assert checkpoint["first_pulse_applied"] is True
