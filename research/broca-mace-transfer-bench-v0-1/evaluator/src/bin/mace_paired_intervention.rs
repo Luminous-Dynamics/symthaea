@@ -669,6 +669,14 @@ fn candidate_record(
         "decision_support_event_ids": decision_support_ids,
         "memory_snapshot_sha256": result.memory_digest,
         "retrieval_profile_sha256": result.retrieval_profile_digest,
+        "phase_timings_ns": {
+            "memory_selection": result.phase_timings.memory_selection_ns,
+            "index_build": result.phase_timings.index_build_ns,
+            "retrieval": result.phase_timings.retrieval_ns,
+            "evidence_resolution_verification": result.phase_timings.evidence_resolution_verification_ns,
+            "policy_application": result.phase_timings.policy_application_ns,
+            "total": result.phase_timings.total_ns
+        },
         "latency_ns": result.latency_ns
     }))
     .unwrap_or_else(|_| sha256(b"candidate-trace-serialization-error"));
@@ -691,10 +699,34 @@ fn candidate_record(
         "decision_support_event_ids": decision_support_ids,
         "decision_trace_sha256": trace_digest,
         "latency_ns": result.latency_ns,
+        "phase_timings_ns": {
+            "memory_selection_ns": result.phase_timings.memory_selection_ns,
+            "index_build_ns": result.phase_timings.index_build_ns,
+            "retrieval_ns": result.phase_timings.retrieval_ns,
+            "evidence_resolution_verification_ns": result.phase_timings.evidence_resolution_verification_ns,
+            "policy_application_ns": result.phase_timings.policy_application_ns,
+            "total_wall_ns": result.phase_timings.total_ns
+        },
         "input_tokens": 0,
+        "model_calls": 0,
         "tool_calls": 0,
+        "external_tool_calls": 0,
         "index_bytes": result.index_bytes,
-        "evidence_sidecar_bytes": result.sidecar_bytes
+        "index_bytes_kind": match arm {
+            Arm::StaticHdc | Arm::HdcLtc | Arm::TypedContentHdc => "measured_index_payload_bytes",
+            Arm::ConventionalRetrieval | Arm::QualifiedSymbolicRetrieval | Arm::SemanticPlacebo => "estimated_id_vector_bytes",
+            Arm::NoMemory | Arm::ExactScopeScan => "not_applicable"
+        },
+        "evidence_sidecar_bytes": result.sidecar_bytes,
+        "evidence_sidecar_bytes_kind": if arm == Arm::NoMemory {
+            "not_applicable"
+        } else {
+            "estimated_rust_struct_size_not_process_rss"
+        },
+        "unmeasured_cost_stages": [
+            "ingestion", "maintenance", "database_storage", "network",
+            "gpu", "llm", "external_tools", "durable_write"
+        ]
     });
     if let Some(profile_digest) = &result.retrieval_profile_digest {
         record["retrieval_profile_sha256"] = json!(profile_digest);
@@ -759,6 +791,7 @@ fn evaluate_arm(
         utility_micros: utility,
         regret_micros: regret,
         task_success: action == Some(case.truth.optimal_action()),
+        phase_timings: candidate.phase_timings,
         latency_ns: candidate.latency_ns,
         memory_bytes: i64::try_from(candidate.index_bytes.saturating_add(candidate.sidecar_bytes))
             .unwrap_or(i64::MAX),
@@ -839,6 +872,9 @@ struct ContrastRows {
     regret_deltas: Vec<f64>,
     latency_deltas: Vec<i64>,
     memory_deltas: Vec<i64>,
+    baseline_phase_latency: BTreeMap<String, Vec<u64>>,
+    treatment_phase_latency: BTreeMap<String, Vec<u64>>,
+    phase_latency_deltas: BTreeMap<String, Vec<i64>>,
     harmful_count: usize,
     pair_count: usize,
     invalid_use: u64,
@@ -854,6 +890,9 @@ impl Default for ContrastRows {
             regret_deltas: Vec::new(),
             latency_deltas: Vec::new(),
             memory_deltas: Vec::new(),
+            baseline_phase_latency: BTreeMap::new(),
+            treatment_phase_latency: BTreeMap::new(),
+            phase_latency_deltas: BTreeMap::new(),
             harmful_count: 0,
             pair_count: 0,
             invalid_use: 0,
@@ -867,6 +906,26 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
     if sorted.is_empty() {
         return 0.0;
     }
+    let index = ((sorted.len() - 1) as f64 * p.clamp(0.0, 1.0)).round() as usize;
+    sorted[index]
+}
+
+fn percentile_u64(values: &[u64], p: f64) -> u64 {
+    if values.is_empty() {
+        return 0;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_unstable();
+    let index = ((sorted.len() - 1) as f64 * p.clamp(0.0, 1.0)).round() as usize;
+    sorted[index]
+}
+
+fn percentile_i64(values: &[i64], p: f64) -> i64 {
+    if values.is_empty() {
+        return 0;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_unstable();
     let index = ((sorted.len() - 1) as f64 * p.clamp(0.0, 1.0)).round() as usize;
     sorted[index]
 }
@@ -948,6 +1007,32 @@ fn contrast_record(
                 - i64::try_from(base.latency_ns).unwrap_or(i64::MAX),
         );
         contrast.memory_deltas.push(treat.memory_bytes - base.memory_bytes);
+        let phase_rows = [
+            ("memory_selection", base.phase_timings.memory_selection_ns, treat.phase_timings.memory_selection_ns),
+            ("index_build", base.phase_timings.index_build_ns, treat.phase_timings.index_build_ns),
+            ("retrieval", base.phase_timings.retrieval_ns, treat.phase_timings.retrieval_ns),
+            ("evidence_resolution_verification", base.phase_timings.evidence_resolution_verification_ns, treat.phase_timings.evidence_resolution_verification_ns),
+            ("policy_application", base.phase_timings.policy_application_ns, treat.phase_timings.policy_application_ns),
+            ("total_wall", base.phase_timings.total_ns, treat.phase_timings.total_ns),
+        ];
+        for (phase, baseline_ns, treatment_ns) in phase_rows {
+            contrast
+                .baseline_phase_latency
+                .entry(phase.to_owned())
+                .or_default()
+                .push(baseline_ns);
+            contrast
+                .treatment_phase_latency
+                .entry(phase.to_owned())
+                .or_default()
+                .push(treatment_ns);
+            contrast
+                .phase_latency_deltas
+                .entry(phase.to_owned())
+                .or_default()
+                .push(i64::try_from(treatment_ns).unwrap_or(i64::MAX)
+                    - i64::try_from(baseline_ns).unwrap_or(i64::MAX));
+        }
         contrast.harmful_count += (treat.utility_micros < base.utility_micros) as usize;
         contrast.pair_count += 1;
         contrast.invalid_use += treat.invalid_evidence_use_count;
@@ -1006,12 +1091,32 @@ fn contrast_record(
     };
     let mut latency_deltas = contrast.latency_deltas.clone();
     latency_deltas.sort_unstable();
-    let p95_latency_delta = if latency_deltas.is_empty() {
-        0
-    } else {
-        let index = ((latency_deltas.len() - 1) as f64 * 0.95).round() as usize;
-        latency_deltas[index]
-    };
+    let p95_latency_delta = percentile_i64(&latency_deltas, 0.95);
+    let baseline_phase_latency_percentiles: BTreeMap<String, Value> = contrast
+        .baseline_phase_latency
+        .iter()
+        .map(|(phase, values)| {
+            (phase.clone(), json!({
+                "p50_ns": percentile_u64(values, 0.50),
+                "p95_ns": percentile_u64(values, 0.95)
+            }))
+        })
+        .collect();
+    let treatment_phase_latency_percentiles: BTreeMap<String, Value> = contrast
+        .treatment_phase_latency
+        .iter()
+        .map(|(phase, values)| {
+            (phase.clone(), json!({
+                "p50_ns": percentile_u64(values, 0.50),
+                "p95_ns": percentile_u64(values, 0.95)
+            }))
+        })
+        .collect();
+    let paired_phase_p95_delta_ns: BTreeMap<String, i64> = contrast
+        .phase_latency_deltas
+        .iter()
+        .map(|(phase, values)| (phase.clone(), percentile_i64(values, 0.95)))
+        .collect();
 
     Ok(json!({
         "contrast_id": contrast_id,
@@ -1030,6 +1135,12 @@ fn contrast_record(
         "stale_evidence_use_count": contrast.stale_use,
         "worst_family_success_delta_pp": worst_family_delta,
         "p95_latency_delta_ns": p95_latency_delta,
+        "phase_latency_percentiles": {
+            "weighting": "paired_query_blocks",
+            "baseline_p50_p95_ns": baseline_phase_latency_percentiles,
+            "treatment_p50_p95_ns": treatment_phase_latency_percentiles,
+            "paired_p95_delta_ns": paired_phase_p95_delta_ns
+        },
         "all_in_memory_bytes_delta": mean_memory_delta.round() as i64
     }))
 }
@@ -1257,6 +1368,14 @@ mod tests {
             utility_micros: 0,
             regret_micros: 100,
             task_success: false,
+            phase_timings: PhaseTimings {
+                memory_selection_ns: 1,
+                index_build_ns: 0,
+                retrieval_ns: 2,
+                evidence_resolution_verification_ns: 3,
+                policy_application_ns: 1,
+                total_ns: 10,
+            },
             latency_ns: 10,
             memory_bytes: 100,
             invalid_evidence_use_count: 0,
@@ -1274,6 +1393,14 @@ mod tests {
             utility_micros: utility_delta,
             regret_micros: 100 - utility_delta,
             task_success: utility_delta > 0,
+            phase_timings: PhaseTimings {
+                memory_selection_ns: 1,
+                index_build_ns: 2,
+                retrieval_ns: 3,
+                evidence_resolution_verification_ns: 4,
+                policy_application_ns: 1,
+                total_ns: 12,
+            },
             latency_ns: 12,
             memory_bytes: 120,
             invalid_evidence_use_count: 0,
@@ -1320,6 +1447,14 @@ mod tests {
             utility_micros: 20,
             regret_micros: 80,
             task_success: true,
+            phase_timings: PhaseTimings {
+                memory_selection_ns: 1,
+                index_build_ns: 0,
+                retrieval_ns: 2,
+                evidence_resolution_verification_ns: 3,
+                policy_application_ns: 1,
+                total_ns: 10,
+            },
             latency_ns: 10,
             memory_bytes: 100,
             invalid_evidence_use_count: 0,
@@ -1372,6 +1507,38 @@ mod tests {
 
         memory.reverse();
         assert_eq!(ids, qualified_symbolic_ids(&memory, target.query, TOP_K));
+    }
+
+    #[test]
+    fn phase_timings_are_nonnegative_and_do_not_exceed_total_wall_time() {
+        let cases = stress::generated_worlds(1);
+        let tasks: Vec<CandidateTask<'_>> = cases.iter().map(candidate_task).collect();
+        let task = &tasks[0];
+        for arm in Arm::ALL {
+            let result = execute_arm(arm, task, &tasks);
+            let phases = result.phase_timings;
+            let measured_sum = phases
+                .memory_selection_ns
+                .saturating_add(phases.index_build_ns)
+                .saturating_add(phases.retrieval_ns)
+                .saturating_add(phases.evidence_resolution_verification_ns)
+                .saturating_add(phases.policy_application_ns);
+            assert!(phases.total_ns >= measured_sum);
+            assert_eq!(phases.total_ns, result.latency_ns);
+            let record = candidate_record("timing-test", task, arm, &result);
+            for key in [
+                "memory_selection_ns",
+                "index_build_ns",
+                "retrieval_ns",
+                "evidence_resolution_verification_ns",
+                "policy_application_ns",
+                "total_wall_ns",
+            ] {
+                assert!(record["phase_timings_ns"][key].as_u64().is_some());
+            }
+            assert_eq!(record["model_calls"].as_u64(), Some(0));
+            assert_eq!(record["external_tool_calls"].as_u64(), Some(0));
+        }
     }
 
     #[test]
