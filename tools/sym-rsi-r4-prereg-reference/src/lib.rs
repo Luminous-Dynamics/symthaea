@@ -1058,6 +1058,30 @@ mod tests {
     }
 
     #[test]
+    fn accepts_selected_claims_matching_enabled_boolean_profile() {
+        let mut value = valid_specimen();
+        value["experiment"]["claim_profile"]["product_improvement"] = Value::Bool(true);
+        value["experiment"]["claim_profile"]["selected_claims"] =
+            Value::String("product_improvement".to_owned());
+        let report = validate_preregistration(&value);
+        assert!(
+            report.ready_for_independent_review,
+            "unexpected issues: {:?}",
+            report.issues
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_and_duplicate_selected_claims() {
+        let mut value = valid_specimen();
+        value["experiment"]["claim_profile"]["selected_claims"] =
+            Value::String("phantom,phantom".to_owned());
+        let report = validate_preregistration(&value);
+        assert!(report.issues.iter().any(|issue| issue.starts_with("UNKNOWN_SELECTED_CLAIM")));
+        assert!(report.issues.iter().any(|issue| issue.starts_with("DUPLICATE_SELECTED_CLAIM")));
+    }
+
+    #[test]
     fn rejects_selected_claims_that_disagree_with_boolean_profile() {
         let mut value = valid_specimen();
         value["experiment"]["claim_profile"]["product_improvement"] = Value::Bool(true);
