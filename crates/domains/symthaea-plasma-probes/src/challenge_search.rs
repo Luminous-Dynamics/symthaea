@@ -46,6 +46,38 @@ pub enum ChallengeSearchTermination {
     FloatingPointResolutionExhausted,
 }
 
+/// Shared evaluation budget for a scalar or multi-dimensional challenge search.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ChallengeSearchBudget {
+    pub absolute_gap_tolerance: f64,
+    pub maximum_evaluations: usize,
+}
+
+/// Provenance binding for the response branch and its global Lipschitz evidence.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChallengeSearchProvenance {
+    pub branch_id: String,
+    pub lipschitz_certificate_sha256: String,
+}
+
+/// Scalar coordinate domain and parameter identity.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScalarSearchDomain {
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+    pub lipschitz_constant: f64,
+    pub parameter_id: String,
+}
+
+/// Ordered continuous-coordinate box and its anisotropic Lipschitz envelope.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BoxSearchDomain {
+    pub axis_ids: Vec<String>,
+    pub lower_bounds: Vec<f64>,
+    pub upper_bounds: Vec<f64>,
+    pub lipschitz_constants: Vec<f64>,
+}
+
 /// Controls for a scalar pulse-domain separation search.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScalarChallengeSearchConfig {
@@ -71,26 +103,22 @@ pub struct ScalarChallengeSearchConfig {
 }
 
 impl ScalarChallengeSearchConfig {
-    /// Construct a scalar search configuration.
+    /// Construct a scalar search configuration from typed domain, budget
+    /// and evidence-provenance objects.
     pub fn new(
-        lower_bound: f64,
-        upper_bound: f64,
-        lipschitz_constant: f64,
-        absolute_gap_tolerance: f64,
-        maximum_evaluations: usize,
-        parameter_id: impl Into<String>,
-        branch_id: impl Into<String>,
-        lipschitz_certificate_sha256: impl Into<String>,
+        domain: ScalarSearchDomain,
+        budget: ChallengeSearchBudget,
+        provenance: ChallengeSearchProvenance,
     ) -> Self {
         Self {
-            lower_bound,
-            upper_bound,
-            lipschitz_constant,
-            absolute_gap_tolerance,
-            maximum_evaluations,
-            parameter_id: parameter_id.into(),
-            branch_id: branch_id.into(),
-            lipschitz_certificate_sha256: lipschitz_certificate_sha256.into(),
+            lower_bound: domain.lower_bound,
+            upper_bound: domain.upper_bound,
+            lipschitz_constant: domain.lipschitz_constant,
+            absolute_gap_tolerance: budget.absolute_gap_tolerance,
+            maximum_evaluations: budget.maximum_evaluations,
+            parameter_id: domain.parameter_id,
+            branch_id: provenance.branch_id,
+            lipschitz_certificate_sha256: provenance.lipschitz_certificate_sha256,
         }
     }
 
@@ -464,25 +492,22 @@ pub struct BoxChallengeSearchConfig {
 }
 
 impl BoxChallengeSearchConfig {
+    /// Construct a multi-dimensional search configuration from typed domain,
+    /// budget and evidence-provenance objects.
     pub fn new(
-        axis_ids: Vec<String>,
-        lower_bounds: Vec<f64>,
-        upper_bounds: Vec<f64>,
-        lipschitz_constants: Vec<f64>,
-        absolute_gap_tolerance: f64,
-        maximum_evaluations: usize,
-        branch_id: impl Into<String>,
-        lipschitz_certificate_sha256: impl Into<String>,
+        domain: BoxSearchDomain,
+        budget: ChallengeSearchBudget,
+        provenance: ChallengeSearchProvenance,
     ) -> Self {
         Self {
-            axis_ids,
-            lower_bounds,
-            upper_bounds,
-            lipschitz_constants,
-            absolute_gap_tolerance,
-            maximum_evaluations,
-            branch_id: branch_id.into(),
-            lipschitz_certificate_sha256: lipschitz_certificate_sha256.into(),
+            axis_ids: domain.axis_ids,
+            lower_bounds: domain.lower_bounds,
+            upper_bounds: domain.upper_bounds,
+            lipschitz_constants: domain.lipschitz_constants,
+            absolute_gap_tolerance: budget.absolute_gap_tolerance,
+            maximum_evaluations: budget.maximum_evaluations,
+            branch_id: provenance.branch_id,
+            lipschitz_certificate_sha256: provenance.lipschitz_certificate_sha256,
         }
     }
 
@@ -891,18 +916,24 @@ mod tests {
     #[test]
     fn box_search_finds_joint_interior_response_peak_and_bounds_the_full_box() {
         let config = BoxChallengeSearchConfig::new(
-            vec![
+            BoxSearchDomain {
+                axis_ids: vec![
                 "second_pulse_phase".to_owned(),
                 "second_pulse_amplitude".to_owned(),
                 "pulse_separation".to_owned(),
             ],
-            vec![0.0, 0.0, 0.0],
-            vec![1.0, 1.0, 1.0],
-            vec![1.0, 2.0, 0.5],
-            5.0e-2,
-            1_024,
-            "echo-branch-7",
-            certificate(),
+                lower_bounds: vec![0.0, 0.0, 0.0],
+                upper_bounds: vec![1.0, 1.0, 1.0],
+                lipschitz_constants: vec![1.0, 2.0, 0.5],
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 5.0e-2,
+                maximum_evaluations: 1_024,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "echo-branch-7".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let objective = |parameters: &[f64]| {
             let value = 3.0
@@ -932,14 +963,20 @@ mod tests {
     #[test]
     fn box_search_budget_exhaustion_is_explicitly_unqualified() {
         let config = BoxChallengeSearchConfig::new(
-            vec!["phase".to_owned(), "amplitude".to_owned()],
-            vec![0.0, 0.0],
-            vec![1.0, 1.0],
-            vec![1.0, 1.0],
-            1.0e-6,
-            1,
-            "stable-branch",
-            certificate(),
+            BoxSearchDomain {
+                axis_ids: vec!["phase".to_owned(), "amplitude".to_owned()],
+                lower_bounds: vec![0.0, 0.0],
+                upper_bounds: vec![1.0, 1.0],
+                lipschitz_constants: vec![1.0, 1.0],
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-6,
+                maximum_evaluations: 1,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "stable-branch".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let report = search_box_response_challenge(&config, |_| {
             Ok(ChallengeObjectiveSample::new(0.5, "stable-branch", true))
@@ -956,14 +993,20 @@ mod tests {
     #[test]
     fn box_search_rejects_duplicate_axes_branch_changes_and_unconverged_samples() {
         let invalid_axes = BoxChallengeSearchConfig::new(
-            vec!["phase".to_owned(), "phase".to_owned()],
-            vec![0.0, 0.0],
-            vec![1.0, 1.0],
-            vec![1.0, 1.0],
-            1.0e-2,
-            8,
-            "stable-branch",
-            certificate(),
+            BoxSearchDomain {
+                axis_ids: vec!["phase".to_owned(), "phase".to_owned()],
+                lower_bounds: vec![0.0, 0.0],
+                upper_bounds: vec![1.0, 1.0],
+                lipschitz_constants: vec![1.0, 1.0],
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-2,
+                maximum_evaluations: 8,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "stable-branch".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         assert_eq!(
             search_box_response_challenge(&invalid_axes, |_| {
@@ -973,14 +1016,20 @@ mod tests {
         );
 
         let valid = BoxChallengeSearchConfig::new(
-            vec!["phase".to_owned(), "amplitude".to_owned()],
-            vec![0.0, 0.0],
-            vec![1.0, 1.0],
-            vec![1.0, 1.0],
-            1.0e-2,
-            8,
-            "stable-branch",
-            certificate(),
+            BoxSearchDomain {
+                axis_ids: vec!["phase".to_owned(), "amplitude".to_owned()],
+                lower_bounds: vec![0.0, 0.0],
+                upper_bounds: vec![1.0, 1.0],
+                lipschitz_constants: vec![1.0, 1.0],
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-2,
+                maximum_evaluations: 8,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "stable-branch".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         assert_eq!(
             search_box_response_challenge(&valid, |_| {
@@ -1000,14 +1049,20 @@ mod tests {
     fn box_search_subnormal_adjacent_endpoints_do_not_collapse_to_zero_radius() {
         let smallest_subnormal = f64::from_bits(1);
         let config = BoxChallengeSearchConfig::new(
-            vec!["subnormal_axis".to_owned(), "regular_axis".to_owned()],
-            vec![0.0, 0.0],
-            vec![smallest_subnormal, 1.0],
-            vec![1.0, 0.0],
-            0.0,
-            1,
-            "stable-branch",
-            certificate(),
+            BoxSearchDomain {
+                axis_ids: vec!["subnormal_axis".to_owned(), "regular_axis".to_owned()],
+                lower_bounds: vec![0.0, 0.0],
+                upper_bounds: vec![smallest_subnormal, 1.0],
+                lipschitz_constants: vec![1.0, 0.0],
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 0.0,
+                maximum_evaluations: 1,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "stable-branch".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let report = search_box_response_challenge(&config, |_| {
             Ok(ChallengeObjectiveSample::new(0.0, "stable-branch", true))
@@ -1024,14 +1079,20 @@ mod tests {
     #[test]
     fn box_search_zero_lipschitz_axes_do_not_consume_refinement_budget() {
         let config = BoxChallengeSearchConfig::new(
-            vec!["phase".to_owned(), "irrelevant_axis".to_owned()],
-            vec![0.0, -1.0],
-            vec![1.0, 1.0],
-            vec![0.0, 0.0],
-            1.0e-10,
-            1,
-            "constant-branch",
-            certificate(),
+            BoxSearchDomain {
+                axis_ids: vec!["phase".to_owned(), "irrelevant_axis".to_owned()],
+                lower_bounds: vec![0.0, -1.0],
+                upper_bounds: vec![1.0, 1.0],
+                lipschitz_constants: vec![0.0, 0.0],
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-10,
+                maximum_evaluations: 1,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "constant-branch".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let report = search_box_response_challenge(&config, |_| {
             Ok(ChallengeObjectiveSample::new(0.125, "constant-branch", true))
@@ -1058,14 +1119,20 @@ mod tests {
             ))
         };
         let config = ScalarChallengeSearchConfig::new(
-            0.0,
-            1.0,
-            2.52,
-            1.0e-2,
-            128,
-            "second_pulse_phase_rad",
-            "echo-branch-2",
-            certificate(),
+            ScalarSearchDomain {
+                lower_bound: 0.0,
+                upper_bound: 1.0,
+                lipschitz_constant: 2.52,
+                parameter_id: "second_pulse_phase_rad".into(),
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-2,
+                maximum_evaluations: 128,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "echo-branch-2".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let report = search_scalar_response_challenge(&config, objective).unwrap();
         let left_boundary = 3.0 - 2.0 * (0.0_f64 - 0.37).powi(2);
@@ -1085,14 +1152,20 @@ mod tests {
     #[test]
     fn exhausted_search_budget_never_returns_a_qualified_bound() {
         let config = ScalarChallengeSearchConfig::new(
-            0.0,
-            1.0,
-            2.52,
-            1.0e-6,
-            1,
-            "second_pulse_amplitude",
-            "echo-branch-2",
-            certificate(),
+            ScalarSearchDomain {
+                lower_bound: 0.0,
+                upper_bound: 1.0,
+                lipschitz_constant: 2.52,
+                parameter_id: "second_pulse_amplitude".into(),
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-6,
+                maximum_evaluations: 1,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "echo-branch-2".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let report = search_scalar_response_challenge(&config, |parameter| {
             Ok(ChallengeObjectiveSample::new(
@@ -1114,14 +1187,20 @@ mod tests {
     fn scalar_search_adjacent_float_interval_is_unqualified_not_invalid() {
         let smallest_subnormal = f64::from_bits(1);
         let config = ScalarChallengeSearchConfig::new(
-            0.0,
-            smallest_subnormal,
-            1.0,
-            0.0,
-            8,
-            "pulse_phase",
-            "stable-branch",
-            certificate(),
+            ScalarSearchDomain {
+                lower_bound: 0.0,
+                upper_bound: smallest_subnormal,
+                lipschitz_constant: 1.0,
+                parameter_id: "pulse_phase".into(),
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 0.0,
+                maximum_evaluations: 8,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "stable-branch".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let report = search_scalar_response_challenge(&config, |_| {
             Ok(ChallengeObjectiveSample::new(0.0, "stable-branch", true))
@@ -1139,14 +1218,20 @@ mod tests {
     #[test]
     fn scalar_search_keeps_reference_objective_uncertainty_in_the_gap() {
         let config = ScalarChallengeSearchConfig::new(
-            0.0,
-            1.0,
-            0.0,
-            1.0e-3,
-            1,
-            "pulse_phase",
-            "stable-branch",
-            certificate(),
+            ScalarSearchDomain {
+                lower_bound: 0.0,
+                upper_bound: 1.0,
+                lipschitz_constant: 0.0,
+                parameter_id: "pulse_phase".into(),
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-3,
+                maximum_evaluations: 1,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "stable-branch".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let report = search_scalar_response_challenge(&config, |_| {
             Ok(ChallengeObjectiveSample::new_with_error_bound(
@@ -1170,14 +1255,20 @@ mod tests {
     #[test]
     fn box_search_does_not_call_uncertain_full_order_samples_exact() {
         let config = BoxChallengeSearchConfig::new(
-            vec!["phase".to_owned(), "amplitude".to_owned()],
-            vec![0.0, 0.0],
-            vec![1.0, 1.0],
-            vec![0.0, 0.0],
-            1.0e-3,
-            1,
-            "stable-branch",
-            certificate(),
+            BoxSearchDomain {
+                axis_ids: vec!["phase".to_owned(), "amplitude".to_owned()],
+                lower_bounds: vec![0.0, 0.0],
+                upper_bounds: vec![1.0, 1.0],
+                lipschitz_constants: vec![0.0, 0.0],
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-3,
+                maximum_evaluations: 1,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "stable-branch".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let report = search_box_response_challenge(&config, |_| {
             Ok(ChallengeObjectiveSample::new_with_error_bound(
@@ -1200,14 +1291,20 @@ mod tests {
     #[test]
     fn negative_or_nonfinite_objective_error_bounds_are_rejected() {
         let config = ScalarChallengeSearchConfig::new(
-            0.0,
-            1.0,
-            1.0,
-            1.0e-2,
-            8,
-            "pulse_phase",
-            "branch-a",
-            certificate(),
+            ScalarSearchDomain {
+                lower_bound: 0.0,
+                upper_bound: 1.0,
+                lipschitz_constant: 1.0,
+                parameter_id: "pulse_phase".into(),
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-2,
+                maximum_evaluations: 8,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "branch-a".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         assert_eq!(
             search_scalar_response_challenge(&config, |_| {
@@ -1236,14 +1333,20 @@ mod tests {
     #[test]
     fn invalid_provenance_or_objective_is_rejected() {
         let invalid_hash = ScalarChallengeSearchConfig::new(
-            0.0,
-            1.0,
-            1.0,
-            1.0e-2,
-            8,
-            "pulse_phase",
-            "branch-a",
-            "not-a-digest",
+            ScalarSearchDomain {
+                lower_bound: 0.0,
+                upper_bound: 1.0,
+                lipschitz_constant: 1.0,
+                parameter_id: "pulse_phase".into(),
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-2,
+                maximum_evaluations: 8,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "branch-a".into(),
+                lipschitz_certificate_sha256: "not-a-digest".into(),
+            },
         );
         assert_eq!(
             search_scalar_response_challenge(&invalid_hash, |_| {
@@ -1253,14 +1356,20 @@ mod tests {
         );
 
         let valid = ScalarChallengeSearchConfig::new(
-            0.0,
-            1.0,
-            1.0,
-            1.0e-2,
-            8,
-            "pulse_phase",
-            "branch-a",
-            certificate(),
+            ScalarSearchDomain {
+                lower_bound: 0.0,
+                upper_bound: 1.0,
+                lipschitz_constant: 1.0,
+                parameter_id: "pulse_phase".into(),
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-2,
+                maximum_evaluations: 8,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "branch-a".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         assert_eq!(
             search_scalar_response_challenge(&valid, |_| {
@@ -1273,14 +1382,20 @@ mod tests {
     #[test]
     fn branch_changes_and_unconverged_full_order_samples_are_rejected() {
         let branch_config = ScalarChallengeSearchConfig::new(
-            0.0,
-            1.0,
-            1.0,
-            1.0e-2,
-            8,
-            "pulse_phase",
-            "branch-a",
-            certificate(),
+            ScalarSearchDomain {
+                lower_bound: 0.0,
+                upper_bound: 1.0,
+                lipschitz_constant: 1.0,
+                parameter_id: "pulse_phase".into(),
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-2,
+                maximum_evaluations: 8,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "branch-a".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         assert_eq!(
             search_scalar_response_challenge(&branch_config, |_| {
@@ -1316,14 +1431,20 @@ mod tests {
             ))
         };
         let config = ScalarChallengeSearchConfig::new(
-            0.0,
-            1.0,
-            lipschitz,
-            5.0e-3,
-            512,
-            "second_pulse_phase_rad",
-            "stable-multi-peak",
-            certificate(),
+            ScalarSearchDomain {
+                lower_bound: 0.0,
+                upper_bound: 1.0,
+                lipschitz_constant: lipschitz,
+                parameter_id: "second_pulse_phase_rad".into(),
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 5.0e-3,
+                maximum_evaluations: 512,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "stable-multi-peak".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let report = search_scalar_response_challenge(&config, objective).unwrap();
         let dense_grid_max = (0..=20_000)
@@ -1348,14 +1469,20 @@ mod tests {
     #[test]
     fn zero_lipschitz_objective_is_bounded_after_one_evaluation() {
         let config = ScalarChallengeSearchConfig::new(
-            -1.0,
-            1.0,
-            0.0,
-            1.0e-8,
-            1,
-            "pulse_phase",
-            "stable-branch",
-            certificate(),
+            ScalarSearchDomain {
+                lower_bound: -1.0,
+                upper_bound: 1.0,
+                lipschitz_constant: 0.0,
+                parameter_id: "pulse_phase".into(),
+            },
+            ChallengeSearchBudget {
+                absolute_gap_tolerance: 1.0e-8,
+                maximum_evaluations: 1,
+            },
+            ChallengeSearchProvenance {
+                branch_id: "stable-branch".into(),
+                lipschitz_certificate_sha256: certificate().into(),
+            },
         );
         let report = search_scalar_response_challenge(&config, |_| {
             Ok(ChallengeObjectiveSample::new(0.125, "stable-branch", true))
