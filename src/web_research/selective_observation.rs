@@ -22,7 +22,10 @@ use std::collections::{BTreeMap, HashSet};
 
 const AURC_CONVENTION: &str =
     "Item-wise empirical AURC; expected over uniform within-tie permutations";
-const UNCERTAINTY_LIMITATION: &str = "No confidence interval: requires joint inclusion probabilities or a design-valid clustered variance estimator";
+const UNCERTAINTY_LIMITATION: &str = concat!(
+    "No confidence interval: requires joint inclusion probabilities or a ",
+    "design-valid clustered variance estimator"
+);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -248,20 +251,34 @@ pub fn evaluate_selective_observation(
 
     let diagnostics = support_diagnostics(records);
     let (population_report, unavailable_reason) =
-        if !diagnostics.positive_support_for_entire_cohort {
+        if diagnostics.pending_certain_inclusion_records > 0 {
             (
                 None,
                 Some(
-                    "population risk is not identifiable: every record needs a known, strictly                      positive adjudication inclusion probability"
+                    "pending labels have inclusion probability 1.0 under a design defined at this evaluation cutoff"
                         .to_owned(),
+                ),
+            )
+        } else if !diagnostics.positive_support_for_entire_cohort {
+            (
+                None,
+                Some(
+                    concat!(
+                        "population risk is not identifiable: every record needs a known, ",
+                        "strictly positive adjudication inclusion probability"
+                    )
+                    .to_owned(),
                 ),
             )
         } else if diagnostics.invalid_prediction_confidence_records > 0 {
             (
                 None,
                 Some(
-                    "population estimate withheld because the candidate emitted invalid                      confidence values"
-                        .to_owned(),
+                    concat!(
+                        "population estimate withheld because the candidate emitted invalid ",
+                        "confidence values"
+                    )
+                    .to_owned(),
                 ),
             )
         } else if diagnostics.kish_effective_sample_size.unwrap_or(0.0)
@@ -321,7 +338,10 @@ fn support_diagnostics(records: &[SelectiveObservationRecord]) -> PropensitySupp
             None => missing_probability_records += 1,
             Some(probability) if probability == 0.0 => zero_probability_records += 1,
             Some(probability)
-                if !probability.is_finite() || probability < 0.0 || probability > 1.0 =>
+                if !probability.is_finite()
+                    || probability < 0.0
+                    || probability > 1.0
+                    || (probability > 0.0 && !(1.0 / probability).is_finite()) =>
             {
                 invalid_probability_records += 1
             }
@@ -340,10 +360,18 @@ fn support_diagnostics(records: &[SelectiveObservationRecord]) -> PropensitySupp
         && zero_probability_records == 0
         && invalid_probability_records == 0
         && pending_certain_inclusion_records == 0;
-    let sum_weights = weights.iter().sum::<f64>();
-    let sum_squared_weights = weights.iter().map(|weight| weight * weight).sum::<f64>();
-    let kish_effective_sample_size = (sum_squared_weights > 0.0)
-        .then_some(sum_weights * sum_weights / sum_squared_weights);
+    let maximum_weight = weights.iter().copied().reduce(f64::max);
+    let scaled_weights: Vec<f64> = maximum_weight
+        .filter(|maximum| *maximum > 0.0)
+        .map(|maximum| weights.iter().map(|weight| weight / maximum).collect())
+        .unwrap_or_default();
+    let scaled_sum = scaled_weights.iter().sum::<f64>();
+    let scaled_sum_squared = scaled_weights
+        .iter()
+        .map(|weight| weight * weight)
+        .sum::<f64>();
+    let kish_effective_sample_size = (scaled_sum_squared > 0.0)
+        .then_some(scaled_sum * scaled_sum / scaled_sum_squared);
 
     PropensitySupportDiagnostics {
         population_records: records.len(),
@@ -355,7 +383,7 @@ fn support_diagnostics(records: &[SelectiveObservationRecord]) -> PropensitySupp
         invalid_prediction_confidence_records,
         pending_certain_inclusion_records,
         positive_support_for_entire_cohort,
-        maximum_inverse_probability_weight: weights.iter().copied().reduce(f64::max),
+        maximum_inverse_probability_weight: maximum_weight,
         kish_effective_sample_size,
         design_assumptions_require_external_audit: true,
     }
@@ -517,7 +545,8 @@ fn compute_population_report(
         assumptions: vec![
             "The target population is the complete frozen prediction cohort; all candidate              predictions are available for every record."
                 .to_owned(),
-            "Every record has a known, strictly positive adjudication inclusion probability.".to_owned(),
+            "Every record has a known, strictly positive adjudication inclusion probability."
+                .to_owned(),
             "The inclusion probability is assigned using only pre-label information.".to_owned(),
             "Conditional ignorability and the declared sampling design are external assumptions;              this evaluator cannot verify them."
                 .to_owned(),
@@ -626,22 +655,15 @@ fn stratify_population(
 
         for (value, group) in groups {
             let diagnostics = support_diagnostics(&group);
-            let (report, reason) = if !diagnostics.positive_support_for_entire_cohort {
-                (
-                    None,
-                    Some("stratum has zero, missing or invalid adjudication support".to_owned()),
-                )
-            } else if diagnostics.pending_certain_inclusion_records > 0 {
-                (
-                    None,
-                    Some(
-                        "population estimate withheld: pending labels have inclusion probability 1.0 under a design defined at this evaluation cutoff".to_owned(),
-                    ),
-                )
-            } else if diagnostics.pending_certain_inclusion_records > 0 {
+            let (report, reason) = if diagnostics.pending_certain_inclusion_records > 0 {
                 (
                     None,
                     Some("stratum has pending records with certain inclusion".to_owned()),
+                )
+            } else if !diagnostics.positive_support_for_entire_cohort {
+                (
+                    None,
+                    Some("stratum has zero, missing or invalid adjudication support".to_owned()),
                 )
             } else if diagnostics.invalid_prediction_confidence_records > 0 {
                 (
@@ -820,8 +842,7 @@ mod tests {
 
     #[test]
     fn invalid_prediction_confidence_blocks_population_estimation() {
-        let mut invalid = prediction("invalid", f64::NAN, true, Some(true));
-        invalid.predicted_confidence = f64::NAN;
+        let invalid = prediction("invalid", f64::NAN, true, Some(true));
         let records = vec![
             observed(invalid, Some(1.0)),
             observed(prediction("valid", 0.5, true, Some(true)), Some(1.0)),
