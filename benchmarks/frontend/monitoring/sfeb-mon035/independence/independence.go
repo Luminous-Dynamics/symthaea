@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 )
 
 const (
@@ -104,7 +105,8 @@ func validSHA256(value string) bool {
 func validIdentifier(value string) bool {
 	return value != "" && len(value) <= MaxIdentifierBytes &&
 		strings.TrimSpace(value) == value &&
-		!strings.ContainsAny(value, " \t\r\n")
+		return value != "" && len(value) <= MaxIdentifierBytes &&
+			strings.IndexFunc(value, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) < 0
 }
 
 func Evaluate(in Input) Result {
@@ -257,6 +259,7 @@ func dependencyClosure(root string,nodes map[string]Node)(map[string]struct{},*e
 		closure[id]=struct{}{}
 		seen:=map[string]struct{}{}
 		for _,child:=range node.DependsOn {
+			if !validIdentifier(child) { flags.block("invalid_dependency_reference:"+id); continue }
 			if _,duplicate:=seen[child]; duplicate { flags.block("duplicate_dependency_edge:"+id); continue }
 			seen[child]=struct{}{}
 			visit(child)
