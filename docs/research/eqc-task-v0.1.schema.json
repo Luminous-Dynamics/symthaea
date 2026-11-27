@@ -288,7 +288,7 @@
         },
         "max_tool_calls": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "network_policy": {
           "enum": [
