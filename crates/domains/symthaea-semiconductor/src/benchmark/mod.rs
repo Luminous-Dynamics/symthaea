@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod calibration_requalification;
+pub mod context_residual_cohort;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
@@ -148,4 +149,12 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use context_residual_cohort::{
+    CONTEXT_RESIDUAL_COHORT_SCHEMA_V1, CONTEXT_RESIDUAL_OBSERVATION_SCHEMA_V1,
+    CONTEXT_RESIDUAL_REPORT_SCHEMA_V1, ContextResidualCohortErrorV1, ContextResidualCohortInputV1,
+    ContextResidualCohortReportV1, ContextResidualCohortStatusV1, ContextResidualObservationV1,
+    evaluate_context_residual_cohort_v1, seal_context_residual_cohort_v1,
+    seal_context_residual_observation_v1,
 };
