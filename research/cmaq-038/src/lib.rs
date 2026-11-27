@@ -633,8 +633,7 @@ mod tests {
                 break;
             }
         }
-        assert!(quarantined_at.is_some());
-        assert!(quarantined_at.unwrap() <= 500);
+        assert!(quarantined_at.is_some_and(|step| step <= 500));
         assert!(monitor.is_quarantined());
         assert_eq!(
             monitor.observe_rank(51),
