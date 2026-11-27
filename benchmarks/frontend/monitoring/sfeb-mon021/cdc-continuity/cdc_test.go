@@ -5,8 +5,8 @@ func ptr(v LSN)*LSN{return &v}
 func base()(Profile,SlotState,Manifest){
 	cp:=LSN(0x100);restart:=LSN(0x80);flush:=LSN(0x100)
 	p:=Profile{ServerMajor:18,ConfiguredWALLevel:"logical",EffectiveWALLevel:"logical",SystemIdentifier:"sys-1",DatabaseOID:42,DatabaseName:"app",SlotName:"mon_slot",OutputPlugin:"pgoutput",PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",SourceEpoch:"epoch-1",TimelineID:1,ConsistentPoint:&cp,SnapshotName:"snap-1",SnapshotDigest:"snapshot-digest"}
-	s:=SlotState{SlotType:"logical",DatabaseOID:42,DatabaseName:"app",SlotName:"mon_slot",OutputPlugin:"pgoutput",WALStatus:"reserved",RestartLSN:&restart,ConfirmedFlushLSN:&flush,SafeWALSize:ptrI(1<<30),CatalogXmin:"100",Xmin:"100"}
-	m:=Manifest{SourceEpoch:"epoch-1",TimelineID:1,SlotName:"mon_slot",DatabaseOID:42,PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",StartExclusiveLSN:cp,TerminalLSN:0x140,SnapshotConsistentPoint:cp,SnapshotDigest:"snapshot-digest",Events:[]DecodedEvent{{ID:"e1",XID:"10",CommitLSN:0x110,Ordinal:1,PayloadDigest:"d1"},{ID:"e2",XID:"11",CommitLSN:0x130,Ordinal:1,PayloadDigest:"d2"}},Complete:true,EvidenceThroughLSN:0x140,AcknowledgementRequestedLSN:0x140,Witnessed:true,ManifestDigest:"manifest-digest"}
+	s:=SlotState{SystemIdentifier:"sys-1",ServerMajor:18,TimelineID:1,SlotType:"logical",DatabaseOID:42,DatabaseName:"app",SlotName:"mon_slot",OutputPlugin:"pgoutput",WALStatus:"reserved",RestartLSN:&restart,ConfirmedFlushLSN:&flush,SafeWALSize:ptrI(1<<30),CatalogXmin:"100",Xmin:"100"}
+	m:=Manifest{ServerMajor:18,SystemIdentifier:"sys-1",DatabaseName:"app",OutputPlugin:"pgoutput",SourceEpoch:"epoch-1",TimelineID:1,SlotName:"mon_slot",DatabaseOID:42,PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",StartExclusiveLSN:cp,TerminalLSN:0x140,SnapshotConsistentPoint:cp,SnapshotDigest:"snapshot-digest",Events:[]DecodedEvent{{ID:"e1",XID:"10",CommitLSN:0x110,Ordinal:1,PayloadDigest:"d1"},{ID:"e2",XID:"11",CommitLSN:0x130,Ordinal:1,PayloadDigest:"d2"}},Complete:true,EvidenceThroughLSN:0x140,AcknowledgementRequestedLSN:0x140,AcknowledgementSentLSN:0x140,Witnessed:true,ManifestDigest:"manifest-digest"}
 	m.Transactions=[]Transaction{
 		{XID:"10",State:"committed",BeginLSN:0x108,CommitLSN:0x110,EndLSN:0x118,EventIDs:[]string{"e1"}},
 		{XID:"11",State:"committed",BeginLSN:0x128,CommitLSN:0x130,EndLSN:0x138,EventIDs:[]string{"e2"}},
@@ -51,11 +51,11 @@ func TestDuplicateIDChangedLSNDivergent(t *testing.T){p,s,m:=base();e:=m.Events[
 func TestExactReplayDuplicateAccepted(t *testing.T){p,s,m:=base();m.Events=append(m.Events,m.Events[1]);want(t,ValidateCapture(p,s,m),Qualified)}
 func TestUnsealedManifestIndeterminate(t *testing.T){p,s,m:=base();m.Witnessed=false;want(t,ValidateCapture(p,s,m),Indeterminate)}
 func TestPluginProfileChangedDenied(t *testing.T){p,s,m:=base();m.PluginProfileDigest="changed";want(t,ValidateCapture(p,s,m),Denied)}
-func TestReplayOverlapQualified(t *testing.T){_,_,m:=base();n:=m;n.Events=append([]DecodedEvent(nil),m.Events...);n.Transactions=append([]Transaction(nil),m.Transactions...);n.StartExclusiveLSN=0x120;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;n.AcknowledgementRequestedLSN=0x160;n.Events=append(n.Events,DecodedEvent{ID:"e3",XID:"12",CommitLSN:0x150,Ordinal:1,PayloadDigest:"d3"});n.Transactions=append(n.Transactions,Transaction{XID:"12",State:"committed",BeginLSN:0x148,CommitLSN:0x150,EndLSN:0x158,EventIDs:[]string{"e3"}});want(t,ValidateReplay(m,n),Qualified)}
+func TestReplayOverlapQualified(t *testing.T){_,_,m:=base();n:=m;n.Events=append([]DecodedEvent(nil),m.Events...);n.Transactions=append([]Transaction(nil),m.Transactions...);n.StartExclusiveLSN=0x120;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;n.AcknowledgementRequestedLSN=0x160;n.AcknowledgementSentLSN=0x160;n.Events=append(n.Events,DecodedEvent{ID:"e3",XID:"12",CommitLSN:0x150,Ordinal:1,PayloadDigest:"d3"});n.Transactions=append(n.Transactions,Transaction{XID:"12",State:"committed",BeginLSN:0x148,CommitLSN:0x150,EndLSN:0x158,EventIDs:[]string{"e3"}});want(t,ValidateReplay(m,n),Qualified)}
 func TestReplayGapIndeterminate(t *testing.T){_,_,m:=base();n:=m;n.StartExclusiveLSN=0x150;n.TerminalLSN=0x160;want(t,ValidateReplay(m,n),Indeterminate)}
 func TestReplayConflictingEventDivergent(t *testing.T){_,_,m:=base();n:=m;n.Events=append([]DecodedEvent(nil),m.Events...);n.StartExclusiveLSN=0x120;n.TerminalLSN=0x160;n.Events[1].CommitLSN++;want(t,ValidateReplay(m,n),Divergent)}
 func TestReplayTerminalRegressionIndeterminate(t *testing.T){_,_,m:=base();n:=m;n.StartExclusiveLSN=0x120;n.TerminalLSN=0x130;n.EvidenceThroughLSN=0x130;want(t,ValidateReplay(m,n),Indeterminate)}
-func failoverFixture() (Profile,Manifest,Failover){p,_,m:=base();replay:=LSN(0x150);restart:=LSN(0x80);s:=SlotState{SlotType:"logical",DatabaseOID:p.DatabaseOID,DatabaseName:p.DatabaseName,SlotName:p.SlotName,OutputPlugin:p.OutputPlugin,WALStatus:"reserved",Failover:true,Synced:true,OnStandby:true,RestartLSN:&restart,StandbyReplayLSN:&replay};n:=p;n.SourceEpoch="epoch-2";n.TimelineID=2;f:=Failover{Prior:p,Next:n,StandbySlot:s,OldPrimaryFenced:true,TimelineHistoryDigest:"timeline-history",TimelineHistoryWitnessed:true,TimelineHistoryParent:p.TimelineID,ForkLSN:0x150,HandoffManifestDigest:"handoff",HandoffWitnessed:true};return p,m,f}
+func failoverFixture() (Profile,Manifest,Failover){p,_,m:=base();replay:=LSN(0x150);restart:=LSN(0x80);s:=SlotState{SystemIdentifier:p.SystemIdentifier,ServerMajor:p.ServerMajor,TimelineID:2,SlotType:"logical",DatabaseOID:p.DatabaseOID,DatabaseName:p.DatabaseName,SlotName:p.SlotName,OutputPlugin:p.OutputPlugin,WALStatus:"reserved",Failover:true,Synced:true,OnStandby:true,RestartLSN:&restart,StandbyReplayLSN:&replay};n:=p;n.SourceEpoch="epoch-2";n.TimelineID=2;nextPoint:=LSN(0x160);n.ConsistentPoint=&nextPoint;f:=Failover{Prior:p,Next:n,StandbySlot:s,OldPrimaryFenced:true,TimelineHistoryDigest:"timeline-history",TimelineHistoryWitnessed:true,TimelineHistoryParent:p.TimelineID,ForkLSN:0x150,HandoffManifestDigest:"handoff",HandoffWitnessed:true};return p,m,f}
 func TestFailoverQualified(t *testing.T){_,m,f:=failoverFixture();want(t,ValidateFailover(f,m.EvidenceThroughLSN),Qualified)}
 func TestFailoverSlotNotSyncedDenied(t *testing.T){_,m,f:=failoverFixture();f.StandbySlot.Synced=false;want(t,ValidateFailover(f,m.EvidenceThroughLSN),Denied)}
 func TestFailoverStandbyBehindIndeterminate(t *testing.T){_,m,f:=failoverFixture();f.StandbySlot.StandbyReplayLSN=ptr(0x130);want(t,ValidateFailover(f,m.EvidenceThroughLSN),Indeterminate)}
@@ -131,5 +131,38 @@ func TestFailoverTimelineHistoryNotWitnessedIndeterminate(t *testing.T){
 func TestFailoverWrongParentTimelineIndeterminate(t *testing.T){
 	_,m,f:=failoverFixture()
 	f.TimelineHistoryParent=99
+	want(t,ValidateFailover(f,m.EvidenceThroughLSN),Indeterminate)
+}
+
+func TestAcknowledgementActuallySentAheadOfDurableDenied(t *testing.T){
+	p,s,m:=base()
+	m.AcknowledgementRequestedLSN=0x140
+	m.AcknowledgementSentLSN=0x150
+	want(t,ValidateCapture(p,s,m),Denied)
+}
+func TestManifestClusterIdentityMismatchDenied(t *testing.T){
+	p,s,m:=base()
+	m.SystemIdentifier="other-cluster"
+	want(t,ValidateCapture(p,s,m),Denied)
+}
+func TestManifestServerMajorMismatchDenied(t *testing.T){
+	p,s,m:=base()
+	m.ServerMajor=19
+	want(t,ValidateCapture(p,s,m),Denied)
+}
+func TestSlotTimelineMismatchDenied(t *testing.T){
+	p,s,m:=base()
+	s.TimelineID=2
+	want(t,ValidateCapture(p,s,m),Denied)
+}
+func TestFailoverStandbyTimelineMismatchDenied(t *testing.T){
+	_,m,f:=failoverFixture()
+	f.StandbySlot.TimelineID=1
+	want(t,ValidateFailover(f,m.EvidenceThroughLSN),Denied)
+}
+func TestFailoverNextConsistentPointBeforeForkIndeterminate(t *testing.T){
+	_,m,f:=failoverFixture()
+	p:=LSN(0x140)
+	f.Next.ConsistentPoint=&p
 	want(t,ValidateFailover(f,m.EvidenceThroughLSN),Indeterminate)
 }
