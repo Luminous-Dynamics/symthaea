@@ -831,6 +831,20 @@ mod tests {
     }
 
     #[test]
+    fn stopped_is_rejected_when_started_output_was_never_observed() {
+        let (policy, permit, mut ledger) = fixture();
+        submit(&mut ledger, &policy, &permit);
+        assert_eq!(
+            ledger.record_stopped("attempt-1", stamp(OUTPUT_CLOCK, "15"), stopped()),
+            Err(ReceiptError::InvalidTransition {
+                from: Some(ReceiptPhase::Submitted),
+                to: ReceiptPhase::Stopped,
+            })
+        );
+        assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Submitted);
+    }
+
+    #[test]
     fn stopped_requires_a_stopped_observation_not_a_command() {
         let (policy, permit, mut ledger) = fixture();
         submit(&mut ledger, &policy, &permit);
