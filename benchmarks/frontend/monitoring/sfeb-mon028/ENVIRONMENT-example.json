@@ -1,0 +1,27 @@
+{
+  "profile": "mon028-environment-profile-v1",
+  "version": "1.0.0",
+  "description": "Illustrative compatibility baseline only; a confirmatory run must record actual immutable image digests, host details and exact tool versions.",
+  "source": {
+    "postgresql_image": "postgres:18.7-bookworm",
+    "postgresql_version": "18.7"
+  },
+  "streaming": {
+    "kafka_image": "apache/kafka:4.3.1",
+    "kafka_version": "4.3.1",
+    "debezium_image": "quay.io/debezium/connect:3.7.1.Final",
+    "debezium_version": "3.7.1.Final"
+  },
+  "host": {
+    "operating_system": "REPLACE_WITH_ACTUAL_OS_AND_VERSION",
+    "architecture": "REPLACE_WITH_ACTUAL_ARCH",
+    "cpu_model": "REPLACE_WITH_ACTUAL_CPU",
+    "docker_engine_version": "REPLACE_WITH_ACTUAL_VERSION",
+    "filesystem": "REPLACE_WITH_ACTUAL_FILESYSTEM"
+  },
+  "image_digests": {
+    "postgresql": "REPLACE_WITH_SHA256_DIGEST",
+    "kafka": "REPLACE_WITH_SHA256_DIGEST",
+    "debezium": "REPLACE_WITH_SHA256_DIGEST"
+  }
+}
