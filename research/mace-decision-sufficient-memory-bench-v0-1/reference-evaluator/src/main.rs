@@ -211,31 +211,31 @@ fn validate_episode(e: &Episode) -> Result<(), String> {
             return Err(format!("{id}: unresolved/self parent on {}", v.event_id));
         }
     }
-    let allowed: BTreeSet<&str> = e.candidate.allowed_actions.iter().map(String::as_str).collect();
+    let allowed: BTreeSet<String> = e.candidate.allowed_actions.iter().cloned().collect();
     if allowed.is_empty() || allowed.len() != e.candidate.allowed_actions.len() {
         return Err(format!("{id}: empty or duplicate action set"));
     }
     let mut losses = BTreeMap::new();
     for x in &e.evaluator_private.action_losses {
-        if !x.loss.is_finite() || !allowed.contains(x.action.as_str()) ||
+        if !x.loss.is_finite() || !allowed.contains(&x.action) ||
             losses.insert(x.action.as_str(), x.loss).is_some() {
             return Err(format!("{id}: malformed/duplicate action loss"));
         }
     }
-    if losses.len() != allowed.len() || !allowed.contains(e.evaluator_private.no_memory_action.as_str()) ||
-        !allowed.contains(e.evaluator_private.oracle_action.as_str()) {
+    if losses.len() != allowed.len() || !allowed.contains(&e.evaluator_private.no_memory_action) ||
+        !allowed.contains(&e.evaluator_private.oracle_action) {
         return Err(format!("{id}: incomplete action loss or baseline set"));
     }
     let best = losses.values().copied().fold(f64::INFINITY, f64::min);
     if (losses[e.evaluator_private.oracle_action.as_str()] - best).abs() > 1e-9 {
         return Err(format!("{id}: oracle action is not minimum-loss"));
     }
-    let required: BTreeSet<&str> = e.evaluator_private.required_evidence_ids.iter().map(String::as_str).collect();
-    let forbidden: BTreeSet<&str> = e.evaluator_private.forbidden_evidence_ids.iter().map(String::as_str).collect();
+    let required: BTreeSet<String> = e.evaluator_private.required_evidence_ids.iter().cloned().collect();
+    let forbidden: BTreeSet<String> = e.evaluator_private.forbidden_evidence_ids.iter().cloned().collect();
     if required.len() != e.evaluator_private.required_evidence_ids.len() ||
         forbidden.len() != e.evaluator_private.forbidden_evidence_ids.len() ||
         !required.is_disjoint(&forbidden) ||
-        required.iter().chain(forbidden.iter()).any(|x| !event_ids.contains(x)) {
+        required.iter().chain(forbidden.iter()).any(|x| !event_ids.contains(x.as_str())) {
         return Err(format!("{id}: malformed required/forbidden evidence set"));
     }
     Ok(())
