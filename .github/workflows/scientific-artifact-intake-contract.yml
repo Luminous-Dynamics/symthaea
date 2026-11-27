@@ -1,0 +1,23 @@
+name: Scientific Artifact Intake Contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/research/artifact-intake/**"
+      - "scripts/validate_scientific_artifact_fixtures.py"
+      - ".github/workflows/scientific-artifact-intake-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  artifact-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate artifact schema declarations and byte-backed fixtures
+        run: python3 scripts/validate_scientific_artifact_fixtures.py
