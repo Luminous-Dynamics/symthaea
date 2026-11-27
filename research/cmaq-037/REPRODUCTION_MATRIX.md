@@ -69,6 +69,39 @@ Any serially dependent cell must be labelled assumption-violating for PRM unless
 8. Store per-replication alarm times / no-alarm indicators plus seed, configuration and source hashes. Aggregate CSVs alone are insufficient.
 9. Publish code, artifact hashes, confidence intervals and the full run command.
 
+## CCTM reproduction details that must be frozen
+
+The official CCTM implementation maps each test score through an empirical CDF built from a fixed calibration set, applies a Dvoretzky–Kiefer–Wolfowitz confidence band, and updates its betting parameter with ONS. Its code exposes both a non-randomized ECDF using the count of calibration scores less than or equal to the test score divided by n, and a randomized ECDF for ties using a uniform tie-break and denominator n+1. These are not interchangeable implementation details. Pin the reference commit and reproduce the paper's exact tie policy, DKW parameter, ONS initialization/bounds, smoothing and threshold before comparing results.
+
+For the documented DKW implementation, the band width is sqrt(log(2/ci_delta)/(2n)). Record both the finite-reference correction and the raw ECDF/tie mode in every run manifest. Do not silently use a deterministic <= ECDF for discrete/tied scores if the target protocol calls for randomized conformal ranks.
+
+## External benchmark translation: from rank streams to control decisions
+
+CMAQ is an assurance layer, not a trajectory predictor. Industry comparison therefore needs two linked evaluations:
+
+1. **Statistical monitor evaluation:** score-to-rank calibration, null false alarms, distribution-shift detection, delay and dependence sensitivity under frozen evidence manifests.
+2. **Decision/system evaluation:** feed a planner's frozen safety/recoverability score stream into the monitor, then measure whether quarantine and fallback happen before the safety margin is exhausted and whether useful operation is preserved.
+
+Use existing public environments without mislabelling their scope:
+
+- **Waymo Open Dataset:** its official site reports active leaderboards in 2026 despite no formal 2026 challenge, and the Motion Dataset contains 103,354 twenty-second segments at 10 Hz. Use motion, interaction-prediction and sim-agent scenarios to derive held-out environmental families and stress scores. The dataset is licensed for non-commercial research and explicitly should not be used to evaluate the real-life performance of a vehicle; it is not physical deployment evidence.
+- **nuPlan:** use its open- and closed-loop simulation framework for long-horizon ego-planning evaluation. Its metric families include traffic-rule violations, collisions/off-road behavior, time-to-collision, vehicle-dynamics feasibility/comfort, goal achievement and scenario-specific interactions. Treat it as a research simulator, not a current live leaderboard claim.
+- **CARLA:** the official Autonomous Driving Leaderboard is permanently closed and its evaluation servers are shut down. A locally reproducible CARLA suite can still supply scenario stress tests, but there is no live CARLA leaderboard submission to target.
+- **Safety-process traceability:** map each scenario to explicit hazards, unsafe control actions, constraints and evidence required to justify fallback. SAE J3307_202503 documents STPA requirements across industries; use it as a process/traceability reference, not as a claim of certification.
+
+For every simulator/data-source experiment, freeze route/scenario, map, weather, interaction class, vehicle/planner version, source trace, calibration split, effective CMAQ-036 dependency block, score definition, fallback policy and software digest. Split by scenario family and common-cause group—not random overlapping clips from the same recording. Record planner outcomes independently from the monitor's own decisions.
+
+The external scorecard should report:
+- collision / contact and traffic-rule violation rates, off-road rate, time-to-collision and minimum signed recoverability margin;
+- intervention lead time: first monitor warning to margin exhaustion;
+- fallback success and fallback completion before the margin is exhausted;
+- spurious quarantine per operating hour or kilometre;
+- safe useful progress / completion under the same fallback budget;
+- p50/p95/p99 assurance latency, CPU/memory overhead and evidence-ingestion delay;
+- worst environment-family results and confidence intervals, not only pooled averages.
+
+The monitor must never be rewarded for avoiding violations by permanently refusing to operate. Report the safety–availability frontier: hazard exposure, unnecessary intervention, safe completion and useful progress together.
+
 ## CMAQ-038 exploratory feature-coverage arm
 
 CMAQ-038 adds a pre-registered dyadic Haar rank-spectrum mixture with 2n directional components for n+1 rank buckets. It is evaluated against the actual CMAQ-031 fixed-four monitor on paired rank streams. Its deliberately trimodal rank-grid alternative is a diagnostic probe, not the raw-score generator used in CMAQ-035 and not a published-paper reproduction. Keep CMAQ-038 results in a separate extension table until the original PRM / CCTM reproduction is complete.
