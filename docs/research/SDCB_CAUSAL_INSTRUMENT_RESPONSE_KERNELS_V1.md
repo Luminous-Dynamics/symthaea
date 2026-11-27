@@ -110,9 +110,17 @@ Both yield the same output covariance at every lag. This is a structural identif
 
 - Do not report a unique physical-process time constant and a unique sensor-response time constant from this single-channel passive data alone.
 - Preserve the observational equivalence class / set of parameter assignments, or report that the physical-vs-instrument attribution is non-identifiable.
-- To distinguish the mechanisms, require additional information such as independently characterized instrument response, a known controlled input/step or frequency sweep, or an independently qualified reference channel with distinct and known response.
+- Because the output is Gaussian, equality of its mean and covariance gives identical finite-dimensional output laws. No passive single-channel statistical test can recover the physical-vs-instrument labels in this equivalence class.
+- A generic step/frequency excitation is **not automatically sufficient**. For the common unit-DC-gain first-order physical relaxation model `dx/dt=lambda*(u-x)` followed by the first-order sensor `dz/dt=mu*(x-z)`, the command-to-output transfer function is `H(s)=lambda*mu/((s+lambda)*(s+mu))`, which is also symmetric under swapping lambda and mu. The commanded input can reveal the unordered pole pair while still failing to label its physical and instrument poles.
+- To break the equivalence, use a traceable step or frequency sweep applied **at the sensor inlet**, bypassing the unknown physical-process dynamics; or use an independently qualified reference channel that observes the latent measurand with known response; or independently characterize one of the two transfer functions. An upstream excitation only qualifies when its physical input-to-state model (including gain and dynamics) is independently known and the resulting combined transfer function demonstrably breaks the pole-swap symmetry.
 - Treat prior-driven pole attribution as prior-sensitive, not as empirical identification.
 - Benchmark both predictive equivalence and causal attribution separately: identical passive predictions may coexist with different physical explanations.
+
+
+
+### Active-calibration caveat
+
+Do not assume "active" automatically means identifiable. With the unit-DC-gain relaxation model above, a known input command still passes through two first-order factors whose transfer-function product is invariant under pole exchange. The benchmark must include an upstream-excitation negative control that remains unresolved, and a sensor-inlet or independent-reference positive control that actually breaks the equivalence.
 
 This identifiability requirement composes with #13691 (active scientific intelligence and hidden mechanism identifiability) and #13567 (exact sequential policy oracle). A calibration action should be selected using the existing decision owner, not by adding a new planner to this response-kernel track.
 
