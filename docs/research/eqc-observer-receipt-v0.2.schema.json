@@ -490,5 +490,150 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "trust_level": {
+            "const": "L2_PLATFORM_ATTESTED"
+          }
+        },
+        "required": [
+          "trust_level"
+        ]
+      },
+      "then": {
+        "properties": {
+          "platform_attestation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "platform_attestation_sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "network": {
+            "properties": {
+              "policy": {
+                "const": "none"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          }
+        },
+        "required": [
+          "network"
+        ]
+      },
+      "then": {
+        "properties": {
+          "network": {
+            "properties": {
+              "bytes_in": {
+                "const": 0
+              },
+              "bytes_out": {
+                "const": 0
+              },
+              "observed_endpoints": {
+                "maxItems": 0
+              },
+              "enforcement": {
+                "const": "enforced"
+              }
+            },
+            "required": [
+              "bytes_in",
+              "bytes_out",
+              "observed_endpoints",
+              "enforcement"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "properties": {
+              "status": {
+                "const": "unchanged"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "properties": {
+              "before_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "after_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "event_log_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "before_sha256",
+              "after_sha256",
+              "event_log_sha256"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "replay": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "replay"
+        ]
+      },
+      "then": {
+        "properties": {
+          "replay": {
+            "properties": {
+              "result_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
