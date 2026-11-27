@@ -65,8 +65,7 @@ jobs:
             src/web_research/mod.rs \
             tests/epistemic_consciousness_tests.rs \
             tools/sym-rsi-epistemic-adjudication/src/lib.rs
-      - name: Check committed formatting (advisory until preview is applied)
-        continue-on-error: true
+      - name: Check committed formatting
         run: |
           rustfmt --edition 2024 --check --config skip_children=true \
             src/web_research/types.rs \
