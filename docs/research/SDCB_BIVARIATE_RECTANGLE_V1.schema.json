@@ -155,6 +155,8 @@
         "conditioning_state_id",
         "conditioning_state_version",
         "common_cause_id",
+        "reference_chain_id",
+        "reference_chain_evidence_version",
         "common_cause_evidence_version",
         "channels",
         "measurement_action_id",
@@ -256,6 +258,14 @@
         },
         "trust_boundary": {
           "type": "string"
+        },
+        "reference_chain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_chain_evidence_version": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
