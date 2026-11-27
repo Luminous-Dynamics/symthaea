@@ -27,7 +27,7 @@ The signed suite uses the MON-028 domain-separated, length-prefixed binary suite
 - resource-budget digest;
 - test cases, family, expected verdict and exact replicate count.
 
-The suite file is created by the benchmark authority and must be signed/custodied separately. The verifier requires the exact expected custody run ID, sequence and previous root (when applicable), as well as an out-of-band trusted public key. The SUT receives the case schedule and inputs, not an editable expected-outcome field in its result schema.
+The suite file is created by the benchmark authority and must be signed/custodied separately. The verifier requires the exact expected custody run ID, sequence and previous root (when applicable), as well as an out-of-band trusted public key. The result bundle must use a different trusted key ID and public key controlled by an independent benchmark observer. The SUT receives the case schedule and inputs, not an editable expected-outcome field in its result schema.
 
 ## 4. Candidate observations
 
@@ -107,7 +107,7 @@ Exact classification agreement is reported separately. The benchmark does not re
 
 ## 8. Matched system comparisons
 
-Candidate and baseline must share:
+The suite and result bundles must be independently verified before scoring. Candidate and baseline must share:
 - same campaign and suite digest;
 - same fault matrix, oracle and workload digest;
 - same hardware/environment digest;
@@ -134,4 +134,4 @@ At least two independent operators should run the same signed suite, pinned SUT 
 
 ## 11. Limitations
 
-The scorer can validate result accounting and independently authored expectations; it cannot prove that the oracle is correct, that a fault was injected as claimed, or that the SUT did not falsify its own observation. MON-025 receipts, MON-026 custody, MON-027 external signing, independent operators and domain-specific checkers remain necessary.
+The scorer can validate result accounting and independently authored expectations; separate custody identities reduce self-certification, but do not prove that the oracle is correct, that a fault was injected as claimed, or that the independent observer did not collude with the SUT. MON-025 receipts, MON-026 custody, MON-027 external signing, independent operators and domain-specific checkers remain necessary.
