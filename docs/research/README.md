@@ -72,7 +72,7 @@ The renderer-independent event, projection, policy, receipt, scene, turn-control
 `crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs`; it checks causal relationships but is not a JSON Schema validator.
 A standalone Bevy 0.20.1 adapter has transition-aware source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
-All 160 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
+All 163 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
 
 ## Theoretical Foundations
 
