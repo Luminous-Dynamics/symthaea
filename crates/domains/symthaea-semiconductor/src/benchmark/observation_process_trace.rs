@@ -535,6 +535,12 @@ fn validate_controller(
         }
         ControllerTrackingStateV1::RetainedPending => {
             if declaration.kind != OnlineControllerKindV1::CaOcrc
+                || !matches!(
+                    row.operational.state,
+                    OperationalAcquisitionStateV1::SelectedPending
+                        | OperationalAcquisitionStateV1::Measured
+                )
+                || controller.proxy_delay_steps.is_none_or(|delay| delay < 0)
                 || controller.feedback_receipt_sha256.is_some()
                 || controller.feedback_update_applied
             {
@@ -548,6 +554,10 @@ fn validate_controller(
             if !op_eligible
                 || controller.feedback_receipt_sha256.is_none()
                 || !controller.feedback_update_applied
+                || !matches!(
+                    row.operational.state,
+                    OperationalAcquisitionStateV1::Measured
+                )
             {
                 return Err(ObservationProcessTraceErrorV1(format!(
                     "round {} consumed feedback requires an eligible K1 label and update receipt",
@@ -559,6 +569,7 @@ fn validate_controller(
             if !op_unqualified
                 || controller.feedback_receipt_sha256.is_none()
                 || controller.feedback_update_applied
+                || row.operational.state != OperationalAcquisitionStateV1::Measured
             {
                 return Err(ObservationProcessTraceErrorV1(format!(
                     "round {} unqualified feedback must be UNKNOWN/BLOCKED and cannot update",
@@ -567,7 +578,13 @@ fn validate_controller(
             }
         }
         ControllerTrackingStateV1::Expired | ControllerTrackingStateV1::Evicted => {
-            if controller.feedback_update_applied {
+            if controller.feedback_update_applied
+                || !matches!(
+                    row.operational.state,
+                    OperationalAcquisitionStateV1::SelectedPending
+                        | OperationalAcquisitionStateV1::Measured
+                )
+            {
                 return Err(ObservationProcessTraceErrorV1(format!(
                     "round {} expired/evicted feedback cannot update an online controller",
                     row.round_id
@@ -689,14 +706,14 @@ fn validate_audit(
             )));
         }
         IndependentAuditStateV1::NotSelected => {
-            if audit.selection_receipt_sha256.is_some()
+            if audit.selection_receipt_sha256.as_deref().is_none_or(|value| !valid_sha256(value))
                 || audit.measurement_receipt_sha256.is_some()
                 || audit.loss.is_some()
                 || audit.independently_archived
                 || audit.archive_receipt_sha256.is_some()
             {
                 return Err(ObservationProcessTraceErrorV1(format!(
-                    "round {} not-selected audit unit carries a measurement/archive",
+                    "round {} not-selected audit unit requires a randomization decision receipt and no measurement/archive",
                     row.round_id
                 )));
             }
@@ -716,6 +733,11 @@ fn validate_audit(
             if audit.selection_receipt_sha256.as_deref().is_none_or(|value| !valid_sha256(value))
                 || audit.measurement_receipt_sha256.as_deref().is_none_or(|value| !valid_sha256(value))
                 || audit.loss.is_none_or(|loss| !loss.is_finite() || !(0.0..=1.0).contains(&loss))
+                || row
+                    .operational
+                    .measurement_system_sha256
+                    .as_deref()
+                    .is_some_and(|value| value == design.reference_method_sha256)
             {
                 return Err(ObservationProcessTraceErrorV1(format!(
                     "round {} measured audit unit requires selection, measurement and bounded-loss evidence",
@@ -921,11 +943,20 @@ pub fn evaluate_observation_process_trace_v1(
                 "selection-risk partition counts disagree with operational observation trace".into(),
             ));
         }
-        if risk_report.independent_audit_estimate.is_some()
-            && input.audit_design.is_none()
-        {
+        let measured_audit_count = input.rows.iter().filter(|row| {
+            row.audit.state == IndependentAuditStateV1::Measured
+        }).count();
+        if let Some(audit_estimate) = &risk_report.independent_audit_estimate {
+            if input.audit_design.is_none()
+                || audit_estimate.audit_sample_count != measured_audit_count
+            {
+                return Err(ObservationProcessTraceErrorV1(
+                    "selection-risk audit sample count/design disagrees with observation trace".into(),
+                ));
+            }
+        } else if measured_audit_count > 0 && input.inventory_complete {
             return Err(ObservationProcessTraceErrorV1(
-                "selection-risk audit estimate has no declared trace audit design".into(),
+                "trace contains measured independent audits but the selection-risk report has no audit estimate".into(),
             ));
         }
         selection_risk_report_sha256 = Some(risk_report.report_sha256.clone());
