@@ -89,10 +89,6 @@
         "operator": {
           "const": "dougherty_fokker_planck"
         },
-        "collision_frequency": {
-          "type": "number",
-          "exclusiveMinimum": 0
-        },
         "self_consistent_temperature": {
           "const": true
         },
@@ -155,7 +151,9 @@
           "end_time",
           "external_drive_schedule",
           "split_role",
-          "independent_initial_state_digest"
+          "independent_initial_state_digest",
+          "initial_condition_parameters",
+          "collision_frequency"
         ],
         "properties": {
           "cohort_id": {
@@ -184,7 +182,8 @@
               "required": [
                 "start_time",
                 "end_time",
-                "amplitude"
+                "amplitude",
+                "frequency"
               ],
               "properties": {
                 "start_time": {
@@ -197,6 +196,10 @@
                 },
                 "amplitude": {
                   "type": "number"
+                },
+                "frequency": {
+                  "type": "number",
+                  "minimum": 0
                 }
               }
             }
@@ -211,6 +214,53 @@
           "independent_initial_state_digest": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
+          },
+          "initial_condition_parameters": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "density_perturbation_amplitude",
+              "stream_speed",
+              "temperature_plus",
+              "temperature_minus",
+              "mixture_weight_mean",
+              "mixture_weight_amplitude",
+              "velocity_shift_amplitude"
+            ],
+            "properties": {
+              "density_perturbation_amplitude": {
+                "type": "number",
+                "minimum": 0
+              },
+              "stream_speed": {
+                "type": "number",
+                "minimum": 0
+              },
+              "temperature_plus": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "temperature_minus": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "mixture_weight_mean": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "mixture_weight_amplitude": {
+                "type": "number",
+                "minimum": 0
+              },
+              "velocity_shift_amplitude": {
+                "type": "number"
+              }
+            }
+          },
+          "collision_frequency": {
+            "type": "number",
+            "exclusiveMinimum": 0
           }
         }
       }
