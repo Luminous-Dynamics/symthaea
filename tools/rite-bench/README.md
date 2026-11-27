@@ -23,11 +23,11 @@ All metrics are emitted separately, with numerator and denominator preserved. Ra
 | Selective reliability | Selective risk | Error rate among non-abstaining decisions |
 | Calibration | Brier score | Mean squared error of P(submitted decision is correct) |
 | Calibration | 10-bin ECE | Weighted absolute calibration gap, fixed equal-width bins |
-| Citations | Citation precision | Eligible claim-specific citations / all cited sources |
-| Independence | Support-origin adequacy | Required tasks meeting the oracle's distinct eligible-origin minimum |
-| Causal robustness | Counterfactual sensitivity | Decision changed when the benchmark's decisive fact changed |
-| Causal robustness | Source-removal sensitivity | Decision changed when a required supporting source was removed |
-| Causal robustness | Placebo invariance | Decision remained stable under a non-decisive placebo change |
+| Citations | Citation precision | Citations eligible for and supporting the evaluator's expected decision / all cited sources |
+| Independence | Decision-support origin adequacy | Required tasks meeting the oracle's distinct eligible-origin minimum for the expected decision |
+| Causal robustness | Counterfactual oracle accuracy | Post-intervention decision matches the oracle after the decisive fact changes |
+| Causal robustness | Source-removal oracle accuracy | Post-removal decision matches the oracle, including abstention when support becomes insufficient |
+| Causal robustness | Placebo invariance | Post-placebo decision matches the unchanged oracle decision |
 | Reproducibility | Replay pass rate | Independent replay, exact contract digest, and exact output-manifest match |
 | Resource discipline | Budget compliance | All declared resource caps respected |
 | Economics | Cost per correct decision | Total measured spend / correct decisions, reported in integer micro-USD |
@@ -41,13 +41,13 @@ A TaskRecord is constructed by the benchmark harness and independent evaluator, 
 - expected_decision is the task oracle's label.
 - submitted_decision is the agent's final label. InsufficientEvidence is the abstention action.
 - confidence_correct means the agent's stated probability that its submitted decision is correct.
-- Citation eligibility and support relation are evaluator-adjudicated against the exact claim.
+- Citation eligibility and support of the expected decision are evaluator-adjudicated against the exact claim. A source may be relevant but contradict the expected conclusion; it does not count as a correct supporting citation.
 - origin_id groups mirrored URLs or re-hosted copies under one underlying origin. Distinct URLs do not imply independent evidence.
-- Counterfactual and source-removal interventions are expected to change the decision; placebo interventions are expected not to.
+- Every intervention carries an explicit post-intervention oracle. Counterfactual and source-removal outputs are scored against that oracle, not merely rewarded for changing. Placebo oracles must preserve the pre-intervention decision.
 - A required replay passes only when an independent replay succeeds and both the contract digest and output manifest match exactly.
 - Resource limits are explicit. Missing limits are not silently interpreted as unlimited budget observations.
 
-The evaluator rejects empty/duplicate task IDs, invalid confidence, empty citation identities, empty budget declarations, and replay evidence on tasks where replay was not required. A missing required replay is scored as a replay failure.
+The evaluator rejects empty/duplicate task IDs, invalid confidence, empty citation identities, empty budget declarations, and replay evidence on tasks where replay was not required. A missing required replay is scored as a replay failure. Resource aggregation uses checked integer addition and returns an error on overflow rather than saturating.
 
 ## Execution
 
