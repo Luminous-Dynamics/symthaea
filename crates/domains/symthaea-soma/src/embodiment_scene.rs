@@ -70,27 +70,48 @@ pub struct SceneElement {
     pub motion: SceneMotion,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EmbodimentSceneFrame {
-    pub schema: String,
-    pub session_id: String,
-    pub clock_domain_id: String,
-    pub event_id: String,
-    pub canonical_cue_digest: String,
-    pub grant_id: String,
-    pub sequence: u64,
-    pub event_kind: EventKind,
-    pub semantic_key: String,
-    pub form: EmbodimentForm,
-    pub motion_mode: MotionMode,
-    pub epistemic_status: EpistemicStatus,
-    pub privacy_class: PrivacyClass,
-    pub source: EventSource,
-    pub observed_at_monotonic_ns: String,
-    pub expires_at_monotonic_ns: String,
+    schema: String,
+    session_id: String,
+    clock_domain_id: String,
+    event_id: String,
+    canonical_cue_digest: String,
+    grant_id: String,
+    sequence: u64,
+    event_kind: EventKind,
+    semantic_key: String,
+    form: EmbodimentForm,
+    motion_mode: MotionMode,
+    epistemic_status: EpistemicStatus,
+    privacy_class: PrivacyClass,
+    source: EventSource,
+    observed_at_monotonic_ns: String,
+    expires_at_monotonic_ns: String,
     /// Privacy-aware, non-colour-only textual equivalent of the essential cue.
-    pub accessible_description: String,
-    pub elements: Vec<SceneElement>,
+    accessible_description: String,
+    elements: Vec<SceneElement>,
+}
+
+impl EmbodimentSceneFrame {
+    pub fn schema(&self) -> &str { &self.schema }
+    pub fn session_id(&self) -> &str { &self.session_id }
+    pub fn clock_domain_id(&self) -> &str { &self.clock_domain_id }
+    pub fn event_id(&self) -> &str { &self.event_id }
+    pub fn canonical_cue_digest(&self) -> &str { &self.canonical_cue_digest }
+    pub fn grant_id(&self) -> &str { &self.grant_id }
+    pub fn sequence(&self) -> u64 { self.sequence }
+    pub fn event_kind(&self) -> EventKind { self.event_kind }
+    pub fn semantic_key(&self) -> &str { &self.semantic_key }
+    pub fn form(&self) -> EmbodimentForm { self.form }
+    pub fn motion_mode(&self) -> MotionMode { self.motion_mode }
+    pub fn epistemic_status(&self) -> EpistemicStatus { self.epistemic_status }
+    pub fn privacy_class(&self) -> PrivacyClass { self.privacy_class }
+    pub fn source(&self) -> &EventSource { &self.source }
+    pub fn observed_at_monotonic_ns(&self) -> &str { &self.observed_at_monotonic_ns }
+    pub fn expires_at_monotonic_ns(&self) -> &str { &self.expires_at_monotonic_ns }
+    pub fn accessible_description(&self) -> &str { &self.accessible_description }
+    pub fn elements(&self) -> &[SceneElement] { &self.elements }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -390,12 +411,12 @@ mod tests {
         }).collect();
         assert_eq!(frames.len(), 7);
         for frame in &frames {
-            assert_eq!(frame.event_id, "event-1");
-            assert_eq!(frame.semantic_key, "conversation.listening.active");
-            assert_eq!(frame.sequence, 0);
-            assert_eq!(frame.privacy_class, PrivacyClass::Public);
+            assert_eq!(frame.event_id(), "event-1");
+            assert_eq!(frame.semantic_key(), "conversation.listening.active");
+            assert_eq!(frame.sequence(), 0);
+            assert_eq!(frame.privacy_class(), PrivacyClass::Public);
         }
-        assert_eq!(frames.iter().map(|frame| frame.elements[0].glyph).collect::<std::collections::HashSet<_>>().len(), 7);
+        assert_eq!(frames.iter().map(|frame| frame.elements()[0].glyph).collect::<std::collections::HashSet<_>>().len(), 7);
     }
 
     #[test]
@@ -437,9 +458,9 @@ mod tests {
                 semantic,
             );
             let frame = compile_scene(&canonical, &permit).unwrap();
-            assert!(!frame.elements.is_empty());
-            assert!(!frame.accessible_description.is_empty());
-            assert_eq!(frame.canonical_cue_digest, permit.cue_digest());
+            assert!(!frame.elements().is_empty());
+            assert!(!frame.accessible_description().is_empty());
+            assert_eq!(frame.canonical_cue_digest(), permit.cue_digest());
         }
     }
 
@@ -452,7 +473,7 @@ mod tests {
         );
         assert_eq!(permit.motion_mode(), MotionMode::Static);
         let frame = compile_scene(&cue, &permit).unwrap();
-        assert!(frame.elements.iter().all(|element| element.motion == SceneMotion::Static));
+        assert!(frame.elements().iter().all(|element| element.motion == SceneMotion::Static));
     }
 
     #[test]
@@ -463,12 +484,12 @@ mod tests {
             SemanticCue::AttentionFocus { target: "private-person".to_owned(), strength: Some(0.9) },
         );
         let frame = compile_scene(&cue, &permit).unwrap();
-        assert!(!frame.accessible_description.contains("private-person"));
-        assert!(frame.accessible_description.contains("Sensitive interaction cue"));
+        assert!(!frame.accessible_description().contains("private-person"));
+        assert!(frame.accessible_description().contains("Sensitive interaction cue"));
         let serialized = serde_json::to_string(&frame).unwrap();
         assert!(!serialized.contains("private-person"));
         assert!(!serialized.contains("evidence:trace-1"));
-        assert!(serialized.contains(&frame.canonical_cue_digest));
+        assert!(serialized.contains(&frame.canonical_cue_digest()));
     }
 
     #[test]
@@ -483,7 +504,7 @@ mod tests {
             },
         );
         let frame = compile_scene(&cue, &permit).unwrap();
-        assert!(frame.elements.iter().any(|element| element.role == SceneRole::Alternative && element.glyph == SceneGlyph::Branch && element.weight.is_none()));
+        assert!(frame.elements().iter().any(|element| element.role == SceneRole::Alternative && element.glyph == SceneGlyph::Branch && element.weight.is_none()));
     }
 
     #[test]
@@ -498,9 +519,9 @@ mod tests {
             },
         );
         let frame = compile_scene(&cue, &permit).unwrap();
-        assert!(frame.elements.iter().any(|element| element.role == SceneRole::Evidence && element.weight.is_none()));
-        assert!(frame.accessible_description.contains("Evidence status reported"));
-        assert!(frame.accessible_description.contains("verifier receipt reference is present"));
+        assert!(frame.elements().iter().any(|element| element.role == SceneRole::Evidence && element.weight.is_none()));
+        assert!(frame.accessible_description().contains("Evidence status reported"));
+        assert!(frame.accessible_description().contains("verifier receipt reference is present"));
     }
 
     #[test]
