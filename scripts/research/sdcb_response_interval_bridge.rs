@@ -17,12 +17,11 @@ pub use interval_observation::{
     IntervalObservationBundle,
     MeasurementWindow,
 };
-pub use response::ResponseModelError;
+pub use response::{FirstOrderResponseOu, ResponseModelError};
 use interval_observation::{
     build_interval_observation_bundle,
     predict_observation_covariance,
 };
-use response::FirstOrderResponseOu;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BridgeError {
