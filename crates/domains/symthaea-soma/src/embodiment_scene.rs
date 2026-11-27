@@ -358,6 +358,7 @@ mod tests {
             expires_at_monotonic_ns: "900".to_owned(),
             epistemic_status: EpistemicStatus::Measured,
             confidence: None,
+            evidence_refs: vec!["evidence:trace-1".to_owned()],
             privacy_class: privacy,
         };
         let mut policy = PresentationPolicy::new(SESSION, CLOCK).unwrap();
@@ -508,7 +509,7 @@ mod tests {
         let serialized = serde_json::to_string(&frame).unwrap();
         assert!(!serialized.contains("private-person"));
         assert!(!serialized.contains("evidence:trace-1"));
-        assert!(serialized.contains(&frame.canonical_cue_digest()));
+        assert!(serialized.contains(frame.canonical_cue_digest()));
     }
 
     #[test]
