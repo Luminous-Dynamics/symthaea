@@ -117,8 +117,11 @@ enum StoredPartV1 {
 struct StoredMemoryRecordV1 {
     id: String,
     user_id: String,
+    session_id: String,
     origin_request_id: String,
     source_request_payload_digest: String,
+    role: super::Role,
+    timestamp_ms: Option<i64>,
     track: String,
     content: StoredContentV1,
 }
@@ -128,8 +131,11 @@ impl StoredMemoryRecordV1 {
         Self {
             id: record.id.clone(),
             user_id: record.user_id.clone(),
+            session_id: record.session_id.clone(),
             origin_request_id: record.origin_request_id.clone(),
             source_request_payload_digest: record.source_request_payload_digest.clone(),
+            role: record.role,
+            timestamp_ms: record.timestamp_ms,
             track: track_name(track).to_owned(),
             content: content_to_stored(&record.content),
         }
@@ -139,8 +145,11 @@ impl StoredMemoryRecordV1 {
         DurableMemoryRecordV1 {
             id: self.id,
             user_id: self.user_id,
+            session_id: self.session_id,
             origin_request_id: self.origin_request_id,
             source_request_payload_digest: self.source_request_payload_digest,
+            role: self.role,
+            timestamp_ms: self.timestamp_ms,
             content: stored_to_content(self.content),
         }
     }
@@ -382,8 +391,11 @@ impl DurableAmlStoreV1 for RedbDurableAmlStoreV1 {
                 .map(|(index, message)| DurableMemoryRecordV1 {
                     id: format!("mace-{}-{index}", &payload_digest[..24]),
                     user_id: request.user_id.clone(),
+                    session_id: request.session_id.clone(),
                     origin_request_id: request.request_id.clone(),
                     source_request_payload_digest: payload_digest.clone(),
+                    role: message.role,
+                    timestamp_ms: message.timestamp_ms,
                     content: message.content.clone(),
                 })
                 .collect();
