@@ -20,6 +20,7 @@ on:
       - "crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs"
       - "crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs"
       - "crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs"
+      - "tools/sym-rsi-decision-replay-contract/**"
       - ".github/workflows/sym-rsi-scientific-decision-replay.yml"
 
 permissions:
@@ -54,6 +55,7 @@ jobs:
             crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs
             crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs
             crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
+            tools/sym-rsi-decision-replay-contract/src/lib.rs
       - name: Restore the exact committed sources
         run: |
           git checkout -- \
@@ -61,6 +63,7 @@ jobs:
             crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
+            tools/sym-rsi-decision-replay-contract/src/lib.rs
       - name: Check formatting on committed sources
         run: |
           rustfmt --edition 2024 --check --config skip_children=true \
@@ -68,6 +71,7 @@ jobs:
             crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
+            tools/sym-rsi-decision-replay-contract/src/lib.rs
       - name: Run isolated decision and custody contract tests
         run: cargo test --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml
       - name: Strict Clippy for isolated contract harness
