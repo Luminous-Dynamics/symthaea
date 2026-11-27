@@ -111,5 +111,35 @@
     ],
     "method": "independent elementwise quadrature of integral exp(Au) Qc exp(A^T u) du"
   },
-  "claim_boundary": "Constructed analytic and independently quadrature-checked fixtures; not physical sensor data."
+  "claim_boundary": "Constructed analytic and independently quadrature-checked fixtures; not physical sensor data.",
+  "gaussian_propagation": {
+    "initial_mean": [
+      1,
+      -2
+    ],
+    "initial_covariance": [
+      [
+        0.5,
+        0.1
+      ],
+      [
+        0.1,
+        0.8
+      ]
+    ],
+    "expected_mean": [
+      0.0377481652013899,
+      -1.0705228570379806
+    ],
+    "expected_covariance": [
+      [
+        0.2600546208095409,
+        0.1586868084984676
+      ],
+      [
+        0.1586868084984676,
+        0.4432523984300951
+      ]
+    ]
+  }
 }
