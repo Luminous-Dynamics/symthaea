@@ -24,12 +24,12 @@ The auditor binds:
 - dataset ID/version/raw digest and split-manifest digest;
 - exact train/validation/test counts;
 - preprocessing graph digest, fit scope, fitted split and fitted-record count;
-- mandatory component implementation digests;
+- mandatory component implementation and configuration digests, with exact set equality;
 - baseline identities/configuration digests;
 - metric definition digests;
 - budget-policy digest, required epochs and resource caps;
 - required output identities/digests;
-- independent replay result bound to the reviewed contract.
+- independent replay result bound to the reviewed contract and exact output artifact list.
 
 A declared, non-critical mismatch is classified as `ExecutedWithDeclaredDeviation`, never as reference reproduction. An undeclared mismatch is unresolved. Resource overruns, incomplete execution, missing required outputs, invalid reference review or missing/failed independent replay remain unresolved even when the producer claims success.
 
