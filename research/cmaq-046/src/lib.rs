@@ -43,11 +43,11 @@ pub struct BoxTarget {
 
 impl BoxTarget {
     pub fn new(lower: Vec<f64>, upper: Vec<f64>) -> Result<Self, ApproachabilityError> {
-        if lower.is_empty() || upper.is_empty() {
-            return Err(ApproachabilityError::EmptyDimension);
-        }
         if lower.len() != upper.len() {
             return Err(ApproachabilityError::DimensionMismatch);
+        }
+        if lower.is_empty() {
+            return Err(ApproachabilityError::EmptyDimension);
         }
         if lower.len() > MAX_DIMENSION {
             return Err(ApproachabilityError::DimensionTooLarge);
@@ -487,7 +487,7 @@ mod tests {
     fn box_support_and_distance_are_exact_for_axis_aligned_examples() {
         let target = target();
         assert!((target.support(&[1.0, -1.0]).unwrap() - 0.3).abs() < 1e-12);
-        assert!((target.distance(&[0.4, -0.5]).unwrap() - 0.5f64.sqrt() * 0.3).abs() < 1e-12);
+        assert!((target.distance(&[0.4, -0.5]).unwrap() - 0.3f64 * 2.0f64.sqrt()).abs() < 1e-12);
         assert_eq!(target.distance(&[0.0, 0.0]).unwrap(), 0.0);
     }
 
@@ -549,10 +549,6 @@ mod tests {
         }
         let report = last.unwrap();
         let left = report.distance_to_target;
-        let right = report
-            .support_residual
-            .mul_add(0.0, 0.0); // keep the per-step term explicit below
-        let _ = right;
         let lhs = left;
         let rhs = (monitor.cumulative_support_residual() + monitor.realized_regret().unwrap())
             / monitor.observations_seen() as f64;
