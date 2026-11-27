@@ -272,16 +272,45 @@ fn main() -> Result<(), String> {
             conditional.push(conditional_alarm);
         }
 
+        let fixed_prechange_alarms = fixed
+            .iter()
+            .filter(|time| time.is_some_and(|alarm| alarm <= config.shift_after))
+            .count();
+        let conditional_prechange_alarms = conditional
+            .iter()
+            .filter(|time| time.is_some_and(|alarm| alarm <= config.shift_after))
+            .count();
+        let fixed_postchange_detections = fixed
+            .iter()
+            .filter(|time| time.is_some_and(|alarm| alarm > config.shift_after))
+            .count();
+        let conditional_postchange_detections = conditional
+            .iter()
+            .filter(|time| time.is_some_and(|alarm| alarm > config.shift_after))
+            .count();
+        let (fixed_median, conditional_median) = match scenario {
+            Scenario::PredictiveNull => ("NA".to_string(), "NA".to_string()),
+            Scenario::StationarySticky => (
+                median_delay(&fixed, config.shift_after)
+                    .map_or_else(|| "NA".into(), |value| value.to_string()),
+                median_delay(&conditional, config.shift_after)
+                    .map_or_else(|| "NA".into(), |value| value.to_string()),
+            ),
+        };
         eprintln!(
-            "{}: replications={} cmaq038_alarms={} cmaq045_alarms={} cmaq038_median_delay={} cmaq045_median_delay={}",
+            "{}: replications={} cmaq038_total_alarms={} cmaq045_total_alarms={} cmaq038_prechange_alarms={} cmaq045_prechange_alarms={} cmaq038_postchange_detections={} cmaq045_postchange_detections={} cmaq038_misses={} cmaq045_misses={} cmaq038_median_delay_conditional={} cmaq045_median_delay_conditional={}",
             scenario.name(),
             config.replications,
             fixed.iter().filter(|time| time.is_some()).count(),
             conditional.iter().filter(|time| time.is_some()).count(),
-            median_delay(&fixed, config.shift_after)
-                .map_or_else(|| "NA".into(), |value| value.to_string()),
-            median_delay(&conditional, config.shift_after)
-                .map_or_else(|| "NA".into(), |value| value.to_string()),
+            fixed_prechange_alarms,
+            conditional_prechange_alarms,
+            fixed_postchange_detections,
+            conditional_postchange_detections,
+            config.replications - fixed_postchange_detections,
+            config.replications - conditional_postchange_detections,
+            fixed_median,
+            conditional_median,
         );
     }
 
