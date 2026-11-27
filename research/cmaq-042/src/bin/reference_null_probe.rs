@@ -11,21 +11,16 @@ use std::env;
 use std::fmt::Write as _;
 
 use cmaq_042_finite_horizon_threshold::{
-    FiniteHorizonGate, ReferenceNullBank, ReferencePathMaximum, TestPathMaximum,
-    ThresholdDecision,
+    FiniteHorizonGate, ReferenceNullBank, ReferencePathMaximum, TestPathMaximum, ThresholdDecision,
 };
 
 const ALPHA_NUMERATOR: u32 = 1;
 const ALPHA_DENOMINATOR: u32 = 20;
 const REFERENCE_COUNT: usize = 99;
-const MONITOR_BUILD: &str =
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const SCORE_DEFINITION: &str =
-    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const RANK_REFERENCE: &str =
-    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-const NULL_SIMULATOR: &str =
-    "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+const MONITOR_BUILD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const SCORE_DEFINITION: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const RANK_REFERENCE: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const NULL_SIMULATOR: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
 #[derive(Clone, Debug)]
 struct SplitMix64 {
@@ -90,7 +85,11 @@ fn path_log_maximum(rng: &mut SplitMix64, horizon: u64) -> f64 {
     let mut maximum = 0.0;
 
     for _ in 0..horizon {
-        log_wealth += if rng.fair_sign() > 0.0 { log_up } else { log_down };
+        log_wealth += if rng.fair_sign() > 0.0 {
+            log_up
+        } else {
+            log_down
+        };
         maximum = maximum.max(log_wealth);
     }
     maximum
@@ -155,9 +154,8 @@ fn run_replication(
         .map_err(|error| format!("test path rejected: {error:?}"))?;
     let reference_reject = matches!(decision, ThresholdDecision::Reject { .. });
     let log_threshold = gate.log_threshold().unwrap_or(f64::INFINITY);
-    let ville_reject = test_log_maximum >= (f64::from(ALPHA_DENOMINATOR)
-        / f64::from(ALPHA_NUMERATOR))
-        .ln();
+    let ville_reject =
+        test_log_maximum >= (f64::from(ALPHA_DENOMINATOR) / f64::from(ALPHA_NUMERATOR)).ln();
 
     writeln!(
         output,
@@ -176,8 +174,7 @@ fn main() -> Result<(), String> {
     let mut ville_rejects = 0usize;
 
     for replication in 0..config.replications {
-        let (reference_reject, ville_reject) =
-            run_replication(replication, config, &mut output)?;
+        let (reference_reject, ville_reject) = run_replication(replication, config, &mut output)?;
         reference_rejects += usize::from(reference_reject);
         ville_rejects += usize::from(ville_reject);
     }
