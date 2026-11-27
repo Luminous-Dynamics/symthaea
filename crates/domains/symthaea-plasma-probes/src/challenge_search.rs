@@ -391,11 +391,13 @@ impl BoxChallengeSearchConfig {
         }
 
         let mut seen = std::collections::HashSet::with_capacity(dimension);
-        for index in 0..dimension {
-            let axis = &self.axis_ids[index];
-            let lower = self.lower_bounds[index];
-            let upper = self.upper_bounds[index];
-            let lipschitz = self.lipschitz_constants[index];
+        for (((axis, &lower), &upper), &lipschitz) in self
+            .axis_ids
+            .iter()
+            .zip(&self.lower_bounds)
+            .zip(&self.upper_bounds)
+            .zip(&self.lipschitz_constants)
+        {
             if axis.trim().is_empty()
                 || !seen.insert(axis)
                 || !lower.is_finite()
