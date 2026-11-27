@@ -638,7 +638,16 @@ mod tests {
         let (closure, binding, attestations) = fixture();
         let qualified =
             build_closure_qualified_rank_reference(&closure, &binding, &attestations).unwrap();
-        assert!(qualified.into_monitor(1, 20).is_ok());
+        let monitor = qualified.into_monitor(1, 20).unwrap();
+        assert_eq!(monitor.calibration_reference_count(), 2);
+        assert_eq!(
+            monitor.diagnostics().calibration_effective_block_count,
+            2
+        );
+        assert_eq!(
+            monitor.diagnostics().closure_manifest_sha256,
+            digest('a')
+        );
     }
 
     #[test]
