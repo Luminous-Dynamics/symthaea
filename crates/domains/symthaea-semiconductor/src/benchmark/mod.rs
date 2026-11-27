@@ -13,6 +13,7 @@ pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
 pub mod qualified_observation_risk;
+pub mod randomized_audit_design;
 pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
 pub mod secom_missingness;
@@ -176,4 +177,16 @@ pub use qualified_observation_risk::{
     QUALIFIED_OBSERVATION_RISK_REPORT_SCHEMA_V1, QUALIFIED_OBSERVATION_RISK_SCHEMA_V1,
     QualifiedObservationRiskErrorV1, QualifiedObservationRiskReportV1, QualifiedObservationUnitV1,
     compute_qualified_observation_risk_v1,
+};
+
+pub use randomized_audit_design::{
+    RANDOMIZED_AUDIT_HT_INPUT_SCHEMA_V1, RANDOMIZED_AUDIT_HT_REPORT_SCHEMA_V1,
+    RANDOMIZED_AUDIT_INPUT_SCHEMA_V1, RANDOMIZED_AUDIT_PAIRWISE_SCHEMA_V1,
+    RANDOMIZED_AUDIT_REPORT_SCHEMA_V1, RandomizedAuditDesignInputV1,
+    RandomizedAuditDesignReportV1, RandomizedAuditErrorV1, RandomizedAuditHtInputV1,
+    RandomizedAuditHtReportV1, RandomizedAuditObservedLossV1,
+    RandomizedAuditPopulationUnitV1, RandomizedAuditUnitSelectionV1,
+    compute_randomized_audit_ht_v1, create_randomized_audit_design_v1,
+    randomized_audit_draw_manifest_digest_v1, randomized_audit_pairwise_inclusion_probability_v1,
+    randomized_audit_population_frame_digest_v1, randomized_audit_target_policy_digest_v1,
 };
