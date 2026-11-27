@@ -54,7 +54,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
         || number(domain, "velocity_cutoff")? <= 0.0
         || !boolean(domain, "velocity_tail_extension_required")?
     {
-        return Err("the VPL domain or velocity-tail convergence contract is invalid".to_owned());
+        return Err(
+            "the VPL domain or velocity-tail convergence contract is invalid".to_owned(),
+        );
     }
 
     let scaling = field(fixture, "perturbation_scaling")?;
@@ -122,12 +124,16 @@ fn audit(fixture: &Value) -> Result<(), String> {
         }
         for trajectory in trajectories {
             let trajectory_id = string(trajectory, "trajectory_id")?;
-            if trajectory_id.trim().is_empty() || !trajectory_ids.insert(trajectory_id.to_owned()) {
+            if trajectory_id.trim().is_empty()
+                || !trajectory_ids.insert(trajectory_id.to_owned())
+            {
                 return Err(format!("trajectory id {trajectory_id} is empty or duplicated"));
             }
             let role = string(trajectory, "split_role")?;
             if role != expected_role {
-                return Err(format!("{trajectory_id} has role {role}, expected {expected_role}"));
+                return Err(format!(
+                    "{trajectory_id} has role {role}, expected {expected_role}"
+                ));
             }
             observed_roles.insert(role.to_owned());
             if !boolean(trajectory, "forward_initialization")? {
@@ -139,7 +145,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
             let p = number(trajectory, "log_power_p")?;
             let epsilon = number(trajectory, "computed_initial_perturbation_amplitude")?;
             if nu < nu_min || nu > nu_max || c <= 0.0 || p < 0.0 {
-                return Err(format!("{trajectory_id} lies outside the registered nu/c/p domain"));
+                return Err(format!(
+                    "{trajectory_id} lies outside the registered nu/c/p domain"
+                ));
             }
             if !c_values.iter().any(|value| *value == c)
                 || !p_values.iter().any(|value| *value == p)
@@ -157,36 +165,48 @@ fn audit(fixture: &Value) -> Result<(), String> {
                 ));
             }
             if epsilon > amplitude_limit {
-                return Err(format!("{trajectory_id} exceeds the small-perturbation design limit"));
+                return Err(format!(
+                    "{trajectory_id} exceeds the small-perturbation design limit"
+                ));
             }
 
             let modes = integer_array(trajectory, "initial_spatial_modes")?;
             if modes.len() < 2 || modes.iter().any(|mode| *mode <= 0) {
-                return Err(format!("{trajectory_id} requires at least two positive spatial modes"));
+                return Err(format!(
+                    "{trajectory_id} requires at least two positive spatial modes"
+                ));
             }
             let distinct_modes = modes.iter().copied().collect::<HashSet<_>>();
             if distinct_modes.len() != modes.len() {
                 return Err(format!("{trajectory_id} contains duplicate initial spatial modes"));
             }
             if integer(trajectory, "echo_cascade_depth")? < 2 {
-                return Err(format!("{trajectory_id} must register at least a two-wave interaction"));
+                return Err(format!(
+                    "{trajectory_id} must register at least a two-wave interaction"
+                ));
             }
             if number(
                 trajectory,
                 "observation_horizon_fraction_of_nu_minus_one_third",
             )? != horizon_fraction
             {
-                return Err(format!("{trajectory_id} does not use the registered observation horizon"));
+                return Err(format!(
+                    "{trajectory_id} does not use the registered observation horizon"
+                ));
             }
 
             let digest = string(trajectory, "initial_state_sha256")?;
             if !is_sha256_hex(digest) || !initial_state_digests.insert(digest.to_owned()) {
-                return Err(format!("{trajectory_id} has an invalid or reused initial-state digest"));
+                return Err(format!(
+                    "{trajectory_id} has an invalid or reused initial-state digest"
+                ));
             }
         }
     }
     if observed_roles.len() != 3 {
-        return Err("training, validation and sealed-holdout roles must all be present".to_owned());
+        return Err(
+            "training, validation and sealed-holdout roles must all be present".to_owned(),
+        );
     }
 
     let qois = string_array(fixture, "registered_qois")?;
