@@ -41,7 +41,7 @@ This is a low-dimensional reference method. The reported outer refinement differ
 - Rank-one PSD inputs are integrated on their exact one-dimensional support by intersecting the two affine channel constraints. This includes exact duplicate channels, perfect negative correlation, and one deterministic channel.
 - Rank-zero covariance is handled as a deterministic rectangle-membership test.
 - A zero-variance coordinate with a nonzero cross-covariance is rejected as non-PSD. Covariance symmetry is checked exactly; no near-symmetric averaging, eigenvalue flooring, diagonal jitter, or silent covariance repair is used. Correlation magnitude above one is rejected as non-PSD.
-- The result reports covariance support rank. Correlation condition is absent for rank-deficient inputs because it is not a finite SPD condition measure.
+- The result reports covariance support rank. Correlation itself is absent when a zero-variance coordinate makes it undefined; the correlation condition estimate is absent for all rank-deficient inputs because it is not a finite SPD condition measure.
 - Standardized normal coordinates are truncated to ([-12,12]); the full-rank result carries an explicit union-bound allowance of (7.1\times10^{-33}). The rank-zero case is deterministic and has no truncation allowance.
 - A rectangle with positive support only beyond the numerical truncation window is rejected as ProbabilityBelowResolution.
 - Zero-width rectangles return zero; invalid or reversed bounds are rejected.
