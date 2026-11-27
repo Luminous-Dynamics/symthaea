@@ -93,6 +93,8 @@ pub enum AcquisitionOutcome {
     RateLimited,
     ProviderFailed,
     HttpError,
+    /// A redirect was returned but not followed; every hop requires explicit validation.
+    RedirectRejected,
     UnsupportedMedia,
     ReadFailed,
     ExtractionFailed,
@@ -110,6 +112,7 @@ impl AcquisitionOutcome {
                 | Self::RateLimited
                 | Self::ProviderFailed
                 | Self::HttpError
+                | Self::RedirectRejected
                 | Self::UnsupportedMedia
                 | Self::ReadFailed
                 | Self::ExtractionFailed
