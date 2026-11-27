@@ -14,6 +14,12 @@ From `benchmarks/frontend/monitoring/sfeb-mon021/cdc-continuity`:
 
 The benchmark harness uses 10, 100, 1,000, 10,000 and 100,000 decoded-event fixtures for capture and replay reconciliation. Fixture setup occurs outside the timed loop.
 
+## Current fixture coverage
+
+The reference benchmark harness uses 10, 100, 1,000, 10,000 and 100,000 decoded events. Each synthetic event has a committed transaction envelope with XID, begin/commit/end LSN and an exact member event ID. The replay benchmark creates a declared overlap window, filters prior event/transaction pairs to that range, then appends a new committed transaction. It does not yet measure multi-event transactions, two-phase transactions, PostgreSQL wire/SQL collection, cryptographic verifier latency or failover coordination.
+
+The test suite includes checks for separate requested and actually-sent acknowledgement values, cluster/timeline binding, exact transaction membership, conflicting commit identity, replay gaps/conflicts, and timeline-fork proof. These tests have not been run against the exact current branch.
+
 ## Correctness-first workload matrix
 
 | Workload | What it measures | Mandatory invariant |
@@ -56,6 +62,6 @@ The end-to-end target is not maximum decoded rows per second. It is maximum **qu
 
 ## Measurement limitations
 
-The current Go package is a semantic envelope checker over normalized slot state/manifests. It is not a live PostgreSQL decoder or replication client. Its booleans and witness markers represent upstream facts that a future pinned verifier/adapter must independently establish. No PostgreSQL server, failover topology, cryptographic verifier, Debezium/Kafka Connect comparator or independent witness is qualified by this file.
+The current Go package is a semantic envelope checker over normalized slot state/manifests. It is not a live PostgreSQL decoder or replication client. It requires source identity in slot/manifest, checks actual sent acknowledgement in addition to requested acknowledgement, and requires a direct parent-timeline/fork-point proof for failover. Replay validation checks transaction envelopes as well as event IDs. Its booleans and witness markers represent upstream facts that a future pinned verifier/adapter must independently establish. No PostgreSQL server, failover topology, cryptographic verifier, Debezium/Kafka Connect comparator or independent witness is qualified by this file.
 
 A numeric benchmark report should be frozen only after the exact committed source is checked out, test/benchmark commands are recorded with hardware/runtime metadata, and result artifacts are attached to the exact commit.
