@@ -1858,7 +1858,7 @@ mod tests {
                     output_without_pair: pair.output_without_pair.clone(),
                 }],
             ),
-            Err(EvaluationErrorV1::PairAblationSetIncomplete)
+            Err(EvaluationErrorV1::DuplicatePairAblation)
         );
     }
 
