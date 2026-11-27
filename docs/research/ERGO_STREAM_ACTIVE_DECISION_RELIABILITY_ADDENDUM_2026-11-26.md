@@ -737,3 +737,27 @@ KITTI's official protocol has 22 stereo sequences (00–10 with public training 
 Source: https://www.cvlibs.net/datasets/kitti/eval_odometry.php
 
 A prospective stereo goal is to reproduce SOFT2 first, then beat 0.53% / 0.0009 deg/m on the official hidden-test protocol using the same modality and fixed-parameter rules. A train-split result is a development result, not leaderboard superiority. This target is research-only and not achieved by Symthaea.
+
+
+## 16. Method comparators for spatial-state construction
+
+The external comparison must distinguish complete SLAM systems, geometry priors, frozen features and long-video memory:
+
+- **ORB-SLAM3:** a complete feature-based visual, visual-inertial and multi-map SLAM system for monocular, stereo and RGB-D modes. It is the classical tracking/relocalization/multi-session baseline. The paper reports 3.5 cm average stereo-inertial accuracy on EuRoC under its own evaluation protocol; reproduce the official dataset metric and do not treat that figure as a universal cross-dataset score. https://doi.org/10.1109/TRO.2021.3075644
+- **MASt3R-SLAM (CVPR 2025):** dense monocular SLAM built around a two-view reconstruction prior with pointmap matching, camera tracking/fusion, graph construction, loop closure and global optimization. The authors report 15 FPS and state-of-the-art performance across the benchmarks they evaluated with known calibration. They also identify lens-distortion/pinhole-training and full-resolution decoder-throughput limitations. Use it in a matched monocular lane, not against stereo/RGB-D numbers. https://openaccess.thecvf.com/content/CVPR2025/html/Murai_MASt3R-SLAM_Real-Time_Dense_SLAM_with_3D_Reconstruction_Priors_CVPR_2025_paper.html
+- **DINOv3:** a frozen dense-feature arm, not a metric SLAM system. Meta reports 7B-scale backbones trained on 1.7B images and high-resolution features for downstream visual tasks. It belongs in #8152's Patch-HDC vs DINOv3 vs hybrid representation test with one fixed downstream geometry/association backend. It does not provide metric scale, trajectory correctness or map topology by itself. https://ai.meta.com/research/dinov3/
+- **LongSpace:** room-tour long-video spatial-memory comparator using sequential chunks, early 3D structural cues and layer-aware memory. Reproduce under its own protocol, separate from OVO-S causal streaming and classical SLAM. https://aclanthology.org/2026.emnlp-main.227/
+
+### Matched method ladder
+
+1. ORB-SLAM3 where sensor modalities match.
+2. MASt3R-SLAM on the same monocular stream and calibration assumptions.
+3. DINOv3 frozen features through the common geometry/association backend.
+4. Patch-HDC features through the exact same backend.
+5. DINOv3/HDC hybrid through the common backend.
+6. Constraint-carrying map state with DecisionNeed-aware acquisition.
+7. No-map/no-geometry/no-persistence/no-loop-closure/no-active-acquisition lesions.
+
+Pin code commit, model and weights digests, preprocessing, camera model, calibration, resolution, precision, hardware and resource budget. Keep off-the-shelf and trained/adapted results separate. The paper-reported 15 FPS is not a comparable runtime number until input and hardware are matched.
+
+The hypothesis is not that HDC replaces SLAM or that a large VLM should be the map authority. It is that replaceable perceptual specialists (including learned dense features and HDC) can feed source-grounded, joint pose/map constraints, temporal revision, topological validation and decision-sufficient acquisition, with an independent evaluator catching unsupported claims. This composition must beat the strongest appropriate specialist at matched cost, not merely outperform weak/no-map baselines.
