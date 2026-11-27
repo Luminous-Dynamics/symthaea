@@ -368,3 +368,14 @@ Each phase has an explicit evidence gate. A design document, synthetic test, com
 ## 10. Decision requests for future review
 
 This RFC chooses a semantic event contract and multiple rendering adapters as the default direction. It does not lock the project to a final visual design, animation engine, humanoid asset standard, or physical hardware. Those choices should follow prototype measurements and user evaluation, not preference alone.
+
+
+## 11. Machine-readable embodiment registry
+
+The seven embodiment IDs and their proposed visual grammars, supported event
+kinds, accessible-text fallbacks, reduced-motion profiles, low-power profiles,
+and sensor/actuator defaults are recorded in
+`docs/research/SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json`.
+The registry confirms that all seven forms are presentation adapters for one
+shared source, not independent agents. It is proposed metadata, not a runtime
+loader or evidence that the renderers exist.
