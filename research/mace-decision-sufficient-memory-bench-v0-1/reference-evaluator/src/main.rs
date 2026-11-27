@@ -396,6 +396,15 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
         r.observation_requests > c.candidate.observation_budget {
         return Err(format!("{id}: retrieved-evidence/observation budget exceeded"));
     }
+    if let Some(receipt) = &r.cost.detailed_receipt {
+        if receipt.schema_version != "mace_dsm_detailed_cost_receipt_v0_1" {
+            return Err(format!("{id}: unsupported detailed-cost receipt schema"));
+        }
+        let mut stages = BTreeSet::new();
+        if receipt.unmeasured_cost_stages.iter().any(|stage| stage.trim().is_empty() || !stages.insert(stage.as_str())) {
+            return Err(format!("{id}: empty or duplicate unmeasured cost stage"));
+        }
+    }
     let event_map: BTreeMap<&str, &SourceEvent> = c.candidate.source_events.iter()
         .map(|e| (e.event_id.as_str(), e)).collect();
     let forbidden: BTreeSet<String> = p.evaluator_private.forbidden_evidence_ids.iter().cloned().collect();
@@ -478,9 +487,26 @@ fn average(values: impl Iterator<Item = f64>) -> Option<f64> {
     let values: Vec<f64> = values.collect();
     (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
 }
+fn optional_u64_stats(values: impl Iterator<Item = Option<u64>>) -> serde_json::Value {
+    let observed: Vec<u64> = values.flatten().collect();
+    json!({
+        "reported_count": observed.len(),
+        "sum_of_reported": observed.iter().copied().sum::<u64>(),
+        "mean_of_reported": if observed.is_empty() { None } else {
+            Some(observed.iter().map(|value| *value as f64).sum::<f64>() / observed.len() as f64)
+        }
+    })
+}
 fn aggregate(key: &str, rows: &[ScoreRow]) -> serde_json::Value {
     let n = rows.len() as f64;
     let latencies: Vec<f64> = rows.iter().filter_map(|r| r.cost.latency_us.map(|x| x as f64)).collect();
+    let detailed = |project: fn(&DetailedCostReceipt) -> Option<u64>| {
+        optional_u64_stats(rows.iter().map(|row| row.cost.detailed_receipt.as_ref().and_then(project)))
+    };
+    let phase = |project: fn(&PhaseTimingsNs) -> u64| {
+        optional_u64_stats(rows.iter().map(|row| row.cost.detailed_receipt.as_ref()
+            .and_then(|receipt| receipt.phase_timings_ns.as_ref().map(project))))
+    };
     json!({
         "key": key, "episodes": rows.len(),
         "mean_loss": average(rows.iter().map(|r| r.loss)),
@@ -516,6 +542,24 @@ fn aggregate(key: &str, rows: &[ScoreRow]) -> serde_json::Value {
         "returned_bytes_reported_count": rows.iter().filter(|r| r.cost.returned_bytes.is_some()).count(),
         "returned_bytes_sum_of_reported": rows.iter().filter_map(|r| r.cost.returned_bytes).sum::<u64>(),
         "detailed_cost_receipt_count": rows.iter().filter(|r| r.cost.detailed_receipt.is_some()).count(),
+        "detailed_cost": {
+            "latency_ns": detailed(|receipt| receipt.latency_ns),
+            "input_tokens": detailed(|receipt| receipt.input_tokens),
+            "model_calls": detailed(|receipt| receipt.model_calls),
+            "tool_calls": detailed(|receipt| receipt.tool_calls),
+            "external_tool_calls": detailed(|receipt| receipt.external_tool_calls),
+            "index_bytes": detailed(|receipt| receipt.index_bytes),
+            "evidence_sidecar_bytes": detailed(|receipt| receipt.evidence_sidecar_bytes),
+            "phase_timings_ns": {
+                "memory_selection": phase(|value| value.memory_selection_ns),
+                "index_build": phase(|value| value.index_build_ns),
+                "retrieval": phase(|value| value.retrieval_ns),
+                "evidence_resolution_verification": phase(|value| value.evidence_resolution_verification_ns),
+                "policy_application": phase(|value| value.policy_application_ns),
+                "unattributed_coordinator": phase(|value| value.unattributed_coordinator_ns),
+                "total_wall": phase(|value| value.total_wall_ns)
+            }
+        },
         "latency_samples": latencies.len(),
         "mean_reported_latency_us": average(latencies.into_iter())
     })
