@@ -303,3 +303,10 @@ The scalar Gaussian interval routine now caches the 64-point Gauss–Legendre ru
 A separate preregistration is now available in docs/research/SDCB_QUANT_REAL_DATA_TOURNAMENT_V1.md. It specifies the 52-device/three-site/2019–2022 CEDA QUANT data cohort, OGL v3 attribution, provider QC custody, device/site/time splits, matched OLS/GDR/C-GDR and temporal-state-space baselines, calibration coverage and decision-value metrics. It explicitly distinguishes the public CEDA low-cost sensor archive from the paper-specific one-minute reference series used by Kok and Tabandeh (2026), whose article says supporting data are available from the corresponding author on reasonable request.
 
 The CEDA catalogue and MAQS listing have been inspected, but the attempt to retrieve a small instrument CSV failed at the archive/file-download endpoint. No QUANT bytes were downloaded, no file checksum was generated and no raw data were parsed. This is a benchmark preregistration and data-access blocker, not a model result. The paper's published six-case numerical tables have been pinned as replication targets; SDCB must first reproduce OLS/GDR-family/C-GDR by their stated uncertainty regimes before claiming gains.
+
+
+## Per-cell joint-likelihood diagnostics and QUANT tracking — 27 November 2026
+
+The bivariate joint-bin adapter now preserves a per-outcome-cell diagnostics matrix aligned with the probabilities: covariance support rank, correlation and condition estimate where defined, truncation allowance, outer refinement indicator and outer-integrand evaluation count. The indicator is not a certified total error bound; the matrix supports audit but does not yet implement decision-margin-driven numerical refinement.
+
+The QUANT real-data protocol is tracked separately in #13974 and documented in docs/research/SDCB_QUANT_REAL_DATA_TOURNAMENT_V1.md. It requires data custody and instrument/QC metadata, leave-one-device/family/site and chronological splits, and exact reproduction of Kok–Tabandeh's OLS/GDR/C-GDR and short-window process-covariance results before SDCB superiority claims. The CEDA files have not been successfully acquired or parsed in this execution.
