@@ -458,10 +458,7 @@ mod tests {
     #[test]
     fn regime_grid_has_complete_finite_report_receipts() {
         let reports = run_suite(20);
-        assert_eq!(
-            reports.len(),
-            2 * 2 * 2
-        );
+        assert_eq!(reports.len(), 2 * 2 * 2);
         for report in reports {
             assert_eq!(report.calibration_blocks, CALIBRATION_BLOCKS);
             assert_eq!(report.trials, 20);
