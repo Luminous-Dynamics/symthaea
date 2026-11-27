@@ -17,3 +17,5 @@ pub mod temporal_reliability;
 pub mod music_listen_bench;
 
 pub mod music_performance_identity;
+
+pub mod music_performance_identity_inference;
