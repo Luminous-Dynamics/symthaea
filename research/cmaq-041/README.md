@@ -26,7 +26,7 @@ All ten evidence digests must be 64-character lowercase hexadecimal SHA-256 valu
 
 ## Output scorecard
 
-The evaluator returns both an overall scorecard and a sorted per-family breakdown. It reports raw episode count and unique effective closure-block count separately; repeated clips or runs from one block do not inflate the latter. It reports these as separate metrics, never as a single composite scalar:
+The evaluator returns an overall scorecard, a sorted per-family breakdown, and a sorted per-effective-block breakdown. It reports raw episode count and unique effective closure-block count separately; repeated clips or runs from one block do not inflate the latter. The block-grouped output preserves a suitable resampling/audit unit for later cluster-aware uncertainty calculations. It reports these as separate metrics, never as a single composite scalar:
 
 - intervention-required episodes;
 - timely warnings versus late/missing warnings;
