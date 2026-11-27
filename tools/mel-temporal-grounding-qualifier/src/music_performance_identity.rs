@@ -511,6 +511,14 @@ fn validate_triad(triad: &MusicalPerformanceIdentityTriadV1, index: usize) -> Re
         }
     }
 
+    if triad.clean.response.question != triad.performance_stay.response.question
+        || triad.clean.response.question != triad.musical_flip.response.question
+    {
+        return Err(format!(
+            "triads[{index}] CLEAN, performance-STAY and musical-FLIP must use identical question bytes"
+        ));
+    }
+
     let clean = &triad.clean;
     let stay = &triad.performance_stay;
     let flip = &triad.musical_flip;
@@ -1150,6 +1158,29 @@ mod tests {
         item.clean.response.model_answer = MusicListenAnswerV1::ChoiceB;
         let report = audit_musical_performance_identity(&case(vec![item])).unwrap();
         assert_eq!(report.overall.clean.accuracy, Some(1.0));
+    }
+
+    #[test]
+    fn all_variants_must_use_identical_question_bytes() {
+        let item = triad(
+            MusicalIdentityPropertyV1::ChordQuality,
+            PerformanceStayFactorV1::DifferentTakeSamePerformer,
+            MusicalFlipFactorV1::ChordQualityChange,
+        );
+        assert!(audit_musical_performance_identity(&case(vec![item.clone()])).is_ok());
+
+        let mut stay_prompt_drift = item.clone();
+        stay_prompt_drift.performance_stay.response.question.push(' ');
+        stay_prompt_drift.performance_stay.response.question_sha256 =
+            sha256_hex(stay_prompt_drift.performance_stay.response.question.as_bytes());
+        assert!(audit_musical_performance_identity(&case(vec![stay_prompt_drift])).is_err());
+
+        let mut flip_prompt_drift = item;
+        flip_prompt_drift.musical_flip.response.question =
+            "Is the target chord quality the same?".into();
+        flip_prompt_drift.musical_flip.response.question_sha256 =
+            sha256_hex(flip_prompt_drift.musical_flip.response.question.as_bytes());
+        assert!(audit_musical_performance_identity(&case(vec![flip_prompt_drift])).is_err());
     }
 
     #[test]
