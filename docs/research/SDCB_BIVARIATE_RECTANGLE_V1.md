@@ -1,6 +1,6 @@
 # SDCB bivariate Gaussian rectangle reference v1
 
-**Status:** bounded, two-channel numerical reference authored in Rust. Seventeen tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
+**Status:** bounded, two-channel numerical reference authored in Rust. Eighteen tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
 
 ## 1. Why this increment
 
@@ -32,7 +32,7 @@ P(\ell_1<Y_1\le u_1,\ell_2<Y_2\le u_2)
 
 The implementation uses deterministic adaptive Simpson integration for the outer conditional integral. Inner standard-normal interval masses reuse the direct-tail 64-point Gauss–Legendre routine from #13944. It splits the integration range at conditional-transition locations (including several conditional-standard-deviation offsets) so a narrow high-correlation transition is less likely to hide between initial samples.
 
-This is a low-dimensional reference method. The reported outer refinement difference is an **error indicator**, not a formally certified total error bound. Inner quadrature and total results must still be checked against independent high-precision calculations.
+This is a low-dimensional reference method. The reported outer refinement difference is an **error indicator**, not a formally certified total error bound. The one-million-call cap is a hard limit on outer integrand evaluations; it does not count the fixed 64-point inner Gaussian quadrature nodes and must not be presented as a total floating-point operation count. Inner quadrature and total results must still be checked against independent high-precision calculations.
 
 ## 3. Covariance and tail policy
 
@@ -79,7 +79,7 @@ These are mathematical numerical fixtures, not measured sensor probabilities. Or
 
 ## 6. Tests and limits
 
-The 17 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, even-small-asymmetry rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, and bounded evaluation.
+The 18 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, even-small-asymmetry rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, and bounded evaluation, including a no-overrun check for the outer integrand-evaluation budget.
 
 Not implemented:
 - trivariate or general n-variate integration;
