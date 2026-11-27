@@ -100,6 +100,7 @@ pub enum AcquisitionOutcome {
     DuplicateSuppressed,
     UrlPolicyRejected,
     DnsPolicyRejected,
+    RedirectRejected,
 }
 
 impl AcquisitionOutcome {
@@ -118,6 +119,7 @@ impl AcquisitionOutcome {
                 | Self::BudgetExceeded
                 | Self::UrlPolicyRejected
                 | Self::DnsPolicyRejected
+                | Self::RedirectRejected
         )
     }
 }
