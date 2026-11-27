@@ -22,7 +22,16 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-      - name: Formatting
+      - name: Normalize source with the pinned formatter
+        run: cargo fmt --manifest-path tools/methode-fidelity-harness/Cargo.toml
+      - name: Upload rustfmt-normalized source for exact commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: methode-rustfmt-source
+          path: tools/methode-fidelity-harness/src/lib.rs
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify formatting
         run: cargo fmt --manifest-path tools/methode-fidelity-harness/Cargo.toml -- --check
       - name: Unit and adversarial conformance tests
         run: cargo test --manifest-path tools/methode-fidelity-harness/Cargo.toml --locked
