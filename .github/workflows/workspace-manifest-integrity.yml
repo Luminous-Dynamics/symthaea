@@ -1,0 +1,178 @@
+name: Workspace Manifest Integrity
+
+on:
+  push:
+    branches:
+      - fix/workspace-stale-member-exclusion-20261121
+    paths:
+      - "Cargo.toml"
+      - ".github/workflows/workspace-manifest-integrity.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - ".github/workflows/workspace-manifest-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workspace-manifest-integrity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manifest:
+    name: Exact-head Cargo workspace integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact tested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          echo "exact workspace source head: $actual"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Detect stale wildcard member directories before Cargo resolution
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import glob
+          import pathlib
+          import tomllib
+
+          with open("Cargo.toml", "rb") as source:
+              workspace = tomllib.load(source)["workspace"]
+
+          excluded = set(workspace.get("exclude", []))
+          unresolved = []
+          for pattern in workspace.get("members", []):
+              if not any(token in pattern for token in "*?["):
+                  continue
+              for match in glob.glob(pattern):
+                  path = pathlib.Path(match)
+                  if path.is_dir() and not (path / "Cargo.toml").is_file():
+                      if path.as_posix() not in excluded:
+                          unresolved.append(path.as_posix())
+
+          if unresolved:
+              raise SystemExit(
+                  "Wildcard member directories without Cargo.toml must be explicitly excluded:\n"
+                  + "\n".join(sorted(unresolved))
+              )
+          print("all wildcard-matched directories without Cargo.toml are explicitly excluded")
+          PY
+
+      - name: Resolve every workspace manifest
+        run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/workspace-metadata.json"
+
+      - name: Verify every workspace member has a manifest
+        shell: bash
+        run: |
+          python3 - "$RUNNER_TEMP/workspace-metadata.json" <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as source:
+              metadata = json.load(source)
+
+          packages = {package["id"]: package for package in metadata["packages"]}
+          missing = []
+          for member in metadata["workspace_members"]:
+              package = packages.get(member)
+              if package is None:
+                  missing.append(f"member is not present in package metadata: {member}")
+                  continue
+              manifest = package["manifest_path"]
+              if not os.path.isfile(manifest):
+                  missing.append(f"workspace member manifest is missing: {manifest}")
+
+          if missing:
+              raise SystemExit("\n".join(missing))
+          print(f"validated {len(metadata['workspace_members'])} workspace member manifests")
+          PY
+
+      - name: Compile Muse library against the real workspace
+        run: cargo check --locked -p symthaea-muse --lib
+
+      - name: Compile Muse library tests against the real workspace
+        run: cargo test --locked -p symthaea-muse --lib --no-run
+
+      - name: Record exact-head workspace evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/workspace-manifest-evidence"
+          mkdir -p "$evidence"
+          cp Cargo.toml "$evidence/Cargo.toml"
+          cp "$RUNNER_TEMP/workspace-metadata.json" "$evidence/workspace-metadata.json"
+          (
+            cd "$evidence"
+            sha256sum Cargo.toml workspace-metadata.json > SHA256SUMS
+          )
+          printf 'exact_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-identities.txt"
+
+      - name: Upload workspace qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-manifest-integrity-${{ github.sha }}
+          path: ${{ runner.temp }}/workspace-manifest-evidence/
+          if-no-files-found: error
+          retention-days: 90
+
+  lockfile-diagnostic:
+    name: Diagnose required lockfile delta (non-qualifying)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Compute candidate lockfile and attempt Muse package check
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/workspace-lockfile-diagnostic"
+          mkdir -p "$evidence"
+          printf 'exact_head=%s\n' "$(git rev-parse HEAD)" > "$evidence/source-identities.txt"
+          sha256sum Cargo.lock > "$evidence/original-lock.sha256"
+          set +e
+          cargo check -p symthaea-muse --lib > "$evidence/cargo-check.log" 2>&1
+          status=$?
+          set -e
+          printf 'cargo_check_exit=%s\n' "$status" >> "$evidence/source-identities.txt"
+          cp Cargo.lock "$evidence/candidate-Cargo.lock"
+          git diff -- Cargo.lock > "$evidence/Cargo.lock.diff"
+          sha256sum "$evidence/candidate-Cargo.lock" > "$evidence/candidate-lock.sha256"
+          echo "unlocked check exit code: $status"
+          echo "candidate lockfile captured; this diagnostic job does not qualify the package"
+
+      - name: Upload candidate lockfile diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-lockfile-diagnostic-${{ github.sha }}
+          path: ${{ runner.temp }}/workspace-lockfile-diagnostic/
+          if-no-files-found: warn
+          retention-days: 14
