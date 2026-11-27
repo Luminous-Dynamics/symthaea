@@ -150,3 +150,13 @@ The claim-relative module now exposes a guarded registration function joining a 
 A passing claim test therefore cannot bypass projection dependency checks, register against the old source event, or resurrect the prior projection ID. Failed, skipped, unverified or inconclusive checks cannot use the guarded path.
 
 This extends the previous policy reference to an integrated in-memory qualification path. It still does not rebuild external embeddings, lexical stores, remote caches, replicas or backups, and it does not provide durable/atomic multi-store coordination. Fourteen deterministic tests are authored across assessment and rebuild integration; they are not executed here.
+
+
+## 11. Store metamemory snapshot
+
+The temporal projection index now exposes a value-free `metamemory_summary` view. It reports the active source-event count, projection count, exact lifecycle-state and projection-kind counts, an ordered inventory of available metadata attributes, ledger and projection-index sequences, and state commitments. The summary refuses to emit if the projection index is behind the source ledger, and its verifier rejects malformed inventories, count mismatches and overflowing count inputs.
+
+The summary deliberately omits record IDs and memory content. Scope authorization, source authenticity and freshness against a newer external head remain caller/store responsibilities. See [MACE Store Metamemory Summary V1](MACE_STORE_METAMEMORY_SUMMARY_V1.md). Eight deterministic summary tests are authored; they have not been executed.
+
+
+The index also exposes `verify_metamemory_summary(ledger, summary)`, which recomputes the value-free snapshot from the current authoritative ledger and exact projection index and requires equality. Internal self-digest verification alone is not treated as freshness. A summary can be internally consistent and still stale; the live-state comparison rejects it.

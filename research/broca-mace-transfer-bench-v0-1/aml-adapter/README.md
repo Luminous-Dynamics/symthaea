@@ -158,7 +158,7 @@ The `temporal_projection` module is exported alongside the streaming ledger. It 
 
 The index propagates invalidation through all descendants, emits a self-committing projection-invalidation receipt, refuses new projections built from non-current parents, and supports rebuilds under new IDs. Source revalidation does not revive old projections. Rights-erasure acknowledgements clear the in-memory projection content/dependency commitments but do not prove deletion from external stores.
 
-Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Twelve deterministic projection-index tests are authored; none have been executed.
+Protocol: [MACE Derived-Memory Invalidation V1](../../../docs/research/MACE_DERIVED_MEMORY_INVALIDATION_V1.md). Twenty deterministic projection-index tests are authored; none have been executed.
 
 
 ## Claim-relative derived-memory revalidation
@@ -173,3 +173,12 @@ Protocol and schema: [MACE Claim-Relative Invalidation V1](../../../docs/researc
 
 
 The guarded function `register_rebuilt_projection_after_claim_revalidation_v1` connects a passing claim assessment to the temporal projection index. It requires a valid assessment bound to the exact retained correction receipt, an index that has consumed that transition, and a new projection whose source dependencies include the corrected event rather than the superseded source event. Failed/unverified claims and stale source dependencies cannot enter this path. Fourteen tests are authored for claim assessment and rebuild integration; they have not been executed.
+
+
+## Store metamemory summary
+
+The temporal projection index exposes `metamemory_summary(&ledger)`, a value-free view of active source count, projection count, per-lifecycle and per-kind counts, the exact available metadata-attribute inventory, matching ledger/index sequence numbers and integrity commitments. It refuses to return a summary while the projection index is behind the authoritative session ledger.
+
+The summary omits record IDs, user identifiers and memory content. The caller must still enforce tenant/role authorization and compare freshness against a trusted current head. Protocol: [MACE Store Metamemory Summary V1](../../../docs/research/MACE_STORE_METAMEMORY_SUMMARY_V1.md); schema: [mace_store_metamemory_summary_v1.schema.json](../../../data/schemas/mace_store_metamemory_summary_v1.schema.json). Eight deterministic summary tests are authored but not executed.
+
+Use `verify_metamemory_summary(&ledger, &summary)` to compare a supplied summary with a fresh recomputation from the current ledger and exact index. This detects internally consistent but stale or self-resealed forged summaries; it does not replace store authenticity or caller authorization.

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_store_metamemory_summary_v1.schema.json",
+  "title": "MACE Store Metamemory Summary V1",
+  "description": "Value-free, integrity-committed aggregate view of one temporal memory store. Schema validity does not establish authorization, authenticity, freshness, or correctness of external storage state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scope_commitment_sha256",
+    "ledger_sequence",
+    "projection_index_sequence",
+    "active_source_event_count",
+    "projection_count",
+    "available_attributes",
+    "status_counts",
+    "kind_counts",
+    "ledger_snapshot_sha256",
+    "projection_index_state_sha256",
+    "summary_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "scope_commitment_sha256": { "$ref": "#/$defs/sha256" },
+    "ledger_sequence": { "type": "integer", "minimum": 0 },
+    "projection_index_sequence": { "type": "integer", "minimum": 0 },
+    "active_source_event_count": { "type": "integer", "minimum": 0 },
+    "projection_count": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+    "available_attributes": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "lifecycle_status",
+          "projection_kind",
+          "built_at_sequence",
+          "source_dependency_count",
+          "parent_dependency_count",
+          "invalidation_receipt_present",
+          "replacement_link_present",
+          "erasure_receipt_present"
+        ]
+      }
+    },
+    "status_counts": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/status_count" }
+    },
+    "kind_counts": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/kind_count" }
+    },
+    "ledger_snapshot_sha256": { "$ref": "#/$defs/sha256" },
+    "projection_index_state_sha256": { "$ref": "#/$defs/sha256" },
+    "summary_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "status_count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "count"],
+      "properties": {
+        "status": {
+          "enum": [
+            "Current",
+            "Stale",
+            "Quarantined",
+            "Revoked",
+            "ErasureRequested",
+            "Rebuilt",
+            "Erased"
+          ]
+        },
+        "count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "kind_count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "count"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "Summary",
+            "Embedding",
+            "PreferenceModel",
+            "Plan",
+            "FactIndex",
+            "AnswerCache",
+            "Other"
+          ]
+        },
+        "count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
