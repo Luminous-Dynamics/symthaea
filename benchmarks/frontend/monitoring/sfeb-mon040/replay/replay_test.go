@@ -40,7 +40,7 @@ func fixture(n int)Input{
 	return Input{
 		Profile:Profile,Version:Version,TrialID:"trial-040-001",Mode:OfflineFixture,
 		EvaluatedAt:now,ScenarioSHA256:scenarioSHA,RecoveryBoundarySHA256:boundarySHA,
-		CodeRevision:revision,FaultSetSHA256:faultSetSHA,TargetFailureSignatureSHA256:targetSignature,
+		CodeRevision:revision,FaultIDs:[]string{"fault-a","fault-c"},FaultSetSHA256:faultSetSHA,TargetFailureSignatureSHA256:targetSignature,
 		RequiredRuns:n,MinimumReliability:0.90,ConfidenceLevel:0.95,Observations:observations,
 	}
 }
@@ -142,4 +142,23 @@ func BenchmarkEvaluateTwentyNineReplays(b *testing.B){
 func BenchmarkEvaluateTwoHundredReplays(b *testing.B){
 	in:=fixture(200);b.ReportAllocs();b.ResetTimer()
 	for i:=0;i<b.N;i++{_ = Evaluate(in)}
+}
+
+
+func TestMissingFaultIDListBlocks(t *testing.T) {
+	in:=fixture(29)
+	in.FaultIDs=nil
+	got:=Evaluate(in)
+	if got.ReproducibilityVerdict!=Blocked {
+		t.Fatalf("omitted fault list must block: %+v",got)
+	}
+}
+
+func TestFaultIDListMustMatchDigest(t *testing.T) {
+	in:=fixture(29)
+	in.FaultIDs=[]string{"fault-a","fault-b"}
+	got:=Evaluate(in)
+	if got.ReproducibilityVerdict!=Blocked {
+		t.Fatalf("fault-list/digest mismatch must block: %+v",got)
+	}
 }
