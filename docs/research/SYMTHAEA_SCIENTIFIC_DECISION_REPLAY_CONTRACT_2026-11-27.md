@@ -305,7 +305,7 @@ Implemented in this branch:
 - fifteen authored decision-contract tests;
 - custodian-only replay-archive/evaluator projection, BLAKE3 digests, opaque IDs, empty/disjoint-root checks, no-overwrite writes, manifest-last materialization and disk-readback checks;
 - decision-time observation-prefix builder with digest and out-of-range rejection;
-- nine authored custody/prefix tests, five AS-Bench payload tests, two materializer output-root tests and a capsule materializer example (31 authored unit tests across the new Rust files; 29 are covered by the standalone harness and the two materializer tests still await the production-example workspace build).
+- nine authored custody/prefix tests, seven AS-Bench payload/offer-binding tests, two materializer output-root tests and a capsule materializer example (33 authored unit tests across the new Rust files; 31 are covered by the standalone harness and the two materializer tests still await the production-example workspace build).
 
 Not implemented or not yet verified:
 - the ten worlds have not been generated or split in this environment; the existing source seed split is public and is not a sealed confirmatory split;
@@ -317,7 +317,7 @@ Not implemented or not yet verified:
 Verification boundary (exact PR head `067cca73ebb7cab162d146342ed41927a94a3087`):
 - Focused Rust 1.96 PR and push workflow runs both succeeded after the standalone dependency lockfile was committed.
 - `rustfmt --check` passed for all included production support modules and the standalone harness.
-- Standalone harness ran with `--locked`, compiled the production support-module source against shape-matched domain shims, and passed **29/29 tests**: 15 decision-contract, 9 custody/prefix and 5 AS-Bench payload tests.
+- Standalone harness ran with `--locked`, compiled the production support-module source against shape-matched domain shims, and passed **31/31 tests**: 15 decision-contract, 9 custody/prefix and 7 AS-Bench payload/offer-binding tests.
 - Strict Clippy with `--locked` for all standalone harness targets passed.
 - The lockfile is committed at `tools/sym-rsi-decision-replay-contract/Cargo.lock` (30 registry/workspace package entries).
 - This is isolated schema/custody/adapter-contract qualification only. It does not establish integration with the real `symthaea-futures-symtropy` crate, a full workspace build, or compilation of the capsule-materializer example; its two output-root tests remain outside the standalone harness.
