@@ -111,5 +111,49 @@
     "bayes_accuracy": "for equal priors, optimal classification accuracy=(1+TV)/2; substituting the TV upper bound yields an upper bound, not an achieved classifier score",
     "high_precision_reference": "mpmath 60 decimal digits in the authoring runtime; source parameters and formulas are frozen here for independent replay"
   },
-  "claim_boundary": "A synthetic finite-sample Gaussian-process identifiability reference. No physical sensor calibration, traceability, QUANT result, or SOTA performance is established."
+  "claim_boundary": "A synthetic finite-sample Gaussian-process identifiability reference. No physical sensor calibration, traceability, QUANT result, or SOTA performance is established.",
+  "fixed_sample_count_interval_sensitivity": {
+    "purpose": "Explore the joint effect of temporal spacing and observation horizon at a fixed 32-sample cost. This is a finite candidate-grid comparison, not a continuous optimum.",
+    "samples": 32,
+    "readout_noise_variance": "0.1",
+    "candidate_sample_intervals": [
+      {
+        "sample_interval": "0.1",
+        "observation_horizon": "3.1",
+        "kl_a_to_b": "0.000159870650617048704235035661059",
+        "kl_b_to_a": "0.000160730491600539894587335336311"
+      },
+      {
+        "sample_interval": "0.25",
+        "observation_horizon": "7.75",
+        "kl_a_to_b": "0.000237458040220367418461942115067",
+        "kl_b_to_a": "0.000238530556044180767265976829434"
+      },
+      {
+        "sample_interval": "0.5",
+        "observation_horizon": "15.5",
+        "kl_a_to_b": "0.000256833652934392910351219648006",
+        "kl_b_to_a": "0.000258055882724519170373108490539"
+      },
+      {
+        "sample_interval": "1.0",
+        "observation_horizon": "31.0",
+        "kl_a_to_b": "0.0000983278542217618636609345824017",
+        "kl_b_to_a": "0.0000986619533174646573670190117791"
+      },
+      {
+        "sample_interval": "2.0",
+        "observation_horizon": "62.0",
+        "kl_a_to_b": "0.0000157437383764742624385569972525",
+        "kl_b_to_a": "0.0000157653378499783301332773536119"
+      },
+      {
+        "sample_interval": "4.0",
+        "observation_horizon": "124.0",
+        "kl_a_to_b": "0.00000187924026148223060485427018917",
+        "kl_b_to_a": "0.00000188000188800181559985681683284"
+      }
+    ],
+    "interpretation": "Among this declared six-point grid, sample interval 0.5 has the largest directional KL (in either direction). Very short spacing uses the same sample budget over too short a horizon; very long spacing undersamples the response dynamics. This is not a globally optimal interval and must be compared under explicit elapsed-time and acquisition-cost budgets."
+  }
 }
