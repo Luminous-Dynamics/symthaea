@@ -1811,6 +1811,98 @@ mod tests {
     }
 
     #[test]
+    fn pairwise_intervention_rejects_incomplete_and_duplicate_pair_sets() {
+        let full = run("mace", "hold", &["signed-current", "signed-release-gate"]);
+        let singles = vec![
+            EvidenceAblationV1 {
+                removed_evidence_id: "signed-current".to_owned(),
+                output_without_evidence: CandidateRunV1 {
+                    retrieved_evidence_ids: vec!["signed-release-gate".to_owned()],
+                    decision_support_evidence_ids: vec!["signed-release-gate".to_owned()],
+                    chosen_action: "hold".to_owned(),
+                    ..full.clone()
+                },
+            },
+            EvidenceAblationV1 {
+                removed_evidence_id: "signed-release-gate".to_owned(),
+                output_without_evidence: CandidateRunV1 {
+                    retrieved_evidence_ids: vec!["signed-current".to_owned()],
+                    decision_support_evidence_ids: vec!["signed-current".to_owned()],
+                    chosen_action: "hold".to_owned(),
+                    ..full.clone()
+                },
+            },
+        ];
+        let pair_output = CandidateRunV1 {
+            retrieved_evidence_ids: vec![],
+            decision_support_evidence_ids: vec![],
+            chosen_action: "abstain".to_owned(),
+            ..full.clone()
+        };
+        let pair = EvidencePairAblationV1 {
+            left_evidence_id: "signed-current".to_owned(),
+            right_evidence_id: "signed-release-gate".to_owned(),
+            output_without_pair: pair_output,
+        };
+        assert_eq!(
+            score_pairwise_interactions(&case(), &full, &singles, &[]),
+            Err(EvaluationErrorV1::PairAblationSetIncomplete)
+        );
+        assert_eq!(
+            score_pairwise_interactions(
+                &case(),
+                &full,
+                &singles,
+                &[pair.clone(), EvidencePairAblationV1 {
+                    left_evidence_id: "signed-release-gate".to_owned(),
+                    right_evidence_id: "signed-current".to_owned(),
+                    output_without_pair: pair.output_without_pair.clone(),
+                }],
+            ),
+            Err(EvaluationErrorV1::PairAblationSetIncomplete)
+        );
+    }
+
+    #[test]
+    fn pairwise_intervention_rejects_a_pair_output_that_retains_one_target() {
+        let full = run("mace", "hold", &["signed-current", "signed-release-gate"]);
+        let singles = vec![
+            EvidenceAblationV1 {
+                removed_evidence_id: "signed-current".to_owned(),
+                output_without_evidence: CandidateRunV1 {
+                    retrieved_evidence_ids: vec!["signed-release-gate".to_owned()],
+                    decision_support_evidence_ids: vec!["signed-release-gate".to_owned()],
+                    chosen_action: "hold".to_owned(),
+                    ..full.clone()
+                },
+            },
+            EvidenceAblationV1 {
+                removed_evidence_id: "signed-release-gate".to_owned(),
+                output_without_evidence: CandidateRunV1 {
+                    retrieved_evidence_ids: vec!["signed-current".to_owned()],
+                    decision_support_evidence_ids: vec!["signed-current".to_owned()],
+                    chosen_action: "hold".to_owned(),
+                    ..full.clone()
+                },
+            },
+        ];
+        let invalid_pair = EvidencePairAblationV1 {
+            left_evidence_id: "signed-current".to_owned(),
+            right_evidence_id: "signed-release-gate".to_owned(),
+            output_without_pair: CandidateRunV1 {
+                retrieved_evidence_ids: vec!["signed-current".to_owned()],
+                decision_support_evidence_ids: vec!["signed-current".to_owned()],
+                chosen_action: "hold".to_owned(),
+                ..full.clone()
+            },
+        };
+        assert_eq!(
+            score_pairwise_interactions(&case(), &full, &singles, &[invalid_pair]),
+            Err(EvaluationErrorV1::PairAblationEvidenceSetMismatch)
+        );
+    }
+
+    #[test]
     fn pairwise_intervention_detects_redundant_evidence() {
         let full = run("mace", "hold", &["signed-current", "signed-release-gate"]);
         let without_left = CandidateRunV1 {
