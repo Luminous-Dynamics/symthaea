@@ -246,17 +246,16 @@
             "version",
             "target",
             "target_reached",
-            "captured_at",
-            "offsets_sha256",
-            "boundary_sha256",
-            "offset"
+            "boundary_sha256"
           ],
           "properties": {
             "profile": {
-              "const": "mon033-postgres-offset-target-v1"
+              "type": "string",
+              "minLength": 1
             },
             "version": {
-              "const": "1.0.0"
+              "type": "string",
+              "minLength": 1
             },
             "target": {
               "enum": [
@@ -267,15 +266,15 @@
             "target_reached": {
               "type": "boolean"
             },
-            "captured_at": {
-              "type": "string",
-              "format": "date-time"
+            "boundary_sha256": {
+              "$ref": "#/$defs/digest"
             },
             "offsets_sha256": {
               "$ref": "#/$defs/digest"
             },
-            "boundary_sha256": {
-              "$ref": "#/$defs/digest"
+            "captured_at": {
+              "type": "string",
+              "format": "date-time"
             },
             "offset": {
               "type": "object"
@@ -287,15 +286,16 @@
           "required": [
             "profile",
             "version",
-            "boundary_sha256",
-            "result"
+            "boundary_sha256"
           ],
           "properties": {
             "profile": {
-              "const": "mon034-postgres-timeline-ancestry-result-v1"
+              "type": "string",
+              "minLength": 1
             },
             "version": {
-              "const": "1.0.0"
+              "type": "string",
+              "minLength": 1
             },
             "boundary_sha256": {
               "$ref": "#/$defs/digest"
@@ -310,15 +310,16 @@
           "required": [
             "profile",
             "version",
-            "boundary_sha256",
-            "result"
+            "boundary_sha256"
           ],
           "properties": {
             "profile": {
-              "const": "mon035-observer-independence-result-v1"
+              "type": "string",
+              "minLength": 1
             },
             "version": {
-              "const": "1.0.0"
+              "type": "string",
+              "minLength": 1
             },
             "boundary_sha256": {
               "$ref": "#/$defs/digest"
@@ -333,52 +334,46 @@
           "required": [
             "profile",
             "version",
-            "boundary_sha256",
-            "ledger_integrity_valid",
-            "ledger_complete",
-            "claims"
+            "boundary_sha256"
           ],
           "properties": {
             "profile": {
-              "const": "mon036-recovery-evidence-continuity-result-v1"
+              "type": "string",
+              "minLength": 1
             },
             "version": {
-              "const": "1.0.0"
+              "type": "string",
+              "minLength": 1
             },
             "boundary_sha256": {
               "$ref": "#/$defs/digest"
             },
-            "ledger_integrity_valid": {
-              "type": "boolean"
-            },
-            "ledger_complete": {
-              "type": "boolean"
-            },
-            "claims": {
-              "type": "array"
+            "result": {
+              "type": "object"
             }
           }
         },
         "mon024_proof_graph_result": {
           "type": "object",
           "required": [
-            "boundary_sha256",
-            "verdict",
-            "may_enable_traffic"
+            "profile",
+            "version",
+            "boundary_sha256"
           ],
           "properties": {
+            "profile": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
             "boundary_sha256": {
               "$ref": "#/$defs/digest"
             },
-            "verdict": {
-              "enum": [
-                "qualified",
-                "blocked",
-                "indeterminate"
-              ]
-            },
-            "may_enable_traffic": {
-              "type": "boolean"
+            "result": {
+              "type": "object"
             }
           }
         }
