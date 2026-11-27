@@ -36,3 +36,14 @@ jobs:
           python3 scripts/validate_cedar_bench_streams.py \
             "$RUNNER_TEMP/cedar-candidate.jsonl" \
             "$RUNNER_TEMP/cedar-auditor.jsonl" all
+
+      - name: Exercise each isolated split and sealed-test default
+        env:
+          CEDAR_BENCH_SEED: "CEDAR-BENCH-CI-SMOKE-SEED-2026-NOT-FOR-SCORES"
+        run: |
+          python3 scripts/generate_cedar_bench.py "$RUNNER_TEMP/cedar-train.jsonl" "$RUNNER_TEMP/cedar-train-audit.jsonl" train
+          python3 scripts/validate_cedar_bench_streams.py "$RUNNER_TEMP/cedar-train.jsonl" "$RUNNER_TEMP/cedar-train-audit.jsonl" train
+          python3 scripts/generate_cedar_bench.py "$RUNNER_TEMP/cedar-development.jsonl" "$RUNNER_TEMP/cedar-development-audit.jsonl" development
+          python3 scripts/validate_cedar_bench_streams.py "$RUNNER_TEMP/cedar-development.jsonl" "$RUNNER_TEMP/cedar-development-audit.jsonl" development
+          python3 scripts/generate_cedar_bench.py "$RUNNER_TEMP/cedar-sealed.jsonl" "$RUNNER_TEMP/cedar-sealed-audit.jsonl"
+          python3 scripts/validate_cedar_bench_streams.py "$RUNNER_TEMP/cedar-sealed.jsonl" "$RUNNER_TEMP/cedar-sealed-audit.jsonl" sealed_test
