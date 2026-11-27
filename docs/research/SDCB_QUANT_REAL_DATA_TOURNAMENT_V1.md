@@ -246,3 +246,34 @@ Source: https://zenodo.org/records/10775692 and the dataset paper https://doi.or
 - Public status tracking for prEN 17660-1 (stage 00.60, close of review 11 March 2026): https://genorma.com/en/standards/pren-17660-1
 - Public status tracking for prEN 17660-2 (stage 00.60, close of review 11 March 2026): https://genorma.com/en/standards/pren-17660-2/amp
 - JCGM 100:2008/Amd.1:2026 DOI: https://doi.org/10.59161/PPDI3267
+
+
+
+## Adjacent 2026 field-calibration comparator (not part of QUANT)
+
+Add a separate external comparator from Mercado-Velazquez et al., *How Accurate Are Low-Cost Air Quality Sensors? A 10-Month Study of Three-Tier Comparison with Three Calibration Methods and Cross-Site Transferability*, Sensors 2026, 26(20), 6441, published 12 October 2026, DOI https://doi.org/10.3390/s26206441.
+
+### Published study design and findings
+
+- Two east London sites 1.6 km apart, with low-cost metal-oxide / optical channels, mid-cost electrochemical sensors, and high-cost government reference stations.
+- The wider deployment used seven nodes, but this three-tier comparison analyzed two nodes (3 and 5) because only those carried all three cost tiers.
+- Ten months of field data. Models trained April–October 2025 were evaluated on November 2025–February 2026.
+- Machine-learning calibration reached reported R² ranges of 0.58–0.74 for PM2.5 and 0.23–0.37 for NO2 against government references in the two-site study.
+- PM2.5 cross-site transfer had limited R² loss (|ΔR²|≤0.18), while gas transfer was poor (reported R²≤0.28).
+- NO2 calibration trained on the earlier period stopped describing the later period at both sites; CO did so at one site; PM2.5 remained comparatively stable.
+- The article reports a dynamically re-estimated clean-air baseline (R0) for metal-oxide sensors using EWMA/nighttime-percentile processing, and compares manufacturer curves, linear temperature/RH calibration, and ML.
+
+### How SDCB should use this comparator
+
+This is a separate field cohort and sensor inventory; it is not a QUANT subset and should not be pooled with the CEDA/Zenodo data or treated as a matched head-to-head. Use it to motivate a distinct external transportability/regime-shift evaluation:
+
+1. **Temporal holdout:** freeze training on early months and evaluate the entire later season without random row splits.
+2. **Cross-site holdout:** train on one site, test on the other, then reverse; report actual sensor/site counts and do not call two sites independent laboratories.
+3. **Pollutant-stratified performance:** report PM2.5, NO2, CO and O3 separately. The paper shows materially different transfer behavior by measurand.
+4. **Calibration-dynamics ablation:** compare manufacturer curve, fixed linear T/RH calibration, ML, dynamic R0 correction, and SDCB temporal/full-covariance/model-mixture approaches only where raw covariates and metadata support equivalent inputs.
+5. **Metrics:** monthly bias, MAE/RMSE, proper predictive scores, calibration coverage/width, slope/intercept drift, false fault decisions, abstention, and decision loss. R² alone is insufficient.
+6. **No hidden adaptation:** distinguish frozen-model generalization from online recalibration; all calibration actions, reference costs, and data available at decision time must be recorded.
+
+The paper's two-site scope and differing pollutant behavior make it a strong adversarial temporal/site-transfer comparator, but not evidence that an SDCB model has already improved performance. Raw-data acquisition and license conditions must be checked before attempting a numerical reproduction. Cite the paper's published version and preserve its exact train/test dates and sensor tiers.
+
+Source: https://www.mdpi.com/1424-8220/26/20/6441.
