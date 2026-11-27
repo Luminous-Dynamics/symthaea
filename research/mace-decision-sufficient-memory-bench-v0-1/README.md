@@ -240,7 +240,7 @@ Measure and report separately:
 
 Never label an estimate as measured cost. Cost-per-decision-gain and cost-per-valid-evidence result may be reported as derived metrics, with their components and assumptions visible.
 
-The Rust evaluator retains the existing `CostReceiptV1` contract for compatibility and adds `CostReceiptV2`, in which retained/index/network byte quantities carry an explicit `Measured`, `Estimated`, `Unknown` or `NotApplicable` state. A measured zero is `Some(0) + Measured`; unreported cost is `None + Unknown`, never numeric zero. Phase timings must still reconcile to wall time. The paired scorer exposes this through `CandidateRunV2` and `score_paired_v2`, binding one cost receipt to each memory/no-memory arm while leaving V1 APIs unchanged. External systems can use [candidate-run-v0.2.schema.json](schemas/candidate-run-v0.2.schema.json); cross-field and phase-reconciliation rules are enforced by the Rust evaluator.
+The Rust evaluator retains the existing `CostReceiptV1` contract for compatibility and adds `CostReceiptV2`, in which retained/index/network byte quantities carry an explicit `Measured`, `Estimated`, `Unknown` or `NotApplicable` state. A measured zero is `Some(0) + Measured`; unreported cost is `None + Unknown`, never numeric zero. Phase timings must still reconcile to wall time. The paired scorer exposes this through `CandidateRunV2` and `score_paired_v2`, binding one cost receipt to each memory/no-memory arm while leaving V1 APIs unchanged. External systems can use [candidate-run-v0.2.schema.json](schemas/candidate-run-v0.2.schema.json); cross-field and phase-reconciliation rules are enforced by the Rust evaluator. The paired result also reports resource deltas only when both arms provide comparable states: measured-to-measured and estimated-to-estimated are separate; mixed states are `Incomparable`; unknown/not-applicable remain non-numeric. No single weighted cost scalar is inferred.
 
 ## Research hypotheses
 
@@ -252,7 +252,7 @@ The Rust evaluator retains the existing `CostReceiptV1` contract for compatibili
 - **H6 — governance is part of capability:** poisoning resistance, deletion and isolation should predict downstream decision safety, not be treated as unrelated operational checkboxes.
 - **H7 — evidence has measurable causal influence:** leave-one-out interventions on returned evidence identify items whose presence improves or worsens the frozen downstream decision. The signal should remain reproducible under fixed reader, seed and evidence-resolution rules.
 
-These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator now contains 31 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
+These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator now contains 32 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
 
 ## Baselines and industry comparison
 
