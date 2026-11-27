@@ -369,7 +369,7 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
             Some(admissible_n as f64 / r.selected_evidence_ids.len() as f64)
         },
         required_evidence_recall: recall,
-        decision_sufficient: (loss - oracle_loss).abs() <= 1e-9 && required_found == required.len() && invalid_n == 0,
+        decision_sufficient: (loss - oracle_loss).abs() <= 1e-9 && required_found == required.len() && invalid_n == 0 && contradiction_pairs == 0,
         attack_case: p.evaluator_private.attack_case,
         observation_requests: r.observation_requests,
         observation_cost_units: c.candidate.observation_cost_units,
@@ -616,6 +616,16 @@ mod tests {
         for (x,y) in a.iter().zip(b.iter()){validate_episode(x).unwrap();assert_eq!(serde_json::to_vec(x).unwrap(),serde_json::to_vec(y).unwrap());}
         let families:BTreeSet<_>=a.iter().map(|x|x.family.as_str()).collect();
         assert_eq!(families,["temporal_drift","contradiction","revocation","insufficient_evidence"].into_iter().collect());
+    }
+    #[test] fn co_retrieved_contradictions_are_not_marked_decision_sufficient_without_resolution_receipt(){
+        let mut e = generated_episode(1, 77);
+        e.evaluator_private.forbidden_evidence_ids.clear();
+        let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id,e.seed,&e.family,&e.candidate).unwrap(),candidate:e.candidate.clone()};
+        let p=PrivateRow{schema_version:PRIVATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id,e.seed,&e.family,&e.candidate).unwrap(),evaluator_private:e.evaluator_private.clone()};
+        let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"conflict-test".into(),candidate_sha256:c.candidate_sha256.clone(),arm_binding_sha256:arm_binding_digest(&c.candidate_sha256,"conflict-test"),action:"declare_blocked".into(),selected_evidence_ids:vec![format!("event-{:06}-old",1),format!("event-{:06}-new",1)],observation_requests:0,cost:Cost{ingest_operations:1,query_operations:1,maintenance_operations:0,retained_bytes:10,returned_bytes:10,latency_us:None}};
+        let scored=score_one(&c,&p,&r).unwrap();
+        assert_eq!(scored.unresolved_contradiction_pairs,1);
+        assert!(!scored.decision_sufficient);
     }
     #[test] fn bad_memory_is_measured_against_no_memory_separately_from_regret(){
         let e=generated_episode(0,77);
