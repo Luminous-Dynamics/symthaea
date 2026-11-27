@@ -14,7 +14,7 @@ Split combined episode records into candidate-visible and evaluator-private JSON
 
     cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- prepare /tmp/dsm-episodes.jsonl /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl
 
-A candidate adapter consumes only the candidate stream and emits one response per episode and arm, conforming to schemas/response-v0.1.schema.json. The response contains a selected action, resolved evidence identifiers, observation-request count and candidate-reported resource counters.
+A candidate adapter consumes only the candidate stream, conforming to schemas/candidate-input-v0.1.schema.json, and emits one response per episode and arm, conforming to schemas/response-v0.1.schema.json. The response contains a selected action, resolved evidence identifiers, observation-request count and candidate-reported resource counters.
 
 Score a balanced set of candidate responses:
 
@@ -55,7 +55,7 @@ Cost fields are candidate-reported counters. The evaluator does not independentl
 - Uncertainty ppm is preserved but not calibrated and is not used as a probability.
 - Observation requests are scored as actions and budget use; no physical or external probe is executed.
 - This version is a response scorer, not a fully autonomous memory-system runner. It does not ingest candidate events into a production store or drive a downstream action environment.
-- There is no schema-validation dependency in this package. Use a Draft 2020-12 validator on the episode and response schemas as a separate release check.
+- There is no schema-validation dependency in this package. Use a Draft 2020-12 validator on the episode, candidate-input and response schemas as a separate release check.
 
 ## Tests
 
