@@ -155,6 +155,7 @@ pub use capacity_aware_ocrc::{
     CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_INPUT_SCHEMA_V1, CA_OCRC_ROUND_RECEIPT_SCHEMA_V1,
     CaoOcrcAdmissionV1, CaoOcrcBernoulliOptimizerResultV1, CaoOcrcBoundRegimeV1,
     CaoOcrcEngineV1, CaoOcrcErrorV1, CaoOcrcFeedbackDispositionV1, CaoOcrcFeedbackInputV1,
+    CaoOcrcGuaranteeStatusV1, CaoOcrcPopulationScopeV1,
     CaoOcrcFeedbackReasonV1, CaoOcrcFeedbackReceiptV1, CaoOcrcPolicyV1,
     CaoOcrcRiskBoundV1, CaoOcrcRoundInputV1, CaoOcrcRoundReceiptV1,
     CaoOcrcRoundRecordV1, CaoOcrcTrackedRoundV1, CaoOcrcTrivialSetV1,
