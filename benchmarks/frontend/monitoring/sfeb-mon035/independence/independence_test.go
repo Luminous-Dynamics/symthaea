@@ -160,3 +160,34 @@ func TestDuplicateDependencyAndNonCanonicalIdentifiersBlock(t *testing.T) {
 		t.Fatalf("non-canonical failure-domain identifier must block: %+v", got)
 	}
 }
+
+
+func TestEveryCriticalFailureDomainBlocksWhenShared(t *testing.T) {
+	for _, class := range []string{
+		"operator", "identity_provider", "control_plane", "compute_host",
+		"storage", "network", "time_source", "signer",
+	} {
+		in := fixture()
+		for i := range in.Nodes {
+			if in.Nodes[i].ID == "b-"+class {
+				in.Nodes[i].FailureDomainID = "a:"+class
+			}
+		}
+		got := Evaluate(in)
+		if got.Verdict != Blocked || !containsDomain(got.SharedDomains, class, "a:"+class) {
+			t.Fatalf("shared %s must block: %+v", class, got)
+		}
+	}
+}
+
+func TestMalformedDependencyReferenceBlocks(t *testing.T) {
+	in := fixture()
+	for i := range in.Nodes {
+		if in.Nodes[i].ID == "a-root" {
+			in.Nodes[i].DependsOn = append(in.Nodes[i].DependsOn, "bad reference")
+		}
+	}
+	if got := Evaluate(in); got.Verdict != Blocked {
+		t.Fatalf("malformed dependency reference must block: %+v", got)
+	}
+}
