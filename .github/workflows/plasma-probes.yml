@@ -929,6 +929,10 @@ jobs:
           assert scalar_search["budget_exhaustion_disposition"] == "unqualified"
           assert scalar_search["global_bound_claim_status"] == "conditional_on_valid_lipschitz_and_branch_evidence"
           assert scalar_search["full_order_confirmation_required"] is True
+          assert scalar_search["objective_sample_error_interval_required"] is True
+          assert scalar_search["sample_interval_semantics"] == "max_zero_value_minus_abs_error_to_value_plus_error"
+          assert scalar_search["physical_sample_error_bound_status"] == "not_issued_synthetic"
+          assert scalar_search["convergence_flag_alone_means_zero_error"] is False
           joint_search = response_qualification["joint_box_oracle"]
           assert joint_search["status"] == "design_only_not_executed"
           assert joint_search["method"] == "anisotropic_lipschitz_branch_and_bound_nd"
@@ -946,6 +950,10 @@ jobs:
           assert joint_search["full_order_confirmation_required"] is True
           assert joint_search["objective_normalization"] == "declared_qoi_scale_and_fixed_positive_floor"
           assert joint_search["reference_response_denominator_lower_bound_required"] is True
+          assert joint_search["objective_sample_error_interval_required"] is True
+          assert joint_search["sample_interval_semantics"] == "max_zero_value_minus_abs_error_to_value_plus_error"
+          assert joint_search["physical_sample_error_bound_status"] == "not_issued_synthetic"
+          assert joint_search["convergence_flag_alone_means_zero_error"] is False
           assert fixture["claim_boundary"] == {
               "physical_solver_executed": False,
               "physical_response_measured": False,
@@ -1084,6 +1092,10 @@ jobs:
           expect_rejection(
               "joint-box-axis-omission",
               lambda value: value["response_qualification"]["joint_box_oracle"].__setitem__("continuous_parameter_axes", ["pulse_phase"]),
+          )
+          expect_rejection(
+              "objective-error-interval-bypass",
+              lambda value: value["response_qualification"]["joint_box_oracle"].__setitem__("convergence_flag_alone_means_zero_error", True),
           )
           expect_rejection(
               "split-id-duplication",
