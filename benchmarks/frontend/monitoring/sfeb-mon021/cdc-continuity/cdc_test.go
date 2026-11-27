@@ -72,4 +72,4 @@ func TestTwoPhaseSlotNotQualified(t *testing.T){p,s,m:=base();s.TwoPhase=true;wa
 func TestReplayAckAheadDenied(t *testing.T){_,_,m:=base();n:=m;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x150;n.AcknowledgementRequestedLSN=0x160;want(t,ValidateReplay(m,n),Indeterminate)}
 func TestReplayAcknowledgementExceedsEvidenceDenied(t *testing.T){_,_,m:=base();n:=m;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;n.AcknowledgementRequestedLSN=0x170;want(t,ValidateReplay(m,n),Denied)}
 func TestReplayTransactionConflictDivergent(t *testing.T){_,_,m:=base();n:=m;n.Transactions=append([]Transaction(nil),m.Transactions...);n.Transactions[0].CommitLSN++;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;want(t,ValidateReplay(m,n),Divergent)}
-func TestSlotTwoPhaseCapabilityHolds(t *testing.T){p,s,_:=base();s.TwoPhase=true;want(t,ValidateInitialSnapshot(p,s,0x100,"snapshot-digest"),Qualified)}
+func TestSlotTwoPhaseCaptureHolds(t *testing.T){p,s,m:=base();s.TwoPhase=true;want(t,ValidateCapture(p,s,m),Indeterminate)}
