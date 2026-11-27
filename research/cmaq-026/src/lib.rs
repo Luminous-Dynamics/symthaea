@@ -582,7 +582,7 @@ mod tests {
         ]);
         let worlds = vec![
             world("w1", "f1", "c1", [("hold", 6, true), ("open", 0, true), ("close", 8, true)], &[("cheap", "a"), ("expensive", "1")]),
-            world("w2", "f2", "c2", [("hold", 7, true), ("open", 0, true), ("close", 8, true)], &[("cheap", "a"), ("expensive", "2")]),
+            world("w2", "f2", "c2", [("hold", 6, true), ("open", 0, true), ("close", 8, true)], &[("cheap", "a"), ("expensive", "2")]),
             world("w3", "f3", "c3", [("hold", 6, true), ("open", 8, true), ("close", 0, true)], &[("cheap", "b"), ("expensive", "3")]),
         ];
         let cheap = score_decision_value(
