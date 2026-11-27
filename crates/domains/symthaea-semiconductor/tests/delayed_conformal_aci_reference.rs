@@ -4,11 +4,10 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use symthaea_semiconductor::benchmark::{
-    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1,
-    DELAYED_ACI_PREDICTION_SCHEMA_V1, DelayedAciFeedbackModeV1,
-    DelayedAciLabelDeliveryV1, DelayedAciPolicyV1, DelayedAciPredictionInputV1,
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-    LabelEvidenceFrontierV1, create_delayed_aci_engine_v1,
+    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1, DELAYED_ACI_PREDICTION_SCHEMA_V1,
+    DelayedAciFeedbackModeV1, DelayedAciLabelDeliveryV1, DelayedAciPolicyV1,
+    DelayedAciPredictionInputV1, LabelConsumptionEligibilityReportV1,
+    LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1, create_delayed_aci_engine_v1,
     current_delayed_aci_alpha_v1, deliver_delayed_aci_feedback_v1,
     register_delayed_aci_prediction_v1,
 };
@@ -89,11 +88,7 @@ fn label_report(
     report
 }
 
-fn delivery(
-    sequence: u64,
-    delivered_round: u64,
-    value: f64,
-) -> DelayedAciLabelDeliveryV1 {
+fn delivery(sequence: u64, delivered_round: u64, value: f64) -> DelayedAciLabelDeliveryV1 {
     let label_id = format!("label-{sequence}");
     let event_id = format!("event-{sequence}");
     let payload = digest('c');
@@ -136,11 +131,9 @@ fn fixed_delay_phase_states_match_an_independent_interleaved_aci_oracle() {
         if round >= tau {
             let prior = round - tau;
             let value = outcomes[prior as usize];
-            let report = deliver_delayed_aci_feedback_v1(
-                &mut engine,
-                &delivery(prior, round, value),
-            )
-            .unwrap();
+            let report =
+                deliver_delayed_aci_feedback_v1(&mut engine, &delivery(prior, round, value))
+                    .unwrap();
             assert_eq!(
                 report.disposition,
                 if value < 9.0 || value > 11.0 {
@@ -150,7 +143,11 @@ fn fixed_delay_phase_states_match_an_independent_interleaved_aci_oracle() {
                 }
             );
 
-            let miss = if value < 9.0 || value > 11.0 { 1.0 } else { 0.0 };
+            let miss = if value < 9.0 || value > 11.0 {
+                1.0
+            } else {
+                0.0
+            };
             let phase = (prior % tau) as usize;
             reference_alpha[phase] =
                 (reference_alpha[phase] + 0.10 * (0.05 - miss)).clamp(0.0, 1.0);
@@ -159,11 +156,7 @@ fn fixed_delay_phase_states_match_an_independent_interleaved_aci_oracle() {
         let phase = (round % tau) as usize;
         let alpha = current_delayed_aci_alpha_v1(&engine).unwrap();
         assert!((alpha - reference_alpha[phase]).abs() < 1.0e-12);
-        register_delayed_aci_prediction_v1(
-            &mut engine,
-            &prediction(round, alpha),
-        )
-        .unwrap();
+        register_delayed_aci_prediction_v1(&mut engine, &prediction(round, alpha)).unwrap();
     }
 
     for phase in 0..tau as usize {
@@ -186,11 +179,7 @@ fn fixed_delay_phase_updates_do_not_cross_contaminate_other_phases() {
 
     for sequence in 0..tau {
         let alpha = current_delayed_aci_alpha_v1(&engine).unwrap();
-        register_delayed_aci_prediction_v1(
-            &mut engine,
-            &prediction(sequence, alpha),
-        )
-        .unwrap();
+        register_delayed_aci_prediction_v1(&mut engine, &prediction(sequence, alpha)).unwrap();
     }
 
     let before = engine.phase_alpha_states.clone();
@@ -203,7 +192,10 @@ fn fixed_delay_phase_updates_do_not_cross_contaminate_other_phases() {
 
     for phase in 0..tau as usize {
         if phase == 2 {
-            assert!((engine.phase_alpha_states[phase] - (before[phase] + 0.10 * (0.05 - 1.0))).abs() < 1.0e-12);
+            assert!(
+                (engine.phase_alpha_states[phase] - (before[phase] + 0.10 * (0.05 - 1.0))).abs()
+                    < 1.0e-12
+            );
         } else {
             assert_eq!(engine.phase_alpha_states[phase], before[phase]);
         }
