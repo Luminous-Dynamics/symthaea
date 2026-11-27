@@ -172,6 +172,9 @@ Do not pool different task units into one RSI number.
 | Research-direction taste | IdeaTaste + blinded expert anchors | Improve actionable idea and novelty quality, not just paper matching |
 | Experimental taste | TasteVal-style fixed-coder comparison | Improve independently confirmed final quality per inclusive total cost |
 | Full-cycle rediscovery | FIRE-Bench | Improve rediscovery validity and reduce planning/analysis errors on matched tasks |
+| Workflow breadth and trajectory stability | SCI-AGENT-EXAM | Improve executable + written artifact correctness, strict success rate and run-to-run stability across research task types |
+| Executable literature and method reuse | Paper2Agent | Convert more papers into scoped, reproducible, independently validated research tools; keep tool validity and scientific validity separate |
+| Open scientific follow-up integrity | Into the Unknown | Satisfy every expert-authored necessary condition with claims tied to executed artifacts; zero unsupported work/result claims |
 | Autonomous science | Autonomous Science Bench | Beat reproducible baselines on quality/cost with independent replication; six-task pilot is diagnostic |
 | Long-horizon work | METR TH1.1 / TH2 | Improve long-horizon success without hiding lifecycle costs or judgment gaps |
 | Research engineering | SWE-bench Pro/Verified, Polyglot, MLE-bench, FML-Bench | Matched-backbone/cost comparison and capability retention |
@@ -186,13 +189,16 @@ These are ambitious targets to validate and power after a variance-estimation pi
 |---|---|---|
 | Autonomous Science Bench 0.1 | Six pilot campaigns, three trials each; best listed resolution rate 72.2% | At least 15/18 resolved trials (83.3%), with discovery and held-out learning gates both passing for every resolved campaign |
 | FIRE-Bench | Best published F1 46.7 on 30 tasks / three trials | At least 55 F1 on the same release, while reporting claim precision, recall, trial variance and unsupported claims |
+| SCI-AGENT-EXAM | 120 expert-curated tasks across 11 fields and 7 task types; GPT-6 Astra reports 80.9 overall, with 26.0% runs above the 0.95 success threshold | At least 85 overall and at least 50% of runs above 0.95, with executable/text artifact agreement, per-task-family reporting and exact-release reproduction |
+| Paper2Agent agentification | 74/100 biology papers agentified; 593/599 proposed tools passed automated validation; 91.2% on 300 tutorial questions with Sonnet 4 | At least 85% end-to-end agentification on a stratified corpus, at least 98% tool-contract test pass, and 95% on matched tutorial/execution questions; scientific conclusion validity remains separately adjudicated |
+| Into the Unknown | 0/135 follow-up submissions met all necessary conditions; 114 failed integrity checks in the reported study | Zero unsupported claims in the admitted subset, 100% claim-to-artifact binding for quantitative claims, and explicit not-performed/indeterminate/invalid dispositions |
 | SciWorkBench | Best reported mean 57.38 | At least 65 on the same official harness/scorer, with domain-specific failure rates |
 | RecurSciBench | 20 independent test tasks across four domains; evolved states show mixed mean transfer and broad per-task regressions | Mean transfer above +5%, nonnegative aggregate in every domain, and no more than 4/20 independent test tasks regressing; confirm on expanded task families |
 | TasteVal-style fixed-coder lane | Reported experimental-compute multiplier up to 2.30x; researcher inference and full lifecycle costs are not included in that multiplier | Match or exceed 2.30x compute-to-target while preserving final-quality non-inferiority and reporting a separate inclusive-cost frontier |
 | METR TH1.1 / TH2 | Long-horizon tasks with materially different lifecycle costs | At non-inferior success, reduce inclusive lifecycle cost by 30%, or extend successful task horizon by 1.5x at matched total cost |
 | SWE-bench Pro (secondary engineering lane) | HGM reported 88.3% on its evaluated subset | Exceed 88.3% only on the same pinned subset/harness, while retaining Verified/Polyglot transfer and reporting full compute/evaluation cost |
 
-The RecurSciBench regression-tail target is intentionally more demanding than merely beating its mean. The TasteVal target must not be claimed from compute-only accounting. METR cost/horizon comparisons must use matched task strata and uncertainty intervals. Never compare numerical scores across different benchmarks.
+The RecurSciBench regression-tail target is intentionally more demanding than merely beating its mean. The TasteVal target must not be claimed from compute-only accounting. METR cost/horizon comparisons must use matched task strata and uncertainty intervals. SCI-AGENT-EXAM is a recent preprint and its hybrid judge requires independent calibration; reproduce its exact task release before comparing. Paper2Agent's tool-extraction accuracy is not equivalent to independent scientific-validity accuracy; compare agentification coverage and tool execution separately from claims about correct science. Into the Unknown's integrity gate should be retained even when no reference numeric answer exists. Never compare numerical scores across different benchmarks.
 
 ### Three non-poolable lanes
 
@@ -238,7 +244,11 @@ The current futures ledger records forecast provenance and scored continuations.
 - [METR Q4 2026](https://metr.org/blog/2026-11-20-q4-2026-capability-update/): judgment without fast feedback and lifecycle-cost measurement need separate lanes.
 - [TasteVal](https://arxiv.org/abs/2610.06824): fixed-coder comparisons can isolate experimental-planning quality.
 - [IdeaTaste](https://arxiv.org/abs/2611.03424): retrospective idea matching is a diagnostic, not a scientific-validity oracle.
-- [FIRE-Bench](https://proceedings.mlr.press/v267/): full-cycle rediscovery measures planning, execution and analysis, not new discovery by itself.
+- [FIRE-Bench](https://arxiv.org/abs/2602.02905): full-cycle rediscovery measures planning, execution and analysis, not new discovery by itself.
+- [SCI-AGENT-EXAM](https://arxiv.org/abs/2610.32441): 120 expert-curated tasks across 11 fields and seven research task types; combines executable and textual outputs and analyses run stability.
+- [Paper2Agent](https://www.nature.com/articles/s41586-026-11044-y): converts papers/repositories into structured resources and validated executable tools; its agentification and tutorial-question metrics are distinct from independent scientific truth.
+- [SciAgentArena](https://www.microsoft.com/en-us/research/publication/benchmarking-ai-agents-for-addressing-scientific-challenges-across-scales/): roughly 200 tasks with stepwise verification; reports persistent difficulty in novel insight and sustained self-directed exploration.
+- [Into the Unknown](https://arxiv.org/abs/2610.19159): open scientific follow-up benchmark with expert-authored necessary conditions and a demanding claim-integrity check.
 
 These are paper/author-reported baselines unless independently reproduced under matched harness and total-cost boundaries. No claim that Symthaea beats them is made here.
 
