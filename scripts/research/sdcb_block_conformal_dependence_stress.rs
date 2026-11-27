@@ -108,6 +108,7 @@ struct CoverageReport {
     embargo_gap: usize,
     calibration_blocks: usize,
     trials: u64,
+    seed: u64,
     alarms: u64,
     nominal_alpha: f64,
     empirical_alarm_rate: f64,
@@ -193,6 +194,7 @@ fn run_coverage_experiment(
         embargo_gap,
         calibration_blocks: CALIBRATION_BLOCKS,
         trials,
+        seed,
         alarms,
         nominal_alpha: ALPHA,
         empirical_alarm_rate: rate,
@@ -233,13 +235,14 @@ fn run_suite(trials: u64) -> Vec<CoverageReport> {
 
 fn print_report(report: &CoverageReport) {
     println!(
-        "{},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6}",
+        "{},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6}",
         report.design.label(),
         report.rho,
         report.block_len,
         report.embargo_gap,
         report.calibration_blocks,
         report.trials,
+        report.seed,
         report.alarms,
         report.nominal_alpha,
         report.empirical_alarm_rate,
@@ -252,7 +255,7 @@ fn print_report(report: &CoverageReport) {
 #[cfg(not(test))]
 fn main() {
     println!(
-        "design,rho,block_len,embargo_gap,calibration_blocks,trials,alarms,nominal_alpha,empirical_alarm_rate,wilson95_alarm_lower,wilson95_alarm_upper,empirical_coverage"
+        "design,rho,block_len,embargo_gap,calibration_blocks,trials,seed,alarms,nominal_alpha,empirical_alarm_rate,wilson95_alarm_lower,wilson95_alarm_upper,empirical_coverage"
     );
     for report in run_suite(TRIALS) {
         print_report(&report);
