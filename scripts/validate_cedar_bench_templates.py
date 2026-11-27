@@ -54,9 +54,16 @@ def validate() -> None:
     ids = [template["id"] for template in templates]
     require(len(set(ids)) == len(ids), "template IDs must be unique")
     families = set()
+    family_splits: dict[str, str] = {}
+    split_counts = {"train": 0, "development": 0, "sealed_test": 0}
     for template in templates:
         tid = template["id"]
         families.add(template["family"])
+        split = template.get("split")
+        require(split in split_counts, f"{tid}: missing or invalid train/development/sealed_test split")
+        require(template["family"] not in family_splits, f"{tid}: template family appears more than once")
+        family_splits[template["family"]] = split
+        split_counts[split] += 1
         source_bundle = template["source"]
         sources = source_bundle["sources"]
         require(bool(sources), f"{tid}: missing source")
@@ -107,7 +114,13 @@ def validate() -> None:
         require(set(all_markers) <= valid_marker_ids, f"{tid}: undeclared marker found")
         require(template["expected"], f"{tid}: missing expected-behavior contract")
     require(len(families) >= 10, "need at least ten distinct task families")
-    print(f"CEDAR-Bench templates: {len(templates)} templates across {len(families)} families passed path and alias checks")
+    require(split_counts == {"train": 10, "development": 5, "sealed_test": 5},
+            f"unexpected split allocation: {split_counts}")
+    require(doc["split_protocol"].get("split_unit") == "template_family",
+            "splits must be assigned by family to prevent family leakage")
+    require(doc["split_protocol"].get("no_template_family_leakage") is True,
+            "template-family leakage control must be explicit")
+    print(f"CEDAR-Bench templates: {len(templates)} templates across {len(families)} families; split counts {split_counts}; path and alias checks passed")
 
 
 def main() -> int:
