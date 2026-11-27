@@ -3,7 +3,7 @@ name = "symthaea-eqc-reference"
 version = "0.1.0"
 edition = "2024"
 publish = false
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 description = "Standalone reference-contract evaluator for the Evidence-Qualified Capability seed"
 
 [dependencies]
