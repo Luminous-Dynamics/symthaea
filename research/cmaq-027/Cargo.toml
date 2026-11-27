@@ -1,0 +1,9 @@
+[package]
+name = "cmaq-027-recoverability"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Finite recoverability-qualified commitment evaluator"
+
+[workspace]
