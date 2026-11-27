@@ -1,6 +1,6 @@
 # MACE temporal BM25 and rank-fusion reference baseline v0.1
 
-**Status:** standalone Rust reference and synthetic candidate-visible fixture authored. Exact-head Rust 1.96 workflow is the execution gate. This is not a production Add/Search service, an external leaderboard reproduction, or a claim of superiority over current memory systems.
+**Status:** standalone Rust reference, synthetic candidate-visible fixture and strict Serde wire adapter pass exact-head Rust 1.96 checks (17 BM25 tests; 21 adapter + embedded tests; locked metadata and strict Clippy). This is not a production Add/Search service, an external leaderboard reproduction, or a claim of superiority over current memory systems.
 
 ## Why this exists
 
@@ -53,7 +53,7 @@ It can compose lexical, entity, date or graph result lists, but this reference d
 
 ## Negative controls
 
-A strict Serde adapter is now provided at `baselines/adapter/`. It uses `deny_unknown_fields`, accepts only candidate-visible v0.1 events, builds the same BM25 index, executes the declared query and weighted-RRF channels, then resolves each hit by exact event ID to its source/authority/uncertainty/lineage record. The adapter rejects unknown wire fields rather than silently ingesting evaluator-only additions. Its focused Cargo test and Clippy workflow is separate from the dependency-free BM25 reference workflow; no adapter test result is claimed until that new workflow passes.
+A strict Serde adapter is provided at `baselines/adapter/`. It uses `deny_unknown_fields`, accepts only candidate-visible v0.1 events, builds the same BM25 index, executes the declared query and weighted-RRF channels, then resolves each hit by exact event ID to its source/authority/uncertainty/lineage record. The adapter rejects unknown wire fields rather than silently ingesting evaluator-only additions. On exact head `b3351adba74119359f4103e5e7eb3d2b6ca1ed3b`, its Rust 1.96 workflow passed formatting, `cargo metadata --locked`, 21/21 tests, strict Clippy with `--locked`, and fixture/schema JSON parsing.
 
 The Rust suite now covers:
 - multi-term BM25 ranking and partial matches;
