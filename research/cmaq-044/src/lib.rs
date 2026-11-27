@@ -367,26 +367,45 @@ fn validate_block(
     }
     for (digest, label) in [
         (&block.source_pair_sha256, "source_pair_sha256"),
-        (&block.scenario_manifest_sha256, "scenario_manifest_sha256"),
-        (&block.ground_truth_receipt_sha256, "ground_truth_receipt_sha256"),
+        (
+            &block.scenario_manifest_sha256,
+            "scenario_manifest_sha256",
+        ),
+        (
+            &block.ground_truth_receipt_sha256,
+            "ground_truth_receipt_sha256",
+        ),
         (&block.score_definition_sha256, "score_definition_sha256"),
-        (&block.calibration_reference_sha256, "calibration_reference_sha256"),
+        (
+            &block.calibration_reference_sha256,
+            "calibration_reference_sha256",
+        ),
         (&block.tie_protocol_sha256, "tie_protocol_sha256"),
         (&block.closure_manifest_sha256, "closure_manifest_sha256"),
         (&block.baseline_build_sha256, "baseline_build_sha256"),
         (&block.candidate_build_sha256, "candidate_build_sha256"),
-        (&block.baseline_configuration_sha256, "baseline_configuration_sha256"),
-        (&block.candidate_configuration_sha256, "candidate_configuration_sha256"),
+        (
+            &block.baseline_configuration_sha256,
+            "baseline_configuration_sha256",
+        ),
+        (
+            &block.candidate_configuration_sha256,
+            "candidate_configuration_sha256",
+        ),
     ] {
         validate_digest(digest, label)?;
     }
-    if block.alpha_numerator == 0 || block.alpha_denominator == 0
+    if block.alpha_numerator == 0
+        || block.alpha_denominator == 0
         || block.alpha_numerator >= block.alpha_denominator
     {
         return Err(BenchmarkError::InvalidAlpha);
     }
     for arm in [&block.baseline, &block.candidate] {
-        if arm.detection_delay_us.is_some_and(|delay| delay > horizon_us) {
+        if arm
+            .detection_delay_us
+            .is_some_and(|delay| delay > horizon_us)
+        {
             return Err(BenchmarkError::DetectionDelayExceedsHorizon);
         }
         if arm.useful_progress_ppm > PPM {
@@ -413,10 +432,7 @@ fn validate_digest(value: &str, label: &'static str) -> Result<(), BenchmarkErro
     }
 }
 
-fn penalized_delay(
-    arm: &ArmOutcome,
-    horizon_us: u64,
-) -> Result<u64, BenchmarkError> {
+fn penalized_delay(arm: &ArmOutcome, horizon_us: u64) -> Result<u64, BenchmarkError> {
     match arm.detection_delay_us {
         Some(delay) if delay <= horizon_us => Ok(delay),
         Some(_) => Err(BenchmarkError::DetectionDelayExceedsHorizon),
@@ -554,9 +570,7 @@ fn events_per_hour_ppm(events: u128, exposure_us: u64) -> Result<Option<u128>, B
     ))
 }
 
-fn union_exposure_us(
-    mut intervals: Vec<ExposureInterval>,
-) -> Result<u64, BenchmarkError> {
+fn union_exposure_us(mut intervals: Vec<ExposureInterval>) -> Result<u64, BenchmarkError> {
     intervals.sort_by(|left, right| {
         left.domain_id
             .cmp(&right.domain_id)
@@ -581,11 +595,7 @@ fn union_exposure_us(
                 .checked_add(end - start)
                 .ok_or(BenchmarkError::ArithmeticOverflow)?;
         }
-        current = Some((
-            interval.domain_id,
-            interval.start_us,
-            interval.end_us,
-        ));
+        current = Some((interval.domain_id, interval.start_us, interval.end_us));
     }
     if let Some((_, start, end)) = current {
         total = total
@@ -649,7 +659,12 @@ mod tests {
         }
     }
 
-    fn block(id: &str, family: &str, baseline: Option<u64>, candidate: Option<u64>) -> PairedBlockOutcome {
+    fn block(
+        id: &str,
+        family: &str,
+        baseline: Option<u64>,
+        candidate: Option<u64>,
+    ) -> PairedBlockOutcome {
         PairedBlockOutcome {
             effective_block_id: id.into(),
             scenario_family: family.into(),
@@ -744,8 +759,18 @@ mod tests {
             42,
         )
         .unwrap();
-        assert!(report.by_family["urban"].paired.mean_penalized_delay_delta_us < 0);
-        assert!(report.by_family["rural"].paired.mean_penalized_delay_delta_us > 0);
+        assert!(
+            report.by_family["urban"]
+                .paired
+                .mean_penalized_delay_delta_us
+                < 0
+        );
+        assert!(
+            report.by_family["rural"]
+                .paired
+                .mean_penalized_delay_delta_us
+                > 0
+        );
         assert_eq!(report.by_family["urban"].paired.bootstrap_95_low_us, None);
         assert_eq!(report.by_family["rural"].paired.bootstrap_95_high_us, None);
     }
@@ -765,14 +790,20 @@ mod tests {
         assert_eq!(report.candidate.safe_exposure_us, 5_400_000_000);
         assert_eq!(report.baseline.false_quarantines, 2);
         assert_eq!(report.candidate.false_quarantines, 4);
-        assert_eq!(report.baseline.false_quarantines_per_hour_ppm, Some(1_333_333));
+        assert_eq!(
+            report.baseline.false_quarantines_per_hour_ppm,
+            Some(1_333_333)
+        );
     }
 
     #[test]
     fn duplicate_effective_blocks_are_rejected() {
         assert_eq!(
             evaluate_paired(
-                &[block("same", "urban", Some(10), Some(10)), block("same", "rural", Some(9), Some(8))],
+                &[
+                    block("same", "urban", Some(10), Some(10)),
+                    block("same", "rural", Some(9), Some(8)),
+                ],
                 100,
                 50,
                 1
@@ -875,14 +906,24 @@ mod tests {
         let mut bad_digest = block("b1", "urban", Some(10), Some(10));
         bad_digest.source_pair_sha256 = "bad".into();
         assert_eq!(
-            evaluate_paired(&[bad_digest, block("b2", "urban", Some(10), Some(10))], 100, 50, 1),
+            evaluate_paired(
+                &[bad_digest, block("b2", "urban", Some(10), Some(10))],
+                100,
+                50,
+                1
+            ),
             Err(BenchmarkError::InvalidDigest("source_pair_sha256"))
         );
 
         let mut bad_progress = block("b1", "urban", Some(10), Some(10));
         bad_progress.candidate.useful_progress_ppm = PPM + 1;
         assert_eq!(
-            evaluate_paired(&[bad_progress, block("b2", "urban", Some(10), Some(10))], 100, 50, 1),
+            evaluate_paired(
+                &[bad_progress, block("b2", "urban", Some(10), Some(10))],
+                100,
+                50,
+                1
+            ),
             Err(BenchmarkError::ProgressOutOfRange)
         );
     }
@@ -891,14 +932,24 @@ mod tests {
     fn horizon_and_exposure_bounds_are_enforced() {
         let bad_delay = block("b1", "urban", Some(101), Some(10));
         assert_eq!(
-            evaluate_paired(&[bad_delay, block("b2", "urban", Some(10), Some(10))], 100, 50, 1),
+            evaluate_paired(
+                &[bad_delay, block("b2", "urban", Some(10), Some(10))],
+                100,
+                50,
+                1
+            ),
             Err(BenchmarkError::DetectionDelayExceedsHorizon)
         );
 
         let mut bad_exposure = block("b1", "urban", Some(10), Some(10));
         bad_exposure.candidate.safe_exposure[0].end_us = 0;
         assert_eq!(
-            evaluate_paired(&[bad_exposure, block("b2", "urban", Some(10), Some(10))], 100, 50, 1),
+            evaluate_paired(
+                &[bad_exposure, block("b2", "urban", Some(10), Some(10))],
+                100,
+                50,
+                1
+            ),
             Err(BenchmarkError::InvalidExposureInterval)
         );
     }
