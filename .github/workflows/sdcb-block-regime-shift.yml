@@ -1,0 +1,69 @@
+name: SDCB Block-Conformal Dependence Regime Shift
+
+on:
+  push:
+    branches:
+      - research/sdcb-block-conformal-regime-shift-2026-11-27
+    paths:
+      - "scripts/research/sdcb_block_conformal_regime_shift.rs"
+      - ".github/workflows/sdcb-block-regime-shift.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/research/sdcb_block_conformal_regime_shift.rs"
+      - ".github/workflows/sdcb-block-regime-shift.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependence-regime-shift:
+    name: Rust 1.96 identical-marginal dependence shift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Generate rustfmt preview
+        run: rustfmt --edition 2024 scripts/research/sdcb_block_conformal_regime_shift.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-regime-shift-rustfmt-preview
+          path: scripts/research/sdcb_block_conformal_regime_shift.rs
+      - name: Restore exact committed source
+        run: git checkout -- scripts/research/sdcb_block_conformal_regime_shift.rs
+      - name: Check formatting on exact committed source
+        run: rustfmt --edition 2024 --check scripts/research/sdcb_block_conformal_regime_shift.rs
+      - name: Compile and run exact-source unit controls
+        run: |
+          rustc --edition=2024 --test scripts/research/sdcb_block_conformal_regime_shift.rs -o /tmp/sdcb-regime-shift-tests
+          /tmp/sdcb-regime-shift-tests
+      - name: Run full deterministic regime-shift grid
+        run: |
+          rustc --edition=2024 scripts/research/sdcb_block_conformal_regime_shift.rs -o /tmp/sdcb-regime-shift
+          mkdir -p "$RUNNER_TEMP/sdcb-regime-shift"
+          /tmp/sdcb-regime-shift > "$RUNNER_TEMP/sdcb-regime-shift/regime_shift.csv"
+          {
+            echo "source_commit=$(git rev-parse HEAD)"
+            rustc --version
+            echo "experiment=unit-variance Gaussian AR(1); dependence parameter changes at calibration/test boundary; each time point remains N(0,1)"
+            echo "calibration_rho={0.05,0.95}; test_rho={0.05,0.95}; calibration_blocks=39; alpha=0.10; trials=2500 per grid point"
+            echo "grid=block_len:{1,8,32}; independent block controls; serial_path embargo_gap:{0,64}; 36 total conditions"
+          } > "$RUNNER_TEMP/sdcb-regime-shift/manifest.txt"
+      - name: Upload reproducible regime-shift report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-block-conformal-regime-shift-report
+          path: ${{ runner.temp }}/sdcb-regime-shift/
+          if-no-files-found: error
+          retention-days: 30
