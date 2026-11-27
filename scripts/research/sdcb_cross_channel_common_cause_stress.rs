@@ -226,6 +226,36 @@ mod tests {
     }
 
     #[test]
+    fn observed_cross_channel_correlation_matches_declared_gamma() {
+        let samples = 50_000_u64;
+        for gamma in [0.05_f64, 0.95] {
+            let mut sum_x = 0.0;
+            let mut sum_y = 0.0;
+            let mut sum_x2 = 0.0;
+            let mut sum_y2 = 0.0;
+            let mut sum_xy = 0.0;
+            for index in 0..samples {
+                let seed = 0xB10C_C0DE_6500 ^ index.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                let mut path = TwoChannelAr1::new(seed, MarginalFamily::Gaussian, gamma);
+                let (x, y) = path.next(CROSS_CHANNEL_RHO, gamma);
+                sum_x += x;
+                sum_y += y;
+                sum_x2 += x * x;
+                sum_y2 += y * y;
+                sum_xy += x * y;
+            }
+            let n = samples as f64;
+            let mean_x = sum_x / n;
+            let mean_y = sum_y / n;
+            let covariance = sum_xy / n - mean_x * mean_y;
+            let variance_x = sum_x2 / n - mean_x * mean_x;
+            let variance_y = sum_y2 / n - mean_y * mean_y;
+            let correlation = covariance / (variance_x * variance_y).sqrt();
+            assert!((correlation - gamma).abs() < 0.02, "gamma={gamma}, observed={correlation:.4}");
+        }
+    }
+
+    #[test]
     fn cross_channel_shift_changes_max_score_in_both_directions() {
         let low_to_high = run_experiment(
             MarginalFamily::Gaussian, 0.05, 0.95, 8, TEST_TRIALS, 0xB10C_C0DE_6201,
@@ -233,8 +263,8 @@ mod tests {
         let high_to_low = run_experiment(
             MarginalFamily::Gaussian, 0.95, 0.05, 8, TEST_TRIALS, 0xB10C_C0DE_6202,
         );
-        assert!(low_to_high.alarm_rate < 0.06, "low→high {:.4}", low_to_high.alarm_rate);
-        assert!(high_to_low.alarm_rate > 0.15, "high→low {:.4}", high_to_low.alarm_rate);
+        assert!(low_to_high.ci_upper < ALPHA, "low→high CI [{:.4}, {:.4}]", low_to_high.ci_lower, low_to_high.ci_upper);
+        assert!(high_to_low.ci_lower > ALPHA, "high→low CI [{:.4}, {:.4}]", high_to_low.ci_lower, high_to_low.ci_upper);
     }
 
     #[test]
@@ -245,8 +275,8 @@ mod tests {
         let high_to_low = run_experiment(
             MarginalFamily::StudentT5CommonScale, 0.95, 0.05, 8, TEST_TRIALS, 0xB10C_C0DE_6302,
         );
-        assert!(low_to_high.alarm_rate < 0.08, "t5 low→high {:.4}", low_to_high.alarm_rate);
-        assert!(high_to_low.alarm_rate > 0.13, "t5 high→low {:.4}", high_to_low.alarm_rate);
+        assert!(low_to_high.ci_upper < ALPHA, "t5 low→high CI [{:.4}, {:.4}]", low_to_high.ci_lower, low_to_high.ci_upper);
+        assert!(high_to_low.ci_lower > ALPHA, "t5 high→low CI [{:.4}, {:.4}]", high_to_low.ci_lower, high_to_low.ci_upper);
     }
 
     #[test]
