@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-for cmd in go jq; do
+for cmd in go jq sha256sum; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "$cmd is required" >&2; exit 69; }
 done
 
@@ -10,6 +10,22 @@ jq -e '
   and (.scenarios | length) >= 10
   and ([.scenarios[].id] | unique | length) == (.scenarios | length)
 ' "$ROOT/SCENARIOS-v1.json" >/dev/null
+
+jq -e '
+  .trial_id == "trial-039-001"
+  and ([.observations[].trial_id] | unique) == [.trial_id]
+  and ([.observations[].scenario_sha256] | unique) == [.scenario_sha256]
+  and ([.observations[].recovery_boundary_sha256] | unique) == [.recovery_boundary_sha256]
+  and ([.observations[].code_revision] | unique) == [.code_revision]
+' "$ROOT/INPUT-example.json" >/dev/null
+verify_manifest() {
+  expected="$1"
+  file="$2"
+  actual="$(sha256sum "$ROOT/$file" | awk '{print $1}')"
+  [ "$expected" = "$actual" ] || { echo "MON-039 fixture manifest mismatch: $file" >&2; exit 1; }
+}
+verify_manifest "$(jq -r '.scenario_sha256' "$ROOT/INPUT-example.json")" "fixtures/manifests/scenario.manifest"
+verify_manifest "$(jq -r '.recovery_boundary_sha256' "$ROOT/INPUT-example.json")" "fixtures/manifests/recovery-boundary.manifest"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -50,6 +66,13 @@ MISSING_STATUS=$?
 set -e
 [ "$MISSING_STATUS" -eq 3 ] || { echo "missing subset must remain indeterminate" >&2; exit 1; }
 jq -e '.minimality_kind == "not_established" and .evidence_complete == false' "$TMP/missing-result.json" >/dev/null
+
+jq '.observations[0].complete = false' "$ROOT/INPUT-example.json" > "$TMP/receipt-tampered.json"
+set +e
+"$TMP/mon039" --input "$TMP/receipt-tampered.json" >/dev/null 2>&1
+RECEIPT_STATUS=$?
+set -e
+[ "$RECEIPT_STATUS" -eq 2 ] || { echo "tampered observation receipt must block" >&2; exit 1; }
 
 jq '.code_revision = "ffffffffffffffffffffffffffffffffffffffff"' "$ROOT/INPUT-example.json" > "$TMP/stale.json"
 set +e
