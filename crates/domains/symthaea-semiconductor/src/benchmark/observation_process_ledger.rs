@@ -279,6 +279,18 @@ fn report_digest(report: &ObservationProcessReportV1) -> Result<String, Observat
     json_sha256(&canonical)
 }
 
+fn validate_optional_probability(
+    value: Option<f64>,
+    field: &str,
+) -> Result<(), ObservationProcessErrorV1> {
+    if value.is_some_and(|p| !p.is_finite() || !(0.0..=1.0).contains(&p)) {
+        return Err(ObservationProcessErrorV1(format!(
+            "{field}: probability must be finite and in [0,1]"
+        )));
+    }
+    Ok(())
+}
+
 fn validate_optional_digest(
     value: Option<&str>,
     field: &str,
@@ -345,6 +357,31 @@ fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), Observati
             row.round_id
         )));
     }
+    validate_optional_probability(
+        row.physical_delivery_probability_given_selection,
+        "physical_delivery_probability_given_selection",
+    )?;
+    validate_optional_probability(
+        row.qualification_probability_given_delivery,
+        "qualification_probability_given_delivery",
+    )?;
+    validate_optional_probability(
+        row.online_tracking_probability_given_selection,
+        "online_tracking_probability_given_selection",
+    )?;
+    validate_optional_probability(
+        row.frontier_availability_probability_given_qualified,
+        "frontier_availability_probability_given_qualified",
+    )?;
+    if row.update_frontier_at_unix_seconds.is_some_and(|frontier| {
+        frontier < row.prediction_time_unix_seconds
+    }) {
+        return Err(ObservationProcessErrorV1(format!(
+            "round {} update frontier precedes its prediction",
+            row.round_id
+        )));
+    }
+
     if acquisition
         .measured_at_unix_seconds
         .is_some_and(|measured| measured < row.event_time_unix_seconds)
@@ -511,7 +548,9 @@ fn validate_qualification(
                 )));
             }
         }
-        K1QualificationStateV1::Unknown | K1QualificationStateV1::Blocked => {
+        K1QualificationStateV1::Unknown
+        | K1QualificationStateV1::Blocked
+        | K1QualificationStateV1::Revoked => {
             require_text(
                 qualification.label_id.as_deref().unwrap_or_default(),
                 "qualification.label_id",
@@ -527,7 +566,7 @@ fn validate_qualification(
                 || qualification.qualified_loss_evidence_sha256.is_some()
             {
                 return Err(ObservationProcessErrorV1(format!(
-                    "round {} UNKNOWN/BLOCKED qualification must carry its K1 report but no qualified loss",
+                    "round {} UNKNOWN/BLOCKED/REVOKED qualification must carry its K1 report but no qualified loss",
                     row.round_id
                 )));
             }
@@ -1165,6 +1204,11 @@ pub fn evaluate_observation_process_v1(
             "observation process must contain at least one population round".into(),
         ));
     }
+    if !valid_sha256(&input.qualified_observation_assumptions.evidence_receipt_sha256) {
+        return Err(ObservationProcessErrorV1(
+            "qualified observation assumption receipt digest is malformed".into(),
+        ));
+    }
     let rows = canonical_rounds(&input.rounds);
     if rows.iter().any(|row| row.round_id > input.closeout_round) {
         return Err(ObservationProcessErrorV1(
@@ -1192,6 +1236,7 @@ pub fn evaluate_observation_process_v1(
         k1_eligible: 0,
         k1_unknown: 0,
         k1_blocked: 0,
+        k1_revoked: 0,
         feedback_not_applicable: 0,
         feedback_pending: 0,
         feedback_received: 0,
@@ -1296,6 +1341,10 @@ pub fn evaluate_observation_process_v1(
                 funnel.k1_blocked += 1;
                 blocked_round_ids.push(row.round_id);
             }
+            K1QualificationStateV1::Revoked => {
+                funnel.k1_revoked += 1;
+                blocked_round_ids.push(row.round_id);
+            }
         }
         match row.tracking.state {
             FeedbackTrackingStateV1::NotApplicable => funnel.feedback_not_applicable += 1,
@@ -1389,6 +1438,81 @@ pub fn evaluate_observation_process_v1(
         evaluate_selection_adjusted_population_risk_v1(&risk_input).map_err(|error| {
             ObservationProcessErrorV1(format!("population-risk evaluation failed: {error}"))
         })?;
+
+    let qualified_units: Vec<QualifiedObservationUnitV1> = rows
+        .iter()
+        .enumerate()
+        .map(|(index, row)| {
+            let selected = row.acquisition.state != PhysicalAcquisitionStateV1::NotSelected;
+            let received = row.acquisition.state == PhysicalAcquisitionStateV1::Measured;
+            let qualification_status = match row.acquisition.state {
+                PhysicalAcquisitionStateV1::NotSelected => MetrologyQualificationStatusV1::NotSelected,
+                PhysicalAcquisitionStateV1::SelectedPending
+                | PhysicalAcquisitionStateV1::MeasurementUnavailable => {
+                    MetrologyQualificationStatusV1::NotReceived
+                }
+                PhysicalAcquisitionStateV1::Measured => match row.qualification.state {
+                    K1QualificationStateV1::NotApplicable => MetrologyQualificationStatusV1::NotReceived,
+                    K1QualificationStateV1::Pending => MetrologyQualificationStatusV1::Pending,
+                    K1QualificationStateV1::Eligible => MetrologyQualificationStatusV1::Qualified,
+                    K1QualificationStateV1::Unknown => MetrologyQualificationStatusV1::Unknown,
+                    K1QualificationStateV1::Blocked => MetrologyQualificationStatusV1::Blocked,
+                    K1QualificationStateV1::Revoked => MetrologyQualificationStatusV1::Revoked,
+                },
+            };
+            let admitted = matches!(
+                row.tracking.state,
+                FeedbackTrackingStateV1::UnlimitedPending
+                    | FeedbackTrackingStateV1::UnlimitedReceived
+                    | FeedbackTrackingStateV1::UnlimitedForfeited
+                    | FeedbackTrackingStateV1::AdmittedPending
+                    | FeedbackTrackingStateV1::Evicted
+                    | FeedbackTrackingStateV1::ProxyExpired
+                    | FeedbackTrackingStateV1::TrackedReceived
+            );
+            let available_by_frontier = row.update_frontier_at_unix_seconds.is_some_and(|frontier| {
+                row.qualification.label_available_at_unix_seconds.is_some_and(|available| available <= frontier)
+                    && row.qualification.report_available_at_unix_seconds.is_some_and(|available| available <= frontier)
+            });
+            QualifiedObservationUnitV1 {
+                // The qualified-observation estimator requires a 1..=N frame.
+                // The source-ledger round ID remains bound in the parent ledger.
+                round: index as u64 + 1,
+                sample_id: row.sample_id.clone(),
+                measurement_event_id: row.measurement_event_id.clone(),
+                selected_for_metrology: selected,
+                admitted_to_online_tracking: admitted,
+                physical_result_received: received,
+                qualification_status,
+                available_by_update_frontier: available_by_frontier,
+                online_update_used: row.tracking.controller_update_applied,
+                qualified_loss: if row.qualification.state == K1QualificationStateV1::Eligible {
+                    row.qualification.qualified_loss
+                } else {
+                    None
+                },
+                probabilities: ObservationStageProbabilitiesV1 {
+                    selection_probability: row.acquisition.inclusion_probability,
+                    physical_delivery_probability_given_selection: row.physical_delivery_probability_given_selection,
+                    qualification_probability_given_delivery: row.qualification_probability_given_delivery,
+                    online_tracking_probability_given_selection: row.online_tracking_probability_given_selection,
+                    frontier_availability_probability_given_qualified: row.frontier_availability_probability_given_qualified,
+                },
+            }
+        })
+        .collect();
+    let qualified_risk_input = ObservationRiskInputV1 {
+        schema: QUALIFIED_OBSERVATION_RISK_SCHEMA_V1.into(),
+        input_id: input.run_id.clone(),
+        population_round_count: qualified_units.len() as u64,
+        units: qualified_units,
+        assumptions: input.qualified_observation_assumptions.clone(),
+    };
+    let qualified_observation_risk =
+        compute_qualified_observation_risk_v1(&qualified_risk_input).map_err(|error| {
+            ObservationProcessErrorV1(format!("qualified observation risk evaluation failed: {error}"))
+        })?;
+
     let mut canonical_input = input.clone();
     canonical_input.rounds = rows.clone();
     let mut report = ObservationProcessReportV1 {
@@ -1400,6 +1524,7 @@ pub fn evaluate_observation_process_v1(
         maximum_observed_tracking_occupancy: maximum_occupancy,
         funnel,
         population_risk,
+        qualified_observation_risk,
         input_sha256: json_sha256(&canonical_input)?,
         report_sha256: String::new(),
         equipment_control_authority: false,
@@ -1464,6 +1589,7 @@ mod tests {
                     K1QualificationStateV1::Eligible
                         | K1QualificationStateV1::Unknown
                         | K1QualificationStateV1::Blocked
+                        | K1QualificationStateV1::Revoked
                 )
                 .then(|| digest('e')),
                 report_available_at_unix_seconds: matches!(
@@ -1471,6 +1597,7 @@ mod tests {
                     K1QualificationStateV1::Eligible
                         | K1QualificationStateV1::Unknown
                         | K1QualificationStateV1::Blocked
+                        | K1QualificationStateV1::Revoked
                 )
                 .then_some(107 + round_id as i64 * 10),
                 qualified_loss: eligible.then_some(if round_id % 2 == 0 { 0.0 } else { 1.0 }),
@@ -1504,6 +1631,11 @@ mod tests {
                     && eligible,
             },
             independent_audit: None,
+            physical_delivery_probability_given_selection: None,
+            qualification_probability_given_delivery: None,
+            online_tracking_probability_given_selection: None,
+            frontier_availability_probability_given_qualified: None,
+            update_frontier_at_unix_seconds: None,
         }
     }
 
@@ -1546,6 +1678,12 @@ mod tests {
             tracking_capacity: capacity,
             closeout_round: 10,
             independent_audit_design: None,
+            qualified_observation_assumptions: ObservationProcessAssumptionsV1 {
+                conditional_probability_factorization: ObservationAssumptionStatusV1::Unknown,
+                conditional_ignorability: ObservationAssumptionStatusV1::Unknown,
+                positivity: ObservationAssumptionStatusV1::Unknown,
+                evidence_receipt_sha256: digest('7'),
+            },
             rounds,
         }
     }
