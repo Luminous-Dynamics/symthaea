@@ -23,6 +23,8 @@ func benchmarkBundle(b *testing.B) (string, Manifest, Policy) {
 	}
 	sum := sha256.Sum256(data)
 	now := time.Date(2026, 11, 27, 9, 0, 0, 0, time.UTC)
+	scopeDigest := sha256.Sum256([]byte("scope"))
+	inventoryDigest := sha256.Sum256([]byte("inventory"))
 	pub, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		b.Fatal(err)
@@ -33,8 +35,8 @@ func benchmarkBundle(b *testing.B) (string, Manifest, Policy) {
 		Source: SourceBoundary{
 			IncidentID: "incident", SourceClusterID: "cluster", Database: "db",
 			SystemIdentifier: "123456789", TimelineID: "1", SnapshotID: "snapshot",
-			CaptureLSN: "0/ABCDE", ScopeDigest: hex.EncodeToString(sha256.New().Sum([]byte("scope"))),
-			InventoryDigest: hex.EncodeToString(sha256.New().Sum([]byte("inventory"))),
+			CaptureLSN: "0/ABCDE", ScopeDigest: hex.EncodeToString(scopeDigest[:]),
+			InventoryDigest: hex.EncodeToString(inventoryDigest[:]),
 		},
 		Artifacts: []Artifact{{
 			Path: "payload.bin", MediaType: "application/octet-stream", Role: "payload",
@@ -49,6 +51,7 @@ func benchmarkBundle(b *testing.B) (string, Manifest, Policy) {
 	return root, m, Policy{
 		Now: now.Add(time.Second), MaxAge: time.Hour, ClockDomain: "bench-clock",
 		MaxClockUncertaintyNS: int64(10 * time.Millisecond),
+		ExpectedRunID: "bench-run", ExpectedSequence: 1,
 		TrustedKeys: map[string]ed25519.PublicKey{"bench-key": pub},
 	}
 }
