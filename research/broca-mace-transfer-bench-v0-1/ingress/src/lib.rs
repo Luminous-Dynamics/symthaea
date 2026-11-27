@@ -1,8 +1,3 @@
-pub mod claims;
-pub mod providers;
-mod evidence_use;
-pub use evidence_use::{revalidate_for_use_v1, EvidenceUseContextV1, EvidenceUseReceiptV1, EvidenceUseRejectV1};
-
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -11,6 +6,11 @@ pub use evidence_use::{revalidate_for_use_v1, EvidenceUseContextV1, EvidenceUseR
 //! This crate does not implement cryptographic verification. A production
 //! EvidenceVerifier must delegate to Mycelix source-ledger, calibration and
 //! outcome-reconciliation receipts. Agent-authored labels are not trust anchors.
+
+pub mod claims;
+pub mod providers;
+mod evidence_use;
+pub use evidence_use::{revalidate_for_use_v1, EvidenceUseContextV1, EvidenceUseReceiptV1, EvidenceUseRejectV1};
 
 use std::collections::{BTreeMap, BTreeSet};
 
