@@ -20,6 +20,9 @@ pub mod selective_prediction;
 #[path = "../../../src/web_research/selective_observation.rs"]
 pub mod selective_observation;
 
+#[path = "../../../src/web_research/stratified_audit.rs"]
+pub mod stratified_audit;
+
 #[cfg(test)]
 mod compatibility_tests {
     use super::types::{ResearchSource, VerificationOutcome};
