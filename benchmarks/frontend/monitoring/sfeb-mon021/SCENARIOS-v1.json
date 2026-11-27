@@ -444,6 +444,46 @@
       "required_control": "hold",
       "severity": "critical",
       "positive_control": false
+    },
+    {
+      "id": "CDC-045",
+      "family": "durability",
+      "description": "The actual acknowledgement sent to PostgreSQL is higher than the durable evidence watermark even though the requested target was lower.",
+      "expected_decision": "denied",
+      "reason_code": "actual_sent_ack_ahead_of_durable_evidence",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-046",
+      "family": "identity",
+      "description": "Slot and manifest LSN values match but the independently observed source timeline or system identifier differs from the pinned source profile.",
+      "expected_decision": "denied",
+      "reason_code": "source_incarnation_or_timeline_mismatch",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-047",
+      "family": "durability",
+      "description": "A replayed event matches its prior payload digest but the transaction envelope membership or begin/commit/end boundaries conflict.",
+      "expected_decision": "divergent",
+      "reason_code": "replay_transaction_envelope_conflict",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-048",
+      "family": "failover",
+      "description": "The prior durable evidence watermark lies after the authenticated timeline fork point, so the promoted branch cannot be assumed to contain that evidence.",
+      "expected_decision": "denied",
+      "reason_code": "durable_evidence_after_timeline_fork",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
     }
   ]
 }
