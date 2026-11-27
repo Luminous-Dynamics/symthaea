@@ -46,6 +46,8 @@ event contract.
 - [Integrated interaction benchmark protocol](SYMTHAEA_INTERACTION_BENCH_INTEGRATION_V0_1_2026-11-27.md)
 - [Interaction trace schema](SYMTHAEA_INTERACTION_TRACE_SCHEMA_V1_2026-11-27.json)
 - [Interaction trace fixtures](SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json)
+- [Causal interaction-trace verifier](../../crates/domains/symthaea-soma/src/embodiment_interaction_trace.rs)
+- [Trace-verifier CLI](../../crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs)
 - [Turn-control benchmark protocol](SYMTHAEA_TURN_CONTROL_BENCHMARK_V0_1_2026-11-27.md)
 - [Cross-form semantic continuity](SYMTHAEA_CROSS_FORM_CONTINUITY_V0_1_2026-11-27.md)
 - [Scene continuity descriptor schema](SYMTHAEA_SCENE_CONTINUITY_SCHEMA_V1_2026-11-27.json)
@@ -57,10 +59,12 @@ event contract.
 - [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
 - [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
 
-The renderer-independent event, projection, policy, receipt, scene, turn-control and continuity modules live under
-`crates/domains/symthaea-soma/src/`. A standalone Bevy 0.20.1 adapter has transition-aware source code under
+The renderer-independent event, projection, policy, receipt, scene, turn-control, continuity and interaction-trace verification modules live under
+`crates/domains/symthaea-soma/src/`. The cross-event trace verifier has a Rust CLI at
+`crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs`; it checks causal relationships but is not a JSON Schema validator.
+A standalone Bevy 0.20.1 adapter has transition-aware source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
-All 124 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
+All 143 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
 
 ## Theoretical Foundations
 

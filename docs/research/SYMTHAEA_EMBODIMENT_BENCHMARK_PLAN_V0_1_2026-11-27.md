@@ -587,9 +587,38 @@ Safety behavior:
 
 The material fade changes presentation opacity only; it does not change scene semantics, semantic confidence or policy-authorized intensity. The adapter's ECS acknowledgement is not a compositor observation.
 
-**Evidence status:** source implementation committed; 124 Rust tests authored (109 core and 15 adapter), none compiled or executed; no Bevy runtime/display, compositor observer or device qualification. Bevy dependency resolution and lockfile are still pending. The adapter README records the current limitations.
+**Evidence status:** source implementation committed; 143 Rust tests authored (128 Soma core and 15 adapter), none compiled or executed; no Bevy runtime/display, compositor observer or device qualification. Bevy dependency resolution and lockfile are still pending. The adapter README records the current limitations.
 
 See:
 - `SYMTHAEA_CROSS_FORM_CONTINUITY_V0_1_2026-11-27.md`
 - `SYMTHAEA_INTERACTION_BENCH_INTEGRATION_V0_1_2026-11-27.md`
 - `../../renderers/symthaea-soma-bevy/README.md`
+
+
+## 16. Replayable interaction traces and causal verifier (2026-11-27)
+
+Added:
+- `crates/domains/symthaea-soma/src/embodiment_interaction_trace.rs`
+- `crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs`
+- `docs/research/SYMTHAEA_INTERACTION_TRACE_SCHEMA_V1_2026-11-27.json`
+- `docs/research/SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json`
+
+The verifier consumes an already-parsed JSON trace or serialized JSON and enforces causal relations across records:
+- global event sequence uniqueness/order and per-clock monotonicity;
+- same-domain source timestamp non-backdating and effective-expiry checks;
+- one decision per candidate and emission before deadline;
+- event digest and privacy-class immutability;
+- authorization bound to session event, digest, clock, privacy, form, channel, destination and current policy version;
+- strictly increasing policy versions;
+- actuator side effects require the action kind in the opaque-permit trace's declared action scope;
+- output submission, observed-frame sequence and output-stop closure.
+
+The CLI accepts either a single trace or the fixture bundle, requiring the positive trace to pass and all negative cases to fail. Example invocation from the repository root:
+
+```sh
+cargo run -p symthaea-soma --bin verify_interaction_trace -- docs/research/SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json
+```
+
+The verifier has 19 authored tests. The existing seven Soma modules have 109 tests; the Bevy adapter has 15. **Total: 143 authored Rust tests, none compiled or executed.** No lockfile, structural JSON Schema validator run, runtime display or benchmark execution is claimed.
+
+Limitations remain explicit: JSON Schema validation is a separate step; observer IDs are not cryptographic attestations; the verifier cannot establish compositor independence, actual physical output, semantic relevance of grounding support, or user task success. Those require separate trusted observers and scorers.

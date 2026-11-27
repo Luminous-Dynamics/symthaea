@@ -105,11 +105,12 @@ A benchmark result is publishable only when the exact evaluated head, environmen
 
 ## 7. Current implementation status (2026-11-27)
 
-- Renderer-neutral event, projection, policy, receipt, scene, turn-control and continuity modules are present.
+- Renderer-neutral event, projection, policy, receipt, scene, turn-control, continuity and interaction-trace verification modules are present.
 - The isolated Bevy adapter now integrates the continuity planner with separate source/target scene groups, explicit alpha blending and live permit rechecks for both groups during transitions.
 - Superseding an unfinished transition uses a hard cut; a denied target clears both groups rather than restoring prior output.
-- Fifteen adapter tests and 109 core tests are authored (124 total), none compiled or executed.
-- No Bevy display/runtime, compositor observation, InteractionBench, TurnBench, StreamEval or VideoFDB evaluation has been executed.
+- Fifteen adapter tests and 128 Soma core tests are authored (143 total), none compiled or executed.
+- The causal verifier has a Rust CLI that accepts a single trace or a positive/negative fixture bundle. Structural JSON Schema validation remains separate.
+- No Rust build/test, Bevy display/runtime, compositor observation, InteractionBench, TurnBench, StreamEval or VideoFDB evaluation has been executed.
 - No claim of SOTA superiority, consciousness, sentience or subjective experience is made.
 
 ## 8. References
@@ -133,8 +134,16 @@ The JSON Schema checks event shape. A separate trace verifier must check relatio
 5. actions without a preceding authorization sequence and an explicit action-kind scope in the actuator permit;
 6. visible frames at or after grant/event effective expiry, following revocation, or following a stop/cancel observation;
 7. an event ID reused with a different canonical cue digest;
-8. a grounding answer whose cited support sequence is absent, future-dated or unrelated to its declared context;
-9. Submitted treated as Observed without a qualified observer identity and matching output/frame digest;
+8. a grounding answer whose cited support sequence is absent or future-dated; semantic relevance of the support requires a separate scorer or human review;
+9. Submitted treated as Observed without a non-empty observer identifier and a matching active output/frame sequence; cryptographic observer qualification, independence and frame-digest attestation remain external;
 10. an output-stop receipt that precedes the final visible frame or is absent after a required stop.
 
-The verifier must preserve clock-domain identity and never compare monotonic timestamps from different domains. It must report every rejected sample and reason, not silently discard invalid traces. These are implementation requirements; the verifier has not yet been written or run.
+The Rust verifier is implemented in `crates/domains/symthaea-soma/src/embodiment_interaction_trace.rs`. It enforces event sequence and per-clock monotonicity, source-clock expiry, one decision per candidate, immutable cue digest and privacy class, monotonic policy versions, action-kind scopes, matching presentation authorizations, and output stop closure. Nineteen tests are authored, but none is compiled or executed.
+
+The CLI supports either a single trace or the full positive/negative fixture bundle:
+
+```sh
+cargo run -p symthaea-soma --bin verify_interaction_trace -- docs/research/SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json
+```
+
+This command is authored but has not been run. The verifier is not a structural JSON Schema validator and does not prove observer independence, hardware attestation, semantic correctness of grounding evidence, or task success. It rejects causally invalid samples rather than silently dropping them.
