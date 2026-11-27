@@ -8,6 +8,10 @@
 #[allow(dead_code)]
 mod scientific_decision_replay;
 
+#[path = "support/asb_action_payload.rs"]
+#[allow(dead_code)]
+mod asb_action_payload;
+
 fn main() {
     println!(
         "Scientific decision replay schema v{} loaded; evaluator outcomes remain separate.",
