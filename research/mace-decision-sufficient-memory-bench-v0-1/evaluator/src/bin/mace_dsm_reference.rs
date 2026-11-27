@@ -149,8 +149,18 @@ struct RunManifestWire {
     schema_version: String,
     run_id: String,
     profile: String,
+    system: SystemWire,
     downstream_policy: DownstreamPolicyWire,
     evaluation: EvaluationWire,
+}
+#[derive(Clone, Debug, Deserialize)]
+struct SystemWire {
+    system_version: String,
+    artifact_digest_sha256: String,
+    #[serde(default)]
+    repository: Option<String>,
+    #[serde(default)]
+    commit_sha: Option<String>,
 }
 #[derive(Clone, Debug, Deserialize)]
 struct DownstreamPolicyWire { policy_digest_sha256: String, reader_seed: u64 }
@@ -328,6 +338,9 @@ fn validate_cost(receipt: &CostReceiptWire) -> Result<&'static str, String> {
         _ => Ok("incomplete_missing_phase_or_wall"),
     }
 }
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
 fn ratio(value: Option<(u64, u64)>) -> Value {
     match value {
         Some((n, d)) => json!({"numerator":n,"denominator":d,"value":if d == 0 {Value::Null} else {json!(n as f64 / d as f64)}}),
@@ -336,18 +349,31 @@ fn ratio(value: Option<(u64, u64)>) -> Value {
 }
 
 fn score(
-    candidate_path: &str, private_path: &str, response_path: &str, manifest_path: &str,
-    memory_id: &str, no_memory_id: &str, report_path: &str,
+    candidate_path: &str, private_path: &str, response_path: &str,
+    memory_manifest_path: &str, no_memory_manifest_path: &str, report_path: &str,
 ) -> Result<(), String> {
-    if memory_id.trim().is_empty() || no_memory_id.trim().is_empty() || memory_id == no_memory_id {
-        return Err("memory and no-memory system IDs must be nonempty and distinct".into());
+    let memory_manifest: RunManifestWire = read_json(memory_manifest_path)?;
+    let no_memory_manifest: RunManifestWire = read_json(no_memory_manifest_path)?;
+    for (label, manifest) in [("memory", &memory_manifest), ("no-memory", &no_memory_manifest)] {
+        if manifest.schema_version != MANIFEST_SCHEMA || manifest.profile != "native-research"
+            || manifest.evaluation.metric_profile != "dsm-v0.1"
+            || manifest.downstream_policy.policy_digest_sha256.trim().is_empty()
+            || manifest.system.system_version.trim().is_empty()
+            || !is_sha256(&manifest.system.artifact_digest_sha256)
+            || manifest.run_id.trim().is_empty() {
+            return Err(format!("{label} run manifest is not a complete native DSM v0.1 manifest"));
+        }
     }
-    let manifest: RunManifestWire = read_json(manifest_path)?;
-    if manifest.schema_version != MANIFEST_SCHEMA || manifest.profile != "native-research"
-        || manifest.evaluation.metric_profile != "dsm-v0.1"
-        || manifest.downstream_policy.policy_digest_sha256.trim().is_empty() {
-        return Err("run manifest is not a native DSM v0.1 manifest".into());
+    if memory_manifest.run_id == no_memory_manifest.run_id
+        || memory_manifest.system.artifact_digest_sha256 == no_memory_manifest.system.artifact_digest_sha256 {
+        return Err("memory and no-memory manifests must identify distinct runs and artifacts".into());
     }
+    if memory_manifest.downstream_policy.policy_digest_sha256 != no_memory_manifest.downstream_policy.policy_digest_sha256
+        || memory_manifest.downstream_policy.reader_seed != no_memory_manifest.downstream_policy.reader_seed {
+        return Err("memory and no-memory manifests do not share the same frozen downstream policy and reader seed".into());
+    }
+    let memory_id = memory_manifest.system.artifact_digest_sha256.as_str();
+    let no_memory_id = no_memory_manifest.system.artifact_digest_sha256.as_str();
 
     let mut candidates = BTreeMap::new();
     for (episode, raw) in read_jsonl::<CandidateEpisode>(candidate_path)? {
@@ -372,9 +398,12 @@ fn score(
     let mut responses: BTreeMap<(String,String),CandidateRunWire> = BTreeMap::new();
     for (response,_) in read_jsonl::<CandidateRunWire>(response_path)? {
         let id=&response.episode_id;
-        if response.schema_version!=RESPONSE_SCHEMA || response.run_id!=manifest.run_id
-            || response.downstream_policy_digest!=manifest.downstream_policy.policy_digest_sha256
-            || response.decision_seed!=manifest.downstream_policy.reader_seed {
+        let expected_run_id = if response.system_id == memory_id { &memory_manifest.run_id }
+            else if response.system_id == no_memory_id { &no_memory_manifest.run_id }
+            else { return Err(format!("{id}: undeclared system artifact {}", response.system_id)); };
+        if response.schema_version!=RESPONSE_SCHEMA || &response.run_id!=expected_run_id
+            || response.downstream_policy_digest!=memory_manifest.downstream_policy.policy_digest_sha256
+            || response.decision_seed!=memory_manifest.downstream_policy.reader_seed {
             return Err(format!("{id}: response/run-manifest identity mismatch"));
         }
         let candidate=candidates.get(id).ok_or_else(||format!("unknown response episode {id}"))?;
@@ -382,9 +411,7 @@ fn score(
             || response.arm_binding_sha256!=arm_digest(&candidate.digest,&response.system_id) {
             return Err(format!("{id}: candidate or system binding digest mismatch"));
         }
-        if response.system_id!=memory_id && response.system_id!=no_memory_id {
-            return Err(format!("{id}: undeclared system ID {}",response.system_id));
-        }
+        
         if response.retrieved_evidence_ids.len()>candidate.episode.evidence_budget
             || response.observation_requests>candidate.episode.observation_budget {
             return Err(format!("{id}: evidence or observation budget exceeded"));
@@ -506,14 +533,19 @@ fn score(
     let report=json!({
         "schema_version":"mace_dsm_paired_report_v0_1",
         "qualification_status":"scorer_completed_unvalidated_rust_execution",
-        "run_id":manifest.run_id,
-        "run_manifest_sha256":sha256(&fs::read(manifest_path).map_err(|e|e.to_string())?),
+        "memory_run_id":memory_manifest.run_id,
+        "no_memory_run_id":no_memory_manifest.run_id,
+        "memory_run_manifest_sha256":sha256(&fs::read(memory_manifest_path).map_err(|e|e.to_string())?),
+        "no_memory_run_manifest_sha256":sha256(&fs::read(no_memory_manifest_path).map_err(|e|e.to_string())?),
         "candidate_jsonl_sha256":sha256(&fs::read(candidate_path).map_err(|e|e.to_string())?),
         "evaluator_private_jsonl_sha256":sha256(&fs::read(private_path).map_err(|e|e.to_string())?),
         "candidate_runs_jsonl_sha256":sha256(&fs::read(response_path).map_err(|e|e.to_string())?),
-        "downstream_policy_digest":manifest.downstream_policy.policy_digest_sha256,
-        "decision_seed":manifest.downstream_policy.reader_seed,
-        "memory_system_id":memory_id,"no_memory_system_id":no_memory_id,
+        "downstream_policy_digest":memory_manifest.downstream_policy.policy_digest_sha256,
+        "decision_seed":memory_manifest.downstream_policy.reader_seed,
+        "memory_system_id":memory_id,"memory_system_version":memory_manifest.system.system_version,
+        "memory_commit_sha":memory_manifest.system.commit_sha,
+        "no_memory_system_id":no_memory_id,"no_memory_system_version":no_memory_manifest.system.system_version,
+        "no_memory_commit_sha":no_memory_manifest.system.commit_sha,
         "episode_count":n,
         "sum_memory_gain_micros":gain_sum.to_string(),
         "mean_memory_gain_micros":if n==0 {Value::Null}else{json!(gain_sum as f64/n as f64)},
@@ -540,12 +572,12 @@ fn score(
 }
 
 fn usage()->&'static str {
-    "MACE DSM reference runner\n\nscore <candidate-episodes.jsonl> <evaluator-private.jsonl> <candidate-runs.jsonl> <run-manifest.json> <memory-system-id> <no-memory-system-id> <report.json>\n"
+    "MACE DSM reference runner\n\nscore <candidate-episodes.jsonl> <evaluator-private.jsonl> <candidate-runs.jsonl> <memory-run-manifest.json> <no-memory-run-manifest.json> <report.json>\n"
 }
 fn run()->Result<(),String>{
     let args:Vec<String>=env::args().collect();
     match args.get(1).map(String::as_str) {
-        Some("score") if args.len()==9=>score(&args[2],&args[3],&args[4],&args[5],&args[6],&args[7],&args[8]),
+        Some("score") if args.len()==8=>score(&args[2],&args[3],&args[4],&args[5],&args[6],&args[7]),
         _=>{eprintln!("{}",usage());Err("invalid command or argument count".into())}
     }
 }
