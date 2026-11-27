@@ -467,6 +467,11 @@ fn aggregate(key: &str, rows: &[ScoreRow]) -> serde_json::Value {
         "worse_than_declared_no_memory_reference_rate": rows.iter().filter(|r| r.worse_than_declared_no_memory_reference).count() as f64 / n,
         "decision_sufficiency_rate": rows.iter().filter(|r| r.decision_sufficient).count() as f64 / n,
         "decision_change_vs_declared_reference_rate": rows.iter().filter(|r| r.changed_action_vs_declared_no_memory_reference).count() as f64 / n,
+        "mean_retrieved_evidence_precision": average(rows.iter().filter_map(|r| r.retrieved_evidence_precision)),
+        "invalid_retrieved_evidence_uses": rows.iter().map(|r| r.invalid_retrieved_evidence_count).sum::<usize>(),
+        "stale_retrieved_evidence_uses": rows.iter().map(|r| r.stale_or_superseded_retrieved_count).sum::<usize>(),
+        "untrusted_retrieved_evidence_uses": rows.iter().map(|r| r.untrusted_retrieved_count).sum::<usize>(),
+        "forbidden_retrieved_evidence_uses": rows.iter().map(|r| r.forbidden_retrieved_count).sum::<usize>(),
         "mean_valid_evidence_precision": average(rows.iter().filter_map(|r| r.valid_evidence_precision)),
         "mean_required_evidence_recall": average(rows.iter().map(|r| r.required_evidence_recall)),
         "invalid_evidence_uses": rows.iter().map(|r| r.invalid_evidence_count).sum::<usize>(),
@@ -477,11 +482,17 @@ fn aggregate(key: &str, rows: &[ScoreRow]) -> serde_json::Value {
         "observation_requests": rows.iter().map(|r| r.observation_requests).sum::<usize>(),
         "declared_observation_cost_units": rows.iter().map(|r| r.observation_cost_units).sum::<f64>(),
         "mean_declared_observation_cost_units": average(rows.iter().map(|r| r.observation_cost_units)),
-        "ingest_operations": rows.iter().map(|r| r.cost.ingest_operations).sum::<u64>(),
-        "query_operations": rows.iter().map(|r| r.cost.query_operations).sum::<u64>(),
-        "maintenance_operations": rows.iter().map(|r| r.cost.maintenance_operations).sum::<u64>(),
-        "retained_bytes": rows.iter().map(|r| r.cost.retained_bytes).sum::<u64>(),
-        "returned_bytes": rows.iter().map(|r| r.cost.returned_bytes).sum::<u64>(),
+        "ingest_operations_reported_count": rows.iter().filter(|r| r.cost.ingest_operations.is_some()).count(),
+        "ingest_operations_sum_of_reported": rows.iter().filter_map(|r| r.cost.ingest_operations).sum::<u64>(),
+        "query_operations_reported_count": rows.iter().filter(|r| r.cost.query_operations.is_some()).count(),
+        "query_operations_sum_of_reported": rows.iter().filter_map(|r| r.cost.query_operations).sum::<u64>(),
+        "maintenance_operations_reported_count": rows.iter().filter(|r| r.cost.maintenance_operations.is_some()).count(),
+        "maintenance_operations_sum_of_reported": rows.iter().filter_map(|r| r.cost.maintenance_operations).sum::<u64>(),
+        "retained_bytes_reported_count": rows.iter().filter(|r| r.cost.retained_bytes.is_some()).count(),
+        "retained_bytes_sum_of_reported": rows.iter().filter_map(|r| r.cost.retained_bytes).sum::<u64>(),
+        "returned_bytes_reported_count": rows.iter().filter(|r| r.cost.returned_bytes.is_some()).count(),
+        "returned_bytes_sum_of_reported": rows.iter().filter_map(|r| r.cost.returned_bytes).sum::<u64>(),
+        "detailed_cost_receipt_count": rows.iter().filter(|r| r.cost.detailed_receipt.is_some()).count(),
         "latency_samples": latencies.len(),
         "mean_reported_latency_us": average(latencies.into_iter())
     })
@@ -703,7 +714,7 @@ mod tests {
         e.evaluator_private.forbidden_evidence_ids.clear();
         let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id,e.seed,&e.family,&e.candidate).unwrap(),candidate:e.candidate.clone()};
         let p=PrivateRow{schema_version:PRIVATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id,e.seed,&e.family,&e.candidate).unwrap(),evaluator_private:e.evaluator_private.clone()};
-        let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"conflict-test".into(),candidate_sha256:c.candidate_sha256.clone(),arm_binding_sha256:arm_binding_digest(&c.candidate_sha256,"conflict-test"),action:"declare_blocked".into(),selected_evidence_ids:vec![format!("event-{:06}-old",1),format!("event-{:06}-new",1)],observation_requests:0,cost:Cost{ingest_operations:1,query_operations:1,maintenance_operations:0,retained_bytes:10,returned_bytes:10,latency_us:None}};
+        let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"conflict-test".into(),candidate_sha256:c.candidate_sha256.clone(),arm_binding_sha256:arm_binding_digest(&c.candidate_sha256,"conflict-test"),action:"declare_blocked".into(),selected_evidence_ids:vec![format!("event-{:06}-old",1),format!("event-{:06}-new",1)],observation_requests:0,retrieved_evidence_ids:vec![format!("event-{:06}-old",1),format!("event-{:06}-new",1)],selected_evidence_ids:vec![format!("event-{:06}-old",1),format!("event-{:06}-new",1)],observation_requests:0,cost:Cost{ingest_operations:Some(1),query_operations:Some(1),maintenance_operations:Some(0),retained_bytes:Some(10),returned_bytes:Some(10),latency_us:None,detailed_receipt:None}};
         let scored=score_one(&c,&p,&r).unwrap();
         assert_eq!(scored.unresolved_contradiction_pairs,1);
         assert!(!scored.decision_sufficient);
@@ -712,7 +723,7 @@ mod tests {
         let e=generated_episode(0,77);
         let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id, e.seed, &e.family, &e.candidate).unwrap(),candidate:e.candidate.clone()};
         let p=PrivateRow{schema_version:PRIVATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id, e.seed, &e.family, &e.candidate).unwrap(),evaluator_private:e.evaluator_private.clone()};
-        let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"bad-memory".into(),candidate_sha256:c.candidate_sha256.clone(),arm_binding_sha256:arm_binding_digest(&c.candidate_sha256,"bad-memory"),action:"use_old_account".into(),selected_evidence_ids:vec!["event-000000-old".into()],observation_requests:0,cost:Cost{ingest_operations:1,query_operations:1,maintenance_operations:0,retained_bytes:10,returned_bytes:10,latency_us:None}};
+        let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"bad-memory".into(),candidate_sha256:c.candidate_sha256.clone(),arm_binding_sha256:arm_binding_digest(&c.candidate_sha256,"bad-memory"),action:"use_old_account".into(),selected_evidence_ids:vec!["event-000000-old".into()],observation_requests:0,retrieved_evidence_ids:vec!["event-000000-old".into()],selected_evidence_ids:vec!["event-000000-old".into()],observation_requests:0,cost:Cost{ingest_operations:Some(1),query_operations:Some(1),maintenance_operations:Some(0),retained_bytes:Some(10),returned_bytes:Some(10),latency_us:None,detailed_receipt:None}};
         let s=score_one(&c,&p,&r).unwrap();
         let mut mismatched = r.clone(); mismatched.candidate_sha256 = "0".repeat(64);
         assert!(score_one(&c,&p,&mismatched).is_err());
