@@ -21,6 +21,8 @@ A first custody adapter is authored at `examples/support/evolutionary_rescue_cus
 
 The current source observation record exposes simulation tick and sample values only. It does not yet provide physical event time, availability time, per-observation source digests or a calibrated observation envelope. Those semantics must be supplied through #12407 before this pilot can support asynchronous/irregular-time replay.
 
+The custody module now includes `build_decision_prefix(archive, decision_tick)`. It validates tick continuity and emits a separate `DecisionObservationPrefix` containing observations only through the requested tick, plus a BLAKE3 digest of that prefix. It rejects out-of-range cutoffs. This is a tested projection helper, not yet a running replay service: an isolated driver still has to deliver the prefix to the candidate and keep the archive/evaluator roots inaccessible.
+
 The pilot materializes three separate artifacts and a runtime-only candidate view.
 
 ### Custodian-only replay observation archive
@@ -276,8 +278,9 @@ Implemented in this branch:
 - evaluator-owned resolution and distinct execution/outcome states;
 - validation for look-ahead evidence, action support, unsupported counterfactuals, delayed/censored/indeterminate outcomes and cost completeness;
 - nine authored decision-contract tests;
-- candidate/evaluator capsule projection, BLAKE3 digests, opaque IDs, disjoint-root checks, no-overwrite writes, manifest-last materialization and disk-readback checks;
-- seven authored custody tests and a capsule materializer example.
+- custodian-only replay-archive/evaluator projection, BLAKE3 digests, opaque IDs, empty/disjoint-root checks, no-overwrite writes, manifest-last materialization and disk-readback checks;
+- decision-time observation-prefix builder with digest and out-of-range rejection;
+- nine authored custody/prefix tests, two output-root tests and a capsule materializer example.
 
 Not implemented or not yet verified:
 - the ten worlds have not been generated or split in this environment; the existing source seed split is public and is not a sealed confirmatory split;
