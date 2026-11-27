@@ -11,7 +11,7 @@ pub struct QualificationDimensions {
     pub authority: bool,
     pub input_integrity: bool,
     pub provenance: bool,
-    pub reproducibility: bool,
+    pub replay_claim_consistency: bool,
     pub failure_containment: bool,
     pub budget_compliance: bool,
 }
@@ -20,6 +20,9 @@ pub struct QualificationDimensions {
 pub struct QualificationReport {
     pub schema: &'static str,
     pub task_id: String,
+    pub contract_checks_pass: bool,
+    pub independent_evidence_verified: bool,
+    pub qualification_status: &'static str,
     pub qualified: bool,
     pub dimensions: QualificationDimensions,
     pub resource_usage: Value,
@@ -243,7 +246,10 @@ pub fn qualify_observation(
     let independent = required_bool(observation, "/verifier/independent")?;
     let replay_result_sha =
         required_str(observation, "/verifier/replay_result_sha256")?;
-    let reproducibility = replay_status == "passed"
+    // These values are adapter claims. We can check internal consistency,
+    // but the adapter's independent=true field is not proof that another
+    // process actually replayed the result.
+    let replay_claim_consistency = replay_status == "passed"
         && independent
         && is_sha256(replay_result_sha)
         && replay_result_sha == result_sha;
@@ -266,17 +272,27 @@ pub fn qualify_observation(
         authority,
         input_integrity,
         provenance,
-        reproducibility,
+        replay_claim_consistency,
         failure_containment,
         budget_compliance,
     };
-    let qualified = dimensions.capability
+    // v0.1 has no trusted observer or resource-meter attestation verifier.
+    // Therefore no adapter-submitted observation can independently qualify,
+    // even when every self-reported contract dimension is internally valid.
+    let contract_checks_pass = dimensions.capability
         && dimensions.authority
         && dimensions.input_integrity
         && dimensions.provenance
-        && dimensions.reproducibility
+        && dimensions.replay_claim_consistency
         && dimensions.failure_containment
         && dimensions.budget_compliance;
+    let independent_evidence_verified = false;
+    let qualification_status = if contract_checks_pass {
+        "unqualified_untrusted_adapter_observation"
+    } else {
+        "unqualified_contract_checks_failed"
+    };
+    let qualified = contract_checks_pass && independent_evidence_verified;
 
     let mut reasons = Vec::new();
     if !capability {
@@ -291,19 +307,27 @@ pub fn qualify_observation(
     if !provenance {
         reasons.push("required provenance identity or digest is missing/invalid".to_owned());
     }
-    if !reproducibility {
-        reasons.push("independent replay did not reproduce the result digest".to_owned());
+    if !replay_claim_consistency {
+        reasons.push("adapter-declared replay failed or its result digest did not match".to_owned());
     }
     if !failure_containment {
         reasons.push("observed state mutations violate the task's containment contract".to_owned());
     }
     if !budget_compliance {
-        reasons.push("observed elapsed time, CPU, memory, tool, or network usage exceeds the task budget".to_owned());
+        reasons.push("adapter-reported elapsed time, CPU, memory, tool, or network usage exceeds the task budget".to_owned());
+    }
+    if !independent_evidence_verified {
+        reasons.push(
+            "no trusted observer attestation verifies resource metering, state observations, or independent replay in EQC v0.1".to_owned(),
+        );
     }
 
     Ok(QualificationReport {
         schema: "luminous.eqc.qualification-report.v0.1",
         task_id,
+        contract_checks_pass,
+        independent_evidence_verified,
+        qualification_status,
         qualified,
         dimensions,
         resource_usage,
@@ -435,11 +459,17 @@ mod tests {
     }
 
     #[test]
-    fn a_fully_observed_episode_qualifies_only_when_all_dimensions_pass() {
+    fn self_reported_observation_passes_contract_checks_but_is_not_independently_qualified() {
         let task = task();
         let observation = valid_observation(&task);
         let report = qualify_observation(&task, &observation).unwrap();
-        assert!(report.qualified);
+        assert!(report.contract_checks_pass);
+        assert!(!report.independent_evidence_verified);
+        assert_eq!(
+            report.qualification_status,
+            "unqualified_untrusted_adapter_observation"
+        );
+        assert!(!report.qualified);
         assert!(report.dimensions.budget_compliance);
         assert_eq!(report.resource_usage["human_interventions"], 0);
         assert!(report.resource_usage["energy_millijoules"].is_null());
@@ -537,13 +567,13 @@ mod tests {
         let mut observation = valid_observation(&task);
         observation["verifier"]["independent"] = json!(false);
         let report = qualify_observation(&task, &observation).unwrap();
-        assert!(!report.dimensions.reproducibility);
+        assert!(!report.dimensions.replay_claim_consistency);
         assert!(!report.qualified);
 
         let mut observation = valid_observation(&task);
         observation["verifier"]["replay_result_sha256"] = json!("1".repeat(64));
         let report = qualify_observation(&task, &observation).unwrap();
-        assert!(!report.dimensions.reproducibility);
+        assert!(!report.dimensions.replay_claim_consistency);
         assert!(!report.qualified);
     }
 
