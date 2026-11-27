@@ -123,6 +123,8 @@ The v0.1 seed fixtures and JSON Schema are synthetic protocol examples, not a va
 | Streaming updates | New information arrives while questions are being asked | Update the affected local state without requiring global corpus reconstruction |
 | Forgetting and replay | A record is erased, expired or revoked while retries and stale copies exist | Prevent reactivation from old writes, indexes, summaries, caches, replicas or backups |
 | Cross-scope isolation | Similar IDs or content exist in different users or evaluation runs | Never expose another user's or run's evidence, before ranking or content resolution |
+| Cross-lingual provenance | A memory is written in one language and queried in another, including code-switching | Preserve semantic qualifiers, entities, uncertainty and source-language traceability; do not fabricate a translation |
+| Representation migration | An embedding, HDC codebook, graph schema or index version changes | Preserve canonical evidence and lineage; verify migration equivalence and support atomic rollback |
 
 ### First confirmatory slice
 
@@ -133,7 +135,7 @@ The first implementation should not attempt all nine families. Begin with four d
 3. Source revocation.
 4. Insufficient evidence and selective abstention.
 
-Add poisoning, compression, streaming and erasure only after the reference evaluator and negative controls are stable. Coordinate security cases with MemSecBench rather than claiming to replace it.
+Add poisoning, compression, streaming and erasure only after the reference evaluator and negative controls are stable. Coordinate security cases with MemSecBench rather than claiming to replace it. Treat cross-lingual provenance and representation migration as follow-on families after the four-family baseline; add source/query language pairs and version-upgrade/rollback controls with independent annotations.
 
 ## Experimental design
 
