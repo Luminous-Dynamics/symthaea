@@ -168,12 +168,15 @@ For mutation-capable tasks, verify the state before and after every negative-con
 
 **Industry comparators**
 
-- SWE-Bench Pro V2 for challenging repository-level issue resolution.
-- SWE Atlas for codebase comprehension, test writing, and refactoring.
-- Terminal-Bench for tool-mediated terminal work.
-- MLPerf-style closed/open comparison discipline for matched systems and declared innovation.
+- **SWE-Bench Pro V2** for repository-level issue/feature resolution under hidden tests and pristine re-grading.
+- **SWE Atlas** for the wider engineering loop: Codebase Q&A, Test Writing, and Refactoring.
+- **Terminal-Bench** for tool-mediated terminal execution, with the caveat that the public 2.0 benchmark has been marked archived due score saturation.
+- **METR Time Horizon 1.1** for reliability as task difficulty increases, using human-expert task duration as the difficulty axis—not autonomous wall-clock duration.
+- **MLPerf-style closed/open comparison discipline** for matched baselines versus declared architectural innovation.
 
-SWE-Bench Pro V2's September 2026 public release describes 642 tasks across 11 repositories, web tools disabled during the agent phase, pristine-image re-grading, and both reference and empty-patch checks. Do not carry a headline score from the earlier public split into V2: the benchmark version and evaluation protocol changed. Treat leaderboard entries as benchmark-specific observations and compare only runs with the same split, harness, budget, and grading protocol.
+SWE-Bench Pro V2's September 2026 release contains 642 tasks across 11 repositories. It removed 89 invalid tasks, corrected contradictory instructions in 69 tasks, disabled web tools during the agent phase, re-grades agent diffs on pristine images, and requires each task to pass with the reference patch and fail with the empty patch. These controls are now part of the benchmark's locked protocol. Do not carry scores from the prior 731-task public split into V2.
+
+SWE Atlas is the complementary benchmark for work around the patch. It covers 124 Codebase Q&A tasks, 90 Test Writing tasks and 70 Refactoring tasks. Its official suite write-up reports that agents still miss runtime details, produce weak tests that fail to detect broken implementations, and leave incomplete refactors; repeated trials also reveal a reliability gap. Score these capabilities separately—do not average them into issue-resolution rate.
 
 **EQC extension**
 
@@ -321,12 +324,30 @@ This section records the public evidence used to set the first comparison target
 
 | Domain | Current public reference | What it measures | Important limitation for EQC |
 |---|---|---|---|
-| Software engineering | SWE-Bench Pro V2: 642 tasks across 11 repositories; current visible leaderboard entries include Claude Opus 5/Claude Code xhigh at 98.00 and GPT-6 Astra/Codex high at 90.20 | Long-horizon repository issue resolution, with hidden tests, network-restricted agent phase, reference/empty-patch admission and pristine-image re-grading | Primary metric is still resolve rate; it does not fully score authority correctness, input provenance or state mutation containment |
-| Terminal work | Terminal-Bench 2.0 | Tool-mediated terminal task completion | Vals AI marks the benchmark archived due saturation; EQC should not rely on a static saturated task set as its only agent benchmark |
-| Healthcare | HealthAgentBench V2: 75 tasks, nine categories/environments; current top displayed success 57.3%, cost $4.70/task and 14.7 minutes/task | Agent performance across imaging, EHR data quality, clinical QA, event modeling and survival | One scored attempt per task; xhigh reasoning; model API only; web tools disabled. Category success varies materially (e.g. MRI 20%, CT 20%, clinical QA 100% for the leading entry), so pooled success hides weak categories |
+| Software engineering — issue resolution | SWE-Bench Pro V2: 642 tasks across 11 repositories; locked V2 protocol | Repository-level bug/feature resolution with hidden tests, no web tools during the agent phase, two-sided reference/empty-patch admission and pristine re-grading | Resolve rate does not score authority, input provenance, state mutation containment or independent reproducibility. V2 scores are not comparable with the previous 731-task split |
+| Software engineering — investigation | SWE Atlas Codebase Q&A: 124 tasks; top systems around 30% under the strictest rubric threshold in the published Q&A release | Runtime-backed codebase comprehension, architecture, root cause, onboarding, security and API integration | Tests whether an agent actually investigates execution, not just whether it can produce a patch; human rubric and task-specific criteria differ from SWE-Bench Pro |
+| Software engineering — test quality | SWE Atlas Test Writing: 90 tasks | Unit, integration and acceptance tests with behavior-oriented grading | Test count is not quality. Weak assertions that pass on broken implementations must fail the benchmark |
+| Software engineering — maintenance | SWE Atlas Refactoring: 70 tasks; published top results remain below 50% | Multi-file decomposition, extraction, relocation, interface evolution, dead-code removal and documentation consistency | Passing the old test suite is necessary but not sufficient; score call-site recall, completeness, maintainability and stale-artifact removal |
+| Software engineering — task difficulty | METR Time Horizon 1.1: 50%/80% reliability curves over 100+ diverse tasks; public dashboard last updated 2026-09-08 | Success probability as a function of estimated human-expert task duration | The horizon is task difficulty measured in human time, not how long an agent can autonomously run; task coverage is concentrated in software, ML and cybersecurity |
+| Terminal work | Terminal-Bench 2.0 | Tool-mediated terminal task completion | The public Vals AI page marks the benchmark archived due saturation; EQC should not rely on a static saturated task set as its only agent benchmark |
+| Healthcare | HealthAgentBench V2: 75 tasks across nine categories/environments; current top displayed success 57.3%, $4.70/task and 14.7 minutes/task | Agent performance across imaging, EHR data quality, clinical QA, event modeling and survival | One scored attempt per task; xhigh reasoning; model API only; web tools disabled. Category success varies (e.g. CT 20%, MRI 20%, clinical QA 100% for the leading entry), so pooled success hides weak categories |
 | Physics | Rapier/Godot 4.7 scene benchmark: same M1 machine, release builds, rendering excluded, p50 physics-step time | Full scene-level performance for Rapier, Box2D and Jolt | These scene timings are not comparable to Symtropy's isolated GJK nanosecond microbenchmarks |
 | Simulation VVUQ | ASME V&V 20 plus VVUQ 20.1-2024 | Pointwise validation and a multivariate metric that aggregates discrepancies across variables, locations and times while accounting for uncertainty | Standards guide the validation method; they do not automatically certify a particular solver or deployment |
 | ML system performance | MLPerf Inference closed/open divisions | Closed division constrains comparison to the same model/reference setup; open division permits model substitution or retraining | Use the same separation in EQC: a closed matched-baseline track and an open innovation track |
+
+### Engineering-loop metrics EQC should add
+
+SWE Atlas shows why “patch success” is not the entire software-engineering capability surface. Symthaea should report at least five distinct task families:
+
+1. **Investigate:** Codebase Q&A with mandatory runtime traces, source locations, call-graph evidence and reproducible commands.
+2. **Diagnose:** Root-cause tasks requiring a falsifiable causal hypothesis, reproduction and counterfactual confirmation.
+3. **Test:** Test writing scored by mutation sensitivity, assertion strength, regression discrimination and false-positive rate—not test count or raw coverage.
+4. **Change:** Repository issue resolution with hidden tests, regression checks and pristine-image re-grading.
+5. **Maintain:** Multi-file refactoring scored for call-site recall, stale-code removal, public API preservation, docs synchronization and structural completeness.
+
+For each task family, report Pass@1, Pass@3 and **Pass³** (all three independent attempts pass). The all-three metric measures operational consistency: a system that succeeds on one lucky attempt is not equivalent to one that reliably produces the same qualified outcome. Preserve the exact attempt seeds and do not allow the three attempts to share mutable state or prior solutions.
+
+METR's time-horizon methodology is useful as a difficulty axis, but it must be described correctly. Its 50%/80% horizon is the human-expert task duration at which the agent is predicted to attain that success probability; it is not agent runtime or an “autonomy duration.” EQC should report the human-time difficulty bin, measured agent elapsed time, tool/compute budget, success probability, and qualified-success probability as separate quantities. METR also cautions that current task coverage is concentrated in software engineering, machine learning and cybersecurity; do not generalize this to all work.
 
 ### What the snapshot says about how to compete
 
@@ -341,7 +362,7 @@ This section records the public evidence used to set the first comparison target
 
 - **Protocol validity:** 100% task admission must pass the two-sided reference/no-op gate and independent task review.
 - **Integrity controls:** zero observed unauthorized mutation in each published negative-control family; report exact counts and confidence intervals rather than claiming zero risk.
-- **Matched capability:** first get within 5 absolute percentage points of the strongest matched baseline on the same valid task set and budget. For the current SWE-Bench Pro V2 public leaderboard, this means an initial comparison target around 93% only when the 98% reference is reproduced under the same harness, task split and 250-turn budget; it is not a forecast or claimed Symthaea result.
+- **Matched capability:** first get within 5 absolute percentage points of the strongest *reproduced, same-version, same-harness, same-budget* baseline on the shared task set. Do not hard-code a target from a leaderboard snapshot: frontier rankings and harnesses change, and a result from a different split is not a baseline.
 - **Integrity differentiation:** on that matched task set, report the fraction of resolved patches that also survive pristine replay and pass the EQC authority, provenance and resource-budget gates. A raw 98% resolve rate is not a 98% qualified-success rate.
 - **Demonstrated improvement:** then seek a statistically supported increase in qualified-success rate or decrease in cost per qualified success on a separately authored, harder held-out extension. At near-ceiling capability, new tasks should increase long-horizon, multi-file, regression, dependency, authority and hidden environment challenges rather than merely inflate the public score.
 - **Freshness:** rotate at least 20% of held-out episodes per major release, with an independently reviewed task-validity report; preserve previous versions to keep historical comparison possible.
@@ -427,6 +448,8 @@ This is a research direction. It should be considered successful only after the 
 ## 11. References
 
 - Scale Labs, [SWE-Bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2) and [V2 methodology](https://labs.scale.com/blog/swe-bench-pro-v2) (September 22, 2026).
+- Scale Labs, [SWE Atlas methodology](https://labs.scale.com/papers/sweatlas), [Codebase Q&A](https://labs.scale.com/leaderboard/sweatlas-qna), [Test Writing](https://labs.scale.com/leaderboard/sweatlas-tw), [Refactoring](https://labs.scale.com/leaderboard/sweatlas-refactoring), and [complete-suite report](https://scale.com/blog/swe-atlas-complete) (2026).
+- METR, [Task-Completion Time Horizons 1.1](https://metr.org/time-horizons/) and [methodological details](https://evals.alignment.org/time-horizons/) (dashboard last updated 2026-09-08).
 - Microsoft, [HealthAgentBench V2 results](https://microsoft.github.io/HealthAgentBench/v2/results/) and [benchmark repository](https://github.com/microsoft/HealthAgentBench) (V2 release announced October 25, 2026).
 - HL7 community, [FHIR conformance testing registry](https://www.fhir.org/conformance-testing/).
 - ASME, [V&V 20: Standard for Verification and Validation in CFD and Heat Transfer](https://www.asme.org/codes-standards/find-codes-standards/standard-for-verification-and-validation-in-computational-fluid-dynamics-and-heat-transfer) (2009, reaffirmed 2021).
