@@ -53,6 +53,7 @@ pub mod lyapunov;
 pub mod noise_robustness;
 pub mod pde_wave_stage_a;
 pub mod pde_wave_stage_b;
+pub mod physical_type;
 pub mod query;
 pub mod recognize;
 pub mod symmetry;
@@ -75,4 +76,10 @@ pub use symmetry::SymmetryEncoder;
 pub use symmetry_inference::infer_symmetry;
 pub use tensor_structure::TensorEncoder;
 pub use typed_generation::random_expr_with_dimension;
+pub use physical_type::{infer_expr_type, infer_expr_type_with_variables, explicit_type};
+pub use symthaea_types::{
+    ModelMaturity, PhysicalDimension, PhysicalType, PhysicalTypeError, QuantityKind, Refinement,
+    ScalarDomain, SemanticIdentifier, TypeJudgement, UnitRef, UnitScale, UnitTransform,
+    RationalScale,
+};
 pub use types::*;

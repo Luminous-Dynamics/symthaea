@@ -16,9 +16,17 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod discovery_handoff;
+pub mod physical_type;
 pub mod threshold_overrides;
 
 pub use threshold_overrides::{THRESHOLD_OVERRIDES_PATH_ENV, ThresholdOverrideValues};
+pub use discovery_handoff::{
+    InquirySelectionScope, ScientificHypothesisHandoff, ScientificHypothesisRevisionReceipt,
+    ScientificInquiryExecutionReceipt, ScientificInquirySelectionReceipt,
+    scientific_hypothesis_set_digest, validate_scientific_hypothesis_set, HYPOTHESIS_HANDOFF_SCHEMA,
+};
+pub use physical_type::{ModelMaturity, PhysicalDimension, PhysicalType, PhysicalTypeError, QuantityKind, RationalScale, Refinement, ScalarDomain, TypeJudgement, UnitRef, UnitScale, UnitTransform};
 
 /// Number of harmonies (Eight Harmonies including Sacred Stillness).
 pub const N_HARMONIES: usize = 8;

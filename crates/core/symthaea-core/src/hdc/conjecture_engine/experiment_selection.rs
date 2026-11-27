@@ -28,11 +28,11 @@
 //! domain. What this module needs is different: not "how much does one
 //! model's own uncertainty shrink," but "how much do *several independent
 //! discrete symbolic hypotheses' predictions disagree* for a given
-//! experiment" -- the classic optimal-experimental-design / query-by-
-//! committee framing, which happens to be the multi-hypothesis analogue of
-//! the same FEP epistemic-value idea. `epistemic_value` below is a new,
-//! small, honestly-scoped implementation of that analogue, not a
-//! reimplementation of `symthaea-fep`'s machinery.
+//! experiment" -- the classic query-by-committee / experimental-design
+//! framing. The score below is explicitly a disagreement heuristic, not a
+//! Shannon-information calculation, because no hypothesis prior/posterior
+//! distribution is supplied. It is not a reimplementation of
+//! `symthaea-fep`'s machinery.
 //!
 //! ## Design
 //!
@@ -73,28 +73,200 @@ pub fn epistemic_value<H, E>(
     hypotheses: &[H],
     predict: impl Fn(&H, &E) -> Option<f64>,
 ) -> f64 {
-    let predictions: Vec<f64> = hypotheses
-        .iter()
-        .filter_map(|h| predict(h, experiment))
-        .collect();
-    variance(&predictions)
+    discriminative_value(experiment, hypotheses, predict)
+        .map(|(score, _)| score)
+        .unwrap_or(0.0)
 }
 
-/// Select, from a pool of candidate experiments, the one with maximum
-/// [`epistemic_value`] against `hypotheses` -- i.e. the single most
-/// discriminating experiment to run next. Returns `None` if `candidates` is
-/// empty. Ties broken by first occurrence (stable, deterministic given a
-/// fixed candidate ordering).
+/// Return the finite prediction-disagreement score and the number of hypotheses
+/// directly compared for one candidate experiment.
+///
+/// This is deliberately *not* Shannon information gain: the selector has no
+/// prior/posterior hypothesis probabilities, so population variance is only a
+/// disagreement heuristic. A candidate with fewer than two finite predictions
+/// is not discriminative and is therefore rejected from the strict inquiry path.
+pub fn discriminative_value<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> Option<(f64, u32)> {
+    let predictions: Vec<f64> = hypotheses
+        .iter()
+        .filter_map(|h| predict(h, experiment).filter(|value| value.is_finite()))
+        .collect();
+
+    if predictions.len() < 2 {
+        return None;
+    }
+
+    let score = variance(&predictions);
+    if !score.is_finite() || score < 0.0 || predictions.len() > u32::MAX as usize {
+        return None;
+    }
+
+    Some((score, predictions.len() as u32))
+}
+
+/// Select the candidate experiment that most strongly discriminates between
+/// the surviving hypotheses. Only candidates with at least two finite
+/// hypothesis predictions are eligible.
+///
+/// Ties are broken by first occurrence, making the result deterministic for a
+/// fixed candidate ordering.
+pub fn select_most_discriminative_experiment<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+) -> Option<(&'a E, f64, u32)> {
+    candidates
+        .iter()
+        .enumerate()
+        .filter_map(|(index, experiment)| {
+            discriminative_value(experiment, hypotheses, predict)
+                .map(|(score, count)| (index, experiment, score, count))
+        })
+        .max_by(|a, b| {
+            a.2.partial_cmp(&b.2)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.0.cmp(&a.0))
+        })
+        .map(|(_, experiment, score, count)| (experiment, score, count))
+}
+
+/// Backward-compatible selection name. The implementation now uses the
+/// strict discriminative path so active-inquiry callers cannot select a
+/// challenge where only one hypothesis can make a finite prediction.
 pub fn select_most_informative_experiment<'a, H, E>(
     candidates: &'a [E],
     hypotheses: &[H],
     predict: impl Fn(&H, &E) -> Option<f64> + Copy,
 ) -> Option<(&'a E, f64)> {
-    candidates
-        .iter()
-        .map(|e| (e, epistemic_value(e, hypotheses, predict)))
-        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+    select_most_discriminative_experiment(candidates, hypotheses, predict)
+        .map(|(experiment, score, _)| (experiment, score))
 }
+
+/// Select a discriminative experiment after converting every finite hypothesis
+/// prediction into one explicit physical frame. A candidate is eligible only
+/// when every live hypothesis produces a finite, physically compatible value.
+///
+/// This closes the unit-scale loophole in raw variance: `1000 J` and `1 kJ`
+/// must compare as equal before disagreement is scored.
+pub fn discriminative_value_typed<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    prediction_frame: &symthaea_types::PhysicalType,
+    predict: impl Fn(&H, &E) -> Option<(f64, symthaea_types::PhysicalType)>,
+) -> Result<Option<(f64, u32)>, String> {
+    prediction_frame
+        .validate()
+        .map_err(|error| format!("invalid prediction frame: {}", error.reason))?;
+
+    if hypotheses.len() < 2 {
+        return Ok(None);
+    }
+
+    let mut predictions = Vec::with_capacity(hypotheses.len());
+    for hypothesis in hypotheses {
+        let Some((value, source_type)) = predict(hypothesis, experiment) else {
+            return Ok(None);
+        };
+        let symthaea_types::TypeJudgement::Valid(normalized) =
+            source_type.convert_value_to(value, prediction_frame)
+        else {
+            return Ok(None);
+        };
+        if !normalized.is_finite() {
+            return Ok(None);
+        }
+        predictions.push(normalized);
+    }
+
+    let score = variance(&predictions);
+    if !score.is_finite() || score < 0.0 || predictions.len() > u32::MAX as usize {
+        return Ok(None);
+    }
+
+    Ok(Some((score, predictions.len() as u32)))
+}
+
+pub fn select_most_discriminative_experiment_typed<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prediction_frame: &symthaea_types::PhysicalType,
+    predict: impl Fn(&H, &E) -> Option<(f64, symthaea_types::PhysicalType)> + Copy,
+) -> Result<Option<(&'a E, f64, u32)>, String> {
+    let mut best: Option<(&'a E, f64, u32, usize)> = None;
+
+    for (index, candidate) in candidates.iter().enumerate() {
+        let Some((score, count)) = discriminative_value_typed(
+            candidate,
+            hypotheses,
+            prediction_frame,
+            predict,
+        )? else {
+            continue;
+        };
+
+        let replace = match best {
+            None => true,
+            Some((_, best_score, _, best_index)) => {
+                score > best_score || (score == best_score && index < best_index)
+            }
+        };
+        if replace {
+            best = Some((candidate, score, count, index));
+        }
+    }
+
+    Ok(best.map(|(candidate, score, count, _)| (candidate, score, count)))
+}
+
+/// Select a typed discriminative experiment and emit an evidence-neutral
+/// reproducibility receipt. The receipt records the canonical physical frame,
+/// prediction coverage, and disagreement score—not realized evidence.
+pub fn select_most_discriminative_experiment_with_typed_receipt<'a, H, E, P, D>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prediction_frame: &symthaea_types::PhysicalType,
+    predict: P,
+    hypothesis_handoff_digest: impl Into<String>,
+    hypothesis_set_digest: impl Into<String>,
+    challenge_space_digest: impl Into<String>,
+    selector_revision: impl Into<String>,
+    selection_seed: u64,
+    challenge_digest: D,
+) -> Result<Option<(&'a E, ScientificInquirySelectionReceipt)>, String>
+where
+    P: Fn(&H, &E) -> Option<(f64, symthaea_types::PhysicalType)> + Copy,
+    D: Fn(&E) -> String,
+{
+    let Some((selected, predicted, prediction_count)) =
+        select_most_discriminative_experiment_typed(
+            candidates,
+            hypotheses,
+            prediction_frame,
+            predict,
+        )?
+    else {
+        return Ok(None);
+    };
+
+    let receipt = ScientificInquirySelectionReceipt::new(
+        hypothesis_handoff_digest,
+        hypothesis_set_digest,
+        challenge_space_digest,
+        challenge_digest(selected),
+        selector_revision,
+        selection_seed,
+        prediction_frame.digest_hex(),
+        predicted,
+        prediction_count,
+        hypotheses.len() as u32,
+    )?;
+    Ok(Some((selected, receipt)))
+}
+
+
 
 #[cfg(test)]
 mod tests {
@@ -149,6 +321,212 @@ mod tests {
             "selector should not pick the point where every hypothesis agrees"
         );
         assert!(value > 0.0);
+    }
+
+    #[test]
+    fn selector_uses_first_candidate_on_exact_tie() {
+        #[derive(Debug, PartialEq)]
+        struct Experiment(u8);
+
+        let hypotheses = [0u8, 1u8];
+        let candidates = [Experiment(1), Experiment(2), Experiment(3)];
+        let predict = |_h: &u8, _e: &Experiment| Some(1.0);
+        let (chosen, value) =
+            select_most_informative_experiment(&candidates, &hypotheses, predict)
+                .expect("non-empty candidate pool");
+        assert_eq!(chosen, &Experiment(1));
+        assert_eq!(value, 0.0);
+    }
+
+    #[test]
+    fn typed_selector_normalizes_prediction_units_before_scoring() {
+        let frame = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Energy,
+            symthaea_types::PhysicalDimension::ENERGY,
+        )
+        .with_unit(symthaea_types::UnitRef {
+            symbol: "J".into(),
+            dimension: symthaea_types::PhysicalDimension::ENERGY,
+            transform_to_si: symthaea_types::UnitTransform::IDENTITY,
+            semantic_id: None,
+        });
+        let kilojoule = frame.clone().with_unit(symthaea_types::UnitRef {
+            symbol: "kJ".into(),
+            dimension: symthaea_types::PhysicalDimension::ENERGY,
+            transform_to_si: symthaea_types::UnitTransform::new(
+                symthaea_types::RationalScale { numerator: 1000, denominator: 1 },
+                symthaea_types::RationalScale { numerator: 0, denominator: 1 },
+            ),
+            semantic_id: None,
+        });
+
+        let hypotheses = [0u8, 1u8];
+        let candidates = [0u8, 1u8];
+        let predict = |h: &u8, candidate: &u8| {
+            match (*h, *candidate) {
+                (0, 0) => Some((1000.0, frame.clone())),
+                (1, 0) => Some((1.0, kilojoule.clone())),
+                (0, 1) => Some((1000.0, frame.clone())),
+                (1, 1) => Some((2.0, kilojoule.clone())),
+                _ => None,
+            }
+        };
+
+        let (chosen, score, count) =
+            select_most_discriminative_experiment_typed(
+                &candidates, &hypotheses, &frame, predict
+            )
+            .unwrap()
+            .expect("complete physical predictions");
+
+        assert_eq!(*chosen, 1);
+        assert!(score > 0.0);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn typed_selector_rejects_semantically_incompatible_prediction() {
+        let frame = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Energy,
+            symthaea_types::PhysicalDimension::ENERGY,
+        );
+        let torque = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Torque,
+            symthaea_types::PhysicalDimension::ENERGY,
+        );
+        let hypotheses = [0u8, 1u8];
+        let candidates = [0u8];
+        let predict = |h: &u8, _candidate: &u8| {
+            if *h == 0 {
+                Some((1.0, frame.clone()))
+            } else {
+                Some((1.0, torque.clone()))
+            }
+        };
+
+        assert!(
+            select_most_discriminative_experiment_typed(
+                &candidates, &hypotheses, &frame, predict
+            )
+            .unwrap()
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn typed_receipt_binds_prediction_frame_and_full_coverage() {
+        let frame = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        );
+        let hypotheses = [0u8, 1u8];
+        let candidates = [1u8];
+        let predict = |_h: &u8, _candidate: &u8| Some((1.0, frame.clone()));
+
+        let (_, receipt) = select_most_discriminative_experiment_with_typed_receipt(
+            &candidates, &hypotheses, &frame, predict,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "selector-v3", 17,
+            |candidate| format!("experiment:{candidate}"),
+        )
+        .unwrap()
+        .expect("typed candidate should be eligible");
+
+        assert_eq!(receipt.prediction_count, 2);
+        assert_eq!(receipt.hypothesis_count, 2);
+        assert_eq!(receipt.prediction_frame_digest, frame.digest_hex());
+        assert!(receipt.validate().is_ok());
+        assert!(receipt.validate_against_prediction_frame(&frame).is_ok());
+    }
+
+
+    #[test]
+    fn strict_selector_rejects_single_prediction_candidates() {
+        let hypotheses = [0u8, 1u8];
+        let candidates = [0.0f64, 2.0f64];
+        let predict = |h: &u8, x: &f64| {
+            if *h == 0 {
+                Some(*x)
+            } else if *x == 0.0 {
+                None
+            } else {
+                Some(*x * 2.0)
+            }
+        };
+        let (chosen, score, count) =
+            select_most_discriminative_experiment(&candidates, &hypotheses, predict)
+                .expect("at least one candidate has two finite predictions");
+        assert_eq!(*chosen, 2.0);
+        assert!(score > 0.0);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn strict_selector_rejects_nonfinite_predictions() {
+        let hypotheses = [0u8, 1u8];
+        let candidates = [1.0f64, 2.0f64];
+        let predict = |h: &u8, x: &f64| {
+            Some(match (*h, *x as u8) {
+                (0, 1) => f64::NAN,
+                (1, 1) => 1.0,
+                (0, 2) => 2.0,
+                (1, 2) => 4.0,
+                _ => 0.0,
+            })
+        };
+        let (chosen, score, count) =
+            select_most_discriminative_experiment(&candidates, &hypotheses, predict)
+                .expect("finite candidate should remain eligible");
+        assert_eq!(*chosen, 2.0);
+        assert!(score > 0.0);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn receipt_selector_returns_none_without_two_finite_predictions() {
+        let hypotheses = [0u8, 1u8];
+        let candidates = [0.0f64];
+        let predict = |h: &u8, _x: &f64| (*h == 0).then_some(1.0);
+
+        let result = select_most_discriminative_experiment_with_receipt(
+            &candidates,
+            &hypotheses,
+            predict,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "selector-v2",
+            17,
+            |x| format!("experiment:{x:.1}"),
+        )
+        .expect("structural selector inputs are valid");
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn selection_receipt_records_prediction_coverage() {
+        let hypotheses = [0u8, 1u8];
+        let candidates = [1.0f64, 3.0f64];
+        let predict = |h: &u8, x: &f64| Some(if *h == 0 { *x } else { *x * 2.0 });
+        let (_, receipt) = select_most_discriminative_experiment_with_receipt(
+            &candidates,
+            &hypotheses,
+            predict,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "selector-v2",
+            17,
+            |x| format!("experiment:{x:.1}"),
+        )
+        .unwrap()
+        .expect("candidate pool is non-empty");
+        assert_eq!(receipt.prediction_count, 2);
+        assert!(receipt.predicted_disagreement_score() > 0.0);
+        assert!(receipt.validate().is_ok());
     }
 
     #[test]
