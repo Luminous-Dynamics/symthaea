@@ -24,6 +24,8 @@ result := custody.VerifyBundle(bundleDir, manifest, custody.Policy{
     MaxAge:                24 * time.Hour,
     ClockDomain:           "attestation-clock",
     MaxClockUncertaintyNS: int64(100 * time.Millisecond),
+    ExpectedRunID:         "run-2026-11-27-001",
+    ExpectedSequence:      2,
     ExpectedPreviousRoot:  previousBundleRoot,
     TrustedKeys: map[string]ed25519.PublicKey{
         "custody-key-2026-01": trustedPublicKey,
@@ -31,7 +33,7 @@ result := custody.VerifyBundle(bundleDir, manifest, custody.Policy{
 })
 ```
 
-A caller must persist the expected chain head independently. Passing an empty `ExpectedPreviousRoot` for sequence 2 or later yields `indeterminate`.
+A caller must persist the expected run ID, exact sequence and chain head independently. Missing expected identity/sequence or an empty predecessor for sequence 2 or later yields `indeterminate`; mismatches are blocked. The artifact directory is treated as an exact inventory: unlisted files and symlinks are rejected.
 
 ## Tests and benchmark
 
