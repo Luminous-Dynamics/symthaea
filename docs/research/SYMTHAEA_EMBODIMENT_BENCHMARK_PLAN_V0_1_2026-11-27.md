@@ -196,6 +196,28 @@ References:
 - https://avera-labs.github.io/InteractionBench/
 - https://anam.ai/tools/latency-benchmark
 
+### E2.6 — Tool-using full-duplex conversation
+
+Use Full-Duplex-Bench v3 as a distinct task-completion lane. The published
+snapshot describes 100 examples, 79 scenarios, 12 speakers and four domains.
+Its current table reports GPT Realtime 1.5 at 60% strict pass@1 (6.36 s first
+response, 6.89 s task completion), Gemini Live 3.1 at 54% (3.95 s, 4.25 s),
+and a Whisper/GPT-4o/TTS cascade at 45% (10.12 s task completion).
+
+Symthaea stretch target on the same frozen version:
+- >= 70% strict pass@1;
+- <= 3.5 s first-response latency and <= 4.5 s task-completion latency under
+  the exact same client/network/compute profile;
+- no reduction in policy compliance, interruption handling or groundedness.
+
+These numbers are from a fixed paper snapshot transcribed by a benchmark
+aggregator, not a continuous universal ranking. Verify the official scorer,
+dataset terms, runtime and exact task protocol before any public comparison.
+Never merge these results with VideoFDB or InteractionBench into a single score.
+
+Source:
+- https://benchlm.ai/voice-benchmarks/full-duplex-bench-v3
+
 ### E3 — Cross-embodiment semantic consistency
 
 Replay identical, frozen event traces through every renderer.
