@@ -24,7 +24,7 @@ Do not combine the following scores into one ranking. Their tasks, denominators,
 
 ### Agent Memory Leaderboard Cycle 2
 
-The official Cycle 2 results were published on 19 November 2026. The table below reports the leading Open-source Methods and Commercial Products entries in each track.
+The official Cycle 2 results were published on 19 November 2026. Its results page lists nine leaderboards and 289 track entries. The announcement separately reports 402 formal evaluation tasks, 333 successfully completed, and 292 valid leaderboard records after review/correction; those are different reporting units and should not be treated as a one-to-one count. The table below reports the leading Open-source Methods and Commercial Products entries in each track.
 
 | Track | Open-source leader | Commercial leader |
 |---|---:|---:|
@@ -32,7 +32,7 @@ The official Cycle 2 results were published on 19 November 2026. The table below
 | Multimodal | Khipu — 43.26 | MemoraX — 53.68 |
 | Coding | InsightMem — 63.33% | MemoraX — 68.00% |
 
-Source: Agent Memory Leaderboard, Cycle 2 results, https://agentmemoryleaderboard.ai/results/cycle-2/
+Sources: Agent Memory Leaderboard, Cycle 2 results, https://agentmemoryleaderboard.ai/results/cycle-2/ ; official results announcement (19 November 2026), https://agentmemoryleaderboard.ai/blog?post=phase2-results-20261119
 
 The track score is not a complete picture of capability. For example, the official Textual leaderboard shows Resurface at 76.55 in Memory Governance and 68.59 in Epistemic Safety & Privacy, but 38.82 in Personalization & Care and 49.65 in Streaming. Commercial MemoraX leads the textual overall board at 69.26 and reports 78.10 Memory Governance, 81.98 Epistemic Safety & Privacy and 63.11 Streaming. These capability-level gaps suggest that memory quality is multi-dimensional, not a single retrieval number.
 
@@ -51,6 +51,8 @@ AML says Cycle 2 received 402 formal Full evaluation tasks, 333 completed succes
 **COLLABMEM (EMNLP 2026).** This benchmark targets multi-agent memory visibility, access, routing, provenance, conflict resolution and retention. It has 58 hand-authored scenarios (1,118 core probes), a scaled 174-scenario split (3,359 probes), and six transactive-memory competencies. Its TMS-GRAPH++ system reports a 69.6% highest non-Oracle average over five splits. MACE should compare against this result only on the same split, SDK, answerer, judge and harness. Source: https://aclanthology.org/2026.emnlp-main.1194/
 
 **Memora / FAMA (Findings of ACL 2026).** Memora evaluates remembering, reasoning and recommending over weeks-to-months conversations. Its Forgetting-Aware Memory Accuracy (FAMA) penalizes reliance on obsolete or invalidated memories. This directly motivates MACE's stale-memory action and invalid-memory reuse measures. MACE should report FAMA on the official protocol when its executable artifacts and exact scoring are pinned; do not invent a crosswalk from DSM regret. Source: https://aclanthology.org/2026.findings-acl.1337/
+
+**MEMORA-Bench (Findings of EMNLP 2026).** This is a distinct embodied-memory benchmark, not the personalized-conversation Memora/FAMA work above. It contains 45 hours of egocentric video and evaluates retrospective memory faithfulness plus prospective memory-grounded planning. Its system uses online typed memory editing and offline consolidation into reusable routines, habits and preferences; the paper reports improvements across four open-weight answer models under matched perception/retrieval and includes a physical-robot demonstration. MACE should add this as an embodied transfer lane, retaining matched perception, action environment and robot safety conditions. Source: https://aclanthology.org/2026.findings-emnlp.1211/
 
 ## 2. Paradigm shifts that could move the field
 
@@ -88,7 +90,13 @@ Do not assume HDC or any single architecture wins every track. Demonstrate selec
 
 Collaborative memory needs explicit writer identity, role visibility, purpose limitation, independent provenance and conflict handling. A fact available to one role must not automatically be exposed to another. Evaluate leakage and unauthorized activation as hard failures, not as a small reduction in recall.
 
-### G. From benchmark scores to evidence-carrying results
+### G. From text-only memory to embodied and sensor-grounded experience
+
+Experience should retain typed object identity, spatial relations, temporal action evidence, actor/role context, and the uncertainty of the perception pipeline. A video frame or transcript is not ground truth: the memory system must preserve the source observation and the perception/identity lineage that produced a derived claim. Separate online event retention from offline consolidation into routines, and test transfer to goals that were not known when the original experience was acquired.
+
+MEMORA-Bench is a relevant external comparator for this direction. MACE should preserve a matched perception budget and use independent task/participant splits; otherwise a memory gain can be confused with a better visual encoder or answer model.
+
+### H. From benchmark scores to evidence-carrying results
 
 Every result should bind the exact source revision, model identifiers, prompt, data split, task-set digest, retrieval configuration, cost observations, grader, seed set, run receipts and independently checked outcome. Publish missingness and failure dispositions. A CI skip is not a validation pass; a synthetic fixture is not an external result.
 
@@ -106,6 +114,7 @@ These are proposed research targets, not existing MACE results. Numerical goals 
 | TimlMemBench | 208 samples, 1,566 sessions, 1,821 governed-use cases | ≥50% relative reduction in stale/revoked/scope-ineligible use vs strongest matched baseline; keep valid-evidence recall loss ≤1 pp | Exact raw-native protocol and reviewed artifact version |
 | COLLABMEM | TMS-GRAPH++ 69.6% non-Oracle average | ≥74.6% (+5 pp) on same splits, with zero cross-role leakage in hard isolation tests | Fixed trace, role, answerer, judge, SDK and all five splits |
 | Memora / FAMA | FAMA explicitly penalizes obsolete-memory reuse | ≥50% relative reduction in invalid-memory reuse while preserving current-memory recall | Official FAMA implementation, released dataset, same answerer and update schedule |
+| MEMORA-Bench | 45-hour egocentric-video suite; retrospective faithfulness and prospective planning | First reproduce the paper's four-answer-model comparison; then target ≥3 percentage-point planning gain over the strongest matched baseline with non-inferior retrospective faithfulness | Same video/perception stack, answerer, action horizon, robot/task success rules and safety gates |
 
 The AML commercial stretch is deliberately separate from the open-source goal. If MACE's model profile or hosting does not satisfy the relevant division's eligibility rules, do not claim that comparison.
 
@@ -153,17 +162,19 @@ Report per-family distributions and confidence intervals. A mean alone can hide 
 
 ## 6. Near-term programme sequence
 
-1. **Make the new DSM episode format executable.** Build candidate/private separation, strict response records, balanced-arm scoring and deterministic first-four-family generation in Rust.
-2. **Connect the existing paired runner.** Add a versioned adapter from its candidate decision/evidence outputs and phase-attributed cost receipts; do not fork a second paired runner.
-3. **Reuse dependency-aware knockouts.** Adapt the existing event/root/family knockout and cluster-level aggregation tools to DSM identifiers instead of creating a new ablation engine.
-4. **Add hidden evaluator custody.** Candidate and evaluator must run under separate OS identities or services; the current preparation digest is a consistency binding, not a security boundary.
-5. **Add multi-seed, held-out benchmark packs.** Use generated seeds for development and sealed templates/source lineages for confirmation.
-6. **Submit AML separately.** Implement its exact Add/Search contract and run the official smoke/full evaluation. Native DSM scores cannot substitute for AML scores.
-7. **Run external suites in their own lanes.** AMA-Bench, MemoryArena, TimlMemBench, COLLABMEM, Memora/FAMA and LongMemEval retain their native datasets, answerers, metrics and cost reporting.
+1. **Make the DSM episode format executable.** The reference evaluator now defines candidate/private split schemas, deterministic episode generation, strict response records, bitemporal checks and a scoring contract. Its fixtures are synthetic, not system results.
+2. **Require evaluator-private pairing.** Each episode is now bound to a pair block, query ID, candidate digest and world-cluster label. The scorer can produce cluster-weighted outcomes, but the cluster labels are not proof of statistical independence and the existing cluster bootstrap remains the confirmatory inference owner.
+3. **Preserve retrieval versus use.** The response contract records all retrieved IDs separately from decision-support IDs, and decision-sufficiency fails closed on invalid evidence or unresolved contradictions anywhere in retrieved context.
+4. **Preserve measured versus unknown cost.** Detailed phase timings, token/model/tool counters and measured/estimated byte labels are carried separately; null remains unknown. The scorer does not convert missing cost into zero.
+5. **Connect the existing paired runner through a fail-closed adapter.** The adapter mapping is documented, but the current paired `Experience`/candidate receipt does not yet carry the full DSM bitemporal source-event envelope. The mapping must be `NotComparable` until that typed source projection exists; do not infer observation time, lifecycle parentage or authority from event IDs.
+6. **Qualify evaluator custody.** Candidate and evaluator must run under separate OS identities or services; current digest bindings are consistency checks, not signatures or custody proofs.
+7. **Add multi-seed, held-out packs and reuse existing inference.** Reuse #13836's independent-cluster bootstrap and existing dependency-aware knockouts; do not fork another runner or claim that per-cluster means are confidence intervals.
+8. **Submit AML separately.** AML expects participant-hosted Add/Search endpoints, a smoke test and then formal evaluation. Its public rankings cannot be replaced with native DSM scores. Source: https://agentmemoryleaderboard.ai/
+9. **Run external suites in their own lanes.** AMA-Bench, MemoryArena, TimlMemBench, COLLABMEM, Memora/FAMA and MEMORA-Bench retain their native datasets, answerers, metrics and costs.
 
 ## 7. Immediate engineering boundary
 
-The DSM parent proposal (#13895) defines the episode protocol and synthetic seed fixtures. This child implementation adds a Rust reference generator, candidate/private split and response scorer. It deliberately does not claim:
+The DSM parent proposal (#13895) defines the episode protocol and synthetic seed fixtures. The evaluator child (#13909) adds a Rust reference generator/scorer, candidate/private split schemas, a required pair/cluster manifest, separate retrieved/selected evidence streams and detailed nullable cost receipts. The paired-runner adapter is still a specification because the common source-event projection is missing. It deliberately does not claim:
 - that a memory system has been benchmarked;
 - that the six positive-control responses were generated by an agent;
 - that the candidate process is isolated by the evaluator binary;
@@ -181,3 +192,4 @@ The relevant executable benchmark result will come only after exact-head Rust ch
 - Zhou et al., TimlMemBench, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.507/
 - Wu et al., COLLABMEM, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.1194/
 - Uddin et al., Memora / FAMA, Findings of ACL 2026: https://aclanthology.org/2026.findings-acl.1337/
+- Yu et al., MEMORA-Bench, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1211/
