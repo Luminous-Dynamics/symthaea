@@ -91,7 +91,8 @@
         "amplitude_is_computed_from_formula",
         "log_argument",
         "observation_horizon_fraction_of_nu_minus_one_third",
-        "p_values_are_exploratory_not_source_theorem_constants"
+        "p_values_are_exploratory_not_source_theorem_constants",
+        "maximum_initial_perturbation_amplitude"
       ],
       "properties": {
         "formula": {
@@ -144,6 +145,9 @@
         },
         "p_values_are_exploratory_not_source_theorem_constants": {
           "const": true
+        },
+        "maximum_initial_perturbation_amplitude": {
+          "const": 0.1
         }
       }
     },
