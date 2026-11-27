@@ -423,7 +423,7 @@ mod tests {
         }
 
         // The finite 4×4×4 grid covers (4/5)^3 of the countable allocation.
-        assert_eq!(total_alpha, (64, 2_500));
+        assert_eq!(total_alpha, (16, 625));
         assert!(total_alpha.0 * 20 <= total_alpha.1);
     }
 
