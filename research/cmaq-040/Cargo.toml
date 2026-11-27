@@ -1,0 +1,12 @@
+[package]
+name = "cmaq-040-restarted-rank-spectrum"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Restart-time mixture over multi-resolution predictive-rank e-processes"
+
+[dependencies]
+cmaq-038-rank-spectrum-monitor = { path = "../cmaq-038" }
+
+[workspace]
