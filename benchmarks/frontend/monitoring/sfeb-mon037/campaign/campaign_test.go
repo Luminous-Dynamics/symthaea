@@ -221,3 +221,35 @@ func TestRowCollectionOrderGapWithinTransactionBlocks(t *testing.T) {
 	refreshRecordDigests(&in)
 	expect(t, in, Blocked)
 }
+
+
+func TestRecordSetDigestMismatchBlocks(t *testing.T) {
+	in := fixture()
+	in.SourceEventsSHA256 = dc
+	expect(t, in, Blocked)
+	in = fixture()
+	in.ObservedEventsSHA256 = dc
+	expect(t, in, Blocked)
+	in = fixture()
+	in.TransactionProofsSHA256 = dc
+	expect(t, in, Blocked)
+	in = fixture()
+	in.TopicPartitionsSHA256 = dc
+	expect(t, in, Blocked)
+	in = fixture()
+	in.SurfaceAssertionsSHA256 = dc
+	expect(t, in, Blocked)
+}
+
+func TestFixtureDigestDerivationCannotRunForRuntimeCandidate(t *testing.T) {
+	in := fixture()
+	in.Mode = RuntimeCandidate
+	in.SourceEventsSHA256 = ""
+	if DeriveFixtureRecordSetDigests(&in) {
+		t.Fatal("runtime candidate must never derive its own evidence digests")
+	}
+	in.Mode = OfflineFixture
+	if !DeriveFixtureRecordSetDigests(&in) || in.SourceEventsSHA256 != sourceEventsDigest(in.SourceEvents) {
+		t.Fatal("offline fixture digest derivation failed")
+	}
+}
