@@ -203,13 +203,17 @@ impl Bm25IndexV1 {
             {
                 return Err(BaselineErrorV1::InvalidSourceFamily);
             }
-            if document.source_root_digest_sha256.as_ref().is_some_and(|root| {
-                root.len() != 64
-                    || !root
-                        .bytes()
-                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-            }) || (document.source_root_digest_sha256.is_some()
-                && document.source_family.is_none())
+            if document
+                .source_root_digest_sha256
+                .as_ref()
+                .is_some_and(|root| {
+                    root.len() != 64
+                        || !root
+                            .bytes()
+                            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                })
+                || (document.source_root_digest_sha256.is_some()
+                    && document.source_family.is_none())
             {
                 return Err(BaselineErrorV1::InvalidSourceRootDigest);
             }
@@ -336,7 +340,9 @@ impl Bm25IndexV1 {
             .filter(|index| {
                 let document = &self.documents[*index].document;
                 document.valid_from_ms <= query.as_of_ms
-                    && document.valid_until_ms.is_none_or(|end| query.as_of_ms < end)
+                    && document
+                        .valid_until_ms
+                        .is_none_or(|end| query.as_of_ms < end)
             })
             .collect();
         let eligible_count = eligible_indexes.len();
@@ -374,8 +380,8 @@ impl Bm25IndexV1 {
                     self.documents[*index].document.observed_at_ms <= query.as_of_ms
                 });
                 let visible_postings = &postings[..knowledge_cutoff];
-                scope_knowledge_postings_visited = scope_knowledge_postings_visited
-                    .saturating_add(visible_postings.len() as u64);
+                scope_knowledge_postings_visited =
+                    scope_knowledge_postings_visited.saturating_add(visible_postings.len() as u64);
                 let document_frequency = visible_postings
                     .iter()
                     .filter(|(index, _)| eligible_set.contains(index))
@@ -407,12 +413,7 @@ impl Bm25IndexV1 {
         let mut ranked: Vec<(String, f64)> = scores
             .iter()
             .filter(|(_, score)| **score > 0.0)
-            .map(|(index, score)| {
-                (
-                    self.documents[*index].document.document_id.clone(),
-                    *score,
-                )
-            })
+            .map(|(index, score)| (self.documents[*index].document.document_id.clone(), *score))
             .collect();
         ranked.sort_by(|left, right| {
             right
@@ -649,12 +650,22 @@ mod tests {
 
     #[test]
     fn other_scopes_and_future_knowledge_do_not_enter_the_query_workset() {
-        let base = index(vec![
-            document("known", "tenant-a", "pump pressure inspection", 1, 1, None),
-        ]);
-        let mut extended_documents = vec![
-            document("known", "tenant-a", "pump pressure inspection", 1, 1, None),
-        ];
+        let base = index(vec![document(
+            "known",
+            "tenant-a",
+            "pump pressure inspection",
+            1,
+            1,
+            None,
+        )]);
+        let mut extended_documents = vec![document(
+            "known",
+            "tenant-a",
+            "pump pressure inspection",
+            1,
+            1,
+            None,
+        )];
         for i in 0..256 {
             extended_documents.push(document(
                 &format!("other-{i:03}"),
@@ -677,8 +688,15 @@ mod tests {
         let q = query("pump pressure inspection", "tenant-a", 10, 10);
         assert_eq!(base.search(&q).unwrap(), extended.search(&q).unwrap());
         assert_eq!(
-            extended.search(&q).unwrap().work.scope_knowledge_postings_visited,
-            base.search(&q).unwrap().work.scope_knowledge_postings_visited
+            extended
+                .search(&q)
+                .unwrap()
+                .work
+                .scope_knowledge_postings_visited,
+            base.search(&q)
+                .unwrap()
+                .work
+                .scope_knowledge_postings_visited
         );
     }
 
@@ -813,13 +831,14 @@ mod tests {
         source.authority_tier = AuthorityTierV1::Verified;
         source.uncertainty_ppm = 500;
         source.source_family = Some("supplier_registry".into());
-        source.source_root_digest_sha256 = Some(
-            "ad74977d718be3043ed9ae57f75765a53724767753b8933e6c81bd94f7068019".into(),
-        );
+        source.source_root_digest_sha256 =
+            Some("ad74977d718be3043ed9ae57f75765a53724767753b8933e6c81bd94f7068019".into());
         source.relation_to_parent = EventRelationV1::Supersedes;
         source.parent_event_ids = vec!["e-old".into()];
         let index = index(vec![source]);
-        let result = index.search(&query("calibration certificate", "lab-a", 20, 5)).unwrap();
+        let result = index
+            .search(&query("calibration certificate", "lab-a", 20, 5))
+            .unwrap();
         assert_eq!(result.hits[0].document_id, "e-current");
         let resolved = index
             .resolve_source_event(&result.hits[0].document_id)
