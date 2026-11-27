@@ -76,6 +76,7 @@ struct AudioEvidencePredicateV1 {
     model_runtime_identity_authenticated: bool,
     runner_receipt_verified: bool,
     request_body_bytes_recomputed: bool,
+    request_body_semantics_bound: bool,
     request_body_delivery_attested: bool,
     model_input_attested: bool,
 }
@@ -244,6 +245,7 @@ pub fn build_audio_evidence_in_toto_statement(
             .model_runtime_identity_authenticated,
         runner_receipt_verified: audit.audio_evidence_report.runner_receipt_verified,
         request_body_bytes_recomputed: audit.audio_evidence_report.request_body_bytes_recomputed,
+        request_body_semantics_bound: audit.audio_evidence_report.request_body_semantics_bound,
         request_body_delivery_attested: audit.audio_evidence_report.request_body_delivery_attested,
         model_input_attested: audit.model_input_attested,
     };
