@@ -30,7 +30,7 @@ P(\ell_1<Y_1\le u_1,\ell_2<Y_2\le u_2)
 \right] dz .
 \]
 
-The implementation uses deterministic adaptive Simpson integration for the outer conditional integral. Inner standard-normal interval masses reuse the direct-tail 64-point Gauss–Legendre routine from #13944. It splits the integration range at conditional-transition locations (including several conditional-standard-deviation offsets) so a narrow high-correlation transition is less likely to hide between initial samples.
+The implementation uses deterministic adaptive Simpson integration for the outer conditional integral. Inner standard-normal interval masses reuse the direct-tail 64-point Gauss–Legendre routine from #13944. The scalar module now initializes that quadrature rule once through a thread-safe OnceLock and exposes a standard-normal interval API; the bivariate loop calls that cached API rather than rebuilding the 64-point rule for every evaluation. It splits the integration range at conditional-transition locations (including several conditional-standard-deviation offsets) so a narrow high-correlation transition is less likely to hide between initial samples.
 
 This is a low-dimensional reference method. The reported outer refinement difference is an **error indicator**, not a formally certified total error bound. The one-million-call cap is a hard limit on outer integrand evaluations; it does not count the fixed 64-point inner Gaussian quadrature nodes and must not be presented as a total floating-point operation count. Inner quadrature and total results must still be checked against independent high-precision calculations.
 
