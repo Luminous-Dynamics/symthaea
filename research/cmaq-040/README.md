@@ -114,7 +114,7 @@ CMAQ-040 borrows the telescoping heavy-tailed start-time allocation idea and com
 ## Required benchmark before any superiority claim
 
 Use paired streams, identical effective calibration blocks, alpha, rank construction, tie handling and horizon. Register:
-- shift times 0, 100, 500, 2,000 and 8,000;
+- shift times 0, 125, 250, 500, 1,000, 2,000, 4,000 and 8,000;
 - calibration sizes 19, 49, 99, 199, 499 and 999 effective blocks;
 - alpha 0.01, 0.05 and 0.10;
 - horizons 100, 500, 2,000 and long late-shift horizons;
