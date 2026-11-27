@@ -18,11 +18,16 @@ Each EpisodeTrace contains:
 - independent safety-violation and task-completion labels;
 - useful progress in fixed-point parts per million;
 - source-trace, scenario-manifest, independent ground-truth, system-build, monitor-build, fallback-policy, score-definition, score, closure-manifest and closure-authority receipt SHA-256 bindings;
-- the CMAQ-036 effective block ID so correlated episodes remain grouped.
+- the CMAQ-036 effective block ID so correlated episodes remain grouped;
+- an absolute safe operating exposure interval (domain ID, monotonic start and end) for each safe episode.
 
 The deadline is supplied by the frozen scenario/plant evaluator. It is not inferred from the warning, fallback action, or monitor state. Hazard episodes must have a deadline within the evaluated trace. Safe episodes must not carry one.
 
-All ten evidence digests must be 64-character lowercase hexadecimal SHA-256 values, and the effective-block ID must be nonempty. This is only structural validation; no signature or receipt authenticity is established.\n\nTimestamps must be within the trace. Fallback completion requires a start. Fallback completion cannot precede start, and fallback cannot start before a recorded warning. A warning or fallback completion exactly at the deadline is late; timely intervention requires strictly positive lead time.
+All ten evidence digests must be 64-character lowercase hexadecimal SHA-256 values, and the effective-block ID must be nonempty. This is only structural validation; no signature or receipt authenticity is established.
+
+Safe episodes must provide an exposure interval whose length equals the episode duration. Hazard episodes cannot contribute safe exposure. The exposure domain identifies one physical asset or simulator clock domain. The evaluator unions overlapping and adjacent intervals within each domain before summing exposure; duplicate or overlapping clips therefore cannot manufacture additional safe operating hours. Different domains (for example, different robots) contribute separate asset-hours. Use a stable domain ID that includes a clock epoch when a device clock can reset.
+
+Event timestamps are relative to the episode trace and must be within the trace. Exposure interval timestamps are absolute within their declared domain. Fallback completion requires a start. Fallback completion cannot precede start, and fallback cannot start before a recorded warning. A warning or fallback completion exactly at the deadline is late; timely intervention requires strictly positive lead time. Fallback completion requires a start. Fallback completion cannot precede start, and fallback cannot start before a recorded warning. A warning or fallback completion exactly at the deadline is late; timely intervention requires strictly positive lead time.
 
 ## Output scorecard
 
@@ -36,11 +41,11 @@ The evaluator returns an overall scorecard, a sorted per-family breakdown, and a
 - false warnings and false quarantines as separate counts on safe episodes;
 - unnecessary fallback starts on safe episodes;
 - safety violations;
-- safe operating exposure in microseconds;
+- unioned safe operating exposure in microseconds, deduplicated per asset/clock domain;
 - safe task completions;
 - safe useful progress observations and their mean in ppm.
 
-For false warning/hour and false quarantine/hour, the evaluator exposes the distinct numerators and safe-operating-time denominator. Consumers should report the raw counts and exposure (or clearly derived rates), not hide the denominator.
+For false warning/hour and false quarantine/hour, the evaluator exposes the distinct event numerators and the unioned safe-operating-time denominator. Consumers should report raw counts and exposure (or clearly derived rates), not hide the denominator.
 
 Safe useful progress and safe task completion stay visible alongside intervention success. A policy that always quarantines cannot score well merely by avoiding intervention misses.
 
