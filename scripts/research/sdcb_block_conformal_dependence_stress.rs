@@ -297,6 +297,28 @@ mod tests {
     }
 
     #[test]
+    fn zero_rho_serial_path_matches_the_independent_block_rate_range() {
+        let independent = run_coverage_experiment(
+            SamplingDesign::IndependentBlocks,
+            0.0,
+            8,
+            0,
+            TEST_TRIALS,
+            0xB10C_C0DE_0003,
+        );
+        let serial = run_coverage_experiment(
+            SamplingDesign::OneSerialPath,
+            0.0,
+            8,
+            0,
+            TEST_TRIALS,
+            0xB10C_C0DE_0004,
+        );
+        assert!((independent.empirical_alarm_rate - ALPHA).abs() <= 0.025);
+        assert!((serial.empirical_alarm_rate - ALPHA).abs() <= 0.025);
+    }
+
+    #[test]
     fn serial_path_experiment_is_exactly_replayable() {
         let first = run_coverage_experiment(
             SamplingDesign::OneSerialPath,
@@ -319,7 +341,12 @@ mod tests {
 
     #[test]
     fn block_length_and_embargo_grid_returns_well_formed_coverage_receipts() {
-        for report in run_suite(100) {
+        let reports = run_suite(100);
+        assert_eq!(
+            reports.len(),
+            RHO_GRID.len() * BLOCK_LENGTH_GRID.len() * (1 + EMBARGO_GRID.len())
+        );
+        for report in reports {
             assert_eq!(report.calibration_blocks, CALIBRATION_BLOCKS);
             assert_eq!(report.trials, 100);
             assert!(report.empirical_alarm_rate.is_finite());
