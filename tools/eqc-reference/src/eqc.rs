@@ -1,4 +1,4 @@
-use anyhow::{Context, bail};
+use anyhow::{bail, Context};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -524,7 +524,9 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
                 "active" if artifact.get("revoked_at").is_none() => {}
                 "revoked" => {
                     let revoked_at = json_string(&artifact, "revoked_at", task, input)?;
-                    if !is_canonical_utc(revoked_at) || revoked_at > task.request.evaluated_at.as_str() {
+                    if !is_canonical_utc(revoked_at)
+                        || revoked_at > task.request.evaluated_at.as_str()
+                    {
                         bail!(
                             "{}: revoked consent fixture '{}' has invalid revocation time",
                             task.task_id,
