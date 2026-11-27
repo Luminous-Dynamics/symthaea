@@ -15,6 +15,7 @@
     "session_id",
     "source_clock_domain_id",
     "event_id",
+    "canonical_cue_digest",
     "event_expires_at_monotonic_ns",
     "grant_expires_at_monotonic_ns",
     "effective_permit_expires_at_monotonic_ns",
@@ -342,6 +343,10 @@
           "pattern": "^(0|[1-9][0-9]*)$"
         }
       }
+    },
+    "canonical_cue_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     }
   }
 }
