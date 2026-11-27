@@ -6,5 +6,5 @@ SELECT
     :'batch_id',
     'account-' || ((n % 7) + 1)::text,
     ((n % 10000)::numeric / 100) - 20
-FROM generate_series(1, :batch_size::integer) AS n;
+FROM generate_series(1, :batch_size::integer) AS g(n);
 COMMIT;
