@@ -9,6 +9,7 @@
     "episode_id",
     "arm_id",
     "candidate_sha256",
+    "arm_binding_sha256",
     "action",
     "selected_evidence_ids",
     "observation_requests",
@@ -89,6 +90,10 @@
       }
     },
     "candidate_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "arm_binding_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     }
