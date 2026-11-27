@@ -185,6 +185,23 @@ fn audit(fixture: &Value) -> Result<(), String> {
         "fixed_topology_piecewise_constant_analytic_module_only",
     )?;
 
+    if !boolean(
+        linearization,
+        "distribution_pulse_spatial_integral_weights_required",
+    )? {
+        return Err("physical spatial mass integration requires explicit quadrature weights".to_owned());
+    }
+    require_string(
+        linearization,
+        "distribution_pulse_unweighted_total_mass_interpretation",
+        "unit_weight_row_sum_not_general_spatial_integral",
+    )?;
+    require_string(
+        linearization,
+        "distribution_pulse_weighted_quadrature_api_status",
+        "positive_spatial_weight_api_implemented_module_only",
+    )?;
+
     let horizon = field(fixture, "prediction_horizon")?;
     let horizon_start = number(horizon, "start_time")?;
     let horizon_end = number(horizon, "end_time")?;
