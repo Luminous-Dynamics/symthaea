@@ -1,0 +1,395 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sat-memory-isolation-case-v0.1.schema.json",
+  "title": "SAT Cross-Context Isolation Case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "pair_id",
+    "pair_role",
+    "surface_id",
+    "test_lane",
+    "boundary_axis",
+    "sharing_policy",
+    "mechanism",
+    "source_context",
+    "reader_context",
+    "record",
+    "expected"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-memory-isolation-case/v0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^XI-[A-Z0-9-]+$"
+    },
+    "pair_id": {
+      "type": "string",
+      "pattern": "^XIP-[A-Z0-9-]+$"
+    },
+    "pair_role": {
+      "enum": [
+        "unauthorized_read_attack",
+        "authorized_read_control"
+      ]
+    },
+    "surface_id": {
+      "const": "cross_context_isolation"
+    },
+    "test_lane": {
+      "enum": [
+        "front_door",
+        "placement_reference"
+      ]
+    },
+    "boundary_axis": {
+      "enum": [
+        "user",
+        "session",
+        "tenant",
+        "agent",
+        "group_membership",
+        "caller_namespace"
+      ]
+    },
+    "sharing_policy": {
+      "enum": [
+        "deny_cross_user",
+        "deny_cross_session",
+        "deny_cross_tenant",
+        "deny_cross_agent",
+        "explicit_group_allowlist",
+        "same_user_cross_session_allow",
+        "owner_only"
+      ]
+    },
+    "mechanism": {
+      "enum": [
+        "shared_pool_filter",
+        "caller_assigned_namespace",
+        "separate_store_per_user",
+        "composite",
+        "not_disclosed"
+      ]
+    },
+    "source_context": {
+      "$ref": "#/$defs/context"
+    },
+    "reader_context": {
+      "$ref": "#/$defs/context"
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "owner_user_id",
+        "owner_tenant_id",
+        "owner_session_id",
+        "owner_agent_id",
+        "synthetic_marker"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_tenant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "synthetic_marker": {
+          "type": "string",
+          "pattern": "^SAT-MOCK-[A-Z0-9-]+$"
+        },
+        "deliberately_shared_group_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_may_be_visible",
+        "authorized_read_must_succeed",
+        "foreign_marker_must_not_be_visible"
+      ],
+      "properties": {
+        "record_may_be_visible": {
+          "type": "boolean"
+        },
+        "authorized_read_must_succeed": {
+          "type": "boolean"
+        },
+        "foreign_marker_must_not_be_visible": {
+          "type": "boolean"
+        },
+        "mock_action_may_use_record": {
+          "type": "boolean"
+        }
+      }
+    },
+    "placement_reference": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "native_case_id",
+        "donor_record",
+        "victim_slot_record_id",
+        "victim_slot_owner_user_id",
+        "donor_record_is_genuine",
+        "victim_identifiers_retained",
+        "requires_store_boundary",
+        "evaluator_has_store_write_access",
+        "ordinary_read_path_required",
+        "separate_isolation_result"
+      ],
+      "properties": {
+        "native_case_id": {
+          "const": "T6"
+        },
+        "donor_record": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "record_id",
+            "source_owner_user_id",
+            "source_tenant_id",
+            "content_digest",
+            "content"
+          ],
+          "properties": {
+            "record_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_owner_user_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_tenant_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "content_digest": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "victim_slot_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "victim_slot_owner_user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "donor_record_is_genuine": {
+          "const": true
+        },
+        "victim_identifiers_retained": {
+          "const": true
+        },
+        "requires_store_boundary": {
+          "const": true
+        },
+        "evaluator_has_store_write_access": {
+          "const": true
+        },
+        "ordinary_read_path_required": {
+          "const": true
+        },
+        "separate_isolation_result": {
+          "const": true
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant_id",
+        "user_id",
+        "session_id",
+        "agent_id",
+        "group_ids",
+        "authenticated_principal"
+      ],
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "authenticated_principal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "caller_namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "pair_role": {
+            "const": "unauthorized_read_attack"
+          }
+        },
+        "required": [
+          "pair_role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "expected": {
+            "properties": {
+              "record_may_be_visible": {
+                "const": false
+              },
+              "foreign_marker_must_not_be_visible": {
+                "const": true
+              },
+              "mock_action_may_use_record": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "pair_role": {
+            "const": "authorized_read_control"
+          }
+        },
+        "required": [
+          "pair_role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "expected": {
+            "properties": {
+              "record_may_be_visible": {
+                "const": true
+              },
+              "authorized_read_must_succeed": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "test_lane": {
+            "const": "front_door"
+          }
+        },
+        "required": [
+          "test_lane"
+        ]
+      },
+      "then": {
+        "required": [
+          "placement_reference"
+        ],
+        "properties": {
+          "placement_reference": {
+            "const": null
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "test_lane": {
+            "const": "placement_reference"
+          }
+        },
+        "required": [
+          "test_lane"
+        ]
+      },
+      "then": {
+        "required": [
+          "placement_reference"
+        ],
+        "properties": {
+          "placement_reference": {
+            "type": "object"
+          },
+          "boundary_axis": {
+            "const": "user"
+          }
+        }
+      }
+    }
+  ]
+}

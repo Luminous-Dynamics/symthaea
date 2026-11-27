@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sat-memory-isolation-result-v0.1.schema.json",
+  "title": "SAT Cross-Context Isolation Result v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "profile_manifest_sha256",
+    "sut_digest",
+    "case_id",
+    "test_lane",
+    "evaluator_identity",
+    "read_completed",
+    "foreign_record_observed",
+    "foreign_record_served",
+    "foreign_record_served_as_trusted",
+    "acted_on",
+    "observation_class",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-memory-isolation-result/v0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile_manifest_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "sut_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^XI-[A-Z0-9-]+$"
+    },
+    "test_lane": {
+      "enum": [
+        "front_door",
+        "placement_reference"
+      ]
+    },
+    "evaluator_identity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "read_completed": {
+      "type": "boolean"
+    },
+    "foreign_record_observed": {
+      "type": "boolean"
+    },
+    "foreign_record_served": {
+      "type": "boolean"
+    },
+    "foreign_record_served_as_trusted": {
+      "type": "boolean"
+    },
+    "acted_on": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "observation_class": {
+      "enum": [
+        "agent_boundary",
+        "store_read_path",
+        "external_mock_sink",
+        "not_observed"
+      ]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "test_lane": {
+            "const": "front_door"
+          }
+        },
+        "required": [
+          "test_lane"
+        ]
+      },
+      "then": {
+        "properties": {
+          "observation_class": {
+            "enum": [
+              "agent_boundary",
+              "external_mock_sink",
+              "not_observed"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "test_lane": {
+            "const": "placement_reference"
+          }
+        },
+        "required": [
+          "test_lane"
+        ]
+      },
+      "then": {
+        "properties": {
+          "observation_class": {
+            "enum": [
+              "store_read_path",
+              "not_observed"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
