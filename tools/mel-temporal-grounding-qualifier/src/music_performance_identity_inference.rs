@@ -76,13 +76,10 @@ pub struct PairedMetricInferenceV1 {
     pub candidate_improvement_interval: Option<PercentileIntervalV1>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Debug, Clone, PartialEq, Serialize)]
 pub struct PairedMusicalIdentityStratumV1 {
     pub target_property: crate::music_performance_identity::MusicalIdentityPropertyV1,
-    pub performance_stay_factor: Option<
-        crate::music_performance_identity::PerformanceStayFactorV1,
-    >,
+    pub performance_stay_factor: Option<crate::music_performance_identity::PerformanceStayFactorV1>,
     pub musical_flip_factor: Option<crate::music_performance_identity::MusicalFlipFactorV1>,
     pub item_count: usize,
     pub source_work_clusters: usize,
@@ -504,11 +501,7 @@ fn build_stratum(
         .filter(|(item_id, _)| selected_ids.contains(**item_id))
         .map(|(item_id, result)| (*item_id, *result))
         .collect();
-    let clusters = paired_cluster_outcomes(
-        &baseline_subset,
-        &candidate_subset,
-        &selected_case,
-    )?;
+    let clusters = paired_cluster_outcomes(&baseline_subset, &candidate_subset, &selected_case)?;
     let cluster_count = clusters.len();
     if cluster_count == 0 {
         return Err("stratum has no source-work clusters".into());
@@ -803,7 +796,10 @@ mod tests {
         assert_eq!(report.by_performance_stay_factor.len(), 1);
         assert_eq!(report.by_musical_flip_factor.len(), 1);
         assert_eq!(report.by_target_property[0].source_work_clusters, 30);
-        assert_eq!(report.by_performance_stay_factor[0].source_work_clusters, 30);
+        assert_eq!(
+            report.by_performance_stay_factor[0].source_work_clusters,
+            30
+        );
         assert_eq!(report.by_musical_flip_factor[0].source_work_clusters, 30);
         assert_eq!(
             report.by_target_property[0].status,
@@ -961,9 +957,8 @@ mod tests {
     fn sparse_property_stratum_is_not_estimable_even_when_overall_floor_is_met() {
         let mut input = fixture();
         let property_question = "Is the root pitch class the same?".to_string();
-        let property_question_sha256 = crate::music_listen_bench::sha256_hex(
-            property_question.as_bytes(),
-        );
+        let property_question_sha256 =
+            crate::music_listen_bench::sha256_hex(property_question.as_bytes());
         for case in [&mut input.baseline, &mut input.candidate] {
             let triad = case.triads.last_mut().unwrap();
             triad.target_property =
@@ -993,13 +988,20 @@ mod tests {
             })
             .unwrap();
         assert_eq!(root.source_work_clusters, 1);
-        assert_eq!(root.status, PairedInferenceStatusV1::InsufficientSourceWorkClusters);
+        assert_eq!(
+            root.status,
+            PairedInferenceStatusV1::InsufficientSourceWorkClusters
+        );
         assert!(
             root.performance_stay_false_difference
                 .candidate_improvement_interval
                 .is_none()
         );
-        assert!(root.musical_flip_miss.candidate_improvement_interval.is_none());
+        assert!(
+            root.musical_flip_miss
+                .candidate_improvement_interval
+                .is_none()
+        );
         assert!(root.joint_exact.candidate_improvement_interval.is_none());
     }
 
@@ -1007,8 +1009,7 @@ mod tests {
     fn sparse_stay_and_flip_factor_strata_withhold_intervals_independently() {
         let mut input = fixture();
         let root_question = "Is the root pitch class the same?".to_string();
-        let root_question_sha256 =
-            crate::music_listen_bench::sha256_hex(root_question.as_bytes());
+        let root_question_sha256 = crate::music_listen_bench::sha256_hex(root_question.as_bytes());
 
         for case in [&mut input.baseline, &mut input.candidate] {
             let triad = case.triads.last_mut().unwrap();
@@ -1091,12 +1092,12 @@ mod tests {
                 .candidate_improvement
                 > 0.0
         );
-        assert!(
-            report.musical_flip_miss.estimate.candidate_improvement
-                < 0.0
-        );
+        assert!(report.musical_flip_miss.estimate.candidate_improvement < 0.0);
         assert_ne!(
-            report.performance_stay_false_difference.estimate.candidate_improvement,
+            report
+                .performance_stay_false_difference
+                .estimate
+                .candidate_improvement,
             report.musical_flip_miss.estimate.candidate_improvement
         );
     }
