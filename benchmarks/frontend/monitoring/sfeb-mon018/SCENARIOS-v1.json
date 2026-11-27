@@ -1,0 +1,702 @@
+{
+  "corpus_id": "MON-018-AUTHORITY-EVIDENCE",
+  "corpus_version": "1.0.0",
+  "status": "research_seed",
+  "purpose": "Synthetic known-answer cases for testing exact Mycelix authority-to-MON action composition. These cases are not field observations or security probabilities.",
+  "decision_semantics": {
+    "qualified": "All declared authority predicates are supported for the exact operation and time. Continue to a separate destination/effect gate; do not infer dispatch.",
+    "denied": "At least one mandatory authority predicate is established false. Do not dispatch.",
+    "indeterminate": "Evidence is missing, stale, unsupported or outside its declared boundary. Hold and obtain evidence or reconcile.",
+    "divergent": "Admissible sources or histories contradict each other. Preserve both and surface divergence."
+  },
+  "scenarios": [
+    {
+      "id": "AUTH-001",
+      "family": "identity",
+      "description": "A directly issued grant binds the authenticated principal, current issuer, exact resource and execution action.",
+      "expected_decision": "qualified",
+      "reason_code": "all_required_claims_verified",
+      "required_control": "continue_to_effect_gate",
+      "severity": "critical",
+      "tags": [
+        "direct-grant",
+        "positive"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "AUTH-002",
+      "family": "delegation",
+      "description": "A delegated execution grant has a complete authenticated lineage, strictly attenuated scopes and active parent history.",
+      "expected_decision": "qualified",
+      "reason_code": "delegation_lineage_valid",
+      "required_control": "continue_to_effect_gate",
+      "severity": "critical",
+      "tags": [
+        "delegation",
+        "positive"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "AUTH-003",
+      "family": "delegation",
+      "description": "A grant limited to proposal is presented for an execution operation.",
+      "expected_decision": "denied",
+      "reason_code": "proposal_is_not_execution",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "mode-substitution"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-004",
+      "family": "identity",
+      "description": "The request principal differs from the authenticated grant subject.",
+      "expected_decision": "denied",
+      "reason_code": "principal_mismatch",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "subject-substitution"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-005",
+      "family": "identity",
+      "description": "A credential subject matches but the signing key/controller binding is stale or does not control the subject.",
+      "expected_decision": "indeterminate",
+      "reason_code": "controller_binding_not_current",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "key-rotation"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-006",
+      "family": "scope",
+      "description": "The delegated action differs from the granted action.",
+      "expected_decision": "denied",
+      "reason_code": "action_scope_mismatch",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "action-substitution"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-007",
+      "family": "scope",
+      "description": "The requested resource or tenant differs from the granted resource scope.",
+      "expected_decision": "denied",
+      "reason_code": "resource_scope_mismatch",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "resource-substitution",
+        "tenant-isolation"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-008",
+      "family": "operation",
+      "description": "The operation label matches but the typed request digest differs.",
+      "expected_decision": "denied",
+      "reason_code": "request_digest_mismatch",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "digest-substitution"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-009",
+      "family": "operation",
+      "description": "The same operation identifier is reused with a changed beneficiary, amount or destination field.",
+      "expected_decision": "denied",
+      "reason_code": "semantic_operation_substitution",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "idempotency",
+        "beneficiary"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-010",
+      "family": "delegation",
+      "description": "A parent delegation was revoked before the child authority's action time.",
+      "expected_decision": "denied",
+      "reason_code": "ancestor_revoked_at_action_time",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "parent-revocation"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-011",
+      "family": "delegation",
+      "description": "A child delegation broadens an action, resource, quantity or mode beyond its parent.",
+      "expected_decision": "denied",
+      "reason_code": "delegation_amplification",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "attenuation"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-012",
+      "family": "delegation",
+      "description": "A child delegation strictly narrows its parent's action and resource scope and remains active.",
+      "expected_decision": "qualified",
+      "reason_code": "delegation_strictly_attenuated",
+      "required_control": "continue_to_effect_gate",
+      "severity": "high",
+      "tags": [
+        "attenuation",
+        "positive"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "AUTH-013",
+      "family": "temporal",
+      "description": "A grant is valid at commit time and is revoked later; the later audit reconstructs the earlier valid state.",
+      "expected_decision": "qualified",
+      "reason_code": "historically_active_at_commit",
+      "required_control": "continue_to_effect_gate",
+      "severity": "critical",
+      "tags": [
+        "bitemporal",
+        "retroactive-audit",
+        "positive"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "AUTH-014",
+      "family": "temporal",
+      "description": "The operation time precedes the grant's effective time.",
+      "expected_decision": "denied",
+      "reason_code": "grant_not_yet_effective",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "effective-time"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-015",
+      "family": "temporal",
+      "description": "The operation time is exactly at the exclusive grant-expiry boundary.",
+      "expected_decision": "denied",
+      "reason_code": "grant_expired_at_boundary",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "expiry-boundary"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-016",
+      "family": "revocation",
+      "description": "A grant revocation is authenticated and effective before destination commit.",
+      "expected_decision": "denied",
+      "reason_code": "revoked_before_commit",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "revocation"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-017",
+      "family": "revocation",
+      "description": "A grant revocation is authenticated and effective at the exact destination commit boundary.",
+      "expected_decision": "denied",
+      "reason_code": "revoked_at_commit_boundary",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "revocation",
+        "race"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-018",
+      "family": "revocation",
+      "description": "A revocation becomes effective after commit, and authenticated effective/recorded times establish that ordering.",
+      "expected_decision": "qualified",
+      "reason_code": "revocation_after_commit",
+      "required_control": "continue_to_effect_gate",
+      "severity": "critical",
+      "tags": [
+        "bitemporal",
+        "positive"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "AUTH-019",
+      "family": "revocation",
+      "description": "Revocation is mentioned but its signature, issuer authority or effective time cannot be verified.",
+      "expected_decision": "indeterminate",
+      "reason_code": "revocation_proof_unverified",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "cryptography",
+        "missing-proof"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-020",
+      "family": "temporal",
+      "description": "The grant is valid under an old authority epoch but the destination commit is fenced to a newer epoch.",
+      "expected_decision": "denied",
+      "reason_code": "stale_authority_epoch",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "epoch",
+        "fencing"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-021",
+      "family": "temporal",
+      "description": "A governing policy or constitution digest changes after approval but before effectuation.",
+      "expected_decision": "denied",
+      "reason_code": "policy_epoch_changed_before_commit",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "policy-currentness"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-022",
+      "family": "identity",
+      "description": "The issuer key was rotated or revoked and current key status cannot be reconstructed at action time.",
+      "expected_decision": "indeterminate",
+      "reason_code": "issuer_key_currentness_unknown",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "issuer-currentness"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-023",
+      "family": "identity",
+      "description": "The grant issuer is not anchored in the accepted institutional trust-root profile.",
+      "expected_decision": "denied",
+      "reason_code": "issuer_not_admitted",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "trust-anchor"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-024",
+      "family": "cryptography",
+      "description": "A correctly shaped issuance proof commitment exists, but the underlying signature was not cryptographically verified.",
+      "expected_decision": "indeterminate",
+      "reason_code": "proof_commitment_is_not_signature_verification",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "proof-commitment"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-025",
+      "family": "cryptography",
+      "description": "The issuer signature verifies, but the credential-status or revocation snapshot is outside its declared freshness bound.",
+      "expected_decision": "indeterminate",
+      "reason_code": "status_evidence_stale",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "freshness"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-026",
+      "family": "temporal",
+      "description": "The commit timestamp or clock relation cannot be authenticated to the required precision.",
+      "expected_decision": "indeterminate",
+      "reason_code": "commit_time_untrusted",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "clock"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-027",
+      "family": "history",
+      "description": "The authority event enumeration has a missing sequence or non-terminal cursor.",
+      "expected_decision": "indeterminate",
+      "reason_code": "authority_history_incomplete",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "completeness",
+        "sequence-gap"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-028",
+      "family": "history",
+      "description": "Two different authority events claim the same sequence position.",
+      "expected_decision": "divergent",
+      "reason_code": "same_sequence_conflict",
+      "required_control": "must_surface_divergence",
+      "severity": "critical",
+      "tags": [
+        "equivocation"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-029",
+      "family": "history",
+      "description": "An event identifier is reused for different event content.",
+      "expected_decision": "divergent",
+      "reason_code": "event_id_reuse_conflict",
+      "required_control": "must_surface_divergence",
+      "severity": "critical",
+      "tags": [
+        "equivocation"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-030",
+      "family": "history",
+      "description": "Two different successor grants claim the same predecessor authority lineage.",
+      "expected_decision": "divergent",
+      "reason_code": "competing_successors",
+      "required_control": "must_surface_divergence",
+      "severity": "critical",
+      "tags": [
+        "rotation",
+        "equivocation"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-031",
+      "family": "history",
+      "description": "A cross-DNA authority reference is supplied without an authenticated mirror or verifiable source path.",
+      "expected_decision": "indeterminate",
+      "reason_code": "cross_dna_reference_unresolved",
+      "required_control": "must_hold",
+      "severity": "high",
+      "tags": [
+        "holochain",
+        "cross-dna"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-032",
+      "family": "availability",
+      "description": "The authoritative Mycelix source is unavailable and the cached snapshot is beyond its bounded lease.",
+      "expected_decision": "indeterminate",
+      "reason_code": "authority_source_unavailable_stale_cache",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "availability",
+        "offline"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-033",
+      "family": "independence",
+      "description": "The purported second authority witness and Mycelix source share the same administrator and signing-key custodian.",
+      "expected_decision": "indeterminate",
+      "reason_code": "shared_control_root",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "independence",
+        "common-cause"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-034",
+      "family": "independence",
+      "description": "The producer, Mycelix authority source and destination observer share one credential and one mutable control plane.",
+      "expected_decision": "indeterminate",
+      "reason_code": "observer_not_independent",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "independence",
+        "common-cause"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-035",
+      "family": "identity",
+      "description": "A reputation score or consciousness tier is used as a substitute for action-specific authorization.",
+      "expected_decision": "denied",
+      "reason_code": "reputation_is_not_authority",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "reputation",
+        "policy-boundary"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-036",
+      "family": "identity",
+      "description": "A consent or information-disclosure record is used as permission to execute a consequential action.",
+      "expected_decision": "denied",
+      "reason_code": "consent_is_not_execution_authority",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "consent",
+        "policy-boundary"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-037",
+      "family": "identity",
+      "description": "A valid credential is forwarded but the authenticated caller is not the credential subject or authorized delegate.",
+      "expected_decision": "denied",
+      "reason_code": "credential_subject_forwarding",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "credential-forwarding"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-038",
+      "family": "operation",
+      "description": "A repeated operation ID has the same exact request digest and the destination already has a committed result.",
+      "expected_decision": "qualified",
+      "reason_code": "same_operation_reconcile_existing_effect",
+      "required_control": "must_reconcile_existing",
+      "severity": "high",
+      "tags": [
+        "idempotency",
+        "lost-ack",
+        "positive"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "AUTH-039",
+      "family": "operation",
+      "description": "A repeated operation ID has a different request digest from the committed operation.",
+      "expected_decision": "denied",
+      "reason_code": "operation_id_digest_conflict",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "idempotency",
+        "substitution"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-040",
+      "family": "operation",
+      "description": "The destination outcome is unknown after dispatch; authority remains valid but the effect is not reconciled.",
+      "expected_decision": "indeterminate",
+      "reason_code": "unknown_effect_requires_reconciliation",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "unknown-outcome",
+        "no-blind-retry"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-041",
+      "family": "revocation",
+      "description": "Authority is revoked after the preflight check but before commit, and receiver-side generation fencing is active.",
+      "expected_decision": "denied",
+      "reason_code": "receiver_fence_rejects_revoked_generation",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "toctou",
+        "fencing"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-042",
+      "family": "revocation",
+      "description": "Authority is revoked after preflight but the destination cannot enforce a current generation or provide commit-time evidence.",
+      "expected_decision": "indeterminate",
+      "reason_code": "commit_time_authority_not_established",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "toctou",
+        "provider-limit"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-043",
+      "family": "history",
+      "description": "A stale primary resumes after failover and attempts a commit with an obsolete authority epoch.",
+      "expected_decision": "denied",
+      "reason_code": "stale_primary_fenced",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "failover",
+        "fencing"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-044",
+      "family": "completeness",
+      "description": "The authority source reports a bounded query but omits source identity, snapshot, terminal cursor or coverage boundary.",
+      "expected_decision": "indeterminate",
+      "reason_code": "authority_capture_boundary_unproven",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "bounded-capture",
+        "absence"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-045",
+      "family": "independence",
+      "description": "A separately administered witness verifies the same bounded authority event set with distinct keys, storage and operator roots.",
+      "expected_decision": "qualified",
+      "reason_code": "independent_authority_witness_corroborates",
+      "required_control": "continue_to_effect_gate",
+      "severity": "high",
+      "tags": [
+        "independence",
+        "positive"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "AUTH-046",
+      "family": "history",
+      "description": "A valid rotation cutover occurs after an action commit; the predecessor is evaluated as active at the earlier commit time.",
+      "expected_decision": "qualified",
+      "reason_code": "predecessor_valid_before_cutover",
+      "required_control": "continue_to_effect_gate",
+      "severity": "critical",
+      "tags": [
+        "rotation",
+        "bitemporal",
+        "positive"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "AUTH-047",
+      "family": "history",
+      "description": "The predecessor grant is used at the exact exclusive rotation cutover boundary.",
+      "expected_decision": "denied",
+      "reason_code": "predecessor_superseded_at_cutover",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "rotation",
+        "boundary"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-048",
+      "family": "availability",
+      "description": "A locally cached authority lease is presented after expiry during a network partition.",
+      "expected_decision": "denied",
+      "reason_code": "authority_lease_expired",
+      "required_control": "must_deny",
+      "severity": "critical",
+      "tags": [
+        "lease",
+        "offline"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-049",
+      "family": "policy_evaluation",
+      "description": "A mandatory Cedar authority guardrail returns an evaluation error while a separate permit policy matches; diagnostics expose the error.",
+      "expected_decision": "indeterminate",
+      "reason_code": "mandatory_guardrail_evaluation_incomplete",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "cedar",
+        "policy-error",
+        "mandatory-guardrail",
+        "diagnostics"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "AUTH-050",
+      "family": "completeness",
+      "description": "An OPA decision event is dropped by a configured rate or buffer limit; absence of the event is used to claim no decision or no downstream action.",
+      "expected_decision": "indeterminate",
+      "reason_code": "decision_log_capture_loss",
+      "required_control": "must_hold",
+      "severity": "critical",
+      "tags": [
+        "opa",
+        "dropped-event",
+        "capture-completeness",
+        "absence"
+      ],
+      "positive_control": false
+    }
+  ]
+}
