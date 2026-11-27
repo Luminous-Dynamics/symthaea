@@ -319,7 +319,6 @@ mod tests {
 
     const YOKED_REQUEST_BODY: &[u8] = br#"{"schema":"mel-client-model-request-v1","experiment_unit_id":"mel-grounding-evidence-window-fixture-001","query_id":"piano-entry-query-001","query_text_sha256":"8faaeb1470e86800e5d84b45b7f311a7f1554eaad46c77b45bd3210d289c1cc2","target_audio_sha256":"b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef","model_identity_sha256":"7777777777777777777777777777777777777777777777777777777777777777","runtime_identity_sha256":"8888888888888888888888888888888888888888888888888888888888888888","decoding_config_sha256":"9999999999999999999999999999999999999999999999999999999999999999","prompt_sha256":"3333333333333333333333333333333333333333333333333333333333333333","adapter_sha256":"4444444444444444444444444444444444444444444444444444444444444444","retrieval_policy_sha256":"5555555555555555555555555555555555555555555555555555555555555555","audio_windows":[{"window_id":"window-001","start_frame":1,"end_frame":3,"sha256":"a673c81ab15732c4634019e4ee3c5e81ebdbd7fe11f7b04f12381c091e20cd83"},{"window_id":"window-002","start_frame":5,"end_frame":8,"sha256":"9162141c0806a771bd7aefe34674c9406292fd3000db3f8800b2be263eec886c"}]}"#;
 
-
     fn revision_case() -> RevisionCaseV2 {
         let audio = AudioArtifactClockV1 {
             audio_sha256: "b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef".into(),
@@ -429,13 +428,7 @@ mod tests {
         manifest.request_body.byte_length = YOKED_REQUEST_BODY.len() as u64;
         manifest.context.context_manifest_sha256 =
             recompute_audio_context_manifest_sha256(&manifest).unwrap();
-        (
-            case,
-            manifest,
-            source,
-            pcm,
-            YOKED_REQUEST_BODY.to_vec(),
-        )
+        (case, manifest, source, pcm, YOKED_REQUEST_BODY.to_vec())
     }
 
     #[test]
@@ -769,8 +762,14 @@ mod tests {
         let mut case = revision_case();
         case.source_lineage_id = "different-lineage".into();
         assert!(
-            audit_revision_with_audio_evidence(&case, &evidence_manifest(), SOURCE_AUDIO, PCM, REQUEST_BODY,)
-                .is_err()
+            audit_revision_with_audio_evidence(
+                &case,
+                &evidence_manifest(),
+                SOURCE_AUDIO,
+                PCM,
+                REQUEST_BODY,
+            )
+            .is_err()
         );
     }
 
@@ -780,17 +779,26 @@ mod tests {
         let mut case = revision_case();
         case.model_identity_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
+        assert!(
+            audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM, REQUEST_BODY)
+                .is_err()
+        );
 
         case = revision_case();
         case.prompt_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
+        assert!(
+            audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM, REQUEST_BODY)
+                .is_err()
+        );
 
         case = revision_case();
         case.adapter_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
+        assert!(
+            audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM, REQUEST_BODY)
+                .is_err()
+        );
     }
 
     #[test]
@@ -798,8 +806,14 @@ mod tests {
         let mut case = revision_case();
         case.evidence.as_mut().unwrap().start_frame = 2;
         assert!(
-            audit_revision_with_audio_evidence(&case, &evidence_manifest(), SOURCE_AUDIO, PCM, REQUEST_BODY,)
-                .is_err()
+            audit_revision_with_audio_evidence(
+                &case,
+                &evidence_manifest(),
+                SOURCE_AUDIO,
+                PCM,
+                REQUEST_BODY,
+            )
+            .is_err()
         );
     }
 
@@ -820,7 +834,10 @@ mod tests {
             });
         manifest.context.context_manifest_sha256 =
             recompute_audio_context_manifest_sha256(&manifest).unwrap();
-        assert!(audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
+        assert!(
+            audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM, REQUEST_BODY)
+                .is_err()
+        );
     }
 
     #[test]
@@ -829,8 +846,14 @@ mod tests {
         case.evidence_condition = RevisionEvidenceConditionV1::NoEvidence;
         case.evidence = None;
         assert!(
-            audit_revision_with_audio_evidence(&case, &evidence_manifest(), SOURCE_AUDIO, PCM, REQUEST_BODY,)
-                .is_err()
+            audit_revision_with_audio_evidence(
+                &case,
+                &evidence_manifest(),
+                SOURCE_AUDIO,
+                PCM,
+                REQUEST_BODY,
+            )
+            .is_err()
         );
     }
 }
