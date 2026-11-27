@@ -25,7 +25,7 @@ For each paired block:
 
 Negative values favor the candidate. CMAQ-044 reports:
 - paired mean penalized-delay difference;
-- percentile 95% bootstrap interval for the paired mean;
+- nearest-rank 2.5th/97.5th percentile bootstrap interval for the paired mean;
 - candidate wins, ties and losses at block level;
 - baseline and candidate mean penalized delay and miss counts;
 - separate per-scenario-family reports.
@@ -53,7 +53,7 @@ The bootstrap PRNG is deterministic SplitMix64 with rejection sampling for unbia
 - paired block count and per-family block count;
 - source-pair, scenario, score, closure and both build digests per block.
 
-All digests are checked for 64-character lowercase SHA-256 shape only. This crate does not authenticate signatures or prove that the source pairs, family labels, closure IDs or truth labels are complete/correct.
+All digests are checked for 64-character lowercase SHA-256 shape only. Each block must bind one common alpha fraction, calibration-reference digest, score definition, tie protocol, scenario manifest, and fixed baseline/candidate build and configuration digests; mismatches across rows are rejected. Duplicate source-pair identities are rejected. This crate does not authenticate signatures or prove that the source pairs, family labels, closure IDs or truth labels are complete/correct.
 
 ## Interpretation limits
 
