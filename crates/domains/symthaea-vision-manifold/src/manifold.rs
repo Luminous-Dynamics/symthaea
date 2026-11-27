@@ -1088,7 +1088,7 @@ impl VisionManifold {
         // object/working memory, avoiding representation-family switching.
         let mut saved_hypotheses: Vec<crate::types::ObjectHypothesis> = Vec::new();
 
-        let bound_frame_hv = if self.config.enable_object_binding && patch_hvs.len() >= 2 {
+        let bound_frame_hv = if !self.observer_only && self.config.enable_object_binding && patch_hvs.len() >= 2 {
             let grid = self.encoder.grid_for(width, height);
             let hypotheses = if scene_changed || self.last_object_hypotheses.is_empty() {
                 Self::cluster_patches(&patch_hvs, &grid)
@@ -2657,8 +2657,6 @@ impl VisionManifold {
         }
         self.observer_only = true;
         self.learning_frozen = true;
-        self.config.enable_object_binding = false;
-        self.config.allow_auto_dilation = false;
         self.scene_memory = None;
         self.object_memory = None;
         self.working_memory = None;
