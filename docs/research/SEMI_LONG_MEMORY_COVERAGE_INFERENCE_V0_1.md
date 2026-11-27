@@ -38,7 +38,7 @@ The process model evidence record therefore binds:
 - nonzero leading coefficient lower bound for \(|a_0|\);
 - positive lower bound for the tail coefficient scale \(c\);
 - positive refinement exponent \(\varphi\);
-- Gaussian iid innovations and regularly varying coefficients declarations;
+- Gaussian iid innovations, zero-mean residuals and regularly varying coefficients declarations;
 - frozen predictor artifact and exact absolute-residual score-definition digests;
 - source-process-model and assumption-evidence digests.
 
