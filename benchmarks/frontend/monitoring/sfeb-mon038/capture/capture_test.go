@@ -73,7 +73,8 @@ func TestCleanMultiPartitionVectorQualifiesWithoutGlobalOrder(t *testing.T){
  if got.CampaignVerdict!=Indeterminate||got.ProductionUsePermitted{t.Fatalf("synthetic capture must not authorize production: %+v",got)}
  if got.GlobalOrderInferred{t.Fatal("partition vector must never infer global order")}
  if got.PartitionCount!=3||got.BusinessEventCount!=4{t.Fatalf("wrong capture counts: %+v",got)}
- if got.OffsetGapsAccepted!=2{t.Fatalf("aborted/control offset gaps must be retained as gaps: %+v",got)}
+ if got.OffsetGapsAccepted!=4{t.Fatalf("all invisible offset slots in the half-open ranges must be retained: %+v",got)}
+ if got.Partitions[0].OffsetGapSlots!=2||got.Partitions[1].OffsetGapSlots!=1||got.Partitions[2].OffsetGapSlots!=1{t.Fatalf("per-partition offset holes were miscounted: %+v",got.Partitions)}
 }
 func TestMissingPartitionRangeIsIndeterminate(t *testing.T){in:=fixture();in.PartitionCaptures=in.PartitionCaptures[:2];refresh(&in);expect(t,in,Indeterminate)}
 func TestDuplicatePartitionRangeBlocks(t *testing.T){in:=fixture();in.PartitionCaptures=append(in.PartitionCaptures,in.PartitionCaptures[0]);refresh(&in);expect(t,in,Blocked)}
@@ -92,7 +93,7 @@ func TestBusinessEventMustMatchExactCapturedRecord(t *testing.T){in:=fixture();i
 func TestCapturedBusinessRecordMustAppearInMon037EventSet(t *testing.T){in:=fixture();in.BusinessEvents=in.BusinessEvents[:3];refresh(&in);expect(t,in,Blocked)}
 func TestDuplicatePartitionOffsetBlocks(t *testing.T){in:=fixture();duplicate:=in.PartitionCaptures[0].Records[0];in.PartitionCaptures[0].Records=append(in.PartitionCaptures[0].Records,duplicate);refresh(&in);expect(t,in,Blocked)}
 func TestOutOfOrderCapturedRecordsBlock(t *testing.T){in:=fixture();records:=in.PartitionCaptures[0].Records;records[0],records[1]=records[1],records[0];refresh(&in);expect(t,in,Blocked)}
-func TestOffsetGapsAreNotTreatedAsMissingMessages(t *testing.T){in:=fixture();got:=Evaluate(in);if got.CaptureVerdict!=Qualified{t.Fatalf("legal Kafka offset gaps were misclassified: %+v",got)}}
+func TestOffsetGapsAreNotTreatedAsMissingMessages(t *testing.T){in:=fixture();got:=Evaluate(in);if got.CaptureVerdict!=Qualified{t.Fatalf("legal Kafka offset gaps were misclassified: %+v",got)};if got.OffsetGapsAccepted!=4{t.Fatalf("range offset holes were not counted, including leading/trailing positions: %+v",got.Partitions)}}
 func TestSameTransactionMaySpanDifferentPartitions(t *testing.T){in:=fixture();got:=Evaluate(in);if got.CaptureVerdict!=Qualified{t.Fatalf("cross-partition transaction was rejected: %+v",got)}}
 func TestBoundaryMutationAfterCaptureBindingBlocks(t *testing.T){in:=fixture();in.Boundary.TerminalPosition="0/ABCDF0";expect(t,in,Blocked)}
 func TestMissingCaptureCompleteIsIndeterminate(t *testing.T){in:=fixture();in.PartitionCaptures[1].CaptureComplete=false;refresh(&in);expect(t,in,Indeterminate)}
