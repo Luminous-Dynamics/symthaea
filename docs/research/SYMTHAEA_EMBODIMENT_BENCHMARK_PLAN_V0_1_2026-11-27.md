@@ -1,0 +1,252 @@
+# Symthaea Embodiment Benchmark Plan v0.1
+
+**Date:** 2026-11-27  
+**Status:** preregistration proposal; targets are aspirational and unmeasured  
+**Parent:** SYMTHAEA_POLYEMBODIMENT_ARCHITECTURE_V0_1_2026-11-27.md
+
+## 1. Research question
+
+Can one cognitive system express the same interaction state through multiple embodiment forms with lower latency, greater user comprehension and agency, stronger epistemic fidelity, and better local-device efficiency than a conventional single human-avatar pipeline?
+
+The comparison must separate:
+1. the quality of the underlying cognitive/communication policy;
+2. the semantic event contract;
+3. the renderer and animation policy;
+4. the end-user experience.
+
+A renderer must not receive extra information unavailable to the baseline. An avatar cannot be scored as better because it was given more context.
+
+## 2. Baselines
+
+| Baseline | What it establishes | Fair comparison rule |
+|---|---|---|
+| Text-only Symthaea | cognitive/communication baseline without animation | same event and response content |
+| Static canonical avatar | value of any visual presence | same identity and messages |
+| Single humanoid puppet/avatar | conventional embodied interface | same model, speech and inputs |
+| Cascaded speech-to-avatar pipeline | non-full-duplex commercial-style pipeline | same audio content and hardware where possible |
+| Full-duplex AV agent | current frontier reference | compare only on compatible benchmark protocol |
+| Multi-form Symthaea | proposed system | same source events, multiple renderers |
+
+External systems are references, not presumed competitors on every dimension. Record model, version, access date, API tier, serving region, hardware, and any undisclosed components. Report unavailable measurements as unavailable rather than estimating them.
+
+## 3. Benchmark tracks
+
+### E0 — Event-contract correctness
+
+**Purpose:** Prove that presentation is causally bound to the events that authorize it.
+
+Fixtures cover:
+- valid ordered events;
+- duplicate event IDs and sequence numbers;
+- cross-session and stale events;
+- event expiry;
+- missing input chunks;
+- out-of-order delivery and replay;
+- superseding/cancel events;
+- unknown event kind and schema version;
+- invalid confidence and privacy class;
+- renderer crash/restart and reconnect.
+
+**Hard gate:** 100% expected outcomes on deterministic positive and negative controls; zero accepted stale, replayed, cross-session, or causally backdated events. Invalid traces are excluded from quality averages and reported separately.
+
+### E1 — Full-duplex conversational behavior
+
+Use VideoFDB's published protocol and dataset if its terms permit. Do not claim a VideoFDB leaderboard result unless the official evaluation path and artifact requirements are followed.
+
+Report separate perception and generation scores. Preserve the four communication channels and the event families: dialogue/turn-taking, gaze/attention, face/expression, and body/gesture.
+
+Project target:
+- beat the v1.4 perception overall reference of 3.87/5;
+- beat the v1.4 generation overall reference of 4.44/5;
+- report every rubric axis and sample count, not only an aggregate.
+
+These are stretch goals, not current Symthaea results. Use official splits, preserve per-sample outputs, and do not tune on the evaluation set.
+
+### E2 — Turn-taking and response timing
+
+Adapt the project's MEL-RTI-001 evaluator carefully:
+- retain WAIT, RESPOND, CONTINUE and YIELD semantics where appropriate;
+- use the monotonic runner clock for decision and effect latency;
+- use the source media clock for event alignment;
+- never infer missing chunks as WAIT;
+- score classification and effect timing separately.
+
+Speech-specific labels must be defined independently from musical labels such as cadence, pickup, and solo handoff.
+
+Metrics:
+- per-action precision, recall and F1;
+- macro-F1 and balanced accuracy;
+- turn-onset alignment;
+- interruption handling;
+- backchannel timing;
+- false activation during WAIT;
+- premature yield during CONTINUE;
+- p50/p95/p99 decision and effect latency;
+- calibration and confidence intervals clustered by conversation/session.
+
+Target: >= 90% turn-onset alignment on the frozen project test set after human annotation validation. A universal millisecond success window must not be invented; calibrate the permitted windows to each annotated conversational event.
+
+### E3 — Cross-embodiment semantic consistency
+
+Replay identical, frozen event traces through every renderer.
+
+Measure:
+- expected event-to-expression mappings;
+- omitted and unsupported event events;
+- contradictions between forms;
+- time alignment across renderers;
+- identity continuity across transitions;
+- preservation of user controls and privacy settings.
+
+Target: 100% deterministic fixture mapping; >= 95% human-rated semantic agreement between forms on held-out interactions; zero false claims of verification, certainty, consent or action.
+
+### E4 — User comprehension and agency
+
+Run a preregistered, randomized, within-subject study comparing text-only, static avatar, single puppet, and multi-form presentation.
+
+Primary outcomes:
+- correct interpretation of turn state and uncertainty;
+- recall of key information;
+- task completion and error recovery;
+- perceived control and ability to interrupt;
+- unwanted anthropomorphic inference;
+- cognitive load and distraction;
+- preference by task and accessibility need.
+
+Target: non-inferior task comprehension versus text-only (pre-register a 5 percentage-point non-inferiority margin), while improving at least one prespecified interaction outcome. Do not optimize solely for liking or anthropomorphic attachment.
+
+Recruitment, sample-size calculation, exclusions, consent, privacy, and analysis plan must be fixed before collecting confirmatory data. Pilot data are not confirmatory evidence.
+
+### E5 — Responsiveness and renderer performance
+
+Measure:
+- source-event-to-render-receipt latency;
+- source-event-to-first-visible-frame latency;
+- p50/p95/p99 frame time;
+- dropped and duplicated frames;
+- stale cue duration;
+- transition time between forms;
+- cancellation latency;
+- CPU/GPU/RAM and thermal behavior;
+- battery and energy per interaction minute.
+
+Proposed engineering targets:
+- local event-to-first-visible-frame p95 <= 100 ms;
+- cancellation effective by the next render update;
+- 60 Hz desktop target and 30 Hz mobile minimum target;
+- < 1% dropped frames over a 15-minute reference workload.
+
+Run separately on named hardware and power profiles. A target achieved on one device does not generalize to all devices.
+
+### E6 — Accessibility and comfort
+
+Test keyboard-only, touch, screen-reader, reduced-motion, low-vision, hearing-accessible, and no-audio paths.
+
+Measure:
+- task success by access mode;
+- time and error rate;
+- discoverability of pause/cancel;
+- motion discomfort and distraction;
+- clarity of nonverbal cues without colour or sound.
+
+Hard requirement: every essential state also has a text or accessible semantic representation. No critical warning may depend solely on colour, animation, gaze, or audio.
+
+### E7 — Privacy, security and robustness
+
+Fault injection:
+- permission revoked mid-session;
+- camera/microphone unavailable;
+- event stream disconnected;
+- stale cached scene;
+- renderer crash;
+- malformed or malicious event;
+- replayed event;
+- oversized asset or decompression bomb;
+- untrusted asset manifest;
+- attempted actuator command without permission.
+
+Hard gate:
+- no sensor starts without explicit permission;
+- raw audio/video retention is disabled by default;
+- no actuator command without a separately authorized, typed action receipt;
+- all invalid event cases fail closed;
+- renderer failure cannot grant additional authority to the cognitive system.
+
+## 4. Scoring policy
+
+Do not collapse all outcomes into one weighted score during early development. Publish a dashboard with:
+- hard safety/causality gates;
+- full-duplex perception;
+- full-duplex generation;
+- turn-taking and latency;
+- cross-form consistency;
+- user comprehension and agency;
+- accessibility;
+- resource use.
+
+A system failing a hard safety or causality gate is not rescued by high animation quality.
+
+For comparisons, publish paired per-sample outputs, dataset/version hashes, prompt and policy versions, model/provider versions, hardware, and analysis scripts. Use bootstrap confidence intervals clustered by user/session; report effect sizes and correction for multiple comparisons. Preserve failed and invalid runs.
+
+## 5. SOTA comparison strategy
+
+### Current references
+
+- VideoFDB v1.4 (2026-11-25): Anam Cara-5 Preview leads perception overall at 3.87; generation overall is 4.44. Other leading entries include Tavus Griffin Lite, MAUI, and Atmanity Causeur. Scores and timing are rubric-specific.
+- MetaHuman Animator: strong real-time/offline human performance animation from video, mobile capture, or audio; use as a human-rig quality reference.
+- VRM 1.0: relevant for portable humanoid puppet assets, not abstract forms.
+- glTF 2.0.1: relevant for portable runtime 3D scene assets and animation channels.
+
+### Where Symthaea should try to win
+
+1. **Polyembodiment:** same meaning across non-human, puppet, graph, swarm and physical forms.
+2. **Epistemic fidelity:** rendered confidence and verification states trace to typed source evidence.
+3. **Full-duplex responsiveness:** timely listening, backchannels, interruption recovery and cancellation.
+4. **Local efficiency:** useful interactions on mobile and modest GPUs, with measured energy and thermal profiles.
+5. **Accessibility:** understandable without photoreal facial cues, colour, audio or high-motion animation.
+6. **User sovereignty:** transparent, reversible form choice and explicit sensor/actuator permissions.
+7. **Reproducibility:** pinned assets, policies, datasets and event traces, plus independent replay.
+
+Do not state "better than SOTA" until a matched protocol demonstrates it. Use external leaderboards for the claims they actually measure, and our own benchmark for the orthogonal contributions.
+
+## 6. Experiment execution plan
+
+| Phase | Work | Exit evidence |
+|---|---|---|
+| 0 | inventory and event contract | frozen schema, positive/negative fixtures |
+| 1 | renderer-neutral Rust module | exact test results, no renderer dependency |
+| 2 | Living Constellation renderer | deterministic trace-to-frame receipts |
+| 3 | one puppet + one nonhuman form | cross-form semantic agreement |
+| 4 | streaming audio/full-duplex | VideoFDB-compatible report and turn timing |
+| 5 | mobile integration | Pixel 8 Pro profiling and privacy evidence |
+| 6 | user study | preregistered analysis and accessibility results |
+| 7 | physical Hearth endpoint | separate actuator safety and human-factors gate |
+
+## 7. Reproducibility requirements
+
+Every benchmark run should bind:
+- source commit and working-tree state;
+- schema, policy, renderer, asset and dataset digests;
+- hardware, OS, GPU/driver, display resolution and power mode;
+- model/provider identifiers and serving configuration;
+- raw per-sample results and scorer version;
+- exclusions, failures and invalid traces;
+- exact evaluation command and environment.
+
+Do not infer a passing build or benchmark from an authored test, queued CI run, skipped workflow, or synthetic demonstration. Mark outcomes as design target, implementation, locally tested, exact-head CI tested, hardware tested, or independently validated.
+
+## 8. Research references
+
+- NVIDIA VideoFDB project: https://research.nvidia.com/labs/amri/projects/video-fdb/
+- VideoFDB leaderboard v1.4: https://research.nvidia.com/labs/amri/projects/video-fdb/leaderboard.html
+- VideoFDB paper: https://research.nvidia.com/labs/amri/publication/mazumdar2026videofdb/
+- Epic MetaHuman Animator: https://dev.epicgames.com/documentation/en-us/metahuman/metahuman-animator
+- Epic real-time MetaHuman animation: https://dev.epicgames.com/documentation/en-us/metahuman/realtime-animation
+- VRM 1.0: https://github.com/vrm-c/vrm-specification/tree/master/specification/VRMC_vrm-1.0
+- Khronos glTF: https://registry.khronos.org/glTF/
+- VMBench: https://arxiv.org/abs/2503.10076
+- Internal starting point: docs/research/MEL-RTI-001-STREAMING-TURNTAKING-SCORER-V1.md
+
+## 9. Current status
+
+No Symthaea embodiment benchmark scores are claimed by this plan. No renderer implementation, VideoFDB run, user study, or hardware qualification is included in this documentation-only proposal. The immediate implementation task is the typed event contract and deterministic replay harness.
