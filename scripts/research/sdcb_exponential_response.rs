@@ -113,9 +113,19 @@ impl FirstOrderResponseOu {
             let gap = -delta;
             m * e_m * (-(-gap * t).exp_m1()) / gap
         } else {
-            m * t * e_l
+            // The repeated-root term is (lambda*t)*exp(-lambda*t). If
+            // lambda*t overflows, the exact term is far below binary64 range.
+            let scaled = m * t;
+            if scaled.is_finite() {
+                scaled * (-scaled).exp()
+            } else {
+                0.0
+            }
         };
 
+        if !lower_left.is_finite() {
+            return Err(ResponseModelError::NumericalFailure);
+        }
         Ok([
             [e_l, 0.0],
             [lower_left, e_m],
@@ -168,17 +178,25 @@ impl FirstOrderResponseOu {
 
         let q = self.stationary_covariance()[1][1];
         let h = elapsed_time;
-        let covariance = if self.mu > self.lambda {
+        let slow_rate = self.lambda.min(self.mu);
+        let slow_scaled = slow_rate * h;
+        if !slow_scaled.is_finite() {
+            // The exponential dominates every finite binary64 variance and
+            // polynomial response factor at this scale.
+            return Ok(0.0);
+        }
+        let factor = if self.mu > self.lambda {
             let gap = self.mu - self.lambda;
             let ratio = -(-gap * h).exp_m1() / gap;
-            q * (-self.lambda * h).exp() * (1.0 + self.lambda * ratio)
+            (-slow_scaled).exp() * (1.0 + self.lambda * ratio)
         } else if self.mu < self.lambda {
             let gap = self.lambda - self.mu;
             let ratio = -(-gap * h).exp_m1() / gap;
-            q * (-self.mu * h).exp() * (1.0 + self.mu * ratio)
+            (-slow_scaled).exp() * (1.0 + self.mu * ratio)
         } else {
-            q * (-self.lambda * h).exp() * (1.0 + self.lambda * h)
+            (-slow_scaled).exp() * (1.0 + slow_scaled)
         };
+        let covariance = q * factor;
 
         if covariance.is_finite() && covariance >= 0.0 {
             Ok(covariance)
@@ -336,6 +354,16 @@ mod tests {
         let (magnitude, phase) = model.frequency_response(4.0).unwrap();
         close(magnitude, std::f64::consts::FRAC_1_SQRT_2, 2.0e-15);
         close(phase, -std::f64::consts::FRAC_PI_4, 2.0e-15);
+    }
+
+    #[test]
+    fn extreme_elapsed_time_keeps_transition_and_covariance_finite() {
+        let model = FirstOrderResponseOu::new(1.0e308, 1.0, 1.0e-308).unwrap();
+        let transition = model.transition_matrix(1.0e308).unwrap();
+        assert!(transition.iter().flatten().all(|value| value.is_finite()));
+        let covariance = model.sensor_autocovariance_convolution(1.0e308).unwrap();
+        assert!(covariance.is_finite());
+        assert!(covariance >= 0.0);
     }
 
     #[test]
