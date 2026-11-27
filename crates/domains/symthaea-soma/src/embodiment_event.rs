@@ -277,25 +277,54 @@ impl EventPayload {
             }
             Self::UserControl(value) => {
                 match value.action {
-                    UserControlAction::Pause => Ok(()),
-                    UserControlAction::Cancel => value
-                        .target_event_id
-                        .as_deref()
-                        .ok_or(EventValidationError::MissingCancelTarget)
-                        .and_then(|id| validate_identifier("target_event_id", id)),
-                    UserControlAction::ChooseForm => value
-                        .form_id
-                        .as_deref()
-                        .ok_or(EventValidationError::MissingFormId)
-                        .and_then(|id| validate_identifier("form_id", id)),
-                    UserControlAction::SetReducedMotion => value
-                        .enabled
-                        .ok_or(EventValidationError::MissingReducedMotionValue)
-                        .map(|_| ()),
-                    UserControlAction::SetIntensity => value
-                        .intensity
-                        .ok_or(EventValidationError::MissingIntensity)
-                        .and_then(validate_unit_interval),
+                    UserControlAction::Pause => {
+                        reject_unexpected_control_fields(
+                            value,
+                            [true, true, true, true],
+                        )
+                    }
+                    UserControlAction::Cancel => {
+                        reject_unexpected_control_fields(
+                            value,
+                            [false, true, true, true],
+                        )?;
+                        value
+                            .target_event_id
+                            .as_deref()
+                            .ok_or(EventValidationError::MissingCancelTarget)
+                            .and_then(|id| validate_identifier("target_event_id", id))
+                    }
+                    UserControlAction::ChooseForm => {
+                        reject_unexpected_control_fields(
+                            value,
+                            [true, false, true, true],
+                        )?;
+                        value
+                            .form_id
+                            .as_deref()
+                            .ok_or(EventValidationError::MissingFormId)
+                            .and_then(|id| validate_identifier("form_id", id))
+                    }
+                    UserControlAction::SetReducedMotion => {
+                        reject_unexpected_control_fields(
+                            value,
+                            [true, true, false, true],
+                        )?;
+                        value
+                            .enabled
+                            .ok_or(EventValidationError::MissingReducedMotionValue)
+                            .map(|_| ())
+                    }
+                    UserControlAction::SetIntensity => {
+                        reject_unexpected_control_fields(
+                            value,
+                            [true, true, true, false],
+                        )?;
+                        value
+                            .intensity
+                            .ok_or(EventValidationError::MissingIntensity)
+                            .and_then(validate_unit_interval)
+                    }
                 }
             }
         }
@@ -398,6 +427,12 @@ impl EmbodimentEvent {
     }
 }
 
+/// Maximum number of accepted events in a single validator session.
+///
+/// Long-running clients should rotate to a new opaque session ID at this bound.
+/// This caps replay-protection memory rather than allowing unbounded HashSet growth.
+pub const MAX_EVENTS_PER_SESSION: usize = 65_536;
+
 /// Stateful validator for one event stream. It rejects gaps rather than
 /// silently interpreting missing events as neutral behavior or WAIT.
 #[derive(Debug, Clone)]
@@ -406,17 +441,33 @@ pub struct EmbodimentStreamValidator {
     last_sequence: Option<u64>,
     last_observed_at_ns: Option<u64>,
     seen_event_ids: HashSet<String>,
+    cancelled_event_ids: HashSet<String>,
+    max_events: usize,
 }
 
 impl EmbodimentStreamValidator {
     pub fn new(session_id: impl Into<String>) -> Result<Self, EventValidationError> {
+        Self::with_max_events(session_id, MAX_EVENTS_PER_SESSION)
+    }
+
+    /// Construct a validator with a smaller event budget for constrained
+    /// environments and deterministic boundary testing.
+    pub fn with_max_events(
+        session_id: impl Into<String>,
+        max_events: usize,
+    ) -> Result<Self, EventValidationError> {
         let session_id = session_id.into();
         validate_identifier("session_id", &session_id)?;
+        if max_events == 0 || max_events > MAX_EVENTS_PER_SESSION {
+            return Err(EventValidationError::InvalidEventLimit);
+        }
         Ok(Self {
             session_id,
             last_sequence: None,
             last_observed_at_ns: None,
-            seen_event_ids: HashSet::new(),
+            seen_event_ids: HashSet::with_capacity(max_events.min(1024)),
+            cancelled_event_ids: HashSet::new(),
+            max_events,
         })
     }
 
@@ -444,16 +495,26 @@ impl EmbodimentStreamValidator {
         if self.seen_event_ids.contains(&event.event_id) {
             return Err(EventValidationError::DuplicateEventId);
         }
-        if let EventPayload::UserControl(UserControlPayload {
-            action: UserControlAction::Cancel,
-            target_event_id: Some(target_event_id),
-            ..
-        }) = &event.payload
-        {
-            if !self.seen_event_ids.contains(target_event_id) {
-                return Err(EventValidationError::UnknownCancelTarget);
-            }
+        if self.seen_event_ids.len() >= self.max_events {
+            return Err(EventValidationError::StreamCapacityReached);
         }
+
+        let cancel_target = match &event.payload {
+            EventPayload::UserControl(UserControlPayload {
+                action: UserControlAction::Cancel,
+                target_event_id: Some(target_event_id),
+                ..
+            }) => {
+                if !self.seen_event_ids.contains(target_event_id) {
+                    return Err(EventValidationError::UnknownCancelTarget);
+                }
+                if self.cancelled_event_ids.contains(target_event_id) {
+                    return Err(EventValidationError::AlreadyCancelled);
+                }
+                Some(target_event_id.clone())
+            }
+            _ => None,
+        };
 
         match self.last_sequence {
             None if event.sequence != 0 => {
@@ -476,9 +537,22 @@ impl EmbodimentStreamValidator {
 
         // Mutate stream state only after every validation has succeeded.
         self.seen_event_ids.insert(event.event_id.clone());
+        if let Some(target_event_id) = cancel_target {
+            self.cancelled_event_ids.insert(target_event_id);
+        }
         self.last_sequence = Some(event.sequence);
         self.last_observed_at_ns = Some(observed);
         Ok(())
+    }
+
+    /// True when an accepted cancel control has invalidated this event.
+    /// Presentation adapters must stop any associated transient output.
+    pub fn is_cancelled(&self, event_id: &str) -> bool {
+        self.cancelled_event_ids.contains(event_id)
+    }
+
+    pub fn accepted_event_count(&self) -> usize {
+        self.seen_event_ids.len()
     }
 
     pub fn last_sequence(&self) -> Option<u64> {
@@ -488,6 +562,24 @@ impl EmbodimentStreamValidator {
     pub fn session_id(&self) -> &str {
         &self.session_id
     }
+}
+
+fn reject_unexpected_control_fields(
+    value: &UserControlPayload,
+    absent: [bool; 4],
+) -> Result<(), EventValidationError> {
+    let present = [
+        value.form_id.is_some(),
+        value.target_event_id.is_some(),
+        value.enabled.is_some(),
+        value.intensity.is_some(),
+    ];
+    if present.iter().zip(absent).any(|(is_present, must_be_absent)| {
+        *is_present && must_be_absent
+    }) {
+        return Err(EventValidationError::UnexpectedControlField);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -504,6 +596,10 @@ pub enum EventValidationError {
     TooManyEvidenceReferences,
     MissingCancelTarget,
     UnknownCancelTarget,
+    AlreadyCancelled,
+    UnexpectedControlField,
+    InvalidEventLimit,
+    StreamCapacityReached,
     MissingFormId,
     MissingReducedMotionValue,
     MissingIntensity,
@@ -750,6 +846,83 @@ mod tests {
             intensity: None,
         });
         assert_eq!(validator.accept(&cancel, "300"), Ok(()));
+        assert_eq!(validator.last_sequence(), Some(1));
+    }
+
+    #[test]
+    fn rejects_control_fields_not_allowed_for_the_selected_action() {
+        let mut event = listening_event(0, "event-0");
+        event.event_kind = EventKind::UserControl;
+        event.payload = EventPayload::UserControl(UserControlPayload {
+            action: UserControlAction::Pause,
+            form_id: Some("living-constellation".to_owned()),
+            target_event_id: None,
+            enabled: None,
+            intensity: None,
+        });
+        assert_eq!(
+            event.validate(),
+            Err(EventValidationError::UnexpectedControlField)
+        );
+    }
+
+    #[test]
+    fn validator_enforces_a_bounded_session_event_budget() {
+        let mut validator = EmbodimentStreamValidator::with_max_events("session-1", 1).unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        assert_eq!(
+            validator.accept(&listening_event(1, "event-1"), "300"),
+            Err(EventValidationError::StreamCapacityReached)
+        );
+        assert_eq!(validator.accepted_event_count(), 1);
+        assert_eq!(validator.last_sequence(), Some(0));
+    }
+
+    #[test]
+    fn validator_rejects_zero_or_oversized_event_budgets() {
+        assert_eq!(
+            EmbodimentStreamValidator::with_max_events("session-1", 0).err(),
+            Some(EventValidationError::InvalidEventLimit)
+        );
+        assert_eq!(
+            EmbodimentStreamValidator::with_max_events(
+                "session-1",
+                MAX_EVENTS_PER_SESSION + 1
+            )
+            .err(),
+            Some(EventValidationError::InvalidEventLimit)
+        );
+    }
+
+    #[test]
+    fn accepted_cancellation_is_queryable_and_not_repeatable() {
+        let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        let mut cancel = listening_event(1, "event-1");
+        cancel.event_kind = EventKind::UserControl;
+        cancel.payload = EventPayload::UserControl(UserControlPayload {
+            action: UserControlAction::Cancel,
+            form_id: None,
+            target_event_id: Some("event-0".to_owned()),
+            enabled: None,
+            intensity: None,
+        });
+        validator.accept(&cancel, "300").unwrap();
+        assert!(validator.is_cancelled("event-0"));
+
+        let mut repeated_cancel = listening_event(2, "event-2");
+        repeated_cancel.event_kind = EventKind::UserControl;
+        repeated_cancel.payload = EventPayload::UserControl(UserControlPayload {
+            action: UserControlAction::Cancel,
+            form_id: None,
+            target_event_id: Some("event-0".to_owned()),
+            enabled: None,
+            intensity: None,
+        });
+        assert_eq!(
+            validator.accept(&repeated_cancel, "400"),
+            Err(EventValidationError::AlreadyCancelled)
+        );
         assert_eq!(validator.last_sequence(), Some(1));
     }
 
