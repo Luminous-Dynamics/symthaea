@@ -214,6 +214,19 @@ func surfaceAssertionsDigest(values []Surface) string {
  sort.Slice(copyValues,func(i,j int)bool{return copyValues[i].ID<copyValues[j].ID})
  return canonicalDigest(copyValues)
 }
+// DeriveFixtureRecordSetDigests is an authoring helper for public offline fixtures only.
+// It must not be used by runtime adapters: runtime manifests must arrive pre-bound and
+// independently authenticated by the caller/custody verifier.
+func DeriveFixtureRecordSetDigests(in *Input) bool {
+ if in==nil||in.Mode!=OfflineFixture{return false}
+ in.SourceEventsSHA256=sourceEventsDigest(in.SourceEvents)
+ in.ObservedEventsSHA256=observedEventsDigest(in.ObservedEvents)
+ in.TransactionProofsSHA256=transactionProofsDigest(in.Transactions)
+ in.TopicPartitionsSHA256=topicPartitionsDigest(in.TopicPartitions)
+ in.RequiredSurfaceIDsSHA256=surfaceIDsDigest(in.RequiredSurfaceIDs)
+ in.SurfaceAssertionsSHA256=surfaceAssertionsDigest(in.Surfaces)
+ return true
+}
 func checkRecordManifest(label string,complete bool,artifactSHA,recordsSHA,expectedSHA string,f *flags) {
  if !complete||!validDigest(artifactSHA)||!validDigest(recordsSHA) {
   f.hold(label+"_manifest_missing_or_incomplete")
