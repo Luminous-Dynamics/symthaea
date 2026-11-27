@@ -85,6 +85,8 @@ pub struct PresentationPermit {
     session_id: String,
     clock_domain_id: String,
     event_id: String,
+    /// Domain-separated digest of the complete canonical cue, not only its ID/key.
+    cue_digest: String,
     grant_id: String,
     issued_at_monotonic_ns: String,
     event_expires_at_monotonic_ns: String,
@@ -109,6 +111,7 @@ impl PresentationPermit {
     pub fn session_id(&self) -> &str { &self.session_id }
     pub fn clock_domain_id(&self) -> &str { &self.clock_domain_id }
     pub fn event_id(&self) -> &str { &self.event_id }
+    pub fn cue_digest(&self) -> &str { &self.cue_digest }
     pub fn grant_id(&self) -> &str { &self.grant_id }
     pub fn issued_at_monotonic_ns(&self) -> &str { &self.issued_at_monotonic_ns }
     pub fn event_expires_at_monotonic_ns(&self) -> &str { &self.event_expires_at_monotonic_ns }
@@ -160,6 +163,7 @@ pub enum DenialReason {
     RestrictedPrivacy,
     SensitiveDataNeedsPrivateDestination,
     InvalidIntensity,
+    CueSerializationFailed,
 }
 
 /// Session-scoped, fail-closed output policy.
@@ -338,6 +342,8 @@ impl PresentationPolicy {
             return Err(DenialReason::SensitiveDataNeedsPrivateDestination);
         }
 
+        let cue_digest = canonical_cue_digest(cue)?;
+
         let grant = self
             .grants
             .iter()
@@ -359,9 +365,10 @@ impl PresentationPolicy {
             session_id: cue.session_id.clone(),
             clock_domain_id: cue.clock_domain_id.clone(),
             event_id: cue.event_id.clone(),
+            cue_digest,
             grant_id: grant.grant_id.clone(),
             issued_at_monotonic_ns: now_monotonic_ns.to_owned(),
-            event_expires_at_monotonic_ns: event.expires_at_monotonic_ns.clone(),
+            event_expires_at_monotonic_ns: cue.expires_at_monotonic_ns.clone(),
             grant_expires_at_monotonic_ns: grant.expires_at_monotonic_ns.clone(),
             expires_at_monotonic_ns: event_expires.min(grant_expires).to_string(),
             requested_intensity: request.requested_intensity,
@@ -482,6 +489,16 @@ impl PresentationPolicy {
     pub fn grant_count(&self) -> usize {
         self.grants.len()
     }
+}
+
+/// Stable digest binding a permit to every field of the exact canonical cue.
+/// The digest is a content-integrity link, not a signature or source-authentication
+/// proof. The full cue remains outside the permit to avoid duplicating payloads.
+pub fn canonical_cue_digest(cue: &CanonicalCue) -> Result<String, DenialReason> {
+    let bytes = serde_json::to_vec(cue).map_err(|_| DenialReason::CueSerializationFailed)?;
+    let mut hasher = blake3::Hasher::new_derive_key("symthaea.canonical-embodiment-cue.v1");
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
 }
 
 fn validate_identifier(value: &str) -> Result<(), PolicyError> {
