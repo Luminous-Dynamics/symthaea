@@ -217,7 +217,7 @@
         "grant_id": "grant-v1",
         "sequence": 6,
         "event_kind": "cognition.uncertainty",
-        "semantic_key": "evidence.status",
+        "semantic_key": "cognition.uncertainty",
         "form": "cognitive_mandala",
         "motion_mode": "static",
         "epistemic_status": "measured",
