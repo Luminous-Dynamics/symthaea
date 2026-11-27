@@ -7,6 +7,7 @@ on:
       - "research/broca-mace-transfer-bench-v0-1/ingress/**"
       - "research/broca-mace-transfer-bench-v0-1/policy/**"
       - "research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json"
+      - "research/broca-mace-transfer-bench-v0-1/schemas/decision-evidence-use-link-v1.schema.json"
       - "docs/research/MACE_USE_TIME_REVALIDATION_V0_1.md"
       - ".github/workflows/mace-use-time-revalidation.yml"
   push:
@@ -45,3 +46,5 @@ jobs:
         run: cargo clippy --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress --all-targets -- -D warnings
       - name: Parse use receipt schema
         run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json >/dev/null
+      - name: Parse decision exposure link schema
+        run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/decision-evidence-use-link-v1.schema.json >/dev/null

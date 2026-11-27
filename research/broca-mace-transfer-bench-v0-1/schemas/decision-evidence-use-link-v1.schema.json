@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/broca-mace-transfer-bench-v0-1/schemas/decision-evidence-use-link-v1.schema.json",
+  "title": "MACE decision evidence-use exposure link v1",
+  "description": "Integrity-bound link from a use-time evidence receipt to an exact UTF-8 evidence span in a frozen model context and a candidate-action record. The record digest is checked against exact bytes and run/episode/sequence/action_type metadata. The evaluated A/B decision is distinct from the candidate action type. Not a portable signature or proof of causal influence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "episode_id",
+    "action_sequence",
+    "event_id",
+    "retrieval_batch_sha256",
+    "evidence_use_receipt_sha256",
+    "model_context_sha256",
+    "evidence_representation_sha256",
+    "candidate_action_sha256",
+    "candidate_action_type",
+    "evidence_span",
+    "time",
+    "evaluated_decision",
+    "scope",
+    "use",
+    "dependency_lineage",
+    "lifecycle",
+    "exposure_stage",
+    "verification_custody",
+    "canonical_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_decision_evidence_use_link_v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "action_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "retrieval_batch_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evidence_use_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model_context_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evidence_representation_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidate_action_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evidence_span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "byte_start",
+        "byte_end"
+      ],
+      "properties": {
+        "byte_start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "byte_end": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "valid_at_ms",
+        "known_at_ms",
+        "context_exposed_at_ms",
+        "action_observed_at_ms"
+      ],
+      "properties": {
+        "valid_at_ms": {
+          "type": "integer"
+        },
+        "known_at_ms": {
+          "type": "integer"
+        },
+        "context_exposed_at_ms": {
+          "type": "integer"
+        },
+        "action_observed_at_ms": {
+          "type": "integer"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "regime",
+        "objective"
+      ],
+      "properties": {
+        "regime": {
+          "enum": [
+            "baseline",
+            "shifted"
+          ]
+        },
+        "objective": {
+          "enum": [
+            "quality",
+            "cost",
+            "speed"
+          ]
+        }
+      }
+    },
+    "use": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose_code",
+        "consumer_policy_sha256"
+      ],
+      "properties": {
+        "purpose_code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9._-]*$"
+        },
+        "consumer_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "dependency_lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "active",
+            "retracted",
+            "superseded"
+          ]
+        },
+        "successor_event_id": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "exposure_stage": {
+      "const": "model_context_exposure"
+    },
+    "verification_custody": {
+      "const": "originating_process_only"
+    },
+    "canonical_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evaluated_decision": {
+      "enum": [
+        "A",
+        "B"
+      ],
+      "description": "Task-specific MACE decision selected under the policy experiment; distinct from the candidate action record's action_type."
+    },
+    "candidate_action_type": {
+      "enum": [
+        "respond",
+        "ask_user",
+        "memory_mutation",
+        "tool_request",
+        "abstain"
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
