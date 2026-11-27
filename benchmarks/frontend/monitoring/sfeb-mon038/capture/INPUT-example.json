@@ -1,0 +1,233 @@
+{
+  "profile": "mon038-kafka-partition-capture-input-v1",
+  "version": "1.0.0",
+  "trial_id": "trial-038-001",
+  "capture_id": "capture-038-001",
+  "mode": "offline_fixture",
+  "evaluated_at": "2026-11-27T20:00:00Z",
+  "recovery_boundary": {
+    "incident_id": "incident-038-001",
+    "claim_id": "claim-cdc",
+    "source_cluster_id": "pg-cluster-a",
+    "database": "application",
+    "source_epoch": "primary-epoch-7",
+    "timeline_id": "3",
+    "snapshot_id": "backup-038-001",
+    "terminal_position": "0/ABCDEF",
+    "scope_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inventory_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "boundary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "producer_fenced": true,
+  "producer_fence_proof_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "producer_fenced_at": "2026-11-27T19:58:00Z",
+  "capture_started_at": "2026-11-27T19:58:30Z",
+  "capture_completed_at": "2026-11-27T19:59:40Z",
+  "topic_inventory_complete": true,
+  "topic_inventory_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "topic_inventory": [
+    {
+      "cluster_id": "kafka-cluster-1",
+      "topic": "ledger",
+      "topic_id": "topic-id-ledger",
+      "partition_count": 2,
+      "cleanup_policy": "delete",
+      "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "cluster_id": "kafka-cluster-1",
+      "topic": "message",
+      "topic_id": "topic-id-message",
+      "partition_count": 1,
+      "cleanup_policy": "delete",
+      "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "partition_ranges_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "partition_captures": [
+    {
+      "capture_id": "capture-038-001",
+      "cluster_id": "kafka-cluster-1",
+      "topic": "ledger",
+      "topic_id": "topic-id-ledger",
+      "partition": 0,
+      "boundary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "start_offset_inclusive": 100,
+      "end_offset_exclusive": 104,
+      "log_start_offset_at_start": 50,
+      "log_start_offset_at_end": 50,
+      "last_stable_offset_before": 104,
+      "last_stable_offset_after": 104,
+      "high_watermark_before": 104,
+      "high_watermark_after": 104,
+      "leader_epoch_before": 3,
+      "leader_epoch_after": 3,
+      "isolation_level": "read_committed",
+      "cleanup_policy": "delete",
+      "capture_started_at": "2026-11-27T19:58:40Z",
+      "capture_completed_at": "2026-11-27T19:59:10Z",
+      "capture_complete": true,
+      "record_count": 2,
+      "records_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "records": [
+        {
+          "topic": "ledger",
+          "topic_id": "topic-id-ledger",
+          "partition": 0,
+          "offset": 100,
+          "record_class": "row_change",
+          "event_id": "row-1",
+          "transaction_id": "tx-1",
+          "data_collection": "public.ledger",
+          "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "topic": "ledger",
+          "topic_id": "topic-id-ledger",
+          "partition": 0,
+          "offset": 102,
+          "record_class": "row_change",
+          "event_id": "row-2",
+          "transaction_id": "tx-1",
+          "data_collection": "public.ledger",
+          "payload_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ]
+    },
+    {
+      "capture_id": "capture-038-001",
+      "cluster_id": "kafka-cluster-1",
+      "topic": "ledger",
+      "topic_id": "topic-id-ledger",
+      "partition": 1,
+      "boundary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "start_offset_inclusive": 200,
+      "end_offset_exclusive": 202,
+      "log_start_offset_at_start": 100,
+      "log_start_offset_at_end": 100,
+      "last_stable_offset_before": 202,
+      "last_stable_offset_after": 202,
+      "high_watermark_before": 202,
+      "high_watermark_after": 202,
+      "leader_epoch_before": 8,
+      "leader_epoch_after": 8,
+      "isolation_level": "read_committed",
+      "cleanup_policy": "delete",
+      "capture_started_at": "2026-11-27T19:58:40Z",
+      "capture_completed_at": "2026-11-27T19:59:10Z",
+      "capture_complete": true,
+      "record_count": 1,
+      "records_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "records": [
+        {
+          "topic": "ledger",
+          "topic_id": "topic-id-ledger",
+          "partition": 1,
+          "offset": 200,
+          "record_class": "row_change",
+          "event_id": "row-3",
+          "transaction_id": "tx-2",
+          "data_collection": "public.ledger",
+          "payload_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ]
+    },
+    {
+      "capture_id": "capture-038-001",
+      "cluster_id": "kafka-cluster-1",
+      "topic": "message",
+      "topic_id": "topic-id-message",
+      "partition": 0,
+      "boundary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "start_offset_inclusive": 40,
+      "end_offset_exclusive": 43,
+      "log_start_offset_at_start": 0,
+      "log_start_offset_at_end": 0,
+      "last_stable_offset_before": 43,
+      "last_stable_offset_after": 43,
+      "high_watermark_before": 43,
+      "high_watermark_after": 43,
+      "leader_epoch_before": 5,
+      "leader_epoch_after": 5,
+      "isolation_level": "read_committed",
+      "cleanup_policy": "delete",
+      "capture_started_at": "2026-11-27T19:58:40Z",
+      "capture_completed_at": "2026-11-27T19:59:10Z",
+      "capture_complete": true,
+      "record_count": 2,
+      "records_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "records": [
+        {
+          "topic": "message",
+          "topic_id": "topic-id-message",
+          "partition": 0,
+          "offset": 40,
+          "record_class": "logical_message",
+          "event_id": "message-1",
+          "transaction_id": "tx-1",
+          "data_collection": "LOGICAL_DECODING_MESSAGE",
+          "payload_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        {
+          "topic": "message",
+          "topic_id": "topic-id-message",
+          "partition": 0,
+          "offset": 42,
+          "record_class": "transaction_metadata",
+          "transaction_id": "tx-1",
+          "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    }
+  ],
+  "business_events_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "business_events": [
+    {
+      "event_id": "row-1",
+      "transaction_id": "tx-1",
+      "topic": "ledger",
+      "topic_id": "topic-id-ledger",
+      "partition": 0,
+      "offset": 100,
+      "record_class": "row_change",
+      "data_collection": "public.ledger",
+      "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "event_id": "row-2",
+      "transaction_id": "tx-1",
+      "topic": "ledger",
+      "topic_id": "topic-id-ledger",
+      "partition": 0,
+      "offset": 102,
+      "record_class": "row_change",
+      "data_collection": "public.ledger",
+      "payload_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "event_id": "row-3",
+      "transaction_id": "tx-2",
+      "topic": "ledger",
+      "topic_id": "topic-id-ledger",
+      "partition": 1,
+      "offset": 200,
+      "record_class": "row_change",
+      "data_collection": "public.ledger",
+      "payload_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "event_id": "message-1",
+      "transaction_id": "tx-1",
+      "topic": "message",
+      "topic_id": "topic-id-message",
+      "partition": 0,
+      "offset": 40,
+      "record_class": "logical_message",
+      "data_collection": "LOGICAL_DECODING_MESSAGE",
+      "payload_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ]
+}
