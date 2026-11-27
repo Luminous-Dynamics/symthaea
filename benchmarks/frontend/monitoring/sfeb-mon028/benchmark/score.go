@@ -229,7 +229,7 @@ func ScoreRun(s Suite, result CampaignResult) (Score, error) {
 		return Score{}, fmt.Errorf("%w: suite digest mismatch", ErrSuiteMismatch)
 	}
 
-	type expectedPair struct { verdict Verdict }
+	type expectedPair struct { verdict Verdict; family string }
 	expected := make(map[string]expectedPair)
 	familyStats := make(map[string]*FamilyScore)
 	score := Score{
@@ -239,9 +239,20 @@ func ScoreRun(s Suite, result CampaignResult) (Score, error) {
 	}
 	for _, c := range s.Cases {
 		for rep := uint32(1); rep <= c.Replicates; rep++ {
-			expected[pairKey(c.CaseID, rep)] = expectedPair{verdict:c.Expected}
+			expected[pairKey(c.CaseID, rep)] = expectedPair{verdict:c.Expected, family:c.Family}
 			score.Planned++
-			if c.Expected == Qualified { score.PositivePlanned++ } else { score.UnsafePlanned++ }
+			fs := familyStats[c.Family]
+			if fs == nil {
+				fs = &FamilyScore{Family:c.Family}
+				familyStats[c.Family] = fs
+			}
+			if c.Expected == Qualified {
+				score.PositivePlanned++
+				fs.PositivePlanned++
+			} else {
+				score.UnsafePlanned++
+				fs.UnsafePlanned++
+			}
 		}
 	}
 	seen := make(map[string]struct{}, len(result.Observations))
@@ -265,12 +276,23 @@ func ScoreRun(s Suite, result CampaignResult) (Score, error) {
 			latencies = append(latencies, observation.ElapsedNS)
 			if observation.PeakMemoryBytes > peakMemory { peakMemory = observation.PeakMemoryBytes }
 			confusion[string(exp.verdict)+"/"+string(observation.Observed)]++
+			fs := familyStats[exp.family]
 			if exp.verdict == observation.Observed { score.ExactMatches++ } else if exp.verdict != Qualified && observation.Observed != Qualified { score.SafeOutcomeMismatches++ }
 			if exp.verdict == Qualified {
-				if observation.Observed == Qualified { score.PositiveAccepted++ } else { score.FalseRejected++ }
+				if observation.Observed == Qualified {
+					score.PositiveAccepted++
+					fs.PositiveAccepted++
+				} else {
+					score.FalseRejected++
+					fs.FalseRejected++
+				}
 			} else {
 				score.UnsafeExecuted++
-				if observation.Observed == Qualified { score.FalseQualified++ }
+				fs.UnsafeExecuted++
+				if observation.Observed == Qualified {
+					score.FalseQualified++
+					fs.FalseQualified++
+				}
 			}
 		case Skipped:
 			if observation.Observed != "" { return Score{}, fmt.Errorf("%w: skipped observation has verdict", ErrInvalidResult) }
