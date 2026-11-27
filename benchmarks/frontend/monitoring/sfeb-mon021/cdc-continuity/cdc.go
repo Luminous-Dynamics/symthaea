@@ -158,14 +158,24 @@ func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
 	for _,e:=range m.Events{if _,ok:=txByXID[e.XID];!ok{return out(Indeterminate,"decoded event has no transaction envelope: "+e.ID,c...)}}
 	return out(Qualified,"bounded logical-decoding interval is sealed with complete committed transaction envelopes; acknowledgement does not exceed durable evidence",c...)
 }
+func sameTransaction(a,b Transaction)bool{
+	if a.XID!=b.XID||a.State!=b.State||a.BeginLSN!=b.BeginLSN||a.CommitLSN!=b.CommitLSN||a.EndLSN!=b.EndLSN||len(a.EventIDs)!=len(b.EventIDs){return false}
+	for i:=range a.EventIDs{if a.EventIDs[i]!=b.EventIDs[i]{return false}}
+	return true
+}
 func ValidateReplay(old,next Manifest)Result{
-	c:=[]string{"overlap-replay-reconciliation","no-unaccounted-range-gap"}
+	c:=[]string{"overlap-replay-reconciliation","transaction-envelope-reconciliation","durable-watermark-and-acknowledgement"}
 	if old.SourceEpoch!=next.SourceEpoch||old.TimelineID!=next.TimelineID||old.SlotName!=next.SlotName||old.DatabaseOID!=next.DatabaseOID||old.PluginProfileDigest!=next.PluginProfileDigest||old.SchemaProfileDigest!=next.SchemaProfileDigest{return out(Divergent,"capture source epoch/slot/timeline/profile changed without handoff",c...)}
+	if !old.Complete||!old.Witnessed||!present(old.ManifestDigest)||!next.Complete||!next.Witnessed||!present(next.ManifestDigest){return out(Indeterminate,"old or new replay manifest lacks completeness/seal evidence",c...)}
 	if next.StartExclusiveLSN>old.EvidenceThroughLSN{return out(Indeterminate,"new capture starts after prior durable evidence; unaccounted range gap",c...)}
-	prior:=map[string]DecodedEvent{};for _,e:=range old.Events{prior[e.ID]=e}
-	for _,e:=range next.Events{if p,ok:=prior[e.ID];ok&&p!=e{return out(Divergent,"replayed event conflicts with prior durable evidence: "+e.ID,c...)}}
 	if next.TerminalLSN<old.TerminalLSN{return out(Indeterminate,"replay capture terminal regressed; await terminal watermark",c...)}
-	return out(Qualified,"replay overlap matches prior evidence; exact duplicates are idempotently reconcilable",c...)
+	if next.EvidenceThroughLSN!=next.TerminalLSN{return out(Indeterminate,"replay evidence watermark does not equal terminal LSN",c...)}
+	if next.AcknowledgementRequestedLSN>next.EvidenceThroughLSN{return out(Denied,"replay acknowledgement advances beyond durable evidence",c...)}
+	prior:=map[string]DecodedEvent{};for _,e:=range old.Events{if p,ok:=prior[e.ID];ok&&p!=e{return out(Divergent,"old manifest contains conflicting duplicate event identity: "+e.ID,c...)};prior[e.ID]=e}
+	for _,e:=range next.Events{if p,ok:=prior[e.ID];ok&&p!=e{return out(Divergent,"replayed event conflicts with prior durable evidence: "+e.ID,c...)}}
+	priorTx:=map[string]Transaction{};for _,tx:=range old.Transactions{if p,ok:=priorTx[tx.XID];ok&&!sameTransaction(p,tx){return out(Divergent,"old manifest contains conflicting transaction envelope: "+tx.XID,c...)};priorTx[tx.XID]=tx}
+	for _,tx:=range next.Transactions{if p,ok:=priorTx[tx.XID];ok&&!sameTransaction(p,tx){return out(Divergent,"replayed transaction envelope conflicts with prior durable evidence: "+tx.XID,c...)}}
+	return out(Qualified,"replay overlap reconciles exact event and transaction identities; acknowledgement remains behind durable evidence",c...)
 }
 type Failover struct{
 	Prior,Next Profile
