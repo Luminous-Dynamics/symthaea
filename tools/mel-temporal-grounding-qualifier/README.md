@@ -91,6 +91,6 @@ Run the synthetic 30-source-work comparison with:
 
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-performance-identity-compare -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-performance-identity-comparison.synthetic.json
 
-The fixture uses the canonical ChordQuality question required by #13947. The 30-cluster floor is a minimum reporting gate, not a power calculation or scientific confirmation. Synthetic values validate plumbing only; they are not real model results. The report leaves lineage and annotation authentication, audio-byte recomputation, model invocation and population generalization explicitly false.
+The fixture uses the canonical ChordQuality question required by #13947. The 30-cluster floor is a minimum reporting gate, not a power calculation or scientific confirmation. Intervals are pointwise, not multiplicity-adjusted. This v1 resamples source works only; repeated-performer dependence across works requires performer-disjoint independent clusters or a separately qualified crossed/multiway method. Synthetic values validate plumbing only; they are not real model results. The report leaves lineage and annotation authentication, audio-byte recomputation, model invocation and population generalization explicitly false.
 
 Protocol: `docs/research/MEL-HEAR-004-PAIRED-SOURCE-WORK-INFERENCE-V1.md`.
