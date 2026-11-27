@@ -112,6 +112,17 @@ Use AutoSciBench-style task recipes to generate *new sealed variants* from vette
 
 The WebResearcher content extractor remains HTML-oriented; its numeric-series helper is line-based and explicitly does not parse units. The acquisition receipt is an integrity record for captured content, not a typed scientific-artifact parser or a stable table/cell/page locator. [Issue #undefined](https://github.com/Luminous-Dynamics/symthaea/issues/undefined) now owns the staged artifact-intake contract: immutable raw bytes, parser/configuration receipts, typed source locations, and explicit unsupported/malformed outcomes. It composes with #13854 acquisition, #12471 method execution and #13796 claim/source relation adjudication; it does not introduce a second planner or evidence ledger.
 
+## Longitudinal evidence correction: REPAIR-Bench
+
+Static benchmark snapshots do not test whether a later source, dataset, parser or method correction reaches every dependent analysis and claim. The new [REPAIR-Bench research issue #undefined](https://github.com/Luminous-Dynamics/symthaea/issues/undefined) defines a two-phase evaluation: establish a reproducible baseline evidence graph, then inject a sealed correction/update event and measure detection, dependency closure, documented reassessment, correct changed/unchanged decisions, stale-use and collateral invalidation.
+
+This extends (but does not claim novelty over) the published Correction Reach construct, which measures documented reassessment of dependent assertions after correction events. Its November 2026 feasibility pilot illustrates the gap, but is small and not a prevalence estimate. REPAIR-Bench adds computational artifact, parser, analysis and method dependencies, plus replay and resource-accounting tests. It composes with #13900 artifact intake, #13792 claim provenance, #13796 relation adjudication, #12471 method execution and #13818 independent audit; it is not another evidence ledger or research engine.
+
+Primary references:
+- Correction Reach (11 Nov 2026): https://doi.org/10.3390/publications14040078
+- Scientific knowledge graphs and dynamic evidence (2026): https://doi.org/10.1093/nsr/nwag140
+- Functionality–Evidence–Validation framework for agentic bioinformatics (25 Nov 2026): https://doi.org/10.1093/bib/bbag650
+
 ## 3. Benchmark architecture
 
 Each evaluated run freezes:
