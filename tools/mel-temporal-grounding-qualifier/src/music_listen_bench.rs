@@ -224,7 +224,10 @@ pub fn audit_music_listen_case(
     case: &MusicListenBenchCaseV1,
 ) -> Result<MusicListenBenchReportV1, String> {
     if case.schema != CASE_SCHEMA_V1 {
-        return Err(format!("unsupported MusicListenBench case schema: {}", case.schema));
+        return Err(format!(
+            "unsupported MusicListenBench case schema: {}",
+            case.schema
+        ));
     }
     require_text(&case.benchmark_id, "benchmark_id")?;
     if case.benchmark_id != "MusicListenBench" {
@@ -264,10 +267,16 @@ pub fn audit_music_listen_case(
     for (index, triad) in case.triads.iter().enumerate() {
         validate_triad(triad, index)?;
         if !item_ids.insert(triad.item_id.as_str()) {
-            return Err(format!("duplicate MusicListenBench item_id: {}", triad.item_id));
+            return Err(format!(
+                "duplicate MusicListenBench item_id: {}",
+                triad.item_id
+            ));
         }
         if !pair_ids.insert(triad.pair_id.as_str()) {
-            return Err(format!("duplicate MusicListenBench pair_id: {}", triad.pair_id));
+            return Err(format!(
+                "duplicate MusicListenBench pair_id: {}",
+                triad.pair_id
+            ));
         }
         lineage_ids.insert(triad.source_lineage_sha256.as_str());
 
@@ -407,7 +416,10 @@ fn validate_triad(triad: &MusicListenTriadV1, index: usize) -> Result<(), String
         ));
     }
     if triad.stay_factor == MusicListenStayFactorV1::RelativePitchPreservingTransposition
-        && !matches!(triad.task, MusicListenTaskV1::Melody | MusicListenTaskV1::Harmony)
+        && !matches!(
+            triad.task,
+            MusicListenTaskV1::Melody | MusicListenTaskV1::Harmony
+        )
     {
         return Err(format!(
             "triads[{index}] relative-pitch-preserving transposition is not an admitted STAY factor for {:?}",
@@ -446,7 +458,9 @@ fn validate_triad(triad: &MusicListenTriadV1, index: usize) -> Result<(), String
             return Err(format!("triads[{index}] repeats a variant_id"));
         }
         if !audio_digests.insert(variant.audio_sha256.as_str()) {
-            return Err(format!("triads[{index}] variants must use distinct audio artifacts"));
+            return Err(format!(
+                "triads[{index}] variants must use distinct audio artifacts"
+            ));
         }
         if variant.option_a_relation == variant.option_b_relation {
             return Err(format!(
@@ -477,16 +491,22 @@ fn validate_triad(triad: &MusicListenTriadV1, index: usize) -> Result<(), String
     Ok(())
 }
 
-fn flip_factor_compatible(
-    task: MusicListenTaskV1,
-    factor: MusicListenFlipFactorV1,
-) -> bool {
+fn flip_factor_compatible(task: MusicListenTaskV1, factor: MusicListenFlipFactorV1) -> bool {
     matches!(
         (task, factor),
-        (MusicListenTaskV1::Melody, MusicListenFlipFactorV1::NoteIdentity)
-            | (MusicListenTaskV1::Harmony, MusicListenFlipFactorV1::ChordThirdQuality)
-            | (MusicListenTaskV1::Timbre, MusicListenFlipFactorV1::InstrumentFamily)
-            | (MusicListenTaskV1::Rhythm, MusicListenFlipFactorV1::PulseRate)
+        (
+            MusicListenTaskV1::Melody,
+            MusicListenFlipFactorV1::NoteIdentity
+        ) | (
+            MusicListenTaskV1::Harmony,
+            MusicListenFlipFactorV1::ChordThirdQuality
+        ) | (
+            MusicListenTaskV1::Timbre,
+            MusicListenFlipFactorV1::InstrumentFamily
+        ) | (
+            MusicListenTaskV1::Rhythm,
+            MusicListenFlipFactorV1::PulseRate
+        )
     )
 }
 
@@ -540,10 +560,7 @@ fn summarize_indices(scored: &[ScoredTriadV1], indices: &[usize]) -> PairedMetri
         flip_miss_rate: rate(flip.incorrect, flip.items),
         stay_false_flip_rate: rate(stay.incorrect, stay.items),
         clean_correct_triads: clean_correct_indices.len(),
-        conditional_flip_miss_rate: rate(
-            conditional_flip_errors,
-            clean_correct_indices.len(),
-        ),
+        conditional_flip_miss_rate: rate(conditional_flip_errors, clean_correct_indices.len()),
         conditional_stay_false_flip_rate: rate(
             conditional_stay_errors,
             clean_correct_indices.len(),
@@ -564,9 +581,7 @@ fn summarize_indices(scored: &[ScoredTriadV1], indices: &[usize]) -> PairedMetri
     }
 }
 
-fn variant_metrics(
-    values: impl Iterator<Item = ScoredVariantV1>,
-) -> VariantMetricV1 {
+fn variant_metrics(values: impl Iterator<Item = ScoredVariantV1>) -> VariantMetricV1 {
     let values: Vec<_> = values.collect();
     let items = values.len();
     let correct = values.iter().filter(|value| value.correct).count();
@@ -626,8 +641,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
-    const LINEAGE: &str =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const LINEAGE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const MODEL: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const PROMPT: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const RUNTIME: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
@@ -698,20 +712,30 @@ mod tests {
             runtime_identity_sha256: RUNTIME.into(),
             decoding_config_sha256: DECODING.into(),
             clean: variant(
-                "clean", "1111111111111111111111111111111111111111111111111111111111111111",
+                "clean",
+                "1111111111111111111111111111111111111111111111111111111111111111",
                 "Do these clips have the same musical property?",
-                MusicalRelationV1::Same, MusicalRelationV1::Different, clean_expected,
+                MusicalRelationV1::Same,
+                MusicalRelationV1::Different,
+                clean_expected,
                 clean_answer,
             ),
             flip: variant(
-                "flip", "2222222222222222222222222222222222222222222222222222222222222222",
+                "flip",
+                "2222222222222222222222222222222222222222222222222222222222222222",
                 "Did the queried musical property change?",
-                flip_choice_a, flip_choice_b, flip_expected, flip_answer,
+                flip_choice_a,
+                flip_choice_b,
+                flip_expected,
+                flip_answer,
             ),
             stay: variant(
-                "stay", "3333333333333333333333333333333333333333333333333333333333333333",
+                "stay",
+                "3333333333333333333333333333333333333333333333333333333333333333",
                 "Does the queried musical property remain the same?",
-                MusicalRelationV1::Same, MusicalRelationV1::Different, clean_expected,
+                MusicalRelationV1::Same,
+                MusicalRelationV1::Different,
+                clean_expected,
                 stay_answer,
             ),
         }
@@ -925,12 +949,13 @@ mod tests {
         assert_eq!(report.by_flip_factor.len(), 2);
         assert_eq!(report.by_stay_factor.len(), 2);
         assert_eq!(
-            report.by_task.iter().map(|slice| slice.metrics.triads).sum::<usize>(),
+            report
+                .by_task
+                .iter()
+                .map(|slice| slice.metrics.triads)
+                .sum::<usize>(),
             report.overall.triads
         );
-        assert_eq!(
-            report.confirmatory_lineage_floor_met,
-            false
-        );
+        assert_eq!(report.confirmatory_lineage_floor_met, false);
     }
 }
