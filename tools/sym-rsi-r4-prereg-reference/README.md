@@ -29,6 +29,11 @@ The checked-in document is intentionally `TEMPLATE_NOT_PREREGISTERED`, so the CL
 - Claim dependencies prevent recursive-progress and ignition labels from being selected without their required lower-level evidence profiles.
 - Research-state continuity binds record classes, cold-restart restore, successor migration, independent recovery audit, and full/no-state/untyped/shuffled/accepted-only plus fixed/adaptive/shuffled/oracle scope-routing ablations. It measures recovery quality, false sharing/fragmentation and downstream research utility rather than memory volume.
 
+## Canonical claim selection
+
+The `experiment.claim_profile.selected_claims` field is `none` or a comma-separated list of the exact enabled claim-flag names. The semantic validator checks that it matches all eight boolean claim flags and rejects unknown/duplicate names or missing/non-boolean flags. This prevents a document from presenting conflicting claim intent in its human-readable and machine-readable fields.
+
+
 ## Canonical inclusive-budget commitment (v1)
 
 The semantic checker recomputes `budget.shared_envelope_digest`; it does not merely compare two copied strings. The lowercase SHA-256 is over compact serde JSON for the fixed-order v1 struct:
