@@ -163,7 +163,7 @@ impl Scorecard {
     /// numerator and denominator; an empty value denotes an undefined rate.
     pub fn to_csv(&self) -> String {
         let mut output =
-            String::from("metric,numerator,denominator,value,unit,direction\\n");
+            String::from("metric,numerator,denominator,value,unit,direction\n");
         push_rate_row(
             &mut output,
             "decision_accuracy",
@@ -279,7 +279,7 @@ impl Scorecard {
             .map(|value| value.to_string())
             .unwrap_or_default();
         output.push_str(&format!(
-            "cost_per_correct_decision_micros_usd,{},{},{cost_value},micro_usd_per_correct_decision,lower_is_better\\n",
+            "cost_per_correct_decision_micros_usd,{},{},{cost_value},micro_usd_per_correct_decision,lower_is_better\n",
             self.total_cost_micros_usd, self.correct_decisions
         ));
         output
@@ -289,7 +289,7 @@ impl Scorecard {
 fn push_rate_row(output: &mut String, name: &str, rate: Rate, unit: &str, direction: &str) {
     let value = rate.value().map(|value| value.to_string()).unwrap_or_default();
     output.push_str(&format!(
-        "{name},{},{},{value},{unit},{direction}\\n",
+        "{name},{},{},{value},{unit},{direction}\n",
         rate.numerator, rate.denominator
     ));
 }
@@ -298,13 +298,13 @@ fn push_mean_row(output: &mut String, name: &str, mean: Mean, unit: &str, direct
     let numerator = mean.numerator.to_string();
     let value = mean.value().map(|value| value.to_string()).unwrap_or_default();
     output.push_str(&format!(
-        "{name},{numerator},{},{value},{unit},{direction}\\n",
+        "{name},{numerator},{},{value},{unit},{direction}\n",
         mean.denominator
     ));
 }
 
 fn push_count_row(output: &mut String, name: &str, value: u64, unit: &str) {
-    output.push_str(&format!("{name},{value},1,{value},{unit},neutral\\n"));
+    output.push_str(&format!("{name},{value},1,{value},{unit},neutral\n"));
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -649,11 +649,11 @@ mod tests {
         .unwrap();
         let csv = result.to_csv();
         assert!(csv.starts_with(
-            "metric,numerator,denominator,value,unit,direction\\n"
+            "metric,numerator,denominator,value,unit,direction\n"
         ));
-        assert!(csv.contains("decision_accuracy,1,1,1,fraction,higher_is_better\\n"));
-        assert!(csv.contains("citation_precision,0,0,,fraction,higher_is_better\\n"));
-        assert!(csv.contains("cost_per_correct_decision_micros_usd,250,1,250,micro_usd_per_correct_decision,lower_is_better\\n"));
+        assert!(csv.contains("decision_accuracy,1,1,1,fraction,higher_is_better\n"));
+        assert!(csv.contains("citation_precision,0,0,,fraction,higher_is_better\n"));
+        assert!(csv.contains("cost_per_correct_decision_micros_usd,250,1,250,micro_usd_per_correct_decision,lower_is_better\n"));
     }
 
     #[test]
