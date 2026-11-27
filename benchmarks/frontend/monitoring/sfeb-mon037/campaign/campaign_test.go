@@ -2,6 +2,7 @@ package campaign
 
 import (
  "encoding/json"
+ "fmt"
  "testing"
  "time"
 )
@@ -15,15 +16,15 @@ func raw(v any)json.RawMessage{b,_:=json.Marshal(v);return b}
 func goodRestore()map[string]string{m:=map[string]string{};for _,k:=range restoreKeys{m[k]="passed"};return m}
 func fixture()Input{
  events:=[]Event{
-  {EventID:"row-1",TransactionID:"tx-1",Topic:"ledger",Operation:"INSERT",PayloadSHA256:da,TotalOrder:1,CollectionOrder:1,Partition:0,Offset:10},
-  {EventID:"message-1",TransactionID:"tx-1",Topic:"message",Operation:"MESSAGE",PayloadSHA256:db,TotalOrder:2,CollectionOrder:1,Partition:0,Offset:7},
+  {EventID:"row-1",TransactionID:"tx-1",Topic:"ledger",DataCollection:"public.ledger",Operation:"INSERT",PayloadSHA256:da,TotalOrder:1,CollectionOrder:1,Partition:0,Offset:10},
+  {EventID:"message-1",TransactionID:"tx-1",Topic:"message",DataCollection:"LOGICAL_DECODING_MESSAGE",Operation:"MESSAGE",PayloadSHA256:db,TotalOrder:2,CollectionOrder:1,Partition:0,Offset:7},
  }
  return Input{
   Profile:Profile,Version:Version,TrialID:"trial-001",ScenarioID:"MON037-P001",Mode:OfflineFixture,EvaluatedAt:now,
   RequiredClaimIDs:[]string{"claim-cdc","claim-backup"},
   SourceEvents:events,ObservedEvents:events,
   TopicPartitions:[]TopicPartition{{Topic:"ledger",PartitionCount:1},{Topic:"message",PartitionCount:1}},
-  Transactions:[]TransactionProof{{TransactionID:"tx-1",ExpectedEventCount:2,BeginObserved:true,EndObserved:true,EndEventCount:2,DataCollections:map[string]int{"ledger":1,"message":1}}},
+  Transactions:[]TransactionProof{{TransactionID:"tx-1",ExpectedEventCount:2,BeginObserved:true,EndObserved:true,EndEventCount:2,DataCollections:map[string]int{"public.ledger":1,"LOGICAL_DECODING_MESSAGE":1}}},
   SurfaceScope:"full_state",
   Surfaces:[]Surface{
    {ID:"heap",Disposition:"covered",SourceSHA256:da,RestoredSHA256:da},
@@ -125,9 +126,9 @@ func TestDeterministicTenThousandUnsafeMutationsNeverPass(t *testing.T){
 func BenchmarkEvaluate1000Events100Transactions(b *testing.B){
  in:=fixture();in.SourceEvents=nil;in.ObservedEvents=nil;in.Transactions=nil
  for tx:=0;tx<100;tx++{
-  counts:=map[string]int{"ledger":0,"message":0}
-  for n:=0;n<10;n++{topic:="ledger";if n%2==1{topic="message"};counts[topic]++
-   e:=Event{EventID:fmt.Sprintf("e-%03d-%02d",tx,n),TransactionID:fmt.Sprintf("tx-%03d",tx),Topic:topic,Operation:"INSERT",PayloadSHA256:da,TotalOrder:n+1,CollectionOrder:counts[topic],Partition:0,Offset:int64(tx*10+n)}
+  counts:=map[string]int{"public.ledger":0,"LOGICAL_DECODING_MESSAGE":0}
+  for n:=0;n<10;n++{topic:="ledger";collection:="public.ledger";if n%2==1{topic="message";collection="LOGICAL_DECODING_MESSAGE"};counts[collection]++
+   e:=Event{EventID:fmt.Sprintf("e-%03d-%02d",tx,n),TransactionID:fmt.Sprintf("tx-%03d",tx),Topic:topic,DataCollection:collection,Operation:"INSERT",PayloadSHA256:da,TotalOrder:n+1,CollectionOrder:counts[topic],Partition:0,Offset:int64(tx*10+n)}
    in.SourceEvents=append(in.SourceEvents,e);in.ObservedEvents=append(in.ObservedEvents,e)
   }
   in.Transactions=append(in.Transactions,TransactionProof{TransactionID:fmt.Sprintf("tx-%03d",tx),ExpectedEventCount:10,BeginObserved:true,EndObserved:true,EndEventCount:10,DataCollections:counts})
