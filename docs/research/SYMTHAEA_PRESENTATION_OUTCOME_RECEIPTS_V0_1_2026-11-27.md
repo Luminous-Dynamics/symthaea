@@ -89,7 +89,7 @@ The fixture file is a research artifact; it is not yet consumed automatically by
 
 ## Tests and qualification
 
-Sixteen Rust tests are authored for:
+Seventeen Rust tests are authored for:
 - permit versus submission distinction;
 - required final policy recheck;
 - rejection of submission acknowledgements carrying a stale pre-authorization permit;
