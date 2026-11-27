@@ -11,6 +11,7 @@ anyhow = "=1.0.102"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.150"
 sha2 = "=0.10.9"
+jsonschema = { version = "=0.63.2", default-features = false }
 
 # Keep this nested workspace independent of Symthaea's root workspace graph.
 [workspace]
