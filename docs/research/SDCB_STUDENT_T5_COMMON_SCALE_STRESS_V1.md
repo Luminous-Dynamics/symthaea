@@ -1,6 +1,6 @@
 # SDCB Gaussian and standardized Student-t(5) common-scale dependence stress v1
 
-**Status:** exact-head Rust 1.96 workflow passed on source `394919be85c65b04510a8ca33b490116a56dcff2`: rustfmt, **7/7 unit controls**, full 72-condition × 2,500-trial grid (180,000 simulations), and report artifact inspection. See [workflow run #?](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46003315297) and [CSV + manifest artifact 15199048151](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46003315297/artifacts/15199048151). Results remain diagnostic, not a general coverage guarantee.
+**Status:** exact-head Rust 1.96 workflow passed on source `394919be85c65b04510a8ca33b490116a56dcff2`: rustfmt, **7/7 unit controls**, full 72-condition × 2,500-trial grid (180,000 simulations), and report artifact inspection. See [workflow run](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46003315297) and [CSV + manifest artifact 15199048151](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46003315297/artifacts/15199048151). Results remain diagnostic, not a general coverage guarantee.
 
 ## Research question
 
