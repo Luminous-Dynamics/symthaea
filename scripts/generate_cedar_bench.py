@@ -175,6 +175,7 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
             "task_id": opaque_id,
             "template_id": template_id,
             "condition": condition,
+            "split": template["split"],
             "baseline_values": baseline_values,
             "counterfactual_values": counter_values,
             "expanded_values": values,
@@ -199,18 +200,26 @@ def main() -> int:
         require(candidate_out.resolve() != audit_out.resolve(), "candidate and auditor output paths must differ")
         document = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
         candidate_rows, audit_rows = [], []
-        for template in document["templates"]:
+        requested_split = sys.argv[3] if len(sys.argv) > 3 else "sealed_test"
+        require(requested_split in {"train", "development", "sealed_test", "all"},
+                "split must be train, development, sealed_test or all")
+        selected_templates = [
+            template for template in document["templates"]
+            if requested_split == "all" or template["split"] == requested_split
+        ]
+        require(bool(selected_templates), f"no templates assigned to split {requested_split}")
+        for template in selected_templates:
             candidates, audits = expand(seed, template)
             candidate_rows.extend(candidates)
             audit_rows.extend(audits)
-        require(len(candidate_rows) == len(audit_rows) == len(document["templates"]) * 4,
+        require(len(candidate_rows) == len(audit_rows) == len(selected_templates) * 4,
                 "candidate/auditor trial count mismatch")
         order = sorted(range(len(candidate_rows)), key=lambda index: keyed(seed, str(index), "order"))
         candidate_out.parent.mkdir(parents=True, exist_ok=True)
         audit_out.parent.mkdir(parents=True, exist_ok=True)
         candidate_out.write_text("".join(json.dumps(candidate_rows[i], sort_keys=True) + "\n" for i in order), encoding="utf-8")
         audit_out.write_text("".join(json.dumps(audit_rows[i], sort_keys=True) + "\n" for i in order), encoding="utf-8")
-        print(f"generated {len(candidate_rows)} candidate trials; auditor key is written separately")
+        print(f"generated {len(candidate_rows)} {requested_split} candidate trials; auditor key is written separately")
         return 0
     except (OSError, KeyError, TypeError, ValueError, IndexError, json.JSONDecodeError) as error:
         print(f"CEDAR-Bench expansion failed: {error}", file=sys.stderr)
