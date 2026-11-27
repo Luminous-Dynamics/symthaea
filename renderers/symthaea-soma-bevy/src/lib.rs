@@ -80,6 +80,7 @@ impl AuthorizedSceneSubmission {
         if frame.session_id() != permit.session_id()
             || frame.clock_domain_id() != permit.clock_domain_id()
             || authorization_receipt.decision_clock().clock_domain_id != frame.clock_domain_id()
+            || authorization_receipt.transition_clock().clock_domain_id != frame.clock_domain_id()
         {
             return Err(AdapterError::WrongClockDomain);
         }
