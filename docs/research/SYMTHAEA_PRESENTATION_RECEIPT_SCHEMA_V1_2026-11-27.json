@@ -15,6 +15,9 @@
     "session_id",
     "source_clock_domain_id",
     "event_id",
+    "event_expires_at_monotonic_ns",
+    "grant_expires_at_monotonic_ns",
+    "effective_permit_expires_at_monotonic_ns",
     "grant_id",
     "event_sequence",
     "event_kind",
@@ -326,6 +329,18 @@
     "digest": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "event_expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "grant_expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "effective_permit_expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
     }
   }
 }
