@@ -15,7 +15,7 @@ This first slice operationalizes the two-phase evaluation in issue #13926: freez
 
 - Two raw artifacts: a CSV dataset and a JSON protocol.
 - Six located observations, two analysis nodes, four claims and two decisions.
-- A deliberate parser rounding defect and comparator defect in the baseline to exercise parser/method correction events.
+- A deliberate parser truncation defect and comparator defect in the baseline to exercise parser/method correction events.
 - Twelve event families: raw-data correction, non-material update, retraction, threshold correction, parser correction, method correction, scope correction, contradictory source, duplicate-origin mirror, semantically equivalent raw-byte version, unavailable correction, and untrusted notice.
 - Every event has expected changed, unchanged, blocked, unresolved, non-dependent and/or ignored-untrusted outcomes.
 
