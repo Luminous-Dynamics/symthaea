@@ -212,10 +212,7 @@ impl Bm25IndexV1 {
     /// the requested cut. Corpus statistics are recomputed over the eligible
     /// scope/time cohort, preventing excluded tenants or future facts from
     /// changing IDF or average document length for this query.
-    pub fn search(
-        &self,
-        query: &RetrievalQueryV1,
-    ) -> Result<Bm25ResultV1, BaselineErrorV1> {
+    pub fn search(&self, query: &RetrievalQueryV1) -> Result<Bm25ResultV1, BaselineErrorV1> {
         if query.scope_id.trim().is_empty() {
             return Err(BaselineErrorV1::EmptyQueryScope);
         }
@@ -254,7 +251,9 @@ impl Bm25IndexV1 {
                 document.scope_id == query.scope_id
                     && document.observed_at_ms <= query.as_of_ms
                     && document.valid_from_ms <= query.as_of_ms
-                    && document.valid_until_ms.is_none_or(|end| query.as_of_ms < end)
+                    && document
+                        .valid_until_ms
+                        .is_none_or(|end| query.as_of_ms < end)
             })
             .collect();
         let eligible_count = eligible.iter().filter(|value| **value).count();
@@ -468,9 +467,17 @@ mod tests {
                 1,
                 None,
             ),
-            document("noise", "tenant-a", "garden irrigation schedule", 1, 1, None),
+            document(
+                "noise",
+                "tenant-a",
+                "garden irrigation schedule",
+                1,
+                1,
+                None,
+            ),
         ]);
-        let result = index.search(&query("rocket motor inspection", "tenant-a", 10, 10))
+        let result = index
+            .search(&query("rocket motor inspection", "tenant-a", 10, 10))
             .unwrap();
         assert_eq!(result.hits[0].document_id, "complete");
         assert_eq!(result.hits[1].document_id, "partial");
@@ -483,7 +490,9 @@ mod tests {
             document("known", "tenant-a", "valve replaced", 10, 5, None),
             document("learned-later", "tenant-a", "valve replaced", 30, 5, None),
         ]);
-        let result = index.search(&query("valve replaced", "tenant-a", 20, 10)).unwrap();
+        let result = index
+            .search(&query("valve replaced", "tenant-a", 20, 10))
+            .unwrap();
         assert_eq!(result.hits.len(), 1);
         assert_eq!(result.hits[0].document_id, "known");
     }
@@ -491,10 +500,26 @@ mod tests {
     #[test]
     fn valid_time_upper_bound_is_exclusive() {
         let index = index(vec![
-            document("expired", "tenant-a", "calibration certificate", 1, 1, Some(20)),
-            document("current", "tenant-a", "calibration certificate", 1, 20, None),
+            document(
+                "expired",
+                "tenant-a",
+                "calibration certificate",
+                1,
+                1,
+                Some(20),
+            ),
+            document(
+                "current",
+                "tenant-a",
+                "calibration certificate",
+                1,
+                20,
+                None,
+            ),
         ]);
-        let result = index.search(&query("calibration certificate", "tenant-a", 20, 10)).unwrap();
+        let result = index
+            .search(&query("calibration certificate", "tenant-a", 20, 10))
+            .unwrap();
         assert_eq!(result.hits.len(), 1);
         assert_eq!(result.hits[0].document_id, "current");
     }
@@ -508,23 +533,58 @@ mod tests {
         let with_other_scope = index(vec![
             document("a", "tenant-a", "pump pressure inspection", 1, 1, None),
             document("b", "tenant-a", "pump repair log", 1, 1, None),
-            document("secret", "tenant-b", "pump pump pump pump pressure", 1, 1, None),
+            document(
+                "secret",
+                "tenant-b",
+                "pump pump pump pump pressure",
+                1,
+                1,
+                None,
+            ),
         ]);
         let q = query("pump pressure", "tenant-a", 10, 10);
-        assert_eq!(base.search(&q).unwrap(), with_other_scope.search(&q).unwrap());
+        assert_eq!(
+            base.search(&q).unwrap(),
+            with_other_scope.search(&q).unwrap()
+        );
     }
 
     #[test]
     fn query_before_first_valid_or_observed_time_returns_no_hits() {
-        let index = index(vec![document("future", "tenant-a", "release approved", 20, 15, None)]);
-        assert!(index.search(&query("release approved", "tenant-a", 10, 10)).unwrap().hits.is_empty());
+        let index = index(vec![document(
+            "future",
+            "tenant-a",
+            "release approved",
+            20,
+            15,
+            None,
+        )]);
+        assert!(
+            index
+                .search(&query("release approved", "tenant-a", 10, 10))
+                .unwrap()
+                .hits
+                .is_empty()
+        );
     }
 
     #[test]
     fn empty_query_and_zero_top_k_are_explicit_empty_results() {
         let index = index(vec![document("a", "tenant-a", "alpha beta", 1, 1, None)]);
-        assert!(index.search(&query("!!!", "tenant-a", 10, 10)).unwrap().hits.is_empty());
-        assert!(index.search(&query("alpha", "tenant-a", 10, 0)).unwrap().hits.is_empty());
+        assert!(
+            index
+                .search(&query("!!!", "tenant-a", 10, 10))
+                .unwrap()
+                .hits
+                .is_empty()
+        );
+        assert!(
+            index
+                .search(&query("alpha", "tenant-a", 10, 0))
+                .unwrap()
+                .hits
+                .is_empty()
+        );
     }
 
     #[test]
@@ -542,27 +602,52 @@ mod tests {
             index(docs_a).search(&q).unwrap().hits,
             index(docs_b).search(&q).unwrap().hits
         );
-        assert_eq!(index(vec![
-            document("z", "tenant-a", "same token", 1, 1, None),
-            document("a", "tenant-a", "same token", 1, 1, None),
-        ]).search(&q).unwrap().hits[0].document_id, "a");
+        assert_eq!(
+            index(vec![
+                document("z", "tenant-a", "same token", 1, 1, None),
+                document("a", "tenant-a", "same token", 1, 1, None),
+            ])
+            .search(&q)
+            .unwrap()
+            .hits[0]
+                .document_id,
+            "a"
+        );
     }
 
     #[test]
     fn unicode_case_folding_preserves_non_ascii_terms() {
         let index = index(vec![
-            document("af", "tenant-a", "Afrikaanse veiligheidsinspeksie", 1, 1, None),
+            document(
+                "af",
+                "tenant-a",
+                "Afrikaanse veiligheidsinspeksie",
+                1,
+                1,
+                None,
+            ),
             document("zu", "tenant-a", "ukuhlolwa kokuphepha", 1, 1, None),
             document("other", "tenant-a", "unrelated data", 1, 1, None),
         ]);
         assert_eq!(
-            index.search(&query("AFRIKAANSE veiligheidsinspeksie", "tenant-a", 10, 10))
-                .unwrap().hits[0].document_id,
+            index
+                .search(&query(
+                    "AFRIKAANSE veiligheidsinspeksie",
+                    "tenant-a",
+                    10,
+                    10
+                ))
+                .unwrap()
+                .hits[0]
+                .document_id,
             "af"
         );
         assert_eq!(
-            index.search(&query("UKUHLOLWA kokuphepha", "tenant-a", 10, 10))
-                .unwrap().hits[0].document_id,
+            index
+                .search(&query("UKUHLOLWA kokuphepha", "tenant-a", 10, 10))
+                .unwrap()
+                .hits[0]
+                .document_id,
             "zu"
         );
     }
@@ -591,17 +676,11 @@ mod tests {
     #[test]
     fn invalid_bm25_parameters_are_rejected() {
         assert_eq!(
-            Bm25IndexV1::build(
-                vec![],
-                Bm25ConfigV1 { k1: 0.0, b: 0.75 },
-            ),
+            Bm25IndexV1::build(vec![], Bm25ConfigV1 { k1: 0.0, b: 0.75 },),
             Err(BaselineErrorV1::InvalidBm25Parameters)
         );
         assert_eq!(
-            Bm25IndexV1::build(
-                vec![],
-                Bm25ConfigV1 { k1: 1.2, b: 1.5 },
-            ),
+            Bm25IndexV1::build(vec![], Bm25ConfigV1 { k1: 1.2, b: 1.5 },),
             Err(BaselineErrorV1::InvalidBm25Parameters)
         );
     }
@@ -676,8 +755,16 @@ mod tests {
     fn rrf_rejects_duplicate_channels_invalid_weights_and_zero_constant() {
         let index = index(vec![document("a", "tenant-a", "alpha", 1, 1, None)]);
         let repeated_channel = vec![
-            RankedChannelV1 { channel_id: "lexical".into(), weight: 1.0, document_ids: vec!["a".into()] },
-            RankedChannelV1 { channel_id: "lexical".into(), weight: 1.0, document_ids: vec!["a".into()] },
+            RankedChannelV1 {
+                channel_id: "lexical".into(),
+                weight: 1.0,
+                document_ids: vec!["a".into()],
+            },
+            RankedChannelV1 {
+                channel_id: "lexical".into(),
+                weight: 1.0,
+                document_ids: vec!["a".into()],
+            },
         ];
         assert_eq!(
             weighted_rrf_v1(&index, "tenant-a", 10, &repeated_channel, 60, 10),
@@ -700,7 +787,14 @@ mod tests {
 
     #[test]
     fn rrf_cannot_resurrect_a_document_after_its_valid_time_ends() {
-        let index = index(vec![document("expired", "tenant-a", "old approval", 1, 1, Some(20))]);
+        let index = index(vec![document(
+            "expired",
+            "tenant-a",
+            "old approval",
+            1,
+            1,
+            Some(20),
+        )]);
         let channels = vec![RankedChannelV1 {
             channel_id: "lexical".into(),
             weight: 1.0,
