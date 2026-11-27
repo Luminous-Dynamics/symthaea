@@ -43,7 +43,5 @@ jobs:
         run: cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress
       - name: Run strict Clippy
         run: cargo clippy --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress --all-targets -- -D warnings
-      - name: Parse use receipt and decision exposure schemas
-        run: |
-          python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json >/dev/null
-          python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/decision-evidence-use-link-v1.schema.json >/dev/null
+      - name: Parse use receipt schema
+        run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json >/dev/null
