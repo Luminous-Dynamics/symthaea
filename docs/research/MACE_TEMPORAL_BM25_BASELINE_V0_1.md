@@ -53,6 +53,8 @@ It can compose lexical, entity, date or graph result lists, but this reference d
 
 ## Negative controls
 
+A strict Serde adapter is now provided at `baselines/adapter/`. It uses `deny_unknown_fields`, accepts only candidate-visible v0.1 events, builds the same BM25 index, executes the declared query and weighted-RRF channels, then resolves each hit by exact event ID to its source/authority/uncertainty/lineage record. The adapter rejects unknown wire fields rather than silently ingesting evaluator-only additions. Its focused Cargo test and Clippy workflow is separate from the dependency-free BM25 reference workflow; no adapter test result is claimed until that new workflow passes.
+
 The Rust suite now covers:
 - multi-term BM25 ranking and partial matches;
 - knowledge-time and valid-time cutoffs;
