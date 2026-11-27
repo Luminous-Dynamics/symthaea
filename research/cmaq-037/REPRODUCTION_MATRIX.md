@@ -17,6 +17,9 @@ CMAQ-035 established an internal comparison between fixed and ONS betting. CMAQ-
 | PRM-spectrum | CMAQ-038 fixed-bet multi-resolution Haar contrasts over the complete finite rank grid | CMAQ exploratory extension; not part of the published PRM reproduction |
 | PF-CCTM | Liu, Prinster & Orabona (2026), restarting universal portfolio for fixed-reference CCTM | New published late-shift baseline; must reproduce from the paper/reference implementation |
 | PRM-restart-spectrum | CMAQ-040: Haar rank-spectrum features × heavy-tailed restart-time mixture × fixed betting-rate grid | CMAQ exploratory compositional extension; not the PF-CCTM algorithm |
+| Operational outcome scorecard | CMAQ-041: warning/quarantine/fallback outcomes vs. independent recoverability deadline, grouped by common-cause block | Application scorecard; not a detector or safety certification |
+| Reference-null finite-T gate | CMAQ-042: independent reference-path order-statistic boundary for frozen horizon | Optional finite-horizon gate only; retain Ville 1/alpha for unbounded monitoring; simple/pivotal null required |
+| Fleet alpha allocation | CMAQ-043: hierarchical alpha_global/[i(i+1)j(j+1)k(k+1)] across asset/channel/deployment | Open-ended union-bound budget; does not assume stream independence; requires durable one-use ledger |
 | CS-risk | Anytime confidence-sequence monitor of a matched running/rolling average risk | Complementary estimand, not a like-for-like per-instance drift detector |
 
 Do not implement CCTM by multiplying repeated marginal conformal p-values or by using a rolling empirical breach rate. Implement its actual conditional calibration and martingale construction from the reference paper/code.
