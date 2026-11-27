@@ -478,7 +478,10 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
     })?;
 
     match input.input_id.as_str() {
-        "synthetic-consent-001" | "synthetic-consent-revoked-001" | "synthetic-consent-expired-001" | "synthetic-consent-wrong-scope-001" => {
+        "synthetic-consent-001"
+        | "synthetic-consent-revoked-001"
+        | "synthetic-consent-expired-001"
+        | "synthetic-consent-wrong-scope-001" => {
             if json_string(&artifact, "schema", task, input)?
                 != "luminous.eqc.synthetic-consent.v0.1"
                 || json_string(&artifact, "consent_id", task, input)? != input.input_id
@@ -568,9 +571,7 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
                 );
             }
             let consumed_at = json_string(&artifact, "consumed_at", task, input)?;
-            if !is_canonical_utc(consumed_at)
-                || consumed_at > task.request.evaluated_at.as_str()
-            {
+            if !is_canonical_utc(consumed_at) || consumed_at > task.request.evaluated_at.as_str() {
                 bail!(
                     "{}: consumed challenge fixture '{}' has invalid consumption time",
                     task.task_id,
