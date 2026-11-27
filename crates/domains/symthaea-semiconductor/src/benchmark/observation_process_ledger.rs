@@ -861,6 +861,13 @@ fn assumption_state(
                 reasons.push("At least one physical feedback result exceeded the declared maximum delay.".into());
                 return (ControllerAssumptionStateV1::DelayContractExceeded, reasons);
             }
+            if maximum_occupancy > input.tracking_capacity.unwrap_or(0) {
+                reasons.push(format!(
+                    "Observed peak tracking occupancy {maximum_occupancy} exceeded declared capacity {}.",
+                    input.tracking_capacity.unwrap_or(0)
+                ));
+                return (ControllerAssumptionStateV1::TrackingCapacityExceeded, reasons);
+            }
             if rows.iter().any(|row| {
                 row.acquisition.state == PhysicalAcquisitionStateV1::SelectedPending
                     || row.qualification.state == K1QualificationStateV1::Pending
@@ -868,13 +875,6 @@ fn assumption_state(
             }) {
                 reasons.push("The closeout contains unresolved physical acquisition, K1 qualification or proxy-tracked feedback.".into());
                 return (ControllerAssumptionStateV1::TraceIncomplete, reasons);
-            }
-            if maximum_occupancy > input.tracking_capacity.unwrap_or(0) {
-                reasons.push(format!(
-                    "Observed peak tracking occupancy {maximum_occupancy} exceeded declared capacity {}.",
-                    input.tracking_capacity.unwrap_or(0)
-                ));
-                return (ControllerAssumptionStateV1::TrackingCapacityExceeded, reasons);
             }
             for row in rows {
                 if row.acquisition.state != PhysicalAcquisitionStateV1::Measured {
@@ -1439,6 +1439,154 @@ mod tests {
     }
 
     #[test]
+    fn capacity_denied_but_physically_qualified_label_still_counts_as_observed_population_evidence() {
+        let mut denied = row(
+            1,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::CapacityDenied,
+        );
+        denied.tracking.proxy_delay_rounds = Some(2);
+        denied.tracking.actual_feedback_delay_rounds = Some(1);
+        let data = input(
+            ObservationRiskControllerV1::CapacityAwareOcrcBounded,
+            vec![denied],
+        );
+        let report = evaluate_observation_process_v1(&data).unwrap();
+        assert_eq!(report.funnel.measured, 1);
+        assert_eq!(report.funnel.k1_eligible, 1);
+        assert_eq!(report.funnel.capacity_denied, 1);
+        assert_eq!(report.population_risk.missing_count, 0);
+        assert_eq!(
+            report.controller_assumption_state,
+            ControllerAssumptionStateV1::CompleteUnderDeclaredAssumptions
+        );
+    }
+
+    #[test]
+    fn proxy_not_tracked_remains_distinct_from_physical_nonselection() {
+        let mut not_tracked = row(
+            1,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::ProxyNotTracked,
+        );
+        not_tracked.tracking.proxy_delay_rounds = Some(-1);
+        not_tracked.tracking.actual_feedback_delay_rounds = Some(2);
+        let data = input(
+            ObservationRiskControllerV1::CapacityAwareOcrcBounded,
+            vec![not_tracked],
+        );
+        let report = evaluate_observation_process_v1(&data).unwrap();
+        assert_eq!(report.funnel.proxy_not_tracked, 1);
+        assert_eq!(report.funnel.not_selected, 0);
+        assert_eq!(report.funnel.measured, 1);
+        assert_eq!(report.funnel.k1_eligible, 1);
+        assert_eq!(
+            report.controller_assumption_state,
+            ControllerAssumptionStateV1::CompleteUnderDeclaredAssumptions
+        );
+    }
+
+    #[test]
+    fn tracked_feedback_releases_capacity_after_actual_arrival_and_applies_k1_update() {
+        let mut received = row(
+            1,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::TrackedReceived,
+        );
+        received.tracking.proxy_delay_rounds = Some(2);
+        received.tracking.actual_feedback_delay_rounds = Some(1);
+        received.tracking.proxy_survival_probability = Some(0.5);
+        received.tracking.tracking_slot_id = Some(101);
+        received.tracking.tracking_end_round = Some(2);
+        received.tracking.controller_update_applied = true;
+        let data = input(
+            ObservationRiskControllerV1::CapacityAwareOcrcBounded,
+            vec![received],
+        );
+        let report = evaluate_observation_process_v1(&data).unwrap();
+        assert_eq!(report.maximum_observed_tracking_occupancy, 1);
+        assert_eq!(report.funnel.feedback_received, 1);
+        assert_eq!(report.funnel.controller_updates_applied, 1);
+        assert_eq!(
+            report.controller_assumption_state,
+            ControllerAssumptionStateV1::CompleteUnderDeclaredAssumptions
+        );
+    }
+
+    #[test]
+    fn peak_tracking_occupancy_exceeding_k_is_reported_as_assumption_failure() {
+        let mut first = row(
+            1,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::AdmittedPending,
+        );
+        first.tracking.proxy_delay_rounds = Some(2);
+        first.tracking.tracking_slot_id = Some(101);
+        let mut second = row(
+            2,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::AdmittedPending,
+        );
+        second.tracking.proxy_delay_rounds = Some(1);
+        second.tracking.tracking_slot_id = Some(102);
+        let mut data = input(
+            ObservationRiskControllerV1::CapacityAwareOcrcBounded,
+            vec![first, second],
+        );
+        data.closeout_round = 2;
+        data.source_ledger_sha256 = json_sha256(&canonical_rounds(&data.rounds)).unwrap();
+        let report = evaluate_observation_process_v1(&data).unwrap();
+        assert_eq!(report.maximum_observed_tracking_occupancy, 2);
+        assert_eq!(
+            report.controller_assumption_state,
+            ControllerAssumptionStateV1::TrackingCapacityExceeded
+        );
+    }
+
+    #[test]
+    fn exceeding_declared_maximum_physical_delay_is_reported_explicitly() {
+        let mut denied = row(
+            1,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::CapacityDenied,
+        );
+        denied.tracking.proxy_delay_rounds = Some(2);
+        denied.tracking.actual_feedback_delay_rounds = Some(3);
+        let data = input(
+            ObservationRiskControllerV1::CapacityAwareOcrcBounded,
+            vec![denied],
+        );
+        let report = evaluate_observation_process_v1(&data).unwrap();
+        assert_eq!(
+            report.controller_assumption_state,
+            ControllerAssumptionStateV1::DelayContractExceeded
+        );
+    }
+
+    #[test]
+    fn fixed_delay_mismatch_is_reported_as_delay_contract_exceeded() {
+        let mut received = row(
+            1,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::UnlimitedReceived,
+        );
+        received.tracking.actual_feedback_delay_rounds = Some(2);
+        let data = input(ObservationRiskControllerV1::FixedDelayAci, vec![received]);
+        let report = evaluate_observation_process_v1(&data).unwrap();
+        assert_eq!(
+            report.controller_assumption_state,
+            ControllerAssumptionStateV1::DelayContractExceeded
+        );
+    }
+
+    #[test]
     fn fixed_delay_aci_and_capacity_ocrc_cannot_be_mixed_in_one_run() {
         let mut data = input(
             ObservationRiskControllerV1::FixedDelayAci,
@@ -1542,6 +1690,36 @@ mod tests {
         let report = evaluate_observation_process_v1(&data).unwrap();
         assert_eq!(report.funnel.independent_audit_observations, 1);
         assert!(report.population_risk.independent_audit_estimate.is_some());
+    }
+
+    #[test]
+    fn independent_audit_reference_method_must_differ_from_operational_method() {
+        let mut data = input(
+            ObservationRiskControllerV1::None,
+            vec![row(
+                1,
+                PhysicalAcquisitionStateV1::MeasurementUnavailable,
+                K1QualificationStateV1::NotApplicable,
+                FeedbackTrackingStateV1::NotApplicable,
+            )],
+        );
+        data.independent_audit_design = Some(SelectionAuditDesignV1 {
+            schema: super::super::selection_risk_bounds::SELECTION_AUDIT_DESIGN_SCHEMA_V1.into(),
+            design_sha256: digest('9'),
+            randomization_provenance_sha256: digest('a'),
+            reference_method_sha256: digest('d'),
+            minimum_inclusion_probability: 1.0,
+            confidence_delta: 0.05,
+            independent_of_operational_qualification: true,
+        });
+        data.rounds[0].independent_audit = Some(IndependentAuditObservationV1 {
+            round_id: 1,
+            loss: 1.0,
+            inclusion_probability: 1.0,
+            audit_measurement_receipt_sha256: digest('c'),
+        });
+        data.source_ledger_sha256 = json_sha256(&canonical_rounds(&data.rounds)).unwrap();
+        assert!(evaluate_observation_process_v1(&data).is_err());
     }
 
     #[test]
