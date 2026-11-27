@@ -10,3 +10,6 @@ Run: go test -race -count=5 ./..., go vet ./..., go test -count=1 -cover ./..., 
 
 
 Additional invariants: the declared MON-022 surface scope must match the recovery plan and all required surface counts must reconcile. Service recovery requires read, write/readback (rollback verified) and business-invariant probes; missing/unverified evidence is indeterminate while a proven failed invariant is denied. A verified unavailable required dependency is denied; absent/stale/unverified dependency evidence is indeterminate. Traffic enablement is ordered after database readiness and fencing, and service acceptance follows traffic enablement. Conservative RPO/RTO upper bounds include clock uncertainty and require a common trusted clock domain.
+
+
+The evaluator separates proven failure from absent proof: a verified dependency that is unavailable or a required business invariant that fails is denied; missing, stale or unverified dependency/probe evidence is indeterminate. It requires an explicit MON-022 scope match and equal required/covered surface counts. For service recovery it requires read, safe write/readback (rollback verified) and invariant probes, then verifies old-primary fencing, stale endpoint fencing, traffic-enable time and independent service-ready time. RPO and RTO are conservative upper bounds including clock uncertainty.
