@@ -1,0 +1,39 @@
+name: CMAQ-033 ONS predictive-rank monitor
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-031/**"
+      - "research/cmaq-033/**"
+      - ".github/workflows/cmaq-033.yml"
+  push:
+    branches:
+      - "research/cmaq-033-*"
+    paths:
+      - "research/cmaq-031/**"
+      - "research/cmaq-033/**"
+      - ".github/workflows/cmaq-033.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-033-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ons:
+    name: ons-predictive-rank-monitor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-033/Cargo.toml --all -- --check
+      - name: Run deterministic ONS tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-033/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-033/Cargo.toml --locked --all-targets -- -D warnings
