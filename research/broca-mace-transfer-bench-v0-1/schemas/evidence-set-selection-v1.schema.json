@@ -83,7 +83,8 @@
         "total_token_cost",
         "total_relevance_score_micros",
         "max_token_cost",
-        "canonical_sha256"
+        "canonical_sha256",
+        "selection_policy_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -142,6 +143,9 @@
           "minimum": 0
         },
         "canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "selection_policy_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }
