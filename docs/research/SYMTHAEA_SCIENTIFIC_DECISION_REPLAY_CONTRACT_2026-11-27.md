@@ -15,6 +15,10 @@ The hypothesis is that complete, evidence- and cost-aware decision histories can
 
 The current Futures Laboratory fixture in the evolutionary-rescue example support code bundles candidate-usable observation streams with privileged observations, the hidden trajectory, first-extinction labels and other evaluator-derived fields. This is workable for trusted offline analysis, but it is not a safe object to pass wholesale to a candidate research policy.
 
+A first custody adapter is now authored at `examples/support/evolutionary_rescue_custody.rs`, with the materializer at `examples/evolutionary_rescue_split_capsules.rs`. It projects one observation view at a time and writes candidate observations/receipt to one output root and evaluator outcomes/manifest to a disjoint output root. The generator refuses overlapping roots and file overwrites, uses opaque UUID world IDs, computes BLAKE3 byte digests, writes the evaluator manifest last, and reads the files back to verify their digest joins.
+
+The current observation record still exposes only simulation tick and sample values; it does not yet provide physical event time, availability time, per-observation source digests or a calibrated observation envelope. Those semantics must be supplied through the #12407 observation-event work before treating the pilot as an asynchronous/irregular-observation benchmark.
+
 The pilot must materialize three logically separate artifacts.
 
 ### Candidate observation capsule
@@ -33,7 +37,7 @@ A Rust module boundary is not access control against malicious candidate code. P
 
 Binds capsules without disclosing evaluator payloads: schema/simulator version, content digests, world/task-family identity and seed commitment, observation-policy version, generator/build/environment digests, lineage/receipt references and custody metadata.
 
-A digest proves byte identity, not truth, independence, access control or correct custody.
+A digest proves byte identity, not truth, independence, access control or correct custody. BLAKE3 here is an integrity identifier, not an authenticated signature. Separate directories are not a security boundary by themselves: the operator must ensure candidate credentials cannot read evaluator storage, and the candidate process must never mount the evaluator root.
 
 ## 3. Contract prototype
 
@@ -97,11 +101,23 @@ Use the existing Futures Laboratory substrate and its current forecast evidence 
 - Generate the ten existing evolutionary-rescue worlds once (five train and five held-out seeds).
 - Freeze file identities and simulator/build provenance.
 - Validate format version, tick continuity, observation timing, seed separation and observation-view semantics.
-- Produce candidate capsules for one permitted observation policy and evaluator capsules under separate custody.
-- Independently verify capsule digests and one-to-one manifest linkage.
-- Never pass the current combined serialized-world object into a candidate process.
+- Run `evolutionary_rescue_generate_worlds` once to materialize the ten source fixtures.
+- Run `evolutionary_rescue_split_capsules` against those frozen fixtures, choosing one view (`census`, `noisy-trait`, or `shuffled-trait`) for each campaign.
+- Give the materializer disjoint candidate/evaluator output roots and the exact source commit SHA.
+- The generator assigns opaque UUID world IDs, writes candidate observations plus a candidate receipt to the candidate root, and writes hidden outcomes plus the joined custody manifest to the evaluator root.
+- Verify capsule byte digests and receipt/manifest/world-ID linkage after disk readback.
+- Never pass the current combined serialized-world object or evaluator root into a candidate process.
 
 Ten worlds are a pipeline pilot, not a confirmatory scientific benchmark.
+
+Example commands (replace paths and source SHA with the actual campaign values):
+
+```sh
+cargo run --release --example evolutionary_rescue_generate_worlds -p symthaea-futures-ensemble
+cargo run --release --example evolutionary_rescue_split_capsules -p symthaea-futures-ensemble -- /secure/candidate /secure/evaluator <40-or-64-hex-source-commit> census
+```
+
+The materializer creates both roots if absent, rejects equal/nested roots, refuses to overwrite existing files, writes the manifest last, and reads all four output artifacts back before accepting the pair. It does not set filesystem ACLs, create separate OS identities or launch the candidate/evaluator processes. Those are required deployment controls, not provided by this fixture utility.
 
 ### Pilot 1 — compare decision policies
 
@@ -229,17 +245,19 @@ These are paper/author-reported baselines unless independently reproduced under 
 ## 12. Implementation status and gates
 
 Implemented in this branch:
-- candidate-visible decision context and prospective proposal;
-- outcome distribution, assignment propensity and causal-design declarations;
+- candidate-visible decision context and prospective proposal, including a decision-objective reference;
+- outcome distribution, full randomized action propensities and causal-design declarations;
 - evaluator-owned resolution and distinct execution/outcome states;
 - validation for look-ahead evidence, action support, unsupported counterfactuals, delayed/censored/indeterminate outcomes and cost completeness;
-- unit tests for contract invariants.
+- nine authored decision-contract tests;
+- candidate/evaluator capsule projection, BLAKE3 digests, opaque IDs, disjoint-root checks, no-overwrite writes, manifest-last materialization and disk-readback checks;
+- seven authored custody tests and a capsule materializer example.
 
-Not implemented:
-- splitting the combined world fixtures;
-- fixture generation or manifest digests;
-- separate candidate/evaluator processes and real access control;
+Not implemented or not yet verified:
+- the ten worlds have not been generated or split in this environment;
+- the capsule utility does not enforce OS/service access control or launch isolated candidate/evaluator processes;
+- current fixture observation timestamps remain simulation ticks, not full #12407 event/availability-time semantics;
 - integration with existing ledger/archive/receipts/attestation;
-- replay policy, live-fidelity audit, benchmark runner or R4.
+- executable replay policy, live-fidelity audit, external benchmark runner or R4.
 
 Verification boundary: schema/validation prototype only. Rust compilation and unit tests have not been run in this environment. Exact-head CI must be checked; queued, skipped or missing status is not a pass. Do not merge or promote on schema tests alone.
