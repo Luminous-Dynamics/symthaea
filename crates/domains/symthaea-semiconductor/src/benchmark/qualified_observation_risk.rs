@@ -22,6 +22,7 @@ pub const QUALIFIED_OBSERVATION_RISK_REPORT_SCHEMA_V1: &str =
 pub enum MetrologyQualificationStatusV1 {
     NotSelected,
     NotReceived,
+    Pending,
     Qualified,
     Unknown,
     Blocked,
@@ -145,6 +146,7 @@ pub struct QualifiedObservationRiskReportV1 {
     pub not_selected_fraction: f64,
     pub not_received_fraction: f64,
     pub unavailable_by_frontier_fraction: f64,
+    pub pending_qualification_fraction: f64,
     pub unknown_fraction: f64,
     pub blocked_or_revoked_fraction: f64,
     pub mnar_or_propensity_warning: bool,
@@ -261,7 +263,8 @@ fn validate_unit(unit: &QualifiedObservationUnitV1) -> Result<(), QualifiedObser
         (
             true,
             true,
-            MetrologyQualificationStatusV1::Qualified
+            MetrologyQualificationStatusV1::Pending
+            | MetrologyQualificationStatusV1::Qualified
             | MetrologyQualificationStatusV1::Unknown
             | MetrologyQualificationStatusV1::Blocked
             | MetrologyQualificationStatusV1::Revoked,
@@ -398,6 +401,7 @@ pub fn compute_qualified_observation_risk_v1(
     let mut online_count = 0_usize;
     let mut selected_count = 0_usize;
     let mut received_count = 0_usize;
+    let mut pending_qualification_count = 0_usize;
     let mut unknown_count = 0_usize;
     let mut blocked_count = 0_usize;
     let mut unavailable_count = 0_usize;
@@ -426,6 +430,7 @@ pub fn compute_qualified_observation_risk_v1(
         unavailable_count +=
             usize::from(unit.physical_result_received && !unit.available_by_update_frontier);
         match unit.qualification_status {
+            MetrologyQualificationStatusV1::Pending => pending_qualification_count += 1,
             MetrologyQualificationStatusV1::Unknown => unknown_count += 1,
             MetrologyQualificationStatusV1::Blocked | MetrologyQualificationStatusV1::Revoked => {
                 blocked_count += 1;
@@ -597,6 +602,7 @@ pub fn compute_qualified_observation_risk_v1(
         not_selected_fraction,
         not_received_fraction,
         unavailable_by_frontier_fraction: unavailable_count as f64 / population,
+        pending_qualification_fraction: pending_qualification_count as f64 / population,
         unknown_fraction: unknown_count as f64 / population,
         blocked_or_revoked_fraction: blocked_count as f64 / population,
         mnar_or_propensity_warning: mnar_warning,
