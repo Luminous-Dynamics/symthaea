@@ -13,6 +13,7 @@ use std::collections::BTreeSet;
 
 pub mod challenge_search;
 pub mod pulse_map;
+pub mod velocity_kick_remap;
 pub mod rbkr;
 pub mod validity_horizon;
 
