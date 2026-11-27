@@ -15,9 +15,9 @@ permissions:
 
 jobs:
   feature-lock-report:
-    name: Preview web_research_module feature lock resolution
+    name: Preview web_research_module test-target lock resolution
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,45 +30,45 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/web-research-lock-report"
           cp Cargo.lock "$RUNNER_TEMP/web-research-lock-report/Cargo.lock.before"
-      - name: Resolve the exact WebResearch feature set and capture lockfile delta
+      - name: Resolve the focused WebResearch test target and capture lockfile delta
         id: resolve
         shell: bash
         run: |
           set +e
-          cargo metadata --no-default-features --features web_research_module --format-version 1 > "$RUNNER_TEMP/web-research-lock-report/metadata.json" 2> "$RUNNER_TEMP/web-research-lock-report/metadata.stderr"
-          resolve_exit=$?
-          cargo metadata --locked --no-default-features --features web_research_module --format-version 1 > "$RUNNER_TEMP/web-research-lock-report/metadata-locked.json" 2> "$RUNNER_TEMP/web-research-lock-report/metadata-locked.stderr"
-          locked_exit=$?
+          cargo test --no-run --no-default-features --features web_research_module --lib web_research:: > "$RUNNER_TEMP/web-research-lock-report/focused-compile-unlocked.log" 2>&1
+          compile_exit=$?
           cp Cargo.lock "$RUNNER_TEMP/web-research-lock-report/Cargo.lock.after"
           diff -u "$RUNNER_TEMP/web-research-lock-report/Cargo.lock.before" "$RUNNER_TEMP/web-research-lock-report/Cargo.lock.after" > "$RUNNER_TEMP/web-research-lock-report/Cargo.lock.diff"
           diff_exit=$?
-          printf 'metadata_exit=%s\nmetadata_locked_exit=%s\ndiff_exit=%s\n' "$resolve_exit" "$locked_exit" "$diff_exit" > "$RUNNER_TEMP/web-research-lock-report/status.txt"
-          echo "resolve_exit=$resolve_exit" >> "$GITHUB_OUTPUT"
-          echo "locked_exit=$locked_exit" >> "$GITHUB_OUTPUT"
+          cargo metadata --locked --no-default-features --features web_research_module --format-version 1 > "$RUNNER_TEMP/web-research-lock-report/metadata-locked.json" 2> "$RUNNER_TEMP/web-research-lock-report/metadata-locked.stderr"
+          metadata_exit=$?
+          printf 'compile_unlocked_exit=%s\ndiff_exit=%s\nmetadata_locked_exit=%s\n' "$compile_exit" "$diff_exit" "$metadata_exit" > "$RUNNER_TEMP/web-research-lock-report/status.txt"
+          echo "compile_exit=$compile_exit" >> "$GITHUB_OUTPUT"
+          echo "metadata_exit=$metadata_exit" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Upload exact feature-resolution report
+      - name: Upload exact test-target lockfile proposal and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: web-research-feature-lock-report
-          path: "$RUNNER_TEMP/web-research-lock-report/"
+          path: |
+            ${{ runner.temp }}/web-research-lock-report/Cargo.lock.before
+            ${{ runner.temp }}/web-research-lock-report/Cargo.lock.after
+            ${{ runner.temp }}/web-research-lock-report/Cargo.lock.diff
+            ${{ runner.temp }}/web-research-lock-report/status.txt
+            ${{ runner.temp }}/web-research-lock-report/focused-compile-unlocked.log
+            ${{ runner.temp }}/web-research-lock-report/metadata-locked.json
+            ${{ runner.temp }}/web-research-lock-report/metadata-locked.stderr
           if-no-files-found: error
           retention-days: 7
-      - name: Compile focused WebResearch tests without executing them
-        if: steps.resolve.outputs.resolve_exit == '0' && steps.resolve.outputs.locked_exit == '0'
-        id: compile
-        shell: bash
-        run: |
-          set +e
-          cargo test --no-run --locked --no-default-features --features web_research_module --lib web_research:: > "$RUNNER_TEMP/web-research-lock-report/focused-compile.log" 2>&1
-          status=$?
-          echo "status=$status" >> "$GITHUB_OUTPUT"
-          exit "$status"
-      - name: Require consistent feature lock resolution
+      - name: Verify the regenerated test-target lockfile with locked resolution
+        if: steps.resolve.outputs.compile_exit == '0' && steps.resolve.outputs.metadata_exit == '0'
+        run: cargo test --no-run --locked --no-default-features --features web_research_module --lib web_research::
+      - name: Require test-target lock resolution
         if: always()
         shell: bash
         run: |
-          if [[ "${{ steps.resolve.outputs.resolve_exit }}" != "0" || "${{ steps.resolve.outputs.locked_exit }}" != "0" ]]; then
-            echo "Feature metadata resolution failed or did not stabilize; inspect the uploaded report."
+          if [[ "${{ steps.resolve.outputs.compile_exit }}" != "0" || "${{ steps.resolve.outputs.metadata_exit }}" != "0" ]]; then
+            echo "Focused test-target resolution failed; inspect the uploaded report."
             exit 1
           fi
