@@ -1,0 +1,12 @@
+{
+  "schema_version": "sdcb_open_world_model_adequacy.expected.v1",
+  "observation": [
+    20
+  ],
+  "best_supported_model_id": "narrow-b",
+  "posterior_weights_sum_to_one": true,
+  "status": "flagged_inadequate",
+  "decision_eligible": false,
+  "threshold": -20,
+  "claim_boundary": "Synthetic negative control; no calibrated threshold or physical result."
+}
