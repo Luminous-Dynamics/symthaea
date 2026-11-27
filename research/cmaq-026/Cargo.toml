@@ -1,0 +1,9 @@
+[package]
+name = "cmaq-026-decision-value"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Finite minimax-regret evaluator for decision-sufficient active probing"
+
+[workspace]
