@@ -1,0 +1,180 @@
+{
+  "schema_version": "mace_memory_benchmark_baselines_v1",
+  "snapshot_date": "2026-11-27",
+  "warning": "External published results only. These scores come from different benchmarks/tracks/setups and must not be averaged or treated as directly comparable.",
+  "agent_memory_leaderboard_cycle_2": {
+    "release_date": "2026-11-19",
+    "board_entries_reported": 289,
+    "source": "https://agentmemoryleaderboard.ai/results/cycle-2/",
+    "tracks": {
+      "textual": {
+        "score_type": "overall_score",
+        "open_source_leader": {
+          "name": "Resurface",
+          "score": 61.22
+        },
+        "commercial_leader": {
+          "name": "MemoraX",
+          "score": 69.26
+        }
+      },
+      "multimodal": {
+        "score_type": "overall_score",
+        "open_source_leader": {
+          "name": "Khipu",
+          "score": 43.26
+        },
+        "commercial_leader": {
+          "name": "MemoraX",
+          "score": 53.68
+        }
+      },
+      "coding": {
+        "score_type": "overall_resolved_percent",
+        "open_source_leader": {
+          "name": "InsightMem",
+          "score": 63.33
+        },
+        "commercial_leader": {
+          "name": "MemoraX",
+          "score": 68
+        }
+      }
+    },
+    "notes": [
+      "Textual, multimodal and coding are distinct score tracks.",
+      "Commercial, closed-source and open-source divisions are separate boards.",
+      "MACE must match the official Add/Search API, model/answerer and evaluation protocol before making a leaderboard claim."
+    ]
+  },
+  "longmemeval_v2": {
+    "source": "https://github.com/xiaowu0162/LongMemEval-V2/",
+    "leaderboard": "https://xiaowu0162.github.io/longmemeval-v2/",
+    "questions": 451,
+    "memory_abilities": [
+      "static_state_recall",
+      "dynamic_state_tracking",
+      "workflow_knowledge",
+      "environment_gotchas",
+      "premise_awareness"
+    ],
+    "largest_haystack_tokens": 115000000,
+    "domains": [
+      "web",
+      "enterprise"
+    ],
+    "tiers": [
+      "small",
+      "medium"
+    ],
+    "metrics": [
+      "overall_full_set_accuracy",
+      "gotchas_accuracy",
+      "static_accuracy",
+      "dynamic_accuracy",
+      "procedure_accuracy",
+      "memory_query_avg_seconds",
+      "LAFS_gain"
+    ],
+    "notes": [
+      "Compare small and medium tiers separately.",
+      "The official leaderboard pairs web and enterprise runs and computes accuracy/latency operating points."
+    ]
+  },
+  "ama_bench": {
+    "source": "https://arxiv.org/abs/2602.22769",
+    "published_result": {
+      "system": "AMA-Agent",
+      "average_accuracy_percent": 57.22,
+      "improvement_over_strongest_baseline_percentage_points": 11.16
+    },
+    "notes": [
+      "Paper-reported result; do not compare without matching LLM, task split and evaluator."
+    ]
+  },
+  "collabmem": {
+    "source": "https://aclanthology.org/2026.emnlp-main.1194/",
+    "core_scenarios": 58,
+    "core_probes": 1118,
+    "scaled_scenarios": 174,
+    "scaled_probes": 3359,
+    "competencies": [
+      "sharing",
+      "access_control",
+      "role_routing",
+      "provenance",
+      "conflict_resolution",
+      "retention"
+    ],
+    "published_non_oracle_leader": {
+      "system": "TMS-GRAPH++",
+      "average_score_percent": 69.6
+    },
+    "notes": [
+      "Matched harness fixes trace, target role, answerer, judge and gold event.",
+      "MACE should report unauthorized visibility and provenance failures as hard gates separate from score."
+    ]
+  },
+  "memsecbench": {
+    "source": "https://arxiv.org/abs/2607.27080",
+    "cases": 310,
+    "contexts": 48,
+    "lifecycle_checkpoints": 7,
+    "published_aggregate_findings": {
+      "malicious_memory_persistence_percent": 84.2,
+      "full_write_execute_chain_success_percent": 50.3,
+      "selective_repair_among_successfully_poisoned_cases_percent": 56.1
+    },
+    "notes": [
+      "Reported descriptive results across the paper's tested configurations.",
+      "Attack resistance and selective repair are distinct endpoints."
+    ]
+  },
+  "timl_mem_bench": {
+    "source": "https://aclanthology.org/2026.findings-emnlp.507/",
+    "reviewed_samples": 208,
+    "sessions": 1566,
+    "questions": 1715,
+    "governance_and_activation_cases": 1821,
+    "evaluation_modes": [
+      "canonical_pool_control",
+      "raw_native"
+    ],
+    "notes": [
+      "Raw-native results test ingestion and governed use, not just answer quality given a canonical memory pool."
+    ]
+  },
+  "memora_fama": {
+    "source": "https://aclanthology.org/2026.findings-acl.1337/",
+    "metric": "Forgetting-Aware Memory Accuracy",
+    "notes": [
+      "FAMA penalizes reliance on obsolete or invalidated memories; use with ordinary answer accuracy."
+    ]
+  },
+  "memgov": {
+    "source": "https://aclanthology.org/2026.aacl-long.246/",
+    "contribution": [
+      "pairwise_must_link",
+      "pairwise_cannot_link",
+      "deterministic_constraint_aware_repair",
+      "auditable_obstruction_certificate"
+    ],
+    "notes": [
+      "Closest conceptual comparator for MACE evidence-set governance.",
+      "MACE's integration target is bitemporal use receipts, lifecycle/trust/lineage and exact context exposure; no claim of algorithmic priority or superiority without matched evaluation."
+    ]
+  },
+  "mace_proposed_targets": {
+    "agent_memory_leaderboard": "Beat each implemented-track open-source leader by at least 3 absolute points under exact official protocol; commercial leaders are stretch targets.",
+    "longmemeval_v2": "Positive LAFS gain and outward movement of the accuracy-latency frontier; report tiers and domains separately.",
+    "collabmem": "Exceed the published 69.6% non-Oracle reference under matched setup with zero unauthorized role disclosure.",
+    "memsecbench": "Zero unauthorized write-execute outcomes and zero post-forget resurrection in the declared threat model; report benign-memory retention.",
+    "cluster_risk": "At least 59 independent zero-unsafe clusters for an unadjusted one-sided 95% upper bound below 5%; account for group multiplicity and fixed-sequence assumptions.",
+    "governance_hard_gates": [
+      "zero_stale_or_revoked_evidence_escape",
+      "zero_wrong_scope_exposure",
+      "zero_unauthorized_side_effect",
+      "zero_erasure_resurrection"
+    ]
+  }
+}
