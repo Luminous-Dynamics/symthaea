@@ -31,6 +31,7 @@ Groups form an explicit parent tree. Parent data include examples assigned to de
 - Calibration and evaluation splits are disjoint at the true independent cluster boundary.
 - Cluster-level unsafe indicators are independent and identically distributed, or the sampling design otherwise justifies the exact binomial bound.
 - The score, loss, policy, thresholds, group tree and hard-gate definition are frozen and hashed.
+- Decision-time assessment requires exact policy, sufficiency-score-definition and group-hierarchy digests to match the certificate; a numerically similar score or reused group name is not sufficient.
 - Candidate code cannot observe evaluator losses, outcomes or calibration labels.
 - Bonferroni covers the declared group × threshold family only; post-hoc groups are outside the guarantee.
 - Detected shift suspends the certificate. This kernel does not prove exchangeability or detect every shift.
@@ -40,7 +41,7 @@ No guarantee transfers automatically to a new policy, score, hierarchy, source d
 
 ## Synthetic tests
 
-Eleven deterministic tests cover the exact zero-violation bound and sample-size consequence, multiplicity conservatism, safe threshold selection, hard-gate dominance, risk-exceeds-target status, explicit parent fallback, shift and exchangeability suspension, hierarchy cycle/digest rejection, retrieve-more behavior, certificate-gated acceptance and tamper rejection.
+Thirteen deterministic tests cover the exact zero-violation bound and sample-size consequence, multiplicity conservatism, safe threshold selection, hard-gate dominance, risk-exceeds-target status, explicit parent fallback, shift and exchangeability suspension, hierarchy cycle/digest rejection, retrieve-more behavior, certificate-gated acceptance and tamper rejection.
 
 ## Run
 
