@@ -557,7 +557,7 @@ fn classify(
     let mut reasons = Vec::new();
 
     let (state, recommendation) =
-        if (residual_alert && reference_alert) || (reference_alert && sensor_alert) {
+        if (residual_alert || sensor_alert) && reference_alert {
             supporting.extend([
                 ShiftSignalChannelV1::VmResidual,
                 ShiftSignalChannelV1::ReferenceStandardResidual,
@@ -602,20 +602,13 @@ fn classify(
                     ShiftAdaptationRecommendationV1::Hold,
                 )
             }
-        } else if residual.is_none() {
+        } else if residual.is_none_or(|entry| entry.observations == 0) {
             reasons.push(ShiftReasonCodeV1::MissingDetectorChannel);
             (
                 ShiftDiagnosticStateV1::InsufficientEvidence,
                 ShiftAdaptationRecommendationV1::Hold,
             )
-        } else if residual.is_some_and(|entry| entry.observations == 0) {
-            reasons.push(ShiftReasonCodeV1::MissingDetectorChannel);
-            (
-                ShiftDiagnosticStateV1::InsufficientEvidence,
-                ShiftAdaptationRecommendationV1::Hold,
-            )
-        } else if residual.is_none()
-            || !residual.is_some_and(|entry| entry.stable_reference_window)
+        } else if !residual.is_some_and(|entry| entry.stable_reference_window)
             || !reference_stable
             || !sensor_stable
         {
@@ -723,15 +716,14 @@ pub fn observe_evidence_shift_v1(
     {
         early_reasons.push(ShiftReasonCodeV1::ProcessEventEvidenceMissing);
     }
-    if early_reasons.is_empty() {
-        if let Some(marker) = observation.process_event_marker.as_ref()
-            && (marker.event_id.trim().is_empty()
-                || marker.event_kind.trim().is_empty()
-                || !valid_sha256(&marker.source_evidence_sha256)
-                || marker.event_time_unix_seconds > observation.event_time_unix_seconds)
-        {
-            early_reasons.push(ShiftReasonCodeV1::ProcessEventEvidenceMissing);
-        }
+    if early_reasons.is_empty()
+        && let Some(marker) = observation.process_event_marker.as_ref()
+        && (marker.event_id.trim().is_empty()
+            || marker.event_kind.trim().is_empty()
+            || !valid_sha256(&marker.source_evidence_sha256)
+            || marker.event_time_unix_seconds > observation.event_time_unix_seconds)
+    {
+        early_reasons.push(ShiftReasonCodeV1::ProcessEventEvidenceMissing);
     }
 
     let mut standardized_value = None;
@@ -747,8 +739,9 @@ pub fn observe_evidence_shift_v1(
         }
     }
 
-    if early_reasons.is_empty() {
-        if let Some(value) = standardized_value {
+    if early_reasons.is_empty()
+        && let Some(value) = standardized_value
+    {
             if !value.is_finite() {
                 early_reasons.push(ShiftReasonCodeV1::NonFiniteObservation);
             } else {
@@ -1250,12 +1243,10 @@ mod tests {
     #[test]
     fn reference_shift_is_not_mislabeled_as_process_shift() {
         let mut engine = engine();
-        let mut seq = 1;
-        for i in 0..3 {
+        for (seq, i) in (1..).zip(0..3) {
             let observation =
                 reference_observation(seq, &format!("ref-{i}"), "tool-a/ch-1", 10 + i, 5.0);
             let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
-            seq += 1;
             if i == 2 {
                 assert_eq!(
                     assessment.diagnostic_state,
@@ -1392,12 +1383,10 @@ mod tests {
     #[test]
     fn sensor_shift_takes_precedence_over_unattributed_process_shift() {
         let mut engine = engine();
-        let mut seq = 1;
-        for i in 0..3 {
+        for (seq, i) in (1..).zip(0..3) {
             let sensor =
                 sensor_observation(seq, &format!("sensor-{i}"), "tool-a/ch-1", 10 + i, 5.0);
             let assessment = observe_evidence_shift_v1(&mut engine, &sensor).unwrap();
-            seq += 1;
             if i == 2 {
                 assert_eq!(
                     assessment.diagnostic_state,
