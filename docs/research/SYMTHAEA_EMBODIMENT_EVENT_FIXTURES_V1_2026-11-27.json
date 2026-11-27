@@ -161,6 +161,30 @@
         "epistemic_status": "measured",
         "privacy_class": "public"
       }
+    },
+    {
+      "case": "pause_with_action_specific_extra_field",
+      "expected": "schema_reject",
+      "event": {
+        "schema": "symthaea.embodiment-event.v1",
+        "session_id": "demo-session-001",
+        "clock_domain_id": "clock:demo-process-epoch-1",
+        "event_id": "invalid-control-001",
+        "sequence": 6,
+        "observed_at_monotonic_ns": "1600000",
+        "expires_at_monotonic_ns": "3600000",
+        "event_kind": "user.control",
+        "payload": {
+          "action": "pause",
+          "form_id": "living_constellation"
+        },
+        "source": {
+          "component": "symthaea-ui",
+          "instance_id": "ui-01"
+        },
+        "epistemic_status": "measured",
+        "privacy_class": "public"
+      }
     }
   ],
   "semantic_validator_rejection_examples": [
