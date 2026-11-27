@@ -354,6 +354,22 @@ mod tests {
     }
 
     #[test]
+    fn passive_single_channel_cannot_label_process_vs_sensor_rate() {
+        // The two models swap lambda and mu. Adjusting the unknown latent
+        // process variance preserves q = mu*variance/(lambda+mu), while the
+        // normalized autocovariance factor is symmetric in the two rates.
+        let physical_slow = FirstOrderResponseOu::new(0.25, 9.0, 0.25).unwrap();
+        let sensor_slow = FirstOrderResponseOu::new(4.0, 144.0, 4.0).unwrap();
+        for elapsed in [0.0, 0.01, 0.1, 0.5, 1.0, 4.0, 10.0] {
+            close(
+                physical_slow.sensor_autocovariance_convolution(elapsed).unwrap(),
+                sensor_slow.sensor_autocovariance_convolution(elapsed).unwrap(),
+                2.0e-14,
+            );
+        }
+    }
+
+    #[test]
     fn direct_convolution_matches_state_space_across_rate_orderings() {
         let cases = [
             (1.0, 3.0, 0.5, 0.0),
