@@ -194,3 +194,26 @@ Targets are not measured results. No specific stop-latency threshold should be d
 ## 10. Qualification status
 
 This document is a protocol proposal. No Wayland, Vulkan, DXGI, compositor, display, driver, or hardware integration has been implemented or tested. The existing Bevy acknowledgement remains ECS acceptance only. The observer must not be presented as implemented until the backend feedback is collected, correlated, fault-injected, and tested on a named runtime.
+
+
+## 12. Source implementation increment (2026-11-27)
+
+A renderer-neutral Wayland feedback correlation ledger now exists at:
+
+`crates/domains/symthaea-soma/src/embodiment_presentation_feedback.rs`
+
+It:
+- binds one feedback request to session, event, cue digest, grant, policy version, surface, frame, backend commit and compositor clock;
+- accepts exactly one Presented or Discarded terminal result for a registered request;
+- rejects mismatched surface/frame/clock identities and presentation timestamps earlier than the submission sample;
+- preserves output ID, refresh interval, sequence counter and raw protocol flags, including unknown future bits;
+- creates `OutputObservation(Compositor, Started)` only for a Presented result;
+- creates no observation for Discarded and never emits Stopped;
+- bounds outstanding requests and completed records;
+- permits a host to record OutcomeUnknown while leaving a request pending for delayed feedback resolution.
+
+The receipt ledger now rejects `AdapterCallback` as evidence for both Observed and Stopped. Compositor and external-observer sources remain distinct from adapter submission acknowledgements.
+
+Ten observer regression tests and one additional receipt-source regression test are authored, not compiled or executed. The Wayland protocol adapter, protocol capability discovery, real compositor callback, separate observer process, receipt persistence, and named-device runtime qualification are not implemented yet.
+
+The observer proves a compositor-reported presentation event, not that a human looked at or understood the frame. This increment intentionally does not claim that presentation of a later frame proves the earlier frame has stopped; Stopped remains a separately qualified evidence requirement.
