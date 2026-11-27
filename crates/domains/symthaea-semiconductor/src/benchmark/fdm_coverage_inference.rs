@@ -194,6 +194,10 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn expected_absolute_error_score_definition_sha256() -> String {
+    sha256_hex(b"abs(qualified_corrected_value - frozen_prediction_receipt.prediction_value)")
+}
+
 fn require_text(value: &str, field: &str) -> Result<(), FdmCoverageErrorV1> {
     if value.trim().is_empty() {
         return Err(FdmCoverageErrorV1(format!("{field}: expected non-empty text")));
@@ -522,6 +526,11 @@ fn validate_adjacent_stream(
             "FDM assumption evidence references a different predictor artifact".into(),
         ));
     }
+    if assumptions.score_definition_sha256 != expected_absolute_error_score_definition_sha256() {
+        return Err(FdmCoverageErrorV1(
+            "FDM score definition is not the paper's fixed absolute-residual score".into(),
+        ));
+    }
 
     let calibration_scores = all_scores[..calibration_rows.len()].to_vec();
     let test_scores = all_scores[calibration_rows.len()..].to_vec();
@@ -758,7 +767,7 @@ mod tests {
             evidence_id: "stationary-fixed-vm-process-v1".into(),
             source_process_model_sha256: digest('a'),
             predictor_artifact_sha256: digest('b'),
-            score_definition_sha256: digest('c'),
+            score_definition_sha256: expected_absolute_error_score_definition_sha256(),
             assumption_evidence_sha256: digest('d'),
             stationary_causal_innovation_representation_declared: true,
             iid_innovations_declared: true,
