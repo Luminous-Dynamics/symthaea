@@ -19,6 +19,7 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Validation Studies](#validation-studies) | Empirical validation approaches |
 | [Publications](#publications) | Papers and manuscripts |
 | [Research Roadmap](#research-roadmap) | Future research directions |
+| [Evidence-Qualified Capability Benchmark v0.1](EVIDENCE_QUALIFIED_CAPABILITY_BENCHMARK_V0_1.md) | Non-compensatory capability, authority, provenance, replay and failure-containment benchmark |
 
 ---
 
