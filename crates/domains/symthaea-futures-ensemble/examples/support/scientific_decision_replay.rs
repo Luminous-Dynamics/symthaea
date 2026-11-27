@@ -489,11 +489,12 @@ impl EvaluatorResolution {
                     || self.action_support != ActionSupport::NoRecordedAction
                     || self.recorded_action_id.is_some()
                     || self.recorded_action_payload_digest.is_some()
+                    || self.execution_receipt_ref.is_some()
                     || self.outcome_label.is_some()
                     || !self.evaluator_evidence.is_empty()
                 {
                     return Err(
-                        "unsupported counterfactual cannot carry execution or fabricated outcome"
+                        "unsupported counterfactual cannot carry execution receipt or fabricated outcome"
                             .into(),
                     );
                 }
@@ -502,10 +503,11 @@ impl EvaluatorResolution {
                 if self.action_support != ActionSupport::NoRecordedAction
                     || self.recorded_action_id.is_some()
                     || self.recorded_action_payload_digest.is_some()
+                    || self.execution_receipt_ref.is_some()
                     || self.outcome_label.is_some()
                     || !self.evaluator_evidence.is_empty()
                 {
-                    return Err("not-run cannot carry recorded action or outcome".into());
+                    return Err("not-run cannot carry action, execution receipt or outcome".into());
                 }
             }
             OutcomeStatus::InvalidExecution => {
@@ -516,9 +518,11 @@ impl EvaluatorResolution {
                     self.require_action(&p.selected_action_id, &p.selected_action_payload_digest)?;
                 } else if self.recorded_action_id.is_some()
                     || self.recorded_action_payload_digest.is_some()
+                    || self.execution_receipt_ref.is_some()
                 {
                     return Err(
-                        "unrecorded action cannot have an action ID or payload digest".into(),
+                        "unrecorded action cannot have an action ID, payload digest or receipt"
+                            .into(),
                     );
                 }
             }
@@ -838,6 +842,29 @@ mod tests {
             r.validate_against(&c, &p)
                 .unwrap_err()
                 .contains("upstream execution receipt reference")
+        );
+    }
+
+    #[test]
+    fn not_run_and_unsupported_states_cannot_carry_execution_receipts() {
+        let c = context();
+        let p = proposal(&c);
+        let mut r = resolution(&c);
+        r.execution_status = ExecutionStatus::NotStarted;
+        r.outcome_status = OutcomeStatus::NotRun;
+        r.action_support = ActionSupport::NoRecordedAction;
+        r.recorded_action_id = None;
+        r.recorded_action_payload_digest = None;
+        assert!(r.validate_against(&c, &p).is_err());
+        r.execution_receipt_ref = None;
+        assert!(r.validate_against(&c, &p).is_ok());
+
+        r.outcome_status = OutcomeStatus::UnsupportedCounterfactual;
+        r.execution_receipt_ref = Some("lab-job-that-was-never-created".into());
+        assert!(
+            r.validate_against(&c, &p)
+                .unwrap_err()
+                .contains("execution receipt")
         );
     }
 
