@@ -58,6 +58,9 @@ mod compatibility_tests {
         .with_confidence(0.91);
         let value = serde_json::to_value(outcome).expect("outcome serializes");
         assert!(value["was_correct"].is_null());
-        assert_eq!(value["predicted_confidence"], 0.91);
+        let serialized_confidence = value["predicted_confidence"]
+            .as_f64()
+            .expect("confidence serializes as a JSON number");
+        assert!((serialized_confidence - 0.91).abs() < 1e-6);
     }
 }
