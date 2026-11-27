@@ -20,6 +20,7 @@ pub mod mon005_record_adapter;
 pub mod mace_context_exposure_receipt;
 pub mod mace_context_exposure_capture;
 pub mod durable_service;
+pub mod redb_store;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
