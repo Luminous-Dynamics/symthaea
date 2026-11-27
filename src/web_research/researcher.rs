@@ -897,7 +897,6 @@ impl WebResearcher {
                                 }
                             }
                         }
-    
                         if let Some(reason) = read_error {
                             let mut receipt = make_receipt(
                                 query_rank,
