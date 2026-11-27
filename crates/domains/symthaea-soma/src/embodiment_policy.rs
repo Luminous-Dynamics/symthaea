@@ -50,6 +50,9 @@ pub enum MotionMode {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConsentGrant {
+    /// Opaque unique identifier for this exact consent-grant version.
+    /// Refreshes must use a new ID; previously issued permits then become stale.
+    pub grant_id: String,
     pub session_id: String,
     pub clock_domain_id: String,
     pub channel: OutputChannel,
@@ -75,26 +78,49 @@ pub struct PresentationRequest {
 /// It carries source identity and epistemic metadata so the adapter can retain
 /// provenance. It is not a cryptographic receipt and is not authorization to
 /// perform physical actuation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PresentationPermit {
-    pub session_id: String,
-    pub clock_domain_id: String,
-    pub event_id: String,
-    pub issued_at_monotonic_ns: String,
-    /// Minimum of event expiry and grant expiry at decision time.
-    pub expires_at_monotonic_ns: String,
-    pub requested_intensity: f32,
-    pub sequence: u64,
-    pub event_kind: EventKind,
-    pub source: EventSource,
-    pub epistemic_status: EpistemicStatus,
-    pub privacy_class: PrivacyClass,
-    pub form: EmbodimentForm,
-    pub channel: OutputChannel,
-    pub destination: OutputDestination,
-    pub motion_mode: MotionMode,
-    pub effective_intensity: f32,
-    pub semantic_key: String,
+    // Opaque, process-local capability: downstream adapters may inspect via
+    // getters but cannot safely construct, mutate, or deserialize a permit.
+    session_id: String,
+    clock_domain_id: String,
+    event_id: String,
+    grant_id: String,
+    issued_at_monotonic_ns: String,
+    /// Minimum of event expiry and the exact grant expiry at decision time.
+    expires_at_monotonic_ns: String,
+    requested_intensity: f32,
+    sequence: u64,
+    event_kind: EventKind,
+    source: EventSource,
+    epistemic_status: EpistemicStatus,
+    privacy_class: PrivacyClass,
+    form: EmbodimentForm,
+    channel: OutputChannel,
+    destination: OutputDestination,
+    motion_mode: MotionMode,
+    effective_intensity: f32,
+    semantic_key: String,
+}
+
+impl PresentationPermit {
+    pub fn session_id(&self) -> &str { &self.session_id }
+    pub fn clock_domain_id(&self) -> &str { &self.clock_domain_id }
+    pub fn event_id(&self) -> &str { &self.event_id }
+    pub fn grant_id(&self) -> &str { &self.grant_id }
+    pub fn issued_at_monotonic_ns(&self) -> &str { &self.issued_at_monotonic_ns }
+    pub fn expires_at_monotonic_ns(&self) -> &str { &self.expires_at_monotonic_ns }
+    pub fn sequence(&self) -> u64 { self.sequence }
+    pub fn event_kind(&self) -> EventKind { self.event_kind }
+    pub fn source(&self) -> &EventSource { &self.source }
+    pub fn epistemic_status(&self) -> EpistemicStatus { self.epistemic_status }
+    pub fn privacy_class(&self) -> PrivacyClass { self.privacy_class }
+    pub fn form(&self) -> EmbodimentForm { self.form }
+    pub fn channel(&self) -> OutputChannel { self.channel }
+    pub fn destination(&self) -> OutputDestination { self.destination }
+    pub fn motion_mode(&self) -> MotionMode { self.motion_mode }
+    pub fn effective_intensity(&self) -> f32 { self.effective_intensity }
+    pub fn semantic_key(&self) -> &str { &self.semantic_key }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,6 +147,7 @@ pub enum DenialReason {
     EventExpired,
     NoMatchingGrant,
     GrantExpired,
+    GrantReplaced,
     PermitExpired,
     FormNotGranted,
     RestrictedPrivacy,
@@ -179,6 +206,7 @@ impl PresentationPolicy {
         if grant.clock_domain_id != self.clock_domain_id {
             return Err(PolicyError::ClockDomainMismatch);
         }
+        validate_identifier(&grant.grant_id)?;
         validate_identifier(&grant.session_id)?;
         validate_identifier(&grant.clock_domain_id)?;
 
@@ -313,6 +341,7 @@ impl PresentationPolicy {
             session_id: cue.session_id.clone(),
             clock_domain_id: cue.clock_domain_id.clone(),
             event_id: cue.event_id.clone(),
+            grant_id: grant.grant_id.clone(),
             issued_at_monotonic_ns: now_monotonic_ns.to_owned(),
             expires_at_monotonic_ns: event_expires.min(grant_expires).to_string(),
             requested_intensity: request.requested_intensity,
@@ -396,6 +425,9 @@ impl PresentationPolicy {
                 grant.channel == permit.channel && grant.destination == permit.destination
             })
             .ok_or(DenialReason::NoMatchingGrant)?;
+        if grant.grant_id != permit.grant_id {
+            return Err(DenialReason::GrantReplaced);
+        }
         if !grant.allowed_forms.contains(&permit.form) {
             return Err(DenialReason::FormNotGranted);
         }
@@ -500,6 +532,7 @@ mod tests {
         policy
             .grant(
                 ConsentGrant {
+                    grant_id: "grant-v1".to_owned(),
                     session_id: SESSION.to_owned(),
                     clock_domain_id: CLOCK.to_owned(),
                     channel,
@@ -545,10 +578,10 @@ mod tests {
                 CLOCK,
             )
             .unwrap();
-        assert_eq!(permit.effective_intensity, 0.5);
-        assert_eq!(permit.motion_mode, MotionMode::Static);
-        assert_eq!(permit.event_id, canonical.event_id);
-        assert_eq!(permit.semantic_key, canonical.semantic.semantic_key());
+        assert_eq!(permit.effective_intensity(), 0.5);
+        assert_eq!(permit.motion_mode(), MotionMode::Static);
+        assert_eq!(permit.event_id(), canonical.event_id);
+        assert_eq!(permit.semantic_key(), canonical.semantic.semantic_key());
     }
 
     #[test]
@@ -567,7 +600,7 @@ mod tests {
                 CLOCK,
             )
             .unwrap();
-        assert_eq!(permit.motion_mode, MotionMode::Dynamic);
+        assert_eq!(permit.motion_mode(), MotionMode::Dynamic);
     }
 
     #[test]
@@ -742,7 +775,7 @@ mod tests {
         assert_eq!(permit.motion_mode, MotionMode::Dynamic);
         policy.set_reduced_motion(true);
         let refreshed = policy.recheck_permit(&permit, "201", CLOCK).unwrap();
-        assert_eq!(refreshed.motion_mode, MotionMode::Static);
+        assert_eq!(refreshed.motion_mode(), MotionMode::Static);
     }
 
     #[test]
@@ -760,7 +793,7 @@ mod tests {
                 CLOCK,
             )
             .unwrap();
-        assert_eq!(permit.expires_at_monotonic_ns, "900");
+        assert_eq!(permit.expires_at_monotonic_ns(), "900");
         assert_eq!(
             policy.recheck_permit(&permit, "900", CLOCK),
             Err(DenialReason::PermitExpired)
@@ -768,9 +801,50 @@ mod tests {
     }
 
     #[test]
+    fn replacing_a_grant_invalidates_permits_issued_under_the_old_grant() {
+        let mut policy = policy_with_grant(
+            PrivacyClass::Public,
+            OutputChannel::Visual,
+            OutputDestination::LocalPrivate,
+        );
+        let permit = policy
+            .evaluate(
+                &cue(PrivacyClass::Public),
+                &request(OutputChannel::Visual, OutputDestination::LocalPrivate),
+                "200",
+                CLOCK,
+            )
+            .unwrap();
+        assert_eq!(permit.grant_id(), "grant-v1");
+
+        policy
+            .grant(
+                ConsentGrant {
+                    grant_id: "grant-v2".to_owned(),
+                    session_id: SESSION.to_owned(),
+                    clock_domain_id: CLOCK.to_owned(),
+                    channel: OutputChannel::Visual,
+                    destination: OutputDestination::LocalPrivate,
+                    allowed_forms: vec![EmbodimentForm::LivingConstellation],
+                    expires_at_monotonic_ns: "850".to_owned(),
+                    max_intensity: 0.25,
+                },
+                "201",
+                CLOCK,
+            )
+            .unwrap();
+
+        assert_eq!(
+            policy.recheck_permit(&permit, "202", CLOCK),
+            Err(DenialReason::GrantReplaced)
+        );
+    }
+
+    #[test]
     fn grant_cannot_be_installed_for_another_session_or_clock() {
         let mut policy = PresentationPolicy::new(SESSION, CLOCK).unwrap();
         let mut grant = ConsentGrant {
+            grant_id: "grant-other".to_owned(),
             session_id: "other-session".to_owned(),
             clock_domain_id: CLOCK.to_owned(),
             channel: OutputChannel::Visual,
@@ -801,6 +875,7 @@ mod tests {
         policy
             .grant(
                 ConsentGrant {
+                    grant_id: "grant-v2".to_owned(),
                     session_id: SESSION.to_owned(),
                     clock_domain_id: CLOCK.to_owned(),
                     channel: OutputChannel::Visual,
