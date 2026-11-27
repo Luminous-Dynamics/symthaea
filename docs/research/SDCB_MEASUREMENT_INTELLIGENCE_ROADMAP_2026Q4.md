@@ -282,3 +282,8 @@ The implementation is a bounded bivariate rank-aware method. Seventeen Rust test
 ## SDCB tournament preregistration — 27 November 2026
 
 A new cross-track protocol is now documented in docs/research/SDCB_NUMERICAL_AND_DECISION_TOURNAMENT_V1.md. It separates low-dimensional numerical truth, matched published Genz workloads, singular-PSD/dependence integrity, temporal metrology/calibration, adaptive scientific decision value, and end-to-end scientific-agent evaluation. It records exact comparator assumptions and QMC-budget normalization requirements, defines per-track baselines and reporting, and keeps all superiority thresholds as targets until independently run. It composes #13567, #13739, #13691, #13805, #13280 and #13924 rather than creating parallel planners, ledgers or online calibration engines.
+
+
+## Bivariate oracle evaluation-budget correction — 27 November 2026
+
+The bivariate reference now checks a hard one-million-call budget before every initial three-call batch and every recursive two-call batch, preventing batch overrun. The reported counter is explicitly named outer-integrand evaluations; it does not count the fixed 64-point scalar inner quadrature nodes and must not be described as total floating-point operations. Eighteen Rust tests are authored but remain uncompiled/unexecuted.
