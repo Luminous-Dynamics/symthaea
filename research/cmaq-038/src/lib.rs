@@ -567,6 +567,10 @@ mod tests {
         for calibration_count in [1, 18, 49, 99, 999] {
             let monitor = RankSpectrumMonitor::new(calibration_count, 1, 20).unwrap();
             assert!((monitor.mixture_weight_sum() - 1.0).abs() < 1e-12);
+            assert_eq!(
+                monitor.contrast_counts_by_resolution().iter().sum::<usize>(),
+                calibration_count
+            );
             assert!(monitor.log_mixture_wealth().unwrap().abs() < 1e-10);
         }
     }
@@ -589,6 +593,54 @@ mod tests {
             }
             assert!(expectation.abs() < 1e-12, "expectation={expectation}");
         }
+    }
+
+    #[test]
+    fn prefix_sum_payoffs_match_direct_full_grid_calculation() {
+        let mut monitor = RankSpectrumMonitor::new(18, 1, 20).unwrap();
+        for rank in [2, 4, 4, 9, 13, 19] {
+            assert!(matches!(
+                monitor.observe_rank(rank).unwrap(),
+                SpectrumUpdate::Accepted { .. }
+            ));
+        }
+
+        let next_t = monitor.observations_seen() + 1;
+        let total = (monitor.calibration_count() as u64 + next_t) as i128;
+        for contrast in monitor.contrasts() {
+            let weighted_code_sum: i128 = monitor
+                .rank_counts
+                .iter()
+                .enumerate()
+                .map(|(bucket, count)| {
+                    (i128::from(*count) + 1) * contrast.code_for_bucket(bucket)
+                })
+                .sum();
+
+            for rank in 1..=monitor.calibration_count() + 1 {
+                let observed_term = contrast.code_for_rank(rank) * total;
+                let expected = (observed_term - weighted_code_sum) as f64
+                    / (2.0 * total as f64);
+                let actual = monitor.test_payoff(contrast, rank, next_t).unwrap();
+                assert!(
+                    (actual - expected).abs() < 1e-12,
+                    "prefix-sum mismatch at rank {rank}: {actual} != {expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn rank_counter_overflow_does_not_mutate_monitor_state() {
+        let mut monitor = RankSpectrumMonitor::new(19, 1, 20).unwrap();
+        monitor.rank_counts[0] = u64::MAX;
+        let before = monitor.clone();
+
+        assert_eq!(
+            monitor.observe_rank(1),
+            Err(SpectrumError::CounterOverflow)
+        );
+        assert_eq!(monitor, before);
     }
 
     #[test]
