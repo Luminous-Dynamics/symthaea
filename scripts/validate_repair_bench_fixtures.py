@@ -132,8 +132,8 @@ def validate() -> None:
     # Independently verify the deterministic numerical event expectations.
     e01 = next(event for event in events if event["event_id"] == "E01")
     corrected_rows = rows(e01["mutation"]["new_artifact_bytes_utf8"])
-    corrected_mean = (round(float(corrected_rows[0]["temperature_C"])) +
-                      round(float(corrected_rows[1]["temperature_C"]))) / 2
+    corrected_mean = (int(float(corrected_rows[0]["temperature_C"])) +
+                      int(float(corrected_rows[1]["temperature_C"]))) / 2
     require(corrected_mean == 20.5 and corrected_mean > protocol["threshold_C"],
             "E01 does not cross the strict baseline threshold as intended")
 
