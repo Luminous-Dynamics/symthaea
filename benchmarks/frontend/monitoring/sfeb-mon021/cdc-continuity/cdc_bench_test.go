@@ -6,7 +6,7 @@ import (
 )
 func fixtureN(n int)(Profile,SlotState,Manifest){
 	cp:=LSN(0x1000);restart:=LSN(0x800);flush:=cp
-	p:=Profile{SystemIdentifier:"sys-bench",DatabaseOID:77,DatabaseName:"bench",SlotName:"bench_slot",OutputPlugin:"pgoutput",PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",SourceEpoch:"bench-epoch-1",TimelineID:1,ConsistentPoint:&cp,SnapshotName:"bench-snapshot",SnapshotDigest:"snapshot-digest"}
+	p:=Profile{ServerMajor:18,ConfiguredWALLevel:"logical",EffectiveWALLevel:"logical",SystemIdentifier:"sys-bench",DatabaseOID:77,DatabaseName:"bench",SlotName:"bench_slot",OutputPlugin:"pgoutput",PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",SourceEpoch:"bench-epoch-1",TimelineID:1,ConsistentPoint:&cp,SnapshotName:"bench-snapshot",SnapshotDigest:"snapshot-digest"}
 	s:=SlotState{SlotType:"logical",DatabaseOID:77,DatabaseName:"bench",SlotName:"bench_slot",OutputPlugin:"pgoutput",WALStatus:"reserved",RestartLSN:&restart,ConfirmedFlushLSN:&flush}
 	terminal:=cp+LSN(n)+0x10
 	m:=Manifest{SourceEpoch:p.SourceEpoch,TimelineID:1,SlotName:p.SlotName,DatabaseOID:p.DatabaseOID,PluginProfileDigest:p.PluginProfileDigest,SchemaProfileDigest:p.SchemaProfileDigest,StartExclusiveLSN:cp,TerminalLSN:terminal,SnapshotConsistentPoint:cp,SnapshotDigest:p.SnapshotDigest,Complete:true,EvidenceThroughLSN:terminal,AcknowledgementRequestedLSN:terminal,Witnessed:true,ManifestDigest:"bench-manifest"}
