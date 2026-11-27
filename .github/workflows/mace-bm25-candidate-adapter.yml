@@ -1,0 +1,58 @@
+name: MACE BM25 Candidate Fixture Adapter
+
+on:
+  push:
+    branches:
+      - research/mace-temporal-bm25-rrf-baseline-2026-11-27
+    paths:
+      - "research/mace-decision-sufficient-memory-bench-v0-1/baselines/adapter/**"
+      - "research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs"
+      - "research/mace-decision-sufficient-memory-bench-v0-1/baselines/raw-trajectory-baseline-v0.1.example.json"
+      - "research/mace-decision-sufficient-memory-bench-v0-1/baselines/raw-trajectory-candidate-v0.1.schema.json"
+      - ".github/workflows/mace-bm25-candidate-adapter.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/mace-decision-sufficient-memory-bench-v0-1/baselines/adapter/**"
+      - "research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs"
+      - "research/mace-decision-sufficient-memory-bench-v0-1/baselines/raw-trajectory-baseline-v0.1.example.json"
+      - "research/mace-decision-sufficient-memory-bench-v0-1/baselines/raw-trajectory-candidate-v0.1.schema.json"
+      - ".github/workflows/mace-bm25-candidate-adapter.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-adapter:
+    name: Rust 1.96 strict candidate JSON to BM25/RRF adapter
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+      - name: Format strict adapter and referenced baseline
+        run: cargo fmt --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/baselines/adapter/Cargo.toml -- --check
+      - name: Generate isolated adapter dependency lock
+        run: cargo generate-lockfile --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/baselines/adapter/Cargo.toml
+      - name: Upload isolated adapter Cargo.lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: mace-bm25-adapter-cargo-lock
+          path: research/mace-decision-sufficient-memory-bench-v0-1/baselines/adapter/Cargo.lock
+          if-no-files-found: error
+          retention-days: 30
+      - name: Run strict candidate adapter and baseline tests
+        run: cargo test --locked --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/baselines/adapter/Cargo.toml
+      - name: Strict Clippy for adapter and baseline
+        run: cargo clippy --locked --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/baselines/adapter/Cargo.toml --all-targets -- -D warnings
+      - name: Parse raw candidate fixture and matching JSON Schema
+        run: |
+          python3 -m json.tool research/mace-decision-sufficient-memory-bench-v0-1/baselines/raw-trajectory-baseline-v0.1.example.json >/dev/null
+          python3 -m json.tool research/mace-decision-sufficient-memory-bench-v0-1/baselines/raw-trajectory-candidate-v0.1.schema.json >/dev/null
