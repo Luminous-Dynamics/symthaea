@@ -39,6 +39,7 @@ pub enum AdapterError {
     EventIdentityMismatch,
     GrantIdentityMismatch,
     CueDigestMismatch,
+    FramePermitMismatch,
     FormMismatch,
     MotionModeMismatch,
     IntensityMismatch,
@@ -98,6 +99,13 @@ impl AuthorizedSceneSubmission {
             || authorization_receipt.canonical_cue_digest() != frame.canonical_cue_digest()
         {
             return Err(AdapterError::CueDigestMismatch);
+        }
+        if frame.sequence() != permit.sequence()
+            || frame.event_kind() != permit.event_kind()
+            || frame.semantic_key() != permit.semantic_key()
+            || frame.source() != permit.source()
+        {
+            return Err(AdapterError::FramePermitMismatch);
         }
         if frame.form() != permit.form() {
             return Err(AdapterError::FormMismatch);
