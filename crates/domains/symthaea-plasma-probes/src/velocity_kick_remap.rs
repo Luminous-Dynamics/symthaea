@@ -120,15 +120,15 @@ pub fn remap_distribution_after_velocity_kick(
         let mut mass_before = 0.0_f64;
         let mut mass_after = 0.0_f64;
 
-        for cell in 0..velocity_cells {
+        for (cell, &cell_average) in source.iter().enumerate() {
             let width = velocity_edges[cell + 1] - velocity_edges[cell];
-            mass_before += source[cell] * width;
+            mass_before += cell_average * width;
             if !mass_before.is_finite() {
                 return Err(VelocityKickRemapError::NonFiniteRemap);
             }
         }
 
-        for target_cell in 0..velocity_cells {
+        for (target_cell, output_cell) in output.iter_mut().enumerate() {
             let preimage_left = velocity_edges[target_cell] - shift;
             let preimage_right = velocity_edges[target_cell + 1] - shift;
             if !preimage_left.is_finite() || !preimage_right.is_finite() {
@@ -138,9 +138,9 @@ pub fn remap_distribution_after_velocity_kick(
             // Locate the source cell containing the left endpoint. If the
             // preimage starts outside the grid, begin at the first cell.
             let partition = velocity_edges.partition_point(|edge| *edge <= preimage_left);
-            let mut source_cell = partition.saturating_sub(1);
+            let source_start = partition.saturating_sub(1);
             let mut integral = 0.0_f64;
-            while source_cell < velocity_cells {
+            for (source_cell, &source_average) in source.iter().enumerate().skip(source_start) {
                 let source_left = velocity_edges[source_cell];
                 let source_right = velocity_edges[source_cell + 1];
                 if source_left >= preimage_right {
@@ -149,18 +149,17 @@ pub fn remap_distribution_after_velocity_kick(
                 let overlap_left = preimage_left.max(source_left);
                 let overlap_right = preimage_right.min(source_right);
                 let overlap = (overlap_right - overlap_left).max(0.0);
-                integral += source[source_cell] * overlap;
+                integral += source_average * overlap;
                 if !integral.is_finite() {
                     return Err(VelocityKickRemapError::NonFiniteRemap);
                 }
-                source_cell += 1;
             }
             let target_width = velocity_edges[target_cell + 1] - velocity_edges[target_cell];
             let average = integral / target_width;
             if !average.is_finite() || average < 0.0 {
                 return Err(VelocityKickRemapError::NonFiniteRemap);
             }
-            output[target_cell] = average;
+            *output_cell = average;
             mass_after += average * target_width;
             if !mass_after.is_finite() {
                 return Err(VelocityKickRemapError::NonFiniteRemap);
@@ -178,11 +177,11 @@ pub fn remap_distribution_after_velocity_kick(
         };
         let mut boundary_outflow = 0.0_f64;
         if let Some((out_left, out_right)) = outflow_interval {
-            for source_cell in 0..velocity_cells {
+            for (source_cell, &source_average) in source.iter().enumerate() {
                 let overlap_left = out_left.max(velocity_edges[source_cell]);
                 let overlap_right = out_right.min(velocity_edges[source_cell + 1]);
                 let overlap = (overlap_right - overlap_left).max(0.0);
-                boundary_outflow += source[source_cell] * overlap;
+                boundary_outflow += source_average * overlap;
                 if !boundary_outflow.is_finite() {
                     return Err(VelocityKickRemapError::NonFiniteRemap);
                 }
