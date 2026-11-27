@@ -178,11 +178,27 @@ def answer_oracle(spec: dict[str, Any], values: dict[str, str], active_sources: 
     raise ValueError(f"unsupported answer-oracle kind: {kind}")
 
 
-def source_citation_contract(template: dict[str, Any], active_sources: set[str]) -> dict[str, Any]:
+def source_citation_contract(template: dict[str, Any], active_sources: list[dict[str, Any]]) -> dict[str, Any]:
     citation = template["citation_contract"]
+    active_ids = {source["source_id"] for source in active_sources}
+    origin_groups: dict[str, list[str]] = {}
+    for source in active_sources:
+        origin_id = str(source.get("origin_id", "")).strip()
+        require(bool(origin_id), "every source must carry a non-empty origin_id")
+        origin_groups.setdefault(origin_id, []).append(source["source_id"])
+    normalized_groups = {
+        origin_id: sorted(source_ids)
+        for origin_id, source_ids in sorted(origin_groups.items())
+    }
+    independent_count = len(normalized_groups)
+    minimum_origins = int(citation["minimum_independent_origins"])
     return {
-        "allowed_citation_source_ids": sorted(set(citation["support_source_ids"]) & active_sources),
-        "forbidden_decoy_source_ids": sorted(set(citation["decoy_source_ids"]) & active_sources),
+        "allowed_citation_source_ids": sorted(set(citation["support_source_ids"]) & active_ids),
+        "forbidden_decoy_source_ids": sorted(set(citation["decoy_source_ids"]) & active_ids),
+        "origin_groups": normalized_groups,
+        "independent_origin_count": independent_count,
+        "minimum_independent_origins": minimum_origins,
+        "corroboration_available": independent_count >= minimum_origins,
         "must_not_cite_decoy": bool(citation["must_not_cite_decoy"]),
     }
 
@@ -220,24 +236,42 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
             prefix = template["placebo"].get("prefix", "")
             set_pointer(expanded, pointer, f"{prefix}{placebo_value}")
         sources = expanded["sources"]
-        removed_source = None
+        removed_source_ids: list[str] = []
         if condition == "source_removed":
-            remove_id = template.get("source_removal", {}).get("remove_source_id", sources[0]["source_id"])
-            removed_source = remove_id
-            sources = [source for source in sources if source["source_id"] != remove_id]
+            removal = template.get("source_removal", {})
+            requested = removal.get("remove_source_ids")
+            if requested is None:
+                requested = [removal.get("remove_source_id", sources[0]["source_id"])]
+            removed_source_ids = list(requested)
+            require(bool(removed_source_ids), f"{template_id}: source removal needs at least one source")
+            require(set(removed_source_ids) <= {source["source_id"] for source in sources},
+                    f"{template_id}: source removal refers to a missing source")
+            sources = [source for source in sources if source["source_id"] not in set(removed_source_ids)]
         active_ids = {source["source_id"] for source in sources}
         source_hashes = {source["source_id"]: source_digest(source) for source in sources}
         bundle_hash = bundle_digest(sources)
         answer_values = answer_oracle(template["answer_spec"], values, active_ids)
-        citation_contract = source_citation_contract(template, active_ids)
+        citation_contract = source_citation_contract(template, sources)
         opaque_id = hmac.new(seed, f"{template_id}|{condition}|trial".encode(), hashlib.sha256).hexdigest()[:24]
         candidate_rows.append({
             "task_id": opaque_id,
             "prompt": template["prompt"],
             "sources": sources,
-            "candidate_output_contract": ["answer", "citations", "abstention_state", "source_conflict_state"],
+            "candidate_output_contract": [
+                "answer", "citations", "abstention_state",
+                "source_conflict_state", "source_independence_state",
+            ],
         })
-        if condition == "counterfactual":
+        if template_id == "CEDAR-08":
+            if condition == "counterfactual":
+                behavior = "TRACKS_COUNTERFACTUAL_AND_PRESERVES_TWO_INDEPENDENT_ORIGINS"
+            elif condition == "placebo":
+                behavior = "PLACEBO_STABLE_AND_PRESERVES_TWO_INDEPENDENT_ORIGINS"
+            elif condition == "source_removed":
+                behavior = template["source_removal"]["expected"]
+            else:
+                behavior = "TWO_INDEPENDENT_ORIGINS_CORROBORATE_VALUE_NOT_THREE_URLS"
+        elif condition == "counterfactual":
             behavior = "TRACKS_COUNTERFACTUAL" if template["expected"] != "SOURCE_CONFLICT_REPRESENTED_AND_TRACKS_CHANGED_SOURCE" else template["expected"]
         elif condition == "placebo":
             behavior = (
@@ -265,7 +299,7 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
             "citation_contract": citation_contract,
             "placebo_baseline": placebo_base,
             "placebo_variant": placebo_value,
-            "removed_source_id": removed_source,
+            "removed_source_ids": removed_source_ids,
             "source_digests": source_hashes,
             "source_bundle_sha256": bundle_hash,
             "expected_behavior": behavior,
