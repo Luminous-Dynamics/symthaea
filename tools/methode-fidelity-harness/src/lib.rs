@@ -789,6 +789,7 @@ mod tests {
         r.components.push(ComponentUse {
             role: "lookup_oracle".into(),
             implementation_sha256: h('9'),
+            configuration_sha256: h('a'),
         });
         assert_eq!(disposition(&c, &r), Disposition::Unresolved);
     }
