@@ -131,3 +131,10 @@ The summary is an in-memory reference view. Production still requires:
 8. fault-injection tests across crash, partition, delayed revocation and concurrent update scenarios.
 
 No deployment or physical-erasure claim is made.
+
+
+## 9. Freshness verification against the current store
+
+An unkeyed self-digest is only an internal consistency check: anyone able to alter a summary can recalculate it. The projection index now also exposes `verify_metamemory_summary(ledger, summary)`. It first checks the summary's internal shape/commitment, then recomputes the expected value from the exact supplied ledger and projection-index instance and requires exact structure equality. This rejects a summary that is well-formed and internally self-consistent but no longer reflects the current ledger/index state.
+
+This still depends on the caller obtaining the authoritative current ledger and enforcing scope authorization. It is not a signature or proof against a malicious store implementation. Three additional tests check exact current acceptance, a valid-but-stale summary after a new event, and a self-resealed count forgery. Eight summary tests are now authored in total; the full projection module has twenty tests, not executed.
