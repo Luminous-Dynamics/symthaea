@@ -4,7 +4,7 @@ import "testing"
 func ptr(v LSN)*LSN{return &v}
 func base()(Profile,SlotState,Manifest){
 	cp:=LSN(0x100);restart:=LSN(0x80);flush:=LSN(0x100)
-	p:=Profile{SystemIdentifier:"sys-1",DatabaseOID:42,DatabaseName:"app",SlotName:"mon_slot",OutputPlugin:"pgoutput",PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",SourceEpoch:"epoch-1",TimelineID:1,ConsistentPoint:&cp,SnapshotName:"snap-1",SnapshotDigest:"snapshot-digest"}
+	p:=Profile{ServerMajor:18,ConfiguredWALLevel:"logical",EffectiveWALLevel:"logical",SystemIdentifier:"sys-1",DatabaseOID:42,DatabaseName:"app",SlotName:"mon_slot",OutputPlugin:"pgoutput",PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",SourceEpoch:"epoch-1",TimelineID:1,ConsistentPoint:&cp,SnapshotName:"snap-1",SnapshotDigest:"snapshot-digest"}
 	s:=SlotState{SlotType:"logical",DatabaseOID:42,DatabaseName:"app",SlotName:"mon_slot",OutputPlugin:"pgoutput",WALStatus:"reserved",RestartLSN:&restart,ConfirmedFlushLSN:&flush,SafeWALSize:ptrI(1<<30),CatalogXmin:"100",Xmin:"100"}
 	m:=Manifest{SourceEpoch:"epoch-1",TimelineID:1,SlotName:"mon_slot",DatabaseOID:42,PluginProfileDigest:"plugin-v1",SchemaProfileDigest:"schema-v1",StartExclusiveLSN:cp,TerminalLSN:0x140,SnapshotConsistentPoint:cp,SnapshotDigest:"snapshot-digest",Events:[]DecodedEvent{{ID:"e1",XID:"10",CommitLSN:0x110,Ordinal:1,PayloadDigest:"d1"},{ID:"e2",XID:"11",CommitLSN:0x130,Ordinal:1,PayloadDigest:"d2"}},Complete:true,EvidenceThroughLSN:0x140,AcknowledgementRequestedLSN:0x140,Witnessed:true,ManifestDigest:"manifest-digest"}
 	m.Transactions=[]Transaction{
@@ -73,3 +73,28 @@ func TestReplayAckAheadDenied(t *testing.T){_,_,m:=base();n:=m;n.TerminalLSN=0x1
 func TestReplayAcknowledgementExceedsEvidenceDenied(t *testing.T){_,_,m:=base();n:=m;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;n.AcknowledgementRequestedLSN=0x170;want(t,ValidateReplay(m,n),Denied)}
 func TestReplayTransactionConflictDivergent(t *testing.T){_,_,m:=base();n:=m;n.Transactions=append([]Transaction(nil),m.Transactions...);n.Transactions[0].CommitLSN++;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;want(t,ValidateReplay(m,n),Divergent)}
 func TestSlotTwoPhaseCaptureHolds(t *testing.T){p,s,m:=base();s.TwoPhase=true;want(t,ValidateCapture(p,s,m),Indeterminate)}
+
+func TestPostgreSQL19AutoEffectiveLogicalWithReplicaConfig(t *testing.T){
+	p,s,m:=base()
+	p.ServerMajor=19
+	p.ConfiguredWALLevel="replica"
+	p.EffectiveWALLevel="logical"
+	want(t,ValidateCapture(p,s,m),Qualified)
+}
+func TestPostgreSQL19RequiresEffectiveLogical(t *testing.T){
+	p,s,m:=base()
+	p.ServerMajor=19
+	p.ConfiguredWALLevel="replica"
+	p.EffectiveWALLevel="replica"
+	want(t,ValidateCapture(p,s,m),Denied)
+}
+func TestPostgreSQL18RequiresConfiguredLogical(t *testing.T){
+	p,s,m:=base()
+	p.ConfiguredWALLevel="replica"
+	want(t,ValidateCapture(p,s,m),Denied)
+}
+func TestUnsupportedPostgreSQLMajorIndeterminate(t *testing.T){
+	p,s,m:=base()
+	p.ServerMajor=17
+	want(t,ValidateCapture(p,s,m),Indeterminate)
+}
