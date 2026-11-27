@@ -15,7 +15,7 @@ This is a differentiation strategy, not evidence of superiority. Symthaea needs 
 
 | Reference | What it demonstrates | What it does not establish |
 |---|---|---|
-| NVIDIA VideoFDB v1.4 | Full-duplex audio-visual perception and generation scores, timing, 13 full-duplex and 3 cascaded entries | General intelligence, consent, privacy, accessibility, multi-form semantic invariance |
+| NVIDIA VideoFDB v1.4 | Full-duplex audio-visual perception and generation scores, timing, 10 full-duplex and 3 cascaded entries (13 total) | General intelligence, consent, privacy, accessibility, multi-form semantic invariance |
 | Tavus conversational-video stack | Integrated LLM, speech, perception, rendering and WebRTC pipeline; tools, memory and RAG product capabilities | Independent evidence that the stack preserves epistemic provenance or supports a renderer-independent semantic identity contract |
 | Epic MetaHuman | Real-time character animation from mono camera, supported mobile device or audio input in Unreal Engine 5.6+ | Full-duplex conversational cognition or event-level authority/consent semantics |
 | Anam latency benchmark | Client-measured full-pipeline response and connection latency across avatar vendors | Independent academic validation; results are vendor-published and provider defaults differ |
@@ -24,7 +24,7 @@ This is a differentiation strategy, not evidence of superiority. Symthaea needs 
 
 ### VideoFDB v1.4 — current full-duplex AV reference
 
-NVIDIA's leaderboard snapshot is dated November 25, 2026 and lists 13 full-duplex and 3 cascaded entries.
+NVIDIA's leaderboard snapshot is dated November 25, 2026 and lists 13 entries total: 10 full-duplex and 3 cascaded.
 
 Perception:
 - Tavus Griffin Lite is the leading listed full-duplex entry: 3.85/5 overall, 90.63% turn-onset-response alignment, 200 ms median latency.
@@ -48,13 +48,13 @@ Tavus advertises an integrated conversational-video system combining LLM, TTS, S
 
 Source: https://www.tavus.io/pricing
 
-Anam's vendor-published October 16, 2026 latency study reports a full-pipeline median response latency of 1.24 s and P95 of 1.84 s for Cara-4.1 Express, from 4,703 turns and 926 connections across 60 participants. It reports a 1.42 s median time to first frame. Its full-pipeline comparisons use provider defaults and include network time; treat these numbers as an operational reference, not an independent benchmark result or like-for-like model comparison.
+Anam's vendor-published October 16, 2026 latency study reports a full-pipeline response latency of 1.24 s median and 1.84 s P95 for Cara-4.1 Express, from 1,173 measured turns in that provider row; the wider study included 4,703 turns, 926 connections and 60 participants. Its time-to-first-frame was 1.42 s median and 2.97 s P95. A separate shared LiveKit pipeline table reports different response latencies (2.12 s median and 3.64 s P95 for Anam); do not mix that setup with the provider-default full-pipeline comparison. These are vendor-published operational references, not independent academic results.
 
 Source: https://anam.ai/tools/latency-benchmark
 
 ### InteractionBench — important voice-only complement
 
-The November 2, 2026 InteractionBench preprint tests 221 items per system over 13 scenarios and 1,519 graded runs. It measures conversational timing, spoken-task accuracy, whisper/volume control and long-conversation groundedness. In its tested set, the best dimension scores were 72% spoken-task accuracy, 86% timing, 75% whisper/volume control, and 88% groundedness; the best groundedness coherence score was 86/100. These are small benchmark-specific results, not universal vendor rankings.
+The November 2, 2026 InteractionBench study covers 13 scenarios and reports 1,519 graded runs across seven systems. It evaluates conversational timing, spoken-task accuracy, whisper/volume control and long-conversation groundedness separately. The three hosted systems and the turn-based cascade answered 34–38 of 50 spoken items (68–76%); the strongest client-clock timing score is 86% for GPT-Live, while the server-clock reconstruction is 56%. Gemini Live whispered on 8/10 explicit requests; only 2 of 35 whispered requests across all seven systems received a quieter reply. Hosted-system groundedness ranges from 67–88%. These are benchmark-specific observations, not universal provider rankings.
 
 The key methodological finding is that server-reported latency can be misleading: client-side timing included network delay, and a server-clock correction changed GPT-Live's timing aggregate from 86% to 56%. Symthaea should measure at the user's output device and preserve both source and client clocks.
 
