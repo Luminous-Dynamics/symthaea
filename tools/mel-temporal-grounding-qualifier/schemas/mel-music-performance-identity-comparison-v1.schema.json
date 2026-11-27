@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-music-performance-identity-comparison-v1.schema.json",
+  "title": "MEL paired source-work-clustered musical identity comparison v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "baseline",
+    "candidate",
+    "inference_policy"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-music-performance-identity-comparison-v1"
+    },
+    "baseline": {
+      "$ref": "mel-music-performance-identity-case-v1.schema.json"
+    },
+    "candidate": {
+      "$ref": "mel-music-performance-identity-case-v1.schema.json"
+    },
+    "inference_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_source_work_clusters",
+        "bootstrap_replicates",
+        "confidence_level",
+        "seed"
+      ],
+      "properties": {
+        "minimum_source_work_clusters": {
+          "type": "integer",
+          "minimum": 30
+        },
+        "bootstrap_replicates": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 100000
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0.8,
+          "exclusiveMaximum": 0.999
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709552000
+        }
+      }
+    }
+  }
+}
