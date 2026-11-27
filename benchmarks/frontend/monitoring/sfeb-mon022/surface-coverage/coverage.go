@@ -48,6 +48,9 @@ type Attestation struct {
 	TargetControlRoot string
 	ObserverID string
 	ObserverControlRoot string
+	ObserverIdentityDigest string
+	ObserverControlRootDigest string
+	ObserverVerified bool
 	ScopeDigest string
 	SourceStateDigest string
 	TargetStateDigest string
@@ -158,8 +161,11 @@ func Evaluate(req Request) Result {
 				return finish(Divergent,"source/target canonical state digest mismatch: "+spec.ID,r)
 			}
 			if a.Mode==IndependentComparison||a.Mode==RecomputedComparison {
-				if !nonempty(a.ObserverID,a.ObserverControlRoot)||a.ObserverControlRoot==req.SourceControlRoot||a.ObserverControlRoot==req.TargetControlRoot {
-					return finish(Indeterminate,"independent observer does not have a distinct verified control root: "+spec.ID,r)
+				if !nonempty(a.ObserverID,a.ObserverControlRoot,a.ObserverIdentityDigest,a.ObserverControlRootDigest) ||
+					a.ObserverID==req.SourceSystem || a.ObserverID==req.TargetSystem ||
+					a.ObserverControlRoot==req.SourceControlRoot || a.ObserverControlRoot==req.TargetControlRoot ||
+					!a.ObserverVerified {
+					return finish(Indeterminate,"independent observer identity and distinct control-root membership are not separately verified: "+spec.ID,r)
 				}
 			}
 			r.Covered++
