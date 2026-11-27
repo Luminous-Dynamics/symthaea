@@ -27,10 +27,10 @@ fn main() -> anyhow::Result<()> {
                 ));
             }
             "--observation" => {
-                observation = Some(PathBuf::from(
-                    args.next()
-                        .ok_or_else(|| anyhow::anyhow!("--observation requires a path"))?,
-                ));
+                observation =
+                    Some(PathBuf::from(args.next().ok_or_else(|| {
+                        anyhow::anyhow!("--observation requires a path")
+                    })?));
             }
             "--task-id" => {
                 task_id = Some(
@@ -60,9 +60,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     if let Some(observation_path) = observation {
-        let task_id = task_id.ok_or_else(|| {
-            anyhow::anyhow!("--observation requires --task-id")
-        })?;
+        let task_id = task_id.ok_or_else(|| anyhow::anyhow!("--observation requires --task-id"))?;
         // Never trust an adapter's comparison against an arbitrary or mutated
         // task definition. Re-validate the frozen corpus and all fixture
         // digests before selecting the task for system-observation grading.
@@ -72,9 +70,12 @@ fn main() -> anyhow::Result<()> {
         let task = corpus_value
             .get("tasks")
             .and_then(serde_json::Value::as_array)
-            .and_then(|tasks| tasks.iter().find(|task| {
-                task.get("task_id").and_then(serde_json::Value::as_str) == Some(task_id.as_str())
-            }))
+            .and_then(|tasks| {
+                tasks.iter().find(|task| {
+                    task.get("task_id").and_then(serde_json::Value::as_str)
+                        == Some(task_id.as_str())
+                })
+            })
             .ok_or_else(|| anyhow::anyhow!("task_id not found in frozen corpus: {task_id}"))?;
         let observation_path = if observation_path.is_absolute() {
             observation_path
@@ -96,7 +97,10 @@ fn main() -> anyhow::Result<()> {
                 fs::create_dir_all(parent)?;
             }
             fs::write(&output_path, &encoded)?;
-            println!("EQC qualification report written to {}", output_path.display());
+            println!(
+                "EQC qualification report written to {}",
+                output_path.display()
+            );
         } else {
             println!("{}", String::from_utf8(encoded)?);
         }
