@@ -12,6 +12,9 @@
 //! AR(1) path, using embargo gaps to expose residual dependence.
 
 const AR1_RHO: f64 = 0.95;
+const RHO_GRID: [f64; 6] = [0.0, 0.5, 0.8, 0.9, 0.95, 0.99];
+const BLOCK_LENGTH_GRID: [usize; 3] = [1, 8, 32];
+const EMBARGO_GRID: [usize; 3] = [0, 16, 64];
 const CALIBRATION_BLOCKS: usize = 39;
 const ALPHA: f64 = 0.10;
 const TRIALS: u64 = 5_000;
@@ -209,24 +212,36 @@ fn run_coverage_experiment(
 
 fn run_suite(trials: u64) -> Vec<CoverageReport> {
     let mut reports = Vec::new();
-    for block_len in [1, 8, 32] {
-        reports.push(run_coverage_experiment(
-            SamplingDesign::IndependentBlocks,
-            AR1_RHO,
-            block_len,
-            0,
-            trials,
-            0x5344_4342_0000_0000 ^ block_len as u64,
-        ));
-        for gap in [0, 16, 64] {
+    for rho in RHO_GRID {
+        // Preserve the original rho=0.95 seeds so the first 12-condition
+        // report remains an exact subset of the expanded grid.
+        let rho_seed = if rho == AR1_RHO {
+            0
+        } else {
+            rho.to_bits().rotate_left(17)
+        };
+        for block_len in BLOCK_LENGTH_GRID {
             reports.push(run_coverage_experiment(
-                SamplingDesign::OneSerialPath,
-                AR1_RHO,
+                SamplingDesign::IndependentBlocks,
+                rho,
                 block_len,
-                gap,
+                0,
                 trials,
-                0x5344_4342_1000_0000 ^ ((block_len as u64) << 16) ^ gap as u64,
+                0x5344_4342_0000_0000 ^ rho_seed ^ block_len as u64,
             ));
+            for gap in EMBARGO_GRID {
+                reports.push(run_coverage_experiment(
+                    SamplingDesign::OneSerialPath,
+                    rho,
+                    block_len,
+                    gap,
+                    trials,
+                    0x5344_4342_1000_0000
+                        ^ rho_seed
+                        ^ ((block_len as u64) << 16)
+                        ^ gap as u64,
+                ));
+            }
         }
     }
     reports
