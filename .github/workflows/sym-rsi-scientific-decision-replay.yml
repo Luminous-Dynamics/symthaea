@@ -10,6 +10,7 @@ on:
       - "crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs"
       - "crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs"
       - "crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs"
+      - "crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs"
       - "tools/sym-rsi-decision-replay-contract/**"
       - ".github/workflows/sym-rsi-scientific-decision-replay.yml"
   pull_request:
@@ -44,6 +45,7 @@ jobs:
             crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs \
             tools/sym-rsi-decision-replay-contract/src/lib.rs
       - name: Upload rustfmt preview
         if: always()
@@ -63,6 +65,7 @@ jobs:
             crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs \
             tools/sym-rsi-decision-replay-contract/src/lib.rs
       - name: Check formatting on committed sources
         run: |
