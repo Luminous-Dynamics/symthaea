@@ -454,15 +454,20 @@ fn restart_masses(start_time_one_based: u64) -> Result<(f64, f64), RestartError>
         return Err(RestartError::ArithmeticOverflow);
     }
     let time = start_time_one_based as f64;
-    let first_log = (time + 1.0).ln();
-    let second_log = (time + 2.0).ln();
-    let start_mass = LN_2 * (1.0 / first_log - 1.0 / second_log);
+    let first_time = time + 1.0;
+    let second_time = time + 2.0;
+    let first_log = first_time.ln();
+    let second_log = second_time.ln();
+    // Stable form of 1/ln(t+1) - 1/ln(t+2): subtracting the
+    // reciprocals directly rounds to zero for sufficiently large t.
+    let log_increment = (1.0 / first_time).ln_1p();
+    let start_mass = LN_2 * log_increment / (first_log * second_log);
     let residual_mass = LN_2 / second_log;
     if !start_mass.is_finite()
         || !residual_mass.is_finite()
         || start_mass <= 0.0
         || residual_mass <= 0.0
-        || (start_mass + residual_mass - LN_2 / first_log).abs() > 1e-10
+        || start_mass > residual_mass
     {
         return Err(RestartError::ArithmeticOverflow);
     }
@@ -618,6 +623,14 @@ mod tests {
             RestartedRankSpectrumMonitor::new(10, 1, 1).err(),
             Some(RestartError::InvalidMiscoverage)
         );
+    }
+
+    #[test]
+    fn restart_mass_remains_positive_at_the_u64_horizon_limit() {
+        let (start_mass, residual_mass) = restart_masses(u64::MAX).unwrap();
+        assert!(start_mass > 0.0);
+        assert!(residual_mass > 0.0);
+        assert!(start_mass < residual_mass);
     }
 
     #[test]
