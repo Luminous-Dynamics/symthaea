@@ -2,7 +2,7 @@
 
 mod eqc;
 
-use anyhow::{Context, bail};
+use anyhow::{bail, Context};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -36,9 +36,7 @@ fn main() -> anyhow::Result<()> {
         let flag = arg
             .into_string()
             .map_err(|_| anyhow::anyhow!("CLI flags must be valid UTF-8"))?;
-        let value = args
-            .next()
-            .context("each CLI flag requires a path value")?;
+        let value = args.next().context("each CLI flag requires a path value")?;
         match flag.as_str() {
             "--corpus" => corpus = PathBuf::from(value),
             "--out" => output = Some(PathBuf::from(value)),
