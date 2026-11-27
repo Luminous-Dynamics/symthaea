@@ -139,7 +139,7 @@ D_{(A,\phi)}(x^+,v^+)=
 \sin\theta&A\cos\theta
 \end{bmatrix}.
 \]
-It also reports the per-unit-mass kinetic-energy exchange \(\tfrac12[(v^+)^2-(v^-)^2]\). Because this is an external impulse, kinetic energy and momentum are not constrained to remain invariant across the pulse; their measured pre/post changes belong in the intervention-energy ledger.
+For a scheduled intervention time, the module also exposes the local reset-time sensitivity \(D R f^- + R_t - f^+\) using caller-supplied pre/post characteristic vector fields. A manufactured hybrid-trajectory test shifts the event time and checks the fixed-observation-time derivative after propagation through the post-event tangent. The K-RESP fixture still marks the full Vlasov trajectory time-shift cross-check as not computed; the local test is not a substitute for that solver-level validation. It also reports the per-unit-mass kinetic-energy exchange \(\tfrac12[(v^+)^2-(v^-)^2]\). Because this is an external impulse, kinetic energy and momentum are not constrained to remain invariant across the pulse; their measured pre/post changes belong in the intervention-energy ledger.
 
 Manufactured Rust tests cover the exact map, unit determinant / symplectic defect, amplitude and phase derivatives, central finite-difference cross-checks, periodic translation, energy exchange, the zero-amplitude boundary and fail-closed inputs. The external RBKR public-API smoke binary also imports and exercises this pulse-map API.
 
