@@ -35,6 +35,7 @@ For every prediction round, record:
 - selection mechanism: deterministic/adaptive or randomized with a known inclusion probability;
 - selection design digest and per-round probability when the design justifies it;
 - acquisition cost and event/measurement times;
+- full operational measurement-method identity;
 - operational measurement method identity.
 
 A deterministic or active policy must not attach a guessed statistical inclusion probability. The recorded selection probability is descriptive evidence and is not automatically applied as a population-risk weight.
@@ -109,6 +110,14 @@ The report distinguishes:
 
 The delay-contract digest is a declared contract, not proof of real fab latency. Complete controller state means the ledger rows satisfy the declared software constraints; it does not authenticate the physical source or prove the external delay distribution.
 
+## Bitemporal availability contract
+
+The ledger records three distinct clocks for a physically measured row: measurement time, label-availability time and K1-report-availability time. A controller-received outcome has a fourth timestamp. The order is enforced as:
+
+`physical event <= measurement <= label available <= K1 report available <= controller receipt`
+
+Prediction time must not precede the event, and controller receipt must not precede prediction. When a label is available but untracked, its physical/K1 evidence still remains in the offline population ledger; the controller receipt timestamp remains absent. This is how physical availability and online retention remain distinct.
+
 ## Frozen adversarial controls
 
 1. Not selected vs selected-pending vs measured-unqualified must produce distinct funnel counts.
@@ -125,8 +134,12 @@ The delay-contract digest is a declared contract, not proof of real fab latency.
 12. An audit method identical to the failed operational method is rejected.
 13. A selection propensity cannot be attached to a deterministic/adaptive rule.
 14. Row/input order permutations preserve the sealed report digest.
-15. The audit estimator can tighten a population interval only through its own independent design; it cannot rewrite K1 eligibility.
-16. No IPW product across selection, qualification, tracking and audit channels is emitted.
+15. The audit estimator can tighten a population interval only through its own independent design; it cannot rewrite K1 eligibility;
+16. no IPW product across selection, qualification, tracking and audit channels is emitted;
+17. physical label availability cannot predate measurement;
+18. K1 report availability cannot predate physical label availability;
+19. controller feedback receipt cannot predate prediction, label or K1 report;
+20. capacity overrun, declared-delay violation and incomplete closeout are reported as distinct assumption states.
 
 ## Benchmark targets (hypotheses)
 
@@ -150,6 +163,10 @@ The resulting benchmark is not another leaderboard score. It provides a common s
 - independent population audit designs.
 
 It extends the public research direction toward NIST's TIDAL manufacturing architecture, which explicitly treats metrology context, contextualized data, human-machine teaming, integration test benches and digital-twin VVUQ as interdependent parts of trustworthy manufacturing intelligence. <https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing>
+
+## Authored tests
+
+Nineteen unit tests exercise the four funnel stages, capacity denial, proxy nontracking, ACI/CA-OCRC separation, fixed-delay missingness, exact tracked receipt and occupancy, capacity overrun, delay-contract violation, K1 timing, audit-method independence, loss withholding and canonical replay. The exact-head formatter, Clippy, crate tests and SEMI-BENCH-001 reference oracle are still required.
 
 ## Claim ceiling
 
