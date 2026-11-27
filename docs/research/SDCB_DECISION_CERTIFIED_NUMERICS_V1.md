@@ -67,6 +67,31 @@ This low-dimensional enclosure path is a correctness reference, not the proposed
 - Preserve exact rank-zero and rank-one support handling; do not use diagonal jitter or eigenvalue flooring.
 - Explicitly reject unsupported ill-conditioned inputs rather than silently regularizing them.
 
+
+### 3.3 Preferred validated-integration reference: FLINT Acb
+
+The current FLINT 3.7.0-dev numerical-integration documentation (generated 25 November 2026) provides a substantially stronger route than hand-authoring a new interval integrator:
+
+- `acb_calc_integrate` returns a complex ball enclosure for a finite-path integral.
+- It combines direct ball enclosures on subintervals, Gauss–Legendre quadrature with rigorous remainder bounds derived from the maximum modulus on Bernstein ellipses, and adaptive subdivision.
+- Its remainder guarantee requires the callback to evaluate the integrand in ball arithmetic and establish analyticity on the relevant complex neighbourhood; if the callback cannot establish this, the evaluator must signal failure/non-analyticity so the interval can be subdivided or handled by a direct enclosure.
+- Evaluation/degree/depth limits return an explicit incomplete/non-converged status; a partial point estimate must not be labelled certified.
+- The documentation explicitly warns that quadrature-rule difference estimates can be fooled, which is exactly the limitation we must avoid with the #13951 Simpson refinement indicator.
+
+For the full-rank bivariate conditional integral, the real-axis integrand is built from the Gaussian density and normal-CDF interval mass. Since the Gaussian CDF is expressible using the entire error function, this has an entire complex continuation for fixed covariance parameters when the conditional standard deviation is positive. That makes the FLINT analytic-path approach a plausible direct fit for rank-two SPD fixtures. This analyticity assumption must be implemented and checked in the Acb callback, not simply asserted in a comment. Rank-one and rank-zero covariance stay on their existing exact support paths.
+
+The finite integration interval still requires a separately enclosed omitted-tail contribution. For a standard-normal first coordinate and K>0, a conservative two-sided Mills bound is
+
+[
+P(|Z|>K) le rac{2phi(K)}{K}.
+]
+
+Compute that bound in ball arithmetic and increase K until the tail contribution is below the requested probability-width budget. Do not hard-code K=12 as sufficient for every rare-tail target. This also makes the truncation budget decision-dependent without confusing it with the integration remainder.
+
+**Implementation recommendation:** first build a minimal standalone C reference that calls FLINT `acb_calc_integrate` for the bivariate integrand, with Acb special-function evaluation and an explicit ball tail bound. Freeze its version and build configuration. Then call it independently from the Rust #13951 implementation for cross-validation. Only consider a production Rust/FFI dependency after measuring interface complexity, portability, performance, licence/build implications, and the value of a second independent implementation. A second validated method (for example a direct interval-panel or Taylor/Cauchy-bound implementation) should be kept as a cross-check rather than assuming one library is infallible.
+
+FLINT's documentation describes the method and its assumptions: https://flintlib.org/doc/algorithms/ball-arithmetic/integration.html. FLINT integrates Arb/Acb ball arithmetic; the old standalone Arb documentation states that Arb was merged into FLINT in 2023.
+
 ### 3.2 Independent reference strategy
 
 Use two distinct paths:
