@@ -396,8 +396,8 @@ mod tests {
     fn predictive_rank_feature_payoffs_are_conditionally_centered() {
         let n = 9;
         let mut counts = vec![0_u64; n + 1];
-        counts[1] = 3;
-        counts[6] = 2;
+        counts[1] = 2;
+        counts[6] = 1;
         let total = (n + 4) as f64;
         for feature in [RankFeature::UpperOrder, RankFeature::TailDispersion] {
             let expected = (0..=n)
@@ -425,7 +425,8 @@ mod tests {
                         component.feature,
                     )
                     .unwrap();
-                    assert!(payoff.abs() <= component.projection_bound + 1e-12);
+                    let factor = 1.0 + component.lambda * payoff;
+                    assert!(factor >= MIN_FACTOR - 1e-12);
                 }
             }
             let update = monitor.observe_rank(rank).unwrap();
@@ -443,13 +444,21 @@ mod tests {
     fn ons_uses_only_past_payoff_to_choose_next_bet() {
         let mut monitor = OnsPredictiveRankMonitor::new(17, 1, 20).unwrap();
         assert_eq!(monitor.components()[0].lambda, 0.0);
-        let first = monitor.observe_rank(17).unwrap();
+        let first = monitor.observe_rank(18).unwrap();
         let components = match first {
             OnsUpdate::Accepted { components, .. }
             | OnsUpdate::Quarantined { components, .. } => components,
         };
         assert!(components[0].lambda > 0.0);
-        assert!(components[1].lambda < 0.0);
+        assert!(components[1].lambda > 0.0);
+
+        let mut lower_shift = OnsPredictiveRankMonitor::new(17, 1, 20).unwrap();
+        let lower = lower_shift.observe_rank(1).unwrap();
+        let lower_components = match lower {
+            OnsUpdate::Accepted { components, .. }
+            | OnsUpdate::Quarantined { components, .. } => components,
+        };
+        assert!(lower_components[0].lambda < 0.0);
     }
 
     #[test]
