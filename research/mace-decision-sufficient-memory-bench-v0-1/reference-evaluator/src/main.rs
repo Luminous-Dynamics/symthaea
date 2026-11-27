@@ -526,7 +526,7 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
             "declared_no_memory_reference_gain": "Task-authored reference action loss minus this arm loss; this is not a separately executed no-memory agent arm.",
             "worse_than_declared_reference": "This arm loss exceeds the task-authored reference action loss; this is not a paired no-memory system comparison.",
             "admissible_evidence": "Current at query time and observed no later than the query, not superseded/retracted, not untrusted, and not evaluator-labelled forbidden.",
-            "decision_sufficient": "Minimum loss, all required evidence selected, and no invalid evidence selected.",
+            "decision_sufficient": "Minimum loss, all required evidence selected, no invalid evidence selected, and no co-retrieved contradiction pair; v0.1 has no explicit conflict-resolution receipt.",
             "cost": "Counters are candidate-reported. Latency is summarized only when supplied; this evaluator does not independently measure it."
         },
         "limitations": [
