@@ -9,6 +9,7 @@
 //! integration boundary rather than only testing module-internal functions.
 
 use symthaea_plasma_probes::{
+    pulse_map::{SinusoidalVelocityKick, check_pulse_jacobians_central_difference},
     EmpiricalGramian,
     rbkr::{
         FiniteHorizonGramianConfig, RbkrConfig, ResponseBalancedBasis,
@@ -19,6 +20,19 @@ use symthaea_plasma_probes::{
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let pulse = SinusoidalVelocityKick::new(
+        -std::f64::consts::PI,
+        2.0 * std::f64::consts::PI,
+        2,
+        0.012,
+        0.37,
+    )?;
+    let pulse_check =
+        check_pulse_jacobians_central_difference(&pulse, 0.23, -0.4, 1.0e-5)?;
+    assert!(pulse_check.state_jacobian_max_abs_error < 1.0e-8);
+    assert!(pulse_check.parameter_jacobian_max_abs_error < 1.0e-8);
+    assert!(pulse_check.symplectic_defect < 1.0e-14);
+
     let identity = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
     let input = vec![vec![1.0], vec![0.0]];
     let output = vec![vec![1.0, 0.0]];
