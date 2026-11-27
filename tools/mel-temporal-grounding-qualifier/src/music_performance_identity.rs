@@ -1170,9 +1170,18 @@ mod tests {
         assert!(audit_musical_performance_identity(&case(vec![item.clone()])).is_ok());
 
         let mut stay_prompt_drift = item.clone();
-        stay_prompt_drift.performance_stay.response.question.push(' ');
-        stay_prompt_drift.performance_stay.response.question_sha256 =
-            sha256_hex(stay_prompt_drift.performance_stay.response.question.as_bytes());
+        stay_prompt_drift
+            .performance_stay
+            .response
+            .question
+            .push(' ');
+        stay_prompt_drift.performance_stay.response.question_sha256 = sha256_hex(
+            stay_prompt_drift
+                .performance_stay
+                .response
+                .question
+                .as_bytes(),
+        );
         assert!(audit_musical_performance_identity(&case(vec![stay_prompt_drift])).is_err());
 
         let mut flip_prompt_drift = item;
