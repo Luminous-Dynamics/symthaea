@@ -291,13 +291,24 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 			}
 			if a.CollectedAt.IsZero() {
 				addIndeterminate("artifact_collection_time_missing")
-			} else if !m.CapturedAt.IsZero() && a.ClockUncertaintyNS >= 0 {
+			} else {
+				artifactUncertainty := time.Duration(a.ClockUncertaintyNS)
+				if !policy.Now.IsZero() && a.ClockUncertaintyNS >= 0 {
+					if a.CollectedAt.After(policy.Now.Add(artifactUncertainty)) {
+						addIndeterminate("artifact_collection_time_in_future")
+					}
+					if policy.MaxAge > 0 && policy.Now.Sub(a.CollectedAt) > policy.MaxAge+artifactUncertainty {
+						addIndeterminate("artifact_expired")
+					}
+				}
+				if !m.CapturedAt.IsZero() && a.ClockUncertaintyNS >= 0 {
 				combined := time.Duration(a.ClockUncertaintyNS)
 				if m.ClockUncertaintyNS > a.ClockUncertaintyNS {
 					combined = time.Duration(m.ClockUncertaintyNS)
 				}
-				if a.CollectedAt.After(m.CapturedAt.Add(combined)) {
-					addIndeterminate("artifact_collected_after_manifest_capture")
+					if a.CollectedAt.After(m.CapturedAt.Add(combined)) {
+						addIndeterminate("artifact_collected_after_manifest_capture")
+					}
 				}
 			}
 
