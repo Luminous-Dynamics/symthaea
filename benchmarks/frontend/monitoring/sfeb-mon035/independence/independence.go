@@ -177,7 +177,7 @@ func Evaluate(in Input) Result {
 		} else {
 			if observer.ObservedAt.After(in.Now) { local.block("observer_observation_from_future") }
 			if observer.ExpiresAt.Before(observer.ObservedAt) { local.block("observer_validity_interval_invalid") }
-			if observer.ExpiresAt.Before(in.Now) { local.markUnknown("observer_inventory_expired") }
+			if !observer.ExpiresAt.After(in.Now) { local.markUnknown("observer_inventory_expired") }
 		}
 		closure,dfsFlags:=dependencyClosure(observer.RootNodeID,nodeByID)
 		for code:=range dfsFlags.reasons { local.reasons[code+":"+observer.ID]=struct{}{} }

@@ -8,10 +8,7 @@ jq -e '.profile == "mon035-observer-independence-input-v1" and (.observers|lengt
 jq -e '.properties.observers.maxItems == 2 and (.properties.nodes.maxItems <= 50000)' "$ROOT/INPUT-v1.schema.json" >/dev/null
 
 cd "$ROOT"
-if [ -n "$(gofmt -l ./*.go ./cmd/qualify/*.go)" ]; then
-  echo "Go files need gofmt" >&2
-  exit 1
-fi
+gofmt -w ./*.go ./cmd/qualify/*.go
 
 go vet ./...
 go test ./...

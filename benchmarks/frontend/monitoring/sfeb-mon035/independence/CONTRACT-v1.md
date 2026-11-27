@@ -46,7 +46,7 @@ The evaluator never infers independence from different observer names alone.
 
 ## Adversarial tests
 
-The suite covers independent positive controls; shared identity-provider, control-plane, operator, time-source and signer domains; incomplete/missing dependencies; cycles; missing critical classes; invalid classes; duplicate roots; future/expired evidence; and resource-cap violations.
+The suite covers independent positive controls; shared operator, identity-provider, control-plane, compute-host, storage, network, time-source and signer domains; a transitive shared dependency; incomplete/missing dependencies; malformed and duplicate edges; cycles; missing critical classes; invalid identifiers/classes; duplicate roots; future/expired/exact-expiry-boundary evidence; and resource-cap violations.
 
 ## Benchmarks and prospective acceptance
 

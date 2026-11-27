@@ -191,3 +191,13 @@ func TestMalformedDependencyReferenceBlocks(t *testing.T) {
 		t.Fatalf("malformed dependency reference must block: %+v", got)
 	}
 }
+
+
+func TestExpiryBoundaryIsIndeterminate(t *testing.T) {
+	in := fixture()
+	in.Observers[0].ExpiresAt = fixtureTime
+	got := Evaluate(in)
+	if got.Verdict != Indeterminate {
+		t.Fatalf("inventory expiring exactly at evaluation time must be indeterminate: %+v", got)
+	}
+}
