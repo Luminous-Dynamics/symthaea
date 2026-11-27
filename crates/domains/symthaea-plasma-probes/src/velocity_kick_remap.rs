@@ -321,8 +321,8 @@ mod tests {
     #[test]
     fn multiple_spatial_rows_keep_independent_kick_ledgers() {
         let edges = uniform_edges(-2.0, 2.0, 32);
-        let row = vec![0.0, 0.25, 0.5, 0.75, 1.0, 0.75, 0.5, 0.25, 0.0];
-        let distribution = vec![row.clone(), row.clone()];
+        let row = vec![1.0; 32];
+        let distribution = vec![row.clone(), row];
         let report = remap_distribution_after_velocity_kick(
             &kick(0.03),
             &[0.0, std::f64::consts::PI],
