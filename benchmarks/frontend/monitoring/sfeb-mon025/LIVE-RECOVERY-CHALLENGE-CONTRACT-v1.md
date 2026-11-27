@@ -73,21 +73,21 @@ A run directory must contain:
 11. Dependency/application probe outcomes, write-probe rollback, old-primary fencing and stale-endpoint fencing results.
 12. Raw output hashes and a manifest index. Never normalize away the raw source evidence.
 
-The independent truth reader must not consume Debezium's reported event count as its expected answer. Expected IDs are derived directly from source fixture SQL and stored before the fault injection.
+The dedicated Debezium role has REPLICATION, CONNECT, schema USAGE and SELECT only on the published fixture table; it is not a superuser. The independent truth reader must not consume Debezium's reported event count as its expected answer. Expected IDs are derived directly from source fixture SQL and stored before the fault injection.
 
 ## 6. Execution protocol
 
 1. Create a fresh uniquely named Compose project and isolated volumes.
-2. Run preflight and record all image digests before starting the lab.
+2. Run preflight and record all resolved image IDs and repository digests before starting the lab.
 3. Start the selected PostgreSQL source, Kafka and Connect services.
 4. Verify PostgreSQL settings, system identifier, slot/publication and source boundary.
-5. Capture pre-workload SQL manifest; register the connector; wait for initial snapshot completion.
+5. Capture pre-workload SQL manifest; provision a dedicated least-privilege replication role, register the connector, and independently verify initial snapshot completion.
 6. Create a deterministic transaction batch and capture expected IDs directly from PostgreSQL.
 7. Execute one fault at a time from the fault matrix. Record injection time and exact command outcome.
 8. Recover connector/broker/database as required. Read Kafka independently and reconcile exact IDs and payload digests.
 9. Capture source state manifest at a known recovery boundary.
 10. Create physical base backup and ensure archive coverage for the required WAL interval.
-11. Restore into a separate volume at a specified target time; keep the restored service isolated.
+11. Capture a repeatable-read state manifest with its LSN, timeline, system identifier and wall-clock observation; restore into a separate volume at that LSN and pinned timeline; keep the restored service isolated.
 12. Verify actual target position, source identity, timeline, catalogs and per-surface digests.
 13. Run read probe, transactional write/readback and rollback; test dependencies and application invariants.
 14. Verify old primary and stale endpoints are fenced. Only a separately authorized controller may activate traffic after proof is independently accepted.
@@ -115,7 +115,7 @@ Never inject faults into a production system or a shared developer database.
 
 ## 8. Restore semantics
 
-The native restore lane uses `pg_basebackup` plus PostgreSQL WAL archive and point-in-time recovery. The restore target receives a distinct volume and loopback-only endpoint. Recovery uses a caller-specified target timestamp and pauses at that target. The operator must verify the actual recovery timeline and position; a server reaching a paused recovery state is not by itself service-ready.
+The native restore lane uses `pg_basebackup` plus PostgreSQL WAL archive and point-in-time recovery. The restore target receives a distinct volume and loopback-only endpoint. Recovery uses a caller-specified LSN and pinned numeric timeline and pauses at the target. `pg_verifybackup` checks the base-backup manifest and embedded WAL; an archive-seal observation is recorded separately, while the restore itself must prove the complete required WAL range was available. The operator records requested and observed replay LSN/timeline; a server reaching a paused recovery state is not by itself service-ready.
 
 pgBackRest is a separately version-pinned comparator. Its archive-check, backup manifest, verify, restore and recovery target evidence should be normalized into the same run model. The local and remote pgBackRest versions must match exactly.
 
