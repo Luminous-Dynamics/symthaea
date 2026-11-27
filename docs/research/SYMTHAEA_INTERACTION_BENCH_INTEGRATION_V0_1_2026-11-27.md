@@ -129,7 +129,7 @@ The JSON Schema checks event shape. A separate trace verifier must check relatio
 1. duplicate or regressing event sequence numbers within a session/clock stream;
 2. regressing monotonic event timestamps, or chunk arrival earlier than its recorded source timestamp;
 3. turn decisions emitted after their deadline, backdated, or duplicated for one candidate;
-4. presentation without a preceding matching authorization for the same session, event digest, grant, channel, destination and form;
+4. presentation without a preceding matching authorization for the same session, semantic event, digest, grant, channel, destination and form; compare the source-clock sample against the authorized effective expiry;
 5. actions without a preceding authorization sequence and action-specific authority;
 6. visible frames at or after grant/event effective expiry, following revocation, or following a stop/cancel observation;
 7. an event ID reused with a different canonical cue digest;

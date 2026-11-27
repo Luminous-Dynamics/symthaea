@@ -54,7 +54,9 @@
           "channel": "visual",
           "destination": "local_private",
           "expires_at_monotonic_ns": 1000,
-          "policy_version": 3
+          "policy_version": 3,
+          "semantic_event_id": "event:1",
+          "form": "living_constellation"
         },
         {
           "sequence": 3,
@@ -70,7 +72,10 @@
           "stage": "adapter_submitted",
           "frame_index": null,
           "effective_intensity": 0.4,
-          "observed_by": null
+          "observed_by": null,
+          "destination": "local_private",
+          "source_clock_domain_id": "clock:synthetic-1",
+          "source_now_monotonic_ns": 125
         },
         {
           "sequence": 4,
@@ -86,7 +91,10 @@
           "stage": "frame_presented",
           "frame_index": 1,
           "effective_intensity": 0.4,
-          "observed_by": "compositor-observer:test"
+          "observed_by": "compositor-observer:test",
+          "destination": "local_private",
+          "source_clock_domain_id": "clock:synthetic-1",
+          "source_now_monotonic_ns": 130
         },
         {
           "sequence": 5,
@@ -110,7 +118,9 @@
           "channel": "visual",
           "destination": "local_private",
           "expires_at_monotonic_ns": null,
-          "policy_version": 4
+          "policy_version": 4,
+          "semantic_event_id": "event:1",
+          "form": "living_constellation"
         },
         {
           "sequence": 7,
@@ -126,7 +136,10 @@
           "stage": "output_stopped",
           "frame_index": 2,
           "effective_intensity": 0,
-          "observed_by": "compositor-observer:test"
+          "observed_by": "compositor-observer:test",
+          "destination": "local_private",
+          "source_clock_domain_id": "clock:synthetic-1",
+          "source_now_monotonic_ns": 150
         }
       ],
       "declared_outcome": {
@@ -194,7 +207,9 @@
             "channel": "visual",
             "destination": "local_private",
             "expires_at_monotonic_ns": 1000,
-            "policy_version": 3
+            "policy_version": 3,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation"
           },
           {
             "sequence": 3,
@@ -210,7 +225,10 @@
             "stage": "adapter_submitted",
             "frame_index": null,
             "effective_intensity": 0.4,
-            "observed_by": null
+            "observed_by": null,
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 125
           },
           {
             "sequence": 3,
@@ -226,7 +244,10 @@
             "stage": "frame_presented",
             "frame_index": 1,
             "effective_intensity": 0.4,
-            "observed_by": "compositor-observer:test"
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 130
           },
           {
             "sequence": 5,
@@ -250,7 +271,9 @@
             "channel": "visual",
             "destination": "local_private",
             "expires_at_monotonic_ns": null,
-            "policy_version": 4
+            "policy_version": 4,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation"
           },
           {
             "sequence": 7,
@@ -266,7 +289,10 @@
             "stage": "output_stopped",
             "frame_index": 2,
             "effective_intensity": 0,
-            "observed_by": "compositor-observer:test"
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 150
           }
         ],
         "declared_outcome": {
@@ -333,7 +359,9 @@
             "channel": "visual",
             "destination": "local_private",
             "expires_at_monotonic_ns": 1000,
-            "policy_version": 3
+            "policy_version": 3,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation"
           },
           {
             "sequence": 3,
@@ -349,7 +377,10 @@
             "stage": "adapter_submitted",
             "frame_index": null,
             "effective_intensity": 0.4,
-            "observed_by": null
+            "observed_by": null,
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 125
           },
           {
             "sequence": 4,
@@ -365,7 +396,10 @@
             "stage": "frame_presented",
             "frame_index": 1,
             "effective_intensity": 0.4,
-            "observed_by": "compositor-observer:test"
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 130
           },
           {
             "sequence": 5,
@@ -389,7 +423,9 @@
             "channel": "visual",
             "destination": "local_private",
             "expires_at_monotonic_ns": null,
-            "policy_version": 4
+            "policy_version": 4,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation"
           },
           {
             "sequence": 7,
@@ -405,7 +441,10 @@
             "stage": "output_stopped",
             "frame_index": 2,
             "effective_intensity": 0,
-            "observed_by": "compositor-observer:test"
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 150
           },
           {
             "sequence": 8,
@@ -421,7 +460,10 @@
             "stage": "frame_presented",
             "frame_index": 3,
             "effective_intensity": 0.4,
-            "observed_by": "compositor-observer:test"
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 155
           }
         ],
         "declared_outcome": {
@@ -488,7 +530,9 @@
             "channel": "visual",
             "destination": "local_private",
             "expires_at_monotonic_ns": 1000,
-            "policy_version": 3
+            "policy_version": 3,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation"
           },
           {
             "sequence": 3,
@@ -504,7 +548,10 @@
             "stage": "adapter_submitted",
             "frame_index": null,
             "effective_intensity": 0.4,
-            "observed_by": null
+            "observed_by": null,
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 125
           },
           {
             "sequence": 4,
@@ -520,7 +567,10 @@
             "stage": "frame_presented",
             "frame_index": 1,
             "effective_intensity": 0.4,
-            "observed_by": "compositor-observer:test"
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 130
           },
           {
             "sequence": 5,
@@ -544,7 +594,9 @@
             "channel": "visual",
             "destination": "local_private",
             "expires_at_monotonic_ns": null,
-            "policy_version": 4
+            "policy_version": 4,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation"
           },
           {
             "sequence": 7,
@@ -560,7 +612,10 @@
             "stage": "output_stopped",
             "frame_index": 2,
             "effective_intensity": 0,
-            "observed_by": "compositor-observer:test"
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 150
           }
         ],
         "declared_outcome": {
@@ -629,7 +684,10 @@
             "stage": "adapter_submitted",
             "frame_index": null,
             "effective_intensity": 0.4,
-            "observed_by": null
+            "observed_by": null,
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 125
           },
           {
             "sequence": 4,
@@ -645,7 +703,10 @@
             "stage": "frame_presented",
             "frame_index": 1,
             "effective_intensity": 0.4,
-            "observed_by": "compositor-observer:test"
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 130
           },
           {
             "sequence": 5,
@@ -669,7 +730,9 @@
             "channel": "visual",
             "destination": "local_private",
             "expires_at_monotonic_ns": null,
-            "policy_version": 4
+            "policy_version": 4,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation"
           },
           {
             "sequence": 7,
@@ -685,7 +748,10 @@
             "stage": "output_stopped",
             "frame_index": 2,
             "effective_intensity": 0,
-            "observed_by": "compositor-observer:test"
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 150
           }
         ],
         "declared_outcome": {

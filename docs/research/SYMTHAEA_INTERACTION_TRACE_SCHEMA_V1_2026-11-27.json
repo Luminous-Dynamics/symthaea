@@ -420,6 +420,21 @@
             "policy_version": {
               "type": "integer",
               "minimum": 0
+            },
+            "semantic_event_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "form": {
+              "enum": [
+                "living_constellation",
+                "puppet_theatre",
+                "mycelial_being",
+                "swarm",
+                "living_instrument",
+                "hearth_companion",
+                "cognitive_mandala"
+              ]
             }
           },
           "required": [
@@ -431,7 +446,9 @@
             "channel",
             "destination",
             "expires_at_monotonic_ns",
-            "policy_version"
+            "policy_version",
+            "semantic_event_id",
+            "form"
           ]
         }
       ],
@@ -566,6 +583,21 @@
                 "null"
               ],
               "maxLength": 128
+            },
+            "destination": {
+              "enum": [
+                "local_private",
+                "shared_local",
+                "remote"
+              ]
+            },
+            "source_clock_domain_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "source_now_monotonic_ns": {
+              "type": "integer",
+              "minimum": 0
             }
           },
           "required": [
@@ -579,7 +611,10 @@
             "stage",
             "frame_index",
             "effective_intensity",
-            "observed_by"
+            "observed_by",
+            "destination",
+            "source_clock_domain_id",
+            "source_now_monotonic_ns"
           ]
         }
       ],
