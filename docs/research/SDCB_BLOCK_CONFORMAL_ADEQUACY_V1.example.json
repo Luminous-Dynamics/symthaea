@@ -1,0 +1,104 @@
+{
+  "schema_version": "sdcb_block_conformal_adequacy.v1",
+  "calibration": {
+    "epoch_id": "fold-stage-1",
+    "model_set_digest": "model-set-sha256:abc",
+    "scoring_protocol_digest": "score-protocol-sha256:def",
+    "exchangeability_unit": "independent-episode",
+    "blocks": [
+      {
+        "unit_id": "episode-01",
+        "max_nonconformity_score": 0.1
+      },
+      {
+        "unit_id": "episode-02",
+        "max_nonconformity_score": 0.2
+      },
+      {
+        "unit_id": "episode-03",
+        "max_nonconformity_score": 0.3
+      },
+      {
+        "unit_id": "episode-04",
+        "max_nonconformity_score": 0.4
+      },
+      {
+        "unit_id": "episode-05",
+        "max_nonconformity_score": 0.5
+      },
+      {
+        "unit_id": "episode-06",
+        "max_nonconformity_score": 0.6
+      },
+      {
+        "unit_id": "episode-07",
+        "max_nonconformity_score": 0.7
+      },
+      {
+        "unit_id": "episode-08",
+        "max_nonconformity_score": 0.8
+      },
+      {
+        "unit_id": "episode-09",
+        "max_nonconformity_score": 0.9
+      },
+      {
+        "unit_id": "episode-10",
+        "max_nonconformity_score": 1
+      },
+      {
+        "unit_id": "episode-11",
+        "max_nonconformity_score": 1.1
+      },
+      {
+        "unit_id": "episode-12",
+        "max_nonconformity_score": 1.2
+      },
+      {
+        "unit_id": "episode-13",
+        "max_nonconformity_score": 1.3
+      },
+      {
+        "unit_id": "episode-14",
+        "max_nonconformity_score": 1.4
+      },
+      {
+        "unit_id": "episode-15",
+        "max_nonconformity_score": 1.5
+      },
+      {
+        "unit_id": "episode-16",
+        "max_nonconformity_score": 1.6
+      },
+      {
+        "unit_id": "episode-17",
+        "max_nonconformity_score": 1.7
+      },
+      {
+        "unit_id": "episode-18",
+        "max_nonconformity_score": 1.8
+      },
+      {
+        "unit_id": "episode-19",
+        "max_nonconformity_score": 1.9
+      }
+    ]
+  },
+  "test": {
+    "unit_id": "test-episode",
+    "model_set_digest": "model-set-sha256:abc",
+    "scoring_protocol_digest": "score-protocol-sha256:def",
+    "nonconformity_scores": [
+      1.1,
+      1.8,
+      2,
+      1.4
+    ]
+  },
+  "alpha": 0.05,
+  "previously_consumed_epoch_ids": [],
+  "previously_consumed_unit_ids": [],
+  "notes": [
+    "Synthetic rank fixture; exchangeability is assumed, not inferred."
+  ]
+}
