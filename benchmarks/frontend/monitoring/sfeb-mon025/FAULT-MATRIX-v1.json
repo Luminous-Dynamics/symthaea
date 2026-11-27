@@ -306,6 +306,14 @@
       "expected_outcome": "blocked",
       "injection": "alter a Kafka row payload amount while keeping event ID and batch row count unchanged",
       "notes": "The independent source SQL oracle must detect value divergence even when event counts and primary keys still match."
+    },
+    {
+      "id": "MON025-N036",
+      "class": "negative_control",
+      "name": "transaction_end_event_count_mismatch",
+      "expected_outcome": "blocked",
+      "injection": "alter Debezium END event_count or omit one row event from a multi-row transaction",
+      "notes": "A complete set of primary keys does not override a missing BEGIN/END witness, wrong END event_count or non-contiguous per-event ordering."
     }
   ]
 }
