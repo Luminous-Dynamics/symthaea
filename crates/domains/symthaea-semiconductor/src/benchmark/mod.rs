@@ -11,6 +11,7 @@ pub mod metrology_qualification_gate;
 pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod observation_process_ledger;
+pub mod qualified_observation_risk;
 pub mod pair_manifest;
 pub mod process_event_graph;
 pub mod secom_fold_preprocessor;
@@ -182,4 +183,12 @@ pub use observation_process_ledger::{
     ObservationProcessFunnelV1, ObservationProcessInputV1, ObservationProcessReportV1,
     ObservationProcessRoundV1, ObservationRiskControllerV1, PhysicalAcquisitionRecordV1,
     PhysicalAcquisitionStateV1, PhysicalSelectionDesignKindV1, evaluate_observation_process_v1,
+};
+
+pub use qualified_observation_risk::{
+    MetrologyQualificationStatusV1, ObservationAssumptionStatusV1,
+    ObservationProcessAssumptionsV1, ObservationRiskInputV1,
+    ObservationStageProbabilitiesV1, PopulationRiskBoundsV1, PopulationRiskIdentificationV1,
+    QualifiedObservationRiskReportV1, QualifiedObservationRiskErrorV1,
+    QualifiedObservationUnitV1, compute_qualified_observation_risk_v1,
 };
