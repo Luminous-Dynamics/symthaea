@@ -2360,11 +2360,7 @@ mod tests {
             .map(ConsolidationEvidenceRefV1::experience)
             .collect();
         let query_b = Query { scope: scope() };
-        for item in &memory_b {
-            println!("decision-chain candidate: {item:?}; qualified={}", is_qualified(item, query_b));
-        }
         let decision_b = decide(Policy::CausalQualified, &memory_b, query_b);
-        println!("decision-chain result: {decision_b:?}");
         assert_eq!(decision_b.action, Some(Action::A));
 
         let session_c_verifier = TestVerifier {
