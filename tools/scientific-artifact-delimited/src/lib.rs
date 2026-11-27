@@ -517,7 +517,7 @@ fn parse_one_record(
                         "Bare carriage return is not an accepted record separator.".to_string(),
                     ));
                 }
-                fields.push(build_field(raw, field_start, index, quoted_field)?);
+                push_field(&mut fields, raw, field_start, index, quoted_field, max_fields)?;
                 return Ok(Some((fields, index + 2)));
             }
             _ => index += 1,
@@ -828,6 +828,17 @@ mod tests {
     #[test]
     fn observation_limit_rejects_the_entire_payload() {
         let raw = b"id,value\n1,2\n";
+        let mut configured = limits();
+        configured.max_observations = 1;
+        let result = parse_csv(raw, &receipt(raw), configured);
+        assert_eq!(result.disposition, Disposition::LimitExceeded);
+        assert!(result.observations.is_empty());
+        assert_eq!(result.usage.observations_emitted, 0);
+    }
+
+    #[test]
+    fn crlf_rows_also_obey_observation_limit() {
+        let raw = b"id,value\r\n1,2\r\n";
         let mut configured = limits();
         configured.max_observations = 1;
         let result = parse_csv(raw, &receipt(raw), configured);
