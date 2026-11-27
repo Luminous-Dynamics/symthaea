@@ -7,6 +7,7 @@ pub mod delayed_aci;
 pub mod dtco_manifest;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
+pub mod observation_process_ledger;
 pub mod metrology_qualification_gate;
 pub mod metrology_semantics;
 pub mod mf_acquisition;
@@ -172,4 +173,14 @@ pub use selection_risk_bounds::{
     QualifiedLossObservationV1, SELECTION_AUDIT_DESIGN_SCHEMA_V1, SELECTION_RISK_INPUT_SCHEMA_V1,
     SELECTION_RISK_REPORT_SCHEMA_V1, SelectionAuditDesignV1, SelectionRiskErrorV1,
     SelectionRiskInputV1, SelectionRiskReportV1, evaluate_selection_adjusted_population_risk_v1,
+};
+
+pub use observation_process_ledger::{
+    OBSERVATION_PROCESS_REPORT_SCHEMA_V1, OBSERVATION_PROCESS_SCHEMA_V1,
+    ControllerAssumptionStateV1, FeedbackTrackingRecordV1, FeedbackTrackingStateV1,
+    IndependentAuditObservationV1, K1QualificationRecordV1, K1QualificationStateV1,
+    ObservationProcessErrorV1, ObservationProcessFunnelV1, ObservationProcessInputV1,
+    ObservationProcessReportV1, ObservationProcessRoundV1, ObservationRiskControllerV1,
+    PhysicalAcquisitionRecordV1, PhysicalAcquisitionStateV1, PhysicalSelectionDesignKindV1,
+    evaluate_observation_process_v1,
 };
