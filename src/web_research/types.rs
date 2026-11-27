@@ -418,9 +418,9 @@ impl IntegrationResult {
 
 /// Outcome of a verification for meta-learning tracking.
 ///
-/// `was_correct` is present only when an independent source of ground truth
+/// was_correct is present only when an independent source of ground truth
 /// has adjudicated the claim. Epistemic status and confidence are predictions,
-/// not correctness labels; an unadjudicated claim must remain `None`.
+/// not correctness labels; an unadjudicated claim must remain None.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VerificationOutcome {
     /// The claim that was verified
