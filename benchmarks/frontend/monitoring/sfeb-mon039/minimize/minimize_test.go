@@ -87,7 +87,7 @@ func TestDifferentFailureSignatureIsNotTheSameFailure(t *testing.T) {
 		if reflect.DeepEqual(observations[i].FaultIDs,[]string{"fault-a","fault-b"}){
 			observations[i].Verdict=Blocked
 			observations[i].FailureSignatureSHA256=testDigest("signature:different-block")
-			observations[i].OutcomeReceiptSHA256=testDigest("different-receipt")
+			observations[i].OutcomeReceiptSHA256=ObservationReceiptDigest(observations[i])
 		}
 	}
 	got:=Minimize(baseInput(ids,observations))
@@ -279,5 +279,15 @@ func TestObservationReceiptDigestBindsEveryObservationField(t *testing.T) {
 	got:=Minimize(in)
 	if got.CampaignVerdict!=Blocked {
 		t.Fatalf("modified trial identity with unchanged receipt digest must block: %+v",got)
+	}
+}
+
+
+func TestInitialIndeterminateOutcomeIsNotMinimizedAsFailure(t *testing.T) {
+	ids:=[]string{"fault-a"}
+	o:=makeObservation(ids,Indeterminate,testDigest("missing-evidence"),codeRevision,true)
+	got:=Minimize(baseInput(ids,[]Observation{o}))
+	if got.MinimizationKind!="not_applicable"||got.CampaignVerdict!=Indeterminate {
+		t.Fatalf("indeterminate evidence is not a reproduced blocked failure: %+v",got)
 	}
 }
