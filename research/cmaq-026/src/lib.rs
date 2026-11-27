@@ -127,8 +127,16 @@ pub fn score_decision_value(
     }
     validate_contract(contract)?;
 
-    let action_ids: BTreeSet<&str> = contract.actions.iter().map(|a| a.action_id.as_str()).collect();
-    let probe_ids: BTreeSet<&str> = contract.probes.iter().map(|p| p.probe_id.as_str()).collect();
+    let action_ids: BTreeSet<&str> = contract
+        .actions
+        .iter()
+        .map(|a| a.action_id.as_str())
+        .collect();
+    let probe_ids: BTreeSet<&str> = contract
+        .probes
+        .iter()
+        .map(|p| p.probe_id.as_str())
+        .collect();
     let mut world_ids = HashSet::new();
     let mut cluster_families = HashMap::new();
     let mut clusters = HashSet::new();
@@ -166,10 +174,16 @@ pub fn score_decision_value(
         if world_action_ids != action_ids {
             return Err(DecisionError::ActionCoverageMismatch);
         }
-        let world_probe_ids: BTreeSet<&str> =
-            world.probe_observations.keys().map(String::as_str).collect();
+        let world_probe_ids: BTreeSet<&str> = world
+            .probe_observations
+            .keys()
+            .map(String::as_str)
+            .collect();
         if world_probe_ids != probe_ids
-            || world.probe_observations.values().any(|value| value.trim().is_empty())
+            || world
+                .probe_observations
+                .values()
+                .any(|value| value.trim().is_empty())
         {
             return Err(DecisionError::ProbeCoverageMismatch);
         }
@@ -209,7 +223,10 @@ pub fn score_decision_value(
             CandidateDecision::Act { action_id } => {
                 validate_action(action_id, &action_ids)?;
                 (
-                    worlds.iter().map(|w| (w.world_id.clone(), action_id.clone())).collect(),
+                    worlds
+                        .iter()
+                        .map(|w| (w.world_id.clone(), action_id.clone()))
+                        .collect(),
                     0,
                     None,
                     0,
@@ -220,7 +237,10 @@ pub fn score_decision_value(
             CandidateDecision::Unknown { fallback_action_id } => {
                 validate_action(fallback_action_id, &action_ids)?;
                 (
-                    worlds.iter().map(|w| (w.world_id.clone(), fallback_action_id.clone())).collect(),
+                    worlds
+                        .iter()
+                        .map(|w| (w.world_id.clone(), fallback_action_id.clone()))
+                        .collect(),
                     0,
                     None,
                     0,
@@ -228,7 +248,10 @@ pub fn score_decision_value(
                     true,
                 )
             }
-            CandidateDecision::Probe { probe_id, action_by_observation } => {
+            CandidateDecision::Probe {
+                probe_id,
+                action_by_observation,
+            } => {
                 let spec = contract
                     .probes
                     .iter()
@@ -291,7 +314,11 @@ pub fn score_decision_value(
 
     let candidate_regret = (violation_count == 0).then_some(worst_regret);
     let candidate_total = candidate_regret
-        .map(|regret| regret.checked_add(probe_cost).ok_or(DecisionError::RegretOverflow))
+        .map(|regret| {
+            regret
+                .checked_add(probe_cost)
+                .ok_or(DecisionError::RegretOverflow)
+        })
         .transpose()?;
 
     score.candidate_worst_case_regret = candidate_regret;
@@ -304,10 +331,11 @@ pub fn score_decision_value(
     score.invariant_violation_count = violation_count;
     score.selected_probe_id = selected_probe;
     score.unnecessary_probe = score.selected_probe_id.is_some()
-        && score.decision_value_vs_no_probe.is_some_and(|value| value <= 0);
-    score.information_only_probe = score.selected_probe_id.is_some()
-        && partition_count > 1
-        && score.unnecessary_probe;
+        && score
+            .decision_value_vs_no_probe
+            .is_some_and(|value| value <= 0);
+    score.information_only_probe =
+        score.selected_probe_id.is_some() && partition_count > 1 && score.unnecessary_probe;
     score.selected_fallback = fallback;
     Ok(score)
 }
@@ -317,7 +345,10 @@ fn validate_contract(contract: &DecisionContract) -> Result<(), DecisionError> {
         (&contract.contract_id, "contract_id"),
         (&contract.contract_sha256, "contract_sha256"),
         (&contract.source_manifest_sha256, "source_manifest_sha256"),
-        (&contract.candidate_checkpoint_sha256, "candidate_checkpoint_sha256"),
+        (
+            &contract.candidate_checkpoint_sha256,
+            "candidate_checkpoint_sha256",
+        ),
     ] {
         if value.trim().is_empty() {
             return Err(DecisionError::EmptyIdentity(name));
@@ -326,7 +357,10 @@ fn validate_contract(contract: &DecisionContract) -> Result<(), DecisionError> {
     for (name, digest) in [
         ("contract_sha256", &contract.contract_sha256),
         ("source_manifest_sha256", &contract.source_manifest_sha256),
-        ("candidate_checkpoint_sha256", &contract.candidate_checkpoint_sha256),
+        (
+            "candidate_checkpoint_sha256",
+            &contract.candidate_checkpoint_sha256,
+        ),
     ] {
         if !is_sha256_hex(digest) {
             return Err(DecisionError::InvalidSha256(name));
@@ -456,9 +490,15 @@ mod tests {
             source_manifest_sha256: digest('b'),
             candidate_checkpoint_sha256: digest('c'),
             actions: vec![
-                ActionSpec { action_id: "hold".into() },
-                ActionSpec { action_id: "open".into() },
-                ActionSpec { action_id: "close".into() },
+                ActionSpec {
+                    action_id: "hold".into(),
+                },
+                ActionSpec {
+                    action_id: "open".into(),
+                },
+                ActionSpec {
+                    action_id: "close".into(),
+                },
             ],
             probes,
         }
@@ -478,7 +518,13 @@ mod tests {
             action_outcomes: outcomes
                 .into_iter()
                 .map(|(action, loss, safe)| {
-                    (action.into(), ActionOutcome { loss_units: loss, invariant_safe: safe })
+                    (
+                        action.into(),
+                        ActionOutcome {
+                            loss_units: loss,
+                            invariant_safe: safe,
+                        },
+                    )
                 })
                 .collect(),
             probe_observations: observations
@@ -500,16 +546,32 @@ mod tests {
 
     #[test]
     fn high_uncertainty_but_same_optimal_action_has_zero_probe_value() {
-        let c = contract(vec![ProbeSpec { probe_id: "sensor".into(), cost_loss_units: 2 }]);
+        let c = contract(vec![ProbeSpec {
+            probe_id: "sensor".into(),
+            cost_loss_units: 2,
+        }]);
         let worlds = vec![
-            world("w1", "f1", "c1", [("hold", 0, true), ("open", 8, true), ("close", 9, true)], &[("sensor", "a")]),
-            world("w2", "f2", "c2", [("hold", 0, true), ("open", 9, true), ("close", 7, true)], &[("sensor", "b")]),
+            world(
+                "w1",
+                "f1",
+                "c1",
+                [("hold", 0, true), ("open", 8, true), ("close", 9, true)],
+                &[("sensor", "a")],
+            ),
+            world(
+                "w2",
+                "f2",
+                "c2",
+                [("hold", 0, true), ("open", 9, true), ("close", 7, true)],
+                &[("sensor", "b")],
+            ),
         ];
         let score = score_decision_value(
             &c,
             &worlds,
             &probe_policy("sensor", &[("a", "hold"), ("b", "hold")]),
-        ).unwrap();
+        )
+        .unwrap();
         assert!(!score.decision_critical_ambiguity);
         assert_eq!(score.best_no_probe_worst_case_regret, 0);
         assert_eq!(score.decision_value_vs_no_probe, Some(-2));
@@ -519,16 +581,32 @@ mod tests {
 
     #[test]
     fn low_world_count_but_action_critical_probe_has_positive_value() {
-        let c = contract(vec![ProbeSpec { probe_id: "diagnostic".into(), cost_loss_units: 1 }]);
+        let c = contract(vec![ProbeSpec {
+            probe_id: "diagnostic".into(),
+            cost_loss_units: 1,
+        }]);
         let worlds = vec![
-            world("w1", "f1", "c1", [("hold", 8, true), ("open", 0, true), ("close", 10, true)], &[("diagnostic", "left")]),
-            world("w2", "f2", "c2", [("hold", 8, true), ("open", 2, true), ("close", 0, true)], &[("diagnostic", "right")]),
+            world(
+                "w1",
+                "f1",
+                "c1",
+                [("hold", 8, true), ("open", 0, true), ("close", 10, true)],
+                &[("diagnostic", "left")],
+            ),
+            world(
+                "w2",
+                "f2",
+                "c2",
+                [("hold", 8, true), ("open", 2, true), ("close", 0, true)],
+                &[("diagnostic", "right")],
+            ),
         ];
         let score = score_decision_value(
             &c,
             &worlds,
             &probe_policy("diagnostic", &[("left", "open"), ("right", "close")]),
-        ).unwrap();
+        )
+        .unwrap();
         assert!(score.decision_critical_ambiguity);
         assert_eq!(score.best_no_probe_worst_case_regret, 2);
         assert_eq!(score.candidate_worst_case_regret, Some(0));
@@ -539,17 +617,39 @@ mod tests {
 
     #[test]
     fn information_rich_probe_can_be_decision_irrelevant() {
-        let c = contract(vec![ProbeSpec { probe_id: "rich".into(), cost_loss_units: 3 }]);
+        let c = contract(vec![ProbeSpec {
+            probe_id: "rich".into(),
+            cost_loss_units: 3,
+        }]);
         let worlds = vec![
-            world("w1", "f1", "c1", [("hold", 0, true), ("open", 4, true), ("close", 5, true)], &[("rich", "x")]),
-            world("w2", "f2", "c2", [("hold", 0, true), ("open", 5, true), ("close", 4, true)], &[("rich", "y")]),
-            world("w3", "f3", "c3", [("hold", 0, true), ("open", 9, true), ("close", 8, true)], &[("rich", "z")]),
+            world(
+                "w1",
+                "f1",
+                "c1",
+                [("hold", 0, true), ("open", 4, true), ("close", 5, true)],
+                &[("rich", "x")],
+            ),
+            world(
+                "w2",
+                "f2",
+                "c2",
+                [("hold", 0, true), ("open", 5, true), ("close", 4, true)],
+                &[("rich", "y")],
+            ),
+            world(
+                "w3",
+                "f3",
+                "c3",
+                [("hold", 0, true), ("open", 9, true), ("close", 8, true)],
+                &[("rich", "z")],
+            ),
         ];
         let score = score_decision_value(
             &c,
             &worlds,
             &probe_policy("rich", &[("x", "hold"), ("y", "hold"), ("z", "hold")]),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(score.probe_observation_partition_count, 3);
         assert!(!score.decision_critical_ambiguity);
         assert!(score.information_only_probe);
@@ -558,16 +658,28 @@ mod tests {
 
     #[test]
     fn cheap_nonseparating_probe_is_charged_and_has_negative_value() {
-        let c = contract(vec![ProbeSpec { probe_id: "cheap".into(), cost_loss_units: 1 }]);
+        let c = contract(vec![ProbeSpec {
+            probe_id: "cheap".into(),
+            cost_loss_units: 1,
+        }]);
         let worlds = vec![
-            world("w1", "f1", "c1", [("hold", 3, true), ("open", 0, true), ("close", 5, true)], &[("cheap", "same")]),
-            world("w2", "f2", "c2", [("hold", 3, true), ("open", 5, true), ("close", 0, true)], &[("cheap", "same")]),
+            world(
+                "w1",
+                "f1",
+                "c1",
+                [("hold", 3, true), ("open", 0, true), ("close", 5, true)],
+                &[("cheap", "same")],
+            ),
+            world(
+                "w2",
+                "f2",
+                "c2",
+                [("hold", 3, true), ("open", 5, true), ("close", 0, true)],
+                &[("cheap", "same")],
+            ),
         ];
-        let score = score_decision_value(
-            &c,
-            &worlds,
-            &probe_policy("cheap", &[("same", "hold")]),
-        ).unwrap();
+        let score =
+            score_decision_value(&c, &worlds, &probe_policy("cheap", &[("same", "hold")])).unwrap();
         assert!(score.decision_critical_ambiguity);
         assert_eq!(score.probe_observation_partition_count, 1);
         assert_eq!(score.decision_value_vs_no_probe, Some(-1));
@@ -577,24 +689,50 @@ mod tests {
     #[test]
     fn lower_information_probe_can_dominate_full_world_discrimination() {
         let c = contract(vec![
-            ProbeSpec { probe_id: "cheap".into(), cost_loss_units: 1 },
-            ProbeSpec { probe_id: "expensive".into(), cost_loss_units: 5 },
+            ProbeSpec {
+                probe_id: "cheap".into(),
+                cost_loss_units: 1,
+            },
+            ProbeSpec {
+                probe_id: "expensive".into(),
+                cost_loss_units: 5,
+            },
         ]);
         let worlds = vec![
-            world("w1", "f1", "c1", [("hold", 6, true), ("open", 0, true), ("close", 8, true)], &[("cheap", "a"), ("expensive", "1")]),
-            world("w2", "f2", "c2", [("hold", 6, true), ("open", 0, true), ("close", 8, true)], &[("cheap", "a"), ("expensive", "2")]),
-            world("w3", "f3", "c3", [("hold", 6, true), ("open", 8, true), ("close", 0, true)], &[("cheap", "b"), ("expensive", "3")]),
+            world(
+                "w1",
+                "f1",
+                "c1",
+                [("hold", 6, true), ("open", 0, true), ("close", 8, true)],
+                &[("cheap", "a"), ("expensive", "1")],
+            ),
+            world(
+                "w2",
+                "f2",
+                "c2",
+                [("hold", 6, true), ("open", 0, true), ("close", 8, true)],
+                &[("cheap", "a"), ("expensive", "2")],
+            ),
+            world(
+                "w3",
+                "f3",
+                "c3",
+                [("hold", 6, true), ("open", 8, true), ("close", 0, true)],
+                &[("cheap", "b"), ("expensive", "3")],
+            ),
         ];
         let cheap = score_decision_value(
             &c,
             &worlds,
             &probe_policy("cheap", &[("a", "open"), ("b", "close")]),
-        ).unwrap();
+        )
+        .unwrap();
         let expensive = score_decision_value(
             &c,
             &worlds,
             &probe_policy("expensive", &[("1", "open"), ("2", "open"), ("3", "close")]),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(cheap.probe_observation_partition_count, 2);
         assert_eq!(expensive.probe_observation_partition_count, 3);
         assert_eq!(cheap.candidate_worst_case_regret, Some(0));
@@ -608,39 +746,78 @@ mod tests {
     fn invariant_violations_are_never_averaged_away() {
         let c = contract(vec![]);
         let worlds = vec![
-            world("w1", "f1", "c1", [("hold", 0, true), ("open", 1, true), ("close", 2, false)], &[]),
-            world("w2", "f2", "c2", [("hold", 0, true), ("open", 2, true), ("close", 1, false)], &[]),
+            world(
+                "w1",
+                "f1",
+                "c1",
+                [("hold", 0, true), ("open", 1, true), ("close", 2, false)],
+                &[],
+            ),
+            world(
+                "w2",
+                "f2",
+                "c2",
+                [("hold", 0, true), ("open", 2, true), ("close", 1, false)],
+                &[],
+            ),
         ];
         let score = score_decision_value(
             &c,
             &worlds,
-            &CandidateDecision::Act { action_id: "close".into() },
-        ).unwrap();
+            &CandidateDecision::Act {
+                action_id: "close".into(),
+            },
+        )
+        .unwrap();
         assert_eq!(score.invariant_violation_count, 2);
         assert_eq!(score.candidate_worst_case_regret, None);
         assert_eq!(score.decision_value_vs_no_probe, None);
     }
 
-
     #[test]
     fn no_shared_invariant_safe_action_fails_closed() {
         let c = contract(vec![]);
         let worlds = vec![
-            world("w1", "f1", "c1", [("hold", 0, true), ("open", 1, false), ("close", 2, false)], &[]),
-            world("w2", "f2", "c2", [("hold", 0, false), ("open", 1, true), ("close", 2, false)], &[]),
+            world(
+                "w1",
+                "f1",
+                "c1",
+                [("hold", 0, true), ("open", 1, false), ("close", 2, false)],
+                &[],
+            ),
+            world(
+                "w2",
+                "f2",
+                "c2",
+                [("hold", 0, false), ("open", 1, true), ("close", 2, false)],
+                &[],
+            ),
         ];
         assert_eq!(
-            score_decision_value(&c, &worlds, &CandidateDecision::Unknown { fallback_action_id: "hold".into() }),
+            score_decision_value(
+                &c,
+                &worlds,
+                &CandidateDecision::Unknown {
+                    fallback_action_id: "hold".into()
+                }
+            ),
             Err(DecisionError::NoCommonInvariantSafeAction)
         );
     }
 
     #[test]
     fn candidate_policy_is_observation_keyed_not_world_keyed() {
-        let c = contract(vec![ProbeSpec { probe_id: "sensor".into(), cost_loss_units: 1 }]);
-        let worlds = vec![
-            world("w1", "f1", "c1", [("hold", 0, true), ("open", 1, true), ("close", 2, true)], &[("sensor", "x")]),
-        ];
+        let c = contract(vec![ProbeSpec {
+            probe_id: "sensor".into(),
+            cost_loss_units: 1,
+        }]);
+        let worlds = vec![world(
+            "w1",
+            "f1",
+            "c1",
+            [("hold", 0, true), ("open", 1, true), ("close", 2, true)],
+            &[("sensor", "x")],
+        )];
         assert_eq!(
             score_decision_value(&c, &worlds, &probe_policy("sensor", &[("w1", "hold")])),
             Err(DecisionError::ProbePolicyObservationMismatch)
