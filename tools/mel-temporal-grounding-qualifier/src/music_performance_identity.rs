@@ -152,11 +152,22 @@ pub struct MusicalFlipFactorSliceV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PerformanceStayIdentitySliceV1 {
+    pub identity_sha256: String,
+    pub items: usize,
+    pub false_difference_rate: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MusicalIdentityTriadResultV1 {
     pub item_id: String,
     pub pair_id: String,
     pub source_work_lineage_sha256: String,
     pub target_property: MusicalIdentityPropertyV1,
+    pub clean_performer_identity_sha256: String,
+    pub performance_stay_performer_identity_sha256: String,
+    pub performance_stay_take_identity_sha256: String,
+    pub performance_stay_renderer_identity_sha256: String,
     pub clean_predicted_relation: Option<MusicalRelationV1>,
     pub performance_stay_predicted_relation: Option<MusicalRelationV1>,
     pub musical_flip_predicted_relation: Option<MusicalRelationV1>,
@@ -178,6 +189,9 @@ pub struct MusicalPerformanceIdentityReportV1 {
     pub by_property: Vec<MusicalIdentityPropertySliceV1>,
     pub by_performance_stay_factor: Vec<PerformanceStayFactorSliceV1>,
     pub by_musical_flip_factor: Vec<MusicalFlipFactorSliceV1>,
+    pub by_performance_stay_performer: Vec<PerformanceStayIdentitySliceV1>,
+    pub by_performance_stay_take: Vec<PerformanceStayIdentitySliceV1>,
+    pub by_performance_stay_renderer: Vec<PerformanceStayIdentitySliceV1>,
     pub source_work_clusters: usize,
     pub performer_clusters: usize,
     pub recommended_confirmatory_source_work_floor: usize,
@@ -281,6 +295,10 @@ pub fn audit_musical_performance_identity(
             pair_id: triad.pair_id.clone(),
             source_work_lineage_sha256: triad.source_work_lineage_sha256.clone(),
             target_property: triad.target_property,
+            clean_performer_identity_sha256: triad.clean.performer_identity_sha256.clone(),
+            performance_stay_performer_identity_sha256: triad.performance_stay.performer_identity_sha256.clone(),
+            performance_stay_take_identity_sha256: triad.performance_stay.take_identity_sha256.clone(),
+            performance_stay_renderer_identity_sha256: triad.performance_stay.renderer_identity_sha256.clone(),
             clean_predicted_relation: clean,
             performance_stay_predicted_relation: performance_stay,
             musical_flip_predicted_relation: musical_flip,
@@ -382,6 +400,21 @@ pub fn audit_musical_performance_identity(
         by_property,
         by_performance_stay_factor,
         by_musical_flip_factor,
+        by_performance_stay_performer: build_identity_slices(
+            &case.triads,
+            &scored,
+            PerformanceStayIdentityKeyV1::Performer,
+        ),
+        by_performance_stay_take: build_identity_slices(
+            &case.triads,
+            &scored,
+            PerformanceStayIdentityKeyV1::Take,
+        ),
+        by_performance_stay_renderer: build_identity_slices(
+            &case.triads,
+            &scored,
+            PerformanceStayIdentityKeyV1::Renderer,
+        ),
         source_work_clusters: lineages.len(),
         performer_clusters: performers.len(),
         recommended_confirmatory_source_work_floor: CONFIRMATORY_SOURCE_WORK_FLOOR,
@@ -656,6 +689,49 @@ fn stay_compatible(
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum PerformanceStayIdentityKeyV1 {
+    Performer,
+    Take,
+    Renderer,
+}
+
+fn build_identity_slices(
+    triads: &[MusicalPerformanceIdentityTriadV1],
+    scored: &[ScoredIdentityTriadV1],
+    key: PerformanceStayIdentityKeyV1,
+) -> Vec<PerformanceStayIdentitySliceV1> {
+    let mut grouped: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
+    for (index, triad) in triads.iter().enumerate() {
+        let identity = match key {
+            PerformanceStayIdentityKeyV1::Performer => {
+                triad.performance_stay.performer_identity_sha256.as_str()
+            }
+            PerformanceStayIdentityKeyV1::Take => {
+                triad.performance_stay.take_identity_sha256.as_str()
+            }
+            PerformanceStayIdentityKeyV1::Renderer => {
+                triad.performance_stay.renderer_identity_sha256.as_str()
+            }
+        };
+        grouped.entry(identity).or_default().push(index);
+    }
+    grouped
+        .into_iter()
+        .map(|(identity, indices)| PerformanceStayIdentitySliceV1 {
+            identity_sha256: identity.to_owned(),
+            items: indices.len(),
+            false_difference_rate: rate(
+                indices
+                    .iter()
+                    .filter(|index| !scored[**index].performance_stay_correct)
+                    .count(),
+                indices.len(),
+            ),
+        })
+        .collect()
+}
+
 fn summarize(scored: &[ScoredIdentityTriadV1]) -> MusicalIdentityMetricsV1 {
     let indices: Vec<_> = (0..scored.len()).collect();
     summarize_indices(scored, &indices)
@@ -766,8 +842,6 @@ fn require_text(value: &str, label: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const D: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
     fn digest(ch: char) -> String {
         ch.to_string().repeat(64)
@@ -1036,6 +1110,33 @@ mod tests {
     }
 
     #[test]
+    fn performer_take_and_renderer_results_remain_separate_slices() {
+        let first = triad(
+            MusicalIdentityPropertyV1::ChordQuality,
+            PerformanceStayFactorV1::DifferentTakeSamePerformer,
+            MusicalFlipFactorV1::ChordQualityChange,
+        );
+        let second = triad(
+            MusicalIdentityPropertyV1::RootPitchClass,
+            PerformanceStayFactorV1::DifferentPerformerSameInstrument,
+            MusicalFlipFactorV1::RootPitchClassChange,
+        );
+        let mut second = second;
+        second.item_id = "second-item".into();
+        second.pair_id = "second-pair".into();
+        second.clean.performer_identity_sha256 = digest('1');
+        second.performance_stay.performer_identity_sha256 = digest('2');
+        second.musical_flip.performer_identity_sha256 = digest('1');
+        second.source_work_lineage_sha256 = digest('3');
+
+        let report = audit_musical_performance_identity(&case(vec![first, second])).unwrap();
+        assert_eq!(report.by_performance_stay_performer.len(), 2);
+        assert_eq!(report.by_performance_stay_take.len(), 2);
+        assert_eq!(report.by_performance_stay_renderer.len(), 1);
+        assert_eq!(report.by_performance_stay_renderer[0].items, 2);
+    }
+
+    #[test]
     fn unknown_audio_reuse_duplicate_pair_and_model_identity_drift_are_rejected() {
         let item = triad(
             MusicalIdentityPropertyV1::ChordQuality,
@@ -1046,12 +1147,13 @@ mod tests {
         reused_audio.performance_stay.response.audio_sha256 = reused_audio.clean.response.audio_sha256.clone();
         assert!(audit_musical_performance_identity(&case(vec![reused_audio])).is_err());
 
-        let duplicate_pair = triad(
+        let mut duplicate_pair = triad(
             MusicalIdentityPropertyV1::RootPitchClass,
             PerformanceStayFactorV1::DifferentTakeSamePerformer,
             MusicalFlipFactorV1::RootPitchClassChange,
         );
-        assert!(audit_musical_performance_identity(&case(vec![item.clone(), duplicate_pair])).is_ok());
+        duplicate_pair.pair_id = item.pair_id.clone();
+        assert!(audit_musical_performance_identity(&case(vec![item.clone(), duplicate_pair])).is_err());
 
         let mut model_drift = triad(
             MusicalIdentityPropertyV1::RootPitchClass,
