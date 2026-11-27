@@ -28,7 +28,7 @@ schema_state AS (
 ),
 index_state AS (
     SELECT encode(
-        digest(convert_to(coalesce(string_agg(pg_get_indexdef(i.indexrelid), E'\\n' ORDER BY t.relname, ic.relname), ''), 'UTF8'), 'sha256'),
+        digest(convert_to(coalesce(string_agg(pg_get_indexdef(i.indexrelid), E'\n' ORDER BY t.relname, ic.relname), ''), 'UTF8'), 'sha256'),
         'hex'
     ) AS digest
     FROM pg_index AS i
@@ -41,7 +41,7 @@ constraint_state AS (
     SELECT encode(
         digest(convert_to(coalesce(string_agg(
             concat_ws('|', c.conrelid::regclass::text, c.conname, c.contype, pg_get_constraintdef(c.oid, true)),
-            E'\\n' ORDER BY c.conrelid::regclass::text, c.conname
+            E'\n' ORDER BY c.conrelid::regclass::text, c.conname
         ), ''), 'UTF8'), 'sha256'),
         'hex'
     ) AS digest
@@ -54,7 +54,7 @@ trigger_state AS (
     SELECT encode(
         digest(convert_to(coalesce(string_agg(
             pg_get_triggerdef(t.oid, true),
-            E'\\n' ORDER BY c.relname, t.tgname
+            E'\n' ORDER BY c.relname, t.tgname
         ), ''), 'UTF8'), 'sha256'),
         'hex'
     ) AS digest
@@ -67,7 +67,7 @@ routine_state AS (
     SELECT encode(
         digest(convert_to(coalesce(string_agg(
             pg_get_functiondef(p.oid),
-            E'\\n' ORDER BY p.proname, pg_get_function_identity_arguments(p.oid)
+            E'\n' ORDER BY p.proname, pg_get_function_identity_arguments(p.oid)
         ), ''), 'UTF8'), 'sha256'),
         'hex'
     ) AS digest
