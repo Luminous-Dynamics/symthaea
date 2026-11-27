@@ -92,7 +92,7 @@ Replay identical, frozen event traces through every renderer.
 
 Measure:
 - expected event-to-expression mappings;
-- omitted and unsupported event events;
+- omitted and unsupported events;
 - contradictions between forms;
 - time alignment across renderers;
 - identity continuity across transitions;
