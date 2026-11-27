@@ -938,6 +938,12 @@ jobs:
           cohorts = fixture["trajectory_cohorts"]
           assert len({cohort["independent_initial_state_digest"] for cohort in cohorts}) == len(cohorts)
           assert {cohort["split_role"] for cohort in cohorts} == {"training", "validation", "sealed_holdout"}
+          assert sum(cohort["split_role"] == "training" for cohort in cohorts) == 4
+          assert sum(cohort["split_role"] == "validation" for cohort in cohorts) == 2
+          assert sum(cohort["split_role"] == "sealed_holdout" for cohort in cohorts) == 3
+          assert {cohort["kind"] for cohort in cohorts if cohort["split_role"] == "sealed_holdout"} == {
+              "two_stream_relaxation", "sustained_heating", "drive_switching"
+          }
           for cohort in cohorts:
               assert cohort["collision_frequency"] > 0
               assert cohort["end_time"] > 0
