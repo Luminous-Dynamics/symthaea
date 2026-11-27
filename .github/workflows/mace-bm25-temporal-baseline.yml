@@ -1,0 +1,44 @@
+name: MACE Temporal BM25 Baseline Reference
+
+on:
+  push:
+    branches:
+      - research/mace-temporal-bm25-rrf-baseline-2026-11-27
+    paths:
+      - "research/mace-decision-sufficient-memory-bench-v0-1/baselines/**"
+      - ".github/workflows/mace-bm25-temporal-baseline.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/mace-decision-sufficient-memory-bench-v0-1/baselines/**"
+      - ".github/workflows/mace-bm25-temporal-baseline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bm25-reference:
+    name: Rust 1.96 temporal BM25 and RRF negative controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Check formatting on exact committed source
+        run: |
+          rustfmt --edition 2024 --check research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs
+      - name: Compile and run exact-source baseline tests
+        run: |
+          rustc --edition=2024 --test research/mace-decision-sufficient-memory-bench-v0-1/baselines/bm25_temporal_reference.rs -o /tmp/mace-bm25-temporal
+          /tmp/mace-bm25-temporal
+      - name: Parse candidate-visible fixture and schema
+        run: |
+          python3 -m json.tool research/mace-decision-sufficient-memory-bench-v0-1/baselines/raw-trajectory-baseline-v0.1.example.json >/dev/null
+          python3 -m json.tool research/mace-decision-sufficient-memory-bench-v0-1/baselines/raw-trajectory-candidate-v0.1.schema.json >/dev/null
