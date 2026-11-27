@@ -196,6 +196,8 @@ Promotion from working memory to validated memory requires independent replicati
 - **Portfolio allocation, not one-step ranking:** allocate across tractable work, high-impact uncertainty, replication and deliberate disconfirmation.
 - **Evaluator pluralism:** cross task generators, model backbones, graders and blinded human/domain-expert anchors. Candidate generation, benchmark admission and final adjudication remain independently controlled.
 - **Researcher/coder separation:** compare research policies with one fixed executor before measuring end-to-end interaction.
+- **Evidence debt, not invisible uncertainty:** every active claim carries unresolved obligations, stale-support triggers, counterevidence and a due revalidation condition; unresolved debt blocks promotion rather than being hidden in a confidence scalar.
+- **Event-time science, not timestamp flattening:** distinguish when an event occurred, when it was observed, when the result became available and when it was interpreted. A future result must remain unavailable to the policy even when its event timestamp is earlier.
 
 ## 9. Competitive benchmark portfolio
 
@@ -211,6 +213,8 @@ Do not pool different task units into one RSI number.
 | Executable literature and method reuse | Paper2Agent | Convert more papers into scoped, reproducible, independently validated research tools; keep tool validity and scientific validity separate |
 | Open scientific follow-up integrity | Into the Unknown | Satisfy every expert-authored necessary condition with claims tied to executed artifacts; zero unsupported work/result claims |
 | Autonomous science | Autonomous Science Bench | Beat reproducible baselines on quality/cost with independent replication; six-task pilot is diagnostic |
+| Scientific terminal workflows | Terminal-Bench-Science 0.1 / current release | Beat matched full-release results on independently re-run task artifacts; report domain-level and planning-stage outcomes |
+| Project-level science | ASI-Bench | Improve full-project performance across the B1–B4 guidance ladder with repeated trials and pinned task-set identity |
 | Long-horizon work | METR TH1.1 / TH2 | Improve long-horizon success without hiding lifecycle costs or judgment gaps |
 | Research engineering | SWE-bench Pro/Verified, Polyglot, MLE-bench, FML-Bench | Matched-backbone/cost comparison and capability retention |
 | Algorithm/kernel discovery | KernelBench, SOL-ExecBench, ALE-Bench | Correctness-first speedup and verified discovery per total compute |
@@ -223,6 +227,8 @@ These are ambitious targets to validate and power after a variance-estimation pi
 | Benchmark | Public reference / scale | Proposed Symthaea stretch target |
 |---|---|---|
 | Autonomous Science Bench 0.1 | Six tasks, three trials each; 10 configurations; GPT-6 Astra 72.2%, Opus 5.5 66.7% | At least 15/18 resolved trials (83.3%), with discovery and held-out learning gates both passing for every resolved campaign; repeat on a fresh campaign family |
+| Terminal-Bench-Science 0.1 | 70 expert-curated tasks across five domains; three independent trials per task; Claude Opus 5 30.0%, GPT-5.6 Sol 22.4% on the initial release | At least 45% resolution on the exact same pinned 0.1 release and harness, with no integrity failures; then use the current 0.2/1.0 release calibrated to current frontier models rather than presenting 0.1 as today's SOTA |
+| ASI-Bench | 60 project-level tasks across 11 domains, B1–B4; leaderboard has 26 supplied results, 24 using three runs and two single-run exceptions; tool access disabled | Exceed 68/100 on the exact pinned task set with at least five paired runs and tool/compute parity; report each guidance level separately and do not claim leaderboard superiority until the official task-set identity and artifact-level scoring are reproducible |
 | FIRE-Bench | Best published F1 46.7 on 30 tasks / three trials; 73.6% of categorized errors arise in planning | At least 55 F1 on the same release, while reducing planning-stage failure rate by at least 50% relative to the matched baseline and reporting claim precision, recall, trial variance and unsupported claims |
 | SCI-AGENT-EXAM | 120 expert-curated tasks across 11 fields and 7 task types; GPT-6 Astra reports 80.9 overall, with 26.0% runs above the 0.95 success threshold | At least 85 overall and at least 50% of runs above 0.95, with executable/text artifact agreement, per-task-family reporting and exact-release reproduction |
 | Paper2Agent agentification | 74/100 computational-biology papers agentified; 593/599 tools passed automated validation; Sonnet 4 achieved 91.2±1.6% on 300 tutorial questions | At least 85% end-to-end agentification on a stratified corpus, at least 99.5% tool-contract validation, and 95% on matched tutorial/execution questions; scientific conclusion validity remains separately adjudicated |
@@ -234,7 +240,7 @@ These are ambitious targets to validate and power after a variance-estimation pi
 | METR TH1.1 / TH2 | Long-horizon tasks with materially different lifecycle costs | At non-inferior success, reduce inclusive lifecycle cost by 30%, or extend successful task horizon by 1.5x at matched total cost |
 | SWE-bench Pro (secondary engineering lane) | HGM reported 88.3% on its evaluated subset | Exceed 88.3% only on the same pinned subset/harness, while retaining Verified/Polyglot transfer and reporting full compute/evaluation cost |
 
-The AS-Bench leaderboard reports ten configurations over six tasks with three trials per task; its own overview cautions that small between-configuration differences are not yet meaningful at this sample size. The 15/18 target is a pilot-stage stretch threshold, not a statistically qualified superiority claim. Paper2Agent's 593/599 is automated tool validation, not scientific claim validity. SciAgentArena's task metrics are different units; its representative task values must not be averaged together. FIRE-Bench's planning-error share is a diagnosis of that benchmark's task set, not a universal breakdown of scientific failure.
+The AS-Bench leaderboard reports ten configurations over six tasks with three trials per task; its own overview cautions that small between-configuration differences are not yet meaningful at this sample size. Terminal-Bench-Science 0.1 is the first 70-task five-domain baseline and is deliberately hard; its newer 0.2 calibration is against Claude Opus 5.5 and GPT-6 Astra, so the old 30% result is not a current-frontier claim. ASI-Bench is broader and project-level but its supplied aggregate leaderboard notes that it does not recompute scores from task artifacts and that the exact scored task-set identifier is unverified; it is a comparison anchor, not an independently audited truth source. The 15/18 target is a pilot-stage stretch threshold, not a statistically qualified superiority claim. Paper2Agent's 593/599 is automated tool validation, not scientific claim validity. SciAgentArena's task metrics are different units; its representative task values must not be averaged together. FIRE-Bench's planning-error share is a diagnosis of that benchmark's task set, not a universal breakdown of scientific failure.
 
 The RecurSciBench regression-tail target is intentionally more demanding than merely beating its mean. The TasteVal target must not be claimed from compute-only accounting. METR cost/horizon comparisons must use matched task strata and uncertainty intervals. SCI-AGENT-EXAM is a recent preprint and its hybrid judge requires independent calibration; reproduce its exact task release before comparing. Paper2Agent's tool-extraction accuracy is not equivalent to independent scientific-validity accuracy; compare agentification coverage and tool execution separately from claims about correct science. Into the Unknown's integrity gate should be retained even when no reference numeric answer exists. Never compare numerical scores across different benchmarks.
 
@@ -287,22 +293,21 @@ The current futures ledger records forecast provenance and scored continuations.
 - [Dream-RSI](https://arxiv.org/abs/2609.14858): replay-based exploration-policy improvements; motivates a policy baseline, not automatic transfer.
 - [AIDE²](https://arxiv.org/abs/2609.26457): recursive improver comparator; same-start comparison was explicitly inconclusive at three seeds per arm.
 - [ELITE](https://arxiv.org/abs/2611.21056): evaluation-free mechanism integration; independent behavioral tests remain necessary.
-- [RecurSciBench](https://arxiv.org/abs/2611.32508): mixed scientific transfer with substantial per-task regression.
-- [METR Q4 2026](https://metr.org/blog/2026-11-20-q4-2026-capability-update/): judgment without fast feedback and lifecycle-cost measurement need separate lanes.
-- [TasteVal](https://arxiv.org/abs/2610.06824): fixed-coder comparisons can isolate experimental-planning quality.
+- [RecurSciBench](https://arxiv.org/abs/2611.32508): recent RSI transfer benchmark with four scientific domains and 96 tasks; its paper emphasizes that aggregate gains can coexist with per-task regressions.
+- [METR Q4 2026](https://metr.org/blog/2026-11-20-q4-2026-capability-update/): verifiable task horizons continue to change rapidly; judgment without fast feedback and full lifecycle-cost measurement need separate lanes.
+- [TasteVal](https://arxiv.org/abs/2610.06824): fixed-coder comparisons can isolate experimental-planning quality; compute-only multipliers are not inclusive research-cost multipliers.
 - [IdeaTaste](https://arxiv.org/abs/2611.03424): retrospective idea matching is a diagnostic, not a scientific-validity oracle.
 - [SCI-AGENT-EXAM](https://arxiv.org/abs/2610.32441): 120 expert-curated tasks across 11 fields and seven scientific workflow task types; evaluates executable and textual artifacts and run stability.
-- [Paper2Agent](https://www.nature.com/articles/s41586-026-11044-y): 100 computational-biology papers in its primary agentification cohort; 74 were agentified and 593/599 generated tools passed automated validation. Tutorial-question performance is distinct from independent truth adjudication.
+- [Paper2Agent](https://www.nature.com/articles/s41586-026-11044-y): 100 computational-biology papers in its primary agentification cohort; 74 were agentified and 593/599 generated tools passed automated validation. Tool validation is distinct from independent scientific-claim validity.
 - [SciAgentArena](https://sciagentarena.github.io/): approximately 200 stepwise-verified tasks across five scientific domains and four task categories; its published representative task scores use different metrics.
-- [Autonomous Science Bench 0.1](https://asb.open-ssi.org/leaderboard): six pilot tasks, three trials each, with GPT-6 Astra at 72.2% and Opus 5.5 at 66.7%; the benchmark overview explicitly warns that small differences are not meaningful at this run count.
-- [FIRE-Bench](https://firebench.github.io/): 30 research rediscovery tasks, claim-level scoring, and a published 46.7 F1 best result with substantial run variance.
-- [SCI-AGENT-EXAM](https://arxiv.org/abs/2610.32441): 120 expert-curated tasks across 11 fields and seven research task types; combines executable and textual outputs and analyses run stability.
-- [Paper2Agent](https://www.nature.com/articles/s41586-026-11044-y): converts papers/repositories into structured resources and validated executable tools; its agentification and tutorial-question metrics are distinct from independent scientific truth.
-- [SciAgentArena](https://www.microsoft.com/en-us/research/publication/benchmarking-ai-agents-for-addressing-scientific-challenges-across-scales/): roughly 200 tasks with stepwise verification; reports persistent difficulty in novel insight and sustained self-directed exploration.
+- [Autonomous Science Bench 0.1](https://asb.open-ssi.org/leaderboard): six pilot tasks, three trials each, with GPT-6 Astra at 72.2% and Opus 5.5 at 66.7%; the benchmark explicitly cautions that small differences are not meaningful at this run count.
+- [FIRE-Bench](https://firebench.github.io/): 30 research rediscovery tasks, claim-level precision/recall/F1 scoring, and a published best F1 of 46.7 over three trials; the benchmark reports planning as the largest categorized error source.
+- [Terminal-Bench-Science](https://www.tbench.ai/news/terminal-bench-science-0-1): 70 expert-curated scientific workflows across life, physical, Earth, mathematical and engineering sciences; 0.1 reports three trials per task and a 30% top resolution rate. The maintainers describe 0.2 as calibrated against Claude Opus 5.5 and GPT-6 Astra, and 1.0 is the next community task-contribution target.
+- [ASI-Bench](https://asibench.apexin.ai/): 60 project-level tasks across 11 domains with B1–B4 guidance withdrawal; its supplied aggregate page lists 26 configurations, but 2 use one run and the page says task-set identity is not independently pinned in the results view.
 - [Into the Unknown](https://arxiv.org/abs/2610.19159): open scientific follow-up benchmark with expert-authored necessary conditions and a demanding claim-integrity check.
 
-These are paper/author-reported baselines unless independently reproduced under matched harness and total-cost boundaries. No claim that Symthaea beats them is made here.
-
+These are paper/author-reported or benchmark-host-supplied baselines unless independently reproduced under matched task, harness and total-cost boundaries. No claim that Symthaea beats them is made here. Never compare numeric scores across different benchmarks.
+ 
 ## 12. Implementation status and gates
 
 Implemented in this branch:
