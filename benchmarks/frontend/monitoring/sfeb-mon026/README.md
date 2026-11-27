@@ -39,7 +39,7 @@ The verifier requires a separately configured trusted public key. A key embedded
 
 The package exposes `ComputeRoot`, `SignManifest` and `VerifyBundle`. The caller supplies an out-of-band trusted-key map and expected previous root. No private key or trust anchor is bundled with the run.
 
-See `custody/README.md` for the model and test commands, and `EVIDENCE-CUSTODY-CONTRACT-v1.md` for the complete trust boundary.
+See `custody/README.md` for the model, offline CLI and test commands, and `EVIDENCE-CUSTODY-CONTRACT-v1.md` for the complete trust boundary.
 
 ## Explicit limits
 
@@ -52,6 +52,7 @@ See `custody/README.md` for the model and test commands, and `EVIDENCE-CUSTODY-C
 ## Files
 
 - `EVIDENCE-CUSTODY-CONTRACT-v1.md` — manifest semantics, trust model, threat model and chain rules.
+- `MANIFEST-v1.schema.json` — strict JSON manifest structure.
 - `SCENARIOS-v1.json` / schema — custody adversarial seed corpus.
 - `BENCHMARKS-v0.1.md` — integrity, overhead and operator acceptance targets.
 - `custody/` — Go verifier, tests, fuzz target and benchmark.
