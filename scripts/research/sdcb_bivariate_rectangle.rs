@@ -23,7 +23,7 @@ const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RectangleError {
     NonFiniteMean, NonFiniteCovariance, AsymmetricCovariance,
-    NonPositiveVariance, SingularCovarianceUnsupported,
+    InvalidVariance, CovarianceNotPositiveSemidefinite,
     IllConditionedCovarianceUnsupported, InvalidBounds,
     NonFiniteBoundIsNaN, IntegrationDidNotConverge,
     EvaluationBudgetExceeded, ProbabilityBelowResolution,
@@ -38,8 +38,9 @@ pub struct BivariateRectangleEstimate {
     pub outer_quadrature_error_indicator: f64,
     /// Union-bound allowance for truncating both independent normal coordinates.
     pub truncation_error_bound: f64,
-    pub correlation: f64,
-    pub correlation_condition_estimate: f64,
+    pub correlation: Option<f64>,
+    pub correlation_condition_estimate: Option<f64>,
+    pub covariance_rank: u8,
     pub function_evaluations: u64,
 }
 
@@ -74,6 +75,61 @@ fn normal_interval(lower: f64, upper: f64) -> Result<f64, RectangleError> {
     } else {
         Err(RectangleError::NumericFailure)
     }
+}
+
+fn deterministic_inside(value: f64, lower: f64, upper: f64) -> bool {
+    value > lower && value <= upper
+}
+
+fn constrain_standard_normal(
+    mean: f64, loading: f64, lower: f64, upper: f64,
+    z_lower: &mut f64, z_upper: &mut f64,
+) -> bool {
+    if loading == 0.0 { return deterministic_inside(mean, lower, upper); }
+    let x_lower = (lower - mean) / loading;
+    let x_upper = (upper - mean) / loading;
+    if loading > 0.0 {
+        *z_lower = z_lower.max(x_lower);
+        *z_upper = z_upper.min(x_upper);
+    } else {
+        *z_lower = z_lower.max(x_upper);
+        *z_upper = z_upper.min(x_lower);
+    }
+    *z_lower < *z_upper
+}
+
+fn rank_one_rectangle(
+    mean: [f64; 2], loading: [f64; 2], lower: [f64; 2], upper: [f64; 2],
+    correlation: Option<f64>,
+) -> Result<BivariateRectangleEstimate, RectangleError> {
+    let mut z_lower = f64::NEG_INFINITY;
+    let mut z_upper = f64::INFINITY;
+    for i in 0..2 {
+        if !constrain_standard_normal(mean[i], loading[i], lower[i], upper[i], &mut z_lower, &mut z_upper) {
+            return Ok(BivariateRectangleEstimate {
+                probability: 0.0, outer_quadrature_error_indicator: 0.0,
+                truncation_error_bound: TRUNCATION_BOUND, correlation,
+                correlation_condition_estimate: None, covariance_rank: 1, function_evaluations: 0,
+            });
+        }
+    }
+    if z_lower >= z_upper {
+        return Ok(BivariateRectangleEstimate {
+            probability: 0.0, outer_quadrature_error_indicator: 0.0,
+            truncation_error_bound: TRUNCATION_BOUND, correlation,
+            correlation_condition_estimate: None, covariance_rank: 1, function_evaluations: 0,
+        });
+    }
+    if z_lower >= CUTOFF || z_upper <= -CUTOFF {
+        return Err(RectangleError::ProbabilityBelowResolution);
+    }
+    let probability = normal_interval(z_lower, z_upper)?;
+    if probability <= TRUNCATION_BOUND { return Err(RectangleError::ProbabilityBelowResolution); }
+    Ok(BivariateRectangleEstimate {
+        probability, outer_quadrature_error_indicator: 0.0,
+        truncation_error_bound: TRUNCATION_BOUND, correlation,
+        correlation_condition_estimate: None, covariance_rank: 1, function_evaluations: 0,
+    })
 }
 
 fn simpson(a: f64, b: f64, fa: f64, fm: f64, fb: f64) -> f64 {
@@ -124,7 +180,7 @@ fn add_transition_points(
 }
 
 /// Compute P(lower < Y <= upper) for a two-channel Gaussian.
-/// Singular/ill-conditioned covariance is rejected; no diagonal jitter is used.
+/// Rank-deficient PSD covariance is integrated on its exact support; no jitter is used.
 pub fn bivariate_gaussian_rectangle(
     mean: [f64; 2], covariance: [[f64; 2]; 2],
     lower: [f64; 2], upper: [f64; 2],
@@ -145,24 +201,51 @@ pub fn bivariate_gaussian_rectangle(
     }
     let v1 = covariance[0][0];
     let v2 = covariance[1][1];
-    if v1 <= 0.0 || v2 <= 0.0 { return Err(RectangleError::NonPositiveVariance); }
+    if v1 < 0.0 || v2 < 0.0 { return Err(RectangleError::InvalidVariance); }
+    let c12 = 0.5 * (covariance[0][1] + covariance[1][0]);
+
+    if v1 == 0.0 && v2 == 0.0 {
+        if c12 != 0.0 { return Err(RectangleError::CovarianceNotPositiveSemidefinite); }
+        let probability = if deterministic_inside(mean[0], lower[0], upper[0])
+            && deterministic_inside(mean[1], lower[1], upper[1]) { 1.0 } else { 0.0 };
+        return Ok(BivariateRectangleEstimate {
+            probability, outer_quadrature_error_indicator: 0.0, truncation_error_bound: 0.0,
+            correlation: None, correlation_condition_estimate: None, covariance_rank: 0,
+            function_evaluations: 0,
+        });
+    }
+
+    if v1 == 0.0 || v2 == 0.0 {
+        if c12 != 0.0 { return Err(RectangleError::CovarianceNotPositiveSemidefinite); }
+        let loading = if v1 == 0.0 { [0.0, v2.sqrt()] } else { [v1.sqrt(), 0.0] };
+        return rank_one_rectangle(mean, loading, lower, upper, Some(0.0));
+    }
+
     let s1 = v1.sqrt();
     let s2 = v2.sqrt();
     if !s1.is_finite() || !s2.is_finite() || s1 <= 0.0 || s2 <= 0.0 {
         return Err(RectangleError::NumericFailure);
     }
-    let c12 = 0.5 * (covariance[0][1] + covariance[1][0]);
     let rho = (c12 / s1) / s2;
     if !rho.is_finite() { return Err(RectangleError::NumericFailure); }
-    if rho.abs() >= 1.0 { return Err(RectangleError::SingularCovarianceUnsupported); }
+    let psd_roundoff = 64.0 * f64::EPSILON;
+    if rho.abs() > 1.0 + psd_roundoff {
+        return Err(RectangleError::CovarianceNotPositiveSemidefinite);
+    }
+    if rho.abs() >= 1.0 {
+        return rank_one_rectangle(mean, [s1, c12 / s1], lower, upper, Some(rho.signum()));
+    }
     let condition = (1.0 + rho.abs()) / (1.0 - rho.abs());
-    if condition > MAX_CONDITION { return Err(RectangleError::IllConditionedCovarianceUnsupported); }
+    if condition > MAX_CONDITION {
+        return Err(RectangleError::IllConditionedCovarianceUnsupported);
+    }
 
     if lower[0] == upper[0] || lower[1] == upper[1] {
         return Ok(BivariateRectangleEstimate {
             probability: 0.0, outer_quadrature_error_indicator: 0.0,
-            truncation_error_bound: TRUNCATION_BOUND, correlation: rho,
-            correlation_condition_estimate: condition, function_evaluations: 0,
+            truncation_error_bound: TRUNCATION_BOUND, correlation: Some(rho),
+            correlation_condition_estimate: Some(condition), covariance_rank: 2,
+            function_evaluations: 0,
         });
     }
 
@@ -173,7 +256,7 @@ pub fn bivariate_gaussian_rectangle(
     let b2 = (upper[1] - mean[1]) / s2;
     let conditional_sd = (1.0 - rho * rho).sqrt();
     if !conditional_sd.is_finite() || conditional_sd <= 0.0 {
-        return Err(RectangleError::SingularCovarianceUnsupported);
+        return Err(RectangleError::NumericFailure);
     }
 
     // Break at conditional transition locations to expose narrow high-rho changes.
@@ -241,8 +324,9 @@ pub fn bivariate_gaussian_rectangle(
         probability: probability.min(1.0),
         outer_quadrature_error_indicator: error_indicator,
         truncation_error_bound: TRUNCATION_BOUND,
-        correlation: rho,
-        correlation_condition_estimate: condition,
+        correlation: Some(rho),
+        correlation_condition_estimate: Some(condition),
+        covariance_rank: 2,
         function_evaluations: evals,
     })
 }
@@ -371,11 +455,60 @@ mod tests {
     }
 
     #[test]
-    fn exact_duplicate_channels_are_unsupported() {
+    fn exact_duplicate_channels_are_integrated_on_rank_one_support() {
+        let r = bivariate_gaussian_rectangle(
+            [0.0, 0.0], [[1.0, 1.0], [1.0, 1.0]],
+            [0.0, 0.0], [1.0, 1.0],
+        ).unwrap();
+        close(r.probability, 0.3413447460685429, 2.0e-13);
+        assert_eq!(r.covariance_rank, 1);
+        assert_eq!(r.correlation, Some(1.0));
+    }
+
+    #[test]
+    fn perfect_anticorrelation_uses_intersected_support() {
+        let r = bivariate_gaussian_rectangle(
+            [0.0, 0.0], [[1.0, -1.0], [-1.0, 1.0]],
+            [0.0, -1.0], [1.0, 0.0],
+        ).unwrap();
+        close(r.probability, 0.3413447460685429, 2.0e-13);
+        assert_eq!(r.covariance_rank, 1);
+        assert_eq!(r.correlation, Some(-1.0));
+    }
+
+    #[test]
+    fn deterministic_coordinate_is_respected_for_rank_one_covariance() {
+        let r = bivariate_gaussian_rectangle(
+            [2.0, 0.0], [[0.0, 0.0], [0.0, 1.0]],
+            [1.0, -0.5], [2.0, 0.5],
+        ).unwrap();
+        close(r.probability, 0.3829249225480262, 2.0e-13);
+        assert_eq!(r.covariance_rank, 1);
+        let excluded = bivariate_gaussian_rectangle(
+            [2.0001, 0.0], [[0.0, 0.0], [0.0, 1.0]],
+            [1.0, -0.5], [2.0, 0.5],
+        ).unwrap();
+        assert_eq!(excluded.probability, 0.0);
+    }
+
+    #[test]
+    fn rank_zero_covariance_is_a_deterministic_rectangle_test() {
+        let r = bivariate_gaussian_rectangle(
+            [0.0, 2.0], [[0.0, 0.0], [0.0, 0.0]],
+            [-1.0, 1.0], [0.0, 3.0],
+        ).unwrap();
+        assert_eq!(r.probability, 1.0);
+        assert_eq!(r.covariance_rank, 0);
+    }
+
+    #[test]
+    fn non_psd_covariance_is_rejected_without_repair() {
         assert_eq!(
-            bivariate_gaussian_rectangle([0.0, 0.0], [[1.0, 1.0], [1.0, 1.0]],
-                [0.0, 0.0], [1.0, 1.0]),
-            Err(RectangleError::SingularCovarianceUnsupported)
+            bivariate_gaussian_rectangle(
+                [0.0, 0.0], [[1.0, 1.01], [1.01, 1.0]],
+                [-1.0, -1.0], [1.0, 1.0],
+            ),
+            Err(RectangleError::CovarianceNotPositiveSemidefinite)
         );
     }
 
