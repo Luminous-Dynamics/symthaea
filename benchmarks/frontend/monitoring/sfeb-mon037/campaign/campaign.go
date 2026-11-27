@@ -117,6 +117,7 @@ type Input struct {
  Transactions []TransactionProof `json:"transactions"`
  ExactReplayDeduplicationProven bool `json:"exact_replay_deduplication_proven"`
  DeduplicationProofSHA256 string `json:"deduplication_proof_sha256,omitempty"`
+ DeduplicationCoverageSHA256 string `json:"deduplication_coverage_sha256,omitempty"`
  SurfaceScope string `json:"surface_scope"`
  Surfaces []Surface `json:"surfaces"`
  RestoreChecks map[string]string `json:"restore_checks"`
@@ -327,11 +328,19 @@ func checkContinuity(in Input,f *flags){
 func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
  r.ExpectedEvents=len(in.SourceEvents);r.ObservedEvents=len(in.ObservedEvents);if len(in.SourceEvents)==0{cdc.hold("source_truth_missing")};checkRecordManifest("source_truth",in.SourceTruthComplete,in.SourceTruthManifestSHA256,in.SourceEventsSHA256,sourceEventsDigest(in.SourceEvents),cdc);checkRecordManifest("observed_capture",in.ObservedCaptureComplete,in.ObservedCaptureManifestSHA256,in.ObservedEventsSHA256,observedEventsDigest(in.ObservedEvents),cdc);checkRecordManifest("topic_partition_inventory",in.ObservedCaptureComplete,in.ObservedCaptureManifestSHA256,in.TopicPartitionsSHA256,topicPartitionsDigest(in.TopicPartitions),cdc);checkRecordManifest("transaction_report",in.TransactionReportComplete,in.TransactionReportSHA256,in.TransactionProofsSHA256,transactionProofsDigest(in.Transactions),txn)
  want:=map[string]Event{};for _,e:=range in.SourceEvents{if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validID(e.DataCollection)||!validDigest(e.PayloadSHA256)||e.TotalOrder<1||e.CollectionOrder<1{cdc.block("source_event_malformed");continue};if _,ok:=want[e.EventID];ok{cdc.block("duplicate_source_event_id:"+e.EventID)};want[e.EventID]=e}
- got:=map[string][]Event{};unique:=map[string]Event{};for _,e:=range in.ObservedEvents{if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validID(e.DataCollection)||!validDigest(e.PayloadSHA256)||e.TotalOrder<1||e.CollectionOrder<1||e.Partition<0||e.Offset<0{cdc.block("observed_event_malformed");continue};got[e.EventID]=append(got[e.EventID],e);if _,ok:=unique[e.EventID];!ok{unique[e.EventID]=e}}
+ got:=map[string][]Event{};unique:=map[string]Event{};exactReplayIDs:=[]string{};for _,e:=range in.ObservedEvents{if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validID(e.DataCollection)||!validDigest(e.PayloadSHA256)||e.TotalOrder<1||e.CollectionOrder<1||e.Partition<0||e.Offset<0{cdc.block("observed_event_malformed");continue};got[e.EventID]=append(got[e.EventID],e);if _,ok:=unique[e.EventID];!ok{unique[e.EventID]=e}}
  r.UniqueObservedEvents=len(unique)
  for id,w:=range want{records,ok:=got[id];if !ok{r.MissingEventIDs=append(r.MissingEventIDs,id);continue};for _,a:=range records{if !sameEvent(w,a){r.MismatchedEventIDs=append(r.MismatchedEventIDs,id);break}}}
- for id,records:=range got{if _,ok:=want[id];!ok{r.ExtraEventIDs=append(r.ExtraEventIDs,id)};if len(records)>1{exact:=true;for _,a:=range records[1:]{if !sameEvent(records[0],a){exact=false}};if exact{r.DuplicateReplays+=len(records)-1;if !in.ExactReplayDeduplicationProven||!validDigest(in.DeduplicationProofSHA256){cdc.hold("exact_replay_not_proven_idempotent:"+id)}}else{r.ConflictingEventIDs=append(r.ConflictingEventIDs,id)}}}
+ for id,records:=range got{if _,ok:=want[id];!ok{r.ExtraEventIDs=append(r.ExtraEventIDs,id)};if len(records)>1{exact:=true;for _,a:=range records[1:]{if !sameEvent(records[0],a){exact=false}};if exact{r.DuplicateReplays+=len(records)-1;exactReplayIDs=append(exactReplayIDs,id)}else{r.ConflictingEventIDs=append(r.ConflictingEventIDs,id)}}}
  for _,list:=range [][]string{r.MissingEventIDs,r.ExtraEventIDs,r.ConflictingEventIDs,r.MismatchedEventIDs}{sort.Strings(list)}
+ sort.Strings(exactReplayIDs)
+ if len(exactReplayIDs)>0 {
+  if !in.ExactReplayDeduplicationProven||!validDigest(in.DeduplicationProofSHA256)||!validDigest(in.DeduplicationCoverageSHA256) {
+   cdc.hold("exact_replay_not_proven_idempotent")
+  } else if in.DeduplicationCoverageSHA256!=canonicalDigest(exactReplayIDs) {
+   cdc.block("deduplication_proof_event_coverage_mismatch")
+  }
+ }
  if len(r.MissingEventIDs)>0{cdc.block("missing_events")};if len(r.ExtraEventIDs)>0{cdc.block("extra_events")};if len(r.ConflictingEventIDs)>0{cdc.block("conflicting_event_ids")};if len(r.MismatchedEventIDs)>0{cdc.block("event_payload_mismatch")}
  parts:=map[string]int{};for _,tp:=range in.TopicPartitions{if !validID(tp.Topic)||tp.PartitionCount<1{cdc.hold("topic_partition_inventory_invalid");continue};if _,ok:=parts[tp.Topic];ok{cdc.block("duplicate_topic_partition_inventory:"+tp.Topic)};parts[tp.Topic]=tp.PartitionCount}
  for _,e:=range in.SourceEvents{if _,ok:=parts[e.Topic];!ok{cdc.hold("topic_partition_inventory_missing:"+e.Topic)}};for topic,n:=range parts{if n!=1{cdc.hold("multi_partition_order_unsupported:"+topic)}}
