@@ -57,6 +57,7 @@ pub mod embodiment_projection;
 pub mod embodiment_receipt;
 pub mod embodiment_scene;
 pub mod embodiment_turn_control;
+pub mod embodiment_transition;
 
 // Mobile embodiment modules (moved from spore)
 pub mod ble_mesh;
