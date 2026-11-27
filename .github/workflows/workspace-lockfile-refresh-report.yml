@@ -53,7 +53,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cargo-lockfile-refresh-report
-          path: "$RUNNER_TEMP/lockfile-report/"
+          path: "${{ runner.temp }}/lockfile-report/"
           if-no-files-found: error
           retention-days: 7
       - name: Require successful lockfile resolution
