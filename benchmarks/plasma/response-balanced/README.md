@@ -183,6 +183,27 @@ Use three separate qualification views:
 
 Do not optimize only CVaR and then report it as a certificate. A finite scenario set only supports claims about that set unless a separate coverage or Lipschitz argument covers the admissible intervention domain.
 
+### Continuous adversarial pulse search: conditional separation oracle
+
+A finite challenge pool only proves a maximum over that pool. The next robust step is a pulse-domain **separation oracle** that searches for a response-loss scenario not already present in the pool. Generic semi-infinite scenario generation is established prior art: Zagorowska et al. (2024) show that worst-case uncertainty scenarios can lie in the interior of the admissible set, so checking only phase/amplitude/delay endpoints is not sufficient: https://doi.org/10.1002/rnc.7038
+
+The new Rust module src/challenge_search.rs implements a bounded one-dimensional branch-and-bound primitive for one continuous pulse coordinate at a time. Given an objective \(f(\theta)\), a closed interval \([a,b]\), and a globally valid Lipschitz constant \(L\), it samples the midpoint \(m\) of each interval and uses
+\[
+\operatorname{UB}([a,b])=f(m)+L\frac{b-a}{2}
+\]
+as a conditional upper envelope. It repeatedly bisects the interval with the largest upper bound and stops only when the largest upper bound minus the best sampled response loss is within the registered tolerance. The report binds the searched parameter, response-branch ID, Lipschitz-certificate SHA-256, best sample, global upper envelope, gap, and evaluation count.
+
+This primitive has deliberately conservative outcomes:
+- ConditionalGapSatisfied: the search gap is closed **assuming** the supplied global Lipschitz and branch-stability evidence is valid;
+- EvaluationBudgetExhausted or FloatingPointResolutionExhausted: the result remains UNQUALIFIED, with the remaining gap reported;
+- non-finite / negative response values or malformed provenance are rejected.
+
+The hash is an evidence reference, not a proof verifier. The code cannot establish that the supplied Lipschitz constant is physically correct, nor can it infer branch stability from a caller-provided branch ID. The physical solver / adjoint analysis must independently establish those facts over the entire searched interval. If an echo branch can appear, disappear, or switch, partition the domain into qualified branch regions or return UNKNOWN / hand-off; do not apply one smooth scalar bound across a branch discontinuity.
+
+K-RESP-1 registers pulse phase, kick amplitude, and pulse separation as continuous search axes. The current Rust primitive searches one scalar axis per invocation; it is not yet a globally certified multidimensional oracle. A multidimensional extension will need a valid anisotropic Lipschitz envelope or another global upper-bound method over boxes, with explicit search-budget accounting and branch-aware subdivision.
+
+The adversarial-search benchmark must compare boundary-only probing, fixed factorial grids, random probes, multi-start local optimization, and this branch-conditioned interval method at equal full-order solver budgets. Include a manufactured response objective with an interior maximum as a negative control for boundary-only designs. Report best sampled loss, conditional global upper bound, gap, solver calls, and unresolved domain mass. A search that runs out of budget is not a robust certificate.
+
 ### Status of the third object: representation / reconstruction contract
 
 The v0.1 routine is deliberately a two-Gramian implementation. The current finite-horizon (A/B/C) path is **intrusive/discrete-tangent**: the caller supplies exact discrete derivatives or labelled finite-difference estimates. It is not the same as Padovan's fully non-intrusive projected empirical-observability construction, which reuses forward-trajectory checkpoints and can avoid additional adjoint integrations under its stated approximation. That method is a required comparator; our builder is a separate path for cases where exact discrete solver derivatives are available. For black-box plasma solvers without tangent/adjoint access, a future non-intrusive response-factor acquisition path must be implemented and validated independently. It does not yet instantiate the programme's third object: representation and reconstruction information. Avoid calling that third object a third Gramian by default. It is a rate–distortion contract, and may contain several things: a declared reconstruction metric, a decoder/representation family, a byte budget, residual coding policy, and structural constraints. Also avoid a notation collision: in standard balanced projection, \(W_r\) denotes the reduced test basis; call the third programme object \(\mathcal R_r\).
