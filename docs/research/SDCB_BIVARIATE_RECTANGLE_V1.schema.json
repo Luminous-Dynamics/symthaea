@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/SDCB_BIVARIATE_RECTANGLE_V1.schema.json",
+  "title": "SDCB bivariate Gaussian rectangle fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "mean",
+    "covariance",
+    "lower",
+    "upper",
+    "expected_probability"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sdcb_bivariate_rectangle.v1"
+    },
+    "mean": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number"
+      }
+    },
+    "covariance": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "number"
+        }
+      }
+    },
+    "lower": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": [
+          "number",
+          "string"
+        ]
+      }
+    },
+    "upper": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": [
+          "number",
+          "string"
+        ]
+      }
+    },
+    "expected_probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "joint_bins": {
+      "type": "object"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
