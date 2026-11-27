@@ -12,11 +12,13 @@
     "event_id",
     "event_sequence",
     "event_kind",
+    "semantic_key",
     "canonical_cue_digest",
     "scene_graph_digest",
     "form",
     "privacy_class",
     "destination",
+    "channel",
     "epistemic_status",
     "effective_intensity",
     "effective_permit_expires_at_monotonic_ns",
@@ -129,6 +131,27 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 2048
+    },
+    "semantic_key": {
+      "enum": [
+        "conversation.listening.active",
+        "conversation.listening.inactive",
+        "conversation.speaking.active",
+        "conversation.speaking.inactive",
+        "conversation.turn.wait",
+        "conversation.turn.respond",
+        "conversation.turn.continue",
+        "conversation.turn.yield",
+        "conversation.backchannel",
+        "attention.focus",
+        "expression.intent",
+        "cognition.uncertainty",
+        "evidence.status",
+        "user.control"
+      ]
+    },
+    "channel": {
+      "const": "visual"
     }
   },
   "allOf": [
