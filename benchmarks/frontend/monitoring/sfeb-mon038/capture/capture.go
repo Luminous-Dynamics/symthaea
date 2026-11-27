@@ -259,6 +259,8 @@ func Evaluate(in Input)Result{
   if p.StartOffset<0||p.EndOffsetExclusive<p.StartOffset{f.block("offset_range_invalid",p.Topic)}
   if p.LogStartOffsetAtStart>p.StartOffset||p.LogStartOffsetAtEnd>p.StartOffset{f.block("capture_range_truncated_by_log_start",p.Topic)}
   if p.LastStableOffsetBefore!=p.LastStableOffsetAfter{f.hold("last_stable_offset_not_stable",p.Topic)}
+  if p.HighWatermarkBefore!=p.HighWatermarkAfter{f.hold("high_watermark_not_stable",p.Topic)}
+  if p.LastStableOffsetAfter>p.HighWatermarkAfter{f.block("last_stable_offset_exceeds_high_watermark",p.Topic)}else if p.LastStableOffsetAfter<p.HighWatermarkAfter{f.hold("unresolved_transaction_at_capture_end",p.Topic)}
   if p.EndOffsetExclusive!=p.LastStableOffsetAfter{if p.EndOffsetExclusive>p.LastStableOffsetAfter{f.block("capture_end_beyond_lso",p.Topic)}else{f.hold("capture_stops_before_lso",p.Topic)}}
   if p.LeaderEpochBefore<0||p.LeaderEpochAfter<0{f.hold("leader_epoch_missing",p.Topic)}else if p.LeaderEpochBefore!=p.LeaderEpochAfter{f.hold("leader_epoch_changed_during_capture",p.Topic)}
   if !p.CaptureComplete{f.hold("partition_capture_incomplete",p.Topic)}
