@@ -198,8 +198,54 @@ pub struct PhaseTimingsV1 {
     pub wall_ns: u64,
 }
 
+/// Legacy cost receipt. Byte fields are retained for v1 compatibility.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum ResourceMeasurementStatusV1 {
+pub struct CostReceiptV1 {
+    pub phases: PhaseTimingsV1,
+    /// Monotonic, measured resource cost in an implementation-defined unit.
+    pub measured_cost_microunits: Option<u64>,
+    /// Separately identified estimate; never substitute this for measurement.
+    pub estimated_cost_microunits: Option<u64>,
+    pub retained_bytes: u64,
+    pub index_bytes: u64,
+    pub network_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CostReceiptErrorV1 {
+    PhaseSumOverflow,
+    PhasesDoNotReconcile,
+}
+
+impl CostReceiptV1 {
+    /// Ensure non-overlapping measured phases, including residual, equal wall time.
+    pub fn validate(&self) -> Result<(), CostReceiptErrorV1> {
+        validate_phase_timings_v1(self.phases)
+    }
+}
+
+fn validate_phase_timings_v1(phases: PhaseTimingsV1) -> Result<(), CostReceiptErrorV1> {
+    let sum = [
+        phases.add_ingest_ns,
+        phases.index_update_ns,
+        phases.retrieval_ns,
+        phases.evidence_verification_ns,
+        phases.policy_application_ns,
+        phases.maintenance_ns,
+        phases.unattributed_ns,
+    ]
+    .into_iter()
+    .try_fold(0_u128, |acc, value| acc.checked_add(u128::from(value)))
+    .ok_or(CostReceiptErrorV1::PhaseSumOverflow)?;
+
+    if sum != u128::from(phases.wall_ns) {
+        return Err(CostReceiptErrorV1::PhasesDoNotReconcile);
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ResourceMeasurementStatusV2 {
     Measured,
     Estimated,
     #[default]
@@ -209,52 +255,52 @@ pub enum ResourceMeasurementStatusV1 {
 
 /// A byte quantity that cannot silently turn an unreported value into zero.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct ResourceQuantityV1 {
+pub struct ResourceQuantityV2 {
     pub value: Option<u64>,
-    pub status: ResourceMeasurementStatusV1,
+    pub status: ResourceMeasurementStatusV2,
 }
 
-impl ResourceQuantityV1 {
+impl ResourceQuantityV2 {
     fn is_consistent(self) -> bool {
         match self.status {
-            ResourceMeasurementStatusV1::Measured | ResourceMeasurementStatusV1::Estimated => {
+            ResourceMeasurementStatusV2::Measured | ResourceMeasurementStatusV2::Estimated => {
                 self.value.is_some()
             }
-            ResourceMeasurementStatusV1::Unknown | ResourceMeasurementStatusV1::NotApplicable => {
+            ResourceMeasurementStatusV2::Unknown | ResourceMeasurementStatusV2::NotApplicable => {
                 self.value.is_none()
             }
         }
     }
 }
 
+/// Cost receipt v2 makes byte measurement state explicit while preserving the v1 contract.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct CostReceiptV1 {
+pub struct CostReceiptV2 {
     pub phases: PhaseTimingsV1,
-    /// Monotonic, measured resource cost in an implementation-defined unit.
     pub measured_cost_microunits: Option<u64>,
-    /// Separately identified estimate; never substitute this for measurement.
     pub estimated_cost_microunits: Option<u64>,
-    pub retained_bytes: ResourceQuantityV1,
-    pub index_bytes: ResourceQuantityV1,
-    pub network_bytes: ResourceQuantityV1,
+    pub retained_bytes: ResourceQuantityV2,
+    pub index_bytes: ResourceQuantityV2,
+    pub network_bytes: ResourceQuantityV2,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CostReceiptErrorV1 {
+pub enum CostReceiptErrorV2 {
     PhaseSumOverflow,
     PhasesDoNotReconcile,
     ResourceStatusValueMismatch,
 }
 
-impl CostReceiptV1 {
-    /// Ensure non-overlapping measured phases, including residual, equal wall time.
-    pub fn validate(&self) -> Result<(), CostReceiptErrorV1> {
+impl CostReceiptV2 {
+    /// Measured zero is Some(0) + Measured; unknown is None + Unknown.
+    pub fn validate(&self) -> Result<(), CostReceiptErrorV2> {
         if !self.retained_bytes.is_consistent()
             || !self.index_bytes.is_consistent()
             || !self.network_bytes.is_consistent()
         {
-            return Err(CostReceiptErrorV1::ResourceStatusValueMismatch);
+            return Err(CostReceiptErrorV2::ResourceStatusValueMismatch);
         }
+
         let p = self.phases;
         let sum = [
             p.add_ingest_ns,
@@ -266,13 +312,11 @@ impl CostReceiptV1 {
             p.unattributed_ns,
         ]
         .into_iter()
-        .try_fold(0_u128, |acc, value| {
-            acc.checked_add(u128::from(value))
-        })
-        .ok_or(CostReceiptErrorV1::PhaseSumOverflow)?;
+        .try_fold(0_u128, |acc, value| acc.checked_add(u128::from(value)))
+        .ok_or(CostReceiptErrorV2::PhaseSumOverflow)?;
 
         if sum != u128::from(p.wall_ns) {
-            return Err(CostReceiptErrorV1::PhasesDoNotReconcile);
+            return Err(CostReceiptErrorV2::PhasesDoNotReconcile);
         }
         Ok(())
     }
@@ -1623,18 +1667,9 @@ mod tests {
             },
             measured_cost_microunits: Some(10),
             estimated_cost_microunits: None,
-            retained_bytes: ResourceQuantityV1 {
-                value: Some(100),
-                status: ResourceMeasurementStatusV1::Measured,
-            },
-            index_bytes: ResourceQuantityV1 {
-                value: Some(40),
-                status: ResourceMeasurementStatusV1::Measured,
-            },
-            network_bytes: ResourceQuantityV1 {
-                value: Some(20),
-                status: ResourceMeasurementStatusV1::Measured,
-            },
+            retained_bytes: 100,
+            index_bytes: 40,
+            network_bytes: 20,
         };
         assert_eq!(
             receipt.validate(),
@@ -1644,7 +1679,7 @@ mod tests {
 
     #[test]
     fn byte_cost_receipts_distinguish_measured_zero_from_unknown_and_not_applicable() {
-        let receipt = CostReceiptV1 {
+        let receipt = CostReceiptV2 {
             phases: PhaseTimingsV1 {
                 add_ingest_ns: 0,
                 index_update_ns: 0,
@@ -1657,28 +1692,28 @@ mod tests {
             },
             measured_cost_microunits: Some(0),
             estimated_cost_microunits: None,
-            retained_bytes: ResourceQuantityV1 {
+            retained_bytes: ResourceQuantityV2 {
                 value: Some(0),
-                status: ResourceMeasurementStatusV1::Measured,
+                status: ResourceMeasurementStatusV2::Measured,
             },
-            index_bytes: ResourceQuantityV1 {
+            index_bytes: ResourceQuantityV2 {
                 value: Some(64),
-                status: ResourceMeasurementStatusV1::Estimated,
+                status: ResourceMeasurementStatusV2::Estimated,
             },
-            network_bytes: ResourceQuantityV1 {
+            network_bytes: ResourceQuantityV2 {
                 value: None,
-                status: ResourceMeasurementStatusV1::Unknown,
+                status: ResourceMeasurementStatusV2::Unknown,
             },
         };
         assert_eq!(receipt.validate(), Ok(()));
-        let not_applicable = ResourceQuantityV1 {
+        let not_applicable = ResourceQuantityV2 {
             value: None,
-            status: ResourceMeasurementStatusV1::NotApplicable,
+            status: ResourceMeasurementStatusV2::NotApplicable,
         };
         assert!(not_applicable.is_consistent());
-        let forged_zero = ResourceQuantityV1 {
+        let forged_zero = ResourceQuantityV2 {
             value: Some(0),
-            status: ResourceMeasurementStatusV1::Unknown,
+            status: ResourceMeasurementStatusV2::Unknown,
         };
         assert!(!forged_zero.is_consistent());
     }
@@ -1698,18 +1733,9 @@ mod tests {
             },
             measured_cost_microunits: None,
             estimated_cost_microunits: Some(12),
-            retained_bytes: ResourceQuantityV1 {
-                value: Some(100),
-                status: ResourceMeasurementStatusV1::Measured,
-            },
-            index_bytes: ResourceQuantityV1 {
-                value: Some(40),
-                status: ResourceMeasurementStatusV1::Measured,
-            },
-            network_bytes: ResourceQuantityV1 {
-                value: Some(20),
-                status: ResourceMeasurementStatusV1::Measured,
-            },
+            retained_bytes: 100,
+            index_bytes: 40,
+            network_bytes: 20,
         };
         assert_eq!(receipt.validate(), Ok(()));
     }
