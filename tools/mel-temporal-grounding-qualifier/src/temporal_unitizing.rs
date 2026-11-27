@@ -14,7 +14,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::temporal_consensus::IndependentTemporalAnnotationV1;
 use crate::temporal_grounding::{AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1};
 use crate::temporal_reliability::ReliabilityCorpusItemV1;
 
@@ -448,6 +447,8 @@ pub fn audit_unitizing_corpus(
         })
         .collect();
 
+    let unitizing_alpha_computed = results.iter().any(|item| item.coefficients.is_some());
+
     Ok(UnitizingCorpusReportV1 {
         schema: REPORT_SCHEMA_V1,
         evaluator_version: EVALUATOR_VERSION_V1,
@@ -478,7 +479,7 @@ pub fn audit_unitizing_corpus(
         },
         source_work_summaries,
         item_results: results,
-        unitizing_alpha_computed: results.iter().any(|item| item.coefficients.is_some()),
+        unitizing_alpha_computed,
         consensus_ground_truth_created: false,
         pooled_continuum_alpha_computed: false,
         population_confidence_interval_computed: false,
@@ -746,7 +747,9 @@ fn compute_unitizing_profile(
         u_alpha_binary,
         observed_disagreement_cu_nominal: cu_nominal.as_ref().map(|value| value.observed),
         expected_disagreement_cu_nominal: cu_nominal.as_ref().map(|value| value.expected),
-        cu_alpha_nominal: cu_nominal.and_then(|value| value.alpha),
+        cu_alpha_nominal: cu_nominal.and_then(|value| {
+            alpha_from_disagreements(value.observed, value.expected)
+        }),
         per_value,
     })
 }
