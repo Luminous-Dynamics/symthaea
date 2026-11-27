@@ -12,18 +12,22 @@ mod response;
 #[path = "sdcb_interval_observation.rs"]
 mod interval_observation;
 
-use interval_observation::{
-    build_interval_observation_bundle,
-    predict_observation_covariance,
+pub use interval_observation::{
+    Error as IntervalObservationError,
     IntervalObservationBundle,
     MeasurementWindow,
 };
-use response::{FirstOrderResponseOu, ResponseModelError};
+pub use response::ResponseModelError;
+use interval_observation::{
+    build_interval_observation_bundle,
+    predict_observation_covariance,
+};
+use response::FirstOrderResponseOu;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BridgeError {
     Response(ResponseModelError),
-    Interval(interval_observation::Error),
+    Interval(IntervalObservationError),
 }
 
 impl From<ResponseModelError> for BridgeError {
@@ -145,13 +149,13 @@ mod tests {
         ];
         assert!(matches!(
             build_response_interval_bundle(&model, &duplicate),
-            Err(BridgeError::Interval(interval_observation::Error::DuplicateWindowIdentity))
+            Err(BridgeError::Interval(IntervalObservationError::DuplicateWindowIdentity))
         ));
 
         let empty = [sensor_window("zero", 1.0, 1.0)];
         assert!(matches!(
             build_response_interval_bundle(&model, &empty),
-            Err(BridgeError::Interval(interval_observation::Error::InvalidWindow))
+            Err(BridgeError::Interval(IntervalObservationError::InvalidWindow))
         ));
     }
 
