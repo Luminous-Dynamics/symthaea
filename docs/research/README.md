@@ -49,6 +49,8 @@ event contract.
 - [Counterfactual audiovisual grounding protocol](SYMTHAEA_COUNTERFACTUAL_AV_GROUNDING_PROTOCOL_V0_1_2026-11-27.md)
 - [Visual language and perceptual qualification](SYMTHAEA_VISUAL_LANGUAGE_AND_PERCEPTUAL_QUALIFICATION_V0_1_2026-11-27.md)
 - [Explicit scene relationship graph v2](SYMTHAEA_SCENE_RELATIONSHIP_GRAPH_V0_1_2026-11-27.md)
+- [Scene graph v2 JSON Schema](SYMTHAEA_SCENE_GRAPH_SCHEMA_V2_2026-11-27.json)
+- [Scene graph v2 fixtures](SYMTHAEA_SCENE_GRAPH_FIXTURES_V2_2026-11-27.json)
 - [Deterministic seven-form Bevy layout](../../renderers/symthaea-soma-bevy/src/visual_grammar.rs)
 - [Interaction trace schema](SYMTHAEA_INTERACTION_TRACE_SCHEMA_V1_2026-11-27.json)
 - [Interaction trace fixtures](SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json)
