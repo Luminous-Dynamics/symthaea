@@ -34,6 +34,7 @@ event contract.
 - [Dynamic temporal attention](SYMTHAEA_DYNAMIC_TEMPORAL_ATTENTION_V0_1_2026-11-27.md)
 - [Consent and presentation policy](SYMTHAEA_EMBODIMENT_CONSENT_POLICY_V0_1_2026-11-27.md)
 - [Deterministic scene compiler](SYMTHAEA_EMBODIMENT_SCENE_COMPILER_V0_1_2026-11-27.md)
+- [Bevy 0.20.1 renderer adapter](../../renderers/symthaea-soma-bevy/README.md)
 - [Scene frame schema](SYMTHAEA_EMBODIMENT_SCENE_SCHEMA_V1_2026-11-27.json)
 - [Scene frame fixtures](SYMTHAEA_EMBODIMENT_SCENE_FIXTURES_V1_2026-11-27.json)
 - [Presentation outcome receipts](SYMTHAEA_PRESENTATION_OUTCOME_RECEIPTS_V0_1_2026-11-27.md)
@@ -46,10 +47,10 @@ event contract.
 - [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
 - [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
 
-The Rust event and projection modules live in
-`crates/domains/symthaea-soma/src/embodiment_event.rs` and
-`embodiment_projection.rs`. Their regression tests are authored but have not
-yet been executed; no renderer or VideoFDB evaluation result is claimed.
+The renderer-independent event, projection, policy, receipt and scene modules live under
+`crates/domains/symthaea-soma/src/`. A standalone Bevy 0.20.1 adapter has source code under
+`renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
+All current regression tests are authored but unexecuted, and no VideoFDB evaluation result is claimed.
 
 ## Theoretical Foundations
 
