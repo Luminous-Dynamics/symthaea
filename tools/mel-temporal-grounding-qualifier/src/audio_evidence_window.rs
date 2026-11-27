@@ -160,6 +160,8 @@ pub struct AudioEvidenceVerificationReportV1 {
     pub context_manifest_recomputed: bool,
     pub request_body_sha256: String,
     pub request_body_bytes_recomputed: bool,
+    /// Parsed request fields were checked against the exact materialization manifest.
+    pub request_body_semantics_bound: bool,
     pub request_body_delivery_attested: bool,
     pub verified_window_count: usize,
     pub verified_windows: Vec<VerifiedWindowV1>,
@@ -205,6 +207,32 @@ struct EvidenceContextDigestPayloadV1<'a> {
     request_body_sha256: &'a str,
     request_body_byte_length: u64,
     request_body_content_type: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ClientModelAudioRequestV1 {
+    schema: String,
+    experiment_unit_id: String,
+    query_id: String,
+    query_text_sha256: String,
+    target_audio_sha256: String,
+    model_identity_sha256: String,
+    runtime_identity_sha256: String,
+    decoding_config_sha256: String,
+    prompt_sha256: String,
+    adapter_sha256: String,
+    retrieval_policy_sha256: String,
+    audio_windows: Vec<ClientAudioWindowV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ClientAudioWindowV1 {
+    window_id: String,
+    start_frame: u64,
+    end_frame: u64,
+    sha256: String,
 }
 
 pub fn verify_audio_evidence_manifest_json(
@@ -315,6 +343,9 @@ pub fn verify_audio_evidence_manifest(
     if request_body_sha256 != manifest.request_body.body_sha256 {
         return Err("client request-body bytes do not match declared SHA-256".into());
     }
+    let client_request: ClientModelAudioRequestV1 = serde_json::from_slice(request_body_bytes)
+        .map_err(|error| format!("invalid client model request body JSON: {error}"))?;
+    validate_client_request_body(&client_request, manifest)?;
 
     if manifest.decoded_pcm.sample_rate_hz == 0 || manifest.decoded_pcm.channels == 0 {
         return Err("decoded PCM sample rate and channel count must be positive".into());
@@ -460,6 +491,7 @@ pub fn verify_audio_evidence_manifest(
         context_manifest_recomputed: true,
         request_body_sha256,
         request_body_bytes_recomputed: true,
+        request_body_semantics_bound: true,
         request_body_delivery_attested: false,
         verified_window_count: verified_windows.len(),
         verified_windows,
@@ -469,6 +501,43 @@ pub fn verify_audio_evidence_manifest(
         runner_receipt_verified: false,
         model_input_attested: false,
     })
+}
+
+fn validate_client_request_body(
+    request: &ClientModelAudioRequestV1,
+    manifest: &AudioEvidenceWindowManifestV1,
+) -> Result<(), String> {
+    if request.schema != "mel-client-model-request-v1"
+        || request.experiment_unit_id != manifest.experiment_unit_id
+        || request.query_id != manifest.query_id
+        || request.query_text_sha256 != manifest.query_text_sha256
+        || request.target_audio_sha256 != manifest.target_audio_sha256
+        || request.model_identity_sha256 != manifest.model_identity_sha256
+        || request.runtime_identity_sha256 != manifest.runtime_identity_sha256
+        || request.decoding_config_sha256 != manifest.decoding_config_sha256
+        || request.prompt_sha256 != manifest.context.prompt_sha256
+        || request.adapter_sha256 != manifest.context.adapter_sha256
+        || request.retrieval_policy_sha256 != manifest.context.retrieval_policy_sha256
+    {
+        return Err("client request body semantics differ from the exact evidence manifest".into());
+    }
+    if request.audio_windows.len() != manifest.windows.len() {
+        return Err("client request body window count differs from materialized evidence windows".into());
+    }
+    for (index, (request_window, manifest_window)) in
+        request.audio_windows.iter().zip(&manifest.windows).enumerate()
+    {
+        if request_window.window_id != manifest_window.window_id
+            || request_window.start_frame != manifest_window.start_frame
+            || request_window.end_frame != manifest_window.end_frame
+            || request_window.sha256 != manifest_window.window_pcm_sha256
+        {
+            return Err(format!(
+                "client request body window {index} does not match the exact materialized frame slice"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_context(
@@ -726,6 +795,21 @@ mod tests {
             verify_audio_evidence_manifest(&manifest(), SOURCE_AUDIO, &bytes, REQUEST_BODY)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn request_body_json_must_match_target_and_selected_materialized_windows() {
+        let manifest = manifest();
+        let mut request: serde_json::Value =
+            serde_json::from_slice(REQUEST_BODY).unwrap();
+        request["target_audio_sha256"] =
+            serde_json::Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into());
+        let unrelated = serde_json::to_vec(&request).unwrap();
+        let mut forged = manifest;
+        forged.request_body.body_sha256 = sha256_hex(&unrelated);
+        forged.request_body.byte_length = unrelated.len() as u64;
+        forged.context.context_manifest_sha256 = context_digest(&forged).unwrap();
+        assert!(verify_audio_evidence_manifest(&forged, SOURCE_AUDIO, PCM, &unrelated).is_err());
     }
 
     #[test]
