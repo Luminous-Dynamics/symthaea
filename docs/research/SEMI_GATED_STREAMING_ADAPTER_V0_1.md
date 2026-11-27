@@ -43,7 +43,7 @@ Online state contains:
 
 The environment correction shrinks local estimates toward the global correction until the context has sufficient support. A new tool/chamber context starts from global context state; it cannot inherit another context's local correction.
 
-NLMS uses a finite norm floor, maximum feature/error limits and bounded per-coordinate weight deltas. Zero feature norm is safe and does not divide by zero or cause unbounded updates.
+NLMS uses a finite norm floor, maximum feature/error limits and bounded per-coordinate weight deltas. A temporal activation threshold may be sealed from a training-only residual sample; its receipt binds both the training manifest digest and the exact ordered residual-vector digest. Zero feature norm is safe and does not divide by zero or cause unbounded updates.
 
 ## Evidence and availability gate
 
@@ -129,6 +129,17 @@ Hard software targets:
 - 0 partial state mutation when an update fails.
 
 A predictive gain target is set only after faithful GRAPE reproduction; compare at equal qualified-label budgets and report paired confidence intervals.
+
+## GRAPE-parity improvement (stacked follow-up)
+
+The follow-up [#14069](https://github.com/Luminous-Dynamics/symthaea/issues/14069) brings the adapter closer to the pinned upstream decomposition:
+- Feature NLMS and global temporal EMA use the prediction-time **base** residual before the temporal correction.
+- Context residual uses the upstream form `label - (global prediction + updated feature correction)`; it does not subtract the prior context or temporal correction.
+- Context levels are global/equipment/chamber/equipment×chamber, with reliability weight `n/(n+n_min)` and a weighted-mean correction.
+- The context IDs and selected-feature vector are frozen at prediction time.
+- The temporal activation threshold can be calibrated from training-only residuals. The policy-bound receipt includes the training manifest and exact residual-vector digests.
+
+This is closer in update semantics, but still not a complete GRAPE reproduction: the Rust path does not yet fit the authors' TorchRidge global predictor, reproduce their training residual feature ranking, label clipping ranges, all configuration/hyperparameter choices, or execute the pinned dataset bundle. The official-code-faithful and corrected delayed-label tracks remain separate.
 
 ## Claim ceiling
 
