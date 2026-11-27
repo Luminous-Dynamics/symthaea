@@ -581,10 +581,9 @@ impl EvaluatorResolution {
         if actual_id != expected_id || actual_payload != expected_payload_digest {
             return Err("recorded action identity/payload differs from proposal".into());
         }
-        let receipt = self
-            .execution_receipt_ref
-            .as_deref()
-            .ok_or_else(|| "recorded action requires an upstream execution receipt reference".to_string())?;
+        let receipt = self.execution_receipt_ref.as_deref().ok_or_else(|| {
+            "recorded action requires an upstream execution receipt reference".to_string()
+        })?;
         require_nonempty("execution receipt reference", receipt)?;
         Ok(())
     }
