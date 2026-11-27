@@ -1,0 +1,133 @@
+{
+  "profile": "mon035-observer-independence-input-v1",
+  "version": "1.0.0",
+  "now": "2026-11-27T12:00:00Z",
+  "nodes": [
+    {
+      "id": "a-operator",
+      "failure_class": "operator",
+      "failure_domain_id": "a:operator"
+    },
+    {
+      "id": "a-identity_provider",
+      "failure_class": "identity_provider",
+      "failure_domain_id": "a:identity_provider"
+    },
+    {
+      "id": "a-control_plane",
+      "failure_class": "control_plane",
+      "failure_domain_id": "a:control_plane"
+    },
+    {
+      "id": "a-compute_host",
+      "failure_class": "compute_host",
+      "failure_domain_id": "a:compute_host"
+    },
+    {
+      "id": "a-storage",
+      "failure_class": "storage",
+      "failure_domain_id": "a:storage"
+    },
+    {
+      "id": "a-network",
+      "failure_class": "network",
+      "failure_domain_id": "a:network"
+    },
+    {
+      "id": "a-time_source",
+      "failure_class": "time_source",
+      "failure_domain_id": "a:time_source"
+    },
+    {
+      "id": "a-signer",
+      "failure_class": "signer",
+      "failure_domain_id": "a:signer"
+    },
+    {
+      "id": "a-root",
+      "depends_on": [
+        "a-operator",
+        "a-identity_provider",
+        "a-control_plane",
+        "a-compute_host",
+        "a-storage",
+        "a-network",
+        "a-time_source",
+        "a-signer"
+      ]
+    },
+    {
+      "id": "b-operator",
+      "failure_class": "operator",
+      "failure_domain_id": "b:operator"
+    },
+    {
+      "id": "b-identity_provider",
+      "failure_class": "identity_provider",
+      "failure_domain_id": "b:identity_provider"
+    },
+    {
+      "id": "b-control_plane",
+      "failure_class": "control_plane",
+      "failure_domain_id": "b:control_plane"
+    },
+    {
+      "id": "b-compute_host",
+      "failure_class": "compute_host",
+      "failure_domain_id": "b:compute_host"
+    },
+    {
+      "id": "b-storage",
+      "failure_class": "storage",
+      "failure_domain_id": "b:storage"
+    },
+    {
+      "id": "b-network",
+      "failure_class": "network",
+      "failure_domain_id": "b:network"
+    },
+    {
+      "id": "b-time_source",
+      "failure_class": "time_source",
+      "failure_domain_id": "b:time_source"
+    },
+    {
+      "id": "b-signer",
+      "failure_class": "signer",
+      "failure_domain_id": "b:signer"
+    },
+    {
+      "id": "b-root",
+      "depends_on": [
+        "b-operator",
+        "b-identity_provider",
+        "b-control_plane",
+        "b-compute_host",
+        "b-storage",
+        "b-network",
+        "b-time_source",
+        "b-signer"
+      ]
+    }
+  ],
+  "observers": [
+    {
+      "id": "observer-a",
+      "root_node_id": "a-root",
+      "inventory_complete": true,
+      "inventory_attestation_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_grade": "runtime_independently_verified",
+      "observed_at": "2026-11-27T11:59:00Z",
+      "expires_at": "2026-11-27T13:00:00Z"
+    },
+    {
+      "id": "observer-b",
+      "root_node_id": "b-root",
+      "inventory_complete": true,
+      "inventory_attestation_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "evidence_grade": "runtime_independently_verified",
+      "observed_at": "2026-11-27T11:59:00Z",
+      "expires_at": "2026-11-27T13:00:00Z"
+    }
+  ]
+}
