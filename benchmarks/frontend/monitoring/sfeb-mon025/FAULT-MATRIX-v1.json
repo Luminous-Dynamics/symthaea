@@ -31,17 +31,17 @@
       "id": "MON025-N001",
       "class": "negative_control",
       "name": "connector_restart_after_commit",
-      "expected_outcome": "blocked",
+      "expected_outcome": "indeterminate",
       "injection": "kill Connect after a source transaction commit; restart Connect",
-      "notes": "No expected event ID may be lost; replay duplicates are distinguished from conflicting identities"
+      "notes": "Immediately after restart, continuity remains indeterminate until an independent event-set and offset reconciliation proves no loss or conflicting replay."
     },
     {
       "id": "MON025-N002",
       "class": "negative_control",
       "name": "connector_crash_mid_transaction",
-      "expected_outcome": "blocked",
+      "expected_outcome": "indeterminate",
       "injection": "terminate Connect during a multi-row transaction",
-      "notes": "Transaction envelope must not be reported complete with missing members"
+      "notes": "A crash mid-transaction is indeterminate until transaction-envelope closure is independently reconciled; a proven missing member blocks."
     },
     {
       "id": "MON025-N003",
@@ -298,6 +298,14 @@
       "expected_outcome": "blocked",
       "injection": "use different local and remote pgBackRest binaries",
       "notes": "pgBackRest protocol requires exact version alignment"
+    },
+    {
+      "id": "MON025-N035",
+      "class": "negative_control",
+      "name": "same_event_id_altered_payload_preserved_row_count",
+      "expected_outcome": "blocked",
+      "injection": "alter a Kafka row payload amount while keeping event ID and batch row count unchanged",
+      "notes": "The independent source SQL oracle must detect value divergence even when event counts and primary keys still match."
     }
   ]
 }
