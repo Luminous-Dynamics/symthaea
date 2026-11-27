@@ -418,13 +418,13 @@ The exact-source test checks equality of each absolute residual and block maximu
 
 The MACE evaluator already supports paired memory/no-memory decision loss, frozen-policy leave-one-out interventions, cost receipts and world-cluster bootstrap. A new research increment adds second-order pairwise interventions to expose non-additive evidence effects that leave-one-out cannot identify.
 
-For full evidence (E), define (L(E)) as evaluator decision loss under the exact frozen downstream policy and seed. The pair interaction for items (i,j) is:
+For full evidence set `E`, define `L(E)` as evaluator decision loss under the exact frozen downstream policy and seed. The pair interaction for items `i,j` is:
 
 `I_ij = L(E\\{i,j}) - L(E\\{i}) - L(E\\{j}) + L(E)`
 
 Positive values mean substitution/redundancy: either item can compensate for the other. Negative values mean complementarity/synergy: the pair is more valuable together than individual removals suggest. The implementation requires a complete single-item ablation set, every unordered pair, and exact policy/system/episode/seed identity. It uses integer micro-loss and does not expose evaluator labels to candidate memory.
 
-Code head `264d4350c373a2b5f3ddf273205da0deec647e3b` adds `score_pairwise_interactions` and a known-answer redundancy/synergy control. The spec is in `research/mace-decision-sufficient-memory-bench-v0-1/PAIRWISE_EVIDENCE_INTERACTION_V0_1.md`. Exact-head Rust 1.96 formatting, compilation and test result are pending; the earlier parent evaluator and BM25 adapter qualifications remain the evidence baseline. This extension is not a Shapley value or an estimate of interactions beyond second order.
+Current code head `23d434535eee712537a0fc849105b0fbb8cfeb8e` contains `score_pairwise_interactions` and a known-answer redundancy/synergy control. The spec is in `research/mace-decision-sufficient-memory-bench-v0-1/PAIRWISE_EVIDENCE_INTERACTION_V0_1.md`. Exact-head Rust 1.96 formatting, compilation and test result are pending; the earlier parent evaluator and BM25 adapter qualifications remain the evidence baseline. This extension is not a Shapley value or an estimate of interactions beyond second order.
 
 The next target is to report pair interaction distributions by evidence family, conflict type and cost, with uncertainty resampled at independent world-cluster level. Do not sum pair interactions into a single “memory value” because higher-order effects can remain and pair terms can double-count.
 
