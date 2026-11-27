@@ -706,7 +706,11 @@
             "branch_stability_evidence_status",
             "budget_exhaustion_disposition",
             "global_bound_claim_status",
-            "full_order_confirmation_required"
+            "full_order_confirmation_required",
+            "objective_sample_error_interval_required",
+            "sample_interval_semantics",
+            "physical_sample_error_bound_status",
+            "convergence_flag_alone_means_zero_error"
           ],
           "properties": {
             "status": {
@@ -747,6 +751,18 @@
             },
             "full_order_confirmation_required": {
               "const": true
+            },
+            "objective_sample_error_interval_required": {
+              "const": true
+            },
+            "sample_interval_semantics": {
+              "const": "max_zero_value_minus_abs_error_to_value_plus_abs_error"
+            },
+            "physical_sample_error_bound_status": {
+              "const": "not_issued_synthetic"
+            },
+            "convergence_flag_alone_means_zero_error": {
+              "const": false
             }
           }
         },
@@ -767,7 +783,11 @@
             "global_bound_claim_status",
             "full_order_confirmation_required",
             "objective_normalization",
-            "reference_response_denominator_lower_bound_required"
+            "reference_response_denominator_lower_bound_required",
+            "objective_sample_error_interval_required",
+            "sample_interval_semantics",
+            "physical_sample_error_bound_status",
+            "convergence_flag_alone_means_zero_error"
           ],
           "properties": {
             "status": {
@@ -821,6 +841,18 @@
             },
             "reference_response_denominator_lower_bound_required": {
               "const": true
+            },
+            "objective_sample_error_interval_required": {
+              "const": true
+            },
+            "sample_interval_semantics": {
+              "const": "max_zero_value_minus_abs_error_to_value_plus_abs_error"
+            },
+            "physical_sample_error_bound_status": {
+              "const": "not_issued_synthetic"
+            },
+            "convergence_flag_alone_means_zero_error": {
+              "const": false
             }
           }
         }
