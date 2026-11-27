@@ -271,3 +271,14 @@ The 10% decision-loss improvement target is a hypothesis, not a result. Require 
 ## 11. Claim boundary
 
 This is an analytic finite-sample Gaussian-process reference and benchmark specification. It does not demonstrate physical sensor calibration, metrological traceability, real-data QUANT performance, production scientific-agent capability, SOTA performance, or superiority over existing methods.
+
+
+## 12. Metrology standards and edition control (checked 27 November 2026)
+
+The standards lane must pin the edition and the procedure actually executed.
+
+- The BIPM/JCGM publication page currently lists GUMsuite:2026, JCGM 100:2008/Amd.1:2026 on nonlinearity in measurement models, and JCGM GUM-5:2026 examples. JCGM 101:2008, Monte Carlo propagation, remains listed. See https://www.bipm.org/en/committees/jc/jcgm/publications/.
+- CEN/TS 17660-1:2021 for gaseous pollutant sensor systems is listed as active by the national standards registry; another catalogue records a review-enquiry stage with completion on 14 October 2026. Continue edition/successor tracking rather than assuming the 2021 text will remain the only applicable edition. See https://app.nbn.be/data/r/platform/frontend/detail?p40_id=199863&p_lang=en and https://www.iteh.us/catalog/standards/cen/5bdb236e-95a3-4b5b-ba7f-62ab08cd21f8/cen-ts-17660-1-2021.
+- PD CEN/TS 17660-2:2024 is listed as current for particulate-matter sensor performance. Its scope is individual low-cost sensor systems at fixed sites; it does not guarantee performance at other locations, different meteorological regimes, or long-term stability without ongoing quality-control strategies. It explicitly does not apply to sensor systems as part of a network, although it includes informative material on network nodes. See https://knowledge.bsigroup.com/products/air-quality-performance-evaluation-of-air-quality-sensor-systems-particulate-matter-in-ambient-air.
+
+**Architecture consequence:** SDCB should preserve a distinct device-conformance lane and a distinct network-decision-assurance lane. The first follows the licensed, version-pinned standard procedure. The second evaluates cross-device covariance, shared references/common causes, site/time transfer, calibration lineage, drift and terminal decision loss. Passing one lane does not imply passing the other. A standards edition being listed or tracked is not evidence that SDCB conforms to it; no conformance test is claimed here.
