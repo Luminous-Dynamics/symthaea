@@ -124,6 +124,20 @@ Compare on identical inputs, hardware, precision, and resource budgets:
 
 Do not compare the bivariate support-aware method's runtime with a high-dimensional SPD throughput result as if the workloads were equivalent. The Peterlin paper's reported near/above-100x speedups apply to its tested large-dimensional settings; they do not establish singular-PSD correctness or decision quality for SDCB.
 
+### Peterlin 2026 replication controls
+
+The paper's experimental setup is specific enough to reproduce rather than treating the headline speedup as a generic target:
+
+- It tests SPD covariance matrices only. Its four matrix families are random low-rank-plus-identity, equicorrelated, and two Matérn constructions. The authors explicitly note that singular-covariance support is available in mvtnorm but absent in the other compared packages.
+- Its main systems are an Apple M2 Ultra and a dual-socket Intel Xeon server, with Apple Accelerate and Intel MKL respectively. The paper says the cross-system timings are not intended as controlled cross-system comparisons.
+- It uses Julia 1.12.x and R 4.4/4.5.2, 16 Julia threads on the M2 Ultra, and one BLAS thread for the main integration kernel to avoid oversubscription.
+- The main comparisons use FP64; FP32 variants are reported separately. Each configuration is repeated at least 100 times and the paper reports minimum runtime, estimate mean, empirical estimate standard deviation, and mean integration error.
+- Preprocessing such as Cholesky factorization and variable reordering is included; package loading and first-use compilation are excluded.
+- Normalize the total QMC work, not the nominal argument: the paper notes tlrmvnmvt interprets N as points per repetition and performs 20 repetitions, while the other implementations interpret qmc_pts as total points.
+- The paper's reported near/above-100x advantage is strongest for large dimensions (n > 2^9) in the tested settings; its independent accuracy control is a special equicorrelation reduction, not arbitrary-covariance certification.
+
+Our reproduction matrix should therefore separate (a) exact paper replication on the same CPU/BLAS conditions where feasible, (b) same-machine cross-method comparisons on our own target hardware, and (c) SDCB-specific singular-support and decision-certified tasks. Report minimum and median/quantile timings, not only a best-case minimum, and retain the paper's QMC/replication budget normalization.
+
 ### Metrics
 
 - enclosure containment rate on frozen known answers;
