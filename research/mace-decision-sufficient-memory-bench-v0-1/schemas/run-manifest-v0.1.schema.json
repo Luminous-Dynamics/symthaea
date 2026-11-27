@@ -10,7 +10,6 @@
     "created_at_utc",
     "profile",
     "system",
-    "downstream_policy",
     "retrieval",
     "dataset",
     "evaluation",
@@ -234,6 +233,23 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "native-research"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "then": {
+        "required": [
+          "downstream_policy"
+        ]
+      }
+    },
     {
       "if": {
         "properties": {
