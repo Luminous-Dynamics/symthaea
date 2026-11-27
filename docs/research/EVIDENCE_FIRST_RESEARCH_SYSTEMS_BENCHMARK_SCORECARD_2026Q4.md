@@ -416,7 +416,7 @@ For full evidence (E), define (L(E)) as evaluator decision loss under the exact 
 
 `I_ij = L(E\\{i,j}) - L(E\\{i}) - L(E\\{j}) + L(E)`
 
-Positive values mean joint removal is more harmful than the sum of individual removals (complementarity); negative values mean substitution/redundancy. The implementation requires a complete single-item ablation set, every unordered pair, and exact policy/system/episode/seed identity. It uses integer micro-loss and does not expose evaluator labels to candidate memory.
+Positive values mean substitution/redundancy: either item can compensate for the other. Negative values mean complementarity/synergy: the pair is more valuable together than individual removals suggest. The implementation requires a complete single-item ablation set, every unordered pair, and exact policy/system/episode/seed identity. It uses integer micro-loss and does not expose evaluator labels to candidate memory.
 
 Code head `264d4350c373a2b5f3ddf273205da0deec647e3b` adds `score_pairwise_interactions` and a known-answer redundancy/synergy control. The spec is in `research/mace-decision-sufficient-memory-bench-v0-1/PAIRWISE_EVIDENCE_INTERACTION_V0_1.md`. Exact-head Rust 1.96 formatting, compilation and test result are pending; the earlier parent evaluator and BM25 adapter qualifications remain the evidence baseline. This extension is not a Shapley value or an estimate of interactions beyond second order.
 
