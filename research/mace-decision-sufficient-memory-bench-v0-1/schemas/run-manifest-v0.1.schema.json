@@ -192,6 +192,20 @@
         "platform_release": {
           "type": "string",
           "minLength": 1
+        },
+        "bootstrap_replicates": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "bootstrap_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "benchmark_tier": {
+          "enum": [
+            "small",
+            "medium"
+          ]
         }
       }
     },
@@ -338,6 +352,61 @@
           "evaluation": {
             "required": [
               "platform_release"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "native-research"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evaluation": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "metric_profile": {
+                      "const": "dsm-v0.1"
+                    }
+                  },
+                  "required": [
+                    "metric_profile"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "bootstrap_replicates",
+                    "bootstrap_seed"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "metric_profile": {
+                      "const": "longmemeval-v2"
+                    }
+                  },
+                  "required": [
+                    "metric_profile"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "benchmark_tier"
+                  ]
+                }
+              }
             ]
           }
         }
