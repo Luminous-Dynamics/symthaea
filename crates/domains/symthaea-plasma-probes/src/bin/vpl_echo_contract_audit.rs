@@ -40,17 +40,19 @@ fn run() -> Result<(), String> {
 fn audit(fixture: &Value) -> Result<(), String> {
     require_string(fixture, "schema_version", "0.1")?;
     require_string(fixture, "record_status", "synthetic_benchmark_contract_only")?;
-    require_string(fixture, "benchmark_id", "KRESP-CL-VPL-1D1V")?;
+    require_string(fixture, "benchmark_id", "KRESP-CL-VPL-3D3V")?;
     require_string(fixture, "equation", "vlasov_poisson_landau_coulomb")?;
     require_string(fixture, "collision_operator", "landau_coulomb")?;
     require_string(fixture, "equilibrium", "global_maxwellian")?;
 
     let domain = field(fixture, "domain")?;
     require_string(domain, "spatial_topology", "periodic_torus")?;
-    require_string(domain, "velocity_domain_model", "truncated_real_line_with_decay_tail")?;
+    require_string(domain, "velocity_domain_model", "truncated_R3_cartesian_cube_with_decay_tail")?;
     require_string(domain, "time_direction", "forward_only_from_physical_initial_data")?;
-    if integer(domain, "velocity_dimension")? != 1
-        || number(domain, "spatial_domain_length")? <= 0.0
+    let spatial_lengths = numeric_array(domain, "spatial_domain_lengths")?;
+    if integer(domain, "velocity_dimension")? != 3
+        || spatial_lengths.len() != 3
+        || spatial_lengths.iter().any(|length| *length <= 0.0)
         || number(domain, "velocity_cutoff")? <= 0.0
         || !boolean(domain, "velocity_tail_extension_required")?
     {
@@ -171,15 +173,11 @@ fn audit(fixture: &Value) -> Result<(), String> {
                 ));
             }
 
-            let modes = integer_array(trajectory, "initial_spatial_modes")?;
-            if modes.len() < 2 || modes.iter().any(|mode| *mode <= 0) {
+            let modes = mode_vectors(trajectory, "initial_spatial_modes")?;
+            if modes.len() < 2 {
                 return Err(format!(
-                    "{trajectory_id} requires at least two positive spatial modes"
+                    "{trajectory_id} requires at least two distinct spatial wavevectors"
                 ));
-            }
-            let distinct_modes = modes.iter().copied().collect::<HashSet<_>>();
-            if distinct_modes.len() != modes.len() {
-                return Err(format!("{trajectory_id} contains duplicate initial spatial modes"));
             }
             if integer(trajectory, "echo_cascade_depth")? < 2 {
                 return Err(format!(
@@ -388,6 +386,30 @@ fn numeric_array(value: &Value, key: &str) -> Result<Vec<f64>, String> {
         .iter()
         .map(|entry| numeric_value(entry, key))
         .collect()
+}
+
+fn mode_vectors(value: &Value, key: &str) -> Result<Vec<[i64; 3]>, String> {
+    let mut vectors = Vec::new();
+    let mut seen = HashSet::new();
+    for entry in array_at(value, key)? {
+        let components = entry
+            .as_array()
+            .ok_or_else(|| format!("{key} entries must be 3-component integer vectors"))?;
+        if components.len() != 3 {
+            return Err(format!("{key} entries must contain exactly three components"));
+        }
+        let mut vector = [0_i64; 3];
+        for (index, component) in components.iter().enumerate() {
+            vector[index] = component
+                .as_i64()
+                .ok_or_else(|| format!("{key} components must be integers"))?;
+        }
+        if vector == [0, 0, 0] || !seen.insert(vector) {
+            return Err(format!("{key} contains a zero or duplicate spatial wavevector"));
+        }
+        vectors.push(vector);
+    }
+    Ok(vectors)
 }
 
 fn integer_array(value: &Value, key: &str) -> Result<Vec<i64>, String> {
