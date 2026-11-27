@@ -252,3 +252,10 @@ Publish Pareto frontiers. Do not collapse probability error, decision loss, safe
 - Wen and Liu (2026), *Autonomous Science Bench: Evaluating AI Agents for Autonomous Scientific Discovery*. https://arxiv.org/abs/2610.18449
 
 The numerical and scientific decision tracks must be reported separately. An external agent benchmark can demonstrate workflow capability; it cannot validate a sensor model, causal interpretation or physical measurement.
+
+
+### Conditional likelihood custody
+
+Every multichannel likelihood supplied to Track E must carry a state-conditional identity envelope: prediction/model IDs and versions, the complete scientific/common-cause/device conditioning assignment, per-channel device evidence versions, each channel's own acquisition-window ID and start/end, per-channel calibration epoch/context, and measurement-action identity. The output also carries the conditional mean/covariance, threshold arrays and numerical method configuration. This prevents a table from becoming an unlabelled probability array or losing the provenance of unequal acquisition windows.
+
+The envelope is identity propagation, not authentication. The likelihood provider does not verify signatures, mutate #13805, authorize physical execution, or replace the independent receipt path. Each table must remain conditional on the relevant model and common/device states until the exact Bayesian or robust decision estimand specifies how to aggregate them.
