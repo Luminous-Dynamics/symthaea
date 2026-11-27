@@ -277,6 +277,158 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "commercial_use_authorized": {
+            "const": false
+          }
+        },
+        "required": [
+          "commercial_use_authorized"
+        ]
+      },
+      "then": {
+        "not": {
+          "properties": {
+            "permitted_operations": {
+              "contains": {
+                "const": "commercial_use"
+              }
+            }
+          },
+          "required": [
+            "permitted_operations"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "training_use_authorized": {
+            "const": false
+          }
+        },
+        "required": [
+          "training_use_authorized"
+        ]
+      },
+      "then": {
+        "not": {
+          "properties": {
+            "permitted_operations": {
+              "contains": {
+                "const": "training"
+              }
+            }
+          },
+          "required": [
+            "permitted_operations"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publication_authorized": {
+            "const": true
+          }
+        },
+        "required": [
+          "publication_authorized"
+        ]
+      },
+      "then": {
+        "properties": {
+          "permitted_operations": {
+            "contains": {
+              "const": "publication"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publication_authorized": {
+            "const": false
+          }
+        },
+        "required": [
+          "publication_authorized"
+        ]
+      },
+      "then": {
+        "not": {
+          "properties": {
+            "permitted_operations": {
+              "contains": {
+                "const": "publication"
+              }
+            }
+          },
+          "required": [
+            "permitted_operations"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "derivative_media_authorized": {
+            "const": false
+          }
+        },
+        "required": [
+          "derivative_media_authorized"
+        ]
+      },
+      "then": {
+        "not": {
+          "properties": {
+            "permitted_operations": {
+              "contains": {
+                "const": "derivative_media"
+              }
+            }
+          },
+          "required": [
+            "permitted_operations"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "permitted_transformations": {
+            "contains": {
+              "enum": [
+                "trim",
+                "resample",
+                "normalization",
+                "temporal_shuffle",
+                "counterfactual_visual_substitution"
+              ]
+            }
+          }
+        },
+        "required": [
+          "permitted_transformations"
+        ]
+      },
+      "then": {
+        "properties": {
+          "derivative_media_authorized": {
+            "const": true
+          }
+        }
+      }
     }
   ],
   "$defs": {
