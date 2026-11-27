@@ -106,6 +106,7 @@ pub struct DelayedAciPredictionInputV1 {
     /// Alpha state that the external interval builder used.
     pub alpha_state_used: f64,
     pub feedback_phase: Option<u64>,
+    pub policy_sha256: String,
     pub point_prediction: f64,
     pub interval_lower: f64,
     pub interval_upper: f64,
@@ -161,6 +162,7 @@ pub struct DelayedAciEngineV1 {
     pub global_model_artifact_sha256: String,
     pub calibration_model_sha256: String,
     pub policy: DelayedAciPolicyV1,
+    pub policy_sha256: String,
     pub current_alpha: f64,
     pub prediction_sequence: u64,
     /// Used only by ArrivalOrder mode.
@@ -189,6 +191,11 @@ pub struct DelayedAciUpdateReceiptV1 {
     pub prediction_receipt_sha256: Option<String>,
     pub eligibility_report_sha256: String,
     pub label_payload_sha256: String,
+    pub policy_sha256: String,
+    pub feedback_mode: DelayedAciFeedbackModeV1,
+    pub feedback_phase: Option<u64>,
+    pub delivered_at_unix_seconds: i64,
+    pub delivery_round_sequence: u64,
     pub interval_lower: Option<f64>,
     pub interval_upper: Option<f64>,
     pub miss_indicator: Option<bool>,
@@ -278,6 +285,10 @@ fn validate_policy(policy: &DelayedAciPolicyV1) -> Result<(), DelayedAciErrorV1>
     Ok(())
 }
 
+fn policy_digest(policy: &DelayedAciPolicyV1) -> Result<String, DelayedAciErrorV1> {
+    json_sha256(policy)
+}
+
 fn alpha_state_digest(engine: &DelayedAciEngineV1) -> Result<String, DelayedAciErrorV1> {
     json_sha256(&(
         engine.current_alpha,
@@ -300,6 +311,9 @@ fn validate_engine(engine: &DelayedAciEngineV1) -> Result<(), DelayedAciErrorV1>
         return Err(DelayedAciErrorV1("model/calibration digest is malformed".into()));
     }
     validate_policy(&engine.policy)?;
+    if !valid_sha256(&engine.policy_sha256) || policy_digest(&engine.policy)? != engine.policy_sha256 {
+        return Err(DelayedAciErrorV1("ACI policy digest is missing or inconsistent".into()));
+    }
     if !engine.current_alpha.is_finite() || !(0.0..=1.0).contains(&engine.current_alpha)
         || engine
             .phase_alpha_states
@@ -351,6 +365,7 @@ pub fn create_delayed_aci_engine_v1(
     if !initial_alpha.is_finite() || !(0.0..=1.0).contains(&initial_alpha) {
         return Err(DelayedAciErrorV1("initial alpha must be in [0,1]".into()));
     }
+    let policy_sha256 = policy_digest(&policy)?;
     let (phase_alpha_states, next_feedback_sequence_by_phase) = match policy.feedback_mode {
         DelayedAciFeedbackModeV1::ArrivalOrder => (Vec::new(), Vec::new()),
         DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps } => (
@@ -365,6 +380,7 @@ pub fn create_delayed_aci_engine_v1(
         global_model_artifact_sha256: global_model_artifact_sha256.into(),
         calibration_model_sha256: calibration_model_sha256.into(),
         policy,
+        policy_sha256,
         current_alpha: initial_alpha,
         phase_alpha_states,
         next_feedback_sequence_by_phase,
@@ -466,6 +482,7 @@ pub fn register_delayed_aci_prediction_v1(
         calibration_model_sha256: input.calibration_model_sha256.clone(),
         alpha_state_used: input.alpha_state_used,
         feedback_phase,
+        policy_sha256: engine.policy_sha256.clone(),
         point_prediction: input.point_prediction,
         interval_lower: input.interval_lower,
         interval_upper: input.interval_upper,
@@ -492,6 +509,7 @@ fn build_update_receipt(
     alpha_before: f64,
     alpha_after: f64,
     miss: Option<bool>,
+    feedback_phase: Option<u64>,
     update_sequence: Option<u64>,
 ) -> Result<DelayedAciUpdateReceiptV1, DelayedAciErrorV1> {
     let mut receipt = DelayedAciUpdateReceiptV1 {
@@ -506,6 +524,11 @@ fn build_update_receipt(
         prediction_receipt_sha256: prediction.map(|item| item.prediction_receipt_sha256.clone()),
         eligibility_report_sha256: delivery.eligibility_report.report_sha256.clone(),
         label_payload_sha256: delivery.label_payload_sha256.clone(),
+        policy_sha256: engine.policy_sha256.clone(),
+        feedback_mode: engine.policy.feedback_mode,
+        feedback_phase,
+        delivered_at_unix_seconds: delivery.delivered_at_unix_seconds,
+        delivery_round_sequence: delivery.delivery_round_sequence,
         interval_lower: prediction.map(|item| item.interval_lower),
         interval_upper: prediction.map(|item| item.interval_upper),
         miss_indicator: miss,
@@ -564,6 +587,7 @@ pub fn deliver_delayed_aci_feedback_v1(
             alpha_before,
             alpha_before,
             None,
+            prediction.and_then(|item| item.feedback_phase),
             None,
         );
     }
@@ -699,6 +723,7 @@ pub fn deliver_delayed_aci_feedback_v1(
             alpha_before,
             alpha_before,
             None,
+            prediction.and_then(|item| item.feedback_phase),
             None,
         );
     };
@@ -728,6 +753,7 @@ pub fn deliver_delayed_aci_feedback_v1(
             alpha_before,
             alpha_before,
             None,
+            prediction.and_then(|item| item.feedback_phase),
             None,
         );
     }
@@ -758,6 +784,7 @@ pub fn deliver_delayed_aci_feedback_v1(
         alpha_before,
         candidate_alpha,
         Some(miss),
+        prediction_receipt.feedback_phase,
         Some(next_count),
     )?;
 
