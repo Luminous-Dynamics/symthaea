@@ -1,0 +1,49 @@
+name: SDCB Absolute-Score Rho Sign Symmetry
+
+on:
+  push:
+    branches:
+      - research/sdcb-absolute-score-rho-sign-symmetry-2026-11-27
+    paths:
+      - "scripts/research/sdcb_student_t5_common_scale_stress.rs"
+      - ".github/workflows/sdcb-absolute-score-rho-symmetry.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/research/sdcb_student_t5_common_scale_stress.rs"
+      - ".github/workflows/sdcb-absolute-score-rho-symmetry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rho-sign-symmetry:
+    name: Rust 1.96 exact-source metamorphic control
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Generate rustfmt preview
+        run: rustfmt --edition 2024 scripts/research/sdcb_student_t5_common_scale_stress.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-rho-sign-rustfmt-preview
+          path: scripts/research/sdcb_student_t5_common_scale_stress.rs
+      - name: Restore exact committed source
+        run: git checkout -- scripts/research/sdcb_student_t5_common_scale_stress.rs
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check scripts/research/sdcb_student_t5_common_scale_stress.rs
+      - name: Compile and run exact-source controls
+        run: |
+          rustc --edition=2024 -D warnings --test scripts/research/sdcb_student_t5_common_scale_stress.rs -o /tmp/sdcb-rho-sign-tests
+          /tmp/sdcb-rho-sign-tests
