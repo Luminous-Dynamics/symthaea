@@ -39,7 +39,7 @@ pub enum LongMemoryCoverageStatusV1 {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LongMemoryLimitRegimeV1 {
-    GaussianShortMemoryWithinLinearModel,
+    GaussianLimitAboveThreeQuarter,
     CriticalGaussianAtThreeQuarter,
     RosenblattNonGaussian,
 }
@@ -72,6 +72,7 @@ pub struct LongMemoryCoveragePolicyV1 {
     pub significance_level: f64,
     pub minimum_calibration_count: usize,
     pub minimum_test_count: usize,
+    pub minimum_paired_block_count: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -200,6 +201,7 @@ fn validate_input_policy(policy: &LongMemoryCoveragePolicyV1) -> Result<(), Long
         || !(0.0..1.0).contains(&policy.significance_level)
         || policy.minimum_calibration_count < 8
         || policy.minimum_test_count < 1
+        || policy.minimum_paired_block_count < 2
     {
         return Err(LongMemoryCoverageErrorV1(
             "long-memory policy has invalid coverage, zeta, significance or sample limits".into(),
@@ -268,6 +270,7 @@ fn validate_adjacent_scores(
     let mut common_schema: Option<String> = None;
     let mut common_policy: Option<String> = None;
     let mut common_adapter_state: Option<String> = None;
+    let mut common_clock_domain: Option<String> = None;
 
     let mut scores = Vec::with_capacity(calibration_rows.len() + test_rows.len());
     let mut signed_residuals = Vec::with_capacity(calibration_rows.len() + test_rows.len());
@@ -310,6 +313,11 @@ fn validate_adjacent_scores(
                 &mut common_adapter_state,
                 &prediction.adapter_state_before_sha256,
                 "adapter state",
+            ),
+            (
+                &mut common_clock_domain,
+                &row.clock_domain_id,
+                "clock domain",
             ),
         ] {
             if stored.as_ref().is_some_and(|value| value != observed) {
@@ -551,6 +559,15 @@ pub fn evaluate_long_memory_coverage_inference_v1(
         return Ok(report);
     }
 
+    if !input.assumptions.gaussian_iid_innovations_declared
+        || !input.assumptions.regularly_varying_coefficients_declared
+        || !input.assumptions.fixed_predictor_independent_of_calibration_and_test_declared
+    {
+        report.status = LongMemoryCoverageStatusV1::AssumptionsNotSupported;
+        report.report_sha256 = report_digest(&report)?;
+        return Ok(report);
+    }
+
     let (calibration_scores, test_scores, signed_residuals) = validate_adjacent_scores(
         &input.calibration,
         &input.test,
@@ -596,7 +613,7 @@ pub fn evaluate_long_memory_coverage_inference_v1(
         return Ok(report);
     }
     report.limit_regime = Some(if beta > 0.75 {
-        LongMemoryLimitRegimeV1::GaussianShortMemoryWithinLinearModel
+        LongMemoryLimitRegimeV1::GaussianLimitAboveThreeQuarter
     } else if beta == 0.75 {
         LongMemoryLimitRegimeV1::CriticalGaussianAtThreeQuarter
     } else {
@@ -635,6 +652,11 @@ pub fn evaluate_long_memory_coverage_inference_v1(
     }
     report.paired_block_count = normalized_blocks.len();
     report.normalized_block_distribution_sha256 = Some(json_sha256(&normalized_blocks)?);
+    if normalized_blocks.len() < input.policy.minimum_paired_block_count {
+        report.status = LongMemoryCoverageStatusV1::InsufficientInput;
+        report.report_sha256 = report_digest(&report)?;
+        return Ok(report);
+    }
 
     let low_probability = input.policy.significance_level / 2.0;
     let high_probability = 1.0 - low_probability;
