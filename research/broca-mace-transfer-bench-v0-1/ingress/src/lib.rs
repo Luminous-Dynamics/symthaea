@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use sha2::{Digest, Sha256};
 
 use broca_mace_policy::{
-    Action, CausalIdentificationV1, Experience, Scope, SemanticEstimandV1,
+    Action, CausalIdentificationV1, Experience, Scope,
     SourceRootDigest,
 };
 
@@ -896,7 +896,7 @@ impl ConsolidationEvidencePackV1 {
                 .iter()
                 .map(|event| event.event_id)
                 .collect(),
-            max_qualified_success_measurement_error_bound,
+            max_qualified_success_measurement_error_bound: max_success_measurement_error_bound,
             scope_matches: !action_events.is_empty()
                 && scoped.len() == action_events.len(),
             all_trusted_predictions_pre_registered,
@@ -1318,7 +1318,7 @@ impl EvidenceDependencySidecarV1 {
                     .to_owned())
             };
             let parent_values = required(entry, "derived_from_event_ids", &record_context)?.as_array()
-                .ok_or_else(|| format!("{record_context}.derived_from_event_ids must be an array".to_string()))?;
+                .ok_or_else(|| format!("{record_context}.derived_from_event_ids must be an array"))?;
             let mut derived_from_event_ids = Vec::with_capacity(parent_values.len());
             for (parent_index, parent) in parent_values.iter().enumerate() {
                 let number = parent.as_u64().ok_or_else(|| format!(
