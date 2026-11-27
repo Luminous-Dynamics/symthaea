@@ -54,6 +54,10 @@ pub struct AdjudicationSamplingDesign {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelectiveObservationRecord {
     pub prediction: SelectivePredictionRecord,
+    /// Adjudicator or audit panel assigned before any outcome is observed.
+    /// Distinct from prediction.adjudicator, which may only identify the
+    /// completed label's actual adjudicator and be unavailable for pending rows.
+    pub prelabel_adjudicator_assignment: Option<String>,
     /// Probability that this record would receive an independent label under
     /// the declared design, conditional only on pre-label information.
     /// Must be present and in (0, 1] for every record in the target cohort.
@@ -657,8 +661,7 @@ fn stratify_population(
                     }
                 }
                 StratificationDimension::Adjudicator => record
-                    .prediction
-                    .adjudicator
+                    .prelabel_adjudicator_assignment
                     .as_deref()
                     .unwrap_or("unknown")
                     .to_owned(),
@@ -756,6 +759,7 @@ mod tests {
     ) -> SelectiveObservationRecord {
         SelectiveObservationRecord {
             prediction,
+            prelabel_adjudicator_assignment: Some("panel-assigned-before-label".to_owned()),
             adjudication_inclusion_probability: inclusion_probability,
         }
     }
@@ -785,7 +789,9 @@ mod tests {
         // One observed error with inclusion probability 0.5 represents two
         // errors in the four-record target population under this fixture.
         assert_eq!(population.always_answer.estimated_error_total, 2.0);
+        let naive_adjudicated_risk = 1.0 / 3.0;
         assert_eq!(population.always_answer.estimated_risk, Some(0.5));
+        assert_ne!(population.always_answer.estimated_risk, Some(naive_adjudicated_risk));
         assert_eq!(population.always_answer.accepted_count_in_full_cohort, 4);
     }
 
@@ -813,6 +819,10 @@ mod tests {
         assert_eq!(point.accepted_count_in_full_cohort, 2);
         assert_eq!(point.independently_labelled_accepted_count, 1);
         assert_eq!(point.coverage_in_full_cohort, 1.0);
+        assert!(report
+            .stratified
+            .iter()
+            .any(|group| group.value == "panel-assigned-before-label"));
     }
 
     #[test]
