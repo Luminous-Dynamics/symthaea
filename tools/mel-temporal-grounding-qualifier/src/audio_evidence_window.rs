@@ -580,13 +580,20 @@ fn validate_client_request_body(
             .end_frame
             .checked_mul(bytes_per_frame)
             .ok_or_else(|| format!("request window {} end overflow", window.window_id))?;
-        let start = usize::try_from(start_byte)
-            .map_err(|_| format!("request window {} offset exceeds host usize", window.window_id))?;
+        let start = usize::try_from(start_byte).map_err(|_| {
+            format!(
+                "request window {} offset exceeds host usize",
+                window.window_id
+            )
+        })?;
         let end = usize::try_from(end_byte)
             .map_err(|_| format!("request window {} end exceeds host usize", window.window_id))?;
-        let pcm_slice = decoded_pcm_bytes
-            .get(start..end)
-            .ok_or_else(|| format!("request window {} is outside decoded PCM bytes", window.window_id))?;
+        let pcm_slice = decoded_pcm_bytes.get(start..end).ok_or_else(|| {
+            format!(
+                "request window {} is outside decoded PCM bytes",
+                window.window_id
+            )
+        })?;
 
         let request_payload = decode_hex_payload(&request_window.payload_hex)
             .map_err(|error| format!("request window {} payload: {error}", window.window_id))?;
