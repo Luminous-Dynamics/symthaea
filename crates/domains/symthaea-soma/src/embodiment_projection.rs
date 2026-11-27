@@ -11,8 +11,7 @@
 use super::embodiment_event::{
     BackchannelSignal, EmbodimentEvent, EmbodimentStreamValidator, EpistemicStatus,
     EventKind, EventPayload, EventSource, EventValidationError, EvidenceState,
-    ExpressionChannel, ExpressionIntentKind, PrivacyClass, TurnState,
-    UserControlAction, UserControlPayload,
+    ExpressionChannel, ExpressionIntentKind, PrivacyClass, TurnState, UserControlAction,
 };
 use serde::{Deserialize, Serialize};
 
@@ -123,7 +122,7 @@ impl SemanticCue {
 
     /// Text alternative describes the reported event, not an inferred emotion
     /// or a claim that a downstream action has completed.
-    pub fn accessible_description(&self) -> String {
+    fn accessible_description(&self) -> String {
         match self {
             Self::Listening { active: true } => "Listening state reported active.".to_owned(),
             Self::Listening { active: false } => "Listening state reported inactive.".to_owned(),
@@ -181,6 +180,20 @@ pub struct CanonicalCue {
 }
 
 impl CanonicalCue {
+    /// Privacy-aware text alternative for generic renderers and assistive
+    /// technology. Sensitive payload values are not copied into this label.
+    pub fn accessible_description(&self) -> String {
+        match self.privacy_class {
+            PrivacyClass::Public => self.semantic.accessible_description(),
+            PrivacyClass::LocalSensitive => {
+                "Sensitive interaction cue; details omitted from generic presentation.".to_owned()
+            }
+            PrivacyClass::Restricted => {
+                "Restricted interaction cue; details omitted.".to_owned()
+            }
+        }
+    }
+
     pub fn from_event(event: &EmbodimentEvent) -> Result<Self, EventValidationError> {
         event.validate()?;
         let semantic = match &event.payload {
@@ -401,10 +414,41 @@ mod tests {
     }
 
     #[test]
+    fn restricted_cues_do_not_leak_subjects_through_accessible_text() {
+        let mut restricted = event(0, "event-0");
+        restricted.event_kind = EventKind::CognitionUncertainty;
+        restricted.payload = EventPayload::Uncertainty(crate::embodiment_event::UncertaintyPayload {
+            subject: "secret-project-name".to_owned(),
+            level: 0.4,
+            calibration_ref: None,
+        });
+        restricted.privacy_class = PrivacyClass::Restricted;
+        let cue = CanonicalCue::from_event(&restricted).unwrap();
+        let description = cue.accessible_description();
+        assert!(!description.contains("secret-project-name"));
+        assert!(description.contains("Restricted"));
+    }
+
+    #[test]
+    fn local_sensitive_cues_are_redacted_from_generic_accessible_text() {
+        let mut sensitive = event(0, "event-0");
+        sensitive.event_kind = EventKind::AttentionFocus;
+        sensitive.payload = EventPayload::AttentionFocus(
+            crate::embodiment_event::AttentionFocusPayload {
+                target: "private-personal-context".to_owned(),
+                strength: None,
+            },
+        );
+        sensitive.privacy_class = PrivacyClass::LocalSensitive;
+        let cue = CanonicalCue::from_event(&sensitive).unwrap();
+        assert!(!cue.accessible_description().contains("private-personal-context"));
+    }
+
+    #[test]
     fn accessible_description_does_not_claim_an_emotion() {
         let cue = CanonicalCue::from_event(&event(0, "event-0")).unwrap();
         assert_eq!(
-            cue.semantic.accessible_description(),
+            cue.accessible_description(),
             "Listening state reported active."
         );
     }
