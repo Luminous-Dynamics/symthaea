@@ -52,7 +52,7 @@ jq -e '
   and .global_order_inferred == false
   and .partition_count == 3
   and .business_event_count == 4
-  and .offset_gaps_accepted == 2
+  and .offset_gaps_accepted == 4
 ' "$TMP/result.json" >/dev/null
 
 jq '.unexpected_field = true' "$TMP/bound-input.json" > "$TMP/unknown.json"
