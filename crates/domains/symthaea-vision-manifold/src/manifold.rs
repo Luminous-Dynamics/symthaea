@@ -2649,6 +2649,9 @@ impl VisionManifold {
     /// unfreezing. The profile does not convert representation telemetry into
     /// a calibrated probability or grant actuation authority.
     pub fn enable_observer_only(&mut self) -> Result<(), String> {
+        if self.observer_only {
+            return Ok(());
+        }
         if self.frame_count != 0 {
             return Err("observer-only mode must be enabled before the first frame".to_string());
         }
@@ -3666,9 +3669,19 @@ impl VisionManifold {
                 || state.last_observed_frame.is_some()
                 || state.scene_memory.is_some()
                 || state.object_memory.is_some()
-                || state.working_memory.is_some())
+                || state.working_memory.is_some()
+                || state.scene_graph_enabled
+                || !state.last_object_hypotheses.is_empty()
+                || !state.last_geodesic.is_empty()
+                || state.modality_contexts.iter().any(|context| {
+                    context.object_memory.is_some()
+                        || context.working_memory.is_some()
+                        || context.scene_graph_enabled
+                }))
         {
-            return Err("observer-only checkpoint violates frozen/no-retention invariants".to_string());
+            return Err(
+                "observer-only checkpoint violates frozen/no-retention invariants".to_string(),
+            );
         }
         let schema_version = if state.schema_version == 0 {
             1
@@ -8706,7 +8719,9 @@ mod tests {
 
         let frame = solid_gray_frame(32, 32, 80);
         for _ in 0..8 {
-            let telemetry = manifold.observe_frame_checked(&frame, 32, 32, 1, 0.033).unwrap();
+            let telemetry = manifold
+                .observe_frame_checked(&frame, 32, 32, 1, 0.033)
+                .unwrap();
             assert!(!telemetry.training_triggered);
             assert_eq!(telemetry.last_fep_action, "OBSERVER_ONLY_DISABLED");
         }
@@ -8722,6 +8737,9 @@ mod tests {
         assert!(saved.scene_memory.is_none());
         assert!(saved.object_memory.is_none());
         assert!(saved.working_memory.is_none());
+        assert!(!saved.scene_graph_enabled);
+        assert!(saved.last_object_hypotheses.is_empty());
+        assert!(saved.last_geodesic.is_empty());
     }
 
     #[test]
@@ -8769,6 +8787,19 @@ mod tests {
         invalid.last_observed_frame = Some(frame);
         let mut fresh = VisionManifold::try_new(config, 32, 32).unwrap();
         assert!(fresh.load_state(&invalid).is_err());
+    }
+
+    #[test]
+    fn observer_only_cannot_be_enabled_after_observation_has_started() {
+        let mut manifold =
+            VisionManifold::try_new(VisionConfig::default(), 32, 32).unwrap();
+        let frame = solid_gray_frame(32, 32, 60);
+        manifold
+            .observe_frame_checked(&frame, 32, 32, 1, 0.033)
+            .unwrap();
+
+        assert!(manifold.enable_observer_only().is_err());
+        assert!(!manifold.is_observer_only());
     }
 
     // === Active Patch Count ===
