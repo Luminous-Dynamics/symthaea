@@ -50,6 +50,8 @@ See `benchmark/` for:
 - JSON CLI;
 - tests, fuzz target and microbenchmark.
 
+Start with `SUITE-example.json`. Run `bash CHECKS.sh` from this directory on a machine with Go 1.23+ to execute formatting, vet, unit, race, fuzz and benchmark checks.
+
 The benchmark suite itself should be signed/custodied with MON-026/027. The scorer's output should also be exported as a MON-026 artifact, with benchmark matrix digest, oracle digest, system implementation digest, environment and resource envelope.
 
 ## Status and limits
