@@ -104,6 +104,12 @@ All split assignments, device IDs, site IDs, event-time ranges and cohort inclus
 
 Compare only on matched channels, units, timestamps/windows, training support and reference assumptions.
 
+**Standards and measurement conformance**
+- CEN/TS 17660-1:2021 for gaseous pollutants (including NO2) and CEN/TS 17660-2:2024 for PM10/PM2.5, using their published editions and licensed test procedures.
+- ISO/IEC Guide 98-3:2008 / JCGM 100 (GUM) uncertainty evaluation and reporting; JCGM 101 Monte Carlo propagation where needed.
+- Keep device-level standard classification separate from SDCB's network-level inference. The published CEN/TS scopes focus on individual sensor systems at fixed sites; they do not by themselves validate common-cause dependence, cross-device reference ancestry, or network-wide decision integrity.
+- Do not claim standards compliance from the QUANT archive alone. Freeze the standard edition, obtain the complete normative test requirements, instrument conditions and acceptance criteria, and execute the required laboratory/field procedures.
+
 **Measurement and regression baselines**
 - naive timestamp join / IID residual baseline (diagnostic negative control only);
 - ordinary least squares (OLS);
@@ -131,7 +137,22 @@ Compare only on matched channels, units, timestamps/windows, training support an
 
 Keep physical pollutant-process covariance separate from shared measurement-system causes, reference-chain uncertainty, device-local drift and residual acquisition noise. Residual correlation alone does not identify a physical cause.
 
-## 7. Metrics and decision outcomes
+## 7. Standards-conformance and traceability lane
+
+Before asserting that SDCB improves deployment quality, qualify the individual sensor systems against the published, applicable standard:
+- CEN/TS 17660-1:2021 covers performance evaluation/classification of low-cost sensor systems for gaseous pollutants in ambient air, including NO2.
+- CEN/TS 17660-2:2024 covers particulate matter, including PM10 and PM2.5.
+- ISO/IEC Guide 98-3:2008 / JCGM 100 provides the general framework for evaluating and expressing measurement uncertainty; JCGM 101 covers propagation of distributions using Monte Carlo methods where appropriate.
+
+The published CEN/TS specifications focus on individual sensor systems under prescribed laboratory/field testing at fixed sites. They are not a substitute for a network-level benchmark. Keep two claim lanes:
+1. **Device conformance:** reproduce the applicable standard's individual-device tests with the exact licensed edition, calibration/field protocol and acceptance criteria.
+2. **Network decision assurance:** quantify shared reference, environmental, power, firmware, device-local and time-window dependence; test network predictive uncertainty, common-cause false confirmation, spatial/site transport and decision value.
+
+Metrological traceability is a separate property: a measurement result must be related to a reference through a documented, unbroken calibration chain, with each calibration contributing to uncertainty. A digital ID/version envelope or verified software receipt is not itself a calibration certificate or proof of traceability. Report instrument identity, reference-standard certificates, calibration intervals, uncertainty contributions and ancestry separately from the statistical predictive model.
+
+The current CEN committee is reviewing successor prEN versions; use the published CEN/TS editions as the declared baseline until a successor is formally published/adopted. Do not silently mix draft criteria into a claimed standards-conformance result.
+
+## 8. Metrics and decision outcomes
 
 Report by pollutant, site, device family, time regime and held-out split:
 - bias, MAE and RMSE;
@@ -147,7 +168,7 @@ Report by pollutant, site, device family, time regime and held-out split:
 
 A high correlation or low RMSE is not a metrological traceability certificate. State separately whether the result establishes predictive performance, calibration-parameter coverage, sensor conformance, traceability, causal diagnosis or physical validation. The public archive alone does not automatically supply ground truth for all of these claims.
 
-## 8. SDCB-specific research questions
+## 9. SDCB-specific research questions
 
 1. Does interval-integrated OU/vector state covariance reduce bias and over-rejection relative to point-sample or IID models when acquisition periods differ?
 2. Does full cross-factor covariance prevent false independent confirmation among devices sharing a site, power/environment, reference or calibration ancestry?
@@ -159,7 +180,7 @@ A high correlation or low RMSE is not a metrological traceability certificate. S
 
 The critical outcome is not whether SDCB wins one RMSE table. It is whether the system makes better-calibrated, lower-cost scientific decisions without claiming independence, adequacy or traceability it has not established.
 
-## 9. Acceptance gates (targets, not results)
+## 10. Acceptance gates (targets, not results)
 
 - 100% agreement with frozen analytical and synthetic numerical fixtures within tolerance.
 - Zero silent time-window substitutions or undocumented resampling.
@@ -172,10 +193,14 @@ The critical outcome is not whether SDCB wins one RMSE table. It is whether the 
 
 These are research gates. No QUANT benchmark result, dataset acquisition, physical test or SOTA comparison is claimed in this document.
 
-## 10. Sources
+## 11. Sources
 
 - CEDA, QUANT dataset catalogue, UUID ae1df3ef736f4248927984b7aa079d2e: https://catalogue.ceda.ac.uk/uuid/ae1df3ef736f4248927984b7aa079d2e
 - CEDA archive directory: https://data.ceda.ac.uk/badc/deposited2023/QUANT/
+- CEN/TS 17660-1:2021, Air quality — Performance evaluation of air quality sensor systems — Part 1: Gaseous pollutants in ambient air.
+- CEN/TS 17660-2:2024, Air quality — Performance evaluation of air quality sensor systems — Part 2: Particulate matter in ambient air.
+- ISO/IEC Guide 98-3:2008 / JCGM 100, Guide to the Expression of Uncertainty in Measurement (GUM).
+- ISO/IEC Guide 98-3 Supplement 1 / JCGM 101, Propagation of distributions using a Monte Carlo method.
 - Kok, G. and Tabandeh, S. (2026), *Uncertainty Evaluation for Testing and Calibrating Mobile Sensors Only Using Short Collocation Periods*, Quality and Reliability Engineering International 42(7), 4298–4309. DOI: https://doi.org/10.1002/qre.70319
 - Terminal-Bench-Science live task set and contribution process: https://github.com/harbor-framework/terminal-bench-science/ and https://www.terminal-bench-science.ai/contribute
 - ASI-Bench task catalog: https://asibench.apexin.ai/tasks/catalog/
