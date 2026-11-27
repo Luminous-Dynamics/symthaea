@@ -9,7 +9,7 @@ use std::fs;
 use std::process::ExitCode;
 
 use mel_temporal_grounding_qualifier::audio_evidence_window::{
-    verify_audio_evidence_manifest_json, AudioEvidenceVerificationReportV1,
+    AudioEvidenceVerificationReportV1, verify_audio_evidence_manifest_json,
 };
 
 fn decode_hex_file(path: &str) -> Result<Vec<u8>, String> {

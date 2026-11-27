@@ -9,14 +9,14 @@
 use serde::Serialize;
 
 use crate::audio_evidence_window::{
-    verify_audio_evidence_manifest, AudioEvidenceVerificationReportV1,
-    AudioEvidenceWindowManifestV1, EvidenceConditionV1 as AudioEvidenceConditionV1,
+    AudioEvidenceVerificationReportV1, AudioEvidenceWindowManifestV1,
+    EvidenceConditionV1 as AudioEvidenceConditionV1, verify_audio_evidence_manifest,
 };
 use crate::evidence_digest::sha256_hex;
 use crate::temporal_revision::{
-    audit_revision_v2, compare_matched_evidence_arms,
     EvidenceBindingStatusV1, EvidenceConditionV1 as RevisionEvidenceConditionV1,
-    MatchedEvidenceContrastV1, RevisionCaseV2, RevisionReportV1,
+    MatchedEvidenceContrastV1, RevisionCaseV2, RevisionReportV1, audit_revision_v2,
+    compare_matched_evidence_arms,
 };
 
 const REPORT_SCHEMA_V1: &str = "mel-audio-bound-revision-report-v1";
@@ -76,7 +76,9 @@ pub fn audit_verified_audio_evidence_triplet(
         || no_evidence.decoded_pcm_bytes.is_some()
         || no_evidence.request_body_bytes.is_some()
     {
-        return Err("NoEvidence arm must not include evidence references, manifests or bytes".into());
+        return Err(
+            "NoEvidence arm must not include evidence references, manifests or bytes".into(),
+        );
     }
     let no_evidence_revision_report = audit_revision_v2(no_case)?;
 
@@ -163,14 +165,15 @@ pub fn audit_revision_with_audio_evidence(
     request_body_bytes: &[u8],
 ) -> Result<AudioBoundRevisionAuditV1, String> {
     let revision_report = audit_revision_v2(revision_case)?;
-    let evidence = revision_case
-        .evidence
-        .as_ref()
-        .ok_or_else(|| "audio evidence binding requires a revision evidence reference".to_string())?;
+    let evidence = revision_case.evidence.as_ref().ok_or_else(|| {
+        "audio evidence binding requires a revision evidence reference".to_string()
+    })?;
 
     let expected_audio_condition = match revision_case.evidence_condition {
         RevisionEvidenceConditionV1::NoEvidence => {
-            return Err("NoEvidence revision cases must not provide an audio-window manifest".into());
+            return Err(
+                "NoEvidence revision cases must not provide an audio-window manifest".into(),
+            );
         }
         RevisionEvidenceConditionV1::LocalRetrieved => AudioEvidenceConditionV1::LocalRetrieved,
         RevisionEvidenceConditionV1::YokedRetrieved => AudioEvidenceConditionV1::YokedRetrieved,
@@ -219,18 +222,24 @@ pub fn audit_revision_with_audio_evidence(
         || evidence_manifest.runtime_identity_sha256 != revision_case.runtime_identity_sha256
         || evidence_manifest.decoding_config_sha256 != revision_case.decoding_config_sha256
     {
-        return Err("audio evidence model/runtime/decoding identity differs from revision case".into());
+        return Err(
+            "audio evidence model/runtime/decoding identity differs from revision case".into(),
+        );
     }
     if evidence_manifest.context.prompt_sha256 != revision_case.prompt_sha256
         || evidence_manifest.context.adapter_sha256 != revision_case.adapter_sha256
         || evidence_manifest.context.retrieval_policy_sha256 != evidence.retrieval_config_sha256
     {
-        return Err("audio evidence prompt/adapter/retrieval policy differs from revision case".into());
+        return Err(
+            "audio evidence prompt/adapter/retrieval policy differs from revision case".into(),
+        );
     }
     if evidence.source_audio_sha256 != evidence_report.source_audio_sha256
         || evidence.source_sample_rate_hz != evidence_manifest.decoded_pcm.sample_rate_hz
     {
-        return Err("revision evidence source identity or sample rate differs from verified bytes".into());
+        return Err(
+            "revision evidence source identity or sample rate differs from verified bytes".into(),
+        );
     }
 
     let selected_window_match_count = evidence_manifest
@@ -257,11 +266,15 @@ pub fn audit_revision_with_audio_evidence(
                 || pcm.channels != artifact.channels
                 || pcm.total_frames != artifact.total_frames
             {
-                return Err("local evidence PCM clock differs from the exact scored target audio".into());
+                return Err(
+                    "local evidence PCM clock differs from the exact scored target audio".into(),
+                );
             }
         }
         AudioEvidenceConditionV1::YokedRetrieved => {
-            if evidence_manifest.source_audio.audio_sha256 == revision_case.truth.artifact.audio_sha256 {
+            if evidence_manifest.source_audio.audio_sha256
+                == revision_case.truth.artifact.audio_sha256
+            {
                 return Err("yoked evidence reuses the target recording".into());
             }
         }
@@ -291,16 +304,15 @@ mod tests {
     use crate::audio_evidence_window::recompute_audio_context_manifest_sha256;
     use crate::evidence_digest::sha256_hex;
     use crate::temporal_grounding::{
-        AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1,
-        GroundingPredictionStateV1, TemporalGroundTruthV1, TemporalGroundingPlanV1,
-        TemporalGroundingPredictionV1, TEMPORAL_GROUNDING_EVALUATOR_V1,
-        TEMPORAL_GROUNDING_SCHEMA_V1,
+        AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1, GroundingPredictionStateV1,
+        TEMPORAL_GROUNDING_EVALUATOR_V1, TEMPORAL_GROUNDING_SCHEMA_V1, TemporalGroundTruthV1,
+        TemporalGroundingPlanV1, TemporalGroundingPredictionV1,
     };
 
     const SOURCE_AUDIO: &[u8] = b"MEL-GROUND-009 synthetic source audio bytes v1\n";
     const PCM: &[u8] = &[
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-        16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31,
     ];
 
     const REQUEST_BODY: &[u8] = br#"{"schema":"mel-client-model-request-v1","experiment_unit_id":"mel-grounding-evidence-window-fixture-001","query_id":"piano-entry-query-001","query_text_sha256":"8faaeb1470e86800e5d84b45b7f311a7f1554eaad46c77b45bd3210d289c1cc2","target_audio_sha256":"b12dbd7c993ac1f0ddf6c0cef16c605ce48da060738b83837e39bdadf9df83ef","model_identity_sha256":"7777777777777777777777777777777777777777777777777777777777777777","runtime_identity_sha256":"8888888888888888888888888888888888888888888888888888888888888888","decoding_config_sha256":"9999999999999999999999999999999999999999999999999999999999999999","prompt_sha256":"3333333333333333333333333333333333333333333333333333333333333333","adapter_sha256":"4444444444444444444444444444444444444444444444444444444444444444","retrieval_policy_sha256":"5555555555555555555555555555555555555555555555555555555555555555","audio_windows":[{"window_id":"window-001","start_frame":1,"end_frame":3,"sha256":"3fc77626f4c70d9e28aa4c1cd901fcf28a7a6a690788342dcb45884f5dc3acb0"},{"window_id":"window-002","start_frame":5,"end_frame":8,"sha256":"74cac05eac42e84ae16f372efbe5354a1fa5e03b39ae90df4a9dcd81a59fb792"}]}"#;
@@ -330,11 +342,16 @@ mod tests {
             case_id: "audio-bound-revision-case-001".into(),
             experiment_unit_id: "mel-grounding-evidence-window-fixture-001".into(),
             source_lineage_id: "synthetic-source-lineage-001".into(),
-            model_identity_sha256: "7777777777777777777777777777777777777777777777777777777777777777".into(),
-            prompt_sha256: "3333333333333333333333333333333333333333333333333333333333333333".into(),
-            adapter_sha256: "4444444444444444444444444444444444444444444444444444444444444444".into(),
-            runtime_identity_sha256: "8888888888888888888888888888888888888888888888888888888888888888".into(),
-            decoding_config_sha256: "9999999999999999999999999999999999999999999999999999999999999999".into(),
+            model_identity_sha256:
+                "7777777777777777777777777777777777777777777777777777777777777777".into(),
+            prompt_sha256: "3333333333333333333333333333333333333333333333333333333333333333"
+                .into(),
+            adapter_sha256: "4444444444444444444444444444444444444444444444444444444444444444"
+                .into(),
+            runtime_identity_sha256:
+                "8888888888888888888888888888888888888888888888888888888888888888".into(),
+            decoding_config_sha256:
+                "9999999999999999999999999999999999999999999999999999999999999999".into(),
             max_output_tokens: 512,
             actual_output_tokens: 128,
             max_wall_time_ms: 30_000,
@@ -343,8 +360,10 @@ mod tests {
             evidence: Some(crate::temporal_revision::RevisionEvidenceV1 {
                 source_audio_sha256: audio.audio_sha256.clone(),
                 source_sample_rate_hz: 48_000,
-                evidence_payload_sha256: "3fc77626f4c70d9e28aa4c1cd901fcf28a7a6a690788342dcb45884f5dc3acb0".into(),
-                retrieval_config_sha256: "5555555555555555555555555555555555555555555555555555555555555555".into(),
+                evidence_payload_sha256:
+                    "3fc77626f4c70d9e28aa4c1cd901fcf28a7a6a690788342dcb45884f5dc3acb0".into(),
+                retrieval_config_sha256:
+                    "5555555555555555555555555555555555555555555555555555555555555555".into(),
                 start_frame: 1,
                 end_frame: 3,
             }),
@@ -355,7 +374,8 @@ mod tests {
                 query_text: query_text.into(),
                 artifact: audio,
                 annotation_policy_version: "synthetic-annotation-v1".into(),
-                annotation_set_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into(),
+                annotation_set_sha256:
+                    "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into(),
                 annotator_count: 2,
                 state: GroundTruthStateV1::Present,
                 intervals,
@@ -371,8 +391,10 @@ mod tests {
     }
 
     fn evidence_manifest() -> AudioEvidenceWindowManifestV1 {
-        serde_json::from_str(include_str!("../fixtures/mel-audio-evidence-window.synthetic.json"))
-            .unwrap()
+        serde_json::from_str(include_str!(
+            "../fixtures/mel-audio-evidence-window.synthetic.json"
+        ))
+        .unwrap()
     }
 
     fn yoked_materialization() -> (
@@ -411,8 +433,7 @@ mod tests {
         no_case.evidence = None;
         let local_case = revision_case();
         let local_manifest = evidence_manifest();
-        let (yoked_case, yoked_manifest, yoked_source, yoked_pcm) =
-            yoked_materialization();
+        let (yoked_case, yoked_manifest, yoked_source, yoked_pcm) = yoked_materialization();
 
         let result = audit_verified_audio_evidence_triplet(
             AudioEvidenceRevisionArmInput {
@@ -450,8 +471,14 @@ mod tests {
         assert_eq!(result.contrast.local_minus_yoked_f1, Some(0.0));
         assert_eq!(result.contrast.local_beats_yoked, Some(false));
         assert_ne!(
-            result.local_audio_bound_report.audio_evidence_report.source_lineage_id,
-            result.yoked_audio_bound_report.audio_evidence_report.source_lineage_id
+            result
+                .local_audio_bound_report
+                .audio_evidence_report
+                .source_lineage_id,
+            result
+                .yoked_audio_bound_report
+                .audio_evidence_report
+                .source_lineage_id
         );
     }
 
@@ -462,8 +489,7 @@ mod tests {
         no_case.evidence = None;
         let local_case = revision_case();
         let local_manifest = evidence_manifest();
-        let (yoked_case, yoked_manifest, yoked_source, yoked_pcm) =
-            yoked_materialization();
+        let (yoked_case, yoked_manifest, yoked_source, yoked_pcm) = yoked_materialization();
 
         assert!(
             audit_verified_audio_evidence_triplet(
@@ -498,8 +524,7 @@ mod tests {
         no_case.evidence = None;
         let local_case = revision_case();
         let local_manifest = evidence_manifest();
-        let (yoked_case, yoked_manifest, mut yoked_source, yoked_pcm) =
-            yoked_materialization();
+        let (yoked_case, yoked_manifest, mut yoked_source, yoked_pcm) = yoked_materialization();
         yoked_source[0] ^= 1;
 
         assert!(
@@ -583,7 +608,10 @@ mod tests {
             YOKED_REQUEST_BODY,
         )
         .unwrap();
-        assert_eq!(report.audio_evidence_report.evidence_condition, AudioEvidenceConditionV1::YokedRetrieved);
+        assert_eq!(
+            report.audio_evidence_report.evidence_condition,
+            AudioEvidenceConditionV1::YokedRetrieved
+        );
         assert_ne!(
             report.audio_evidence_report.source_audio_sha256,
             report.audio_evidence_report.target_audio_sha256
@@ -603,8 +631,7 @@ mod tests {
             YOKED_REQUEST_BODY,
         )
         .unwrap();
-        let statement: serde_json::Value =
-            serde_json::from_str(&payload.statement_json).unwrap();
+        let statement: serde_json::Value = serde_json::from_str(&payload.statement_json).unwrap();
         assert_eq!(
             statement["predicate"]["target_source_lineage_id"],
             "synthetic-source-lineage-001"
@@ -613,7 +640,10 @@ mod tests {
             statement["predicate"]["evidence_source_lineage_id"],
             "synthetic-yoked-source-lineage-001"
         );
-        assert_eq!(statement["predicate"]["target_audio_bytes_recomputed"], false);
+        assert_eq!(
+            statement["predicate"]["target_audio_bytes_recomputed"],
+            false
+        );
         assert_eq!(statement["predicate"]["model_input_attested"], false);
     }
 
@@ -636,12 +666,8 @@ mod tests {
             sha256_hex(output.statement_json.as_bytes())
         );
 
-        let statement: serde_json::Value =
-            serde_json::from_str(&output.statement_json).unwrap();
-        assert_eq!(
-            statement["_type"],
-            "https://in-toto.io/Statement/v1"
-        );
+        let statement: serde_json::Value = serde_json::from_str(&output.statement_json).unwrap();
+        assert_eq!(statement["_type"], "https://in-toto.io/Statement/v1");
         assert_eq!(
             statement["predicateType"],
             "https://luminousdynamics.io/attestations/mel/audio-evidence-materialization/v1"
@@ -651,18 +677,43 @@ mod tests {
             .iter()
             .filter_map(|subject| subject["name"].as_str())
             .collect();
-        assert!(subject_names.iter().any(|name| name.starts_with("target-audio-reference/")));
-        assert!(subject_names.iter().any(|name| name.starts_with("source-audio/")));
-        assert!(subject_names.iter().any(|name| name == &"audio-window/window-001"));
-        assert!(subject_names.iter().any(|name| name == &"audio-window/window-002"));
-        assert!(subject_names.iter().any(|name| name.starts_with("audio-context-manifest/")));
-        assert!(subject_names.iter().any(|name| name.starts_with("audio-evidence-manifest/")));
-        assert!(subject_names.iter().any(|name| name.starts_with("temporal-revision-report/")));
-
-        assert_eq!(
-            statement["predicate"]["evidence_level"],
-            "DigestLinked"
+        assert!(
+            subject_names
+                .iter()
+                .any(|name| name.starts_with("target-audio-reference/"))
         );
+        assert!(
+            subject_names
+                .iter()
+                .any(|name| name.starts_with("source-audio/"))
+        );
+        assert!(
+            subject_names
+                .iter()
+                .any(|name| name == &"audio-window/window-001")
+        );
+        assert!(
+            subject_names
+                .iter()
+                .any(|name| name == &"audio-window/window-002")
+        );
+        assert!(
+            subject_names
+                .iter()
+                .any(|name| name.starts_with("audio-context-manifest/"))
+        );
+        assert!(
+            subject_names
+                .iter()
+                .any(|name| name.starts_with("audio-evidence-manifest/"))
+        );
+        assert!(
+            subject_names
+                .iter()
+                .any(|name| name.starts_with("temporal-revision-report/"))
+        );
+
+        assert_eq!(statement["predicate"]["evidence_level"], "DigestLinked");
         assert_eq!(
             statement["predicate"]["target_source_lineage_id"],
             "synthetic-source-lineage-001"
@@ -671,8 +722,14 @@ mod tests {
             statement["predicate"]["evidence_source_lineage_id"],
             "synthetic-source-lineage-001"
         );
-        assert_eq!(statement["predicate"]["target_audio_bytes_recomputed"], true);
-        assert_eq!(statement["predicate"]["source_audio_bytes_recomputed"], true);
+        assert_eq!(
+            statement["predicate"]["target_audio_bytes_recomputed"],
+            true
+        );
+        assert_eq!(
+            statement["predicate"]["source_audio_bytes_recomputed"],
+            true
+        );
         assert_eq!(statement["predicate"]["sample_rate_hz"], 48_000);
         assert_eq!(statement["predicate"]["channels"], 2);
         assert_eq!(statement["predicate"]["total_frames"], 8);
@@ -692,13 +749,8 @@ mod tests {
         let mut case = revision_case();
         case.source_lineage_id = "different-lineage".into();
         assert!(
-            audit_revision_with_audio_evidence(
-                &case,
-                &evidence_manifest(),
-                SOURCE_AUDIO,
-                PCM,
-            )
-            .is_err()
+            audit_revision_with_audio_evidence(&case, &evidence_manifest(), SOURCE_AUDIO, PCM,)
+                .is_err()
         );
     }
 
@@ -706,15 +758,18 @@ mod tests {
     fn mismatched_model_prompt_or_adapter_is_rejected() {
         let manifest = evidence_manifest();
         let mut case = revision_case();
-        case.model_identity_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        case.model_identity_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
         assert!(audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM).is_err());
 
         case = revision_case();
-        case.prompt_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        case.prompt_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
         assert!(audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM).is_err());
 
         case = revision_case();
-        case.adapter_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        case.adapter_sha256 =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
         assert!(audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM).is_err());
     }
 
@@ -723,13 +778,8 @@ mod tests {
         let mut case = revision_case();
         case.evidence.as_mut().unwrap().start_frame = 2;
         assert!(
-            audit_revision_with_audio_evidence(
-                &case,
-                &evidence_manifest(),
-                SOURCE_AUDIO,
-                PCM,
-            )
-            .is_err()
+            audit_revision_with_audio_evidence(&case, &evidence_manifest(), SOURCE_AUDIO, PCM,)
+                .is_err()
         );
     }
 
@@ -740,16 +790,17 @@ mod tests {
         let mut duplicate = manifest.windows[0].clone();
         duplicate.window_id = "window-duplicate".into();
         manifest.windows.push(duplicate);
-        manifest.context.items.push(crate::audio_evidence_window::EvidenceContextItemV1 {
-            position: 2,
-            window_id: "window-duplicate".into(),
-            payload_sha256: manifest.windows[2].window_pcm_sha256.clone(),
-        });
+        manifest
+            .context
+            .items
+            .push(crate::audio_evidence_window::EvidenceContextItemV1 {
+                position: 2,
+                window_id: "window-duplicate".into(),
+                payload_sha256: manifest.windows[2].window_pcm_sha256.clone(),
+            });
         manifest.context.context_manifest_sha256 =
             recompute_audio_context_manifest_sha256(&manifest).unwrap();
-        assert!(
-            audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM).is_err()
-        );
+        assert!(audit_revision_with_audio_evidence(&case, &manifest, SOURCE_AUDIO, PCM).is_err());
     }
 
     #[test]
@@ -758,13 +809,8 @@ mod tests {
         case.evidence_condition = RevisionEvidenceConditionV1::NoEvidence;
         case.evidence = None;
         assert!(
-            audit_revision_with_audio_evidence(
-                &case,
-                &evidence_manifest(),
-                SOURCE_AUDIO,
-                PCM,
-            )
-            .is_err()
+            audit_revision_with_audio_evidence(&case, &evidence_manifest(), SOURCE_AUDIO, PCM,)
+                .is_err()
         );
     }
 }

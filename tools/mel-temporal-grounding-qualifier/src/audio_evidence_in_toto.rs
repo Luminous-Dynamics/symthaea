@@ -134,11 +134,17 @@ pub fn build_audio_evidence_in_toto_statement(
         audit.audio_evidence_report.target_audio_sha256.clone(),
     ));
     subjects.push(subject(
-        format!("source-audio/{}", audit.audio_evidence_report.source_audio_sha256),
+        format!(
+            "source-audio/{}",
+            audit.audio_evidence_report.source_audio_sha256
+        ),
         audit.audio_evidence_report.source_audio_sha256.clone(),
     ));
     subjects.push(subject(
-        format!("decoded-pcm/{}", audit.audio_evidence_report.decoded_pcm_sha256),
+        format!(
+            "decoded-pcm/{}",
+            audit.audio_evidence_report.decoded_pcm_sha256
+        ),
         audit.audio_evidence_report.decoded_pcm_sha256.clone(),
     ));
     for window in &audit.audio_evidence_report.verified_windows {
@@ -159,7 +165,10 @@ pub fn build_audio_evidence_in_toto_statement(
             "audio-context-manifest/{}",
             audit.audio_evidence_report.evidence_context_manifest_sha256
         ),
-        audit.audio_evidence_report.evidence_context_manifest_sha256.clone(),
+        audit
+            .audio_evidence_report
+            .evidence_context_manifest_sha256
+            .clone(),
     ));
     subjects.push(subject(
         format!(
@@ -181,10 +190,7 @@ pub fn build_audio_evidence_in_toto_statement(
         schema: "mel-audio-evidence-materialization-predicate-v1",
         evidence_level: "DigestLinked",
         experiment_unit_id: audit.audio_evidence_report.experiment_unit_id.clone(),
-        target_source_lineage_id: audit
-            .audio_evidence_report
-            .target_source_lineage_id
-            .clone(),
+        target_source_lineage_id: audit.audio_evidence_report.target_source_lineage_id.clone(),
         evidence_source_lineage_id: audit.audio_evidence_report.source_lineage_id.clone(),
         query_id: audit.audio_evidence_report.query_id.clone(),
         query_text_sha256: evidence_manifest.query_text_sha256.clone(),
@@ -205,7 +211,10 @@ pub fn build_audio_evidence_in_toto_statement(
         channels: evidence_manifest.decoded_pcm.channels,
         total_frames: evidence_manifest.decoded_pcm.total_frames,
         sample_format: evidence_manifest.decoded_pcm.sample_format,
-        decoder_identity_sha256: evidence_manifest.decoded_pcm.decoder_identity_sha256.clone(),
+        decoder_identity_sha256: evidence_manifest
+            .decoded_pcm
+            .decoder_identity_sha256
+            .clone(),
         decode_profile_sha256: evidence_manifest.decoded_pcm.decode_profile_sha256.clone(),
         model_identity_sha256: evidence_manifest.model_identity_sha256.clone(),
         runtime_identity_sha256: evidence_manifest.runtime_identity_sha256.clone(),
@@ -234,12 +243,8 @@ pub fn build_audio_evidence_in_toto_statement(
             .audio_evidence_report
             .model_runtime_identity_authenticated,
         runner_receipt_verified: audit.audio_evidence_report.runner_receipt_verified,
-        request_body_bytes_recomputed: audit
-            .audio_evidence_report
-            .request_body_bytes_recomputed,
-        request_body_delivery_attested: audit
-            .audio_evidence_report
-            .request_body_delivery_attested,
+        request_body_bytes_recomputed: audit.audio_evidence_report.request_body_bytes_recomputed,
+        request_body_delivery_attested: audit.audio_evidence_report.request_body_delivery_attested,
         model_input_attested: audit.model_input_attested,
     };
 

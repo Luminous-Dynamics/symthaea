@@ -11,7 +11,7 @@ use std::fs;
 use std::process::ExitCode;
 
 use mel_temporal_grounding_qualifier::audio_evidence_in_toto::{
-    build_audio_evidence_in_toto_statement, UnsignedInTotoAudioEvidenceStatementV1,
+    UnsignedInTotoAudioEvidenceStatementV1, build_audio_evidence_in_toto_statement,
 };
 use mel_temporal_grounding_qualifier::audio_evidence_window::AudioEvidenceWindowManifestV1;
 use mel_temporal_grounding_qualifier::temporal_revision::RevisionCaseV2;
@@ -77,14 +77,13 @@ fn run() -> Result<String, String> {
     let evidence_manifest: AudioEvidenceWindowManifestV1 = serde_json::from_str(&manifest_text)
         .map_err(|error| format!("invalid audio evidence manifest JSON: {error}"))?;
 
-    let payload: UnsignedInTotoAudioEvidenceStatementV1 =
-        build_audio_evidence_in_toto_statement(
-            &revision_case,
-            &evidence_manifest,
-            &source_audio,
-            &decoded_pcm,
-            &request_body,
-        )?;
+    let payload: UnsignedInTotoAudioEvidenceStatementV1 = build_audio_evidence_in_toto_statement(
+        &revision_case,
+        &evidence_manifest,
+        &source_audio,
+        &decoded_pcm,
+        &request_body,
+    )?;
     serde_json::to_string_pretty(&payload)
         .map_err(|error| format!("failed serializing unsigned in-toto payload: {error}"))
 }

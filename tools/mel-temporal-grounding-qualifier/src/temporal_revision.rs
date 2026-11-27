@@ -1563,8 +1563,7 @@ mod tests {
                 local_beats_yoked: Some(true),
             },
         ];
-        let result =
-            bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 0xA11CE).unwrap();
+        let result = bootstrap_matched_evidence_contrasts(&contrasts, 1_000, 0xA11CE).unwrap();
         assert_eq!(result.verified_evidence_binding_units, 1);
         assert_eq!(result.declared_only_evidence_binding_units, 1);
         assert!(!result.all_evidence_bindings_verified);
