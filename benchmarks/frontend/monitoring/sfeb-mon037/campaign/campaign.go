@@ -108,7 +108,6 @@ type Input struct {
  Transactions []TransactionProof `json:"transactions"`
  ExactReplayDeduplicationProven bool `json:"exact_replay_deduplication_proven"`
  DeduplicationProofSHA256 string `json:"deduplication_proof_sha256,omitempty"`
- DeduplicationProofSHA256 string `json:"deduplication_proof_sha256,omitempty"`
  SurfaceScope string `json:"surface_scope"`
  Surfaces []Surface `json:"surfaces"`
  RestoreChecks map[string]string `json:"restore_checks"`
