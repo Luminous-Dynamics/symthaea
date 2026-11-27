@@ -379,6 +379,22 @@ pub fn build_interval_observation_bundle(
     })
 }
 
+fn validate_psd_covariance(covariance: &[Vec<f64>]) -> Result<(), Error> {
+    let n = covariance.len();
+    if n == 0 || covariance.iter().any(|row| row.len() != n) {
+        return Err(Error::InvalidDimensions);
+    }
+    let check = state_space::propagate_gaussian(
+        &GaussianState { mean: vec![0.0; n], covariance: covariance.to_vec() },
+        &DiscreteTransition {
+            transition: identity(n),
+            process_covariance: zeros(n, n),
+            elapsed_seconds: 0.0,
+        },
+    );
+    check.map(|_| ()).map_err(Error::StateSpace)
+}
+
 /// Predict the observation covariance for an initial Gaussian state and an
 /// independent acquisition-noise covariance. Process and overlapping-window
 /// covariance are already included in the bundle.
@@ -396,6 +412,8 @@ pub fn predict_observation_covariance(
     {
         return Err(Error::InvalidDimensions);
     }
+    validate_psd_covariance(initial_covariance)?;
+    validate_psd_covariance(acquisition_noise_covariance)?;
     let projected = multiply(
         &multiply(&bundle.observation_operator, initial_covariance)?,
         &transpose(&bundle.observation_operator),
@@ -619,5 +637,19 @@ mod tests {
             build_interval_observation_bundle(&vec![vec![-1.0]],&vec![vec![1.0]],&duplicate),
             Err(Error::DuplicateWindowIdentity)
         );
+
+
+    #[test]
+    fn invalid_acquisition_covariance_fails_closed() {
+        let bundle=build_interval_observation_bundle(
+            &vec![vec![-1.0]],&vec![vec![2.0]],&ou_windows()
+        ).unwrap();
+        assert!(matches!(
+            predict_observation_covariance(
+                &vec![vec![1.0]],&bundle,&vec![vec![-0.01,0.0],vec![0.0,0.01]]
+            ),
+            Err(Error::StateSpace(state_space::Error::CovarianceNotPositiveSemidefinite))
+        ));
+    }
     }
 }
