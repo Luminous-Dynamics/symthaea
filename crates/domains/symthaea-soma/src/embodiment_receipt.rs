@@ -28,7 +28,7 @@ pub const MAX_RECEIPT_ATTEMPTS: usize = 65_536;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ReceiptPhase { Permitted, Submitted, Observed, OutcomeUnknown, Stopped, Failed, NotSubmitted }
+pub enum ReceiptPhase { Permitted, Authorized, Submitted, Observed, OutcomeUnknown, Stopped, Failed, NotSubmitted }
 
 impl ReceiptPhase {
     pub const fn is_terminal(self) -> bool {
@@ -179,7 +179,7 @@ pub struct PresentationReceipt {
     effective_intensity: f32,
     semantic_key: String,
     decision_clock: ReceiptStamp,
-    output_clock: ReceiptStamp,
+    transition_clock: ReceiptStamp,
     adapter: AdapterIdentity,
     observation: Option<OutputObservation>,
     not_submitted_reason: Option<NotSubmittedReason>,
@@ -199,7 +199,7 @@ impl PresentationReceipt {
     pub fn previous_digest(&self) -> Option<&str> { self.previous_digest.as_deref() }
     pub fn digest(&self) -> &str { &self.digest }
     pub fn decision_clock(&self) -> &ReceiptStamp { &self.decision_clock }
-    pub fn output_clock(&self) -> &ReceiptStamp { &self.output_clock }
+    pub fn transition_clock(&self) -> &ReceiptStamp { &self.transition_clock }
     pub fn observation(&self) -> Option<&OutputObservation> { self.observation.as_ref() }
 }
 
@@ -319,18 +319,16 @@ impl PresentationReceiptLedger {
         }
     }
 
-    /// Re-check policy before submission. Hold the same serialization lock
-    /// around this call and the renderer's actual submission to prevent a
-    /// concurrent revocation race. Policy and renderer clocks are separate.
-    pub fn record_submitted(
+    /// Re-check policy immediately before submitting to the renderer. This
+    /// records Authorized, not Submitted. Hold the same serialization lock
+    /// across this call, the renderer submission, and record_submitted().
+    pub fn record_authorized(
         &mut self,
         attempt_id: &str,
         policy: &PresentationPolicy,
         policy_now: ReceiptStamp,
-        submitted_at: ReceiptStamp,
     ) -> Result<(PresentationPermit, PresentationReceipt), ReceiptError> {
         validate_stamp(&policy_now)?;
-        validate_stamp(&submitted_at)?;
         let attempt = self.attempts.get(attempt_id).ok_or(ReceiptError::AttemptNotFound)?;
         let original = attempt.permit.clone();
         if policy_now.clock_domain_id != original.clock_domain_id() {
@@ -340,10 +338,30 @@ impl PresentationReceiptLedger {
             .recheck_permit(&original, &policy_now.monotonic_ns, &policy_now.clock_domain_id)
             .map_err(ReceiptError::PolicyDenied)?;
         let receipt = self.append_transition(
-            attempt_id, ReceiptPhase::Submitted, submitted_at,
+            attempt_id, ReceiptPhase::Authorized, policy_now,
             None, None, None, Some(refreshed.clone()),
         )?;
         Ok((refreshed, receipt))
+    }
+
+    /// Record the adapter's acknowledgement that it accepted the exact
+    /// authorized permit for submission. This is not proof that output was
+    /// observed; that requires record_observed().
+    pub fn record_submitted(
+        &mut self,
+        attempt_id: &str,
+        authorized_permit: &PresentationPermit,
+        submitted_at: ReceiptStamp,
+    ) -> Result<PresentationReceipt, ReceiptError> {
+        validate_stamp(&submitted_at)?;
+        let attempt = self.attempts.get(attempt_id).ok_or(ReceiptError::AttemptNotFound)?;
+        if !same_permit_identity(&attempt.permit, authorized_permit) {
+            return Err(ReceiptError::PermitIdentityMismatch);
+        }
+        self.append_transition(
+            attempt_id, ReceiptPhase::Submitted, submitted_at,
+            None, None, None, Some(authorized_permit.clone()),
+        )
     }
 
     pub fn record_observed(
@@ -496,7 +514,7 @@ impl PresentationReceiptLedger {
                 clock_domain_id: permit.clock_domain_id().to_owned(),
                 monotonic_ns: permit.issued_at_monotonic_ns().to_owned(),
             },
-            output_clock: stamp,
+            transition_clock: stamp,
             adapter: self.adapter.clone(),
             observation,
             not_submitted_reason,
@@ -551,7 +569,8 @@ impl PresentationReceiptLedger {
 fn transition_allowed(from: Option<ReceiptPhase>, to: ReceiptPhase) -> bool {
     match (from, to) {
         (None, ReceiptPhase::Permitted) => true,
-        (Some(ReceiptPhase::Permitted), ReceiptPhase::Submitted | ReceiptPhase::NotSubmitted) => true,
+        (Some(ReceiptPhase::Permitted), ReceiptPhase::Authorized | ReceiptPhase::NotSubmitted) => true,
+        (Some(ReceiptPhase::Authorized), ReceiptPhase::Submitted | ReceiptPhase::NotSubmitted | ReceiptPhase::Failed) => true,
         (Some(ReceiptPhase::Submitted), ReceiptPhase::Observed | ReceiptPhase::OutcomeUnknown | ReceiptPhase::Failed) => true,
         (Some(ReceiptPhase::OutcomeUnknown), ReceiptPhase::Observed | ReceiptPhase::Failed) => true,
         (Some(ReceiptPhase::Observed), ReceiptPhase::Stopped | ReceiptPhase::Failed) => true,
@@ -726,8 +745,11 @@ mod tests {
         permit: &PresentationPermit,
     ) {
         begin(ledger, permit);
+        let (authorized, _) = ledger.record_authorized(
+            "attempt-1", policy, stamp(CLOCK, "121"),
+        ).unwrap();
         ledger.record_submitted(
-            "attempt-1", policy, stamp(CLOCK, "121"), stamp(OUTPUT_CLOCK, "10"),
+            "attempt-1", &authorized, stamp(OUTPUT_CLOCK, "10"),
         ).unwrap();
     }
 
@@ -747,7 +769,7 @@ mod tests {
         begin(&mut ledger, &permit);
         policy.revoke_channel(OutputChannel::Visual);
         assert!(matches!(
-            ledger.record_submitted("attempt-1", &policy, stamp(CLOCK, "121"), stamp(OUTPUT_CLOCK, "10")),
+            ledger.record_authorized("attempt-1", &policy, stamp(CLOCK, "121")),
             Err(ReceiptError::PolicyDenied(DenialReason::NoMatchingGrant))
         ));
         assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Permitted);
@@ -867,8 +889,8 @@ mod tests {
         let (mut policy, permit, mut ledger) = fixture();
         begin(&mut ledger, &permit);
         policy.set_paused(true);
-        assert!(ledger.record_submitted(
-            "attempt-1", &policy, stamp(CLOCK, "121"), stamp(OUTPUT_CLOCK, "10"),
+        assert!(ledger.record_authorized(
+            "attempt-1", &policy, stamp(CLOCK, "121"),
         ).is_err());
         assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Permitted);
         assert_eq!(ledger.receipts().len(), 1);
@@ -881,8 +903,8 @@ mod tests {
         ledger.record_observed("attempt-1", stamp(OUTPUT_CLOCK, "12"), started()).unwrap();
         assert_eq!(ledger.receipts()[0].previous_digest(), None);
         assert_eq!(
-            ledger.receipts()[1].previous_digest(),
-            Some(ledger.receipts()[0].digest())
+            ledger.receipts()[2].previous_digest(),
+            Some(ledger.receipts()[1].digest())
         );
         ledger.verify_chain().unwrap();
     }
@@ -891,10 +913,14 @@ mod tests {
     fn receipt_retains_separate_decision_and_renderer_clock_domains() {
         let (policy, permit, mut ledger) = fixture();
         submit(&mut ledger, &policy, &permit);
-        let receipt = &ledger.receipts()[1];
-        assert_eq!(receipt.decision_clock().clock_domain_id, CLOCK);
-        assert_eq!(receipt.output_clock().clock_domain_id, OUTPUT_CLOCK);
-        assert_eq!(receipt.decision_clock().monotonic_ns, "110");
-        assert_eq!(receipt.output_clock().monotonic_ns, "10");
+        let authorization = &ledger.receipts()[1];
+        let submission = &ledger.receipts()[2];
+        assert_eq!(authorization.phase(), ReceiptPhase::Authorized);
+        assert_eq!(authorization.transition_clock().clock_domain_id, CLOCK);
+        assert_eq!(authorization.transition_clock().monotonic_ns, "121");
+        assert_eq!(submission.decision_clock().clock_domain_id, CLOCK);
+        assert_eq!(submission.transition_clock().clock_domain_id, OUTPUT_CLOCK);
+        assert_eq!(submission.decision_clock().monotonic_ns, "110");
+        assert_eq!(submission.transition_clock().monotonic_ns, "10");
     }
 }
