@@ -94,6 +94,7 @@ pub struct StreamingAdapterPolicyV1 {
 pub struct TemporalThresholdCalibrationReceiptV1 {
     pub schema: String,
     pub training_manifest_sha256: String,
+    pub training_residuals_sha256: String,
     pub residual_count: usize,
     pub quantile: f64,
     pub threshold: f64,
@@ -330,6 +331,7 @@ fn validate_policy(policy: &StreamingAdapterPolicyV1) -> Result<(), GatedStreami
     if let Some(receipt) = &policy.temporal_threshold_calibration {
         if receipt.schema != "luminous.semi-bench.temporal-threshold-calibration.v1"
             || !valid_sha256(&receipt.training_manifest_sha256)
+            || !valid_sha256(&receipt.training_residuals_sha256)
             || receipt.residual_count == 0
             || !receipt.quantile.is_finite()
             || !(0.0..=1.0).contains(&receipt.quantile)
@@ -605,6 +607,7 @@ pub fn calibrate_streaming_temporal_threshold_v1(
     let mut receipt = TemporalThresholdCalibrationReceiptV1 {
         schema: "luminous.semi-bench.temporal-threshold-calibration.v1".into(),
         training_manifest_sha256: training_manifest_sha256.into(),
+        training_residuals_sha256: json_sha256(training_residuals)?,
         residual_count: training_residuals.len(),
         quantile,
         threshold,
