@@ -27,7 +27,19 @@ capture="$("${DC[@]}" exec -T \
   psql -X -q -A -t -h 127.0.0.1 -U "${MON025_DB_USER:-mon025}" -d "${MON025_DB_NAME:-mon025}" \
   -v ON_ERROR_STOP=1 \
   -c "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY" \
-  -c "SELECT jsonb_build_object('database', current_database(), 'captured_at', transaction_timestamp()::text, 'capture_lsn', CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn()::text ELSE pg_current_wal_lsn()::text END, 'system_identifier', (SELECT system_identifier::text FROM pg_control_system()), 'timeline_id', (SELECT timeline_id::text FROM pg_control_checkpoint()), 'is_in_recovery', pg_is_in_recovery())::text" \
+  -c "WITH boundary AS (
+      SELECT
+        CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() ELSE pg_current_wal_lsn() END AS capture_lsn,
+        pg_is_in_recovery() AS is_in_recovery
+    )
+    SELECT jsonb_build_object(
+      'database', current_database(),
+      'captured_at', transaction_timestamp()::text,
+      'capture_lsn', boundary.capture_lsn::text,
+      'system_identifier', (SELECT system_identifier::text FROM pg_control_system()),
+      'timeline_id', (('x' || substring(pg_walfile_name(boundary.capture_lsn) from 1 for 8))::bit(32)::bigint)::text,
+      'is_in_recovery', boundary.is_in_recovery
+    )::text FROM boundary" \
   -f /lab/postgres/state-manifest.sql \
   -c "COMMIT")"
 
