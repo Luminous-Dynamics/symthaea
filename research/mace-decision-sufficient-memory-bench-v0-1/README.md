@@ -174,7 +174,7 @@ The academic hybrid arm must use the AML-designated embedding model when it is i
 - Use the same corpus, query, allowed evidence count or token budget and downstream policy for every paired arm.
 - Do not provide candidate systems with hidden target utilities, optimal actions, future facts, evaluator labels or latent state.
 - Keep answer-generation and judge configurations fixed when an external benchmark requires them.
-- Freeze commit SHAs, model identifiers, prompts, index parameters, retrieval limits, corpus generator, seeds, machine configuration and evaluator version in the run manifest.
+- Freeze commit SHAs, model identifiers, prompts, index parameters, retrieval limits, corpus generator, seeds, machine configuration and evaluator version in the run manifest. Enforce an identical downstream-policy digest and decision seed across no-memory, memory and leave-one-out interventions. The versioned [run-manifest schema](schemas/run-manifest-v0.1.schema.json) binds these configurations and applies the AML Academic model restrictions and top_k=100 ceiling.
 - Use separate development and held-out generator seeds. No tuning on held-out results.
 - Cluster-bootstrap at the independent world/episode-cluster level. Do not treat correlated questions from one world as independent samples.
 - Publish per-family results and uncertainty intervals. A single composite score is optional only as a secondary, explicitly defined view.
@@ -190,7 +190,7 @@ Do not collapse these dimensions into one unqualified score.
 - **Memory-induced harm rate:** fraction of paired episodes where access to memory increases loss relative to the no-memory policy.
 - **Decision-sufficiency rate:** fraction of episodes where the returned admissible evidence is sufficient for the frozen policy to attain the best action it could take with all admissible evidence.
 - **Action-change justification:** among cases where memory changes the action, the fraction where that change is supported by valid, current evidence and reduces realised loss.
-- **Evidence-level counterfactual influence:** re-run the same frozen downstream policy with each returned evidence ID withheld in turn. Report how removing each item changes decision loss. This is leave-one-out attribution, not Shapley attribution; interacting evidence items require additional subset interventions.
+- **Evidence-level counterfactual influence:** re-run the same frozen downstream policy with each returned evidence ID withheld in turn. Report how removing each item changes decision loss. This is leave-one-out attribution, not Shapley attribution; interacting evidence items require additional subset interventions. Every rerun must carry the same downstream-policy digest and decision seed; a changed reader or seed invalidates the intervention.
 
 ### Evidence quality
 
