@@ -1,0 +1,15 @@
+[package]
+name = "mace-evidence-span-ablation"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Independent paired evaluator for MACE exact evidence-span interventions"
+
+# This standalone workspace keeps the assurance evaluator independent of agent/runtime crates.
+[workspace]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"

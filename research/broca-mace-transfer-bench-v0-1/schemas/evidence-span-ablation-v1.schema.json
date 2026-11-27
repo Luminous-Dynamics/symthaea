@@ -1,0 +1,439 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/broca-mace-transfer-bench-v0-1/schemas/evidence-span-ablation-v1.schema.json",
+  "title": "MACE evidence span ablation observation or report v1",
+  "description": "Strict evaluator-side exchange for paired frozen-history exposure ablation observations and diagnostic cluster-bootstrap reports. No raw user memory content is included.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/observation"
+    },
+    {
+      "$ref": "#/$defs/report"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "arm": {
+      "enum": [
+        "exposed",
+        "ablated"
+      ]
+    },
+    "mode": {
+      "enum": [
+        "remove_span",
+        "replace_with_neutral_marker"
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "pair_block_id",
+        "profile_cluster_id",
+        "episode_id",
+        "population_stratum",
+        "arm",
+        "ablation_mode",
+        "execution_order",
+        "assignment_manifest_sha256",
+        "randomization_receipt_sha256",
+        "candidate_policy_sha256",
+        "model_revision_sha256",
+        "prompt_template_sha256",
+        "tool_contract_sha256",
+        "task_spec_sha256",
+        "frozen_history_sha256",
+        "shared_context_projection_sha256",
+        "intervention_spec_sha256",
+        "target_evidence_representation_sha256",
+        "model_request_sha256",
+        "candidate_action_sha256",
+        "decision_fingerprint_sha256",
+        "outcome_spec_sha256",
+        "evaluator_outcome_receipt_sha256",
+        "utility",
+        "regret",
+        "all_in_cost_micros",
+        "privacy_violation_count",
+        "unauthorized_action_count",
+        "erasure_resurrection_count",
+        "evidence_use_link_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_evidence_span_ablation_observation_v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "pair_block_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "profile_cluster_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "population_stratum": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "arm": {
+          "$ref": "#/$defs/arm"
+        },
+        "ablation_mode": {
+          "$ref": "#/$defs/mode"
+        },
+        "execution_order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "assignment_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "randomization_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model_revision_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "prompt_template_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "tool_contract_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "task_spec_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "frozen_history_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "shared_context_projection_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "intervention_spec_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_evidence_representation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidence_use_link_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model_request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_action_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_fingerprint_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "outcome_spec_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluator_outcome_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "utility": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "regret": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "all_in_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "privacy_violation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unauthorized_action_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "erasure_resurrection_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "arm": {
+                "const": "exposed"
+              }
+            },
+            "required": [
+              "arm"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_use_link_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "arm": {
+                "const": "ablated"
+              }
+            },
+            "required": [
+              "arm"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_use_link_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "assignment_manifest_sha256",
+        "randomization_receipt_set_sha256",
+        "observation_set_sha256",
+        "ablation_mode",
+        "inference_method",
+        "interpretation_status",
+        "pair_blocks",
+        "independent_profile_clusters",
+        "confirmatory_cluster_floor",
+        "minimum_cluster_count_met",
+        "bootstrap_seed",
+        "bootstrap_replicates",
+        "utility_effect_exposed_minus_ablated",
+        "utility_effect_ci95",
+        "regret_reduction_exposed_minus_ablated",
+        "regret_reduction_ci95",
+        "mean_decision_change_rate",
+        "mean_added_cost_micros",
+        "stratum_utility_effects",
+        "privacy_violation_count",
+        "unauthorized_action_count",
+        "erasure_resurrection_count",
+        "hard_gate_violation_count",
+        "hard_gates_passed",
+        "positive_utility_ci_lower_bound",
+        "positive_regret_reduction_ci_lower_bound",
+        "canonical_sha256",
+        "stratum_utility_effect_ci95",
+        "stratum_regret_reduction_effects",
+        "stratum_regret_reduction_ci95",
+        "stratum_independent_profile_clusters",
+        "stratum_confirmatory_cluster_floor_met"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_evidence_span_ablation_report_v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "assignment_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "randomization_receipt_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "observation_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "ablation_mode": {
+          "$ref": "#/$defs/mode"
+        },
+        "inference_method": {
+          "const": "profile_cluster_bootstrap_percentile_v1"
+        },
+        "interpretation_status": {
+          "const": "paired_diagnostic_only_randomizer_and_observer_custody_not_independently_verified"
+        },
+        "pair_blocks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "independent_profile_clusters": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "confirmatory_cluster_floor": {
+          "const": 30
+        },
+        "minimum_cluster_count_met": {
+          "type": "boolean"
+        },
+        "bootstrap_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bootstrap_replicates": {
+          "const": 2000
+        },
+        "utility_effect_exposed_minus_ablated": {
+          "type": "number"
+        },
+        "utility_effect_ci95": {
+          "$ref": "#/$defs/ci"
+        },
+        "regret_reduction_exposed_minus_ablated": {
+          "type": "number"
+        },
+        "regret_reduction_ci95": {
+          "$ref": "#/$defs/ci"
+        },
+        "mean_decision_change_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mean_added_cost_micros": {
+          "type": "number"
+        },
+        "stratum_utility_effects": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "privacy_violation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unauthorized_action_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "erasure_resurrection_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_gate_violation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_gates_passed": {
+          "type": "boolean"
+        },
+        "positive_utility_ci_lower_bound": {
+          "type": "boolean"
+        },
+        "positive_regret_reduction_ci_lower_bound": {
+          "type": "boolean"
+        },
+        "canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "stratum_utility_effect_ci95": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ci"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "stratum_regret_reduction_effects": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "stratum_regret_reduction_ci95": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ci"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "stratum_independent_profile_clusters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "stratum_confirmatory_cluster_floor_met": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
