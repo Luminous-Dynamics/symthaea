@@ -253,6 +253,8 @@ pub struct VisionManifold {
     predictive: Option<PredictiveCodingHierarchy>,
     /// When true, skip training and contrastive refinement.
     learning_frozen: bool,
+    /// Restrict this manifold to frozen, non-retaining, non-acting observation.
+    observer_only: bool,
     /// Optional episodic scene memory for recognition and surprise dampening.
     scene_memory: Option<SceneMemory>,
     /// Optional object identity tracker for cross-frame persistence.
@@ -610,6 +612,9 @@ impl VisionManifold {
         &mut self,
         target: symthaea_core::hdc::HdcDimensionality,
     ) -> Result<DilationEstimate, String> {
+        if self.observer_only && target.dimension() != self.config.hdc_dim {
+            return Err("HDC dimensionality is immutable in observer-only mode".to_string());
+        }
         let estimate = self.estimate_dilation(target);
         let target_dim = estimate.target_dim;
         if self.config.hdc_dim == target_dim {
@@ -777,6 +782,7 @@ impl VisionManifold {
             error_ema: 0.0,
             predictive,
             learning_frozen: false,
+            observer_only: false,
             scene_memory: None,  // Enabled externally via enable_scene_memory()
             object_memory: None, // Enabled externally via enable_object_memory()
             next_track_id: 0,
@@ -1016,7 +1022,11 @@ impl VisionManifold {
         let encode_us = t0.elapsed().as_micros() as u64;
 
         // Store reference frame for decoding mental movies
-        self.last_observed_frame = Some(pixels.to_vec());
+        self.last_observed_frame = if self.observer_only {
+            None
+        } else {
+            Some(pixels.to_vec())
+        };
         self.last_frame_width = width;
         self.last_frame_height = height;
         self.last_frame_channels = channels;
@@ -1562,38 +1572,43 @@ impl VisionManifold {
             }
         }
 
-        // ── FEP Metrics Calculation (Active Inference Agent) ──
-        // Science: Friston (2010). F = Complexity - Accuracy.
-        // We use the rigorous FEP engine to compute free energy from high-level signals.
-        let obs = symthaea_fep::Observation {
-            values: vec![
-                self.surprise.max_surprise() as f64,
-                self.prediction_error as f64,
-                self.coherence as f64,
-                self.telemetry.motion_surprise as f64,
-            ],
-            precision: 1.0,
-            timestamp: self.frame_count,
-            modality: "visual".to_string(),
-        };
+        // The spacecraft observer profile must not mutate the FEP agent or
+        // select/map an internal behaviour. Its output is an observation only.
+        if self.observer_only {
+            self.last_fep = crate::types::FepMetrics::default();
+            self.telemetry.last_fep_action = "OBSERVER_ONLY_DISABLED".to_string();
+        } else {
+            // ── FEP Metrics Calculation (Active Inference Agent) ──
+            let obs = symthaea_fep::Observation {
+                values: vec![
+                    self.surprise.max_surprise() as f64,
+                    self.prediction_error as f64,
+                    self.coherence as f64,
+                    self.telemetry.motion_surprise as f64,
+                ],
+                precision: 1.0,
+                timestamp: self.frame_count,
+                modality: "visual".to_string(),
+            };
 
-        let perception_res = self.fep_agent.perceive(&obs);
-        let fe = perception_res.free_energy;
+            let perception_res = self.fep_agent.perceive(&obs);
+            let fe = perception_res.free_energy;
 
-        self.last_fep = crate::types::FepMetrics {
-            free_energy: fe.total as f32,
-            complexity: fe.complexity as f32,
-            accuracy: fe.accuracy as f32,
-        };
+            self.last_fep = crate::types::FepMetrics {
+                free_energy: fe.total as f32,
+                complexity: fe.complexity as f32,
+                accuracy: fe.accuracy as f32,
+            };
 
-        // Select best cognitive action based on Expected Free Energy (Closing the Loop)
-        let action_res = self.fep_agent.select_action();
-        let action_name = self.map_fep_action_to_vision_behavior(action_res.action);
+            // Select best cognitive action based on Expected Free Energy.
+            let action_res = self.fep_agent.select_action();
+            let action_name = self.map_fep_action_to_vision_behavior(action_res.action);
+            self.telemetry.last_fep_action = action_name;
+        }
 
         // Store training telemetry
         self.telemetry.training_triggered = training_triggered;
         self.telemetry.training_loss = training_loss;
-        self.telemetry.last_fep_action = action_name;
         self.telemetry.last_geodesic_path = self
             .last_geodesic
             .iter()
@@ -1932,7 +1947,7 @@ impl VisionManifold {
         goal: &ContinuousHV,
         steps: usize,
     ) -> Vec<ContinuousHV> {
-        if steps == 0 {
+        if self.observer_only || steps == 0 {
             return Vec::new();
         }
 
@@ -1981,7 +1996,7 @@ impl VisionManifold {
         steps: usize,
         num_candidates: usize,
     ) -> Vec<ContinuousHV> {
-        if steps == 0 || num_candidates == 0 {
+        if self.observer_only || steps == 0 || num_candidates == 0 {
             return Vec::new();
         }
 
@@ -2627,12 +2642,53 @@ impl VisionManifold {
         (active, attention.values.len())
     }
 
+    /// Enable the immutable observer-only operating profile.
+    ///
+    /// Must be enabled before the first frame. This freezes learning, removes
+    /// all pixel-retaining and scene/action subsystems, and prevents future
+    /// unfreezing. The profile does not convert representation telemetry into
+    /// a calibrated probability or grant actuation authority.
+    pub fn enable_observer_only(&mut self) -> Result<(), String> {
+        if self.frame_count != 0 {
+            return Err("observer-only mode must be enabled before the first frame".to_string());
+        }
+        self.observer_only = true;
+        self.learning_frozen = true;
+        self.config.enable_object_binding = false;
+        self.config.allow_auto_dilation = false;
+        self.scene_memory = None;
+        self.object_memory = None;
+        self.working_memory = None;
+        self.scene_graph = None;
+        self.last_observed_frame = None;
+        self.last_frame_width = 0;
+        self.last_frame_height = 0;
+        self.last_frame_channels = 0;
+        self.last_frame_modality = VisualModality::Unknown;
+        self.last_tracking_result = None;
+        self.last_object_hypotheses.clear();
+        self.last_geodesic.clear();
+        self.last_intent_hv = ContinuousHV::zero(self.config.hdc_dim);
+        self.last_fep = crate::types::FepMetrics::default();
+        self.telemetry.last_fep_action = "OBSERVER_ONLY_DISABLED".to_string();
+        Ok(())
+    }
+
+    /// Whether the immutable observer-only profile is active.
+    pub fn is_observer_only(&self) -> bool {
+        self.observer_only
+    }
+
     /// Freeze or unfreeze learning.
     ///
     /// When frozen, `train_step_inner()` and `refine_contrastive()` are skipped
     /// during `observe_encoded()`. The manifold still evolves its CfC state and
     /// computes prediction error — only parameter updates are suppressed.
     pub fn freeze_learning(&mut self, freeze: bool) {
+        if self.observer_only && !freeze {
+            tracing::warn!("observer-only mode prevents unfreezing learning");
+            return;
+        }
         self.learning_frozen = freeze;
     }
 
@@ -2695,6 +2751,10 @@ impl VisionManifold {
 
     /// Enable scene memory with given capacity.
     pub fn enable_scene_memory(&mut self, capacity: usize) {
+        if self.observer_only {
+            tracing::warn!("scene memory is disabled in observer-only mode");
+            return;
+        }
         self.scene_memory = Some(SceneMemory::new(capacity));
     }
 
@@ -2703,6 +2763,10 @@ impl VisionManifold {
     /// Object hypotheses from `cluster_patches()` (when `enable_object_binding`
     /// is true) are automatically matched and tracked across frames.
     pub fn enable_object_memory(&mut self, capacity: usize) {
+        if self.observer_only {
+            tracing::warn!("object memory is disabled in observer-only mode");
+            return;
+        }
         self.object_memory = Some(ObjectMemory::new(capacity));
     }
 
@@ -2721,6 +2785,10 @@ impl VisionManifold {
     /// Requires `enable_object_memory()` to be active — working memory tracks
     /// which of the known objects are currently attended.
     pub fn enable_working_memory(&mut self, capacity: usize) {
+        if self.observer_only {
+            tracing::warn!("working memory is disabled in observer-only mode");
+            return;
+        }
         self.working_memory = Some(VisualWorkingMemory::new(capacity));
     }
 
@@ -2734,6 +2802,10 @@ impl VisionManifold {
     /// Requires `enable_object_memory()` to be active — the scene graph
     /// computes relations between tracked objects.
     pub fn enable_scene_graph(&mut self) {
+        if self.observer_only {
+            tracing::warn!("scene graph is disabled in observer-only mode");
+            return;
+        }
         self.scene_graph = Some(VisualSceneGraph::new(self.config.hdc_dim, self.config.seed));
     }
 
@@ -2956,6 +3028,9 @@ impl VisionManifold {
         dt: f32,
         steps_per_memory: usize,
     ) -> Result<Vec<ContinuousHV>, String> {
+        if self.observer_only {
+            return Err("dream replay is disabled in observer-only mode".to_string());
+        }
         if !dt.is_finite() || dt <= 0.0 {
             return Err(format!(
                 "dream replay timestep must be finite and > 0, got {dt}"
@@ -3088,6 +3163,7 @@ impl VisionManifold {
                 .collect(),
             trainer_state: Some(self.trainer.save_state()),
             learning_frozen: self.learning_frozen,
+            observer_only: self.observer_only,
             last_observed_frame: self.last_observed_frame.clone(),
             last_frame_width: self.last_frame_width,
             last_frame_height: self.last_frame_height,
@@ -3582,6 +3658,18 @@ impl VisionManifold {
     /// present.
     pub fn load_state(&mut self, state: &ManifoldState) -> Result<(), String> {
         let dim = self.config.hdc_dim;
+        if self.observer_only && !state.observer_only {
+            return Err("observer-only manifold cannot load a non-observer checkpoint".to_string());
+        }
+        if state.observer_only
+            && (!state.learning_frozen
+                || state.last_observed_frame.is_some()
+                || state.scene_memory.is_some()
+                || state.object_memory.is_some()
+                || state.working_memory.is_some())
+        {
+            return Err("observer-only checkpoint violates frozen/no-retention invariants".to_string());
+        }
         let schema_version = if state.schema_version == 0 {
             1
         } else {
@@ -4215,6 +4303,7 @@ impl VisionManifold {
         }
         self.frame_count = state.frame_count;
         self.learning_frozen = state.learning_frozen;
+        self.observer_only = state.observer_only;
         self.encoder.prev_patch_lum = state.prev_patch_lum.clone().unwrap_or_default();
 
         if let Some(ref values) = state.state_hv {
@@ -4494,7 +4583,7 @@ impl VisionManifold {
         self.frame_count = 0;
         self.error_ema = 0.0;
         self.telemetry = VisionTelemetry::default();
-        self.learning_frozen = false;
+        self.learning_frozen = self.observer_only;
         if let Some(ref mut predictive) = self.predictive {
             predictive.reset();
         }
@@ -8600,6 +8689,86 @@ mod tests {
             (tau_before - tau_after).abs() < 1e-6,
             "Tau should not change while frozen"
         );
+    }
+
+    #[test]
+    fn observer_only_freezes_learning_prevents_retention_and_suppresses_actions() {
+        let mut config = VisionConfig::default();
+        config.training.error_threshold = 0.0001;
+        let mut manifold = VisionManifold::try_new(config, 32, 32).unwrap();
+        manifold.enable_observer_only().unwrap();
+        assert!(manifold.is_observer_only());
+        assert!(manifold.is_learning_frozen());
+
+        let before_weights = manifold.encoder().feature_weights().to_vec();
+        let before_tau = manifold.current_tau();
+        let before_fep_belief = manifold.save_state().fep_belief_mean;
+
+        let frame = solid_gray_frame(32, 32, 80);
+        for _ in 0..8 {
+            let telemetry = manifold.observe_frame_checked(&frame, 32, 32, 1, 0.033).unwrap();
+            assert!(!telemetry.training_triggered);
+            assert_eq!(telemetry.last_fep_action, "OBSERVER_ONLY_DISABLED");
+        }
+
+        assert_eq!(manifold.encoder().feature_weights(), before_weights.as_slice());
+        assert!((manifold.current_tau() - before_tau).abs() < 1e-6);
+        assert_eq!(manifold.save_state().fep_belief_mean, before_fep_belief);
+
+        let saved = manifold.save_state();
+        assert!(saved.observer_only);
+        assert!(saved.learning_frozen);
+        assert!(saved.last_observed_frame.is_none());
+        assert!(saved.scene_memory.is_none());
+        assert!(saved.object_memory.is_none());
+        assert!(saved.working_memory.is_none());
+    }
+
+    #[test]
+    fn observer_only_cannot_be_disabled_by_learning_memory_or_simulation_apis() {
+        let mut manifold =
+            VisionManifold::try_new(VisionConfig::default(), 32, 32).unwrap();
+        manifold.enable_observer_only().unwrap();
+
+        manifold.freeze_learning(false);
+        manifold.enable_scene_memory(4);
+        manifold.enable_object_memory(4);
+        manifold.enable_working_memory(4);
+        manifold.enable_scene_graph();
+
+        assert!(manifold.is_observer_only());
+        assert!(manifold.is_learning_frozen());
+        assert!(manifold.scene_memory.is_none());
+        assert!(manifold.object_memory.is_none());
+        assert!(manifold.working_memory.is_none());
+        assert!(manifold.scene_graph.is_none());
+
+        let a = ContinuousHV::random(manifold.hdc_dim(), 881);
+        let b = ContinuousHV::random(manifold.hdc_dim(), 882);
+        assert!(manifold.find_geodesic(&a, &b, 5).is_empty());
+        assert!(manifold.select_best_geodesic(&a, &b, 5, 3).is_empty());
+        assert!(manifold.dream_replay_checked(0.1, 2).is_err());
+    }
+
+    #[test]
+    fn observer_only_checkpoint_roundtrip_preserves_restrictions_and_rejects_retained_pixels() {
+        let config = VisionConfig::default();
+        let mut source = VisionManifold::try_new(config.clone(), 32, 32).unwrap();
+        source.enable_observer_only().unwrap();
+        let frame = solid_gray_frame(32, 32, 120);
+        source.observe_frame_checked(&frame, 32, 32, 1, 0.033).unwrap();
+
+        let saved = source.save_state();
+        let mut restored = VisionManifold::try_new(config.clone(), 32, 32).unwrap();
+        restored.load_state(&saved).unwrap();
+        assert!(restored.is_observer_only());
+        assert!(restored.is_learning_frozen());
+        assert!(restored.save_state().last_observed_frame.is_none());
+
+        let mut invalid = saved;
+        invalid.last_observed_frame = Some(frame);
+        let mut fresh = VisionManifold::try_new(config, 32, 32).unwrap();
+        assert!(fresh.load_state(&invalid).is_err());
     }
 
     // === Active Patch Count ===
