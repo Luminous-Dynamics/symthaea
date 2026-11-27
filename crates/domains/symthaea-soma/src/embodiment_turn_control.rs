@@ -198,7 +198,7 @@ pub struct TurnDecisionGate {
     consumed_event_ids: HashSet<String>,
     last_sequence: Option<u64>,
     last_candidate_observed_at: Option<u64>,
-    last_decision_clock: Option<u64>,
+    last_evaluation_clock: Option<u64>,
     current_action: Option<TurnState>,
 }
 
@@ -227,7 +227,7 @@ impl TurnDecisionGate {
             consumed_event_ids: HashSet::with_capacity(max_decisions.min(1024)),
             last_sequence: None,
             last_candidate_observed_at: None,
-            last_decision_clock: None,
+            last_evaluation_clock: None,
             current_action: None,
         })
     }
@@ -256,7 +256,7 @@ impl TurnDecisionGate {
         if self.consumed_event_ids.len() >= self.max_decisions {
             return Err(TurnControlError::CapacityReached);
         }
-        if let Some(previous_now) = self.last_decision_clock {
+        if let Some(previous_now) = self.last_evaluation_clock {
             if now < previous_now {
                 return Err(TurnControlError::ClockRegression);
             }
@@ -281,19 +281,20 @@ impl TurnDecisionGate {
                 return Err(TurnControlError::SequenceGap);
             }
         }
+        // Consume each structurally valid candidate before checking transition
+        // legality or confidence. Neither invalid actions nor abstentions may
+        // be retried with a later fallback prediction for the same event.
+        self.consumed_event_ids.insert(candidate.event_id.clone());
+        self.last_sequence = Some(candidate.sequence);
+        self.last_candidate_observed_at = Some(observed);
+        self.last_evaluation_clock = Some(now);
+
         if !transition_allowed(self.current_action, candidate.action) {
             return Err(TurnControlError::InvalidTransition {
                 from: self.current_action,
                 to: candidate.action,
             });
         }
-
-        // Consume the candidate before returning either decision or abstention.
-        // A low-confidence event must not be re-emitted later as a fallback.
-        self.consumed_event_ids.insert(candidate.event_id.clone());
-        self.last_sequence = Some(candidate.sequence);
-        self.last_candidate_observed_at = Some(observed);
-        self.last_decision_clock = Some(now);
 
         let required_confidence = self.thresholds.threshold_for(candidate.action);
         if candidate.confidence < required_confidence {
@@ -393,18 +394,23 @@ mod tests {
     #[test]
     fn low_confidence_yield_abstains_and_is_consumed() {
         let mut gate = gate();
+        gate.evaluate(
+            candidate("event-1", 1, "100", "1000", TurnState::Wait, 0.9),
+            CLOCK,
+            "150",
+        ).unwrap();
         let result = gate.evaluate(
-            candidate("event-1", 1, "100", "1000", TurnState::Yield, 0.93),
+            candidate("event-2", 2, "160", "1000", TurnState::Yield, 0.93),
             CLOCK,
             "200",
         ).unwrap();
         let TurnControlOutcome::Abstained(abstention) = result else { panic!("expected abstention"); };
         assert_eq!(abstention.required_confidence(), 0.94);
-        assert_eq!(gate.current_action(), None);
-        assert_eq!(gate.consumed_count(), 1);
+        assert_eq!(gate.current_action(), Some(TurnState::Wait));
+        assert_eq!(gate.consumed_count(), 2);
         assert_eq!(
             gate.evaluate(
-                candidate("event-1", 1, "100", "1000", TurnState::Yield, 1.0),
+                candidate("event-2", 2, "160", "1000", TurnState::Yield, 1.0),
                 CLOCK,
                 "210",
             ),
@@ -491,6 +497,32 @@ mod tests {
             gate.evaluate(candidate("event-2", 2, "210", "1000", TurnState::Continue, 0.9), CLOCK, "220"),
             Err(TurnControlError::InvalidTransition { .. })
         ));
+    }
+
+    #[test]
+    fn invalid_transition_consumes_candidate_and_cannot_be_retried() {
+        let mut gate = gate();
+        assert_eq!(
+            gate.evaluate(
+                candidate("event-1", 1, "100", "1000", TurnState::Continue, 0.99),
+                CLOCK,
+                "200",
+            ),
+            Err(TurnControlError::InvalidTransition {
+                from: None,
+                to: TurnState::Continue,
+            })
+        );
+        assert_eq!(
+            gate.evaluate(
+                candidate("event-1", 1, "100", "1000", TurnState::Respond, 0.99),
+                CLOCK,
+                "210",
+            ),
+            Err(TurnControlError::DuplicateEvent)
+        );
+        assert_eq!(gate.current_action(), None);
+        assert_eq!(gate.consumed_count(), 1);
     }
 
     #[test]
