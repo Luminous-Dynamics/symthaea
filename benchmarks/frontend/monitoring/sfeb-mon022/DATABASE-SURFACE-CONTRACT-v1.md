@@ -61,6 +61,7 @@ Each surface attestation selects exactly one mode:
 - unknown: no trustworthy evidence; always prevents a complete claim for a required surface.
 
 Every evidence record binds:
+- the exact inventory digest and surface evidence subject ID under the pinned mon022-surface-coverage-attestation-v1 profile;
 - stable surface ID and class;
 - source and target cluster/system identities;
 - source and target administrative control roots;
@@ -72,17 +73,17 @@ Every evidence record binds:
 - observation time, freshness deadline and completeness result;
 - exclusion reason or applicability proof as required.
 
-A source and target digest mismatch is divergence. A missing/ambiguous/stale/unverified attestation is indeterminate. An excluded required surface prevents full-state qualification. An independent comparison is only independent if its observer control root differs from both source and target roots.
+A source and target digest mismatch is divergence. A missing/ambiguous/stale/unverified attestation is indeterminate. An excluded required surface prevents full-state qualification. An independent comparison is only independent if its observer identity and observer control-root membership are separately verified, its observer ID is not an endpoint alias, and its control root differs from both source and target roots.
 
 ## 5. Scope and decision rules
 
 The request carries the complete inventory and the claim scope. The evaluator must:
 1. reject duplicate surface IDs or conflicting evidence records;
 2. require evidence for every surface required by the selected claim;
-3. check exact source/target identity and scope digest;
+3. check exact inventory digest, source/target identity and per-surface scope digest;
 4. check freshness, completeness and non-empty evidence/method digests;
 5. check source/target state digests agree for replicated/recomputed/compared modes;
-6. check independent observer control root is separate from both endpoints;
+6. check independent observer identity and control-root membership are separately evidenced and separate from both endpoints;
 7. require explicit reason for excluded surfaces;
 8. reject exclusions for required full-database-state surfaces;
 9. report excluded surfaces in a scoped row-stream result.
@@ -198,3 +199,10 @@ Targets are not results. They must be measured under exact, reproducible environ
 ## 12. Claim ceiling
 
 The Go package consumes normalized surface inventory and evidence. It does not query PostgreSQL or compute canonical digests itself. No live source/target snapshot, sequence reconciliation, large-object verification, DDL attestation, independent observer, restore test or production coverage claim is made. A row-stream result never means full database state is recoverable.
+
+
+## 13. Semantic reference execution status
+
+The Go reference in surface-coverage/ consumes normalized attestations and enforces the two claim scopes, explicit row-stream exclusions, full-state required-surface completeness, inventory/scope/evidence subject binding, freshness, state-digest equality and separate observer identity/control-root evidence. It does not execute catalog queries, canonicalization, signature verification, observer deployment or restore operations.
+
+The code includes 29+ named adversarial tests, one fuzz target and scaling benchmarks. No exact-head Go test, race test, vet, fuzz run or numeric benchmark is claimed for the current evolving branch. A fresh GitHub clone could not be obtained in this environment. The 40 scenario rows are descriptive seed cases, not a frozen independently authored executable oracle corpus.
