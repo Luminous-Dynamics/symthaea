@@ -52,9 +52,10 @@ jobs:
           set -euo pipefail
           manifest="tools/eqc-reference/Cargo.toml"
           lock="tools/eqc-reference/Cargo.lock"
-          if [[ ! -f "$lock" ]]; then
-            cargo generate-lockfile --manifest-path "$manifest"
-          fi
+          # Re-resolve only this nested workspace graph. This intentionally
+          # does not touch the repository root Cargo.lock.
+          cargo metadata --manifest-path "$manifest" --format-version 1 \
+            > "$RUNNER_TEMP/eqc-cargo-metadata.json"
           test -s "$lock"
           git add "$lock"
           if ! git diff --cached --quiet -- "$lock"; then
@@ -94,7 +95,9 @@ jobs:
             .task_count == 4 and
             .reference_pass_count == 4 and
             .no_op_fails_positive_controls == true and
-            .allow_all_fails_negative_controls == true
+            .allow_all_fails_negative_controls == true and
+            .task_schema_validated == true and
+            .receipt_schema_meta_validated == true
           ' "$RUNNER_TEMP/eqc-reference-report.json" >/dev/null
           cat "$RUNNER_TEMP/eqc-reference-report.json"
 
@@ -109,6 +112,7 @@ jobs:
             echo "cargo=$(cargo --version)"
             echo "task_corpus_sha256=$(sha256sum docs/research/eqc-seed-corpus-v0.1.json | cut -d' ' -f1)"
             echo "standalone_lock_sha256=$(sha256sum tools/eqc-reference/Cargo.lock | cut -d' ' -f1)"
+            echo "schema_validator=jsonschema-0.63.2-offline-draft-2020-12"
           } > "$RUNNER_TEMP/eqc-evidence/run-metadata.txt"
 
       - name: Upload reference evidence
