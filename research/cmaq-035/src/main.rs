@@ -325,8 +325,10 @@ pub fn run_scenario(
             .seed
             .wrapping_add(scenario.stream_id())
             .wrapping_add((replication as u64).wrapping_mul(0xD1342543DE82EF95));
-        let (four_delay, two_delay, ons_delay) =
-            run_pair(replication_seed, config.horizon, scenario)?;
+        let pair = run_pair(replication_seed, config.horizon, scenario)?;
+        let four_delay = pair.fixed_four;
+        let two_delay = pair.fixed_two;
+        let ons_delay = pair.ons;
         if let Some(delay) = four_delay {
             fixed_four.alarm_delays.push(delay);
         }
@@ -385,11 +387,18 @@ fn compare_delays(
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PairDelays {
+    fixed_four: Option<usize>,
+    fixed_two: Option<usize>,
+    ons: Option<usize>,
+}
+
 fn run_pair(
     seed: u64,
     horizon: usize,
     scenario: Scenario,
-) -> Result<(Option<usize>, Option<usize>, Option<usize>), String> {
+) -> Result<PairDelays, String> {
     // Deterministic domain separation prevents accidental stream reuse in the
     // simulation. Neither generator is cryptographic.
     let mut score_rng = SplitMix64::new(seed ^ 0x53434F52455F524E);
@@ -474,7 +483,11 @@ fn run_pair(
             break;
         }
     }
-    Ok((four_delay, two_delay, ons_delay))
+    Ok(PairDelays {
+        fixed_four: four_delay,
+        fixed_two: two_delay,
+        ons: ons_delay,
+    })
 }
 
 fn rank_against_fixed_reference(
