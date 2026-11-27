@@ -40,7 +40,7 @@ The report includes:
 
 Fixed-coverage points report target and achieved coverage, accepted sample count, error count, selective risk and Wilson interval. A score and interval are omitted when the accepted set is smaller than the configured minimum. The default minimum is 20; the small-sample test configuration exists only to verify edge cases.
 
-Decision cost is optional and only emitted when the evaluator supplies nonnegative finite costs for false positives, false negatives and abstentions. The reported value is mean cost per original eligible case. Random-abstention expected cost uses the requested coverage and assumes random selection independent of correctness. Costs are policy/application-specific and should never be inferred from confidence.
+Decision cost is optional and only emitted when the evaluator supplies nonnegative finite costs for false positives, false negatives and abstentions. The reported value is mean cost per original eligible case. Random-abstention expected cost uses the achieved tie-safe coverage of the corresponding operating point and assumes random selection independent of correctness. Costs are policy/application-specific and should never be inferred from confidence.
 
 Strata are reported independently for domain, source family, delayed/censored status and adjudicator. Small strata are counted but do not receive scores until they meet the minimum sample size. Unknown metadata is retained as an explicit group.
 
