@@ -1,0 +1,9 @@
+[package]
+name = "cmaq-030-recoverability-margin"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "One-sided cluster-conformal calibration of recovery-option margin"
+
+[workspace]
