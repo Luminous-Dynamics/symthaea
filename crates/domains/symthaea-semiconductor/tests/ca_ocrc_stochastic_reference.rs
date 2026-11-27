@@ -32,6 +32,7 @@ fn policy(
         maximum_proxy_delay_rounds: proxy_max,
         delay_assumption: CaoOcrcDelayAssumptionV1::IidStochastic,
         feedback_delay_survival: Some(true_delay_survival),
+        feedback_delay_law_manifest_sha256: Some(digest('9')),
         population_scope: CaoOcrcPopulationScopeV1::QualifiedMeasuredStreamOnly,
         proxy_survival,
     }
@@ -207,6 +208,15 @@ fn optimizer_returns_monotone_survival_and_supported_proxy_horizon() {
     assert!(result.proxy_survival.windows(2).all(|w| w[0] >= w[1]));
     assert!(result.stochastic_tracking_load <= result.capacity as f64 + 1.0e-12);
     assert!(result.risk_bound.is_finite());
+}
+
+#[test]
+fn iid_delay_profile_requires_a_content_addressed_delay_law_manifest() {
+    let mut policy = policy(2, 1, vec![1.0, 0.5], vec![1.0, 0.8, 0.3, 0.0]);
+    policy.feedback_delay_law_manifest_sha256 = None;
+    assert!(
+        create_ca_ocrc_engine_v1("missing-g-manifest", "fab-clock", policy).is_err()
+    );
 }
 
 #[test]
