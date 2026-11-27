@@ -365,6 +365,19 @@ The likely long-term design is a **local response-balanced atlas**, not one glob
 
 The collisional programme is split by collision operator and equation. [K-RESP-C — Vlasov–Poisson–Dougherty](kresp-c-collisional/README.md) tests response-conditioned enrichment inside a positive entropy-moment representation. [K-RESP-CL — Coulomb Vlasov–Poisson–Landau echo growth](kresp-cl-coulomb/README.md) is a separate forward-time benchmark motivated by Zhao & Zi (2026), targeting growing echo cascades before the \\(\\nu^{-1/3}\\) enhanced-dissipation scale. Dougherty and Landau collision operators are not interchangeable; neither model's entropy guarantees or measured performance can be transferred to the other. Both tracks are design-only and have no physical solver result from this work.
 
+## Next response-surrogate research: path-ordered finite-amplitude response jet
+
+The next many-query extension is tracked in [issue #13934](https://github.com/Luminous-Dynamics/symthaea/issues/13934). It composes the existing signed first-/diagonal-second-order estimators and mixed-pulse coefficient into a path-indexed complex response polynomial:
+[
+\widehat R_q(\mathbf a\mid\pi)=R_{0,q}
++\sum_i a_i C_{i,q}
++\sum_i a_i^2 C_{ii,q}
++\sum_{i<j}a_i a_j C_{ij,q}^{\pi}.
+]
+The path digest binds checkpoint, ordered pulse operators, modes, signed amplitudes, phases, delays, QoI axes and branch. Reversing pulses is a different response path. The omitted third-and-higher-order contribution is carried as an independently calibrated error interval; it is never assumed zero. Coefficients remain finite-amplitude estimates until a three-or-more-scale amplitude-convergence study supports an asymptotic interpretation.
+
+This is **not** a claim to invent Taylor, Volterra, mixed-response or nonlinear model-reduction methods. The proposed novelty is their integration with kinetic pulse-path identity, phase-resolved echo response, sealed-holdout-safe remainder calibration and RBKR basis updates. The acceptance cohort includes three-/four-pulse cascades, reversed order, near-cancellation and high-mode cases. Unmeasured interactions, branch changes or an unqualified higher-order remainder return UNKNOWN / full-order fallback. This surrogate has not yet been implemented or physically benchmarked.
+
 ## First physics-facing experiment: K-RESP-1
 
 The first target experiment is a frozen-checkpoint, two-pulse 1D1V collisionless Vlasov–Poisson echo cohort using the existing `sinusoidal_velocity_kick_v1` contract. Every path shares the same first pulse and the same post-phase-mixing, post-first-pulse checkpoint; only the second pulse varies across training, validation and held-out paths. This places the first pulse's reachable directions in the checkpoint-centred reachability Gramian and tests whether the reduced state preserves the response to unseen second pulses. A later atlas experiment will vary first-pulse histories and qualify separate checkpoint-local bases. The experiment contract is machine-readable:
