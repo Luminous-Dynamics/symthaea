@@ -1,0 +1,152 @@
+{
+  "schema": "symthaea.embodiment-fixtures.v1",
+  "note": "Illustrative contract fixtures. JSON syntax was checked at authoring time; these are not claimed to have passed a JSON Schema validator or a Rust test runner.",
+  "valid_events": [
+    {
+      "schema": "symthaea.embodiment-event.v1",
+      "session_id": "demo-session-001",
+      "event_id": "event-listening-001",
+      "sequence": 0,
+      "observed_at_monotonic_ns": "1000000",
+      "expires_at_monotonic_ns": "3000000",
+      "event_kind": "conversation.listening",
+      "payload": {
+        "active": true
+      },
+      "source": {
+        "component": "symthaea-dialogue",
+        "instance_id": "dialogue-01"
+      },
+      "epistemic_status": "measured",
+      "privacy_class": "public"
+    },
+    {
+      "schema": "symthaea.embodiment-event.v1",
+      "session_id": "demo-session-001",
+      "event_id": "event-uncertainty-001",
+      "sequence": 1,
+      "observed_at_monotonic_ns": "1100000",
+      "expires_at_monotonic_ns": "3100000",
+      "event_kind": "cognition.uncertainty",
+      "payload": {
+        "subject": "candidate-selection",
+        "level": 0.4,
+        "calibration_ref": "calibration:reasoner:v1"
+      },
+      "source": {
+        "component": "symthaea-reasoner",
+        "instance_id": "reasoner-01"
+      },
+      "epistemic_status": "inferred",
+      "confidence": 0.73,
+      "privacy_class": "local_sensitive"
+    },
+    {
+      "schema": "symthaea.embodiment-event.v1",
+      "session_id": "demo-session-001",
+      "event_id": "event-evidence-001",
+      "sequence": 2,
+      "observed_at_monotonic_ns": "1200000",
+      "expires_at_monotonic_ns": "3200000",
+      "event_kind": "evidence.status",
+      "payload": {
+        "subject_id": "claim:example-17",
+        "status": "supported",
+        "verifier_receipt_ref": "receipt:example-17"
+      },
+      "source": {
+        "component": "symthaea-evidence-gate",
+        "instance_id": "evidence-01"
+      },
+      "epistemic_status": "measured",
+      "evidence_refs": [
+        "sha256:0123456789abcdef"
+      ],
+      "privacy_class": "public"
+    }
+  ],
+  "schema_rejection_examples": [
+    {
+      "case": "inferred_without_confidence",
+      "expected": "schema_reject",
+      "event": {
+        "schema": "symthaea.embodiment-event.v1",
+        "session_id": "demo-session-001",
+        "event_id": "invalid-inferred-001",
+        "sequence": 3,
+        "observed_at_monotonic_ns": "1300000",
+        "expires_at_monotonic_ns": "3300000",
+        "event_kind": "cognition.uncertainty",
+        "payload": {
+          "subject": "candidate-selection",
+          "level": 0.4
+        },
+        "source": {
+          "component": "symthaea-reasoner",
+          "instance_id": "reasoner-01"
+        },
+        "epistemic_status": "inferred",
+        "privacy_class": "local_sensitive"
+      }
+    },
+    {
+      "case": "unknown_turn_state",
+      "expected": "schema_reject",
+      "event": {
+        "schema": "symthaea.embodiment-event.v1",
+        "session_id": "demo-session-001",
+        "event_id": "invalid-turn-001",
+        "sequence": 4,
+        "observed_at_monotonic_ns": "1400000",
+        "expires_at_monotonic_ns": "3400000",
+        "event_kind": "conversation.turn_state",
+        "payload": {
+          "state": "maybe"
+        },
+        "source": {
+          "component": "symthaea-dialogue",
+          "instance_id": "dialogue-01"
+        },
+        "epistemic_status": "measured",
+        "privacy_class": "public"
+      }
+    }
+  ],
+  "semantic_validator_rejection_examples": [
+    {
+      "case": "sequence_regression",
+      "events": [
+        7,
+        6
+      ],
+      "expected": "reject_second_event"
+    },
+    {
+      "case": "duplicate_event_id",
+      "events": [
+        "event-a",
+        "event-a"
+      ],
+      "expected": "reject_duplicate"
+    },
+    {
+      "case": "expiry_not_after_observation",
+      "observed_at_monotonic_ns": "5000",
+      "expires_at_monotonic_ns": "5000",
+      "expected": "reject"
+    },
+    {
+      "case": "cross_session_event",
+      "session_ids": [
+        "session-a",
+        "session-b"
+      ],
+      "expected": "reject"
+    },
+    {
+      "case": "cancel_not_applied",
+      "cancel_to_render_updates": 2,
+      "expected": "reject"
+    }
+  ]
+}
