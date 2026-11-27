@@ -826,7 +826,55 @@ fn check_authority_and_claims(report: &mut ValidationReport, root: &Value) {
         report.issue("CLAIM_PROFILE_MISSING", "experiment.claim_profile");
         return;
     };
-    let value = |key: &str| claims.get(key).and_then(Value::as_bool).unwrap_or(false);
+    let claim_flags = [
+        "product_improvement",
+        "accumulation",
+        "repeatability",
+        "matched_budget_better_improver",
+        "outer_loop_ignition",
+        "recursive_progress",
+        "fresh_family_transfer",
+        "cross_domain_transfer",
+    ];
+    let mut declared_claims = BTreeSet::new();
+    match string_at(root, &["experiment", "claim_profile", "selected_claims"]) {
+        Some("none") => {}
+        Some(raw) if !raw.trim().is_empty() => {
+            for item in raw.split(',') {
+                let claim = item.trim();
+                if !claim_flags.contains(&claim) {
+                    report.issue("UNKNOWN_SELECTED_CLAIM", claim);
+                } else if !declared_claims.insert(claim.to_owned()) {
+                    report.issue("DUPLICATE_SELECTED_CLAIM", claim);
+                }
+            }
+        }
+        _ => report.issue(
+            "SELECTED_CLAIMS_MISSING",
+            "selected_claims must be none or a comma-separated list of canonical claim flag names",
+        ),
+    }
+    let mut enabled_claims = BTreeSet::new();
+    for flag in claim_flags {
+        match bool_at(claims, &[flag]) {
+            Some(true) => {
+                enabled_claims.insert(flag.to_owned());
+            }
+            Some(false) => {}
+            None => report.issue("CLAIM_FLAG_MISSING", flag),
+        }
+    }
+    if declared_claims != enabled_claims {
+        report.issue(
+            "SELECTED_CLAIMS_MISMATCH",
+            format!(
+                "selected_claims must exactly match enabled flags (declared: {:?}; enabled: {:?})",
+                declared_claims, enabled_claims
+            ),
+        );
+    }
+
+    let value = |key: &str| bool_at(claims, &[key]).unwrap_or(false);
     if value("outer_loop_ignition")
         && !(value("matched_budget_better_improver")
             && value("repeatability")
@@ -934,6 +982,8 @@ mod tests {
                     "2026-11-06T00:00:00Z".to_owned()
                 } else if key == "protocol_contract_commit" || key == "analysis_code_commit" {
                     "b".repeat(40)
+                } else if key == "selected_claims" {
+                    "none".to_owned()
                 } else if key == "confirmatory_seed_count" {
                     "10".to_owned()
                 } else if key == "planned_outer_loop_steps" {
@@ -1005,6 +1055,17 @@ mod tests {
         assert!(!report.ready_for_independent_review);
         assert!(report.issues.iter().any(|issue| issue.starts_with("DOCUMENT_NOT_FROZEN")));
         assert!(report.issues.iter().any(|issue| issue.starts_with("UNRESOLVED_PLACEHOLDER")));
+    }
+
+    #[test]
+    fn rejects_selected_claims_that_disagree_with_boolean_profile() {
+        let mut value = valid_specimen();
+        value["experiment"]["claim_profile"]["product_improvement"] = Value::Bool(true);
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("SELECTED_CLAIMS_MISMATCH")));
     }
 
     #[test]
