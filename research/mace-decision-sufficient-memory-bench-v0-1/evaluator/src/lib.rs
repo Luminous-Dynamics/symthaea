@@ -14,6 +14,8 @@
 //! public JSONL format, generate worlds, run a memory backend, or establish
 //! production security. Those are separate adapter/evaluator responsibilities.
 
+pub mod longmemeval_v2;
+
 use std::collections::BTreeSet;
 
 /// Evaluator-owned action loss, expressed in integer micro-loss units.
