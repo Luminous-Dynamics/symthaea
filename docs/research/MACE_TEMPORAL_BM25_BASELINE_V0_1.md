@@ -1,6 +1,6 @@
 # MACE temporal BM25 and rank-fusion reference baseline v0.1
 
-**Status:** standalone Rust reference, synthetic candidate-visible fixture and strict Serde wire adapter pass exact-head Rust 1.96 checks (17 BM25 tests; 21 adapter + embedded tests; locked metadata and strict Clippy). This is not a production Add/Search service, an external leaderboard reproduction, or a claim of superiority over current memory systems.
+**Status:** the original standalone Rust reference, synthetic candidate-visible fixture and earlier strict Serde wire adapter revision passed exact-head Rust 1.96 checks (17 BM25 tests; 21 adapter + embedded tests; locked metadata and strict Clippy). A follow-on adds archive-wide exact-ID lineage closure/cycle auditing and stricter wire limits; that current head is awaiting its own exact-head qualification. This is not a production Add/Search service, an external leaderboard reproduction, or a claim of superiority over current memory systems.
 
 ## Why this exists
 
@@ -28,6 +28,20 @@ The index exposes `resolve_source_event(document_id)`, allowing each returned BM
 A query carries `scope_id`, `as_of_ms`, free-text query and `top_k`. A record is eligible only when its scope matches, it was observed no later than the query cut, and its valid-time interval contains that cut.
 
 Crucially, the index partitions documents and term postings by `scope_id`, and orders each partition by `observed_at_ms`. Search resolves the requested scope before traversing any posting list, then uses a binary-search cutoff to exclude records learned after `as_of_ms`. Valid-time filtering follows within that bounded candidate cohort. BM25 corpus statistics (eligible document count, document frequency and average document length) are recomputed over the eligible scope/time cohort. Other tenants and future-observed records are therefore excluded before ranking work, not merely ignored after a global scan. The work receipt reports the eligible cohort, scope/knowledge-bounded posting visits and valid eligible postings actually scored; it does not pretend to report wall-clock or measured hardware cost.
+
+## Exact lineage-closure audit
+
+The reference now adds `audit_lineage()` over the canonical candidate-visible source-event archive. It emits one deterministic edge receipt per declared parent reference:
+
+- `resolved`: exact parent event ID exists in the same scope;
+- `missing_parent`: the exact event ID is absent;
+- `cross_scope_parent`: the exact ID exists, but belongs to a different scope.
+
+It also reports strongly connected components containing directed cycles. The implementation uses an iterative two-pass SCC traversal so archive depth does not become call-stack depth. Missing and cross-scope references are not traversed when detecting cycles.
+
+This is an **integrity diagnostic**, not an authorization algorithm. A resolved edge does not transfer a parent's authority, validity interval, freshness, or trust to its child. A lineage edge can be structurally present while its target is not visible at a particular query-time cut; query eligibility remains separately bitemporal. The adapter exposes the report alongside BM25/RRF results so a paired decision evaluator can penalize or reject incomplete provenance without conflating lexical relevance with evidence admissibility.
+
+The new tests exercise resolved/missing/cross-scope classification and an exact three-node cycle with a downstream acyclic node. They are added to the current branch head; the follow-on's exact-head Rust 1.96 run is pending.
 
 ## BM25 definition
 
@@ -92,4 +106,4 @@ External anchors must remain track-specific. AML Cycle 2 publishes separate text
 
 ## Claim boundary and next work
 
-This increment establishes a transparent lexical comparator, scope/knowledge-time partitioned worksets, and exact-ID provenance resolution for the same bitemporal source-event fields used by MACE Candidate Episode v0.1. It does not reproduce Resurface/Khipu/InsightMem, does not establish an AML score, and does not show SOTA superiority. The next integration step is an adapter from the same canonical source-event projection used by the paired evaluator; until then, the BM25 run and paired decision run must be joined by exact document/source IDs and frozen source digests, not inferred from text similarity.
+This increment establishes a transparent lexical comparator, scope/knowledge-time partitioned worksets, exact-ID provenance resolution, and an explicit audit of parent-edge closure and directed cycles for the same bitemporal source-event fields used by MACE Candidate Episode v0.1. It does not reproduce Resurface/Khipu/InsightMem, does not establish an AML score, and does not show SOTA superiority. The next integration step is an adapter from the same canonical source-event projection used by the paired evaluator; until then, the BM25 run and paired decision run must be joined by exact document/source IDs and frozen source digests, not inferred from text similarity.
