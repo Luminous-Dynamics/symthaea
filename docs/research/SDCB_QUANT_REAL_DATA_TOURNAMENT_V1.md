@@ -209,3 +209,27 @@ These are research gates. No QUANT benchmark result, dataset acquisition, physic
 - BIPM/OIML/ILAC/ISO joint declaration on metrological traceability: https://www.bipm.org/documents/20126/42177518/BIPM-OIML-ILAC-ISO_joint_declaration_2011.pdf
 - Terminal-Bench-Science live task set and contribution process: https://github.com/harbor-framework/terminal-bench-science/ and https://www.terminal-bench-science.ai/contribute
 - ASI-Bench task catalog: https://asibench.apexin.ai/tasks/catalog/
+
+
+## Tiered empirical data access — curated hourly QUANT release
+
+The Zenodo release provides a viable **hourly screening tier** while the raw CEDA archive and paper-specific high-rate reference access are unresolved:
+
+- Diez et al., *QUANT: A Three-Year, Multi-City Air Quality Dataset of Commercial Air Sensors and Reference Data for Performance Evaluation*, Zenodo v1, published 2 March 2024, DOI: https://doi.org/10.5281/zenodo.10775692.
+- `QUANT_DuplicateRef_hourly.csv`: 1.4 MB, MD5 `95a7adc5e12f6b67f92baadb9a18cb2a`.
+- `QUANT_Reference_hourly.csv`: 26.7 MB, MD5 `51df9e9632f21e5a8fcbed11662cab45`.
+- `QUANT_SensorSystems_hourly.csv`: 476.9 MB, MD5 `7f8665948c58014f4dde1122d5f438e6`.
+
+The release contains standardized hourly records from London, Manchester and York, including commercial sensor systems, reference monitors and duplicate reference instruments. It provides NO, NO2, O3, PM1, PM2.5, PM10 and meteorological channels. The Zenodo record identifies the sensor data as derived from CEDA under OGL v3.0; the reference series originate from public site data and have been harmonized to hourly averages; the duplicate reference data are only in the Zenodo release. The Zenodo record's top-level Rights field states CC BY 4.0, but the data components have their own provenance statements. Preserve per-file source attribution and licence metadata rather than flattening provenance into a single undifferentiated claim.
+
+### Tiered use and limits
+
+1. **Q0 — hourly screening:** use the curated Zenodo files to qualify parsing, units, site/device mapping, missingness, duplicate-reference disagreement, hourly calibration baselines and chronological/leave-device/site holdouts. The reference data have been processed/harmonized and may have undergone later ratification. This tier is useful for cohort construction and coarse predictive evaluation, not for reconstructing sub-hourly dynamics.
+2. **Q1 — raw CEDA sensor archive:** use the richer source archive for original temporal resolution, additional pollutants and fuller sensor metadata. CEDA's sensor archive is not itself the site's full regulatory reference archive; join only with separately sourced, versioned references whose provenance is explicit.
+3. **Q2 — short-collocation paper reproduction:** obtain the exact one-minute reference series, five-minute mobile-sensor series, instrument uncertainty inputs and collocation metadata used by Kok and Tabandeh (2026) from the corresponding author as required by the paper's data availability statement. Do not treat Zenodo hourly data as a substitute.
+
+The files have been identified from the source catalogue, but direct download attempts in this environment were rate-limited/failed. **No Zenodo file bytes have been acquired, hashed locally, parsed or analyzed in this execution.** The file MD5 values above are publisher-provided catalogue metadata, not independently verified local checksums. The original CEDA archive acquisition blocker remains separate. No real-data result is claimed.
+
+Do not upsample hourly records into one- or five-minute observations. Do not infer sensor process response or short-collocation coverage from hourly aggregates. All tier transitions require separate acquisition receipts, raw-file SHA-256 digests, parser versions and frozen cohort manifests.
+
+Source: https://zenodo.org/records/10775692 and the dataset paper https://doi.org/10.1038/s41597-024-03767-2.
