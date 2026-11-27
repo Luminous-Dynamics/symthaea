@@ -42,7 +42,7 @@ The Ed25519 message is domain-separated from other protocols and contains the ro
 
 ## 4. Trust model
 
-The verifier receives a trusted-key map from outside the bundle. The bundle's `key_id` selects one key from that configured map. An unknown key is indeterminate; an invalid signature is blocked. A missing signature is indeterminate and never qualifies.
+The verifier receives the expected run ID, exact bundle sequence, expected predecessor root and trusted-key map from outside the bundle. The bundle's `key_id` selects one key from that configured map. An unknown key is indeterminate; an invalid signature is blocked. A missing signature is indeterminate and never qualifies.
 
 The v1 verifier does not decide how keys are provisioned, rotated, revoked or protected. Production deployment should use:
 - signer identities distinct from the system that generated source and restore observations;
@@ -58,13 +58,13 @@ A first bundle uses sequence 1 and has no previous root. Later bundles must:
 - include the prior manifest root;
 - be checked against the verifier's separately supplied expected previous root.
 
-A missing prior bundle or unavailable expected predecessor is indeterminate. A predecessor mismatch or sequence discontinuity is blocked. A signature alone does not prove the prior bundle was retained; the verifier or custody service must retain the expected chain head.
+A missing prior bundle or unavailable expected run ID, sequence or predecessor is indeterminate. A predecessor mismatch or sequence discontinuity is blocked. A signature alone does not prove the prior bundle was retained; the verifier or custody service must retain the expected chain head.
 
 ## 6. Artifact verification
 
 Paths use normalized forward-slash relative form. Absolute paths, empty paths, `.`, `..`, backslashes, NUL bytes, duplicate paths and symlink components are rejected. Only regular files are accepted.
 
-The verifier checks observed size and SHA-256 against the signed manifest. Missing files, size mismatch or digest mismatch block the bundle. File bytes remain outside the manifest, so copying the bundle preserves the raw artifacts and permits independent re-hashing.
+The verifier requires the bundle directory to contain exactly the declared regular files (no unlisted files or symlinks), then checks observed size and SHA-256 against the signed manifest. Missing files, size mismatch or digest mismatch block the bundle. File bytes remain outside the manifest, so copying the bundle preserves the raw artifacts and permits independent re-hashing.
 
 The current reference rejects symlinks and validates all path components before opening. It assumes the bundle is quiescent during verification; a hostile concurrent filesystem mutation could require stronger platform-specific no-follow APIs or immutable storage.
 
