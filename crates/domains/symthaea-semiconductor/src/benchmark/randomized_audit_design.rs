@@ -212,7 +212,12 @@ fn sorted_units(
                 unit.sample_id
             )));
         }
-        if !priorities.insert(unit.audit_priority.to_bits()) {
+        let priority_bits = if unit.audit_priority == 0.0 {
+            0.0_f64.to_bits()
+        } else {
+            unit.audit_priority.to_bits()
+        };
+        if !priorities.insert(priority_bits) {
             return Err(RandomizedAuditErrorV1(
                 "audit priority ties are rejected to preserve deterministic SRSWOR ordering"
                     .into(),
@@ -862,6 +867,66 @@ mod tests {
     }
 
     #[test]
+    fn srswor_ht_mean_is_design_unbiased_over_a_frozen_monte_carlo_suite() {
+        let losses = [0.0_f64, 0.1, 0.2, 0.4, 0.7, 1.0];
+        let population_mean = losses.iter().sum::<f64>() / losses.len() as f64;
+        let mut state = 0x8f3a_2c71_9bde_4451_u64;
+        let mut estimate_sum = 0.0;
+
+        fn next_uniform(state: &mut u64) -> f64 {
+            *state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            let mantissa = *state >> 11;
+            mantissa as f64 / ((1_u64 << 53) as f64)
+        }
+
+        for replicate in 0..4_000 {
+            let mut priorities = Vec::new();
+            let mut draws = Vec::new();
+            for _ in 0..losses.len() {
+                priorities.push(next_uniform(&mut state));
+                draws.push(next_uniform(&mut state));
+            }
+            let population = units(
+                &[0.0; 6],
+                &priorities,
+                &draws,
+            );
+            let design = create_randomized_audit_design_v1(&input(population, 2)).unwrap();
+            let outcomes = design
+                .selected_sample_ids
+                .iter()
+                .map(|sample_id| {
+                    let index = sample_id
+                        .strip_prefix("sample-")
+                        .unwrap()
+                        .parse::<usize>()
+                        .unwrap();
+                    RandomizedAuditObservedLossV1 {
+                        sample_id: sample_id.clone(),
+                        qualified_loss: losses[index],
+                    }
+                })
+                .collect();
+            let report = compute_randomized_audit_ht_v1(&RandomizedAuditHtInputV1 {
+                schema: RANDOMIZED_AUDIT_HT_INPUT_SCHEMA_V1.into(),
+                design_report: design,
+                observed_losses: outcomes,
+            })
+            .unwrap();
+            estimate_sum += report.horvitz_thompson_mean;
+            assert_eq!(report.population_size, 6, "replicate {replicate}");
+        }
+
+        let monte_carlo_mean = estimate_sum / 4_000.0;
+        assert!(
+            (monte_carlo_mean - population_mean).abs() < 0.01,
+            "HT design expectation {monte_carlo_mean} differs from population mean {population_mean}"
+        );
+    }
+
+    #[test]
     fn tampered_frame_draw_or_target_policy_receipt_is_rejected() {
         let population = units(&[0.2, 0.3, 0.4], &[0.2, 0.5, 0.8], &[0.1, 0.5, 0.9]);
         let mut design_input = input(population, 1);
@@ -872,6 +937,13 @@ mod tests {
             1,
         );
         design_input.target_policy_receipt_sha256 = "invalid".into();
+        assert!(create_randomized_audit_design_v1(&design_input).is_err());
+
+        let mut design_input = input(
+            units(&[0.2, 0.3, 0.4], &[0.2, 0.5, 0.8], &[0.1, 0.5, 0.9]),
+            1,
+        );
+        design_input.random_draw_manifest_sha256 = digest('c');
         assert!(create_randomized_audit_design_v1(&design_input).is_err());
     }
 }
