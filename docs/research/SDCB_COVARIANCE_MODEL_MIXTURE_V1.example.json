@@ -1,0 +1,49 @@
+{
+  "schema_version": "sdcb_covariance_model_mixture.v1",
+  "observation": [
+    0.5
+  ],
+  "models": [
+    {
+      "model_id": "fast-drift",
+      "prior_weight": 0.7,
+      "theta_mean": 0,
+      "theta_variance": 2,
+      "predictive_mean": [
+        0
+      ],
+      "innovation_covariance": [
+        [
+          1
+        ]
+      ],
+      "theta_observation_covariance": [
+        0.8
+      ]
+    },
+    {
+      "model_id": "slow-drift",
+      "prior_weight": 0.3,
+      "theta_mean": 2,
+      "theta_variance": 3,
+      "predictive_mean": [
+        1
+      ],
+      "innovation_covariance": [
+        [
+          2
+        ]
+      ],
+      "theta_observation_covariance": [
+        1
+      ]
+    }
+  ],
+  "robust_support_ids": [
+    "fast-drift",
+    "slow-drift"
+  ],
+  "notes": [
+    "Constructed Gaussian known-answer fixture only."
+  ]
+}
