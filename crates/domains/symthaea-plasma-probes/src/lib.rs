@@ -16,7 +16,6 @@ pub mod pulse_map;
 pub mod rbkr;
 pub mod validity_horizon;
 pub mod velocity_kick_remap;
-pub mod validity_horizon;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
