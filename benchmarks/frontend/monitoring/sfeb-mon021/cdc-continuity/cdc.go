@@ -37,6 +37,9 @@ type Profile struct {
 	SnapshotName,SnapshotDigest string
 }
 type SlotState struct {
+	SystemIdentifier string
+	ServerMajor uint16
+	TimelineID uint32
 	SlotType string
 	DatabaseOID uint32
 	DatabaseName,SlotName,OutputPlugin string
@@ -57,6 +60,8 @@ type Transaction struct {
 	EventIDs []string
 }
 type Manifest struct {
+	ServerMajor uint16
+	SystemIdentifier,DatabaseName,OutputPlugin string
 	SourceEpoch string
 	TimelineID uint32
 	SlotName string
@@ -68,7 +73,7 @@ type Manifest struct {
 	Transactions []Transaction
 	Complete bool
 	DroppedEvents,QueueOverflowCount uint64
-	EvidenceThroughLSN,AcknowledgementRequestedLSN LSN
+	EvidenceThroughLSN,AcknowledgementRequestedLSN,AcknowledgementSentLSN LSN
 	Witnessed bool
 	ManifestDigest string
 }
@@ -88,7 +93,7 @@ func validateWALLevel(p Profile)(Decision,string){
 	}
 	return Indeterminate,"unsupported PostgreSQL major version"
 }
-func slotMatches(p Profile,s SlotState)bool{return s.SlotType=="logical"&&s.DatabaseOID==p.DatabaseOID&&s.DatabaseName==p.DatabaseName&&s.SlotName==p.SlotName&&s.OutputPlugin==p.OutputPlugin}
+func slotMatches(p Profile,s SlotState)bool{return s.SlotType=="logical"&&s.SystemIdentifier==p.SystemIdentifier&&s.ServerMajor==p.ServerMajor&&s.TimelineID==p.TimelineID&&s.DatabaseOID==p.DatabaseOID&&s.DatabaseName==p.DatabaseName&&s.SlotName==p.SlotName&&s.OutputPlugin==p.OutputPlugin}
 func slotHealth(s SlotState)(Decision,string){
 	if s.SlotType!="logical"{return Denied,"slot is not logical"}
 	if s.Temporary{return Denied,"temporary logical slot is not durable"}
@@ -141,7 +146,7 @@ func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
 	c:=[]string{"source-slot-profile","capture-range","decoded-event-order","durable-evidence-before-ack"}
 	if !profileOK(p){return out(Indeterminate,"source profile incomplete or PostgreSQL major version unsupported",c...)}
 	if d,r:=validateWALLevel(p);d!=Qualified{return out(d,r,c...)}
-	if !slotMatches(p,s)||m.SourceEpoch!=p.SourceEpoch||m.TimelineID!=p.TimelineID||m.SlotName!=p.SlotName||m.DatabaseOID!=p.DatabaseOID||m.PluginProfileDigest!=p.PluginProfileDigest||m.SchemaProfileDigest!=p.SchemaProfileDigest{return out(Denied,"capture source/slot/plugin/timeline profile mismatch",c...)}
+	if !slotMatches(p,s)||m.ServerMajor!=p.ServerMajor||m.SystemIdentifier!=p.SystemIdentifier||m.DatabaseName!=p.DatabaseName||m.OutputPlugin!=p.OutputPlugin||m.SourceEpoch!=p.SourceEpoch||m.TimelineID!=p.TimelineID||m.SlotName!=p.SlotName||m.DatabaseOID!=p.DatabaseOID||m.PluginProfileDigest!=p.PluginProfileDigest||m.SchemaProfileDigest!=p.SchemaProfileDigest{return out(Denied,"capture server/cluster/database/slot/plugin/timeline profile mismatch",c...)}
 	if d,r:=slotHealth(s);d!=Qualified{return out(d,r,c...)}
 	if s.TwoPhase { return out(Indeterminate,"two-phase decoding is not qualified by this capture profile",c...) }
 	if m.SnapshotConsistentPoint!=*p.ConsistentPoint||m.SnapshotDigest!=p.SnapshotDigest{return out(Denied,"capture snapshot anchor mismatch",c...)}
@@ -150,6 +155,7 @@ func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
 	if m.TerminalLSN<m.StartExclusiveLSN{return out(Denied,"terminal LSN precedes capture start",c...)}
 	if m.EvidenceThroughLSN!=m.TerminalLSN{return out(Indeterminate,"durable evidence watermark does not equal terminal LSN",c...)}
 	if m.AcknowledgementRequestedLSN>m.EvidenceThroughLSN{return out(Denied,"requested acknowledgement advances beyond durable evidence",c...)}
+	if m.AcknowledgementSentLSN>m.EvidenceThroughLSN{return out(Denied,"actual acknowledgement sent advances beyond durable evidence",c...)}
 	if s.ConfirmedFlushLSN!=nil&&*s.ConfirmedFlushLSN>m.EvidenceThroughLSN{return out(Denied,"observed confirmed_flush_lsn exceeds durable evidence",c...)}
 	if *s.RestartLSN>m.StartExclusiveLSN{return out(Indeterminate,"slot restart_lsn is later than required capture start",c...)}
 	txByXID:=map[string]Transaction{}
@@ -216,9 +222,11 @@ func ValidateReplay(old,next Manifest)Result{
 	c:=[]string{"overlap-replay-reconciliation","transaction-envelope-reconciliation","durable-watermark-and-acknowledgement"}
 	if d,r:=transactionMembersConsistent(old);d!=Qualified{return out(d,"old manifest: "+r,c...)}
 	if d,r:=transactionMembersConsistent(next);d!=Qualified{return out(d,"new manifest: "+r,c...)}
-	if old.SourceEpoch!=next.SourceEpoch||old.TimelineID!=next.TimelineID||old.SlotName!=next.SlotName||old.DatabaseOID!=next.DatabaseOID||old.PluginProfileDigest!=next.PluginProfileDigest||old.SchemaProfileDigest!=next.SchemaProfileDigest{return out(Divergent,"capture source epoch/slot/timeline/profile changed without handoff",c...)}
+	if old.ServerMajor!=next.ServerMajor||old.SystemIdentifier!=next.SystemIdentifier||old.DatabaseName!=next.DatabaseName||old.OutputPlugin!=next.OutputPlugin||old.SourceEpoch!=next.SourceEpoch||old.TimelineID!=next.TimelineID||old.SlotName!=next.SlotName||old.DatabaseOID!=next.DatabaseOID||old.PluginProfileDigest!=next.PluginProfileDigest||old.SchemaProfileDigest!=next.SchemaProfileDigest{return out(Divergent,"capture server/cluster/database/slot/timeline/profile changed without handoff",c...)}
 	if !old.Complete||!old.Witnessed||!present(old.ManifestDigest)||!next.Complete||!next.Witnessed||!present(next.ManifestDigest){return out(Indeterminate,"old or new replay manifest lacks completeness/seal evidence",c...)}
 	if next.StartExclusiveLSN>old.EvidenceThroughLSN{return out(Indeterminate,"new capture starts after prior durable evidence; unaccounted range gap",c...)}
+	if next.EvidenceThroughLSN!=next.TerminalLSN{return out(Indeterminate,"replay evidence watermark does not equal terminal LSN",c...)}
+	if next.AcknowledgementRequestedLSN>next.EvidenceThroughLSN||next.AcknowledgementSentLSN>next.EvidenceThroughLSN{return out(Denied,"replay request/sent acknowledgement advances beyond durable evidence",c...)}
 	if next.TerminalLSN<old.TerminalLSN{return out(Indeterminate,"replay capture terminal regressed; await terminal watermark",c...)}
 	if next.EvidenceThroughLSN!=next.TerminalLSN{return out(Indeterminate,"replay evidence watermark does not equal terminal LSN",c...)}
 	if next.AcknowledgementRequestedLSN>next.EvidenceThroughLSN{return out(Denied,"replay acknowledgement advances beyond durable evidence",c...)}
@@ -248,8 +256,9 @@ func ValidateFailover(f Failover,durable LSN)Result{
 	if f.Prior.TimelineID==f.Next.TimelineID||f.Next.TimelineID==0||f.Next.SourceEpoch==f.Prior.SourceEpoch{return out(Denied,"failover must create new timeline and source epoch",c...)}
 	if !present(f.TimelineHistoryDigest)||!f.TimelineHistoryWitnessed||f.TimelineHistoryParent!=f.Prior.TimelineID||f.ForkLSN==0{return out(Indeterminate,"verified timeline history does not bind the prior timeline and fork point",c...)}
 	if durable>f.ForkLSN{return out(Denied,"durable evidence lies beyond the promoted standby timeline fork; history is not shared",c...)}
+	if f.Next.ConsistentPoint==nil||*f.Next.ConsistentPoint<f.ForkLSN{return out(Indeterminate,"promoted source consistent point precedes the authenticated timeline fork",c...)}
 	s:=f.StandbySlot
-	if s.SlotType!="logical"||s.DatabaseOID!=f.Prior.DatabaseOID||s.DatabaseName!=f.Prior.DatabaseName||s.SlotName!=f.Prior.SlotName||s.OutputPlugin!=f.Prior.OutputPlugin{return out(Denied,"standby slot database/name/plugin identity mismatch",c...)}
+	if s.SlotType!="logical"||s.SystemIdentifier!=f.Prior.SystemIdentifier||s.ServerMajor!=f.Next.ServerMajor||s.TimelineID!=f.Next.TimelineID||s.DatabaseOID!=f.Prior.DatabaseOID||s.DatabaseName!=f.Prior.DatabaseName||s.SlotName!=f.Prior.SlotName||s.OutputPlugin!=f.Prior.OutputPlugin{return out(Denied,"standby cluster/timeline/database/name/plugin identity mismatch",c...)}
 	if !s.OnStandby||!s.Failover||!s.Synced||s.Temporary||s.TwoPhase||s.InvalidationReason!=""||(s.WALStatus!="reserved"&&s.WALStatus!="extended"){return out(Denied,"standby logical slot is not persistent, synced, failover-enabled and valid for the supported transaction profile",c...)}
 	if s.RestartLSN==nil||s.StandbyReplayLSN==nil{return out(Indeterminate,"standby slot restart/replay position unavailable",c...)}
 	if *s.StandbyReplayLSN<f.ForkLSN{return out(Indeterminate,"standby has not replayed through the verified timeline fork point",c...)}
