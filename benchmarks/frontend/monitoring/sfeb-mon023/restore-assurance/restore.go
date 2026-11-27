@@ -1,9 +1,6 @@
 package restoreassurance
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 type Claim string
 const (
