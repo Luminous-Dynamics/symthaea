@@ -5,8 +5,10 @@
 //!
 //! The source SerializedWorld is an offline research artifact containing both observations and
 //! evaluator truth. This adapter projects exactly one permitted observation stream into a
-//! replay archive and keeps the trajectory, privileged observations, seed and split in an
-//! evaluator-only capsule/manifest.
+//! custodian-only replay archive and keeps the trajectory, privileged observations, seed and split
+//! in an evaluator-only capsule/manifest. The archive contains future observations and MUST NOT
+//! be mounted into the candidate process; a trusted replay driver may expose only decision-time
+//! prefixes through CandidateDecisionContext.
 //!
 //! Digests identify serialized bytes; they are not signatures, proof of truth, or access control.
 //! Candidate/evaluator separation must also be enforced by filesystem/service custody.
@@ -51,8 +53,8 @@ pub enum WorldSplit {
     HeldOut,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 /// Custodian-only full observation stream. Never pass this archive wholesale to a candidate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReplayObservationArchive {
     pub schema_version: u16,
     pub world_id: String,
@@ -119,7 +121,7 @@ pub fn encode_world(
     require_nonempty("world_id", world_id)?;
     validate_commit_sha(source_commit)?;
 
-    let candidate = ReplayObservationArchive {
+    let replay_archive = ReplayObservationArchive {
         schema_version: CAPSULE_SCHEMA_VERSION,
         world_id: world_id.to_owned(),
         world_format_version: world.format_version.clone(),
@@ -138,7 +140,7 @@ pub fn encode_world(
         trait_level_just_before_extinction: world.trait_level_just_before_extinction,
     };
 
-    let replay_archive_json = serde_json::to_vec(&candidate)
+    let replay_archive_json = serde_json::to_vec(&replay_archive)
         .map_err(|e| format!("serialize replay archive: {e}"))?;
     let evaluator_capsule_json = serde_json::to_vec(&evaluator)
         .map_err(|e| format!("serialize evaluator capsule: {e}"))?;
@@ -166,7 +168,7 @@ pub fn encode_world(
     Ok(EncodedReplayArtifacts {
         replay_archive_json,
         replay_receipt_json: serde_json::to_vec(&receipt)
-            .map_err(|e| format!("serialize candidate receipt: {e}"))?,
+            .map_err(|e| format!("serialize replay archive receipt: {e}"))?,
         evaluator_capsule_json,
         evaluator_manifest_json: serde_json::to_vec(&manifest)
             .map_err(|e| format!("serialize evaluator manifest: {e}"))?,
@@ -191,7 +193,7 @@ pub fn verify_encoded_replay_artifacts(
         return Err("evaluator capsule digest mismatch".into());
     }
     let receipt: ReplayArchiveReceipt = serde_json::from_slice(&set.replay_receipt_json)
-        .map_err(|e| format!("decode candidate receipt: {e}"))?;
+        .map_err(|e| format!("decode replay archive receipt: {e}"))?;
     let manifest: WorldCustodyManifest = serde_json::from_slice(&set.evaluator_manifest_json)
         .map_err(|e| format!("decode evaluator manifest: {e}"))?;
     let candidate: ReplayObservationArchive = serde_json::from_slice(&set.replay_archive_json)
@@ -337,7 +339,7 @@ mod tests {
     }
 
     #[test]
-    fn candidate_capsule_excludes_seed_truth_and_privileged_streams() {
+    fn replay_archive_excludes_seed_truth_and_privileged_streams() {
         let encoded = encode_world(
             &world(), "d5a4dfc1-7e8c-4a9b-8e57-2bd995c5ce21",
             WorldSplit::Training, ObservationView::Census,
