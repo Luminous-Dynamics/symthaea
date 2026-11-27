@@ -19,12 +19,10 @@ use super::label_consumption_guard::{
     LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
 
-pub const EVIDENCE_SHIFT_POLICY_SCHEMA_V1: &str =
-    "luminous.semi-bench.evidence-shift-policy.v1";
+pub const EVIDENCE_SHIFT_POLICY_SCHEMA_V1: &str = "luminous.semi-bench.evidence-shift-policy.v1";
 pub const EVIDENCE_SHIFT_OBSERVATION_SCHEMA_V1: &str =
     "luminous.semi-bench.evidence-shift-observation.v1";
-pub const EVIDENCE_SHIFT_ENGINE_SCHEMA_V1: &str =
-    "luminous.semi-bench.evidence-shift-engine.v1";
+pub const EVIDENCE_SHIFT_ENGINE_SCHEMA_V1: &str = "luminous.semi-bench.evidence-shift-engine.v1";
 pub const EVIDENCE_SHIFT_ASSESSMENT_SCHEMA_V1: &str =
     "luminous.semi-bench.evidence-shift-assessment.v1";
 
@@ -272,16 +270,20 @@ fn observation_state_scope(
             .as_deref()
             .filter(|value| !value.trim().is_empty())
             .map(reference_state_scope)
-            .ok_or_else(|| EvidenceShiftErrorV1(
-                "reference-standard observation requires an explicit standard identity".into(),
-            ));
+            .ok_or_else(|| {
+                EvidenceShiftErrorV1(
+                    "reference-standard observation requires an explicit standard identity".into(),
+                )
+            });
     }
     Ok(observation.scope_id.clone())
 }
 
 fn validate_policy(policy: &EvidenceShiftPolicyV1) -> Result<(), EvidenceShiftErrorV1> {
     if policy.schema != EVIDENCE_SHIFT_POLICY_SCHEMA_V1 {
-        return Err(EvidenceShiftErrorV1("unsupported shift policy schema".into()));
+        return Err(EvidenceShiftErrorV1(
+            "unsupported shift policy schema".into(),
+        ));
     }
     if policy.policy_id.trim().is_empty()
         || policy.clock_domain_id.trim().is_empty()
@@ -300,9 +302,10 @@ fn validate_policy(policy: &EvidenceShiftPolicyV1) -> Result<(), EvidenceShiftEr
         ShiftSignalChannelV1::ReferenceStandardResidual,
         ShiftSignalChannelV1::SensorObservabilityScore,
     ] {
-        let config = policy.channels.get(&channel).ok_or_else(|| {
-            EvidenceShiftErrorV1(format!("shift policy is missing {channel:?}"))
-        })?;
+        let config = policy
+            .channels
+            .get(&channel)
+            .ok_or_else(|| EvidenceShiftErrorV1(format!("shift policy is missing {channel:?}")))?;
         if !config.baseline_mean.is_finite()
             || !config.baseline_standard_deviation.is_finite()
             || config.baseline_standard_deviation <= 0.0
@@ -326,7 +329,9 @@ fn validate_policy(policy: &EvidenceShiftPolicyV1) -> Result<(), EvidenceShiftEr
 
 fn validate_engine(engine: &EvidenceShiftMonitorV1) -> Result<(), EvidenceShiftErrorV1> {
     if engine.schema != EVIDENCE_SHIFT_ENGINE_SCHEMA_V1 {
-        return Err(EvidenceShiftErrorV1("unsupported shift engine schema".into()));
+        return Err(EvidenceShiftErrorV1(
+            "unsupported shift engine schema".into(),
+        ));
     }
     validate_policy(&engine.policy)?;
     if json_sha256(&engine.policy)? != engine.policy_sha256 {
@@ -390,7 +395,8 @@ fn normalize_channel_value(
             if !valid_sha256(&report.label_sha256) {
                 reasons.push(ShiftReasonCodeV1::LabelPayloadDigestInvalid);
             }
-            if report_digest(report).map_err(|_| vec![ShiftReasonCodeV1::LabelReportDigestMismatch])?
+            if report_digest(report)
+                .map_err(|_| vec![ShiftReasonCodeV1::LabelReportDigestMismatch])?
                 != report.report_sha256
             {
                 reasons.push(ShiftReasonCodeV1::LabelReportDigestMismatch);
@@ -550,84 +556,83 @@ fn classify(
     let mut contradicting = Vec::new();
     let mut reasons = Vec::new();
 
-    let (state, recommendation) = if (residual_alert && reference_alert)
-        || (reference_alert && sensor_alert)
-    {
-        supporting.extend([
-            ShiftSignalChannelV1::VmResidual,
-            ShiftSignalChannelV1::ReferenceStandardResidual,
-        ]);
-        reasons.push(ShiftReasonCodeV1::ResidualAndReferenceBothShifted);
-        (
-            ShiftDiagnosticStateV1::CommonCauseOrMixedShift,
-            ShiftAdaptationRecommendationV1::Hold,
-        )
-    } else if reference_alert {
-        supporting.push(ShiftSignalChannelV1::ReferenceStandardResidual);
-        (
-            ShiftDiagnosticStateV1::MeasurementSystemShiftSuspected,
-            ShiftAdaptationRecommendationV1::Hold,
-        )
-    } else if sensor_alert {
-        supporting.push(ShiftSignalChannelV1::SensorObservabilityScore);
-        if residual_alert {
-            supporting.push(ShiftSignalChannelV1::VmResidual);
-        }
-        (
-            ShiftDiagnosticStateV1::SensorObservabilityShift,
-            ShiftAdaptationRecommendationV1::Hold,
-        )
-    } else if residual_alert {
-        supporting.push(ShiftSignalChannelV1::VmResidual);
-        if reference_stable {
-            contradicting.push(ShiftSignalChannelV1::ReferenceStandardResidual);
-        }
-        if sensor_stable {
-            contradicting.push(ShiftSignalChannelV1::SensorObservabilityScore);
-        }
-        if reference_stable && sensor_stable && process_marker_recent {
+    let (state, recommendation) =
+        if (residual_alert && reference_alert) || (reference_alert && sensor_alert) {
+            supporting.extend([
+                ShiftSignalChannelV1::VmResidual,
+                ShiftSignalChannelV1::ReferenceStandardResidual,
+            ]);
+            reasons.push(ShiftReasonCodeV1::ResidualAndReferenceBothShifted);
             (
-                ShiftDiagnosticStateV1::ProcessShiftSuspected,
-                ShiftAdaptationRecommendationV1::RequestMetrology,
-            )
-        } else {
-            reasons.push(ShiftReasonCodeV1::ResidualShiftWithoutIdentifyingEvidence);
-            (
-                ShiftDiagnosticStateV1::Unresolved,
+                ShiftDiagnosticStateV1::CommonCauseOrMixedShift,
                 ShiftAdaptationRecommendationV1::Hold,
             )
-        }
-    } else if residual.is_none() {
-        reasons.push(ShiftReasonCodeV1::MissingDetectorChannel);
-        (
-            ShiftDiagnosticStateV1::InsufficientEvidence,
-            ShiftAdaptationRecommendationV1::Hold,
-        )
-    } else if residual.is_some_and(|entry| entry.observations == 0) {
-        reasons.push(ShiftReasonCodeV1::MissingDetectorChannel);
-        (
-            ShiftDiagnosticStateV1::InsufficientEvidence,
-            ShiftAdaptationRecommendationV1::Hold,
-        )
-    } else if residual.is_none()
-        || !residual.is_some_and(|entry| entry.stable_reference_window)
-        || !reference_stable
-        || !sensor_stable
-    {
-        reasons.push(ShiftReasonCodeV1::InsufficientIndependentEvidence);
-        (
-            ShiftDiagnosticStateV1::InsufficientEvidence,
-            ShiftAdaptationRecommendationV1::Hold,
-        )
-    } else {
-        if process_marker_recent {
-            reasons.push(ShiftReasonCodeV1::ProcessMarkerWithoutMeasuredShift);
-        }
-        (
-            ShiftDiagnosticStateV1::Nominal,
-            ShiftAdaptationRecommendationV1::Continue,
-        )
-    };
+        } else if reference_alert {
+            supporting.push(ShiftSignalChannelV1::ReferenceStandardResidual);
+            (
+                ShiftDiagnosticStateV1::MeasurementSystemShiftSuspected,
+                ShiftAdaptationRecommendationV1::Hold,
+            )
+        } else if sensor_alert {
+            supporting.push(ShiftSignalChannelV1::SensorObservabilityScore);
+            if residual_alert {
+                supporting.push(ShiftSignalChannelV1::VmResidual);
+            }
+            (
+                ShiftDiagnosticStateV1::SensorObservabilityShift,
+                ShiftAdaptationRecommendationV1::Hold,
+            )
+        } else if residual_alert {
+            supporting.push(ShiftSignalChannelV1::VmResidual);
+            if reference_stable {
+                contradicting.push(ShiftSignalChannelV1::ReferenceStandardResidual);
+            }
+            if sensor_stable {
+                contradicting.push(ShiftSignalChannelV1::SensorObservabilityScore);
+            }
+            if reference_stable && sensor_stable && process_marker_recent {
+                (
+                    ShiftDiagnosticStateV1::ProcessShiftSuspected,
+                    ShiftAdaptationRecommendationV1::RequestMetrology,
+                )
+            } else {
+                reasons.push(ShiftReasonCodeV1::ResidualShiftWithoutIdentifyingEvidence);
+                (
+                    ShiftDiagnosticStateV1::Unresolved,
+                    ShiftAdaptationRecommendationV1::Hold,
+                )
+            }
+        } else if residual.is_none() {
+            reasons.push(ShiftReasonCodeV1::MissingDetectorChannel);
+            (
+                ShiftDiagnosticStateV1::InsufficientEvidence,
+                ShiftAdaptationRecommendationV1::Hold,
+            )
+        } else if residual.is_some_and(|entry| entry.observations == 0) {
+            reasons.push(ShiftReasonCodeV1::MissingDetectorChannel);
+            (
+                ShiftDiagnosticStateV1::InsufficientEvidence,
+                ShiftAdaptationRecommendationV1::Hold,
+            )
+        } else if residual.is_none()
+            || !residual.is_some_and(|entry| entry.stable_reference_window)
+            || !reference_stable
+            || !sensor_stable
+        {
+            reasons.push(ShiftReasonCodeV1::InsufficientIndependentEvidence);
+            (
+                ShiftDiagnosticStateV1::InsufficientEvidence,
+                ShiftAdaptationRecommendationV1::Hold,
+            )
+        } else {
+            if process_marker_recent {
+                reasons.push(ShiftReasonCodeV1::ProcessMarkerWithoutMeasuredShift);
+            }
+            (
+                ShiftDiagnosticStateV1::Nominal,
+                ShiftAdaptationRecommendationV1::Continue,
+            )
+        };
     supporting.sort();
     supporting.dedup();
     contradicting.sort();
@@ -657,9 +662,14 @@ pub fn observe_evidence_shift_v1(
             "observation and scope identities must be non-empty".into(),
         ));
     }
-    if let Some(previous) = engine.assessments_by_observation.get(&observation.observation_id) {
+    if let Some(previous) = engine
+        .assessments_by_observation
+        .get(&observation.observation_id)
+    {
         let mut duplicate = previous.clone();
-        duplicate.reason_codes.push(ShiftReasonCodeV1::DuplicateObservation);
+        duplicate
+            .reason_codes
+            .push(ShiftReasonCodeV1::DuplicateObservation);
         duplicate.reason_codes.sort();
         duplicate.reason_codes.dedup();
         duplicate.assessment_sha256 = assessment_digest(&duplicate)?;
@@ -707,7 +717,8 @@ pub fn observe_evidence_shift_v1(
     }
 
     let mut qualified_label_ids = Vec::new();
-    if early_reasons.is_empty() && observation.channel == ShiftSignalChannelV1::ProcessEventMarker
+    if early_reasons.is_empty()
+        && observation.channel == ShiftSignalChannelV1::ProcessEventMarker
         && observation.process_event_marker.is_none()
     {
         early_reasons.push(ShiftReasonCodeV1::ProcessEventEvidenceMissing);
@@ -849,10 +860,7 @@ pub fn observe_evidence_shift_v1(
         process_event_id: marker.map(|value| value.event_id.clone()),
         qualified_source_label_ids: qualified_label_ids,
         reason_codes: reasons,
-        nominal_baseline_manifest_sha256: engine
-            .policy
-            .nominal_baseline_manifest_sha256
-            .clone(),
+        nominal_baseline_manifest_sha256: engine.policy.nominal_baseline_manifest_sha256.clone(),
         policy_sha256: engine.policy_sha256.clone(),
         previous_assessment_sha256: engine
             .assessments_by_observation
@@ -870,16 +878,19 @@ pub fn observe_evidence_shift_v1(
     // Valid process markers are retained separately as contextual evidence.
     if early_reasons.is_empty() {
         engine.last_stream_sequence = observation.stream_sequence;
-        engine
-            .last_scope_event_times
-            .insert(observation.scope_id.clone(), observation.event_time_unix_seconds);
+        engine.last_scope_event_times.insert(
+            observation.scope_id.clone(),
+            observation.event_time_unix_seconds,
+        );
         if let Some(reference_id) = observation.reference_standard_id.as_deref() {
             engine.last_scope_event_times.insert(
                 reference_state_scope(reference_id),
                 observation.event_time_unix_seconds,
             );
         }
-        engine.seen_observation_ids.insert(observation.observation_id.clone());
+        engine
+            .seen_observation_ids
+            .insert(observation.observation_id.clone());
     }
     engine
         .assessments_by_observation
@@ -915,7 +926,10 @@ mod tests {
             maximum_absolute_standardized_value: 20.0,
             channels: BTreeMap::from([
                 (ShiftSignalChannelV1::VmResidual, config.clone()),
-                (ShiftSignalChannelV1::ReferenceStandardResidual, config.clone()),
+                (
+                    ShiftSignalChannelV1::ReferenceStandardResidual,
+                    config.clone(),
+                ),
                 (ShiftSignalChannelV1::SensorObservabilityScore, config),
             ]),
         }
@@ -955,7 +969,11 @@ mod tests {
         }
     }
 
-    fn label_report(label_id: &str, event_id: &str, value: f64) -> LabelConsumptionEligibilityReportV1 {
+    fn label_report(
+        label_id: &str,
+        event_id: &str,
+        value: f64,
+    ) -> LabelConsumptionEligibilityReportV1 {
         let mut report = LabelConsumptionEligibilityReportV1 {
             schema: "luminous.semi-bench.label-consumption-report.v1".into(),
             label_id: label_id.into(),
@@ -990,13 +1008,8 @@ mod tests {
         residual: f64,
         label_id: &str,
     ) -> EvidenceShiftObservationV1 {
-        let mut observation = base_observation(
-            sequence,
-            id,
-            scope,
-            time,
-            ShiftSignalChannelV1::VmResidual,
-        );
+        let mut observation =
+            base_observation(sequence, id, scope, time, ShiftSignalChannelV1::VmResidual);
         let event_id = format!("event-{id}");
         let mut prediction = StreamingPredictionReceiptV1 {
             schema: STREAMING_PREDICTION_RECEIPT_SCHEMA_V1.into(),
@@ -1075,9 +1088,12 @@ mod tests {
     #[test]
     fn verified_prediction_receipt_is_required_for_vm_residual() {
         let mut engine = engine();
-        let mut observation =
-            vm_residual_observation(1, "vm-1", "tool-a/ch-1", 10, 5.0, "label-1");
-        observation.prediction_receipt.as_mut().unwrap().prediction_value = 123.0;
+        let mut observation = vm_residual_observation(1, "vm-1", "tool-a/ch-1", 10, 5.0, "label-1");
+        observation
+            .prediction_receipt
+            .as_mut()
+            .unwrap()
+            .prediction_value = 123.0;
         let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
         assert_eq!(
             assessment.diagnostic_state,
@@ -1094,8 +1110,7 @@ mod tests {
     #[test]
     fn measurement_event_identity_must_match_prediction_and_label_receipts() {
         let mut engine = engine();
-        let mut observation =
-            vm_residual_observation(1, "vm-1", "tool-a/ch-1", 10, 5.0, "label-1");
+        let mut observation = vm_residual_observation(1, "vm-1", "tool-a/ch-1", 10, 5.0, "label-1");
         observation.measurement_event_id = Some("different-event".into());
         let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
         assert_eq!(
@@ -1115,22 +1130,12 @@ mod tests {
         let mut engine = engine();
         let mut sequence = 1;
         for index in 0..3 {
-            let reference = reference_observation(
-                sequence,
-                &format!("ref-{index}"),
-                "tool-a/ch-1",
-                10,
-                0.0,
-            );
+            let reference =
+                reference_observation(sequence, &format!("ref-{index}"), "tool-a/ch-1", 10, 0.0);
             observe_evidence_shift_v1(&mut engine, &reference).unwrap();
             sequence += 1;
-            let sensor = sensor_observation(
-                sequence,
-                &format!("sensor-{index}"),
-                "tool-a/ch-1",
-                10,
-                0.0,
-            );
+            let sensor =
+                sensor_observation(sequence, &format!("sensor-{index}"), "tool-a/ch-1", 10, 0.0);
             observe_evidence_shift_v1(&mut engine, &sensor).unwrap();
             sequence += 1;
             let vm = vm_residual_observation(
@@ -1157,7 +1162,8 @@ mod tests {
     fn vm_residual_never_enters_detector_without_current_qualified_label() {
         let mut engine = engine();
         let mut observation = vm_residual_observation(1, "obs-1", "tool-a/ch-1", 1, 5.0, "label-1");
-        observation.label_report.as_mut().unwrap().eligibility = LabelConsumptionEligibilityV1::Unknown;
+        observation.label_report.as_mut().unwrap().eligibility =
+            LabelConsumptionEligibilityV1::Unknown;
         let report = observation.label_report.as_mut().unwrap();
         report.downstream_consumption_allowed = false;
         report.report_sha256 = report_digest(report).unwrap();
@@ -1166,8 +1172,16 @@ mod tests {
             assessment.diagnostic_state,
             ShiftDiagnosticStateV1::InsufficientEvidence
         );
-        assert!(assessment.reason_codes.contains(&ShiftReasonCodeV1::LabelNotEligible));
-        assert!(!engine.channel_states.contains_key(&("tool-a/ch-1".into(), ShiftSignalChannelV1::VmResidual)));
+        assert!(
+            assessment
+                .reason_codes
+                .contains(&ShiftReasonCodeV1::LabelNotEligible)
+        );
+        assert!(
+            !engine
+                .channel_states
+                .contains_key(&("tool-a/ch-1".into(), ShiftSignalChannelV1::VmResidual))
+        );
     }
 
     #[test]
@@ -1179,7 +1193,10 @@ mod tests {
             assessment.diagnostic_state,
             ShiftDiagnosticStateV1::InsufficientEvidence
         );
-        assert_eq!(assessment.recommendation, ShiftAdaptationRecommendationV1::Hold);
+        assert_eq!(
+            assessment.recommendation,
+            ShiftAdaptationRecommendationV1::Hold
+        );
     }
 
     #[test]
@@ -1205,7 +1222,13 @@ mod tests {
     #[test]
     fn process_marker_alone_does_not_create_a_shift_alarm() {
         let mut engine = engine();
-        let mut observation = base_observation(1, "maintenance-1", "tool-a/ch-1", 10, ShiftSignalChannelV1::ProcessEventMarker);
+        let mut observation = base_observation(
+            1,
+            "maintenance-1",
+            "tool-a/ch-1",
+            10,
+            ShiftSignalChannelV1::ProcessEventMarker,
+        );
         observation.process_event_marker = Some(ProcessEventMarkerV1 {
             event_id: "maint-1".into(),
             event_kind: "maintenance".into(),
@@ -1213,8 +1236,14 @@ mod tests {
             source_evidence_sha256: digest('c'),
         });
         let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
-        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
-        assert_eq!(assessment.recommendation, ShiftAdaptationRecommendationV1::Hold);
+        assert_eq!(
+            assessment.diagnostic_state,
+            ShiftDiagnosticStateV1::InsufficientEvidence
+        );
+        assert_eq!(
+            assessment.recommendation,
+            ShiftAdaptationRecommendationV1::Hold
+        );
     }
 
     #[test]
@@ -1222,11 +1251,15 @@ mod tests {
         let mut engine = engine();
         let mut seq = 1;
         for i in 0..3 {
-            let observation = reference_observation(seq, &format!("ref-{i}"), "tool-a/ch-1", 10 + i, 5.0);
+            let observation =
+                reference_observation(seq, &format!("ref-{i}"), "tool-a/ch-1", 10 + i, 5.0);
             let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
             seq += 1;
             if i == 2 {
-                assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::MeasurementSystemShiftSuspected);
+                assert_eq!(
+                    assessment.diagnostic_state,
+                    ShiftDiagnosticStateV1::MeasurementSystemShiftSuspected
+                );
             }
         }
     }
@@ -1236,14 +1269,25 @@ mod tests {
         let mut engine = engine();
         let mut seq = 1;
         for i in 0..3 {
-            let reference = reference_observation(seq, &format!("ref-{i}"), "tool-a/ch-1", 10 + i, 5.0);
+            let reference =
+                reference_observation(seq, &format!("ref-{i}"), "tool-a/ch-1", 10 + i, 5.0);
             observe_evidence_shift_v1(&mut engine, &reference).unwrap();
             seq += 1;
-            let residual = vm_residual_observation(seq, &format!("vm-{i}"), "tool-a/ch-1", 10 + i, 5.0, &format!("label-{i}"));
+            let residual = vm_residual_observation(
+                seq,
+                &format!("vm-{i}"),
+                "tool-a/ch-1",
+                10 + i,
+                5.0,
+                &format!("label-{i}"),
+            );
             let assessment = observe_evidence_shift_v1(&mut engine, &residual).unwrap();
             seq += 1;
             if i == 2 {
-                assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::CommonCauseOrMixedShift);
+                assert_eq!(
+                    assessment.diagnostic_state,
+                    ShiftDiagnosticStateV1::CommonCauseOrMixedShift
+                );
             }
         }
     }
@@ -1264,14 +1308,8 @@ mod tests {
             observe_evidence_shift_v1(&mut engine, &reference).unwrap();
         }
 
-        let mut vm = vm_residual_observation(
-            4,
-            "tool-b-vm",
-            "tool-b/ch-9",
-            13,
-            5.0,
-            "label-tool-b",
-        );
+        let mut vm =
+            vm_residual_observation(4, "tool-b-vm", "tool-b/ch-9", 13, 5.0, "label-tool-b");
         vm.reference_standard_id = Some(shared_standard.into());
         let assessment = observe_evidence_shift_v1(&mut engine, &vm).unwrap();
         assert_eq!(
@@ -1290,10 +1328,20 @@ mod tests {
         let mut engine = engine();
         let mut result = None;
         for i in 0..4 {
-            let observation = vm_residual_observation(i + 1, &format!("vm-{i}"), "tool-a/ch-1", i as i64 + 1, 5.0, &format!("label-{i}"));
+            let observation = vm_residual_observation(
+                i + 1,
+                &format!("vm-{i}"),
+                "tool-a/ch-1",
+                i as i64 + 1,
+                5.0,
+                &format!("label-{i}"),
+            );
             result = Some(observe_evidence_shift_v1(&mut engine, &observation).unwrap());
         }
-        assert_eq!(result.unwrap().diagnostic_state, ShiftDiagnosticStateV1::Unresolved);
+        assert_eq!(
+            result.unwrap().diagnostic_state,
+            ShiftDiagnosticStateV1::Unresolved
+        );
     }
 
     #[test]
@@ -1492,7 +1540,10 @@ mod tests {
         let mut engine = engine();
         let observation = reference_observation(2, "ref-2", "tool-a/ch-1", 10, 5.0);
         let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
-        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert_eq!(
+            assessment.diagnostic_state,
+            ShiftDiagnosticStateV1::InsufficientEvidence
+        );
         assert_eq!(engine.last_stream_sequence, 0);
     }
 }
