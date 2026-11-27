@@ -17,7 +17,8 @@
     "state_mutation_count",
     "action_log_sha256",
     "result_digest_sha256",
-    "verifier"
+    "verifier",
+    "resource_usage"
   ],
   "properties": {
     "schema": {
@@ -154,6 +155,69 @@
     "timestamp": {
       "type": "string",
       "format": "date-time"
+    },
+    "resource_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "elapsed_ms",
+        "cpu_time_ms",
+        "peak_memory_bytes",
+        "tool_calls",
+        "network_bytes",
+        "network_endpoints",
+        "human_interventions",
+        "energy_millijoules",
+        "cost_microusd"
+      ],
+      "properties": {
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cpu_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "network_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "network_endpoints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "human_interventions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "energy_millijoules": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cost_microusd": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
     }
   }
 }
