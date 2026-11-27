@@ -13,14 +13,16 @@ The offline runner executes MON-025 static preflight and parser fixtures, MON-02
 
 ## Integrated invariants
 
-- Exact source-event identity and payload digests are reconciled against observed topic records.
+- Source SQL truth, observed Kafka capture, transaction metadata and required database-surface inventory each carry an explicit completeness assertion and SHA-256 manifest reference.
+- Each event includes both Kafka topic and Debezium data_collection label. END.data_collections is reconciled against collection labels, not incorrectly inferred from topic names.
 - Missing, extra, conflicting or mismatched event IDs block.
-- Exact replays are recorded; without independent idempotency proof they remain indeterminate.
-- Transaction BEGIN/END, expected event counts, END.event_count, data_collections, transaction total_order and per-topic collection_order are checked.
-- Ordering is local to each topic/partition. V1 refuses to infer one global order across multiple partitions.
-- Full-state claims cannot exclude required surfaces; row-stream scope may use explicit exclusions.
+- Exact replays are recorded; without a digest-bound idempotency proof they remain indeterminate.
+- Transaction BEGIN/END, expected event counts, END.event_count, collection-label counts and transaction total_order are checked.
+- Kafka offsets are checked monotonically within topic/partition. Row collection_order is checked for contiguity within each transaction/collection. Logical-message collection labels are not assumed to be globally stable or contiguous across transactions.
+- V1 refuses to infer one global order across multiple Kafka partitions.
+- Full-state claims cannot exclude required surfaces; row-stream exclusions require a digest-bound exclusion manifest.
 - Timeline, observer independence and evidence continuity results must use their exact versioned profiles.
 - MON-024 cannot promote a blocked or unknown lower layer. Synthetic fixtures never qualify production traffic.
 - This tool never enables traffic.
 
-The 27 positive/negative controls are public synthetic development cases, not a sealed holdout or live recovery results.
+SCENARIOS-v1.json contains 27 public scenario definitions. They are a development corpus, not a sealed holdout or 27 live recovery trials.
