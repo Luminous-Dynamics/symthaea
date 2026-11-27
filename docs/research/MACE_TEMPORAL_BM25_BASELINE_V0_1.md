@@ -1,6 +1,6 @@
 # MACE temporal BM25 and rank-fusion reference baseline v0.1
 
-**Status:** the original standalone Rust reference, synthetic candidate-visible fixture and earlier strict Serde wire adapter revision passed exact-head Rust 1.96 checks (17 BM25 tests; 21 adapter + embedded tests; locked metadata and strict Clippy). A follow-on adds archive-wide exact-ID lineage closure/cycle auditing and stricter wire limits; that current head is awaiting its own exact-head qualification. This is not a production Add/Search service, an external leaderboard reproduction, or a claim of superiority over current memory systems.
+**Status:** exact-head Rust 1.96 qualification on `5f7357b40114a7c340199cfd8dcfb01bc4ef354e`: temporal BM25/RRF reference **19/19 tests passed**; strict candidate adapter **26/26 tests passed**, `cargo metadata --locked` and strict Clippy passed; paired DSM evaluator **45/45 tests passed**. This is not a production Add/Search service, an external leaderboard reproduction, or a claim of superiority over current memory systems.
 
 ## Why this exists
 
@@ -67,7 +67,7 @@ It can compose lexical, entity, date or graph result lists, but this reference d
 
 ## Negative controls
 
-A strict Serde adapter is provided at `baselines/adapter/`. It uses `deny_unknown_fields`, accepts only candidate-visible v0.1 events, builds the same BM25 index, executes the declared query and weighted-RRF channels, then resolves each hit by exact event ID to its source/authority/uncertainty/lineage record. The adapter rejects unknown wire fields rather than silently ingesting evaluator-only additions. On exact head `b3351adba74119359f4103e5e7eb3d2b6ca1ed3b`, its Rust 1.96 workflow passed formatting, `cargo metadata --locked`, 21/21 tests, strict Clippy with `--locked`, and fixture/schema JSON parsing.
+A strict Serde adapter is provided at `baselines/adapter/`. It uses `deny_unknown_fields`, accepts only candidate-visible v0.1 events, builds the same BM25 index, executes the declared query and weighted-RRF channels, then resolves each hit by exact event ID to its source/authority/uncertainty/lineage record. The adapter rejects unknown wire fields rather than silently ingesting evaluator-only additions. On exact head `5f7357b40114a7c340199cfd8dcfb01bc4ef354e`, the Rust 1.96 workflow passed formatting, `cargo metadata --locked`, **26/26 tests**, strict Clippy with `--locked`, and fixture/schema JSON parsing.
 
 The Rust suite now covers:
 - multi-term BM25 ranking and partial matches;
@@ -75,6 +75,7 @@ The Rust suite now covers:
 - exclusive valid-until semantics;
 - scope isolation, including invariance of in-scope scores and bounded posting-visit counts when another scope gains documents;
 - retrieval-to-evidence resolution by exact event ID, preserving source ID, authority, uncertainty, parent relation, source family and source-root digest;
+- archive-wide parent-edge classification (resolved, missing, cross-scope) and iterative strongly-connected-component cycle detection, without inheriting parent authority;
 - invalid uncertainty, malformed roots and self-parent/duplicate-parent rejection;
 - knowledge-time partitioning, including exclusion of a large set of future-observed records before posting traversal;
 - empty queries and zero top-k;
