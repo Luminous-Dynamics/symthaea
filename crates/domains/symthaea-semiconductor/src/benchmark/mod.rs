@@ -152,11 +152,12 @@ pub use gated_streaming_adapter::{
 };
 
 pub use delayed_conformal_aci::{
-    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1, DELAYED_ACI_PREDICTION_RECEIPT_SCHEMA_V1,
-    DELAYED_ACI_PREDICTION_SCHEMA_V1, DELAYED_ACI_SCHEMA_V1, DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1,
-    DelayedAciDispositionV1, DelayedAciEngineV1, DelayedAciErrorV1, DelayedAciFeedbackModeV1,
-    DelayedAciLabelDeliveryV1, DelayedAciPolicyV1, DelayedAciPredictionInputV1,
-    DelayedAciPredictionReceiptV1, DelayedAciReasonV1, DelayedAciUpdateReceiptV1,
-    create_delayed_aci_engine_v1, current_delayed_aci_alpha_v1,
-    deliver_delayed_aci_feedback_v1, register_delayed_aci_prediction_v1,
+    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1,
+    DELAYED_ACI_PREDICTION_RECEIPT_SCHEMA_V1, DELAYED_ACI_PREDICTION_SCHEMA_V1,
+    DELAYED_ACI_SCHEMA_V1, DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1, DelayedAciDispositionV1,
+    DelayedAciEngineV1, DelayedAciErrorV1, DelayedAciFeedbackModeV1, DelayedAciLabelDeliveryV1,
+    DelayedAciPolicyV1, DelayedAciPredictionInputV1, DelayedAciPredictionReceiptV1,
+    DelayedAciReasonV1, DelayedAciUpdateReceiptV1, create_delayed_aci_engine_v1,
+    current_delayed_aci_alpha_v1, deliver_delayed_aci_feedback_v1,
+    register_delayed_aci_prediction_v1,
 };
