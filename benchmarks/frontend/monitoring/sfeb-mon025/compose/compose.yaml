@@ -69,7 +69,7 @@ services:
       - -c
       - archive_timeout=30s
       - -c
-      - archive_command=mkdir -p /var/lib/postgresql/data/mon025-archive && test ! -f /var/lib/postgresql/data/mon025-archive/%f && cp %p /var/lib/postgresql/data/mon025-archive/%f
+      - archive_command=mkdir -p /var/lib/postgresql/data/mon025-archive && if [ -f /var/lib/postgresql/data/mon025-archive/%f ]; then cmp -s %p /var/lib/postgresql/data/mon025-archive/%f; else cp %p /var/lib/postgresql/data/mon025-archive/%f; fi
     environment:
       POSTGRES_USER: ${MON025_DB_USER:-mon025}
       POSTGRES_PASSWORD: ${MON025_DB_PASSWORD:?Set MON025_DB_PASSWORD in .env}
@@ -110,7 +110,7 @@ services:
       - -c
       - archive_timeout=30s
       - -c
-      - archive_command=mkdir -p /var/lib/postgresql/data/mon025-archive && test ! -f /var/lib/postgresql/data/mon025-archive/%f && cp %p /var/lib/postgresql/data/mon025-archive/%f
+      - archive_command=mkdir -p /var/lib/postgresql/data/mon025-archive && if [ -f /var/lib/postgresql/data/mon025-archive/%f ]; then cmp -s %p /var/lib/postgresql/data/mon025-archive/%f; else cp %p /var/lib/postgresql/data/mon025-archive/%f; fi
     environment:
       POSTGRES_USER: ${MON025_DB_USER:-mon025}
       POSTGRES_PASSWORD: ${MON025_DB_PASSWORD:?Set MON025_DB_PASSWORD in .env}
