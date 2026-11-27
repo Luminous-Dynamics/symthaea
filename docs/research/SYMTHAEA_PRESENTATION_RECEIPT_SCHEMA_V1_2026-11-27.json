@@ -32,7 +32,7 @@
     "effective_intensity",
     "semantic_key",
     "decision_clock",
-    "output_clock",
+    "transition_clock",
     "adapter",
     "observation",
     "not_submitted_reason",
@@ -65,6 +65,7 @@
       "type": "string",
       "enum": [
         "permitted",
+        "authorized",
         "submitted",
         "observed",
         "outcome_unknown",
@@ -221,24 +222,6 @@
         }
       }
     },
-    "output_clock": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "clock_domain_id",
-        "monotonic_ns"
-      ],
-      "properties": {
-        "clock_domain_id": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
-        },
-        "monotonic_ns": {
-          "type": "string",
-          "pattern": "^(0|[1-9][0-9]*)$"
-        }
-      }
-    },
     "adapter": {
       "type": "object",
       "additionalProperties": false,
@@ -341,6 +324,24 @@
     "effective_permit_expires_at_monotonic_ns": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "transition_clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock_domain_id",
+        "monotonic_ns"
+      ],
+      "properties": {
+        "clock_domain_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "monotonic_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        }
+      }
     }
   }
 }
