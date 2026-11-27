@@ -198,6 +198,7 @@ pub struct DelayedAciUpdateReceiptV1 {
     pub delivery_round_sequence: u64,
     pub interval_lower: Option<f64>,
     pub interval_upper: Option<f64>,
+    pub prediction_alpha_state_used: Option<f64>,
     pub miss_indicator: Option<bool>,
     pub target_miscoverage: f64,
     pub alpha_before: f64,
@@ -268,11 +269,12 @@ fn validate_policy(policy: &DelayedAciPolicyV1) -> Result<(), DelayedAciErrorV1>
         return Err(DelayedAciErrorV1("delayed ACI policy schema is unsupported".into()));
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
-    let invalid_mode = matches!(
-        policy.feedback_mode,
-        DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps: 0 }
-            | DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps: 4097..=u64::MAX }
-    );
+    let invalid_mode = match policy.feedback_mode {
+        DelayedAciFeedbackModeV1::ArrivalOrder => false,
+        DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps } => {
+            delay_steps == 0 || delay_steps > 4096
+        }
+    };
     if policy.revision == 0
         || !policy.target_miscoverage.is_finite()
         || !(0.0..1.0).contains(&policy.target_miscoverage)
@@ -289,6 +291,7 @@ fn policy_digest(policy: &DelayedAciPolicyV1) -> Result<String, DelayedAciErrorV
     json_sha256(policy)
 }
 
+#[cfg(test)]
 fn alpha_state_digest(engine: &DelayedAciEngineV1) -> Result<String, DelayedAciErrorV1> {
     json_sha256(&(
         engine.current_alpha,
@@ -452,8 +455,6 @@ pub fn register_delayed_aci_prediction_v1(
         || !input.interval_lower.is_finite()
         || !input.interval_upper.is_finite()
         || input.interval_lower > input.interval_upper
-        || input.point_prediction < input.interval_lower
-        || input.point_prediction > input.interval_upper
         || input
             .residual_scale
             .is_some_and(|scale| !scale.is_finite() || scale <= 0.0)
@@ -531,6 +532,7 @@ fn build_update_receipt(
         delivery_round_sequence: delivery.delivery_round_sequence,
         interval_lower: prediction.map(|item| item.interval_lower),
         interval_upper: prediction.map(|item| item.interval_upper),
+        prediction_alpha_state_used: prediction.map(|item| item.alpha_state_used),
         miss_indicator: miss,
         target_miscoverage: engine.policy.target_miscoverage,
         alpha_before,
@@ -570,9 +572,12 @@ pub fn deliver_delayed_aci_feedback_v1(
 
     let report = &delivery.eligibility_report;
     let prediction = engine.pending_predictions.get(&delivery.sample_id);
-    let alpha_before = prediction
-        .map(|item| item.alpha_state_used)
-        .unwrap_or(current_delayed_aci_alpha_v1(engine)?);
+    let alpha_before = match engine.policy.feedback_mode {
+        DelayedAciFeedbackModeV1::ArrivalOrder => engine.current_alpha,
+        DelayedAciFeedbackModeV1::FixedDelayPhased { .. } => prediction
+            .map(|item| item.alpha_state_used)
+            .unwrap_or(current_delayed_aci_alpha_v1(engine)?),
+    };
 
     if engine
         .accepted_label_revisions
@@ -760,8 +765,13 @@ pub fn deliver_delayed_aci_feedback_v1(
 
     let miss = delivery.label_value < prediction_receipt.interval_lower
         || delivery.label_value > prediction_receipt.interval_upper;
-    let direction = engine.policy.target_miscoverage - f64::from(miss);
-    let alpha_base = prediction_receipt.alpha_state_used;
+    let direction = engine.policy.target_miscoverage - if miss { 1.0 } else { 0.0 };
+    let alpha_base = match engine.policy.feedback_mode {
+        DelayedAciFeedbackModeV1::ArrivalOrder => engine.current_alpha,
+        DelayedAciFeedbackModeV1::FixedDelayPhased { .. } => {
+            prediction_receipt.alpha_state_used
+        }
+    };
     let candidate_alpha =
         (alpha_base + engine.policy.learning_rate * direction).clamp(0.0, 1.0);
     if !candidate_alpha.is_finite() {
