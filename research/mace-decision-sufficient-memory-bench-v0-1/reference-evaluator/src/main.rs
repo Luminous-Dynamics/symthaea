@@ -135,15 +135,15 @@ struct ScoreRow {
     seed: u64,
     arm_id: String,
     action: String,
-    no_memory_action: String,
+    declared_no_memory_reference_action: String,
     oracle_action: String,
     loss: f64,
     oracle_loss: f64,
     regret: f64,
-    no_memory_loss: f64,
-    memory_gain_vs_no_memory: f64,
-    memory_induced_harm: bool,
-    changed_action_vs_no_memory: bool,
+    declared_no_memory_reference_loss: f64,
+    gain_vs_declared_no_memory_reference: f64,
+    worse_than_declared_no_memory_reference: bool,
+    changed_action_vs_declared_no_memory_reference: bool,
     selected_evidence_count: usize,
     admissible_evidence_count: usize,
     invalid_evidence_count: usize,
@@ -331,7 +331,7 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
     let loss_map: BTreeMap<&str, f64> = p.evaluator_private.action_losses.iter().map(|x| (x.action.as_str(), x.loss)).collect();
     let loss = *loss_map.get(r.action.as_str()).ok_or_else(|| format!("{id}: action has no loss"))?;
     let oracle_loss = loss_map.values().copied().fold(f64::INFINITY, f64::min);
-    let no_memory_loss = *loss_map.get(p.evaluator_private.no_memory_action.as_str())
+    let declared_no_memory_reference_loss = *loss_map.get(p.evaluator_private.no_memory_action.as_str())
         .ok_or_else(|| format!("{id}: no-memory action has no loss"))?;
     let required_found = required.iter().filter(|event_id|
         selected.contains(*event_id) &&
@@ -342,12 +342,13 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
     Ok(ScoreRow {
         episode_id: id.clone(), family: c.family.clone(), seed: c.seed,
         arm_id: r.arm_id.clone(), action: r.action.clone(),
-        no_memory_action: p.evaluator_private.no_memory_action.clone(),
+        declared_no_memory_reference_action: p.evaluator_private.no_memory_action.clone(), 
         oracle_action: p.evaluator_private.oracle_action.clone(),
-        loss, oracle_loss, regret: (loss - oracle_loss).max(0.0), no_memory_loss,
-        memory_gain_vs_no_memory: no_memory_loss - loss,
-        memory_induced_harm: loss > no_memory_loss + 1e-9,
-        changed_action_vs_no_memory: r.action != p.evaluator_private.no_memory_action,
+        loss, oracle_loss, regret: (loss - oracle_loss).max(0.0),
+        declared_no_memory_reference_loss,
+        gain_vs_declared_no_memory_reference: declared_no_memory_reference_loss - loss,
+        worse_than_declared_no_memory_reference: loss > declared_no_memory_reference_loss + 1e-9,
+        changed_action_vs_declared_no_memory_reference: r.action != p.evaluator_private.no_memory_action,
         selected_evidence_count: r.selected_evidence_ids.len(),
         admissible_evidence_count: admissible_n, invalid_evidence_count: invalid_n,
         stale_or_superseded_evidence_count: stale_n, untrusted_evidence_count: untrusted_n,
@@ -374,10 +375,11 @@ fn aggregate(key: &str, rows: &[ScoreRow]) -> serde_json::Value {
         "key": key, "episodes": rows.len(),
         "mean_loss": average(rows.iter().map(|r| r.loss)),
         "mean_regret": average(rows.iter().map(|r| r.regret)),
-        "mean_memory_gain_vs_no_memory": average(rows.iter().map(|r| r.memory_gain_vs_no_memory)),
-        "memory_induced_harm_rate": rows.iter().filter(|r| r.memory_induced_harm).count() as f64 / n,
+        "mean_gain_vs_declared_no_memory_reference": average(rows.iter().map(|r| r.gain_vs_declared_no_memory_reference)),
+        "declared_no_memory_reference_comparison": "task-authored reference action; not an independently executed no-memory arm",
+        "worse_than_declared_no_memory_reference_rate": rows.iter().filter(|r| r.worse_than_declared_no_memory_reference).count() as f64 / n,
         "decision_sufficiency_rate": rows.iter().filter(|r| r.decision_sufficient).count() as f64 / n,
-        "decision_change_rate": rows.iter().filter(|r| r.changed_action_vs_no_memory).count() as f64 / n,
+        "decision_change_vs_declared_reference_rate": rows.iter().filter(|r| r.changed_action_vs_declared_no_memory_reference).count() as f64 / n,
         "mean_valid_evidence_precision": average(rows.iter().filter_map(|r| r.valid_evidence_precision)),
         "mean_required_evidence_recall": average(rows.iter().map(|r| r.required_evidence_recall)),
         "invalid_evidence_uses": rows.iter().map(|r| r.invalid_evidence_count).sum::<usize>(),
@@ -459,8 +461,8 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
         "per_arm": per_arm, "per_family_arm": per_family_arm, "per_episode": scored,
         "interpretation": {
             "regret": "Candidate action loss minus minimum evaluator-private action loss.",
-            "memory_gain": "No-memory baseline loss minus this arm loss; positive means improvement.",
-            "memory_induced_harm": "This arm loss exceeds the matched no-memory baseline loss.",
+            "declared_no_memory_reference_gain": "Task-authored reference action loss minus this arm loss; this is not a separately executed no-memory agent arm.",
+            "worse_than_declared_reference": "This arm loss exceeds the task-authored reference action loss; this is not a paired no-memory system comparison.",
             "admissible_evidence": "Current at query time and observed no later than the query, not superseded/retracted, not untrusted, and not evaluator-labelled forbidden.",
             "decision_sufficient": "Minimum loss, all required evidence selected, and no invalid evidence selected.",
             "cost": "Counters are candidate-reported. Latency is summarized only when supplied; this evaluator does not independently measure it."
@@ -578,6 +580,6 @@ mod tests {
         let s=score_one(&c,&p,&r).unwrap();
         let mut mismatched = r.clone(); mismatched.candidate_sha256 = "0".repeat(64);
         assert!(score_one(&c,&p,&mismatched).is_err());
-        assert_eq!(s.regret,12.0);assert!(s.memory_induced_harm);assert_eq!(s.memory_gain_vs_no_memory,-10.0);assert_eq!(s.stale_or_superseded_evidence_count,1);
+        assert_eq!(s.regret,12.0);assert!(s.worse_than_declared_no_memory_reference);assert_eq!(s.gain_vs_declared_no_memory_reference,-10.0);assert_eq!(s.stale_or_superseded_evidence_count,1);
     }
 }
