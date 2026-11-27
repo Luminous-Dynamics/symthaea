@@ -1,0 +1,321 @@
+{
+  "schema": "mel-performance-invariance-case-v1",
+  "benchmark_id": "Melothaea-Performance-Identity",
+  "benchmark_version": "1.0",
+  "dataset_revision_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+  "annotation_policy_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "triads": [
+    {
+      "item_id": "quality-001",
+      "pair_id": "pair-quality-001",
+      "source_lineage_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "composition_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "target_property": "ChordQuality",
+      "performance_stay_factor": "DifferentTake",
+      "musical_flip_factor": "ChordQuality",
+      "model_identity_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "system_prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runtime_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "clean": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "quality-001-clean",
+          "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "question": "Are these chord qualities the same?",
+          "question_sha256": "e36d808714d11f64d5084b1eee3029472aa5a3f4cf84633cc0bf3893ddab8c95",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceA"
+        }
+      },
+      "performance_stay": {
+        "performance_condition_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "answer": {
+          "variant_id": "quality-001-stay",
+          "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "question": "Are these chord qualities the same?",
+          "question_sha256": "e36d808714d11f64d5084b1eee3029472aa5a3f4cf84633cc0bf3893ddab8c95",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceA"
+        }
+      },
+      "musical_flip": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "quality-001-flip",
+          "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "question": "Are these chord qualities the same?",
+          "question_sha256": "e36d808714d11f64d5084b1eee3029472aa5a3f4cf84633cc0bf3893ddab8c95",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Different",
+          "model_answer": "ChoiceB"
+        }
+      }
+    },
+    {
+      "item_id": "root-001",
+      "pair_id": "pair-root-001",
+      "source_lineage_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "composition_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "target_property": "RootPitchClass",
+      "performance_stay_factor": "DifferentPerformer",
+      "musical_flip_factor": "RootPitchClass",
+      "model_identity_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "system_prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runtime_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "clean": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "root-001-clean",
+          "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "question": "Do these clips share the same chord root pitch class?",
+          "question_sha256": "efb0b2d1a0a86e43c97efc30d4026a62346e59d32dc60bbb7c1cb6637ff09e68",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceA"
+        }
+      },
+      "performance_stay": {
+        "performance_condition_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "answer": {
+          "variant_id": "root-001-stay",
+          "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "question": "Do these clips share the same chord root pitch class?",
+          "question_sha256": "efb0b2d1a0a86e43c97efc30d4026a62346e59d32dc60bbb7c1cb6637ff09e68",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceA"
+        }
+      },
+      "musical_flip": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "root-001-flip",
+          "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "question": "Do these clips share the same chord root pitch class?",
+          "question_sha256": "efb0b2d1a0a86e43c97efc30d4026a62346e59d32dc60bbb7c1cb6637ff09e68",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Different",
+          "model_answer": "ChoiceA"
+        }
+      }
+    },
+    {
+      "item_id": "interval-001",
+      "pair_id": "pair-interval-001",
+      "source_lineage_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "composition_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "target_property": "RelativeIntervalSequence",
+      "performance_stay_factor": "GlobalTransposition",
+      "musical_flip_factor": "MelodicInterval",
+      "model_identity_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "system_prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runtime_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "clean": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "interval-001-clean",
+          "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "question": "Is the ordered melodic interval sequence the same?",
+          "question_sha256": "c6347916e4642ed1c48c3bc9d9279ab6f0484287b79fd14daa5765604446f631",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceA"
+        }
+      },
+      "performance_stay": {
+        "performance_condition_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "answer": {
+          "variant_id": "interval-001-stay",
+          "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "question": "Is the ordered melodic interval sequence the same?",
+          "question_sha256": "c6347916e4642ed1c48c3bc9d9279ab6f0484287b79fd14daa5765604446f631",
+          "option_a_relation": "Different",
+          "option_b_relation": "Same",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceB"
+        }
+      },
+      "musical_flip": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "interval-001-flip",
+          "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "question": "Is the ordered melodic interval sequence the same?",
+          "question_sha256": "c6347916e4642ed1c48c3bc9d9279ab6f0484287b79fd14daa5765604446f631",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Different",
+          "model_answer": "ChoiceB"
+        }
+      }
+    },
+    {
+      "item_id": "ratio-001",
+      "pair_id": "pair-ratio-001",
+      "source_lineage_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "composition_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "target_property": "RhythmicRatioPattern",
+      "performance_stay_factor": "UniformTempoScale",
+      "musical_flip_factor": "RhythmicRatio",
+      "model_identity_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "system_prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runtime_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "clean": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "ratio-001-clean",
+          "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "question": "Is the rhythmic ratio pattern the same?",
+          "question_sha256": "a395a3c80978eca1fee72d50423248e76571dc62dee0c98ca91ec9c6a042630b",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceA"
+        }
+      },
+      "performance_stay": {
+        "performance_condition_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "answer": {
+          "variant_id": "ratio-001-stay",
+          "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "question": "Is the rhythmic ratio pattern the same?",
+          "question_sha256": "a395a3c80978eca1fee72d50423248e76571dc62dee0c98ca91ec9c6a042630b",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceB"
+        }
+      },
+      "musical_flip": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "ratio-001-flip",
+          "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "question": "Is the rhythmic ratio pattern the same?",
+          "question_sha256": "a395a3c80978eca1fee72d50423248e76571dc62dee0c98ca91ec9c6a042630b",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Different",
+          "model_answer": "ChoiceB"
+        }
+      }
+    },
+    {
+      "item_id": "pulse-001",
+      "pair_id": "pair-pulse-001",
+      "source_lineage_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "composition_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "target_property": "PulseRate",
+      "performance_stay_factor": "StrumOrArticulation",
+      "musical_flip_factor": "PulseRate",
+      "model_identity_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "system_prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runtime_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "clean": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "pulse-001-clean",
+          "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "question": "Is the pulse rate the same?",
+          "question_sha256": "96a063112678e5b92faae22ec064312ca5b2cc3fe4d723d219472570091a6c2d",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceA"
+        }
+      },
+      "performance_stay": {
+        "performance_condition_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "answer": {
+          "variant_id": "pulse-001-stay",
+          "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "question": "Is the pulse rate the same?",
+          "question_sha256": "96a063112678e5b92faae22ec064312ca5b2cc3fe4d723d219472570091a6c2d",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceA"
+        }
+      },
+      "musical_flip": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "pulse-001-flip",
+          "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "question": "Is the pulse rate the same?",
+          "question_sha256": "96a063112678e5b92faae22ec064312ca5b2cc3fe4d723d219472570091a6c2d",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Different",
+          "model_answer": "ChoiceA"
+        }
+      }
+    },
+    {
+      "item_id": "instrument-001",
+      "pair_id": "pair-instrument-001",
+      "source_lineage_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "composition_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "target_property": "InstrumentFamily",
+      "performance_stay_factor": "DifferentPerformer",
+      "musical_flip_factor": "InstrumentFamily",
+      "model_identity_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "system_prompt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runtime_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decoding_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "clean": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "instrument-001-clean",
+          "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "question": "Are these performances from the same instrument family?",
+          "question_sha256": "b8452a975ff123dd2762fe0c62752110d3faffddcd4df6bec114015f28ac3d70",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceA"
+        }
+      },
+      "performance_stay": {
+        "performance_condition_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "answer": {
+          "variant_id": "instrument-001-stay",
+          "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "question": "Are these performances from the same instrument family?",
+          "question_sha256": "b8452a975ff123dd2762fe0c62752110d3faffddcd4df6bec114015f28ac3d70",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Same",
+          "model_answer": "ChoiceA"
+        }
+      },
+      "musical_flip": {
+        "performance_condition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "answer": {
+          "variant_id": "instrument-001-flip",
+          "audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "question": "Are these performances from the same instrument family?",
+          "question_sha256": "b8452a975ff123dd2762fe0c62752110d3faffddcd4df6bec114015f28ac3d70",
+          "option_a_relation": "Same",
+          "option_b_relation": "Different",
+          "expected_relation": "Different",
+          "model_answer": "ChoiceB"
+        }
+      }
+    }
+  ]
+}
