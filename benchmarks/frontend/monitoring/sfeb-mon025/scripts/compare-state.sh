@@ -15,6 +15,8 @@ mkdir -p "$(dirname "$REPORT")"
 jq -n --slurpfile source "$source_file" --slurpfile restored "$restore_file" \
   '($source[0] | if has("state") then .state else . end) as $s
    | ($restored[0] | if has("state") then .state else . end) as $r
+   | ($source[0].metadata // {}) as $sm
+   | ($restored[0].metadata // {}) as $rm
    | (($s | keys) + ($r | keys) | unique) as $keys
    | [ $keys[] as $k | {
         surface: $k,
@@ -24,7 +26,23 @@ jq -n --slurpfile source "$source_file" --slurpfile restored "$restore_file" \
         source_value: (if ($s | has($k)) then $s[$k] else null end),
         restored_value: (if ($r | has($k)) then $r[$k] else null end)
       } ] as $rows
-   | {profile:"mon025-surface-comparison-v1",equal:(all($rows[]; .equal)),surface_results:$rows}' >"$REPORT"
+   | {
+       profile:"mon025-surface-comparison-v1",
+       metadata_checks:{
+         database_equal: (($sm.database != null) and ($sm.database == $rm.database)),
+         system_identifier_equal: (($sm.system_identifier != null) and ($sm.system_identifier == $rm.system_identifier)),
+         timeline_equal: (($sm.timeline_id != null) and ($sm.timeline_id == $rm.timeline_id)),
+         restore_still_in_recovery: ($rm.is_in_recovery == true)
+       },
+       surface_results:$rows,
+       equal:(
+         all($rows[]; .equal)
+         and ($sm.database != null and $sm.database == $rm.database)
+         and ($sm.system_identifier != null and $sm.system_identifier == $rm.system_identifier)
+         and ($sm.timeline_id != null and $sm.timeline_id == $rm.timeline_id)
+         and ($rm.is_in_recovery == true)
+       )
+     }' >"$REPORT"
 
 jq . "$REPORT"
 sha256sum "$REPORT"
