@@ -209,9 +209,12 @@ pub enum EvaluationErrorV1 {
     EpisodeMismatch,
     SameSystemUsedForBothArms,
     EmptyDownstreamPolicyDigest,
+    InvalidDownstreamPolicyDigest,
     DownstreamPolicyMismatch,
     DecisionSeedMismatch,
     InvalidCandidateAction,
+    EmptyActionId,
+    EmptyEvidenceId,
     DuplicateReturnedEvidenceId,
     NoMemoryArmContainsEvidence,
     NoMemoryArmActionMismatch,
@@ -226,6 +229,7 @@ pub enum EvaluationErrorV1 {
     InsufficientIndependentClusters,
     InvalidBootstrapReplicates,
     AggregateOverflow,
+    InvalidPairedScore,
     MissingActionLoss,
 }
 
@@ -255,6 +259,11 @@ pub fn validate_case(case: &EvaluatorCaseV1) -> Result<(), EvaluationErrorV1> {
     }
     if !unique(&case.allowed_actions) {
         return Err(EvaluationErrorV1::DuplicateAllowedAction);
+    }
+    if case.allowed_actions.iter().any(|action| action.trim().is_empty())
+        || case.action_losses.iter().any(|entry| entry.action.trim().is_empty())
+    {
+        return Err(EvaluationErrorV1::EmptyActionId);
     }
 
     let loss_actions: Vec<String> = case
@@ -301,6 +310,11 @@ pub fn validate_case(case: &EvaluatorCaseV1) -> Result<(), EvaluationErrorV1> {
     if !unique(&case.required_evidence_ids) {
         return Err(EvaluationErrorV1::DuplicateRequiredEvidenceId);
     }
+    if case.admissible_evidence_ids.iter().any(|id| id.trim().is_empty())
+        || case.required_evidence_ids.iter().any(|id| id.trim().is_empty())
+    {
+        return Err(EvaluationErrorV1::EmptyEvidenceId);
+    }
     if case
         .required_evidence_ids
         .iter()
@@ -318,17 +332,32 @@ fn validate_candidate(
     if candidate.episode_id != case.episode_id {
         return Err(EvaluationErrorV1::EpisodeMismatch);
     }
-    if candidate.system_id.is_empty() {
+    if candidate.system_id.trim().is_empty() {
         return Err(EvaluationErrorV1::EmptySystemId);
     }
     if candidate.downstream_policy_digest.is_empty() {
         return Err(EvaluationErrorV1::EmptyDownstreamPolicyDigest);
+    }
+    if candidate.downstream_policy_digest.len() != 64
+        || !candidate
+            .downstream_policy_digest
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return Err(EvaluationErrorV1::InvalidDownstreamPolicyDigest);
     }
     if !contains(&case.allowed_actions, &candidate.chosen_action) {
         return Err(EvaluationErrorV1::InvalidCandidateAction);
     }
     if !unique(&candidate.retrieved_evidence_ids) {
         return Err(EvaluationErrorV1::DuplicateReturnedEvidenceId);
+    }
+    if candidate
+        .retrieved_evidence_ids
+        .iter()
+        .any(|id| id.trim().is_empty())
+    {
+        return Err(EvaluationErrorV1::EmptyEvidenceId);
     }
     Ok(())
 }
@@ -543,6 +572,39 @@ impl SplitMix64V1 {
     }
 }
 
+fn validate_paired_score(score: &PairedScoreV1) -> Result<(), EvaluationErrorV1> {
+    if score.memory.system_id == score.no_memory.system_id
+        || score.memory.oracle_loss_micros != score.no_memory.oracle_loss_micros
+        || score.memory.decision_regret_micros
+            != score.memory.decision_loss_micros - score.memory.oracle_loss_micros
+        || score.no_memory.decision_regret_micros
+            != score.no_memory.decision_loss_micros - score.no_memory.oracle_loss_micros
+        || score.memory.decision_optimal != (score.memory.decision_regret_micros == 0)
+        || score.no_memory.decision_optimal != (score.no_memory.decision_regret_micros == 0)
+        || score.no_memory.returned_evidence_count != 0
+        || score.no_memory.admissible_returned_evidence_count != 0
+        || score.no_memory.inadmissible_returned_evidence_count != 0
+        || score.memory.returned_evidence_count
+            != score.memory.admissible_returned_evidence_count
+                + score.memory.inadmissible_returned_evidence_count
+    {
+        return Err(EvaluationErrorV1::InvalidPairedScore);
+    }
+
+    let expected_gain = i128::from(score.no_memory.decision_loss_micros)
+        - i128::from(score.memory.decision_loss_micros);
+    let changed_action = score.memory.chosen_action != score.no_memory.chosen_action;
+    if score.memory_gain_micros != expected_gain
+        || score.memory_induced_harm != (expected_gain < 0)
+        || score.memory_changed_action != changed_action
+        || score.changed_action_helped != (changed_action && expected_gain > 0)
+        || score.changed_action_harmed != (changed_action && expected_gain < 0)
+    {
+        return Err(EvaluationErrorV1::InvalidPairedScore);
+    }
+    Ok(())
+}
+
 fn nearest_rank(sorted: &[f64], probability: f64) -> f64 {
     let rank = (probability * sorted.len() as f64).ceil() as usize;
     let index = rank.clamp(1, sorted.len()) - 1;
@@ -578,6 +640,7 @@ pub fn summarize_clustered_pairs(
     let mut improvement_count = 0_u64;
 
     for row in rows {
+        validate_paired_score(&row.score)?;
         if row.cluster_id.trim().is_empty() {
             return Err(EvaluationErrorV1::EmptyClusterId);
         }
@@ -587,9 +650,6 @@ pub fn summarize_clustered_pairs(
         total_gain = total_gain
             .checked_add(row.score.memory_gain_micros)
             .ok_or(EvaluationErrorV1::AggregateOverflow)?;
-        if row.score.memory_induced_harm != (row.score.memory_gain_micros < 0) {
-            return Err(EvaluationErrorV1::AggregateOverflow);
-        }
         if row.score.memory_gain_micros < 0 {
             harm_count = harm_count
                 .checked_add(1)
@@ -719,7 +779,7 @@ mod tests {
         CandidateRunV1 {
             episode_id: "known-answer/0001".to_owned(),
             system_id: system.to_owned(),
-            downstream_policy_digest: "frozen-reader-sha256:known-answer-v1".to_owned(),
+            downstream_policy_digest: "a".repeat(64),
             decision_seed: 4101,
             chosen_action: action.to_owned(),
             retrieved_evidence_ids: evidence.iter().map(|id| (*id).to_owned()).collect(),
@@ -891,7 +951,7 @@ mod tests {
         let memory = CandidateRunV1 {
             episode_id: episode.to_owned(),
             system_id: "mace".to_owned(),
-            downstream_policy_digest: "frozen-reader-sha256:aggregate-v1".to_owned(),
+            downstream_policy_digest: "b".repeat(64),
             decision_seed: 77,
             chosen_action: memory_action.to_owned(),
             retrieved_evidence_ids: memory_evidence.into_iter().map(str::to_owned).collect(),
@@ -978,6 +1038,30 @@ mod tests {
         assert_eq!(
             summarize_clustered_pairs(&rows, 99, 1),
             Err(EvaluationErrorV1::InvalidBootstrapReplicates)
+        );
+    }
+
+    #[test]
+    fn cluster_bootstrap_rejects_a_forged_paired_gain() {
+        let mut row = clustered_row("episode-a1", "world-a", 1);
+        row.score.memory_gain_micros += 1;
+        let rows = vec![
+            row,
+            clustered_row("episode-b1", "world-b", -1),
+        ];
+        assert_eq!(
+            summarize_clustered_pairs(&rows, 1_000, 1),
+            Err(EvaluationErrorV1::InvalidPairedScore)
+        );
+    }
+
+    #[test]
+    fn candidate_policy_digest_must_be_a_lowercase_sha256_hex_string() {
+        let mut candidate = run("mace", "hold", &["signed-current"]);
+        candidate.downstream_policy_digest = "not-a-digest".to_owned();
+        assert_eq!(
+            score_paired(&case(), &candidate, &run("no-memory", "abstain", &[])),
+            Err(EvaluationErrorV1::InvalidDownstreamPolicyDigest)
         );
     }
 
