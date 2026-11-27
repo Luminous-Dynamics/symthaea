@@ -1,6 +1,6 @@
 {
   "schema_version": "0.1.0",
-  "fixture_class": "synthetic_contract_only",
+  "fixture_class": "synthetic_contract_with_real_fixture_bytes",
   "claim_boundary": "These fixtures test the manifest contract only. They are not parser executions, benchmark observations, or scientific evidence.",
   "cases": [
     {
@@ -9,12 +9,12 @@
       "expected_acceptance": "schema_valid_and_cross_field_invariants_valid",
       "manifest": {
         "schema_version": "0.1.0",
-        "artifact_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "artifact_id": "sha256:79ee82ea9b736a6472be8430330b08de3937c59d961efe56af24ef60b31f4aee",
         "acquisition": {
           "receipt_id": "acq-receipt-csv-001",
-          "receipt_content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_content_sha256": "79ee82ea9b736a6472be8430330b08de3937c59d961efe56af24ef60b31f4aee",
           "requested_uri": "https://data.example.test/study.csv",
-          "final_uri": "https://data.example.test/releases/2026-11/study.csv",
+          "final_uri": "https://data.example.test/study.csv",
           "captured_at_unix_ms": 1795770000000
         },
         "media": {
@@ -24,9 +24,9 @@
           "encoding": "utf-8"
         },
         "raw": {
-          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "byte_length": 64,
-          "capture_ref": "cas://sha256/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          "sha256": "79ee82ea9b736a6472be8430330b08de3937c59d961efe56af24ef60b31f4aee",
+          "byte_length": 35,
+          "capture_ref": "cas://sha256/79ee82ea9b736a6472be8430330b08de3937c59d961efe56af24ef60b31f4aee"
         },
         "parser": {
           "parser_id": "symthaea.delimited-text",
@@ -36,7 +36,7 @@
         },
         "parse": {
           "disposition": "PARSED",
-          "derived_payload_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "derived_payload_sha256": "fe18f50ea0248b6884dbe8ca669e47791bb1382ad100fb9d6e58c6dfbcb68edd",
           "observations": [
             {
               "observation_id": "study-row-0-temperature",
@@ -45,8 +45,8 @@
                 "record_index": 0,
                 "column_index": 1,
                 "column_name": "temperature_C",
-                "byte_start": 28,
-                "byte_end": 33
+                "byte_start": 29,
+                "byte_end": 34
               },
               "raw_lexeme": "21.50",
               "value_kind": "DECIMAL",
@@ -60,12 +60,14 @@
             "max_observations": 64
           },
           "usage": {
-            "bytes_read": 64,
+            "bytes_read": 35,
             "elapsed_ms": 4,
             "observations_emitted": 1
           }
         }
-      }
+      },
+      "fixture_artifact_bytes_utf8": "sample_id,temperature_C\nS001,21.50\n",
+      "fixture_derived_payload_utf8": "observation_id=study-row-0-temperature\nlocator=CSV_CELL|record=0|column=1|name=temperature_C|start=29|end=34\nraw_lexeme=21.50\nvalue_kind=DECIMAL\nunit=degC\n"
     },
     {
       "case_id": "json_pointer_numeric",
@@ -73,10 +75,10 @@
       "expected_acceptance": "schema_valid_and_cross_field_invariants_valid",
       "manifest": {
         "schema_version": "0.1.0",
-        "artifact_id": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "artifact_id": "sha256:1dada1a2c1a40a36a4fa6d88197d9c31190b5ab4c3525012d1f498806cf6cc38",
         "acquisition": {
           "receipt_id": "acq-receipt-json-001",
-          "receipt_content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "receipt_content_sha256": "1dada1a2c1a40a36a4fa6d88197d9c31190b5ab4c3525012d1f498806cf6cc38",
           "requested_uri": "https://data.example.test/results.json",
           "final_uri": "https://data.example.test/results.json",
           "captured_at_unix_ms": 1795770000000
@@ -88,9 +90,9 @@
           "encoding": "utf-8"
         },
         "raw": {
-          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-          "byte_length": 48,
-          "capture_ref": "cas://sha256/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          "sha256": "1dada1a2c1a40a36a4fa6d88197d9c31190b5ab4c3525012d1f498806cf6cc38",
+          "byte_length": 40,
+          "capture_ref": "cas://sha256/1dada1a2c1a40a36a4fa6d88197d9c31190b5ab4c3525012d1f498806cf6cc38"
         },
         "parser": {
           "parser_id": "symthaea.json",
@@ -100,7 +102,7 @@
         },
         "parse": {
           "disposition": "PARSED",
-          "derived_payload_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "derived_payload_sha256": "29b1d195356a1dce2f7ba1498ffd0d3588b4f1631cc144f4884eca38acd5f68f",
           "observations": [
             {
               "observation_id": "results-effect-estimate",
@@ -120,12 +122,14 @@
             "max_observations": 64
           },
           "usage": {
-            "bytes_read": 48,
+            "bytes_read": 40,
             "elapsed_ms": 2,
             "observations_emitted": 1
           }
         }
-      }
+      },
+      "fixture_artifact_bytes_utf8": "{\"results\":[{\"effect_estimate\":0.032}]}\n",
+      "fixture_derived_payload_utf8": "observation_id=results-effect-estimate\nlocator=JSON_POINTER|/results/0/effect_estimate\nraw_lexeme=0.032\nvalue_kind=DECIMAL\nunit=NULL\n"
     },
     {
       "case_id": "unsupported_pdf",
@@ -133,10 +137,10 @@
       "expected_acceptance": "schema_valid_but_not_policy_usable",
       "manifest": {
         "schema_version": "0.1.0",
-        "artifact_id": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "artifact_id": "sha256:90fdc3feb228128e26b970b7a4e9d731b705dadc0aba2b3b5b1c2228baecc684",
         "acquisition": {
           "receipt_id": "acq-receipt-pdf-001",
-          "receipt_content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "receipt_content_sha256": "90fdc3feb228128e26b970b7a4e9d731b705dadc0aba2b3b5b1c2228baecc684",
           "requested_uri": "https://data.example.test/figure.pdf",
           "final_uri": "https://data.example.test/figure.pdf",
           "captured_at_unix_ms": 1795770000000
@@ -148,9 +152,9 @@
           "encoding": null
         },
         "raw": {
-          "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "byte_length": 2048,
-          "capture_ref": "cas://sha256/1111111111111111111111111111111111111111111111111111111111111111"
+          "sha256": "90fdc3feb228128e26b970b7a4e9d731b705dadc0aba2b3b5b1c2228baecc684",
+          "byte_length": 48,
+          "capture_ref": "cas://sha256/90fdc3feb228128e26b970b7a4e9d731b705dadc0aba2b3b5b1c2228baecc684"
         },
         "parser": {
           "parser_id": "symthaea.artifact-intake",
@@ -179,7 +183,8 @@
             "observations_emitted": 0
           }
         }
-      }
+      },
+      "fixture_artifact_bytes_utf8": "%PDF-1.7\n% synthetic unsupported parser fixture\n"
     },
     {
       "case_id": "receipt_digest_mismatch",
@@ -187,12 +192,12 @@
       "expected_acceptance": "schema_valid_but_cross_field_integrity_rejected",
       "manifest": {
         "schema_version": "0.1.0",
-        "artifact_id": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "artifact_id": "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
         "acquisition": {
           "receipt_id": "acq-receipt-integrity-mismatch",
-          "receipt_content_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
-          "requested_uri": "https://data.example.test/figure.pdf",
-          "final_uri": "https://data.example.test/figure.pdf",
+          "receipt_content_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "requested_uri": "https://data.example.test/receipt-mismatch.json",
+          "final_uri": "https://data.example.test/receipt-mismatch.json",
           "captured_at_unix_ms": 1795770000000
         },
         "media": {
@@ -202,9 +207,9 @@
           "encoding": null
         },
         "raw": {
-          "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
-          "byte_length": 2048,
-          "capture_ref": "cas://sha256/3333333333333333333333333333333333333333333333333333333333333333"
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+          "byte_length": 3,
+          "capture_ref": "cas://sha256/ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
         },
         "parser": {
           "parser_id": "symthaea.artifact-intake",
@@ -233,7 +238,8 @@
             "observations_emitted": 0
           }
         }
-      }
+      },
+      "fixture_artifact_bytes_utf8": "{}\n"
     },
     {
       "case_id": "malformed_csv_row_width",
@@ -241,10 +247,10 @@
       "expected_acceptance": "schema_valid_fail_closed_no_observations",
       "manifest": {
         "schema_version": "0.1.0",
-        "artifact_id": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "artifact_id": "sha256:bdd02e073d54b9b21e1b7e77262cc24be5759448ac6668c73e769c31d7230868",
         "acquisition": {
           "receipt_id": "acq-receipt-malformed-csv",
-          "receipt_content_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "receipt_content_sha256": "bdd02e073d54b9b21e1b7e77262cc24be5759448ac6668c73e769c31d7230868",
           "requested_uri": "https://data.example.test/malformed.csv",
           "final_uri": "https://data.example.test/malformed.csv",
           "captured_at_unix_ms": 1795770000000
@@ -256,9 +262,9 @@
           "encoding": "utf-8"
         },
         "raw": {
-          "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
-          "byte_length": 32,
-          "capture_ref": "cas://sha256/5555555555555555555555555555555555555555555555555555555555555555"
+          "sha256": "bdd02e073d54b9b21e1b7e77262cc24be5759448ac6668c73e769c31d7230868",
+          "byte_length": 22,
+          "capture_ref": "cas://sha256/bdd02e073d54b9b21e1b7e77262cc24be5759448ac6668c73e769c31d7230868"
         },
         "parser": {
           "parser_id": "symthaea.delimited-text",
@@ -282,12 +288,13 @@
             "max_observations": 64
           },
           "usage": {
-            "bytes_read": 32,
+            "bytes_read": 22,
             "elapsed_ms": 1,
             "observations_emitted": 0
           }
         }
-      }
+      },
+      "fixture_artifact_bytes_utf8": "id,value\nA001,1,extra\n"
     },
     {
       "case_id": "input_byte_limit",
@@ -295,10 +302,10 @@
       "expected_acceptance": "schema_valid_fail_closed_no_observations",
       "manifest": {
         "schema_version": "0.1.0",
-        "artifact_id": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "artifact_id": "sha256:8bb9d4b0419ddfff205348150355a44ba17b072718b441a44ddaf504e76f128e",
         "acquisition": {
           "receipt_id": "acq-receipt-input-limit",
-          "receipt_content_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+          "receipt_content_sha256": "8bb9d4b0419ddfff205348150355a44ba17b072718b441a44ddaf504e76f128e",
           "requested_uri": "https://data.example.test/large.csv",
           "final_uri": "https://data.example.test/large.csv",
           "captured_at_unix_ms": 1795770000000
@@ -310,9 +317,9 @@
           "encoding": "utf-8"
         },
         "raw": {
-          "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
-          "byte_length": 8192,
-          "capture_ref": "cas://sha256/6666666666666666666666666666666666666666666666666666666666666666"
+          "sha256": "8bb9d4b0419ddfff205348150355a44ba17b072718b441a44ddaf504e76f128e",
+          "byte_length": 149,
+          "capture_ref": "cas://sha256/8bb9d4b0419ddfff205348150355a44ba17b072718b441a44ddaf504e76f128e"
         },
         "parser": {
           "parser_id": "symthaea.delimited-text",
@@ -331,17 +338,18 @@
             }
           ],
           "limits": {
-            "max_input_bytes": 4096,
+            "max_input_bytes": 64,
             "max_elapsed_ms": 2000,
             "max_observations": 64
           },
           "usage": {
-            "bytes_read": 4096,
+            "bytes_read": 64,
             "elapsed_ms": 1,
             "observations_emitted": 0
           }
         }
-      }
+      },
+      "fixture_artifact_bytes_utf8": "id,value\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\n"
     },
     {
       "case_id": "partial_csv_diagnostic_only",
@@ -349,10 +357,10 @@
       "expected_acceptance": "diagnostic_only_not_policy_usable",
       "manifest": {
         "schema_version": "0.1.0",
-        "artifact_id": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "artifact_id": "sha256:992752f65913a10925d10f9edf32befdf29da44a2d793bd9c6bebb5e306aa4a9",
         "acquisition": {
           "receipt_id": "acq-receipt-partial-csv",
-          "receipt_content_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+          "receipt_content_sha256": "992752f65913a10925d10f9edf32befdf29da44a2d793bd9c6bebb5e306aa4a9",
           "requested_uri": "https://data.example.test/partial.csv",
           "final_uri": "https://data.example.test/partial.csv",
           "captured_at_unix_ms": 1795770000000
@@ -364,9 +372,9 @@
           "encoding": "utf-8"
         },
         "raw": {
-          "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-          "byte_length": 64,
-          "capture_ref": "cas://sha256/7777777777777777777777777777777777777777777777777777777777777777"
+          "sha256": "992752f65913a10925d10f9edf32befdf29da44a2d793bd9c6bebb5e306aa4a9",
+          "byte_length": 29,
+          "capture_ref": "cas://sha256/992752f65913a10925d10f9edf32befdf29da44a2d793bd9c6bebb5e306aa4a9"
         },
         "parser": {
           "parser_id": "symthaea.delimited-text",
@@ -376,21 +384,21 @@
         },
         "parse": {
           "disposition": "PARTIAL",
-          "derived_payload_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+          "derived_payload_sha256": "593fedce11f183c859f8ed45c2bae3707059723e2db29df0fd5260d7c0ddac2c",
           "observations": [
             {
-              "observation_id": "study-row-0-temperature",
+              "observation_id": "partial-row-0-value",
               "locator": {
                 "kind": "CSV_CELL",
                 "record_index": 0,
                 "column_index": 1,
-                "column_name": "temperature_C",
-                "byte_start": 28,
-                "byte_end": 33
+                "column_name": "value",
+                "byte_start": 14,
+                "byte_end": 15
               },
-              "raw_lexeme": "21.50",
-              "value_kind": "DECIMAL",
-              "unit_lexeme": "degC"
+              "raw_lexeme": "1",
+              "value_kind": "INTEGER",
+              "unit_lexeme": null
             }
           ],
           "issues": [
@@ -405,12 +413,14 @@
             "max_observations": 64
           },
           "usage": {
-            "bytes_read": 64,
+            "bytes_read": 29,
             "elapsed_ms": 4,
             "observations_emitted": 1
           }
         }
-      }
+      },
+      "fixture_artifact_bytes_utf8": "id,value\nA001,1\nA002,2,EXTRA\n",
+      "fixture_derived_payload_utf8": "observation_id=partial-row-0-value\nlocator=CSV_CELL|record=0|column=1|name=value|start=14|end=15\nraw_lexeme=1\nvalue_kind=INTEGER\nunit=NULL\n"
     }
   ],
   "cross_field_invariants": [
@@ -421,6 +431,12 @@
     "parse.usage.observations_emitted must equal parse.observations.length and not exceed parse.limits.max_observations",
     "For CSV_CELL, byte_start must be strictly less than byte_end and the span must resolve inside raw.byte_length",
     "A non-PARSED disposition is never sufficient for downstream claim support or decision use",
-    "PARTIAL observations and derived payloads are diagnostic only and cannot be promoted into claim support or decision inputs."
-  ]
+    "PARTIAL observations and derived payloads are diagnostic only and cannot be promoted into claim support or decision inputs.",
+    "SHA-256(UTF-8(fixture_artifact_bytes_utf8)) must equal manifest.raw.sha256",
+    "manifest.raw.byte_length must equal the UTF-8 byte length of fixture_artifact_bytes_utf8",
+    "For PARSED and PARTIAL cases, SHA-256(UTF-8(fixture_derived_payload_utf8)) must equal parse.derived_payload_sha256",
+    "Every CSV_CELL byte span must select exactly the declared raw_lexeme bytes from fixture_artifact_bytes_utf8",
+    "The receipt_digest_mismatch case is intentionally the sole fixture where acquisition.receipt_content_sha256 differs from raw.sha256"
+  ],
+  "hash_contract": "fixture_artifact_bytes_utf8 and fixture_derived_payload_utf8 are UTF-8 byte strings; their SHA-256 digests must equal raw.sha256 and parse.derived_payload_sha256 respectively, except for the intentional receipt digest mismatch case."
 }
