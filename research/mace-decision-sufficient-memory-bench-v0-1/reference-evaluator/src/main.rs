@@ -483,13 +483,13 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
     let per_family_arm: Vec<_> = family_groups.iter().map(|((f,a),v)| aggregate(&format!("{f}/{a}"),v)).collect();
     let paired_vs_executed_no_memory = if let Some(baseline_id) = arm_manifest.no_memory_arm_id.as_ref() {
         let baseline_by_episode: BTreeMap<&str, f64> = scored.iter()
-            .filter(|row| row.arm_id == *baseline_id)
+            .filter(|row| row.arm_id.as_str() == baseline_id.as_str())
             .map(|row| (row.episode_id.as_str(), row.loss)).collect();
         let paired: Vec<_> = expected_arms.iter()
-            .filter(|arm| *arm != baseline_id)
+            .filter(|arm| arm.as_str() != baseline_id.as_str())
             .map(|arm| {
                 let pairs: Vec<(&ScoreRow, f64)> = scored.iter()
-                    .filter(|row| row.arm_id == *arm)
+                    .filter(|row| row.arm_id.as_str() == arm.as_str())
                     .map(|row| (row, *baseline_by_episode.get(row.episode_id.as_str()).expect("balanced matrix includes baseline")))
                     .collect();
                 let gains: Vec<f64> = pairs.iter().map(|(row, baseline_loss)| baseline_loss - row.loss).collect();
