@@ -772,8 +772,11 @@ mod tests{
     #[test]
     fn low_score_triggers_retrieve_more(){
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
-        let rows=examples(80,"root",0.9,0.0);let cfg=config(&groups,&rows,vec![0.0,0.5],30);
+        let mut rows=examples(80,"root",0.9,0.0);
+        for row in rows.iter_mut().take(20) { row.sufficiency_score=0.2; row.decision_loss=1.0; }
+        let cfg=config(&groups,&rows,vec![0.0,0.5,0.8],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();let cert=&result.certificates[0];
+        assert_eq!(cert.threshold,Some(0.5));
         let assessment=assess_decision_v1(&DecisionInputV1{
             group_id:"root".into(),sufficiency_score:0.1,hard_gates_pass:true,distribution_shift_detected:false,
             evidence_acquisition_available:true,retrieval_available:true,escalate_on_hard_gate:false,
@@ -801,7 +804,7 @@ mod tests{
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(100,"root",0.9,0.0);let cfg=config(&groups,&rows,vec![0.0,0.5],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
-        let mut cert=result.certificates[0].clone();cert.threshold=Some(0.0);
+        let mut cert=result.certificates[0].clone();cert.threshold=Some(0.99);
         assert!(!cert.verify_integrity());assert!(!cert.is_usable());
     }
 }
