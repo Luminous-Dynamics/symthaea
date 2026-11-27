@@ -493,8 +493,31 @@
             ]
           }
         },
-        "required": [
-          "evidence_refs"
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "payload": {
+                  "properties": {
+                    "status": {
+                      "const": "supported"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              },
+              "required": [
+                "payload"
+              ]
+            },
+            "then": {
+              "required": [
+                "evidence_refs"
+              ]
+            }
+          }
         ]
       }
     },
