@@ -1243,7 +1243,13 @@ mod tests {
         assert_eq!(receipt.adapter_state_after_sha256, before);
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
         assert_eq!(receipt.selected_feature_vector, vec![1.0, 2.0]);
-        assert_eq!(receipt.context_key.as_deref(), Some(("eqp-1", "ch-1")));
+        assert_eq!(
+            receipt.context_identity,
+            Some(StreamingContextIdentityV1 {
+                equipment_id: Some("eqp-1".into()),
+                chamber_id: Some("ch-1".into()),
+            })
+        );
         assert_eq!(receipt.prediction_value, 10.0);
     }
 
