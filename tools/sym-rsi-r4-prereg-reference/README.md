@@ -4,6 +4,8 @@ This standalone Rust crate performs offline, fail-closed semantic readiness chec
 
 It is deliberately outside the production Cargo workspace. It consumes only a JSON document; it never executes candidates, reads confirmation data, signs artifacts, writes receipts, or authorizes promotion.
 
+The `experiment.protocol_contract_commit` field identifies the exact protocol/checker implementation commit. It is deliberately not the commit containing the completed preregistration file: embedding that file's own future commit SHA would be self-referential. The resulting document commit is recorded externally by the existing canonical run receipt/attestation after the file is frozen.
+
 ## Run
 
 ```sh
