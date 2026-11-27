@@ -29,6 +29,8 @@ pub enum ChallengeSearchError {
     ResponseBranchChanged,
     /// A full-order response sample did not pass its convergence contract.
     FullOrderResponseUnqualified,
+    /// A full-order response sample supplied an invalid absolute uncertainty.
+    InvalidObjectiveUncertainty,
 }
 
 /// Search termination. Only ConditionalGapSatisfied establishes the requested
@@ -119,22 +121,53 @@ impl ScalarChallengeSearchConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChallengeObjectiveSample {
     pub objective_value: f64,
+    /// Absolute error bound for the sampled objective after the registered
+    /// full-order convergence and QoI-normalization checks.
+    pub objective_absolute_error_bound: f64,
     pub branch_id: String,
     pub full_order_reference_converged: bool,
 }
 
 impl ChallengeObjectiveSample {
+    /// Construct an exact/manufactured objective sample with zero error bound.
     pub fn new(
         objective_value: f64,
         branch_id: impl Into<String>,
         full_order_reference_converged: bool,
     ) -> Self {
+        Self::new_with_error_bound(
+            objective_value,
+            0.0,
+            branch_id,
+            full_order_reference_converged,
+        )
+    }
+
+    /// Construct a sample with an independently justified absolute objective
+    /// error bound. The bound must include reference-solver, QoI extraction,
+    /// and normalization uncertainty; a convergence boolean alone is not an
+    /// error estimate.
+    pub fn new_with_error_bound(
+        objective_value: f64,
+        objective_absolute_error_bound: f64,
+        branch_id: impl Into<String>,
+        full_order_reference_converged: bool,
+    ) -> Self {
         Self {
             objective_value,
+            objective_absolute_error_bound,
             branch_id: branch_id.into(),
             full_order_reference_converged,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct EvaluatedObjective {
+    estimate: f64,
+    lower_bound: f64,
+    upper_bound: f64,
+    absolute_error_bound: f64,
 }
 
 /// Result of the scalar separation oracle.
@@ -144,7 +177,11 @@ pub struct ScalarChallengeSearchReport {
     pub branch_id: String,
     pub lipschitz_certificate_sha256: String,
     pub best_parameter: f64,
+    /// Sampled objective estimate at best_parameter.
     pub best_sampled_objective: f64,
+    /// Conservative lower bound for that sampled objective.
+    pub best_sample_lower_bound: f64,
+    pub best_sample_absolute_error_bound: f64,
     pub global_upper_bound: f64,
     pub absolute_gap: f64,
     pub evaluations: usize,
@@ -185,13 +222,15 @@ where
     }
     let initial_value = evaluate_checked(&mut evaluate, initial_midpoint, &config.branch_id)?;
     let initial_upper = upper_envelope(
-        initial_value,
+        initial_value.upper_bound,
         config.lipschitz_constant,
-        half_width(config.lower_bound, config.upper_bound),
+        outward_radius(half_width(config.lower_bound, config.upper_bound)),
     )?;
 
     let mut best_parameter = initial_midpoint;
-    let mut best_value = initial_value;
+    let mut best_value = initial_value.estimate;
+    let mut best_lower_bound = initial_value.lower_bound;
+    let mut best_error_bound = initial_value.absolute_error_bound;
     let mut evaluations = 1_usize;
     let mut cells = vec![SearchCell {
         left: config.lower_bound,
@@ -201,7 +240,7 @@ where
 
     let termination = loop {
         let (worst_index, global_upper_bound) = worst_cell(&cells);
-        let absolute_gap = (global_upper_bound - best_value).max(0.0);
+        let absolute_gap = (global_upper_bound - best_lower_bound).max(0.0);
         if absolute_gap <= config.absolute_gap_tolerance {
             break ChallengeSearchTermination::ConditionalGapSatisfied;
         }
@@ -236,14 +275,17 @@ where
                 .checked_add(1)
                 .ok_or(ChallengeSearchError::InvalidConfiguration)?;
             let cell_upper = upper_envelope(
-                sample_value,
+                sample_value.upper_bound,
                 config.lipschitz_constant,
-                half_width(left, right),
+                outward_radius(half_width(left, right)),
             )?;
-            if sample_value > best_value
-                || (sample_value == best_value && sample_parameter < best_parameter)
+            if sample_value.lower_bound > best_lower_bound
+                || (sample_value.lower_bound == best_lower_bound
+                    && sample_parameter < best_parameter)
             {
-                best_value = sample_value;
+                best_value = sample_value.estimate;
+                best_lower_bound = sample_value.lower_bound;
+                best_error_bound = sample_value.absolute_error_bound;
                 best_parameter = sample_parameter;
             }
             cells.push(SearchCell {
@@ -255,13 +297,15 @@ where
     };
 
     let (_, global_upper_bound) = worst_cell(&cells);
-    let absolute_gap = (global_upper_bound - best_value).max(0.0);
+    let absolute_gap = (global_upper_bound - best_lower_bound).max(0.0);
     Ok(ScalarChallengeSearchReport {
         parameter_id: config.parameter_id.clone(),
         branch_id: config.branch_id.clone(),
         lipschitz_certificate_sha256: config.lipschitz_certificate_sha256.clone(),
         best_parameter,
         best_sampled_objective: best_value,
+        best_sample_lower_bound: best_lower_bound,
+        best_sample_absolute_error_bound: best_error_bound,
         global_upper_bound,
         absolute_gap,
         evaluations,
@@ -273,7 +317,7 @@ fn evaluate_checked<F>(
     evaluate: &mut F,
     parameter: f64,
     expected_branch_id: &str,
-) -> Result<f64, ChallengeSearchError>
+) -> Result<EvaluatedObjective, ChallengeSearchError>
 where
     F: FnMut(f64) -> Result<ChallengeObjectiveSample, ChallengeSearchError>,
 {
@@ -287,15 +331,73 @@ where
     if !sample.objective_value.is_finite() || sample.objective_value < 0.0 {
         return Err(ChallengeSearchError::InvalidObjective);
     }
-    Ok(sample.objective_value)
+    if !sample.objective_absolute_error_bound.is_finite()
+        || sample.objective_absolute_error_bound < 0.0
+    {
+        return Err(ChallengeSearchError::InvalidObjectiveUncertainty);
+    }
+
+    let lower_raw = sample.objective_value - sample.objective_absolute_error_bound;
+    let lower_bound = if lower_raw > 0.0 {
+        lower_raw.next_down().max(0.0)
+    } else {
+        0.0
+    };
+    let upper_raw = sample.objective_value + sample.objective_absolute_error_bound;
+    if !upper_raw.is_finite() {
+        return Err(ChallengeSearchError::NonFiniteUpperBound);
+    }
+    let upper_bound = if sample.objective_absolute_error_bound > 0.0 {
+        upper_raw.next_up()
+    } else {
+        upper_raw
+    };
+    if !upper_bound.is_finite() {
+        return Err(ChallengeSearchError::NonFiniteUpperBound);
+    }
+    Ok(EvaluatedObjective {
+        estimate: sample.objective_value,
+        lower_bound,
+        upper_bound,
+        absolute_error_bound: sample.objective_absolute_error_bound,
+    })
+}
+
+fn outward_radius(radius: f64) -> f64 {
+    if radius > 0.0 {
+        radius.next_up()
+    } else {
+        radius
+    }
 }
 
 fn upper_envelope(
-    sample_value: f64,
+    sample_upper: f64,
     lipschitz_constant: f64,
     radius: f64,
 ) -> Result<f64, ChallengeSearchError> {
-    let upper = sample_value + lipschitz_constant * radius;
+    if !sample_upper.is_finite()
+        || sample_upper < 0.0
+        || !lipschitz_constant.is_finite()
+        || lipschitz_constant < 0.0
+        || !radius.is_finite()
+        || radius < 0.0
+    {
+        return Err(ChallengeSearchError::NonFiniteUpperBound);
+    }
+    if lipschitz_constant == 0.0 || radius == 0.0 {
+        return Ok(sample_upper);
+    }
+    let product = lipschitz_constant * radius;
+    if !product.is_finite() {
+        return Err(ChallengeSearchError::NonFiniteUpperBound);
+    }
+    let product_upper = product.next_up();
+    let sum = sample_upper + product_upper;
+    if !sum.is_finite() {
+        return Err(ChallengeSearchError::NonFiniteUpperBound);
+    }
+    let upper = sum.next_up();
     if upper.is_finite() {
         Ok(upper)
     } else {
@@ -424,7 +526,11 @@ pub struct BoxChallengeSearchReport {
     pub branch_id: String,
     pub lipschitz_certificate_sha256: String,
     pub best_parameters: Vec<f64>,
+    /// Sampled objective estimate at best_parameters.
     pub best_sampled_objective: f64,
+    /// Conservative lower bound for that sampled objective.
+    pub best_sample_lower_bound: f64,
+    pub best_sample_absolute_error_bound: f64,
     pub global_upper_bound: f64,
     pub absolute_gap: f64,
     pub evaluations: usize,
@@ -462,14 +568,17 @@ where
         box_center_and_radii(&config.lower_bounds, &config.upper_bounds)?;
     let initial_value =
         evaluate_box_checked(&mut evaluate, &initial_center, &config.branch_id)?;
+    let outward_radii = initial_radii.iter().copied().map(outward_radius).collect::<Vec<_>>();
     let initial_upper = box_upper_envelope(
-        initial_value,
+        initial_value.upper_bound,
         &config.lipschitz_constants,
-        &initial_radii,
+        &outward_radii,
     )?;
 
     let mut best_parameters = initial_center;
-    let mut best_value = initial_value;
+    let mut best_value = initial_value.estimate;
+    let mut best_lower_bound = initial_value.lower_bound;
+    let mut best_error_bound = initial_value.absolute_error_bound;
     let mut evaluations = 1_usize;
     let mut cells = vec![BoxSearchCell {
         lower: config.lower_bounds.clone(),
@@ -479,7 +588,7 @@ where
 
     let termination = loop {
         let (worst_index, global_upper_bound) = worst_box_cell(&cells);
-        let absolute_gap = (global_upper_bound - best_value).max(0.0);
+        let absolute_gap = (global_upper_bound - best_lower_bound).max(0.0);
         if absolute_gap <= config.absolute_gap_tolerance {
             break ChallengeSearchTermination::ConditionalGapSatisfied;
         }
@@ -515,13 +624,19 @@ where
             evaluations = evaluations
                 .checked_add(1)
                 .ok_or(ChallengeSearchError::InvalidConfiguration)?;
-            let cell_upper =
-                box_upper_envelope(sample_value, &config.lipschitz_constants, &radii)?;
-            if sample_value > best_value
-                || (sample_value == best_value
+            let outward_radii = radii.iter().copied().map(outward_radius).collect::<Vec<_>>();
+            let cell_upper = box_upper_envelope(
+                sample_value.upper_bound,
+                &config.lipschitz_constants,
+                &outward_radii,
+            )?;
+            if sample_value.lower_bound > best_lower_bound
+                || (sample_value.lower_bound == best_lower_bound
                     && lexicographically_less(&center, &best_parameters))
             {
-                best_value = sample_value;
+                best_value = sample_value.estimate;
+                best_lower_bound = sample_value.lower_bound;
+                best_error_bound = sample_value.absolute_error_bound;
                 best_parameters = center;
             }
             cells.push(BoxSearchCell {
@@ -533,13 +648,15 @@ where
     };
 
     let (_, global_upper_bound) = worst_box_cell(&cells);
-    let absolute_gap = (global_upper_bound - best_value).max(0.0);
+    let absolute_gap = (global_upper_bound - best_lower_bound).max(0.0);
     Ok(BoxChallengeSearchReport {
         axis_ids: config.axis_ids.clone(),
         branch_id: config.branch_id.clone(),
         lipschitz_certificate_sha256: config.lipschitz_certificate_sha256.clone(),
         best_parameters,
         best_sampled_objective: best_value,
+        best_sample_lower_bound: best_lower_bound,
+        best_sample_absolute_error_bound: best_error_bound,
         global_upper_bound,
         absolute_gap,
         evaluations,
@@ -551,7 +668,7 @@ fn evaluate_box_checked<F>(
     evaluate: &mut F,
     parameters: &[f64],
     expected_branch_id: &str,
-) -> Result<f64, ChallengeSearchError>
+) -> Result<EvaluatedObjective, ChallengeSearchError>
 where
     F: FnMut(&[f64]) -> Result<ChallengeObjectiveSample, ChallengeSearchError>,
 {
@@ -565,7 +682,78 @@ where
     if !sample.objective_value.is_finite() || sample.objective_value < 0.0 {
         return Err(ChallengeSearchError::InvalidObjective);
     }
-    Ok(sample.objective_value)
+    if !sample.objective_absolute_error_bound.is_finite()
+        || sample.objective_absolute_error_bound < 0.0
+    {
+        return Err(ChallengeSearchError::InvalidObjectiveUncertainty);
+    }
+
+    let lower_raw = sample.objective_value - sample.objective_absolute_error_bound;
+    let lower_bound = if lower_raw > 0.0 {
+        lower_raw.next_down().max(0.0)
+    } else {
+        0.0
+    };
+    let upper_raw = sample.objective_value + sample.objective_absolute_error_bound;
+    if !upper_raw.is_finite() {
+        return Err(ChallengeSearchError::NonFiniteUpperBound);
+    }
+    let upper_bound = if sample.objective_absolute_error_bound > 0.0 {
+        upper_raw.next_up()
+    } else {
+        upper_raw
+    };
+    if !upper_bound.is_finite() {
+        return Err(ChallengeSearchError::NonFiniteUpperBound);
+    }
+    Ok(EvaluatedObjective {
+        estimate: sample.objective_value,
+        lower_bound,
+        upper_bound,
+        absolute_error_bound: sample.objective_absolute_error_bound,
+    })
+}
+
+fn outward_radius(radius: f64) -> f64 {
+    if radius > 0.0 {
+        radius.next_up()
+    } else {
+        radius
+    }
+}
+
+fn upper_envelope(
+    sample_upper: f64,
+    lipschitz_constant: f64,
+    radius: f64,
+) -> Result<f64, ChallengeSearchError> {
+    if !sample_upper.is_finite()
+        || sample_upper < 0.0
+        || !lipschitz_constant.is_finite()
+        || lipschitz_constant < 0.0
+        || !radius.is_finite()
+        || radius < 0.0
+    {
+        return Err(ChallengeSearchError::NonFiniteUpperBound);
+    }
+    if lipschitz_constant == 0.0 || radius == 0.0 {
+        return Ok(sample_upper);
+    }
+    let product = lipschitz_constant * radius;
+    if !product.is_finite() {
+        return Err(ChallengeSearchError::NonFiniteUpperBound);
+    }
+    let product_upper = product.next_up();
+    let sum = sample_upper + product_upper;
+    if !sum.is_finite() {
+        return Err(ChallengeSearchError::NonFiniteUpperBound);
+    }
+    let upper = sum.next_up();
+    if upper.is_finite() {
+        Ok(upper)
+    } else {
+        Err(ChallengeSearchError::NonFiniteUpperBound)
+    }
 }
 
 fn box_center_and_radii(
@@ -598,19 +786,30 @@ fn box_center_and_radii(
 }
 
 fn box_upper_envelope(
-    sample_value: f64,
+    sample_upper: f64,
     lipschitz_constants: &[f64],
     radii: &[f64],
 ) -> Result<f64, ChallengeSearchError> {
     if lipschitz_constants.len() != radii.len() {
         return Err(ChallengeSearchError::InvalidConfiguration);
     }
-    let mut upper = sample_value;
+    let mut upper = sample_upper;
     for (&lipschitz, &radius) in lipschitz_constants.iter().zip(radii) {
-        if lipschitz == 0.0 {
+        if !lipschitz.is_finite() || lipschitz < 0.0 || !radius.is_finite() || radius < 0.0 {
+            return Err(ChallengeSearchError::NonFiniteUpperBound);
+        }
+        if lipschitz == 0.0 || radius == 0.0 {
             continue;
         }
-        upper += lipschitz * radius;
+        let product = lipschitz * radius;
+        if !product.is_finite() {
+            return Err(ChallengeSearchError::NonFiniteUpperBound);
+        }
+        upper += product.next_up();
+        if !upper.is_finite() {
+            return Err(ChallengeSearchError::NonFiniteUpperBound);
+        }
+        upper = upper.next_up();
         if !upper.is_finite() {
             return Err(ChallengeSearchError::NonFiniteUpperBound);
         }
@@ -875,6 +1074,103 @@ mod tests {
         );
         assert!(report.absolute_gap > config.absolute_gap_tolerance);
         assert_eq!(report.evaluations, 1);
+    }
+
+    #[test]
+    fn scalar_search_keeps_reference_objective_uncertainty_in_the_gap() {
+        let config = ScalarChallengeSearchConfig::new(
+            0.0,
+            1.0,
+            0.0,
+            1.0e-3,
+            1,
+            "pulse_phase",
+            "stable-branch",
+            certificate(),
+        );
+        let report = search_scalar_response_challenge(&config, |_| {
+            Ok(ChallengeObjectiveSample::new_with_error_bound(
+                1.0,
+                0.025,
+                "stable-branch",
+                true,
+            ))
+        })
+        .unwrap();
+        assert!((report.best_sample_lower_bound - 0.975).abs() < 1.0e-12);
+        assert!((report.best_sample_absolute_error_bound - 0.025).abs() < 1.0e-12);
+        assert!(report.global_upper_bound >= 1.025);
+        assert!(report.absolute_gap > config.absolute_gap_tolerance);
+        assert_eq!(
+            report.termination,
+            ChallengeSearchTermination::EvaluationBudgetExhausted
+        );
+    }
+
+    #[test]
+    fn box_search_does_not_call_uncertain_full_order_samples_exact() {
+        let config = BoxChallengeSearchConfig::new(
+            vec!["phase".to_owned(), "amplitude".to_owned()],
+            vec![0.0, 0.0],
+            vec![1.0, 1.0],
+            vec![0.0, 0.0],
+            1.0e-3,
+            1,
+            "stable-branch",
+            certificate(),
+        );
+        let report = search_box_response_challenge(&config, |_| {
+            Ok(ChallengeObjectiveSample::new_with_error_bound(
+                0.5,
+                0.01,
+                "stable-branch",
+                true,
+            ))
+        })
+        .unwrap();
+        assert!((report.best_sample_lower_bound - 0.49).abs() < 1.0e-12);
+        assert!(report.global_upper_bound >= 0.51);
+        assert!(report.absolute_gap > config.absolute_gap_tolerance);
+        assert_eq!(
+            report.termination,
+            ChallengeSearchTermination::EvaluationBudgetExhausted
+        );
+    }
+
+    #[test]
+    fn negative_or_nonfinite_objective_error_bounds_are_rejected() {
+        let config = ScalarChallengeSearchConfig::new(
+            0.0,
+            1.0,
+            1.0,
+            1.0e-2,
+            8,
+            "pulse_phase",
+            "branch-a",
+            certificate(),
+        );
+        assert_eq!(
+            search_scalar_response_challenge(&config, |_| {
+                Ok(ChallengeObjectiveSample::new_with_error_bound(
+                    0.5,
+                    -0.01,
+                    "branch-a",
+                    true,
+                ))
+            }),
+            Err(ChallengeSearchError::InvalidObjectiveUncertainty)
+        );
+        assert_eq!(
+            search_scalar_response_challenge(&config, |_| {
+                Ok(ChallengeObjectiveSample::new_with_error_bound(
+                    0.5,
+                    f64::INFINITY,
+                    "branch-a",
+                    true,
+                ))
+            }),
+            Err(ChallengeSearchError::InvalidObjectiveUncertainty)
+        );
     }
 
     #[test]
