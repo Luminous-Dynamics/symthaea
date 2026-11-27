@@ -11,9 +11,7 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use cmaq_031_anytime_calibration_monitor::{
-    CalibrationRankReference, CalibrationRankScore,
-};
+use cmaq_031_anytime_calibration_monitor::{CalibrationRankReference, CalibrationRankScore};
 use cmaq_036_common_cause_closure::{
     ClosureManifest, EvidenceSplit, IndependentBlock, KeyReceiptBinding, SplitCount,
 };
@@ -167,9 +165,7 @@ pub fn build_closure_qualified_rank_reference(
             score_units: block.maximum_dangerous_score_units,
             tie_break_key: attestation.tie_break_key,
             block_manifest_sha256: attestation.block_manifest_sha256.clone(),
-            aggregate_score_receipt_sha256: attestation
-                .aggregate_score_receipt_sha256
-                .clone(),
+            aggregate_score_receipt_sha256: attestation.aggregate_score_receipt_sha256.clone(),
             tie_break_receipt_sha256: attestation.tie_break_receipt_sha256.clone(),
         });
     }
@@ -245,9 +241,7 @@ fn validate_binding(
     Ok(())
 }
 
-fn validate_closure_structure(
-    closure: &ClosureManifest,
-) -> Result<(), ClosureBridgeError> {
+fn validate_closure_structure(closure: &ClosureManifest) -> Result<(), ClosureBridgeError> {
     if closure.blocks.is_empty() {
         return Err(ClosureBridgeError::EmptyClosure);
     }
@@ -266,9 +260,10 @@ fn validate_closure_structure(
         if !block_ids.insert(block.block_id.as_str()) {
             return Err(ClosureBridgeError::DuplicateBlockId);
         }
-        if block.member_unit_ids.is_empty()
-            || block.member_unit_ids.first().map(String::as_str)
-                != Some(block.block_id.as_str())
+        if block.block_id.trim().is_empty()
+            || block.member_unit_ids.is_empty()
+            || block.member_unit_ids.first().map(String::as_str) != Some(block.block_id.as_str())
+            || block.member_unit_ids.iter().any(|member| member.trim().is_empty())
         {
             return Err(ClosureBridgeError::InvalidBlockIdentity);
         }
@@ -280,8 +275,20 @@ fn validate_closure_structure(
         {
             return Err(ClosureBridgeError::NonCanonicalScoreReceiptOrder);
         }
+        for receipt in &block.score_receipts_sha256 {
+            validate_sha256(receipt, "block.score_receipts_sha256")?;
+        }
         if !strictly_sorted(&block.dependence_key_receipts) {
             return Err(ClosureBridgeError::NonCanonicalDependenceReceiptOrder);
+        }
+        for key in &block.dependence_key_receipts {
+            if key.value.trim().is_empty() {
+                return Err(ClosureBridgeError::InvalidBlockIdentity);
+            }
+            validate_sha256(
+                &key.receipt_sha256,
+                "block.dependence_key_receipts.receipt_sha256",
+            )?;
         }
 
         let order_key = (block.split, block.block_id.as_str());
@@ -647,6 +654,30 @@ mod tests {
         assert_eq!(
             build_closure_qualified_rank_reference(&closure, &binding, &attestations),
             Err(ClosureBridgeError::SourceManifestMismatch)
+        );
+    }
+
+    #[test]
+    fn malformed_member_score_receipt_is_rejected() {
+        let (mut closure, binding, attestations) = fixture();
+        closure.blocks[0].score_receipts_sha256[0] = "invalid".into();
+        assert_eq!(
+            build_closure_qualified_rank_reference(&closure, &binding, &attestations),
+            Err(ClosureBridgeError::InvalidSha256(
+                "block.score_receipts_sha256"
+            ))
+        );
+    }
+
+    #[test]
+    fn malformed_dependence_receipt_is_rejected() {
+        let (mut closure, binding, attestations) = fixture();
+        closure.blocks[0].dependence_key_receipts[0].receipt_sha256 = "invalid".into();
+        assert_eq!(
+            build_closure_qualified_rank_reference(&closure, &binding, &attestations),
+            Err(ClosureBridgeError::InvalidSha256(
+                "block.dependence_key_receipts.receipt_sha256"
+            ))
         );
     }
 
