@@ -352,9 +352,7 @@
           "analysis_mean_temperature",
           "analysis_control_check"
         ],
-        "reassessed_unchanged": [
-          "claim_protocol_version"
-        ],
+        "reassessed_unchanged": [],
         "blocked": [
           "decision_temperature_alert",
           "decision_control_accept"
