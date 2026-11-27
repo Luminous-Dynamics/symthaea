@@ -1,5 +1,8 @@
 # 🧠 Meta-Epistemic Learning - Self-Improving Verification
 
+> **Ground-truth boundary (updated 2026-11-25):** this document's older `record_outcome` examples describe the original design and are superseded by the current WebResearcher API. Confidence or local epistemic-verifier status must never be converted into `was_correct`. The live learner accepts `AdjudicatedVerificationOutcome` through `record_adjudicated_outcome()`, requiring an adjudication kind, authority ID and evidence reference; provenance is retained with the outcome. These fields are audit metadata, not cryptographic authentication. Persisted learner state stores adjudicated records and rebuilds aggregate calibration; legacy aggregate-only snapshots are reset. See [`src/web_research/types.rs`](../../src/web_research/types.rs), [`meta_learning.rs`](../../src/web_research/meta_learning.rs) and [`mod.rs`](../../src/web_research/mod.rs).
+
+
 **Status**: ✅ **COMPLETE** - Revolutionary meta-consciousness achieved
 **Date**: December 22, 2025
 **Paradigm Shift**: First AI that improves its own epistemic standards through meta-cognitive monitoring
@@ -188,7 +191,9 @@ let outcome = VerificationOutcome {
     verification_level: VerificationLevel::Standard,
 };
 
-learner.record_outcome(outcome)?;
+// Legacy API removed: ordinary predictions cannot supply correctness labels.
+// Use record_adjudicated_outcome(AdjudicatedVerificationOutcome) only after
+// independent ground truth and evidence provenance have been established.
 ```
 
 ### 2. Learning Source Performance
@@ -396,7 +401,9 @@ fn main() -> Result<()> {
     };
 
     // Record for learning
-    learner.record_outcome(outcome)?;
+    // Legacy API removed: ordinary predictions cannot supply correctness labels.
+// Use record_adjudicated_outcome(AdjudicatedVerificationOutcome) only after
+// independent ground truth and evidence provenance have been established.
 
     // Check meta-learning stats
     let stats = learner.get_stats();
@@ -482,7 +489,9 @@ async fn research_with_learning(
         verification_level: VerificationLevel::Standard,
     };
 
-    learner.record_outcome(outcome)?;
+    // Legacy API removed: ordinary predictions cannot supply correctness labels.
+// Use record_adjudicated_outcome(AdjudicatedVerificationOutcome) only after
+// independent ground truth and evidence provenance have been established.
 
     // 4. Return response
     Ok(result.summary)
@@ -633,7 +642,7 @@ learned_credibility = accuracy * 0.7 + prior_credibility * 0.3
 - **Lines**: 820+
 - **Core Types**: `EpistemicLearner`, `VerificationOutcome`, `SourcePerformance`, `DomainExpertise`, `VerificationStrategy`
 - **Key Functions**:
-  - `record_outcome()` - Record verification for learning
+  - `record_adjudicated_outcome(AdjudicatedVerificationOutcome)` - Record independently adjudicated ground truth; confidence is never correctness
   - `update_source_performance()` - Learn source accuracy
   - `update_domain_expertise()` - Develop domain knowledge
   - `update_strategy_performance()` - Optimize strategies

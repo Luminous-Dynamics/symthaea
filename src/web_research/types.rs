@@ -416,21 +416,115 @@ impl IntegrationResult {
     }
 }
 
-/// Outcome of a verification for meta-learning tracking
+/// Provenance for the independent adjudication used as a correctness label.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdjudicationProvenance {
+    /// Type of adjudication that produced the ground-truth label
+    pub kind: AdjudicationKind,
+    /// Stable identity of the human or independent evaluation authority
+    pub authority_id: String,
+    /// Immutable evidence URI, digest, or receipt reference supporting the label
+    pub evidence_reference: String,
+}
+
+/// Outcome of a verification for meta-learning tracking.
+///
+/// `was_correct` is ground truth supplied by an external adjudicator. It must
+/// never be inferred from `predicted_confidence`, `EpistemicStatus`, or the
+/// same local verifier output being calibrated. When present, adjudication
+/// provenance is retained with the learner's outcome history.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VerificationOutcome {
-    /// The claim that was verified
+    /// The claim that was independently adjudicated
     pub claim: String,
-    /// Source domain
+    /// Domain of the cited source
     pub source_domain: String,
-    /// Source type
+    /// Type of the cited source
     pub source_type: ResearchSource,
-    /// Whether verification was correct (ground truth)
+    /// Whether independent ground truth judged the claim correct
     pub was_correct: bool,
-    /// Predicted confidence at verification time
+    /// Model confidence recorded before adjudication
     pub predicted_confidence: f32,
     /// Topic/domain of the claim
     pub domain: String,
+    /// Independent adjudication provenance; absent on unadjudicated predictions
+    #[serde(default)]
+    pub adjudication_provenance: Option<AdjudicationProvenance>,
+}
+
+/// Kind of independent evidence used to adjudicate a prediction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum AdjudicationKind {
+    /// Human review or user feedback against external evidence
+    #[default]
+    HumanReview,
+    /// An independently controlled evaluator with hidden-target custody
+    IndependentEvaluator,
+    /// Instrument or experimental ground truth
+    InstrumentGroundTruth,
+    /// External fact-checking or a separately sourced authoritative record
+    ExternalFactCheck,
+    /// Another explicitly identified adjudication process
+    Other,
+}
+
+/// A verification outcome accompanied by an external adjudication reference.
+///
+/// This wrapper binds the label to an identified authority and evidence
+/// reference. It does not authenticate that authority or validate the cited
+/// evidence; callers must obtain it through the existing independent
+/// adjudication/evidence-custody process.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AdjudicatedVerificationOutcome {
+    /// Ground-truth outcome that may enter meta-learning
+    pub outcome: VerificationOutcome,
+    /// Type of adjudication that produced the ground-truth label
+    pub adjudication_kind: AdjudicationKind,
+    /// Stable identity of the human or independent evaluation authority
+    pub authority_id: String,
+    /// Immutable evidence URI, digest, or receipt reference supporting the label
+    pub evidence_reference: String,
+}
+
+impl AdjudicatedVerificationOutcome {
+    /// Validate and convert an independently adjudicated outcome.
+    ///
+    /// This checks required metadata and confidence bounds, but does not
+    /// authenticate the authority or resolve the evidence reference. Those
+    /// remain responsibilities of the independent adjudication/custody process.
+    pub fn into_outcome(mut self) -> Result<VerificationOutcome, &'static str> {
+        let outcome = &self.outcome;
+        if outcome.claim.trim().is_empty() {
+            return Err("adjudicated verification claim must be non-empty");
+        }
+        if outcome.source_domain.trim().is_empty() {
+            return Err("adjudicated verification source domain must be non-empty");
+        }
+        if outcome.domain.trim().is_empty() {
+            return Err("adjudicated verification topic domain must be non-empty");
+        }
+        if !outcome.predicted_confidence.is_finite()
+            || !(0.0..=1.0).contains(&outcome.predicted_confidence)
+        {
+            return Err("adjudicated verification confidence must be finite and in [0, 1]");
+        }
+        if outcome.adjudication_provenance.is_some() {
+            return Err("verification outcome already contains adjudication provenance");
+        }
+        if self.authority_id.trim().is_empty() {
+            return Err("adjudication authority ID must be non-empty");
+        }
+        if self.evidence_reference.trim().is_empty() {
+            return Err("adjudication evidence reference must be non-empty");
+        }
+
+        self.outcome.adjudication_provenance = Some(AdjudicationProvenance {
+            kind: self.adjudication_kind,
+            authority_id: self.authority_id,
+            evidence_reference: self.evidence_reference,
+        });
+        Ok(self.outcome)
+    }
 }
 
 impl VerificationOutcome {
@@ -447,6 +541,7 @@ impl VerificationOutcome {
             was_correct,
             predicted_confidence: 0.5,
             domain: String::new(),
+            adjudication_provenance: None,
         }
     }
 

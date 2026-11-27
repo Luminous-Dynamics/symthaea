@@ -11,7 +11,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
-use super::types::{ResearchSource, VerificationOutcome};
+use super::types::{AdjudicatedVerificationOutcome, ResearchSource, VerificationOutcome};
+
+const ADJUDICATED_LEARNER_STATE_VERSION: u16 = 1;
+const MAX_PERSISTED_ADJUDICATED_OUTCOMES: usize = 1_000;
+#[cfg(test)]
+use super::types::AdjudicationKind;
 
 /// Configuration for the epistemic learner
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -219,8 +224,23 @@ impl EpistemicLearner {
         }
     }
 
-    /// Record a verification outcome for learning
-    pub fn record_outcome(&mut self, outcome: VerificationOutcome) -> anyhow::Result<()> {
+    /// Record an outcome only when its independent-adjudication metadata is present.
+    ///
+    /// The wrapper validates required provenance fields and confidence bounds.
+    /// It does not authenticate the adjudicator or resolve the referenced
+    /// evidence; those remain responsibilities of the independent custody path.
+    pub fn record_adjudicated_outcome(
+        &mut self,
+        adjudicated: AdjudicatedVerificationOutcome,
+    ) -> anyhow::Result<()> {
+        let outcome = adjudicated
+            .into_outcome()
+            .map_err(anyhow::Error::msg)?;
+        self.record_outcome_verified(outcome)
+    }
+
+    /// Internal sink for outcomes already validated by the adjudication boundary.
+    fn record_outcome_verified(&mut self, outcome: VerificationOutcome) -> anyhow::Result<()> {
         // Update source credibility
         self.update_source_credibility(&outcome);
 
@@ -230,17 +250,36 @@ impl EpistemicLearner {
         // Store outcome
         self.outcomes.push_back(outcome);
 
-        // Trim old outcomes
-        if self.outcomes.len() > 1000 {
-            self.outcomes.pop_front();
-        }
-
-        // Periodically update meta-phi
-        if self.outcomes.len() % 10 == 0 {
+        // Keep the live learner bounded to the same adjudicated window
+        // that is exported. Rebuild aggregates after eviction so source/domain
+        // counts and meta-Phi describe exactly the retained evidence window.
+        if self.outcomes.len() > MAX_PERSISTED_ADJUDICATED_OUTCOMES {
+            self.rebuild_calibration_from_retained_outcomes();
+        } else if self.outcomes.len() % 10 == 0 {
             self.update_meta_phi();
         }
 
         Ok(())
+    }
+
+    fn rebuild_calibration_from_retained_outcomes(&mut self) {
+        while self.outcomes.len() > MAX_PERSISTED_ADJUDICATED_OUTCOMES {
+            self.outcomes.pop_front();
+        }
+        let retained: Vec<VerificationOutcome> = self.outcomes.iter().cloned().collect();
+        self.outcomes.clear();
+        self.source_credibility.clear();
+        self.domain_expertise.clear();
+        self.meta_phi = MetaPhi::default();
+
+        for outcome in retained {
+            self.update_source_credibility(&outcome);
+            self.update_domain_expertise(&outcome);
+            self.outcomes.push_back(outcome);
+            if self.outcomes.len() % 10 == 0 {
+                self.update_meta_phi();
+            }
+        }
     }
 
     /// Update source credibility based on outcome
@@ -345,6 +384,18 @@ impl EpistemicLearner {
         &self.meta_phi
     }
 
+    /// Iterate over outcomes that retain independent adjudication provenance.
+    ///
+    /// Unadjudicated predictions are intentionally excluded from this view and
+    /// must not be used as correctness labels.
+    pub fn adjudicated_outcomes(
+        &self,
+    ) -> impl Iterator<Item = &VerificationOutcome> {
+        self.outcomes
+            .iter()
+            .filter(|outcome| outcome.adjudication_provenance.is_some())
+    }
+
     /// Get learning statistics
     pub fn stats(&self) -> LearnerStats {
         LearnerStats {
@@ -380,22 +431,70 @@ impl EpistemicLearner {
         self.strategies.push(strategy);
     }
 
-    /// Export learner state for persistence
+    /// Export the adjudicated observations needed to deterministically rebuild
+    /// source/domain/meta-Phi calibration state. Cached aggregates are deliberately
+    /// not persisted as an authority; they are recomputed from provenance-bearing
+    /// records. The separate strategy suggestion library is not persisted until
+    /// its success-rate updates have their own adjudication lineage.
     pub fn export_state(&self) -> LearnerState {
         LearnerState {
-            source_credibility: self.source_credibility.clone(),
-            strategies: self.strategies.clone(),
-            meta_phi: self.meta_phi.clone(),
-            domain_expertise: self.domain_expertise.clone(),
+            adjudication_schema_version: ADJUDICATED_LEARNER_STATE_VERSION,
+            adjudicated_outcomes: self.adjudicated_outcomes().cloned().collect(),
         }
     }
 
-    /// Import learner state from persistence
-    pub fn import_state(&mut self, state: LearnerState) {
-        self.source_credibility = state.source_credibility;
-        self.strategies = state.strategies;
-        self.meta_phi = state.meta_phi;
-        self.domain_expertise = state.domain_expertise;
+    fn reset_calibration_state(&mut self) {
+        self.source_credibility.clear();
+        self.strategies.clear();
+        self.outcomes.clear();
+        self.meta_phi = MetaPhi::default();
+        self.domain_expertise.clear();
+    }
+
+    fn valid_persisted_adjudication(outcome: &VerificationOutcome) -> bool {
+        let Some(provenance) = &outcome.adjudication_provenance else {
+            return false;
+        };
+        !outcome.claim.trim().is_empty()
+            && !outcome.source_domain.trim().is_empty()
+            && !outcome.domain.trim().is_empty()
+            && outcome.predicted_confidence.is_finite()
+            && (0.0..=1.0).contains(&outcome.predicted_confidence)
+            && !provenance.authority_id.trim().is_empty()
+            && !provenance.evidence_reference.trim().is_empty()
+    }
+
+    /// Import learner state from persistence, rebuilding aggregates from
+    /// provenance-bearing outcome records.
+    ///
+    /// Unversioned legacy snapshots are rejected fail-closed because their
+    /// calibration aggregates predate adjudication provenance and may include
+    /// confidence-derived correctness labels. This also rejects versioned
+    /// snapshots containing any unadjudicated or malformed outcome. In either
+    /// case all calibration-derived state is reset.
+    ///
+    /// Returns true only when a compatible state was imported successfully.
+    /// This validates provenance structure, not authority signatures or the
+    /// truth of the referenced evidence.
+    pub fn import_state(&mut self, state: LearnerState) -> bool {
+        self.reset_calibration_state();
+        if state.adjudication_schema_version != ADJUDICATED_LEARNER_STATE_VERSION
+            || state.adjudicated_outcomes.len() > MAX_PERSISTED_ADJUDICATED_OUTCOMES
+            || state
+                .adjudicated_outcomes
+                .iter()
+                .any(|outcome| !Self::valid_persisted_adjudication(outcome))
+        {
+            return false;
+        }
+
+        for outcome in state.adjudicated_outcomes {
+            if self.record_outcome_verified(outcome).is_err() {
+                self.reset_calibration_state();
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -421,29 +520,190 @@ pub struct LearnerStats {
 /// Exportable learner state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearnerState {
-    /// Source credibility data
-    pub source_credibility: HashMap<String, SourceCredibility>,
-    /// Learned strategies
-    pub strategies: Vec<VerificationStrategy>,
-    /// Meta-phi tracking
-    pub meta_phi: MetaPhi,
-    /// Domain expertise
-    pub domain_expertise: HashMap<String, f32>,
+    /// Version of the independent-adjudication contract used to build this state.
+    /// Missing values deserialize as zero and are rejected by import_state().
+    #[serde(default)]
+    pub adjudication_schema_version: u16,
+    /// Ground-truth records used to rebuild source/domain/meta-learning state.
+    /// Every entry must carry non-empty adjudication provenance.
+    #[serde(default)]
+    pub adjudicated_outcomes: Vec<VerificationOutcome>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn make_outcome(domain: &str, source: &str, correct: bool) -> VerificationOutcome {
-        VerificationOutcome {
-            claim: "Test claim".to_string(),
-            source_domain: source.to_string(),
-            source_type: ResearchSource::Documentation,
-            was_correct: correct,
-            predicted_confidence: 0.8,
-            domain: domain.to_string(),
+    fn make_outcome(domain: &str, source: &str, correct: bool) -> AdjudicatedVerificationOutcome {
+        AdjudicatedVerificationOutcome {
+            outcome: VerificationOutcome {
+                claim: "Test claim".to_string(),
+                source_domain: source.to_string(),
+                source_type: ResearchSource::Documentation,
+                was_correct: correct,
+                predicted_confidence: 0.8,
+                domain: domain.to_string(),
+                adjudication_provenance: None,
+            },
+            adjudication_kind: AdjudicationKind::Other,
+            authority_id: "synthetic-unit-test-authority".to_owned(),
+            evidence_reference: "test-fixture://epistemic-outcome".to_owned(),
         }
+    }
+
+    #[test]
+    fn persisted_state_rebuilds_calibration_from_adjudicated_records() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..12 {
+            learner
+                .record_adjudicated_outcome(make_outcome(
+                    "programming",
+                    "rust-lang.org",
+                    index % 4 != 0,
+                ))
+                .unwrap();
+        }
+
+        let state = learner.export_state();
+        assert_eq!(state.adjudication_schema_version, ADJUDICATED_LEARNER_STATE_VERSION);
+        assert_eq!(state.adjudicated_outcomes.len(), 12);
+        assert!(state
+            .adjudicated_outcomes
+            .iter()
+            .all(|outcome| outcome.adjudication_provenance.is_some()));
+
+        let serialized = serde_json::to_string(&state).unwrap();
+        let state: LearnerState = serde_json::from_str(&serialized).unwrap();
+        let mut restored = EpistemicLearner::new();
+        assert!(restored.import_state(state));
+        assert_eq!(restored.stats().total_outcomes, 12);
+        assert_eq!(restored.adjudicated_outcomes().count(), 12);
+        assert_eq!(
+            restored
+                .get_source_credibility("rust-lang.org")
+                .unwrap()
+                .outcome_count,
+            12
+        );
+    }
+
+    #[test]
+    fn rolling_window_state_roundtrips_after_more_than_one_thousand_outcomes() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..1_005 {
+            learner
+                .record_adjudicated_outcome(make_outcome(
+                    if index % 2 == 0 { "science" } else { "programming" },
+                    if index % 3 == 0 { "example.org" } else { "rust-lang.org" },
+                    index % 5 != 0,
+                ))
+                .unwrap();
+        }
+
+        let before = learner.stats();
+        assert_eq!(before.total_outcomes, MAX_PERSISTED_ADJUDICATED_OUTCOMES);
+        let before_meta_phi = learner.meta_phi.clone();
+        let state = learner.export_state();
+        assert_eq!(state.adjudicated_outcomes.len(), MAX_PERSISTED_ADJUDICATED_OUTCOMES);
+
+        let serialized = serde_json::to_string(&state).unwrap();
+        let state: LearnerState = serde_json::from_str(&serialized).unwrap();
+        let mut restored = EpistemicLearner::new();
+        assert!(restored.import_state(state));
+
+        let after = restored.stats();
+        assert_eq!(after.total_outcomes, MAX_PERSISTED_ADJUDICATED_OUTCOMES);
+        assert_eq!(after.source_count, before.source_count);
+        assert_eq!(after.domain_count, before.domain_count);
+        assert_eq!(after.overall_accuracy, before.overall_accuracy);
+        assert_eq!(restored.meta_phi.value, before_meta_phi.value);
+        assert_eq!(restored.meta_phi.cycles, before_meta_phi.cycles);
+        assert_eq!(
+            restored
+                .get_source_credibility("rust-lang.org")
+                .unwrap()
+                .outcome_count,
+            learner
+                .get_source_credibility("rust-lang.org")
+                .unwrap()
+                .outcome_count
+        );
+    }
+
+    #[test]
+    fn rolling_window_evicts_oldest_outcome_in_live_memory() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..(MAX_PERSISTED_ADJUDICATED_OUTCOMES + 5) {
+            let mut adjudicated = make_outcome("science", "example.org", true);
+            adjudicated.outcome.claim = format!("claim-{index}");
+            learner.record_adjudicated_outcome(adjudicated).unwrap();
+        }
+
+        assert_eq!(
+            learner.stats().total_outcomes,
+            MAX_PERSISTED_ADJUDICATED_OUTCOMES
+        );
+        assert_eq!(
+            learner.adjudicated_outcomes().next().unwrap().claim,
+            "claim-5"
+        );
+        assert_eq!(
+            learner.adjudicated_outcomes().last().unwrap().claim,
+            format!("claim-{}", MAX_PERSISTED_ADJUDICATED_OUTCOMES + 4)
+        );
+        assert_eq!(
+            learner.export_state().adjudicated_outcomes.len(),
+            MAX_PERSISTED_ADJUDICATED_OUTCOMES
+        );
+    }
+
+    #[test]
+    fn legacy_or_malformed_persisted_state_resets_calibration() {
+        let mut seeded = EpistemicLearner::new();
+        for _ in 0..12 {
+            seeded
+                .record_adjudicated_outcome(make_outcome("programming", "rust-lang.org", true))
+                .unwrap();
+        }
+        let legacy_json = r#"{
+            "source_credibility": {},
+            "strategies": [],
+            "meta_phi": {},
+            "domain_expertise": {}
+        }"#;
+        let legacy_state: LearnerState = serde_json::from_str(legacy_json).unwrap();
+        assert_eq!(legacy_state.adjudication_schema_version, 0);
+
+        let mut restored = EpistemicLearner::new();
+        restored
+            .record_adjudicated_outcome(make_outcome("history", "example.org", false))
+            .unwrap();
+        assert!(!restored.import_state(legacy_state));
+        assert_eq!(restored.stats().total_outcomes, 0);
+        assert_eq!(restored.stats().source_count, 0);
+        assert_eq!(restored.stats().domain_count, 0);
+        assert_eq!(restored.adjudicated_outcomes().count(), 0);
+
+        let mut malformed_state = seeded.export_state();
+        malformed_state.adjudicated_outcomes[0].adjudication_provenance = None;
+        assert!(!restored.import_state(malformed_state));
+        assert_eq!(restored.stats().total_outcomes, 0);
+        assert_eq!(restored.stats().source_count, 0);
+
+        let mut invalid_confidence_state = seeded.export_state();
+        invalid_confidence_state.adjudicated_outcomes[0].predicted_confidence = f32::INFINITY;
+        assert!(!restored.import_state(invalid_confidence_state));
+        assert_eq!(restored.stats().total_outcomes, 0);
+        assert_eq!(restored.stats().source_count, 0);
+
+        let mut oversized_state = seeded.export_state();
+        let duplicate = oversized_state.adjudicated_outcomes[0].clone();
+        oversized_state
+            .adjudicated_outcomes
+            .extend(std::iter::repeat_n(duplicate, MAX_PERSISTED_ADJUDICATED_OUTCOMES + 1));
+        assert!(!restored.import_state(oversized_state));
+        assert_eq!(restored.stats().total_outcomes, 0);
+        assert_eq!(restored.stats().source_count, 0);
     }
 
     #[test]
@@ -454,7 +714,7 @@ mod tests {
         for i in 0..10 {
             let correct = i % 3 != 0; // i=0,3,6,9 are wrong, rest are correct (6/10)
             learner
-                .record_outcome(make_outcome("programming", "rust-lang.org", correct))
+                .record_adjudicated_outcome(make_outcome("programming", "rust-lang.org", correct))
                 .unwrap();
         }
 
@@ -476,14 +736,14 @@ mod tests {
         // Source that is mostly correct
         for _ in 0..20 {
             learner
-                .record_outcome(make_outcome("programming", "docs.rust-lang.org", true))
+                .record_adjudicated_outcome(make_outcome("programming", "docs.rust-lang.org", true))
                 .unwrap();
         }
 
         // Source that is often wrong
         for _ in 0..20 {
             learner
-                .record_outcome(make_outcome("programming", "random-blog.com", false))
+                .record_adjudicated_outcome(make_outcome("programming", "random-blog.com", false))
                 .unwrap();
         }
 
@@ -504,7 +764,7 @@ mod tests {
         // Build expertise in programming
         for _ in 0..30 {
             learner
-                .record_outcome(make_outcome("programming", "rust-lang.org", true))
+                .record_adjudicated_outcome(make_outcome("programming", "rust-lang.org", true))
                 .unwrap();
         }
 
@@ -531,15 +791,15 @@ mod tests {
         // Build history with different sources
         for _ in 0..10 {
             learner
-                .record_outcome(make_outcome("programming", "rust-lang.org", true))
+                .record_adjudicated_outcome(make_outcome("programming", "rust-lang.org", true))
                 .unwrap();
         }
         for _ in 0..10 {
             learner
-                .record_outcome(make_outcome("programming", "stackoverflow.com", true))
+                .record_adjudicated_outcome(make_outcome("programming", "stackoverflow.com", true))
                 .unwrap();
             learner
-                .record_outcome(make_outcome("programming", "stackoverflow.com", false))
+                .record_adjudicated_outcome(make_outcome("programming", "stackoverflow.com", false))
                 .unwrap();
         }
 

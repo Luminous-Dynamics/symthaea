@@ -30,6 +30,8 @@ use symthaea::web_research::{
     ResearchStatus,
     SourceEvidence,
     VerificationContext,
+    AdjudicatedVerificationOutcome,
+    AdjudicationKind,
     VerificationOutcome,
     VerifiedClaim,
     WebResearchResult,
@@ -271,6 +273,15 @@ async fn test_knowledge_integrator() {
     assert!(integration.phi_after >= phi_before);
 }
 
+fn synthetic_adjudication(outcome: VerificationOutcome) -> AdjudicatedVerificationOutcome {
+    AdjudicatedVerificationOutcome {
+        outcome,
+        adjudication_kind: AdjudicationKind::Other,
+        authority_id: "synthetic-test-fixture".to_owned(),
+        evidence_reference: "test-fixture://epistemic-consciousness/ground-truth".to_owned(),
+    }
+}
+
 // ============================================================================
 // Meta-Learning Tests
 // ============================================================================
@@ -288,8 +299,9 @@ fn test_epistemic_learner_basics() {
             was_correct: i % 3 != 0, // ~70% correct
             predicted_confidence: 0.8,
             domain: "programming".into(),
+            adjudication_provenance: None,
         };
-        learner.record_outcome(outcome).unwrap();
+        learner.record_adjudicated_outcome(synthetic_adjudication(outcome)).unwrap();
     }
 
     let stats = learner.stats();
@@ -305,28 +317,30 @@ fn test_source_credibility_learning() {
     // Reliable source - always correct
     for _ in 0..20 {
         learner
-            .record_outcome(VerificationOutcome {
+            .record_adjudicated_outcome(synthetic_adjudication(VerificationOutcome {
                 claim: "Test".into(),
                 source_domain: "docs.rust-lang.org".into(),
                 source_type: ResearchSource::Documentation,
                 was_correct: true,
                 predicted_confidence: 0.9,
                 domain: "programming".into(),
-            })
+                adjudication_provenance: None,
+            }))
             .unwrap();
     }
 
     // Unreliable source - often wrong
     for _ in 0..20 {
         learner
-            .record_outcome(VerificationOutcome {
+            .record_adjudicated_outcome(synthetic_adjudication(VerificationOutcome {
                 claim: "Test".into(),
                 source_domain: "unreliable-blog.com".into(),
                 source_type: ResearchSource::Web,
                 was_correct: false,
                 predicted_confidence: 0.5,
                 domain: "programming".into(),
-            })
+                adjudication_provenance: None,
+            }))
             .unwrap();
     }
 
@@ -425,14 +439,15 @@ fn test_full_epistemic_pipeline() {
 
     // 3. Record outcome for learning
     learner
-        .record_outcome(VerificationOutcome {
+        .record_adjudicated_outcome(synthetic_adjudication(VerificationOutcome {
             claim: verification.claim.clone(),
             source_domain: "nixos.org".into(),
             source_type: ResearchSource::Documentation,
             was_correct: true,
             predicted_confidence: verification.confidence,
             domain: "systems".into(),
-        })
+            adjudication_provenance: None,
+        }))
         .unwrap();
 
     // 4. Verify learning occurred

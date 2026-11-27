@@ -182,22 +182,24 @@ impl EpistemicConsciousness {
         // Update last Phi
         self.last_phi = integration.phi_after;
 
-        // Record outcomes for meta-learning
-        for claim in &result.claims {
-            // For now, assume high-confidence claims are correct
-            // In a real system, this would be based on user feedback
-            let outcome = VerificationOutcome {
-                claim: claim.text.clone(),
-                source_domain: self.extract_domain(&result.url),
-                source_type: result.source_type,
-                was_correct: claim.confidence > 0.7,
-                predicted_confidence: claim.confidence,
-                domain: self.detect_domain(query),
-            };
-            self.learner.record_outcome(outcome)?;
-        }
-
+        // Do not feed the local verifier's own confidence/status back as
+        // correctness labels. Meta-learning requires independent ground truth;
+        // callers can supply that later via record_adjudicated_outcome().
         Ok(result)
+    }
+
+    /// Record a verification outcome only after independent adjudication.
+    ///
+    /// The authority/evidence fields make the provenance requirement explicit,
+    /// but this method does not authenticate the authority or resolve the
+    /// referenced evidence. Callers must use the existing human-review or
+    /// independent-evaluator process; never derive `was_correct` from model
+    /// confidence or the local `EpistemicVerifier` result.
+    pub fn record_adjudicated_outcome(
+        &mut self,
+        adjudicated: AdjudicatedVerificationOutcome,
+    ) -> anyhow::Result<()> {
+        self.learner.record_adjudicated_outcome(adjudicated)
     }
 
     /// Get current epistemic stats
@@ -300,6 +302,110 @@ mod tests {
         assert!(ec.should_research(0.3)); // Low Phi, research needed
     }
 
+    fn test_consciousness() -> EpistemicConsciousness {
+        let (researcher, integrator, learner) = create_epistemic_system().unwrap();
+        EpistemicConsciousness {
+            researcher,
+            integrator,
+            learner,
+            phi_threshold: 0.6,
+            last_phi: 0.0,
+        }
+    }
+
+    fn adjudicated_outcome() -> AdjudicatedVerificationOutcome {
+        AdjudicatedVerificationOutcome {
+            outcome: VerificationOutcome {
+                claim: "The test result is independently reproducible".to_owned(),
+                source_domain: "example.org".to_owned(),
+                source_type: ResearchSource::Academic,
+                was_correct: true,
+                predicted_confidence: 0.9,
+                domain: "science".to_owned(),
+            },
+            adjudication_kind: AdjudicationKind::IndependentEvaluator,
+            authority_id: "independent-evaluator-test".to_owned(),
+            evidence_reference: "urn:example:receipt:sha256:0123456789abcdef".to_owned(),
+        }
+    }
+
+    #[test]
+    fn meta_learning_accepts_only_complete_adjudication_records() {
+        let mut consciousness = test_consciousness();
+        assert_eq!(consciousness.learner.stats().total_outcomes, 0);
+
+        let mut missing_authority = adjudicated_outcome();
+        missing_authority.authority_id.clear();
+        assert!(consciousness
+            .record_adjudicated_outcome(missing_authority)
+            .is_err());
+
+        let mut missing_evidence = adjudicated_outcome();
+        missing_evidence.evidence_reference.clear();
+        assert!(consciousness
+            .record_adjudicated_outcome(missing_evidence)
+            .is_err());
+
+        let mut invalid_confidence = adjudicated_outcome();
+        invalid_confidence.outcome.predicted_confidence = f32::NAN;
+        assert!(consciousness
+            .record_adjudicated_outcome(invalid_confidence)
+            .is_err());
+
+        let mut out_of_range_confidence = adjudicated_outcome();
+        out_of_range_confidence.outcome.predicted_confidence = 1.01;
+        assert!(consciousness
+            .record_adjudicated_outcome(out_of_range_confidence)
+            .is_err());
+
+        let mut empty_claim = adjudicated_outcome();
+        empty_claim.outcome.claim = "   ".to_owned();
+        assert!(consciousness
+            .record_adjudicated_outcome(empty_claim)
+            .is_err());
+
+        let mut empty_source_domain = adjudicated_outcome();
+        empty_source_domain.outcome.source_domain.clear();
+        assert!(consciousness
+            .record_adjudicated_outcome(empty_source_domain)
+            .is_err());
+
+        let mut empty_topic_domain = adjudicated_outcome();
+        empty_topic_domain.outcome.domain.clear();
+        assert!(consciousness
+            .record_adjudicated_outcome(empty_topic_domain)
+            .is_err());
+
+        assert_eq!(consciousness.learner.stats().total_outcomes, 0);
+    }
+
+    #[test]
+    fn independently_adjudicated_outcome_updates_the_existing_learner() {
+        let mut consciousness = test_consciousness();
+        consciousness
+            .record_adjudicated_outcome(adjudicated_outcome())
+            .unwrap();
+
+        assert_eq!(consciousness.learner.stats().total_outcomes, 1);
+        assert_eq!(
+            consciousness
+                .learner
+                .get_source_credibility("example.org")
+                .unwrap()
+                .outcome_count,
+            1
+        );
+
+        let recorded = consciousness.learner.adjudicated_outcomes().next().unwrap();
+        let provenance = recorded.adjudication_provenance.as_ref().unwrap();
+        assert_eq!(provenance.kind, AdjudicationKind::IndependentEvaluator);
+        assert_eq!(provenance.authority_id, "independent-evaluator-test");
+        assert_eq!(
+            provenance.evidence_reference,
+            "urn:example:receipt:sha256:0123456789abcdef"
+        );
+    }
+
     #[test]
     fn test_epistemic_types() {
         // Test that all types are properly exported
@@ -309,5 +415,8 @@ mod tests {
 
         let source = ResearchSource::Documentation;
         assert_eq!(source.label(), "Documentation");
+
+        let adjudication = AdjudicationKind::IndependentEvaluator;
+        assert_eq!(adjudication, AdjudicationKind::IndependentEvaluator);
     }
 }
