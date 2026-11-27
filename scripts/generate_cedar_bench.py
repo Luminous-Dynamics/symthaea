@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Expand CEDAR-Bench templates into isolated candidate and auditor JSONL streams.
-
-The seed is supplied out of band via CEDAR_BENCH_SEED. It is never printed or
-written to the candidate stream. This is a harness fixture generator, not a
-semantic scorer or model runner.
-"""
+"""Expand CEDAR-Bench into isolated candidate and auditor JSONL streams."""
 from __future__ import annotations
 
 import copy
@@ -14,7 +9,7 @@ import hmac
 import json
 import os
 import sys
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
@@ -56,14 +51,6 @@ def derive_value(seed: bytes, template_id: str, fact: dict[str, Any], variant: s
         start = dt.date.fromisoformat(fact["start"])
         return (start + dt.timedelta(days=n % int(fact["days"]))).isoformat()
     raise ValueError(f"unsupported value kind: {kind}")
-
-
-def distinct_value(seed: bytes, template_id: str, fact: dict[str, Any], baseline: str) -> str:
-    for attempt in range(256):
-        value = derive_value(seed, template_id, fact, f"counterfactual-{attempt}")
-        if value != baseline:
-            return value
-    raise ValueError(f"could not derive distinct counterfactual for {template_id}/{fact['id']}")
 
 
 def replace_markers(value: Any, markers: dict[str, str], fact_kinds: dict[str, str]) -> Any:
@@ -127,17 +114,93 @@ def bundle_digest(sources: list[dict[str, Any]]) -> str:
     return digest(canonical)
 
 
+def answer_oracle(spec: dict[str, Any], values: dict[str, str], active_sources: set[str]) -> dict[str, Any]:
+    kind = spec["kind"]
+    if kind in {"fact", "value_and_unit"}:
+        required_sources = set(spec["source_ids"])
+        mode = spec.get("source_mode", "all")
+        present = sorted(required_sources & active_sources)
+        answerable = bool(present) if mode == "any" else required_sources <= active_sources
+        if not answerable:
+            return {"answerable": False, "value": None, "supported_by_sources": present}
+        if kind == "fact":
+            result = {"value": values[spec["fact_id"]]}
+        else:
+            result = {
+                "value": values[spec["value_fact"]],
+                "unit": values[spec["unit_fact"]],
+            }
+        if "unit" in spec:
+            result["unit"] = spec["unit"]
+        result["answerable"] = True
+        result["supported_by_sources"] = present
+        return result
+
+    if kind == "absolute_difference":
+        if not set(spec["source_ids"]) <= active_sources:
+            return {"answerable": False, "value": None, "supported_by_sources": sorted(set(spec["source_ids"]) & active_sources)}
+        value = abs(Decimal(values[spec["left_fact"]]) - Decimal(values[spec["right_fact"]]))
+        result = {"answerable": True, "value": format(value, "f"), "supported_by_sources": sorted(spec["source_ids"])}
+        if "unit" in spec:
+            result["unit"] = spec["unit"]
+        return result
+
+    if kind == "ratio":
+        if not set(spec["source_ids"]) <= active_sources:
+            return {"answerable": False, "value": None, "supported_by_sources": sorted(set(spec["source_ids"]) & active_sources)}
+        denominator = Decimal(values[spec["denominator_fact"]])
+        require(denominator != 0, "ratio denominator unexpectedly zero")
+        quantum = Decimal(1).scaleb(-int(spec["decimals"]))
+        value = (Decimal(values[spec["numerator_fact"]]) / denominator).quantize(quantum, rounding=ROUND_HALF_UP)
+        return {"answerable": True, "value": format(value, "f"), "supported_by_sources": sorted(spec["source_ids"])}
+
+    if kind == "fact_map":
+        mapping = spec["fact_source_map"]
+        entries = {
+            fact_id: values[fact_id]
+            for fact_id, source_id in mapping.items()
+            if source_id in active_sources
+        }
+        return {
+            "answerable": bool(entries),
+            "complete": len(entries) == len(mapping),
+            "values_by_fact": entries,
+            "supported_by_sources": sorted({mapping[fact_id] for fact_id in entries}),
+        }
+    raise ValueError(f"unsupported answer-oracle kind: {kind}")
+
+
+def source_citation_contract(template: dict[str, Any], active_sources: set[str]) -> dict[str, Any]:
+    citation = template["citation_contract"]
+    return {
+        "allowed_citation_source_ids": sorted(set(citation["support_source_ids"]) & active_sources),
+        "forbidden_decoy_source_ids": sorted(set(citation["decoy_source_ids"]) & active_sources),
+        "must_not_cite_decoy": bool(citation["must_not_cite_decoy"]),
+    }
+
+
 def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     template_id = template["id"]
     facts = template["facts"]
     baseline_values = {fact["id"]: derive_value(seed, template_id, fact, "baseline") for fact in facts}
-    counter_values = dict(baseline_values)
     selected = next((fact for fact in facts if fact.get("intervene", True)), facts[0])
-    counter_values[selected["id"]] = distinct_value(seed, template_id, selected, baseline_values[selected["id"]])
     fact_kinds = {fact["id"]: fact["kind"] for fact in facts}
+
+    # Require the intervention to change the answer oracle, not merely an input field.
+    baseline_answer = answer_oracle(template["answer_spec"], baseline_values, {s["source_id"] for s in template["source"]["sources"]})
+    counter_values = dict(baseline_values)
+    changed_answer = False
+    for attempt in range(256):
+        counter_values[selected["id"]] = derive_value(seed, template_id, selected, f"counterfactual-{attempt}")
+        candidate_answer = answer_oracle(template["answer_spec"], counter_values, {s["source_id"] for s in template["source"]["sources"]})
+        if candidate_answer != baseline_answer:
+            changed_answer = True
+            break
+    require(changed_answer, f"{template_id}: could not produce an answer-changing counterfactual intervention")
+
     placebo_fact = dict(template["placebo"], id=template["placebo"].get("id", "P"))
     placebo_base = derive_value(seed, template_id, placebo_fact, "placebo-baseline")
-    placebo_counterfactual = distinct_value(seed, template_id, placebo_fact, placebo_base)
+    placebo_counterfactual = derive_value(seed, template_id, placebo_fact, "placebo-counterfactual")
 
     candidate_rows: list[dict[str, Any]] = []
     audit_rows: list[dict[str, Any]] = []
@@ -154,8 +217,11 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
             remove_id = template.get("source_removal", {}).get("remove_source_id", sources[0]["source_id"])
             removed_source = remove_id
             sources = [source for source in sources if source["source_id"] != remove_id]
+        active_ids = {source["source_id"] for source in sources}
         source_hashes = {source["source_id"]: source_digest(source) for source in sources}
         bundle_hash = bundle_digest(sources)
+        answer_values = answer_oracle(template["answer_spec"], values, active_ids)
+        citation_contract = source_citation_contract(template, active_ids)
         opaque_id = hmac.new(seed, f"{template_id}|{condition}|trial".encode(), hashlib.sha256).hexdigest()[:24]
         candidate_rows.append({
             "task_id": opaque_id,
@@ -164,7 +230,7 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
             "candidate_output_contract": ["answer", "citations", "abstention_state", "source_conflict_state"],
         })
         if condition == "counterfactual":
-            behavior = "TRACKS_COUNTERFACTUAL" if template["expected"] != "SOURCE_CONFLICT_REPRESENTED" else template["expected"]
+            behavior = "TRACKS_COUNTERFACTUAL" if template["expected"] != "SOURCE_CONFLICT_REPRESENTED_AND_TRACKS_CHANGED_SOURCE" else template["expected"]
         elif condition == "placebo":
             behavior = "PLACEBO_STABLE"
         elif condition == "source_removed":
@@ -179,6 +245,8 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
             "baseline_values": baseline_values,
             "counterfactual_values": counter_values,
             "expanded_values": values,
+            "expected_answer": answer_values,
+            "citation_contract": citation_contract,
             "placebo_baseline": placebo_base,
             "placebo_variant": placebo_value,
             "removed_source_id": removed_source,
