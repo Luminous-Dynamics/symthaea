@@ -71,6 +71,59 @@ pub struct ReplayArchiveReceipt {
     pub replay_archive_blake3: String,
 }
 
+/// The only observation artifact a candidate should receive for one replay decision.
+/// This type is constructed by the trusted replay driver from a custodian-only archive.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DecisionObservationPrefix {
+    pub schema_version: u16,
+    pub world_id: String,
+    pub observation_policy_id: String,
+    pub decision_tick: u64,
+    pub observations: Vec<EvolutionaryRescueObservation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EncodedDecisionPrefix {
+    pub prefix_json: Vec<u8>,
+    pub prefix_blake3: String,
+}
+
+/// Construct a time-bounded candidate input. The full replay archive must remain outside the
+/// candidate process; only this prefix is eligible for delivery at the declared decision tick.
+pub fn build_decision_prefix(
+    archive: &ReplayObservationArchive,
+    decision_tick: u64,
+) -> Result<EncodedDecisionPrefix, String> {
+    if archive.schema_version != CAPSULE_SCHEMA_VERSION {
+        return Err("unsupported replay archive schema version".into());
+    }
+    if archive.observations.is_empty() {
+        return Err("replay archive has no observations".into());
+    }
+    for (index, observation) in archive.observations.iter().enumerate() {
+        if observation.tick != index as u64 {
+            return Err(format!("replay archive tick discontinuity at index {index}"));
+        }
+    }
+    let cutoff = usize::try_from(decision_tick)
+        .map_err(|_| "decision tick does not fit platform index".to_owned())?;
+    if cutoff >= archive.observations.len() {
+        return Err("decision tick is beyond the replay archive".into());
+    }
+
+    let prefix = DecisionObservationPrefix {
+        schema_version: CAPSULE_SCHEMA_VERSION,
+        world_id: archive.world_id.clone(),
+        observation_policy_id: archive.observation_policy_id.clone(),
+        decision_tick,
+        observations: archive.observations[..=cutoff].to_vec(),
+    };
+    let prefix_json = serde_json::to_vec(&prefix)
+        .map_err(|e| format!("serialize decision observation prefix: {e}"))?;
+    let prefix_blake3 = blake3::hash(&prefix_json).to_hex().to_string();
+    Ok(EncodedDecisionPrefix { prefix_json, prefix_blake3 })
+}
+
 /// Evaluator-only material. Never pass this struct or its serialized bytes to candidate code.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EvaluatorOutcomeCapsule {
@@ -366,6 +419,33 @@ mod tests {
         let parsed_manifest: WorldCustodyManifest = serde_json::from_str(&manifest).unwrap();
         assert_eq!(parsed_manifest.seed, 11);
         assert_eq!(parsed_manifest.split, WorldSplit::HeldOut);
+    }
+
+    #[test]
+    fn decision_prefix_contains_no_future_observations() {
+        let encoded = encode_world(
+            &world(), "d5a4dfc1-7e8c-4a9b-8e57-2bd995c5ce21",
+            WorldSplit::Training, ObservationView::Census,
+            "0123456789abcdef0123456789abcdef01234567",
+        ).unwrap();
+        let archive: ReplayObservationArchive = serde_json::from_slice(&encoded.replay_archive_json).unwrap();
+        let prefix = build_decision_prefix(&archive, 0).unwrap();
+        let parsed: DecisionObservationPrefix = serde_json::from_slice(&prefix.prefix_json).unwrap();
+        assert_eq!(parsed.decision_tick, 0);
+        assert_eq!(parsed.observations.len(), 1);
+        assert_eq!(parsed.observations[0].tick, 0);
+        assert!(prefix.prefix_blake3.len() == 64);
+    }
+
+    #[test]
+    fn rejects_decision_tick_beyond_available_history() {
+        let encoded = encode_world(
+            &world(), "opaque",
+            WorldSplit::Training, ObservationView::Census,
+            "0123456789abcdef0123456789abcdef01234567",
+        ).unwrap();
+        let archive: ReplayObservationArchive = serde_json::from_slice(&encoded.replay_archive_json).unwrap();
+        assert!(build_decision_prefix(&archive, 2).unwrap_err().contains("beyond"));
     }
 
     #[test]
