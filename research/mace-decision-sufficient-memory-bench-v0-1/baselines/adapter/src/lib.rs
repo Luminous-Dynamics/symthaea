@@ -8,8 +8,8 @@ mod bm25;
 
 pub use bm25::{
     AuthorityTierV1, Bm25ConfigV1, Bm25IndexV1, Bm25ResultV1, EventRelationV1, FusedHitV1,
-    LineageAuditReportV1, LineageEdgeStatusV1, RankedChannelV1, RetrievalHitV1,
-    RetrievalQueryV1, RetrievalWorkV1, SourceDocumentV1, weighted_rrf_v1,
+    LineageAuditReportV1, LineageEdgeStatusV1, RankedChannelV1, RetrievalHitV1, RetrievalQueryV1,
+    RetrievalWorkV1, SourceDocumentV1, weighted_rrf_v1,
 };
 
 use serde::{Deserialize, Deserializer};
