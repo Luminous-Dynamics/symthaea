@@ -65,7 +65,19 @@ pub enum DelayedAciReasonV1 {
     AlphaStateMismatch,
     DuplicateLabelRevision,
     DeliveryOrderRegression,
+    FixedDelayScheduleMismatch,
+    FeedbackPhaseOrderMismatch,
+    PriorPhaseFeedbackMissing,
     PendingPredictionMissing,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DelayedAciFeedbackModeV1 {
+    /// Exact fixed-delay recursion split into independent modulo-tau phases.
+    FixedDelayPhased { delay_steps: u64 },
+    /// Variable-delay adaptive heuristic; no fixed-delay theorem is claimed.
+    ArrivalOrder,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -77,6 +89,7 @@ pub struct DelayedAciPolicyV1 {
     pub target_miscoverage: f64,
     /// ACI adaptation step size gamma.
     pub learning_rate: f64,
+    pub feedback_mode: DelayedAciFeedbackModeV1,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -92,6 +105,7 @@ pub struct DelayedAciPredictionInputV1 {
     pub calibration_model_sha256: String,
     /// Alpha state that the external interval builder used.
     pub alpha_state_used: f64,
+    pub feedback_phase: Option<u64>,
     pub point_prediction: f64,
     pub interval_lower: f64,
     pub interval_upper: f64,
@@ -112,6 +126,7 @@ pub struct DelayedAciPredictionReceiptV1 {
     pub global_model_artifact_sha256: String,
     pub calibration_model_sha256: String,
     pub alpha_state_used: f64,
+    pub feedback_phase: Option<u64>,
     pub point_prediction: f64,
     pub interval_lower: f64,
     pub interval_upper: f64,
@@ -131,6 +146,8 @@ pub struct DelayedAciLabelDeliveryV1 {
     pub label_available_at_unix_seconds: i64,
     pub eligibility_report_available_at_unix_seconds: i64,
     pub delivered_at_unix_seconds: i64,
+    /// Zero-based stream round at which this label delivery is processed.
+    pub delivery_round_sequence: u64,
     pub clock_domain_id: String,
     pub idempotency_key: String,
     pub eligibility_report: LabelConsumptionEligibilityReportV1,
@@ -146,6 +163,12 @@ pub struct DelayedAciEngineV1 {
     pub policy: DelayedAciPolicyV1,
     pub current_alpha: f64,
     pub prediction_sequence: u64,
+    /// Used only by ArrivalOrder mode.
+    pub current_alpha: f64,
+    /// One ACI state per sequence phase when fixed-delay mode is active.
+    pub phase_alpha_states: Vec<f64>,
+    /// Next prediction sequence whose feedback is required for each phase.
+    pub next_feedback_sequence_by_phase: Vec<u64>,
     pub accepted_feedback_count: u64,
     pub last_delivery_time_unix_seconds: Option<i64>,
     pub pending_predictions: BTreeMap<String, DelayedAciPredictionReceiptV1>,
@@ -238,11 +261,17 @@ fn validate_policy(policy: &DelayedAciPolicyV1) -> Result<(), DelayedAciErrorV1>
         return Err(DelayedAciErrorV1("delayed ACI policy schema is unsupported".into()));
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
+    let invalid_mode = matches!(
+        policy.feedback_mode,
+        DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps: 0 }
+            | DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps: 4097..=u64::MAX }
+    );
     if policy.revision == 0
         || !policy.target_miscoverage.is_finite()
         || !(0.0..1.0).contains(&policy.target_miscoverage)
         || !policy.learning_rate.is_finite()
         || policy.learning_rate <= 0.0
+        || invalid_mode
     {
         return Err(DelayedAciErrorV1("delayed ACI policy parameters are invalid".into()));
     }
@@ -252,6 +281,8 @@ fn validate_policy(policy: &DelayedAciPolicyV1) -> Result<(), DelayedAciErrorV1>
 fn alpha_state_digest(engine: &DelayedAciEngineV1) -> Result<String, DelayedAciErrorV1> {
     json_sha256(&(
         engine.current_alpha,
+        engine.phase_alpha_states.clone(),
+        engine.next_feedback_sequence_by_phase.clone(),
         engine.accepted_feedback_count,
         engine.policy.clone(),
     ))
@@ -269,8 +300,33 @@ fn validate_engine(engine: &DelayedAciEngineV1) -> Result<(), DelayedAciErrorV1>
         return Err(DelayedAciErrorV1("model/calibration digest is malformed".into()));
     }
     validate_policy(&engine.policy)?;
-    if !engine.current_alpha.is_finite() || !(0.0..=1.0).contains(&engine.current_alpha) {
-        return Err(DelayedAciErrorV1("current alpha is outside [0,1]".into()));
+    if !engine.current_alpha.is_finite() || !(0.0..=1.0).contains(&engine.current_alpha)
+        || engine
+            .phase_alpha_states
+            .iter()
+            .any(|alpha| !alpha.is_finite() || !(0.0..=1.0).contains(alpha))
+    {
+        return Err(DelayedAciErrorV1("current/phase alpha is outside [0,1]".into()));
+    }
+    match engine.policy.feedback_mode {
+        DelayedAciFeedbackModeV1::ArrivalOrder => {
+            if !engine.phase_alpha_states.is_empty()
+                || !engine.next_feedback_sequence_by_phase.is_empty()
+            {
+                return Err(DelayedAciErrorV1(
+                    "arrival-order mode must not carry fixed-delay phases".into(),
+                ));
+            }
+        }
+        DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps } => {
+            if engine.phase_alpha_states.len() != delay_steps as usize
+                || engine.next_feedback_sequence_by_phase.len() != delay_steps as usize
+            {
+                return Err(DelayedAciErrorV1(
+                    "fixed-delay phase state dimensions do not match delay".into(),
+                ));
+            }
+        }
     }
     Ok(())
 }
@@ -295,6 +351,13 @@ pub fn create_delayed_aci_engine_v1(
     if !initial_alpha.is_finite() || !(0.0..=1.0).contains(&initial_alpha) {
         return Err(DelayedAciErrorV1("initial alpha must be in [0,1]".into()));
     }
+    let (phase_alpha_states, next_feedback_sequence_by_phase) = match policy.feedback_mode {
+        DelayedAciFeedbackModeV1::ArrivalOrder => (Vec::new(), Vec::new()),
+        DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps } => (
+            vec![initial_alpha; delay_steps as usize],
+            (0..delay_steps).collect(),
+        ),
+    };
     Ok(DelayedAciEngineV1 {
         schema: DELAYED_ACI_SCHEMA_V1.into(),
         engine_id: engine_id.into(),
@@ -303,6 +366,8 @@ pub fn create_delayed_aci_engine_v1(
         calibration_model_sha256: calibration_model_sha256.into(),
         policy,
         current_alpha: initial_alpha,
+        phase_alpha_states,
+        next_feedback_sequence_by_phase,
         prediction_sequence: 0,
         accepted_feedback_count: 0,
         last_delivery_time_unix_seconds: None,
@@ -316,7 +381,13 @@ pub fn current_delayed_aci_alpha_v1(
     engine: &DelayedAciEngineV1,
 ) -> Result<f64, DelayedAciErrorV1> {
     validate_engine(engine)?;
-    Ok(engine.current_alpha)
+    match engine.policy.feedback_mode {
+        DelayedAciFeedbackModeV1::ArrivalOrder => Ok(engine.current_alpha),
+        DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps } => {
+            let phase = (engine.prediction_sequence % delay_steps) as usize;
+            Ok(engine.phase_alpha_states[phase])
+        }
+    }
 }
 
 /// Freezes the interval and alpha used by the predictor. This is intentionally
@@ -344,8 +415,23 @@ pub fn register_delayed_aci_prediction_v1(
     {
         return Err(DelayedAciErrorV1("prediction chronology is invalid".into()));
     }
+    let (expected_alpha, feedback_phase) = match engine.policy.feedback_mode {
+        DelayedAciFeedbackModeV1::ArrivalOrder => (engine.current_alpha, None),
+        DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps } => {
+            let phase = engine.prediction_sequence % delay_steps;
+            if engine.prediction_sequence >= delay_steps
+                && engine.next_feedback_sequence_by_phase[phase as usize]
+                    != engine.prediction_sequence
+            {
+                return Err(DelayedAciErrorV1(
+                    "prior fixed-delay phase feedback has not been qualified and consumed".into(),
+                ));
+            }
+            (engine.phase_alpha_states[phase as usize], Some(phase))
+        }
+    };
     if !input.alpha_state_used.is_finite()
-        || input.alpha_state_used != engine.current_alpha
+        || input.alpha_state_used != expected_alpha
         || !input.point_prediction.is_finite()
         || !input.interval_lower.is_finite()
         || !input.interval_upper.is_finite()
@@ -379,6 +465,7 @@ pub fn register_delayed_aci_prediction_v1(
         global_model_artifact_sha256: input.global_model_artifact_sha256.clone(),
         calibration_model_sha256: input.calibration_model_sha256.clone(),
         alpha_state_used: input.alpha_state_used,
+        feedback_phase,
         point_prediction: input.point_prediction,
         interval_lower: input.interval_lower,
         interval_upper: input.interval_upper,
@@ -437,10 +524,10 @@ fn build_update_receipt(
 }
 
 /// Accepts one delivered physical label in monotonic arrival-time order.
-/// For a constant delay and in-order feedback this implements the delayed ACI
-/// recursion alpha_{t+tau} = alpha_t + gamma(target_alpha - miss_t).
-/// With variable delay it is an arrival-order adaptive heuristic; the
-/// fixed-delay interleaving theorem is not claimed.
+/// In FixedDelayPhased mode, this implements the delayed ACI recursion
+/// alpha_{t+tau} = alpha_t + gamma(target_alpha - miss_t) using tau independent
+/// phase states. In ArrivalOrder mode it is a variable-delay adaptive heuristic;
+/// the fixed-delay interleaving theorem is not claimed.
 pub fn deliver_delayed_aci_feedback_v1(
     engine: &mut DelayedAciEngineV1,
     delivery: &DelayedAciLabelDeliveryV1,
@@ -576,6 +663,24 @@ pub fn deliver_delayed_aci_feedback_v1(
     {
         reasons.push(DelayedAciReasonV1::DeliveryOrderRegression);
     }
+    if let Some(prediction) = prediction {
+        if let DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps } =
+            engine.policy.feedback_mode
+        {
+            let expected_delivery_round = prediction
+                .sequence
+                .checked_add(delay_steps)
+                .ok_or_else(|| DelayedAciErrorV1("fixed-delay sequence overflow".into()))?;
+            if delivery.delivery_round_sequence != expected_delivery_round {
+                reasons.push(DelayedAciReasonV1::FixedDelayScheduleMismatch);
+            }
+            if let Some(phase) = prediction.feedback_phase {
+                if engine.next_feedback_sequence_by_phase[phase as usize] != prediction.sequence {
+                    reasons.push(DelayedAciReasonV1::FeedbackPhaseOrderMismatch);
+                }
+            }
+        }
+    }
 
     reasons.sort();
     reasons.dedup();
@@ -628,8 +733,9 @@ pub fn deliver_delayed_aci_feedback_v1(
     let miss = delivery.label_value < prediction_receipt.interval_lower
         || delivery.label_value > prediction_receipt.interval_upper;
     let direction = engine.policy.target_miscoverage - f64::from(miss);
+    let alpha_base = prediction_receipt.alpha_state_used;
     let candidate_alpha =
-        (engine.current_alpha + engine.policy.learning_rate * direction).clamp(0.0, 1.0);
+        (alpha_base + engine.policy.learning_rate * direction).clamp(0.0, 1.0);
     if !candidate_alpha.is_finite() {
         return Err(DelayedAciErrorV1("candidate alpha is non-finite".into()));
     }
@@ -653,7 +759,21 @@ pub fn deliver_delayed_aci_feedback_v1(
         Some(next_count),
     )?;
 
-    engine.current_alpha = candidate_alpha;
+    match engine.policy.feedback_mode {
+        DelayedAciFeedbackModeV1::ArrivalOrder => {
+            engine.current_alpha = candidate_alpha;
+        }
+        DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps } => {
+            let phase = prediction_receipt
+                .feedback_phase
+                .expect("fixed-delay prediction has a phase") as usize;
+            engine.phase_alpha_states[phase] = candidate_alpha;
+            engine.next_feedback_sequence_by_phase[phase] = prediction_receipt
+                .sequence
+                .checked_add(delay_steps)
+                .ok_or_else(|| DelayedAciErrorV1("next feedback sequence overflow".into()))?;
+        }
+    }
     engine.accepted_feedback_count = next_count;
     engine.last_delivery_time_unix_seconds = Some(delivery.delivered_at_unix_seconds);
     engine.accepted_label_revisions.insert(format!(
