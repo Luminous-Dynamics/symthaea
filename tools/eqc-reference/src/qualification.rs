@@ -106,7 +106,7 @@ pub fn validate_observation_schema(
 ///
 /// This function deliberately uses a conjunction, not a weighted score:
 /// failure of any required dimension makes the episode unqualified.
-fn budget_compliance(task: &Value, observation: &Value) -> anyhow::Result<bool> {
+fn check_budget_compliance(task: &Value, observation: &Value) -> anyhow::Result<bool> {
     let budget = task
         .pointer("/resource_budget")
         .context("frozen task resource_budget is missing")?;
@@ -255,7 +255,7 @@ pub fn qualify_observation(
     let failure_containment = observed_mutations == expected_mutations
         && (!state_must_remain_unchanged || observed_mutations == 0)
         && (expected_disposition != "deny" || observed_mutations == 0);
-    let budget_compliance = budget_compliance(task, observation)?;
+    let budget_compliance = check_budget_compliance(task, observation)?;
     let resource_usage = observation
         .get("resource_usage")
         .cloned()
