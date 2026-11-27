@@ -17,12 +17,13 @@ var now=time.Date(2026,11,27,12,0,0,0,time.UTC)
 
 func raw(v any)json.RawMessage{b,_:=json.Marshal(v);return b}
 func goodRestore()map[string]string{m:=map[string]string{};for _,k:=range restoreKeys{m[k]="passed"};return m}
+func refreshRecordDigests(in *Input){in.SourceEventsSHA256=sourceEventsDigest(in.SourceEvents);in.ObservedEventsSHA256=observedEventsDigest(in.ObservedEvents);in.TransactionProofsSHA256=transactionProofsDigest(in.Transactions);in.TopicPartitionsSHA256=topicPartitionsDigest(in.TopicPartitions);in.RequiredSurfaceIDsSHA256=surfaceIDsDigest(in.RequiredSurfaceIDs);in.SurfaceAssertionsSHA256=surfaceAssertionsDigest(in.Surfaces)}
 func fixture()Input{
  events:=[]Event{
   {EventID:"row-1",TransactionID:"tx-1",Topic:"ledger",DataCollection:"public.ledger",Operation:"INSERT",PayloadSHA256:da,TotalOrder:1,CollectionOrder:1,Partition:0,Offset:10},
   {EventID:"message-1",TransactionID:"tx-1",Topic:"message",DataCollection:"LOGICAL_DECODING_MESSAGE",Operation:"MESSAGE",PayloadSHA256:db,TotalOrder:2,CollectionOrder:1,Partition:0,Offset:7},
  }
- return Input{
+ in := Input{
   Profile:Profile,Version:Version,TrialID:"trial-001",ScenarioID:"MON037-P001",Mode:OfflineFixture,EvaluatedAt:now,
   RequiredClaimIDs:[]string{"claim-cdc","claim-backup"},
   SourceTruthComplete:true,SourceTruthManifestSHA256:fixtureDigest("MON037 synthetic SQL source-truth manifest v1\n"),
@@ -53,6 +54,8 @@ func fixture()Input{
    ProofGraphResult:raw(map[string]any{"verdict":"indeterminate","may_enable_traffic":false}),
   },
  }
+ refreshRecordDigests(&in)
+ return in
 }
 func expect(t *testing.T,in Input,want Verdict){t.Helper();got:=Evaluate(in);if got.ComponentVerdict!=want{t.Fatalf("want %s, got %+v",want,got)}}
 
@@ -60,7 +63,7 @@ func TestCleanFixturePassesComponentModelButNotProduction(t *testing.T){
  got:=Evaluate(fixture())
  if got.ComponentVerdict!=Qualified||got.CampaignVerdict!=Indeterminate||got.TrafficActivationPermitted{t.Fatalf("offline fixture must remain production-indeterminate: %+v",got)}
 }
-func TestMissingAcknowledgedEventBlocks(t *testing.T){in:=fixture();in.ObservedEvents=in.ObservedEvents[:1];expect(t,in,Blocked)}
+func TestMissingAcknowledgedEventBlocks(t *testing.T){in:=fixture();in.ObservedEvents=in.ObservedEvents[:1];refreshRecordDigests(&in);expect(t,in,Blocked)}
 func TestUnexpectedEventBlocks(t *testing.T){in:=fixture();e:=in.ObservedEvents[0];e.EventID="extra";e.PayloadSHA256=dc;e.Offset=11;e.TotalOrder=3;e.CollectionOrder=2;in.ObservedEvents=append(in.ObservedEvents,e);expect(t,in,Blocked)}
 func TestConflictingDuplicateIdentityBlocks(t *testing.T){in:=fixture();e:=in.ObservedEvents[0];e.PayloadSHA256=dc;e.Offset=11;in.ObservedEvents=append(in.ObservedEvents,e);expect(t,in,Blocked)}
 func TestExactReplayRequiresDeduplicationProof(t *testing.T){
@@ -70,9 +73,9 @@ func TestExactReplayRequiresDeduplicationProof(t *testing.T){
  got:=Evaluate(in);if got.Reconciliation.DuplicateReplays!=1{t.Fatalf("duplicate replay count lost: %+v",got.Reconciliation)}
 }
 func TestPayloadMismatchBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].PayloadSHA256=dc;expect(t,in,Blocked)}
-func TestTransactionEndCountMismatchBlocks(t *testing.T){in:=fixture();in.Transactions[0].EndEventCount=1;expect(t,in,Blocked)}
-func TestTransactionDataCollectionsMismatchBlocks(t *testing.T){in:=fixture();in.Transactions[0].DataCollections["message"]=2;expect(t,in,Blocked)}
-func TestPerTopicPartitionViolationBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].Partition=1;expect(t,in,Blocked)}
+func TestTransactionEndCountMismatchBlocks(t *testing.T){in:=fixture();in.Transactions[0].EndEventCount=1;refreshRecordDigests(&in);expect(t,in,Blocked)}
+func TestTransactionDataCollectionsMismatchBlocks(t *testing.T){in:=fixture();in.Transactions[0].DataCollections["LOGICAL_DECODING_MESSAGE"]=2;refreshRecordDigests(&in);expect(t,in,Blocked)}
+func TestPerTopicPartitionViolationBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].Partition=1;refreshRecordDigests(&in);expect(t,in,Blocked)}
 func TestMultiplePartitionsAreIndeterminate(t *testing.T){in:=fixture();in.TopicPartitions[0].PartitionCount=2;expect(t,in,Indeterminate)}
 func TestTimelineBlockedPropagates(t *testing.T){in:=fixture();in.Components.TimelineResult=raw(map[string]any{"profile":"mon034-postgres-timeline-ancestry-result-v1","version":"1.0.0","result":map[string]any{"verdict":"blocked"}});expect(t,in,Blocked)}
 func TestObserverSharedDomainBlocks(t *testing.T){
@@ -107,7 +110,7 @@ func TestOffsetPredicateMismatchBlocks(t *testing.T){
  p.Offset.LSN="0/10";p.Offset.LSNProc="0/F";p.Offset.LSNCommit="0/10";p.Offset.MessageType="MESSAGE";p.Offset.EventsProcessed=1
  in.Components.OffsetProof=raw(p);expect(t,in,Blocked)
 }
-func TestSurfaceDigestMismatchBlocks(t *testing.T){in:=fixture();in.Surfaces[0].RestoredSHA256=dc;expect(t,in,Blocked)}
+func TestSurfaceDigestMismatchBlocks(t *testing.T){in:=fixture();in.Surfaces[0].RestoredSHA256=dc;refreshRecordDigests(&in);expect(t,in,Blocked)}
 func TestFullStateExclusionBlocks(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");expect(t,in,Blocked)}
 func TestRowStreamAllowsExplicitExclusion(t *testing.T){in:=fixture();in.SurfaceScope="row_stream";in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded",ExclusionManifestSHA256:fixtureDigest("MON037 synthetic generated-surface exclusion manifest v1\n")});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");expect(t,in,Qualified)}
 func TestUnknownSurfaceIsIndeterminate(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"unknown",Disposition:"unknown"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"unknown");expect(t,in,Indeterminate)}
@@ -161,6 +164,7 @@ func TestIncompleteSourceTruthAndTopicCaptureAreIndeterminate(t *testing.T) {
 func TestMissingRequiredSurfaceIsIndeterminate(t *testing.T) {
 	in := fixture()
 	in.Surfaces = in.Surfaces[:2]
+	refreshRecordDigests(&in)
 	got := Evaluate(in)
 	if got.ComponentVerdict != Indeterminate {
 		t.Fatalf("omitted required surface must remain indeterminate: %+v", got)
@@ -170,9 +174,10 @@ func TestMissingRequiredSurfaceIsIndeterminate(t *testing.T) {
 func TestRowStreamExclusionRequiresManifest(t *testing.T) {
 	in := fixture()
 	in.SurfaceScope = "row_stream"
-	in.Surfaces = append(in.Surfaces, Surface{ID:"generated", Disposition:"excluded"})
+	in.Surfaces = append(in.Surfaces, Surface{ID:"generated", Disposition:"excluded", ExclusionManifestSHA256:fixtureDigest("MON037 synthetic generated-surface exclusion manifest v1\\n")})
 	in.RequiredSurfaceIDs = append(in.RequiredSurfaceIDs, "generated")
-	expect(t, in, Indeterminate)
+	refreshRecordDigests(&in)
+	expect(t, in, Qualified)
 }
 
 
@@ -197,6 +202,7 @@ func TestCollectionOrderMayResetAcrossTransactions(t *testing.T) {
 		EndObserved: true, EndEventCount: 2,
 		DataCollections: map[string]int{"public.ledger": 1, "LOGICAL_DECODING_MESSAGE": 1},
 	})
+	refreshRecordDigests(&in)
 	expect(t, in, Qualified)
 }
 
@@ -212,5 +218,6 @@ func TestRowCollectionOrderGapWithinTransactionBlocks(t *testing.T) {
 	in.Transactions[0].ExpectedEventCount = 3
 	in.Transactions[0].EndEventCount = 3
 	in.Transactions[0].DataCollections["public.ledger"] = 2
+	refreshRecordDigests(&in)
 	expect(t, in, Blocked)
 }
