@@ -328,6 +328,12 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
     if task.authority_snapshot.snapshot_id.is_empty() {
         bail!("{}: authority snapshot id is missing", task.task_id);
     }
+    if !matches!(
+        task.authority_snapshot.status.as_str(),
+        "active" | "revoked" | "expired" | "missing" | "unverifiable"
+    ) {
+        bail!("{}: unsupported authority status", task.task_id);
+    }
     if task.resource_budget.timeout_seconds == 0
         || task.resource_budget.max_tool_calls == 0
         || task.resource_budget.network_policy != "none"
@@ -368,6 +374,46 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
     {
         bail!("{}: reason_code cannot be empty when present", task.task_id);
     }
+    let allowed_controls = [
+        "wrong_subject",
+        "wrong_tenant",
+        "revoked_authority",
+        "expired_authority",
+        "missing_authority",
+        "replayed_challenge",
+        "duplicate_delivery",
+        "stale_input",
+        "tampered_input",
+        "tool_injection",
+        "environment_tampering",
+        "partial_commit",
+    ];
+    let mut control_ids = HashSet::new();
+    for control in &task.negative_controls {
+        if !allowed_controls.contains(&control.as_str()) || !control_ids.insert(control.as_str()) {
+            bail!("{}: unknown or duplicate negative control '{}'", task.task_id, control);
+        }
+    }
+    let mut provenance_ids = HashSet::new();
+    for item in &task.required_provenance {
+        if ![
+            "task_digest",
+            "input_digests",
+            "actor_identity",
+            "authority_snapshot",
+            "policy_digest",
+            "system_identity",
+            "environment_identity",
+            "action_log",
+            "result_digest",
+            "independent_verifier",
+        ]
+        .contains(&item.as_str())
+            || !provenance_ids.insert(item.as_str())
+        {
+            bail!("{}: unknown or duplicate provenance field '{}'", task.task_id, item);
+        }
+    }
     for required in REQUIRED_PROVENANCE {
         if !task.required_provenance.iter().any(|item| item == required) {
             bail!(
@@ -377,7 +423,11 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
             );
         }
     }
+    let mut input_ids = HashSet::new();
     for input in &task.input_refs {
+        if !input_ids.insert(input.input_id.as_str()) {
+            bail!("{}: duplicate input id '{}'", task.task_id, input.input_id);
+        }
         let relative_path = Path::new(&input.artifact_path);
         if input.input_id.is_empty()
             || input.artifact_path.is_empty()
@@ -506,11 +556,13 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
                 })
                 .collect::<anyhow::Result<Vec<_>>>()?;
 
+            let valid_from = json_string(&artifact, "valid_from", task, input)?;
+            let valid_until = json_string(&artifact, "valid_until", task, input)?;
             if fixture_scopes != task.authority_snapshot.scopes
-                || Some(json_string(&artifact, "valid_until", task, input)?)
-                    != task.authority_snapshot.valid_until.as_deref()
-                || json_string(&artifact, "valid_from", task, input)?
-                    > task.request.evaluated_at.as_str()
+                || Some(valid_until) != task.authority_snapshot.valid_until.as_deref()
+                || !is_canonical_utc(valid_from)
+                || valid_from > task.authority_snapshot.observed_at.as_str()
+                || valid_from > task.request.evaluated_at.as_str()
             {
                 bail!(
                     "{}: consent fixture '{}' disagrees with scopes or temporal bounds",
@@ -523,7 +575,11 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
                 "active" if artifact.get("revoked_at").is_none() => {}
                 "revoked" => {
                     let revoked_at = json_string(&artifact, "revoked_at", task, input)?;
-                    if !is_canonical_utc(revoked_at) || revoked_at > task.request.evaluated_at {
+                    let valid_from = json_string(&artifact, "valid_from", task, input)?;
+                    if !is_canonical_utc(revoked_at)
+                        || revoked_at < valid_from
+                        || revoked_at > task.request.evaluated_at
+                    {
                         bail!(
                             "{}: revoked consent fixture '{}' has invalid revocation time",
                             task.task_id,
@@ -806,6 +862,39 @@ mod tests {
             .find(|task| task.task_id == "eqc-trust-replayed-challenge-deny-001")
             .unwrap();
         task.request.challenge_state = Some("unused".into());
+        assert!(validate_task(&task, &repository_root()).is_err());
+    }
+
+    #[test]
+    fn impossible_calendar_dates_are_rejected() {
+        assert!(!is_canonical_utc("2026-02-30T00:00:00Z"));
+        assert!(!is_canonical_utc("2026-02-29T00:00:00Z"));
+        assert!(is_canonical_utc("2024-02-29T00:00:00Z"));
+        assert!(!is_canonical_utc("2026-12-01T23:59:60Z"));
+    }
+
+    #[test]
+    fn duplicate_input_ids_are_rejected() {
+        let mut task = seed_corpus().tasks.remove(0);
+        task.input_refs.push(task.input_refs[0].clone());
+        assert!(validate_task(&task, &repository_root()).is_err());
+    }
+
+    #[test]
+    fn unknown_negative_controls_are_rejected() {
+        let mut task = seed_corpus().tasks.remove(0);
+        task.negative_controls.push("always_allow".into());
+        assert!(validate_task(&task, &repository_root()).is_err());
+    }
+
+    #[test]
+    fn fixture_cannot_become_valid_after_the_authority_snapshot() {
+        let mut task = seed_corpus().tasks.remove(0);
+        let active_fixture = task.input_refs[0].artifact_path.clone();
+        assert!(active_fixture.ends_with("consent-active-001.json"));
+        // The checked-in fixture's valid_from is 2026-11-25T00:00:00Z.
+        // Move the authority observation before that instant.
+        task.authority_snapshot.observed_at = "2026-11-24T23:00:00Z".into();
         assert!(validate_task(&task, &repository_root()).is_err());
     }
 
