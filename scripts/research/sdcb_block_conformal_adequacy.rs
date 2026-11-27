@@ -324,8 +324,8 @@ mod tests {
         assert_eq!(minimum_calibration_units(0.05).unwrap(), 19);
         let short_fold = CalibrationFold {
             epoch_id: "short".into(),
-            model_set_digest: MODEL_SET_DIGEST.into()
-            scoring_protocol_digest: SCORING_PROTOCOL_DIGEST.into()
+            model_set_digest: MODEL_SET_DIGEST.into(),
+            scoring_protocol_digest: SCORING_PROTOCOL_DIGEST.into(),
             blocks: (0..4).map(|i| CalibrationBlock {
                 unit_id: format!("u{i}"),
                 max_nonconformity_score: i as f64,
