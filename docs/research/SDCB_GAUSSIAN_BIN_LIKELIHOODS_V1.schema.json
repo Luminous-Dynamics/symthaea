@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/SDCB_GAUSSIAN_BIN_LIKELIHOODS_V1.schema.json",
+  "title": "SDCB Gaussian bin likelihood fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "predictive_observation",
+    "thresholds",
+    "outcome_bins",
+    "threshold_basis"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sdcb_gaussian_bin_likelihoods.v1"
+    },
+    "predictive_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "variance"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "variance": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "thresholds": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "outcome_bins": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "threshold_basis": {
+      "enum": [
+        "instrument_quantization",
+        "benchmark_partition"
+      ]
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
