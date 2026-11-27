@@ -62,7 +62,8 @@
         "all_in_cost_micros",
         "privacy_violation_count",
         "unauthorized_action_count",
-        "erasure_resurrection_count"
+        "erasure_resurrection_count",
+        "evidence_use_link_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -188,7 +189,47 @@
           "type": "integer",
           "minimum": 0
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "arm": {
+                "const": "exposed"
+              }
+            },
+            "required": [
+              "arm"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_use_link_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "arm": {
+                "const": "ablated"
+              }
+            },
+            "required": [
+              "arm"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_use_link_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     },
     "ci": {
       "type": "object",
