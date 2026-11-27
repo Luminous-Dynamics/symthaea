@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/mace-decision-sufficient-memory-bench-v0-1/schemas/candidate-run-v0.1.schema.json",
+  "title": "MACE DSM Candidate Run Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "episode_id",
+    "candidate_sha256",
+    "arm_binding_sha256",
+    "system_id",
+    "downstream_policy_digest",
+    "decision_seed",
+    "chosen_action",
+    "retrieved_evidence_ids",
+    "selected_evidence_ids",
+    "observation_requests"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_dsm_candidate_run_v0_1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "candidate_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "arm_binding_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "system_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Exact artifact_digest_sha256 from the arm's run manifest."
+    },
+    "downstream_policy_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "chosen_action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retrieved_evidence_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "selected_evidence_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "observation_requests": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pair_block_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "world_cluster_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "query_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "cost_receipt": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "latency_ns",
+        "phase_timings_ns",
+        "input_tokens",
+        "model_calls",
+        "tool_calls",
+        "external_tool_calls",
+        "index_bytes",
+        "index_bytes_kind",
+        "evidence_sidecar_bytes",
+        "evidence_sidecar_bytes_kind",
+        "unmeasured_cost_stages"
+      ],
+      "properties": {
+        "latency_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "phase_timings_ns": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "memory_selection_ns",
+            "index_build_ns",
+            "retrieval_ns",
+            "evidence_resolution_verification_ns",
+            "policy_application_ns",
+            "unattributed_coordinator_ns",
+            "total_wall_ns"
+          ],
+          "properties": {
+            "memory_selection_ns": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "index_build_ns": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "retrieval_ns": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "evidence_resolution_verification_ns": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "policy_application_ns": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "unattributed_coordinator_ns": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "total_wall_ns": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "model_calls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "external_tool_calls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "index_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "index_bytes_kind": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "evidence_sidecar_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "evidence_sidecar_bytes_kind": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "unmeasured_cost_stages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "selected_evidence_ids": {
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "retrieved_evidence_ids": {
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}
