@@ -496,6 +496,7 @@ mod tests {
             purpose_code: "research.memory_decision".into(),
             consumer_policy_sha256: digest("consumer-policy"),
             constraint_policy_sha256: digest("constraint-policy"),
+            selection_policy_sha256: digest("selection-policy"),
             require_complete_dependency_lineage: true,
             max_token_cost: 100,
             max_items: 8,
@@ -523,6 +524,7 @@ mod tests {
         EvidenceSetCandidateV1 {
             evidence_id: id,
             representation_sha256: digest(id),
+            transformation_sha256: receipt.transformation_digest.clone(),
             token_cost,
             relevance_score_micros: relevance,
             required,
@@ -721,4 +723,15 @@ mod tests {
             EvidenceSetObstructionReasonV1::DuplicateEvidenceId
         );
     }
+
+    #[test]
+    fn candidate_transformation_must_match_verified_receipt() {
+        let receipt = receipt(1);
+        let mut candidate = candidate("memory-a", &receipt, 10, 10, false);
+        candidate.transformation_sha256 = digest("different-transform");
+        let obstruction = select_evidence_set_v1(&context(), &[candidate], &[], &TestConstraintVerifier).unwrap_err();
+        assert_eq!(obstruction.reason, EvidenceSetObstructionReasonV1::InvalidCandidateDigest);
+        assert!(obstruction.verify_integrity());
+    }
+
 }
