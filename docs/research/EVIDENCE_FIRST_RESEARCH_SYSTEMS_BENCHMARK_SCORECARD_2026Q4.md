@@ -206,7 +206,29 @@ For governed-memory and security tests, require **zero** unauthorized cross-scop
 
 For every numerical target, report the test set size, independent cluster unit, confidence method, hardware, inference model/version, prompt/reader digest, data version, and missing/unsupported count. Use episode/world/source-root clusters for uncertainty; individual ticks or repeated queries from one episode are not independent samples.
 
-### 4.3 Scientific decision replay — research-policy quality
+### 4.2A Competitive target ladder (proposed acceptance gates)
+
+These targets translate the current public frontiers into explicit experiments. They are not results already achieved by Symthaea.
+
+| Track | Current public reference | First reproduction gate | Competitive / SOTA-beating gate |
+|---|---|---|---|
+| AML Textual, open methods | Resurface 61.22 overall | Match official Add/Search contract, task version, capability profile and resource disclosure | Exceed 61.22 with a paired confidence interval; target ≥65 while no capability falls >2 points |
+| AML Textual, commercial ceiling | MemoraX 69.26 | Treat as a separate commercial comparison, not a same-class baseline | Stretch target ≥70 on the same official track and division |
+| AML Multimodal, open methods | Khipu 43.26 | Reproduce official multimodal request shape, image handling and per-capability metrics | Exceed 43.26; stretch ≥48 without worsening governance |
+| AML Multimodal, commercial ceiling | MemoraX 53.68 | Separate hardware, model and cost profile | Stretch target ≥55 on same official track |
+| AML Coding, open methods | InsightMem 63.33% overall resolved | Reproduce relevant/noisy splits, exact task set and resolution rubric | Exceed 63.33%; stretch ≥68% with no noisy-memory regression |
+| AML Coding, commercial ceiling | 68.00% overall resolved | Separate division and resource disclosure | Stretch target ≥70% |
+| LongMemEval-V2 | AgentRunbook-C v2 Online: +2.823 LAFS, 75.6% accuracy, 130.5 s | Reproduce official reader, small/medium tier, web+enterprise pair, and all operating points | First require positive LAFS; SOTA gate >+2.823, with accuracy ≥75.6% at ≤130.5 s or a strictly better full frontier |
+| Native MACE decision utility | No directly equivalent public scalar | BM25, BM25+RRF, no-memory and file-based/agentic baselines under one frozen reader | Mean paired memory gain lower 95% cluster CI >0; harm-rate upper CI ≤1%; 0 cross-scope/unauthorized use; report regret, sufficiency, interaction and cost |
+| SDCB calibration assurance | Mature mvtnorm/Genz–Bretz/Miwa/TVPACK numerical references; no directly comparable dependence-envelope benchmark | Reproduce oracle error and coverage on held-out Gaussian/t5 regimes | Within declared envelope: absolute coverage error ≤1 percentage point with adequate power; outside envelope: false-qualified upper 95% bound <0.1%; detection power ≥90% for preregistered shifts |
+
+**Important comparison rules**
+- AML tracks/divisions are not pooled. Its Cycle 2 release reports 402 full tasks, 333 completed, 41 corrections and 292 valid leaderboard records; bind the result version and corrected task set.
+- LongMemEval-V2 LAFS is an accuracy-vs-query-latency frontier score, not AML's score. Report online learning, memory construction and maintenance cost in addition to official query latency.
+- MACE native utility is a different construct from retrieval recall or answer accuracy. A higher retrieval score is not a decision-value improvement.
+- SDCB numerical integration accuracy, conformal coverage, regime detection power and false qualification are four different metrics; never combine them into one “confidence” score.
+
+## 4.3 Scientific decision replay — research-policy quality
 
 Compare at least:
 1. no-memory/static baseline;
