@@ -33,6 +33,14 @@ None of this is a claim of general intelligence, sentience, or legal/medical/fin
 - **Verifiable search** — Prove search results were ranked per a stated formula, not manipulated. ([prism-zkp](papers/binius-hdc/))
 - **Cognitive-loop state-transition proof** — Prove a specific internal state transition occurred as specified, without revealing the internal state itself. This is a proof about *a computation*, not a proof about *consciousness*. ([cycle_integrity](crates/symthaea-zkproof/src/cycle_integrity.rs))
 
+## Research: Optical ISRU Material-Response Design
+
+The isolated ISRU experiment-selection benchmark reuses Symthaea's currently supported hypothesis-disagreement selector and compares it with precommitted fixed, OFAT, space-spread and seeded-random designs. It is explicitly synthetic and does not claim Bayesian EIG or physical material validation.
+
+- [ISRU material experiment-selection benchmark v0.1](docs/research/ISRU_MATERIAL_EXPERIMENT_SELECTION_BENCHMARK_V0_1.md)
+- [ISRU-MATERIAL-DOE-001 issue #12476](https://github.com/Luminous-Dynamics/symthaea/issues/12476)
+- [Symtropy source-observation register PR #5578](https://github.com/Luminous-Dynamics/symtropy/pull/5578)
+
 ## Quick Start
 
 ```bash

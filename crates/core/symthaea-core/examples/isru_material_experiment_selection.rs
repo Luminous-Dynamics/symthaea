@@ -17,10 +17,15 @@ use symthaea_core::hdc::conjecture_engine::select_most_informative_experiment;
 const FLUX_LEVELS_W_CM2: [f64; 7] = [100.0, 200.0, 300.0, 400.0, 500.0, 600.0, 700.0];
 const MORPHOLOGY_INDEXES: [f64; 3] = [0.1, 0.5, 0.9];
 const MAX_EXPERIMENTS: usize = 6;
+const MIN_CONFIRMATORY_EXPERIMENTS: usize = 2;
+const MAX_SUPPORTED_MEAN_SQUARED_ERROR: f64 = 0.0016;
+const MIN_MODEL_ERROR_GAP: f64 = 0.0016;
 const COST_HOURS_PER_EXPERIMENT: f64 = 1.0;
 const MEASUREMENT_SIGMA: f64 = 0.01;
 const MEASUREMENT_TOLERANCE: f64 = 0.04;
 const RANDOM_SEED: u64 = 0x4953_5255_444f_4531;
+const REFERENCE_OUTPUT: &str =
+    include_str!("fixtures/isru-material-experiment-selection-reference-v0.1.csv");
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Experiment {
@@ -274,7 +279,7 @@ fn by_id(pool: &[Experiment], id: u8) -> Option<Experiment> {
 fn fixed_schedule(policy: Policy, pool: &[Experiment], seed: &mut u64) -> Vec<Experiment> {
     let ids: &[u8] = match policy {
         // Three flux levels crossed with two morphology strata.
-        Policy::FixedCanonical => &[7, 9, 13, 15, 19, 1],
+        Policy::FixedCanonical => &[3, 5, 9, 11, 15, 17],
         // Irradiance changes while morphology is held at the central index.
         Policy::OneFactorAtATime => &[7, 4, 10, 13, 16, 19],
         // A deterministic spread over both axes.
@@ -315,11 +320,56 @@ fn choose_active_next(
     Some((*chosen, disagreement))
 }
 
+fn ranked_hypothesis_errors(observations: &[(Experiment, f64)]) -> Vec<(f64, Hypothesis)> {
+    let mut ranked: Vec<(f64, Hypothesis)> = Hypothesis::ALL
+        .iter()
+        .copied()
+        .map(|hypothesis| {
+            let mean_squared_error = if observations.is_empty() {
+                f64::INFINITY
+            } else {
+                observations
+                    .iter()
+                    .map(|(experiment, observed)| {
+                        let predicted = hypothesis_prediction(&hypothesis, experiment)
+                            .unwrap_or(f64::INFINITY);
+                        (predicted - observed).powi(2)
+                    })
+                    .sum::<f64>()
+                    / observations.len() as f64
+            };
+            (mean_squared_error, hypothesis)
+        })
+        .collect();
+    ranked.sort_by(|a, b| a.0.total_cmp(&b.0));
+    ranked
+}
+
+/// Require two distinct observations, low absolute model error, and a gap from
+/// the runner-up. Otherwise return None and keep measuring. This is a synthetic
+/// stopping rule, not a calibrated statistical confidence interval.
+fn supported_decision(observations: &[(Experiment, f64)]) -> Option<Decision> {
+    if observations.len() < MIN_CONFIRMATORY_EXPERIMENTS {
+        return None;
+    }
+    let ranked = ranked_hypothesis_errors(observations);
+    let (best_error, best_hypothesis) = *ranked.first()?;
+    let (second_error, _) = *ranked.get(1)?;
+    if best_error > MAX_SUPPORTED_MEAN_SQUARED_ERROR {
+        return Some(Decision::OutOfDomain);
+    }
+    if second_error - best_error >= MIN_MODEL_ERROR_GAP {
+        return Some(Decision::Identified(best_hypothesis));
+    }
+    None
+}
+
 fn run_trial(policy: Policy, world: SyntheticWorld) -> TrialResult {
     let mut seed = RANDOM_SEED;
     let mut remaining = eligible_catalogue();
     let mut schedule = fixed_schedule(policy, &remaining, &mut seed);
-    let mut surviving = Hypothesis::ALL.to_vec();
+    let mut selection_hypotheses = Hypothesis::ALL.to_vec();
+    let mut observations: Vec<(Experiment, f64)> = Vec::new();
     let mut selected_ids = Vec::new();
     let mut total_cost_hours = 0.0;
     let mut initial_disagreement_score = None;
@@ -327,7 +377,7 @@ fn run_trial(policy: Policy, world: SyntheticWorld) -> TrialResult {
 
     for _ in 0..MAX_EXPERIMENTS {
         let selected = if policy == Policy::SymthaeaPredictionDisagreement {
-            choose_active_next(&remaining, &surviving)
+            choose_active_next(&remaining, &selection_hypotheses)
         } else if schedule.is_empty() {
             None
         } else {
@@ -356,19 +406,25 @@ fn run_trial(policy: Policy, world: SyntheticWorld) -> TrialResult {
 
         // Hidden world is queried only after the policy has committed to a candidate.
         let observed = hidden_world_observation(world, &experiment);
-        surviving.retain(|hypothesis| {
-            hypothesis_prediction(hypothesis, &experiment)
-                .is_some_and(|prediction| (prediction - observed).abs() <= MEASUREMENT_TOLERANCE)
-        });
+        observations.push((experiment, observed));
 
-        if surviving.is_empty() {
-            decision = Decision::OutOfDomain;
-            break;
+        // Static baselines execute their complete precommitted six-run design.
+        // Only the active policy may stop early, and only after confirmatory evidence.
+        if policy == Policy::SymthaeaPredictionDisagreement {
+            if let Some(supported) = supported_decision(&observations) {
+                decision = supported;
+                break;
+            }
+            selection_hypotheses = ranked_hypothesis_errors(&observations)
+                .into_iter()
+                .take(2)
+                .map(|(_, hypothesis)| hypothesis)
+                .collect();
         }
-        if surviving.len() == 1 {
-            decision = Decision::Identified(surviving[0]);
-            break;
-        }
+    }
+
+    if policy != Policy::SymthaeaPredictionDisagreement {
+        decision = supported_decision(&observations).unwrap_or(Decision::Unresolved);
     }
 
     TrialResult {
@@ -378,7 +434,6 @@ fn run_trial(policy: Policy, world: SyntheticWorld) -> TrialResult {
         initial_disagreement_score,
     }
 }
-
 fn is_correct(world: SyntheticWorld, result: &TrialResult) -> bool {
     match (world.expected_hypothesis(), result.decision) {
         (Some(expected), Decision::Identified(actual)) => expected == actual,
@@ -476,7 +531,7 @@ mod tests {
         ] {
             let result = run_trial(Policy::SymthaeaPredictionDisagreement, world);
             assert!(is_correct(world, &result), "{world:?}: {result:?}");
-            assert_eq!(result.selected_ids.len(), 1);
+            assert_eq!(result.selected_ids.len(), MIN_CONFIRMATORY_EXPERIMENTS);
         }
     }
 
@@ -487,7 +542,7 @@ mod tests {
             SyntheticWorld::OutOfDomainShift,
         );
         assert_eq!(result.decision, Decision::OutOfDomain);
-        assert_eq!(result.selected_ids.len(), 1);
+        assert_eq!(result.selected_ids.len(), MIN_CONFIRMATORY_EXPERIMENTS);
     }
 
     #[test]
@@ -518,6 +573,58 @@ mod tests {
                 assert_eq!(unique.len(), result.selected_ids.len());
             }
         }
+    }
+
+    #[test]
+    fn fixed_factorial_baseline_executes_its_full_preregistered_design() {
+        for world in SyntheticWorld::ALL {
+            let fixed = run_trial(Policy::FixedCanonical, world);
+            assert_eq!(fixed.selected_ids.len(), MAX_EXPERIMENTS);
+            assert!(is_correct(world, &fixed), "{world:?}: {fixed:?}");
+        }
+    }
+
+    #[test]
+    fn active_policy_matches_fixed_decisions_with_two_runs_on_all_frozen_worlds() {
+        for world in SyntheticWorld::ALL {
+            let fixed = run_trial(Policy::FixedCanonical, world);
+            let active = run_trial(Policy::SymthaeaPredictionDisagreement, world);
+            assert!(is_correct(world, &fixed), "fixed {world:?}: {fixed:?}");
+            assert!(is_correct(world, &active), "active {world:?}: {active:?}");
+            assert_eq!(active.selected_ids.len(), MIN_CONFIRMATORY_EXPERIMENTS);
+            assert_eq!(fixed.selected_ids.len(), MAX_EXPERIMENTS);
+        }
+    }
+
+    #[test]
+    fn active_policy_requires_two_measurements_before_any_decision() {
+        let candidate = eligible_catalogue()[0];
+        let observation = hidden_world_observation(SyntheticWorld::LowFluxPeak, &candidate);
+        assert_eq!(supported_decision(&[(candidate, observation)]), None);
+    }
+
+    #[test]
+    fn deterministic_policy_rows_match_the_frozen_reference_fixture() {
+        let mut expected_lines = REFERENCE_OUTPUT.lines();
+        assert_eq!(
+            expected_lines.next(),
+            Some("world,policy,decision,correct,experiments_used,cost_hours,initial_disagreement_score,selected_candidate_ids")
+        );
+
+        for world in SyntheticWorld::ALL {
+            for policy in Policy::ALL {
+                let actual = policy_row(world, policy, &run_trial(policy, world));
+                let expected = expected_lines
+                    .next()
+                    .expect("reference fixture must contain every world/policy pair");
+                assert_eq!(actual, expected, "{world:?} / {policy:?}");
+            }
+        }
+
+        assert!(
+            expected_lines.next().is_none(),
+            "reference fixture must not contain extra policy rows"
+        );
     }
 
     #[test]
