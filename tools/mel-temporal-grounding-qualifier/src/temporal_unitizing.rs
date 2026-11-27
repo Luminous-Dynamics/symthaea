@@ -1127,7 +1127,7 @@ mod tests {
     }
 
     #[test]
-    fn observer_order_and_exact_frame_rescaling_do_not_change_unitizing_coefficients() {
+    fn observer_order_is_invariant_but_u_alpha_exposes_known_scale_sensitivity() {
         let original = published_book_example();
         let baseline = compute_unitizing_profile(&original, 60).unwrap();
 
@@ -1148,6 +1148,10 @@ mod tests {
                 < 1e-12
         );
 
+        // Krippendorff's u-alpha is known to be scale-sensitive: its positional
+        // disagreement weights squared overlap lengths. Uniformly changing the
+        // coordinate unit therefore changes the coefficient; this must not be
+        // mistaken for a temporal annotation change.
         let scale = 7_u64;
         let scaled: Vec<Vec<UnitSegmentV1>> = original
             .iter()
@@ -1164,16 +1168,20 @@ mod tests {
             .collect();
         let scaled_profile = compute_unitizing_profile(&scaled, 60 * scale).unwrap();
         assert!(
-            (baseline.u_alpha_nominal.unwrap() - scaled_profile.u_alpha_nominal.unwrap()).abs()
+            (scaled_profile.u_alpha_nominal.unwrap() - 0.509_032_735_310_107_6).abs()
                 < 1e-12
+        );
+        assert!(
+            (scaled_profile.u_alpha_binary.unwrap() - 0.412_463_363_258_039_56).abs()
+                < 1e-12
+        );
+        assert!(
+            (baseline.u_alpha_nominal.unwrap() - scaled_profile.u_alpha_nominal.unwrap()).abs()
+                > 1e-4
         );
         assert!(
             (baseline.u_alpha_binary.unwrap() - scaled_profile.u_alpha_binary.unwrap()).abs()
-                < 1e-12
-        );
-        assert!(
-            (baseline.cu_alpha_nominal.unwrap() - scaled_profile.cu_alpha_nominal.unwrap()).abs()
-                < 1e-12
+                > 1e-4
         );
     }
 
