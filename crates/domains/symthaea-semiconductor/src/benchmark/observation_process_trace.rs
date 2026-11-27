@@ -1257,7 +1257,7 @@ mod tests {
 
     #[test]
     fn controller_cannot_consume_unknown_or_blocked_k1_label() {
-        let mut row = base_row(1);
+        let mut row = measured_row(1, LabelConsumptionEligibilityV1::Unknown);
         row.controller = ControllerTrackingEvidenceV1 {
             state: ControllerTrackingStateV1::ConsumedQualified,
             prediction_receipt_sha256: Some(digest('d')),
@@ -1268,27 +1268,24 @@ mod tests {
             proxy_delay_steps: None,
             proxy_survival_probability: None,
         };
-        let input = {
-            let mut value = input(vec![row, base_row(2)], true);
-            value.controller = ObservationProcessControllerDeclarationV1 {
-                kind: OnlineControllerKindV1::TauDaci,
-                run_id: "aci-run-1".into(),
-                policy_sha256: Some(digest('f')),
-                delay_contract_sha256: Some(digest('1')),
-                maximum_delay_steps: Some(2),
-                tracking_capacity: None,
-            };
-            for item in &mut value.rows {
-                if item.round_id == 1 {
-                    item.row_sha256 = row_digest(item).unwrap();
-                }
-            }
-            value.trace_sha256 = seal_observation_process_trace_v1(&value).unwrap();
-            value
-        };
-        assert!(evaluate_observation_process_trace_v1(&input).is_err());
-    }
+        row.row_sha256 = row_digest(&row).unwrap();
+        let mut second = base_row(2);
+        second.controller.state = ControllerTrackingStateV1::Pending;
+        second.controller.prediction_receipt_sha256 = Some(digest('f'));
+        second.row_sha256 = row_digest(&second).unwrap();
 
+        let mut value = input(vec![row, second], true);
+        value.controller = ObservationProcessControllerDeclarationV1 {
+            kind: OnlineControllerKindV1::TauDaci,
+            run_id: "aci-run-unknown".into(),
+            policy_sha256: Some(digest('1')),
+            delay_contract_sha256: Some(digest('2')),
+            maximum_delay_steps: Some(2),
+            tracking_capacity: None,
+        };
+        value.trace_sha256 = seal_observation_process_trace_v1(&value).unwrap();
+        assert!(evaluate_observation_process_trace_v1(&value).is_err());
+    }
     #[test]
     fn eligible_operational_label_can_update_tau_daci_only_with_matching_report() {
         let mut row = measured_row(
@@ -1430,7 +1427,12 @@ mod tests {
 
     #[test]
     fn ca_ocrc_admitted_path_requires_capacity_and_proxy_delay() {
-        let mut value = input(vec![base_row(1), base_row(2)], true);
+        let mut selected = base_row(1);
+        selected.operational.state = OperationalAcquisitionStateV1::SelectedPending;
+        selected.operational.inclusion_probability = Some(0.1);
+        selected.operational.selection_design_sha256 = Some(digest('9'));
+        selected.row_sha256 = row_digest(&selected).unwrap();
+        let mut value = input(vec![selected, base_row(2)], true);
         value.controller = ObservationProcessControllerDeclarationV1 {
             kind: OnlineControllerKindV1::CaOcrc,
             run_id: "ca-run-1".into(),
