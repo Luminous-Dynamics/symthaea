@@ -1,0 +1,49 @@
+name: CMAQ-040 restarted rank-spectrum monitor
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-031/**"
+      - "research/cmaq-038/**"
+      - "research/cmaq-040/**"
+      - ".github/workflows/cmaq-040.yml"
+  push:
+    branches:
+      - "research/cmaq-040-*"
+    paths:
+      - "research/cmaq-031/**"
+      - "research/cmaq-038/**"
+      - "research/cmaq-040/**"
+      - ".github/workflows/cmaq-040.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-040-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  restarted-rank-spectrum:
+    name: restarted-rank-spectrum
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-040/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-040/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-040/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Paired predictive-rank smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-040/Cargo.toml --locked --bin restart_probe -- 32 600 20261127 300 > cmaq-040-restart-smoke.csv
+      - name: Preserve probe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-040-restart-smoke
+          path: cmaq-040-restart-smoke.csv
+          if-no-files-found: error
