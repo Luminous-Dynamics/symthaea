@@ -818,6 +818,9 @@ jobs:
           assert linearization["distribution_pulse_boundary_outflow_jacobian_required"] is True
           assert linearization["distribution_pulse_boundary_outflow_finite_difference_required"] is True
           assert linearization["distribution_pulse_boundary_outflow_jacobian_status"] == "fixed_topology_piecewise_constant_analytic_module_only"
+          assert linearization["distribution_pulse_spatial_integral_weights_required"] is True
+          assert linearization["distribution_pulse_unweighted_total_mass_interpretation"] == "unit_weight_row_sum_not_general_spatial_integral"
+          assert linearization["distribution_pulse_weighted_quadrature_api_status"] == "positive_spatial_weight_api_implemented_module_only"
           assert horizon["start_time"] == checkpoint["time"]
           assert checkpoint["first_pulse_applied"] is True
           assert checkpoint["second_pulse_not_yet_applied"] is True
@@ -1065,6 +1068,10 @@ jobs:
           expect_rejection(
               "coordinate-identity-missing",
               lambda value: value["cohort"].__setitem__("state_coordinate_id", ""),
+          )
+          expect_rejection(
+              "spatial-mass-weight-bypass",
+              lambda value: value["linearization_contract"].__setitem__("distribution_pulse_spatial_integral_weights_required", False),
           )
           expect_rejection(
               "future-pulse-response-bypass",
