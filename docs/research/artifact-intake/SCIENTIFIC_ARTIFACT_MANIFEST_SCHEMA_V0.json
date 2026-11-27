@@ -1,0 +1,429 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:scientific-artifact-manifest:v0",
+  "title": "Symthaea Scientific Artifact Manifest v0",
+  "description": "Content-addressed raw scientific artifact plus a versioned parser result. This contract does not adjudicate source authenticity, claim truth, or downstream decision usability.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "acquisition",
+    "media",
+    "raw",
+    "parser",
+    "parse"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_id",
+        "receipt_content_sha256",
+        "requested_uri",
+        "final_uri",
+        "captured_at_unix_ms"
+      ],
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "receipt_content_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "requested_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "final_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "captured_at_unix_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "declared_content_type",
+        "detected_content_type"
+      ],
+      "properties": {
+        "declared_content_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "detected_content_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "filename": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1024
+        },
+        "encoding": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      }
+    },
+    "raw": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256",
+        "byte_length",
+        "capture_ref"
+      ],
+      "properties": {
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capture_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
+    },
+    "parser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parser_id",
+        "parser_version",
+        "config_sha256"
+      ],
+      "properties": {
+        "parser_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "parser_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "runtime_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        }
+      }
+    },
+    "parse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "derived_payload_sha256",
+        "observations",
+        "issues",
+        "limits",
+        "usage"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "PARSED",
+            "PARTIAL",
+            "UNSUPPORTED",
+            "MALFORMED",
+            "LIMIT_EXCEEDED",
+            "INTEGRITY_FAILED"
+          ]
+        },
+        "derived_payload_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observations": {
+          "type": "array",
+          "maxItems": 100000,
+          "items": {
+            "$ref": "#/$defs/observation"
+          }
+        },
+        "issues": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "$ref": "#/$defs/issue"
+          }
+        },
+        "limits": {
+          "$ref": "#/$defs/limits"
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "PARSED"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "derived_payload_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "UNSUPPORTED",
+                  "MALFORMED",
+                  "LIMIT_EXCEEDED",
+                  "INTEGRITY_FAILED"
+                ]
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "derived_payload_sha256": {
+                "type": "null"
+              },
+              "observations": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "locator",
+        "raw_lexeme",
+        "value_kind"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "locator": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/csv_cell_locator"
+            },
+            {
+              "$ref": "#/$defs/json_pointer_locator"
+            }
+          ]
+        },
+        "raw_lexeme": {
+          "type": "string",
+          "maxLength": 1048576
+        },
+        "value_kind": {
+          "enum": [
+            "TEXT",
+            "INTEGER",
+            "DECIMAL",
+            "BOOLEAN",
+            "NULL",
+            "DATE",
+            "TIMESTAMP",
+            "UNKNOWN"
+          ]
+        },
+        "unit_lexeme": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      }
+    },
+    "csv_cell_locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "record_index",
+        "column_index",
+        "column_name",
+        "byte_start",
+        "byte_end"
+      ],
+      "properties": {
+        "kind": {
+          "const": "CSV_CELL"
+        },
+        "record_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based data-record index; header is not counted."
+        },
+        "column_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "column_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "byte_start": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based byte offset in the immutable raw artifact; inclusive."
+        },
+        "byte_end": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Zero-based byte offset in the immutable raw artifact; exclusive."
+        }
+      }
+    },
+    "json_pointer_locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "pointer"
+      ],
+      "properties": {
+        "kind": {
+          "const": "JSON_POINTER"
+        },
+        "pointer": {
+          "type": "string",
+          "pattern": "^(|(/([^~/]|~[01])*)*)$",
+          "maxLength": 4096
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason_code",
+        "message"
+      ],
+      "properties": {
+        "reason_code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9_]{1,96}$"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_input_bytes",
+        "max_elapsed_ms",
+        "max_observations"
+      ],
+      "properties": {
+        "max_input_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_observations": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bytes_read",
+        "elapsed_ms",
+        "observations_emitted"
+      ],
+      "properties": {
+        "bytes_read": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observations_emitted": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
