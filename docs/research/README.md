@@ -54,7 +54,7 @@ event contract.
 - [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
 - [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
 
-The renderer-independent event, projection, policy, receipt, scene and turn-control modules live under
+The renderer-independent event, projection, policy, receipt, scene, turn-control and continuity modules live under
 `crates/domains/symthaea-soma/src/`. A standalone Bevy 0.20.1 adapter has source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
 All current regression tests are authored but unexecuted, and no VideoFDB evaluation result is claimed.
