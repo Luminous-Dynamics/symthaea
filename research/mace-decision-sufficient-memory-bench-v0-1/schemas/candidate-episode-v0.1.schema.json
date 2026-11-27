@@ -7,8 +7,6 @@
   "required": [
     "schema_version",
     "episode_id",
-    "seed",
-    "family",
     "query_time_ms",
     "query",
     "scope",
@@ -26,25 +24,6 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 160
-    },
-    "seed": {
-      "type": "integer",
-      "minimum": 0
-    },
-    "family": {
-      "enum": [
-        "temporal_drift",
-        "contradiction",
-        "revocation",
-        "insufficient_evidence",
-        "poisoning",
-        "decision_sufficient_compression",
-        "streaming_update",
-        "forgetting_replay",
-        "scope_isolation",
-        "cross_lingual_provenance",
-        "representation_migration"
-      ]
     },
     "query_time_ms": {
       "type": "integer"
