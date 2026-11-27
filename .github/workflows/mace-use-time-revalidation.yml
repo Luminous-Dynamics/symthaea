@@ -1,0 +1,44 @@
+name: MACE Use-Time Evidence Revalidation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/broca-mace-transfer-bench-v0-1/ingress/**"
+      - "research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json"
+      - "docs/research/MACE_USE_TIME_REVALIDATION_V0_1.md"
+      - ".github/workflows/mace-use-time-revalidation.yml"
+  push:
+    branches:
+      - research/mace-use-time-revalidation-v0-1
+    paths:
+      - "research/broca-mace-transfer-bench-v0-1/ingress/**"
+      - "research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json"
+      - "docs/research/MACE_USE_TIME_REVALIDATION_V0_1.md"
+      - ".github/workflows/mace-use-time-revalidation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ingress:
+    name: Rust ingress revalidation tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress -- --check
+      - name: Run ingress tests
+        run: cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress --all-targets -- -D warnings
+      - name: Parse use receipt schema
+        run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json >/dev/null
