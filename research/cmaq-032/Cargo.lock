@@ -1,0 +1,17 @@
+version = 4
+
+[[package]]
+name = "cmaq-030-recoverability-margin"
+version = "0.1.0"
+
+[[package]]
+name = "cmaq-031-anytime-calibration-monitor"
+version = "0.1.0"
+
+[[package]]
+name = "cmaq-032-recoverability-monitor-bridge"
+version = "0.1.0"
+dependencies = [
+ "cmaq-030-recoverability-margin",
+ "cmaq-031-anytime-calibration-monitor",
+]
