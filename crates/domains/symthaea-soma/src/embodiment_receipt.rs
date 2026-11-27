@@ -162,6 +162,7 @@ pub struct PresentationReceipt {
     session_id: String,
     source_clock_domain_id: String,
     event_id: String,
+    canonical_cue_digest: String,
     grant_id: String,
     event_expires_at_monotonic_ns: String,
     grant_expires_at_monotonic_ns: String,
@@ -195,6 +196,7 @@ impl PresentationReceipt {
     pub fn transition_index(&self) -> u32 { self.transition_index }
     pub fn phase(&self) -> ReceiptPhase { self.phase }
     pub fn event_id(&self) -> &str { &self.event_id }
+    pub fn canonical_cue_digest(&self) -> &str { &self.canonical_cue_digest }
     pub fn grant_id(&self) -> &str { &self.grant_id }
     pub fn previous_digest(&self) -> Option<&str> { self.previous_digest.as_deref() }
     pub fn digest(&self) -> &str { &self.digest }
@@ -494,6 +496,7 @@ impl PresentationReceiptLedger {
             session_id: permit.session_id().to_owned(),
             source_clock_domain_id: permit.clock_domain_id().to_owned(),
             event_id: permit.event_id().to_owned(),
+            canonical_cue_digest: permit.cue_digest().to_owned(),
             grant_id: permit.grant_id().to_owned(),
             event_expires_at_monotonic_ns: permit.event_expires_at_monotonic_ns().to_owned(),
             grant_expires_at_monotonic_ns: permit.grant_expires_at_monotonic_ns().to_owned(),
@@ -605,6 +608,7 @@ fn same_permit_identity(a: &PresentationPermit, b: &PresentationPermit) -> bool 
     a.session_id() == b.session_id()
         && a.clock_domain_id() == b.clock_domain_id()
         && a.event_id() == b.event_id()
+        && a.cue_digest() == b.cue_digest()
         && a.grant_id() == b.grant_id()
         && a.sequence() == b.sequence()
         && a.event_kind() == b.event_kind()
@@ -926,6 +930,17 @@ mod tests {
             Some(ledger.receipts()[1].digest())
         );
         ledger.verify_chain().unwrap();
+    }
+
+    #[test]
+    fn receipt_binds_the_exact_canonical_cue_digest() {
+        let (policy, permit, mut ledger) = fixture();
+        submit(&mut ledger, &policy, &permit);
+        let submitted = ledger.receipts().iter()
+            .find(|receipt| receipt.phase() == ReceiptPhase::Submitted)
+            .unwrap();
+        assert_eq!(submitted.canonical_cue_digest(), permit.cue_digest());
+        assert_eq!(submitted.event_id(), permit.event_id());
     }
 
     #[test]
