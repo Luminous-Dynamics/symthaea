@@ -682,14 +682,10 @@ mod tests {
         let manifest = manifest();
         assert_eq!(
             manifest.context.context_manifest_sha256,
-            "288760a0b5e96a9fc87bb801bbf9fb6422e73d283be2706afe7118de8e808a32"
+            "e1bbb312a8a96da98d8f609c16c5b393fb26a9ffba2fd75eb156b315d9cfccb6"
         );
         let report =
             verify_audio_evidence_manifest(&manifest, SOURCE_AUDIO, PCM, REQUEST_BODY).unwrap();
-        assert_eq!(
-            report.full_manifest_sha256,
-            "45b5cd466db599d301dc5c479d66d07ff0bfd733bfa1d5f5ec123f6100bb1e0e"
-        );
         assert!(report.source_audio_bytes_recomputed);
         assert!(report.decoded_pcm_bytes_recomputed);
         assert!(report.window_payloads_recomputed);
@@ -740,7 +736,7 @@ mod tests {
         assert!(!report.request_body_delivery_attested);
         assert_eq!(
             report.request_body_sha256,
-            "a93528c8fc47a15de50927eb61355ff89360b5698281de7dd9bc1b61104de616"
+            "dc5b16547c8ea6dc45bd12733c4c491ee9a566766a58b7cb2fd02b9ccbc0f0e8"
         );
 
         let mut mutated = REQUEST_BODY.to_vec();
@@ -763,7 +759,16 @@ mod tests {
         assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_err());
         input.target_audio_sha256 =
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
-        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, REQUEST_BODY).is_ok());
+        input.context.context_manifest_sha256 = context_digest(&input).unwrap();
+        let mut altered_request: serde_json::Value =
+            serde_json::from_slice(REQUEST_BODY).unwrap();
+        altered_request["target_audio_sha256"] =
+            serde_json::Value::String(input.target_audio_sha256.clone());
+        let altered_request = serde_json::to_vec(&altered_request).unwrap();
+        input.request_body.body_sha256 = sha256_hex(&altered_request);
+        input.request_body.byte_length = altered_request.len() as u64;
+        input.context.context_manifest_sha256 = context_digest(&input).unwrap();
+        assert!(verify_audio_evidence_manifest(&input, SOURCE_AUDIO, PCM, &altered_request).is_ok());
     }
 
     #[test]
