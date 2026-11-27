@@ -32,7 +32,8 @@
     "amplitude_is_computed_from_formula": true,
     "log_argument": "1/nu",
     "observation_horizon_fraction_of_nu_minus_one_third": 0.9,
-    "p_values_are_exploratory_not_source_theorem_constants": true
+    "p_values_are_exploratory_not_source_theorem_constants": true,
+    "maximum_initial_perturbation_amplitude": 0.1
   },
   "trajectory_cohorts": {
     "training": [
