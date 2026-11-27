@@ -24,7 +24,7 @@ The crate has no external dependencies. Its public API currently provides:
 
 ## Critical evaluator isolation
 
-The public candidate fixture is in ../fixtures/candidate-seed-v0.1.jsonl. It contains only candidate-visible fields.
+The public candidate fixture is in ../fixtures/candidate-episodes-v0.1.jsonl. It contains only candidate-visible fields; generator seeds and task-family labels are withheld.
 
 EvaluatorCaseV1 and the loss/admissibility labels do not appear in the candidate JSONL schema or seed fixture. The known-answer cases in unit tests are public development tests and must not be treated as a secret test set or benchmark result. Confirmatory answer keys, held-out seeds, evaluator labels and scoring configuration must be held by a separate evaluator service or private artifact store that candidate processes cannot read.
 
