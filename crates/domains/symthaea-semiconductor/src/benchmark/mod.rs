@@ -149,3 +149,20 @@ pub use gated_streaming_adapter::{
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
 };
+
+pub use capacity_constrained_ocr_control::{
+    CAPACITY_OCRC_ENGINE_SCHEMA_V1, CAPACITY_OCRC_FEEDBACK_SCHEMA_V1,
+    CAPACITY_OCRC_POLICY_SCHEMA_V1, CAPACITY_OCRC_PREDICTION_INPUT_SCHEMA_V1,
+    CAPACITY_OCRC_PREDICTION_RECEIPT_SCHEMA_V1, CAPACITY_OCRC_ROUND_INPUT_SCHEMA_V1,
+    CAPACITY_OCRC_ROUND_RECEIPT_SCHEMA_V1, CapacityOcrcEngineV1, CapacityOcrcErrorV1,
+    CapacityOcrcFeedbackOutcomeV1, CapacityOcrcFeedbackUpdateV1,
+    CapacityOcrcOptimizedProxyV1, CapacityOcrcPolicyV1,
+    CapacityOcrcPredictionInputV1, CapacityOcrcPredictionReceiptV1,
+    CapacityOcrcQualifiedFeedbackV1, CapacityOcrcRiskBoundV1,
+    CapacityOcrcRoundInputV1, CapacityOcrcRoundReceiptV1,
+    CapacityOcrcTrackedRoundV1, OcrcFeedbackDispositionV1, OcrcFeedbackReasonV1,
+    OcrcIntervalKindV1, OcrcTheoremEligibilityV1,
+    advance_capacity_ocrc_round_v1, capacity_ocrc_risk_bound_v1,
+    capacity_ocrc_tracking_load_v1, create_capacity_ocrc_engine_v1,
+    optimize_capacity_ocrc_proxy_v1, validate_capacity_ocrc_policy_v1,
+};
