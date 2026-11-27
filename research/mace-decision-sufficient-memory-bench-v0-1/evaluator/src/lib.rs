@@ -103,7 +103,7 @@ pub struct ResourceQuantityDeltaV2 {
     pub comparison: ResourceMeasurementComparisonV2,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PairedCostDeltaV2 {
     pub retained_bytes: ResourceQuantityDeltaV2,
     pub index_bytes: ResourceQuantityDeltaV2,
