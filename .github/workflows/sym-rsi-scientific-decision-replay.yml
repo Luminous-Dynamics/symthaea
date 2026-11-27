@@ -10,6 +10,7 @@ on:
       - "crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs"
       - "crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs"
       - "crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs"
+      - "tools/sym-rsi-decision-replay-contract/**"
       - ".github/workflows/sym-rsi-scientific-decision-replay.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -41,7 +42,8 @@ jobs:
             crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs \
             crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
-            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
+            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs \
+            tools/sym-rsi-decision-replay-contract/src/lib.rs
       - name: Upload rustfmt preview
         if: always()
         uses: actions/upload-artifact@v4
@@ -66,13 +68,7 @@ jobs:
             crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
             crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
-      - name: Run decision contract tests
-        run: cargo test --locked -p symthaea-futures-ensemble --example scientific_decision_replay_contract
-      - name: Run replay custody and materializer tests
-        run: cargo test --locked -p symthaea-futures-ensemble --example evolutionary_rescue_split_capsules
-      - name: Strict Clippy for changed targets
-        run: |
-          cargo clippy --locked -p symthaea-futures-ensemble \
-            --example scientific_decision_replay_contract \
-            --example evolutionary_rescue_split_capsules \
-            -- -D warnings
+      - name: Run isolated decision and custody contract tests
+        run: cargo test --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml
+      - name: Strict Clippy for isolated contract harness
+        run: cargo clippy --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml --all-targets -- -D warnings
