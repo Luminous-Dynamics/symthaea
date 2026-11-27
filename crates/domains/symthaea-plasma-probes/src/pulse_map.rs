@@ -456,6 +456,62 @@ mod tests {
     }
 
     #[test]
+    fn scheduled_event_time_sensitivity_matches_shifted_hybrid_trajectory() {
+        let kick = manufactured_kick();
+        let x0 = 0.4;
+        let v0 = 0.6;
+        let a_minus = 0.2;
+        let a_plus = -0.1;
+        let event_time = 0.5;
+        let observation_time = 1.4;
+        let step = 1.0e-5;
+        let explicit_reset_time_derivative = PhasePoint { x: 0.03, v: -0.02 };
+
+        let pre_x = x0 + v0 * event_time + 0.5 * a_minus * event_time * event_time;
+        let pre_v = v0 + a_minus * event_time;
+        let post_event_duration = observation_time - event_time;
+        let local_sensitivity = kick
+            .application_time_sensitivity(
+                pre_x,
+                pre_v,
+                a_minus,
+                a_plus,
+                explicit_reset_time_derivative,
+            )
+            .unwrap();
+
+        let trajectory_at_event_time = |time: f64| {
+            let x_before =
+                x0 + v0 * time + 0.5 * a_minus * time * time;
+            let v_before = v0 + a_minus * time;
+            let reset = kick.apply(x_before, v_before).unwrap();
+            let delta_time = time - event_time;
+            let reset_x =
+                reset.x + explicit_reset_time_derivative.x * delta_time;
+            let reset_v =
+                reset.v + explicit_reset_time_derivative.v * delta_time;
+            let remaining = observation_time - time;
+            PhasePoint {
+                x: reset_x + reset_v * remaining + 0.5 * a_plus * remaining * remaining,
+                v: reset_v + a_plus * remaining,
+            }
+        };
+
+        let later = trajectory_at_event_time(event_time + step);
+        let earlier = trajectory_at_event_time(event_time - step);
+        let fd_x = (later.x - earlier.x) / (2.0 * step);
+        let fd_v = (later.v - earlier.v) / (2.0 * step);
+
+        // Propagate the event-time sensitivity to the fixed observation time
+        // through the post-event tangent [[1, dt], [0, 1]].
+        let predicted_x =
+            local_sensitivity.x + post_event_duration * local_sensitivity.v;
+        let predicted_v = local_sensitivity.v;
+        assert!((fd_x - predicted_x).abs() < 1.0e-7);
+        assert!((fd_v - predicted_v).abs() < 1.0e-7);
+    }
+
+    #[test]
     fn energy_exchange_is_reported_not_constrained_away() {
         let kick = manufactured_kick();
         let delta = kick.kinetic_energy_delta(0.7, 1.2).unwrap();
