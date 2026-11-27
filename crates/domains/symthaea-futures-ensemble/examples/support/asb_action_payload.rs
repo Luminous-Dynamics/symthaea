@@ -167,7 +167,10 @@ mod tests {
         let second = batch(&["variant-a", "variant-b"]);
         first.validate(2, &permitted()).unwrap();
         second.validate(2, &permitted()).unwrap();
-        assert_eq!(first.payload_sha256().unwrap(), second.payload_sha256().unwrap());
+        assert_eq!(
+            first.payload_sha256().unwrap(),
+            second.payload_sha256().unwrap()
+        );
         assert_eq!(first.payload_sha256().unwrap().len(), 64);
     }
 
@@ -177,7 +180,10 @@ mod tests {
         let reverse = batch(&["variant-b", "variant-a"]);
         forward.validate(2, &permitted()).unwrap();
         reverse.validate(2, &permitted()).unwrap();
-        assert_ne!(forward.payload_sha256().unwrap(), reverse.payload_sha256().unwrap());
+        assert_ne!(
+            forward.payload_sha256().unwrap(),
+            reverse.payload_sha256().unwrap()
+        );
     }
 
     #[test]
@@ -185,13 +191,22 @@ mod tests {
         let base = batch(&["variant-a", "variant-b"]);
         let mut other = base.clone();
         other.campaign_id = "propylene-active-learning".into();
-        assert_ne!(base.payload_sha256().unwrap(), other.payload_sha256().unwrap());
+        assert_ne!(
+            base.payload_sha256().unwrap(),
+            other.payload_sha256().unwrap()
+        );
         other = base.clone();
         other.stage = 3;
-        assert_ne!(base.payload_sha256().unwrap(), other.payload_sha256().unwrap());
+        assert_ne!(
+            base.payload_sha256().unwrap(),
+            other.payload_sha256().unwrap()
+        );
         other = base.clone();
         other.design_id_field = "design_id".into();
-        assert_ne!(base.payload_sha256().unwrap(), other.payload_sha256().unwrap());
+        assert_ne!(
+            base.payload_sha256().unwrap(),
+            other.payload_sha256().unwrap()
+        );
     }
 
     #[test]
