@@ -18,6 +18,7 @@ Keep these methods separate; do not merge their guarantees or silently borrow th
 | CMAQ-040 | Rank spectrum × restart-time mixture | Exploratory CMAQ arm |
 | CMAQ-045 | Rank spectrum × predictable history contexts | Exploratory CMAQ arm |
 | CMAQ-046 | Predictable OCO witness × convex-target support residual × conditional-mean e-process | Exploratory conditional-mean arm; fixed-bet subset, distinct null contract |
+| CMAQ-047 | Controlled Blackwell action selection with action-conditional null mean sets | Exploratory active diagnostic arm; selected action must satisfy current support-halfspace contract |
 
 For every method, freeze source revision, dependencies, score mapping, reference set, ties, warm-up, alpha, horizon and stopping rule. The CCTM/PF-CCTM arms operate on their own stated score/p-value contracts; a PRM result cannot be presented as a reproduction of either.
 
@@ -65,6 +66,25 @@ A smaller smoke run may test wiring but cannot estimate a five-percent false-ala
 **Recoverability shifts:** increasing residual variance, decreasing barrier/recoverability margin, delayed actuation, fallback degradation, and simultaneous sensor/control disturbances. Ground-truth deadlines must come from independent plant/scenario evaluation, not from the detector.
 
 For every generator, store its source, parameters, seed, split, effective block ID, rank/score receipt and exact build digest.
+
+### Controlled action-selection experiments (CMAQ-047)
+
+Treat this as a separate controlled-experiment family, not a passive detector baseline. At every round the monitor emits a predictable witness w_t, then an action is selected from a frozen catalog. For every admissible action a, the independently authenticated action-conditional null set S_a must satisfy h_(S_a)(w_t) <= h_S(w_t). Only then may the resulting residual vector be fed into the betting process.
+
+Preregister:
+- action-specific null-mean boxes and the authority receipts that justify them;
+- alternative diagnostic signatures and the deterministic action ranking policy;
+- target, scope, monitor build, observation bound, alpha, action inventory and execution semantics;
+- one-use action sequence IDs and the result-reconciliation policy;
+- baseline fixed action, random admissible action and oracle-only upper-bound action.
+
+Measure the fraction of rounds with at least one admissible action, chosen-action alignment with the true alternative orientation, information/diagnostic utility per action, false alarms over the entire adaptive action sequence, detection power/delay/misses, action frequency and budget consumption, p99 selection latency, execution latency, unresolved-result frequency and recoverability/fallback consequences.
+
+Null simulations must condition the next residual distribution on the action actually selected and keep its conditional mean in S_a. Sampling residuals from the global target S alone is not enough to validate an action-conditional policy. Alternatives may violate the action-specific null box, but the same action policy and observation model must be used for all arms.
+
+Unknown or ambiguous action outcomes remain pending. Do not count a retry as an independent observation or select a second action until the first result is reconciled. Cross-process replay protection, authority signatures and physical action attestation require an external durable evidence ledger.
+
+Compare adaptive controlled selection against a fixed safe action, a precommitted schedule, random choice among current admissible actions, and an oracle action only as a non-deployable upper bound. Pair these runs by effective block and use CMAQ-044. Any power improvement must be assessed alongside action availability, false alarms, execution delays, fallback timing and safety outcomes.
 
 ### Conditional-mean vector residual experiments (CMAQ-046)
 
