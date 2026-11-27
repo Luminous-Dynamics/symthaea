@@ -227,6 +227,7 @@ Measure:
 - identical canonical-cue digest across all seven forms for the same source event;
 - rejection of mutated payloads even when event ID and semantic key are unchanged;
 - preservation of semantic key, source/clock/provenance, epistemic status and accessible description;
+- separate event, grant, and effective-permit expiry in every renderer scene frame; the frame may not be retained or displayed beyond effective-permit expiry;
 - no raw evidence-reference or sensitive-target identifiers copied to renderer-facing scene frames;
 - omitted and unsupported events;
 - contradictions between forms;
@@ -234,7 +235,7 @@ Measure:
 - identity continuity across transitions;
 - preservation of user controls and privacy settings.
 
-Hard gate: 100% exact canonical-cue digest preservation across all seven forms; zero renderer acceptance of cue-content mutations; zero raw sensitive-reference disclosure in renderer-facing frames. Scene frames are immutable outside the compiler and exposed through read-only accessors.
+Hard gate: 100% exact canonical-cue digest preservation across all seven forms; zero renderer acceptance of cue-content mutations; zero raw sensitive-reference disclosure in renderer-facing frames; 100% correct event/grant/effective expiry propagation, with no frame remaining renderable after the effective permit expiry. Scene frames are immutable outside the compiler and exposed through read-only accessors.
 
 Target: 100% deterministic fixture mapping; >= 95% human-rated semantic agreement between forms on held-out interactions; zero false claims of verification, certainty, consent or action.
 
