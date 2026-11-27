@@ -301,7 +301,7 @@ fn run_suite(trials: u64) -> Vec<RegimeReport> {
 
 fn print_report(report: &RegimeReport) {
     println!(
-        "{},{},{:.2},{:.2},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6}",
+        "{},{},{:.2},{:.2},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6}",
         report.marginal.label(),
         report.design.label(),
         report.calibration_rho,
