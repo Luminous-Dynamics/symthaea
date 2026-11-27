@@ -18,8 +18,13 @@ pub const PROBABILITY_SCALE: u32 = 1_000_000;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionPhase {
-    QuestionSelection, HypothesisFormation, ExperimentalDesign, ProspectivePrediction,
-    ExecutionAndObservation, Interpretation, ResearchPolicyUpdate,
+    QuestionSelection,
+    HypothesisFormation,
+    ExperimentalDesign,
+    ProspectivePrediction,
+    ExecutionAndObservation,
+    Interpretation,
+    ResearchPolicyUpdate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,15 +48,22 @@ pub struct ResourceVector {
 }
 impl ResourceVector {
     fn is_complete(&self) -> bool {
-        self.inference_tokens.is_some() && self.cpu_millis.is_some()
-            && self.accelerator_millis.is_some() && self.wall_clock_millis.is_some()
-            && self.expert_minutes.is_some() && self.data_cost_microusd.is_some()
+        self.inference_tokens.is_some()
+            && self.cpu_millis.is_some()
+            && self.accelerator_millis.is_some()
+            && self.wall_clock_millis.is_some()
+            && self.expert_minutes.is_some()
+            && self.data_cost_microusd.is_some()
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CostCompleteness { Complete, Partial, Unknown }
+pub enum CostCompleteness {
+    Complete,
+    Partial,
+    Unknown,
+}
 
 /// The frozen downstream decision/loss contract. This is not an information-gain score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,12 +87,22 @@ impl DecisionObjectiveReference {
     fn validate(&self) -> Result<(), String> {
         validate_sha256("decision objective digest", &self.objective_digest)?;
         match self.mode {
-            DecisionValueMode::BayesianExpectedUtility | DecisionValueMode::PriorFreeRobustMinimax => {
-                require_nonempty("decision utility unit", self.utility_unit.as_deref().unwrap_or_default())?;
-                validate_sha256("decision loss-table digest", self.loss_table_digest.as_deref().unwrap_or_default())?;
+            DecisionValueMode::BayesianExpectedUtility
+            | DecisionValueMode::PriorFreeRobustMinimax => {
+                require_nonempty(
+                    "decision utility unit",
+                    self.utility_unit.as_deref().unwrap_or_default(),
+                )?;
+                validate_sha256(
+                    "decision loss-table digest",
+                    self.loss_table_digest.as_deref().unwrap_or_default(),
+                )?;
             }
             DecisionValueMode::DirectOutcomeMetric => {
-                require_nonempty("decision metric unit", self.utility_unit.as_deref().unwrap_or_default())?;
+                require_nonempty(
+                    "decision metric unit",
+                    self.utility_unit.as_deref().unwrap_or_default(),
+                )?;
             }
             DecisionValueMode::NotQuantified => {
                 if self.utility_unit.is_some() || self.loss_table_digest.is_some() {
@@ -123,10 +145,17 @@ impl CandidateDecisionContext {
         validate_sha256("context_digest", &self.context_digest)?;
         validate_sha256("research_state_sha256", &self.research_state_sha256)?;
         validate_sha256("evidence_prefix_sha256", &self.evidence_prefix_sha256)?;
-        validate_sha256("permitted_action_offer_list_sha256", &self.permitted_action_offer_list_sha256)?;
+        validate_sha256(
+            "permitted_action_offer_list_sha256",
+            &self.permitted_action_offer_list_sha256,
+        )?;
         self.decision_objective.validate()?;
-        if self.schema_version != SCHEMA_VERSION { return Err("unsupported schema version".into()); }
-        if self.permitted_action_ids.is_empty() { return Err("permitted action set is empty".into()); }
+        if self.schema_version != SCHEMA_VERSION {
+            return Err("unsupported schema version".into());
+        }
+        if self.permitted_action_ids.is_empty() {
+            return Err("permitted action set is empty".into());
+        }
         ensure_unique("permitted_action_ids", &self.permitted_action_ids)?;
         if self.deadline_ms.is_some_and(|d| d < self.decision_time_ms) {
             return Err("deadline precedes decision time".into());
@@ -165,15 +194,28 @@ pub struct ActionProbability {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AssignmentMechanism {
-    Randomized { action_probabilities: Vec<ActionProbability>, protocol_ref: String },
-    Deterministic { policy_digest: String },
-    Observational { selection_process_ref: String },
+    Randomized {
+        action_probabilities: Vec<ActionProbability>,
+        protocol_ref: String,
+    },
+    Deterministic {
+        policy_digest: String,
+    },
+    Observational {
+        selection_process_ref: String,
+    },
     Unknown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CausalDesign { RandomizedControlled, QuasiExperimental, Observational, MechanisticModel, NotClaimed }
+pub enum CausalDesign {
+    RandomizedControlled,
+    QuasiExperimental,
+    Observational,
+    MechanisticModel,
+    NotClaimed,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DecisionProposal {
@@ -197,33 +239,55 @@ impl DecisionProposal {
         require_nonempty("policy_id", &self.policy_id)?;
         require_nonempty("policy_version", &self.policy_version)?;
         require_nonempty("selected_action_id", &self.selected_action_id)?;
-        validate_sha256("selected_action_payload_digest", &self.selected_action_payload_digest)?;
+        validate_sha256(
+            "selected_action_payload_digest",
+            &self.selected_action_payload_digest,
+        )?;
         validate_sha256("rationale_digest", &self.rationale_digest)?;
-        if self.episode_id != c.episode_id { return Err("proposal episode mismatch".into()); }
-        if !c.permits(&self.selected_action_id) { return Err("selected action outside permitted set".into()); }
-        if self.predicted_outcomes.is_empty() { return Err("predicted outcome distribution is empty".into()); }
+        if self.episode_id != c.episode_id {
+            return Err("proposal episode mismatch".into());
+        }
+        if !c.permits(&self.selected_action_id) {
+            return Err("selected action outside permitted set".into());
+        }
+        if self.predicted_outcomes.is_empty() {
+            return Err("predicted outcome distribution is empty".into());
+        }
         let mut labels = Vec::new();
         let mut sum = 0_u64;
         for item in &self.predicted_outcomes {
             require_nonempty("outcome label", &item.outcome_label)?;
-            if item.probability_micros > PROBABILITY_SCALE { return Err("probability exceeds scale".into()); }
+            if item.probability_micros > PROBABILITY_SCALE {
+                return Err("probability exceeds scale".into());
+            }
             labels.push(item.outcome_label.clone());
             sum += u64::from(item.probability_micros);
         }
         ensure_unique("outcome labels", &labels)?;
-        if sum != u64::from(PROBABILITY_SCALE) { return Err("probabilities must sum to 1,000,000".into()); }
+        if sum != u64::from(PROBABILITY_SCALE) {
+            return Err("probabilities must sum to 1,000,000".into());
+        }
         match &self.assignment_mechanism {
-            AssignmentMechanism::Randomized { action_probabilities, protocol_ref } => {
+            AssignmentMechanism::Randomized {
+                action_probabilities,
+                protocol_ref,
+            } => {
                 require_nonempty("randomization protocol reference", protocol_ref)?;
                 if action_probabilities.len() != c.permitted_action_ids.len() {
-                    return Err("randomized policy must log probabilities for every permitted action".into());
+                    return Err(
+                        "randomized policy must log probabilities for every permitted action"
+                            .into(),
+                    );
                 }
                 let mut action_ids = Vec::with_capacity(action_probabilities.len());
                 let mut probability_sum = 0_u64;
                 let mut selected_probability = 0_u32;
                 for entry in action_probabilities {
                     require_nonempty("randomized action_id", &entry.action_id)?;
-                    validate_sha256("randomized action_payload_digest", &entry.action_payload_digest)?;
+                    validate_sha256(
+                        "randomized action_payload_digest",
+                        &entry.action_payload_digest,
+                    )?;
                     if !c.permits(&entry.action_id) {
                         return Err("randomization distribution contains an action outside the permitted set".into());
                     }
@@ -246,17 +310,30 @@ impl DecisionProposal {
                     return Err("selected action must have nonzero randomized propensity".into());
                 }
             }
-            AssignmentMechanism::Deterministic { policy_digest } => validate_sha256("assignment policy digest", policy_digest)?,
-            AssignmentMechanism::Observational { selection_process_ref } => require_nonempty("selection process reference", selection_process_ref)?,
+            AssignmentMechanism::Deterministic { policy_digest } => {
+                validate_sha256("assignment policy digest", policy_digest)?
+            }
+            AssignmentMechanism::Observational {
+                selection_process_ref,
+            } => require_nonempty("selection process reference", selection_process_ref)?,
             AssignmentMechanism::Unknown => {}
         }
         ensure_sha256_items("assumption_digests", &self.assumption_digests)?;
-        ensure_sha256_items("identification_assumption_digests", &self.identification_assumption_digests)?;
-        if self.causal_design != CausalDesign::NotClaimed && self.identification_assumption_digests.is_empty() {
+        ensure_sha256_items(
+            "identification_assumption_digests",
+            &self.identification_assumption_digests,
+        )?;
+        if self.causal_design != CausalDesign::NotClaimed
+            && self.identification_assumption_digests.is_empty()
+        {
             return Err("causal claim requires identification-assumption digests".into());
         }
         if self.causal_design == CausalDesign::RandomizedControlled
-            && !matches!(&self.assignment_mechanism, AssignmentMechanism::Randomized { .. }) {
+            && !matches!(
+                &self.assignment_mechanism,
+                AssignmentMechanism::Randomized { .. }
+            )
+        {
             return Err("randomized-controlled claim requires randomized assignment".into());
         }
         Ok(())
@@ -265,18 +342,34 @@ impl DecisionProposal {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ExecutionStatus { NotStarted, Started, Completed, Failed, TimedOut, Aborted }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum OutcomeStatus {
-    AwaitingObservation, ImmediateObserved, DelayedObserved, CensoredAtDeadline,
-    UnsupportedCounterfactual, Indeterminate, InvalidExecution, NotRun,
+pub enum ExecutionStatus {
+    NotStarted,
+    Started,
+    Completed,
+    Failed,
+    TimedOut,
+    Aborted,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ActionSupport { RecordedAction, NoRecordedAction }
+pub enum OutcomeStatus {
+    AwaitingObservation,
+    ImmediateObserved,
+    DelayedObserved,
+    CensoredAtDeadline,
+    UnsupportedCounterfactual,
+    Indeterminate,
+    InvalidExecution,
+    NotRun,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionSupport {
+    RecordedAction,
+    NoRecordedAction,
+}
 
 /// Evaluator-owned record. Never serialize this into candidate-process input.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -295,37 +388,68 @@ pub struct EvaluatorResolution {
     pub independent_adjudication_ref: Option<String>,
 }
 impl EvaluatorResolution {
-    pub fn validate_against(&self, c: &CandidateDecisionContext, p: &DecisionProposal) -> Result<(), String> {
+    pub fn validate_against(
+        &self,
+        c: &CandidateDecisionContext,
+        p: &DecisionProposal,
+    ) -> Result<(), String> {
         c.validate()?;
         p.validate_against(c)?;
         require_nonempty("resolution episode_id", &self.episode_id)?;
-        if self.episode_id != c.episode_id { return Err("resolution episode mismatch".into()); }
+        if self.episode_id != c.episode_id {
+            return Err("resolution episode mismatch".into());
+        }
         if self.finalized_at_ms.is_some_and(|t| t < c.decision_time_ms) {
             return Err("resolution finalized before decision".into());
         }
         for e in &self.evaluator_evidence {
             require_nonempty("evaluator evidence_id", &e.evidence_id)?;
             validate_sha256("evaluator evidence digest", &e.content_digest)?;
-            if e.observed_at_ms > e.available_at_ms { return Err("evaluator evidence availability precedes observation".into()); }
+            if e.observed_at_ms > e.available_at_ms {
+                return Err("evaluator evidence availability precedes observation".into());
+            }
             if self.finalized_at_ms.is_some_and(|t| e.available_at_ms > t) {
                 return Err("evaluator evidence arrived after finalization".into());
             }
         }
         if self.cost_completeness == CostCompleteness::Complete && !self.actual_cost.is_complete() {
-            return Err("complete cost requires every resource dimension, including measured zero".into());
+            return Err(
+                "complete cost requires every resource dimension, including measured zero".into(),
+            );
         }
-        if let Some(r) = &self.independent_adjudication_ref { require_nonempty("adjudication reference", r)?; }
+        if let Some(r) = &self.independent_adjudication_ref {
+            require_nonempty("adjudication reference", r)?;
+        }
 
         match self.execution_status {
-            ExecutionStatus::NotStarted if !matches!(self.outcome_status, OutcomeStatus::NotRun | OutcomeStatus::UnsupportedCounterfactual) =>
-                return Err("not-started execution must be not-run or unsupported".into()),
-            ExecutionStatus::Started if self.outcome_status != OutcomeStatus::AwaitingObservation =>
-                return Err("started execution must await observation".into()),
+            ExecutionStatus::NotStarted
+                if !matches!(
+                    self.outcome_status,
+                    OutcomeStatus::NotRun | OutcomeStatus::UnsupportedCounterfactual
+                ) =>
+            {
+                return Err("not-started execution must be not-run or unsupported".into());
+            }
+            ExecutionStatus::Started
+                if self.outcome_status != OutcomeStatus::AwaitingObservation =>
+            {
+                return Err("started execution must await observation".into());
+            }
             ExecutionStatus::Failed | ExecutionStatus::TimedOut | ExecutionStatus::Aborted
                 if self.outcome_status != OutcomeStatus::InvalidExecution =>
-                return Err("failed/timed-out/aborted execution must be invalid_execution".into()),
-            ExecutionStatus::Completed if matches!(self.outcome_status, OutcomeStatus::AwaitingObservation | OutcomeStatus::NotRun | OutcomeStatus::UnsupportedCounterfactual) =>
-                return Err("completed execution has incompatible outcome status".into()),
+            {
+                return Err("failed/timed-out/aborted execution must be invalid_execution".into());
+            }
+            ExecutionStatus::Completed
+                if matches!(
+                    self.outcome_status,
+                    OutcomeStatus::AwaitingObservation
+                        | OutcomeStatus::NotRun
+                        | OutcomeStatus::UnsupportedCounterfactual
+                ) =>
+            {
+                return Err("completed execution has incompatible outcome status".into());
+            }
             _ => {}
         }
 
@@ -338,47 +462,79 @@ impl EvaluatorResolution {
             }
             OutcomeStatus::ImmediateObserved | OutcomeStatus::DelayedObserved => {
                 self.require_action(&p.selected_action_id, &p.selected_action_payload_digest)?;
-                require_nonempty("observed outcome label", self.outcome_label.as_deref().unwrap_or_default())?;
+                require_nonempty(
+                    "observed outcome label",
+                    self.outcome_label.as_deref().unwrap_or_default(),
+                )?;
                 if self.evaluator_evidence.is_empty() || self.finalized_at_ms.is_none() {
                     return Err("observed outcome requires evidence and finalization time".into());
                 }
             }
             OutcomeStatus::CensoredAtDeadline | OutcomeStatus::Indeterminate => {
                 self.require_action(&p.selected_action_id, &p.selected_action_payload_digest)?;
-                if self.outcome_label.is_some() || self.evaluator_evidence.is_empty() || self.finalized_at_ms.is_none() {
+                if self.outcome_label.is_some()
+                    || self.evaluator_evidence.is_empty()
+                    || self.finalized_at_ms.is_none()
+                {
                     return Err("censored/indeterminate outcome requires evidence, no label and finalization time".into());
                 }
             }
             OutcomeStatus::UnsupportedCounterfactual => {
                 if self.execution_status != ExecutionStatus::NotStarted
                     || self.action_support != ActionSupport::NoRecordedAction
-                    || self.recorded_action_id.is_some() || self.recorded_action_payload_digest.is_some() || self.outcome_label.is_some()
-                    || !self.evaluator_evidence.is_empty() {
-                    return Err("unsupported counterfactual cannot carry execution or fabricated outcome".into());
+                    || self.recorded_action_id.is_some()
+                    || self.recorded_action_payload_digest.is_some()
+                    || self.outcome_label.is_some()
+                    || !self.evaluator_evidence.is_empty()
+                {
+                    return Err(
+                        "unsupported counterfactual cannot carry execution or fabricated outcome"
+                            .into(),
+                    );
                 }
             }
             OutcomeStatus::NotRun => {
                 if self.action_support != ActionSupport::NoRecordedAction
-                    || self.recorded_action_id.is_some() || self.recorded_action_payload_digest.is_some() || self.outcome_label.is_some()
-                    || !self.evaluator_evidence.is_empty() {
+                    || self.recorded_action_id.is_some()
+                    || self.recorded_action_payload_digest.is_some()
+                    || self.outcome_label.is_some()
+                    || !self.evaluator_evidence.is_empty()
+                {
                     return Err("not-run cannot carry recorded action or outcome".into());
                 }
             }
             OutcomeStatus::InvalidExecution => {
-                if self.outcome_label.is_some() { return Err("invalid execution cannot carry scientific label".into()); }
+                if self.outcome_label.is_some() {
+                    return Err("invalid execution cannot carry scientific label".into());
+                }
                 if self.action_support == ActionSupport::RecordedAction {
                     self.require_action(&p.selected_action_id, &p.selected_action_payload_digest)?;
-                } else if self.recorded_action_id.is_some() || self.recorded_action_payload_digest.is_some() {
-                    return Err("unrecorded action cannot have an action ID or payload digest".into());
+                } else if self.recorded_action_id.is_some()
+                    || self.recorded_action_payload_digest.is_some()
+                {
+                    return Err(
+                        "unrecorded action cannot have an action ID or payload digest".into(),
+                    );
                 }
             }
         }
         Ok(())
     }
-    fn require_action(&self, expected_id: &str, expected_payload_digest: &str) -> Result<(), String> {
-        if self.action_support != ActionSupport::RecordedAction { return Err("recorded action support required".into()); }
-        let actual_id = self.recorded_action_id.as_deref().ok_or_else(|| "recorded action ID required".to_string())?;
-        let actual_payload = self.recorded_action_payload_digest.as_deref()
+    fn require_action(
+        &self,
+        expected_id: &str,
+        expected_payload_digest: &str,
+    ) -> Result<(), String> {
+        if self.action_support != ActionSupport::RecordedAction {
+            return Err("recorded action support required".into());
+        }
+        let actual_id = self
+            .recorded_action_id
+            .as_deref()
+            .ok_or_else(|| "recorded action ID required".to_string())?;
+        let actual_payload = self
+            .recorded_action_payload_digest
+            .as_deref()
             .ok_or_else(|| "recorded action payload digest required".to_string())?;
         if actual_id != expected_id || actual_payload != expected_payload_digest {
             return Err("recorded action identity/payload differs from proposal".into());
@@ -389,7 +545,9 @@ impl EvaluatorResolution {
 
 fn validate_sha256(field: &str, value: &str) -> Result<(), String> {
     if value.len() != 64
-        || !value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
     {
         return Err(format!("{field} must be lowercase SHA-256 hex"));
     }
@@ -397,16 +555,24 @@ fn validate_sha256(field: &str, value: &str) -> Result<(), String> {
 }
 
 fn require_nonempty(field: &str, value: &str) -> Result<(), String> {
-    if value.trim().is_empty() { Err(format!("{field} must not be empty")) } else { Ok(()) }
+    if value.trim().is_empty() {
+        Err(format!("{field} must not be empty"))
+    } else {
+        Ok(())
+    }
 }
 fn ensure_unique(field: &str, values: &[String]) -> Result<(), String> {
     for (i, value) in values.iter().enumerate() {
-        if values[..i].iter().any(|prior| prior == value) { return Err(format!("{field} contains duplicate {value}")); }
+        if values[..i].iter().any(|prior| prior == value) {
+            return Err(format!("{field} contains duplicate {value}"));
+        }
     }
     Ok(())
 }
 fn ensure_sha256_items(field: &str, values: &[String]) -> Result<(), String> {
-    for value in values { validate_sha256(field, value)?; }
+    for value in values {
+        validate_sha256(field, value)?;
+    }
     Ok(())
 }
 
@@ -415,22 +581,37 @@ mod tests {
     use super::*;
     fn context() -> CandidateDecisionContext {
         CandidateDecisionContext {
-            schema_version: SCHEMA_VERSION, episode_id: "e1".into(), parent_episode_id: None,
-            task_family_id: "pilot".into(), decision_index: 0, decision_time_ms: 100,
-            deadline_ms: Some(1_000), phase: DecisionPhase::ExperimentalDesign,
+            schema_version: SCHEMA_VERSION,
+            episode_id: "e1".into(),
+            parent_episode_id: None,
+            task_family_id: "pilot".into(),
+            decision_index: 0,
+            decision_time_ms: 100,
+            deadline_ms: Some(1_000),
+            phase: DecisionPhase::ExperimentalDesign,
             decision_objective: DecisionObjectiveReference {
-                objective_digest: "1111111111111111111111111111111111111111111111111111111111111111".into(),
+                objective_digest:
+                    "1111111111111111111111111111111111111111111111111111111111111111".into(),
                 mode: DecisionValueMode::PriorFreeRobustMinimax,
                 utility_unit: Some("normalized_loss_units".into()),
-                loss_table_digest: Some("2222222222222222222222222222222222222222222222222222222222222222".into()),
+                loss_table_digest: Some(
+                    "2222222222222222222222222222222222222222222222222222222222222222".into(),
+                ),
             },
-            research_state_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
-            evidence_prefix_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
-            permitted_action_offer_list_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
-            context_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into(),
+            research_state_sha256:
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            evidence_prefix_sha256:
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+            permitted_action_offer_list_sha256:
+                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
+            context_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+                .into(),
             evidence_available_at_decision: vec![EvidenceReference {
-                evidence_id: "obs".into(), content_digest: "3333333333333333333333333333333333333333333333333333333333333333".into(),
-                observed_at_ms: 80, available_at_ms: 90,
+                evidence_id: "obs".into(),
+                content_digest: "3333333333333333333333333333333333333333333333333333333333333333"
+                    .into(),
+                observed_at_ms: 80,
+                available_at_ms: 90,
             }],
             permitted_action_ids: vec!["a".into(), "b".into()],
             estimated_budget: ResourceVector::default(),
@@ -438,42 +619,80 @@ mod tests {
     }
     fn proposal(c: &CandidateDecisionContext) -> DecisionProposal {
         DecisionProposal {
-            episode_id: c.episode_id.clone(), policy_id: "fixed".into(), policy_version: "1".into(),
-            selected_action_id: "a".into(), selected_action_payload_digest: "6666666666666666666666666666666666666666666666666666666666666666".into(),
-            rationale_digest: "4444444444444444444444444444444444444444444444444444444444444444".into(),
+            episode_id: c.episode_id.clone(),
+            policy_id: "fixed".into(),
+            policy_version: "1".into(),
+            selected_action_id: "a".into(),
+            selected_action_payload_digest:
+                "6666666666666666666666666666666666666666666666666666666666666666".into(),
+            rationale_digest: "4444444444444444444444444444444444444444444444444444444444444444"
+                .into(),
             assumption_digests: vec![],
             predicted_outcomes: vec![
-                PredictedOutcome { outcome_label: "yes".into(), probability_micros: 400_000 },
-                PredictedOutcome { outcome_label: "no".into(), probability_micros: 600_000 },
+                PredictedOutcome {
+                    outcome_label: "yes".into(),
+                    probability_micros: 400_000,
+                },
+                PredictedOutcome {
+                    outcome_label: "no".into(),
+                    probability_micros: 600_000,
+                },
             ],
             assignment_mechanism: AssignmentMechanism::Randomized {
                 action_probabilities: vec![
-                    ActionProbability { action_id: "a".into(), action_payload_digest: "6666666666666666666666666666666666666666666666666666666666666666".into(), probability_micros: 500_000 },
-                    ActionProbability { action_id: "b".into(), action_payload_digest: "7777777777777777777777777777777777777777777777777777777777777777".into(), probability_micros: 500_000 },
+                    ActionProbability {
+                        action_id: "a".into(),
+                        action_payload_digest:
+                            "6666666666666666666666666666666666666666666666666666666666666666"
+                                .into(),
+                        probability_micros: 500_000,
+                    },
+                    ActionProbability {
+                        action_id: "b".into(),
+                        action_payload_digest:
+                            "7777777777777777777777777777777777777777777777777777777777777777"
+                                .into(),
+                        probability_micros: 500_000,
+                    },
                 ],
                 protocol_ref: "random-protocol".into(),
             },
             causal_design: CausalDesign::RandomizedControlled,
-            identification_assumption_digests: vec!["5555555555555555555555555555555555555555555555555555555555555555".into()],
+            identification_assumption_digests: vec![
+                "5555555555555555555555555555555555555555555555555555555555555555".into(),
+            ],
         }
     }
     fn complete_cost() -> ResourceVector {
         ResourceVector {
-            inference_tokens: Some(0), cpu_millis: Some(1), accelerator_millis: Some(0),
-            wall_clock_millis: Some(1), expert_minutes: Some(0), data_cost_microusd: Some(0),
+            inference_tokens: Some(0),
+            cpu_millis: Some(1),
+            accelerator_millis: Some(0),
+            wall_clock_millis: Some(1),
+            expert_minutes: Some(0),
+            data_cost_microusd: Some(0),
         }
     }
     fn resolution(c: &CandidateDecisionContext) -> EvaluatorResolution {
         EvaluatorResolution {
-            episode_id: c.episode_id.clone(), execution_status: ExecutionStatus::Completed,
-            outcome_status: OutcomeStatus::DelayedObserved, action_support: ActionSupport::RecordedAction,
-            recorded_action_id: Some("a".into()), recorded_action_payload_digest: Some("6666666666666666666666666666666666666666666666666666666666666666".into()),
+            episode_id: c.episode_id.clone(),
+            execution_status: ExecutionStatus::Completed,
+            outcome_status: OutcomeStatus::DelayedObserved,
+            action_support: ActionSupport::RecordedAction,
+            recorded_action_id: Some("a".into()),
+            recorded_action_payload_digest: Some(
+                "6666666666666666666666666666666666666666666666666666666666666666".into(),
+            ),
             outcome_label: Some("yes".into()),
             evaluator_evidence: vec![EvidenceReference {
-                evidence_id: "result".into(), content_digest: "8888888888888888888888888888888888888888888888888888888888888888".into(),
-                observed_at_ms: 900, available_at_ms: 950,
+                evidence_id: "result".into(),
+                content_digest: "8888888888888888888888888888888888888888888888888888888888888888"
+                    .into(),
+                observed_at_ms: 900,
+                available_at_ms: 950,
             }],
-            finalized_at_ms: Some(960), actual_cost: complete_cost(),
+            finalized_at_ms: Some(960),
+            actual_cost: complete_cost(),
             cost_completeness: CostCompleteness::Complete,
             independent_adjudication_ref: Some("independent-review".into()),
         }
@@ -489,7 +708,11 @@ mod tests {
         assert!(c.validate().unwrap_err().contains("evidence_prefix_sha256"));
         c = context();
         c.permitted_action_offer_list_sha256 = "c".repeat(63);
-        assert!(c.validate().unwrap_err().contains("permitted_action_offer_list_sha256"));
+        assert!(
+            c.validate()
+                .unwrap_err()
+                .contains("permitted_action_offer_list_sha256")
+        );
     }
 
     #[test]
@@ -497,10 +720,18 @@ mod tests {
         let c = context();
         let mut p = proposal(&c);
         p.selected_action_payload_digest = "payload-not-a-sha256".into();
-        assert!(p.validate_against(&c).unwrap_err().contains("selected_action_payload_digest"));
+        assert!(
+            p.validate_against(&c)
+                .unwrap_err()
+                .contains("selected_action_payload_digest")
+        );
         let mut r = resolution(&c);
         r.evaluator_evidence[0].content_digest = "not-a-hash".into();
-        assert!(r.validate_against(&c, &proposal(&c)).unwrap_err().contains("evaluator evidence digest"));
+        assert!(
+            r.validate_against(&c, &proposal(&c))
+                .unwrap_err()
+                .contains("evaluator evidence digest")
+        );
     }
 
     #[test]
@@ -512,12 +743,15 @@ mod tests {
 
     #[test]
     fn rejects_lookahead_evidence() {
-        let mut c = context(); c.evidence_available_at_decision[0].available_at_ms = 101;
+        let mut c = context();
+        c.evidence_available_at_decision[0].available_at_ms = 101;
         assert!(c.validate().unwrap_err().contains("look-ahead"));
     }
     #[test]
     fn rejects_probability_mass_error() {
-        let c = context(); let mut p = proposal(&c); p.predicted_outcomes[0].probability_micros = 399_999;
+        let c = context();
+        let mut p = proposal(&c);
+        p.predicted_outcomes[0].probability_micros = 399_999;
         assert!(p.validate_against(&c).unwrap_err().contains("sum to"));
     }
     #[test]
@@ -525,25 +759,48 @@ mod tests {
         let c = context();
         let mut p = proposal(&c);
         p.assignment_mechanism = AssignmentMechanism::Randomized {
-            action_probabilities: vec![
-                ActionProbability { action_id: "a".into(), action_payload_digest: "6666666666666666666666666666666666666666666666666666666666666666".into(), probability_micros: 1_000_000 },
-            ],
+            action_probabilities: vec![ActionProbability {
+                action_id: "a".into(),
+                action_payload_digest:
+                    "6666666666666666666666666666666666666666666666666666666666666666".into(),
+                probability_micros: 1_000_000,
+            }],
             protocol_ref: "random-protocol".into(),
         };
-        assert!(p.validate_against(&c).unwrap_err().contains("every permitted action"));
+        assert!(
+            p.validate_against(&c)
+                .unwrap_err()
+                .contains("every permitted action")
+        );
 
         p.assignment_mechanism = AssignmentMechanism::Randomized {
             action_probabilities: vec![
-                ActionProbability { action_id: "a".into(), action_payload_digest: "6666666666666666666666666666666666666666666666666666666666666666".into(), probability_micros: 0 },
-                ActionProbability { action_id: "b".into(), action_payload_digest: "7777777777777777777777777777777777777777777777777777777777777777".into(), probability_micros: 1_000_000 },
+                ActionProbability {
+                    action_id: "a".into(),
+                    action_payload_digest:
+                        "6666666666666666666666666666666666666666666666666666666666666666".into(),
+                    probability_micros: 0,
+                },
+                ActionProbability {
+                    action_id: "b".into(),
+                    action_payload_digest:
+                        "7777777777777777777777777777777777777777777777777777777777777777".into(),
+                    probability_micros: 1_000_000,
+                },
             ],
             protocol_ref: "random-protocol".into(),
         };
-        assert!(p.validate_against(&c).unwrap_err().contains("selected action must have nonzero"));
+        assert!(
+            p.validate_against(&c)
+                .unwrap_err()
+                .contains("selected action must have nonzero")
+        );
     }
     #[test]
     fn rejects_unauthorized_action() {
-        let c = context(); let mut p = proposal(&c); p.selected_action_id = "off-menu".into();
+        let c = context();
+        let mut p = proposal(&c);
+        p.selected_action_id = "off-menu".into();
         assert!(p.validate_against(&c).unwrap_err().contains("outside"));
     }
     #[test]
@@ -551,38 +808,69 @@ mod tests {
         let c = context();
         let p = proposal(&c);
         let mut r = resolution(&c);
-        r.recorded_action_payload_digest = Some("9999999999999999999999999999999999999999999999999999999999999999".into());
-        assert!(r.validate_against(&c, &p).unwrap_err().contains("identity/payload differs"));
+        r.recorded_action_payload_digest =
+            Some("9999999999999999999999999999999999999999999999999999999999999999".into());
+        assert!(
+            r.validate_against(&c, &p)
+                .unwrap_err()
+                .contains("identity/payload differs")
+        );
     }
 
     #[test]
     fn rejects_fabricated_unsupported_outcome() {
-        let c = context(); let p = proposal(&c); let mut r = resolution(&c);
-        r.execution_status = ExecutionStatus::NotStarted; r.outcome_status = OutcomeStatus::UnsupportedCounterfactual;
-        r.action_support = ActionSupport::NoRecordedAction; r.recorded_action_id = None;
+        let c = context();
+        let p = proposal(&c);
+        let mut r = resolution(&c);
+        r.execution_status = ExecutionStatus::NotStarted;
+        r.outcome_status = OutcomeStatus::UnsupportedCounterfactual;
+        r.action_support = ActionSupport::NoRecordedAction;
+        r.recorded_action_id = None;
         r.recorded_action_payload_digest = None;
-        r.outcome_label = Some("yes".into()); r.evaluator_evidence.clear(); r.finalized_at_ms = None;
-        assert!(r.validate_against(&c, &p).unwrap_err().contains("unsupported counterfactual"));
+        r.outcome_label = Some("yes".into());
+        r.evaluator_evidence.clear();
+        r.finalized_at_ms = None;
+        assert!(
+            r.validate_against(&c, &p)
+                .unwrap_err()
+                .contains("unsupported counterfactual")
+        );
     }
     #[test]
     fn preserves_delayed_censored_and_indeterminate_states() {
-        let c = context(); let p = proposal(&c); let mut r = resolution(&c);
+        let c = context();
+        let p = proposal(&c);
+        let mut r = resolution(&c);
         assert!(r.validate_against(&c, &p).is_ok());
-        r.outcome_status = OutcomeStatus::CensoredAtDeadline; r.outcome_label = None;
+        r.outcome_status = OutcomeStatus::CensoredAtDeadline;
+        r.outcome_label = None;
         assert!(r.validate_against(&c, &p).is_ok());
         r.outcome_status = OutcomeStatus::Indeterminate;
         assert!(r.validate_against(&c, &p).is_ok());
     }
     #[test]
     fn complete_cost_requires_explicit_zero_or_value_for_every_dimension() {
-        let c = context(); let p = proposal(&c); let mut r = resolution(&c);
+        let c = context();
+        let p = proposal(&c);
+        let mut r = resolution(&c);
         r.actual_cost.accelerator_millis = None;
-        assert!(r.validate_against(&c, &p).unwrap_err().contains("every resource dimension"));
+        assert!(
+            r.validate_against(&c, &p)
+                .unwrap_err()
+                .contains("every resource dimension")
+        );
     }
     #[test]
     fn execution_failure_is_not_a_scientific_negative_result() {
-        let c = context(); let p = proposal(&c); let mut r = resolution(&c);
-        r.execution_status = ExecutionStatus::TimedOut; r.outcome_status = OutcomeStatus::DelayedObserved;
-        assert!(r.validate_against(&c, &p).unwrap_err().contains("invalid_execution"));
+        let c = context();
+        let p = proposal(&c);
+        let mut r = resolution(&c);
+        r.execution_status = ExecutionStatus::TimedOut;
+        r.outcome_status = OutcomeStatus::DelayedObserved;
+        assert!(
+            r.validate_against(&c, &p)
+                .unwrap_err()
+                .contains("invalid_execution")
+        );
     }
 }
