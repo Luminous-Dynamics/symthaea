@@ -130,6 +130,7 @@ pub enum EvidenceQualificationRejectV1 {
     SignatureTooLarge,
     SignatureRejected,
     TrustProfileInvalid,
+    TrustProfileVersionRollback,
     TrustProfileDigestMismatch,
     UnknownKey,
     RevokedKey,
