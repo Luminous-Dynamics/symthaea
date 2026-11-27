@@ -54,6 +54,78 @@ pub struct BivariateJointBins {
     pub marginalization_error: f64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChannelEvidenceBinding {
+    pub channel_id: String,
+    pub device_id: String,
+    pub device_evidence_version: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConditionalLikelihoodContext {
+    pub episode_id: String,
+    pub prediction_id: String,
+    pub prediction_version: u64,
+    pub covariance_model_id: String,
+    pub covariance_model_version: u64,
+    /// Identifies the explicit h/g/c conditioning assignment used for the
+    /// supplied mean and covariance. Do not pre-marginalize these states.
+    pub conditioning_state_id: String,
+    pub conditioning_state_version: u64,
+    pub common_cause_id: String,
+    pub common_cause_evidence_version: u64,
+    pub channels: [ChannelEvidenceBinding; 2],
+    pub measurement_action_id: String,
+    pub observation_window_id: String,
+    pub calibration_context_id: String,
+    pub calibration_epoch: u64,
+}
+
+impl ConditionalLikelihoodContext {
+    fn validate(&self) -> Result<(), RectangleError> {
+        let required = [
+            self.episode_id.as_str(),
+            self.prediction_id.as_str(),
+            self.covariance_model_id.as_str(),
+            self.conditioning_state_id.as_str(),
+            self.common_cause_id.as_str(),
+            self.measurement_action_id.as_str(),
+            self.observation_window_id.as_str(),
+            self.calibration_context_id.as_str(),
+            self.channels[0].channel_id.as_str(),
+            self.channels[0].device_id.as_str(),
+            self.channels[1].channel_id.as_str(),
+            self.channels[1].device_id.as_str(),
+        ];
+        if required.iter().any(|value| value.trim().is_empty())
+            || self.channels[0].channel_id == self.channels[1].channel_id
+            || (self.channels[0].device_id == self.channels[1].device_id
+                && self.channels[0].device_evidence_version
+                    != self.channels[1].device_evidence_version)
+        {
+            return Err(RectangleError::InvalidLikelihoodContext);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoundBivariateJointLikelihood {
+    /// Caller-supplied context, preserved unchanged alongside the table.
+    /// This is identity propagation, not digest verification or authentication.
+    pub context: ConditionalLikelihoodContext,
+    pub mean: [f64; 2],
+    pub covariance: [[f64; 2]; 2],
+    pub thresholds_first: Vec<f64>,
+    pub thresholds_second: Vec<f64>,
+    pub joint_bins: BivariateJointBins,
+    pub numerical_method: &'static str,
+    pub numerical_cutoff_sigma: f64,
+    pub outer_relative_tolerance: f64,
+    pub outer_absolute_tolerance: f64,
+    pub max_outer_integrand_evaluations: u64,
+}
+
 fn normal_pdf(x: f64) -> f64 {
     INV_SQRT_2PI * (-0.5 * x * x).exp()
 }
@@ -392,6 +464,36 @@ pub fn bivariate_gaussian_joint_bins(
     })
 }
 
+/// Generate a joint table while preserving the exact prediction, model,
+/// conditioning-state, common-cause, channel/device, action/window and
+/// calibration identities supplied by the caller. This function does not
+/// authenticate those identities or mutate an evidence ledger.
+pub fn bivariate_gaussian_joint_bins_bound(
+    mean: [f64; 2],
+    covariance: [[f64; 2]; 2],
+    thresholds_first: &[f64],
+    thresholds_second: &[f64],
+    context: ConditionalLikelihoodContext,
+) -> Result<BoundBivariateJointLikelihood, RectangleError> {
+    context.validate()?;
+    let joint_bins = bivariate_gaussian_joint_bins(
+        mean, covariance, thresholds_first, thresholds_second,
+    )?;
+    Ok(BoundBivariateJointLikelihood {
+        context,
+        mean,
+        covariance,
+        thresholds_first: thresholds_first.to_vec(),
+        thresholds_second: thresholds_second.to_vec(),
+        joint_bins,
+        numerical_method: "conditional-bivariate-adaptive-simpson-v1",
+        numerical_cutoff_sigma: CUTOFF,
+        outer_relative_tolerance: REL_TOL,
+        outer_absolute_tolerance: ABS_TOL,
+        max_outer_integrand_evaluations: MAX_OUTER_EVALUATIONS,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -567,6 +669,92 @@ mod tests {
             bivariate_gaussian_rectangle([0.0, 0.0], [[1.0, 0.2], [0.2, 1.0]],
                 [1.0, -1.0], [0.0, 1.0]),
             Err(RectangleError::InvalidBounds)
+        );
+    }
+
+
+    fn sample_likelihood_context() -> ConditionalLikelihoodContext {
+        ConditionalLikelihoodContext {
+            episode_id: "episode-17".to_string(),
+            prediction_id: "prediction-42".to_string(),
+            prediction_version: 3,
+            covariance_model_id: "ou-coupled-v2".to_string(),
+            covariance_model_version: 2,
+            conditioning_state_id: "h1-g0-deviceA0-deviceB1".to_string(),
+            conditioning_state_version: 8,
+            common_cause_id: "reference-chain-9".to_string(),
+            common_cause_evidence_version: 5,
+            channels: [
+                ChannelEvidenceBinding {
+                    channel_id: "mobile-channel".to_string(),
+                    device_id: "mobile-1".to_string(),
+                    device_evidence_version: 4,
+                },
+                ChannelEvidenceBinding {
+                    channel_id: "reference-channel".to_string(),
+                    device_id: "reference-1".to_string(),
+                    device_evidence_version: 7,
+                },
+            ],
+            measurement_action_id: "collocation-run-5".to_string(),
+            observation_window_id: "window-mobile-1-reference-4".to_string(),
+            calibration_context_id: "calibration-epoch-12".to_string(),
+            calibration_epoch: 12,
+        }
+    }
+
+    #[test]
+    fn bound_joint_likelihood_preserves_conditioning_and_measurement_identity() {
+        let context = sample_likelihood_context();
+        let result = bivariate_gaussian_joint_bins_bound(
+            [0.0, 0.0], [[1.0, 0.6], [0.6, 1.0]], &[0.0], &[0.0], context.clone(),
+        ).unwrap();
+        assert_eq!(result.context, context);
+        assert_eq!(result.context.common_cause_evidence_version, 5);
+        assert_eq!(result.context.channels[0].device_evidence_version, 4);
+        assert_eq!(result.context.channels[1].device_evidence_version, 7);
+        assert_eq!(result.context.conditioning_state_version, 8);
+        assert_eq!(result.thresholds_first, vec![0.0]);
+        assert_eq!(result.thresholds_second, vec![0.0]);
+        close(result.joint_bins.probabilities[1][1], 0.35241638234956674, 2.0e-10);
+        assert_eq!(result.numerical_method, "conditional-bivariate-adaptive-simpson-v1");
+        assert_eq!(result.max_outer_integrand_evaluations, MAX_OUTER_EVALUATIONS);
+    }
+
+    #[test]
+    fn bound_joint_likelihood_rejects_empty_identity_fields() {
+        let mut context = sample_likelihood_context();
+        context.conditioning_state_id.clear();
+        assert_eq!(
+            bivariate_gaussian_joint_bins_bound(
+                [0.0, 0.0], [[1.0, 0.6], [0.6, 1.0]], &[0.0], &[0.0], context,
+            ),
+            Err(RectangleError::InvalidLikelihoodContext)
+        );
+    }
+
+    #[test]
+    fn bound_joint_likelihood_rejects_inconsistent_same_device_versions() {
+        let mut context = sample_likelihood_context();
+        context.channels[1].device_id = context.channels[0].device_id.clone();
+        context.channels[1].device_evidence_version = 5;
+        assert_eq!(
+            bivariate_gaussian_joint_bins_bound(
+                [0.0, 0.0], [[1.0, 0.6], [0.6, 1.0]], &[0.0], &[0.0], context,
+            ),
+            Err(RectangleError::InvalidLikelihoodContext)
+        );
+    }
+
+    #[test]
+    fn bound_joint_likelihood_rejects_duplicate_channel_identity() {
+        let mut context = sample_likelihood_context();
+        context.channels[1].channel_id = context.channels[0].channel_id.clone();
+        assert_eq!(
+            bivariate_gaussian_joint_bins_bound(
+                [0.0, 0.0], [[1.0, 0.6], [0.6, 1.0]], &[0.0], &[0.0], context,
+            ),
+            Err(RectangleError::InvalidLikelihoodContext)
         );
     }
 
