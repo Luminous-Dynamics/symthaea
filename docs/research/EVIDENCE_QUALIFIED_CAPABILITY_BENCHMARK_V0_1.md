@@ -78,8 +78,8 @@ The initial contract artifacts are committed alongside this proposal:
 - `jsonschema 0.63.2`: offline Draft 2020-12 meta-schema and instance validation. HTTP and filesystem reference resolution are disabled; external references cannot silently fetch data during evaluation.
 - A Rust reference-contract evaluator that validates frozen input bytes, fixture/authority consistency, expected decisions, fail-closed denials, and two-sided baseline controls.
 - Receipt-schema tests for valid qualified receipts, invalid compensated-integrity receipts, missing independent replay, and valid records of failed/unqualified episodes.
-- A separate `eqc-system-observation-v0.1.schema.json` adapter envelope for a system-under-test to report its observed decision, task success, actor/subject, input hashes, authority-snapshot digest, mutations, provenance and independent replay.
-- A non-compensatory `qualify_observation` evaluator and CLI. It computes six dimensions independently and sets `qualified=true` only when every dimension passes; an unauthorized mutation cannot be averaged away by a successful answer.
+- A separate `eqc-system-observation-v0.1.schema.json` adapter envelope for a system-under-test to report its observed decision, task success, actor/subject, input hashes, authority-snapshot digest, mutations, provenance, independent replay, and actual resource usage (elapsed time, CPU, peak memory, tool calls, network bytes/endpoints, human interventions, energy and cost).
+- A non-compensatory `qualify_observation` evaluator and CLI. It computes the six evidence dimensions plus an operational budget-compliance gate and sets `qualified=true` only when every gate passes; an unauthorized mutation or over-budget run cannot be averaged away by a successful answer.
 
 Run the standalone reference evaluator from the repository root:
 
@@ -103,9 +103,9 @@ cargo run --locked --manifest-path tools/eqc-reference/Cargo.toml -- \
 
 The command exits non-zero when the episode is not qualified and preserves the dimension-specific failure reasons. The report distinguishes successful task validation from successful schema validation and continues to identify reference-seed mode as `reference_contract_only_not_system_under_test`. The seed corpus remains `synthetic_public_seed_unqualified`: no live health records or EHR, Holochain, or external cryptographic service is exercised. The adapter envelope and evaluator are ready for integration testing, but the presence of the schema does not mean that a live system has been run.
 
-## 3. Six independent dimensions
+## 3. Six evidence dimensions and an operational budget gate
 
-Publish all six dimensions separately. Do not collapse them into a weighted aggregate.
+Publish each dimension separately. Do not collapse them into a weighted aggregate. EQC adds an explicit resource-budget gate: systems must be compared at the budgets they were actually given, and exceeding a task's declared time, CPU, memory, tool-call or network budget makes that episode unqualified.
 
 | Dimension | Question | Primary measurements |
 |---|---|---|
@@ -115,21 +115,25 @@ Publish all six dimensions separately. Do not collapse them into a weighted aggr
 | Provenance | Can every claimed result be traced to its causes? | Evidence completeness, source lineage, policy/code/environment/result binding |
 | Reproducibility | Can an independent environment reproduce the outcome? | Replay agreement, deterministic equality, numerical residual/tolerance |
 | Failure containment | What happens under uncertainty, conflict or attack? | Unsafe action rate, abstention quality, recovery, duplicate/replay prevention |
+| Budget compliance | Did it stay within the declared task budget? | Elapsed time, CPU time, peak memory, tool calls, network bytes/endpoints |
+
+The system-observation schema also records **energy**, **monetary cost**, and **human interventions**. Those are reported as measured resources and used in the Pareto comparison; v0.1 does not set universal energy/cost/human-intervention limits because those limits depend on the target deployment and must be preregistered per benchmark profile.
+
+For the v0.1 public seed, the network policy is `none`: any network bytes or endpoint observations fail budget compliance. The reference evaluator currently accepts this closed policy only. `declared_endpoints_only` and `open` remain unsupported until endpoint allow-lists are part of the frozen task contract; the evaluator must reject rather than silently interpret them.
 
 Report performance and resource measurements alongside these dimensions:
 
-- p50 and p95 end-to-end latency;
-- total elapsed time and time spent by each stage;
-- CPU/GPU/memory and energy where measurable;
-- API, storage, and infrastructure cost;
+- p50/p95/p99 end-to-end latency and per-stage time;
+- CPU/GPU time, peak memory, and energy where measurable;
+- tool/API calls, network bytes and endpoints, infrastructure cost;
 - human interventions and review time;
-- cost per independently verified qualified success.
+- cost and energy per independently verified qualified success.
 
 ### 3.1 Qualified success
 
 For an episode (i), define:
 
-`qualified_i = capability_i AND authority_i AND input_integrity_i AND provenance_i AND replay_i AND containment_i`
+`qualified_i = capability_i AND authority_i AND input_integrity_i AND provenance_i AND reproducibility_i AND failure_containment_i AND budget_compliance_i`
 
 The AND is intentional. It is not a weighted score.
 
