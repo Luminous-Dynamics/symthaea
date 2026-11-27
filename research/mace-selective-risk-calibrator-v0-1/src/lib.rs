@@ -246,7 +246,7 @@ fn valid_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 fn nonempty(value: &str) -> bool { !value.trim().is_empty() && value.len() <= 512 }
-fn digest_serialized<T: Serialize>(value: &T) -> Result<String, CalibrationRejectV1> {
+fn digest_serialized<T: Serialize + ?Sized>(value: &T) -> Result<String, CalibrationRejectV1> {
     serde_json::to_vec(value).map(|bytes| sha256_hex(&bytes)).map_err(|_| CalibrationRejectV1::SerializationFailure)
 }
 
