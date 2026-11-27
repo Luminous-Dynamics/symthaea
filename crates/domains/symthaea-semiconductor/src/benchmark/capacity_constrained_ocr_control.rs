@@ -724,7 +724,7 @@ pub fn advance_capacity_ocrc_round_v1(
             ));
         }
         let Some(tracked) = candidate.tracked_rounds.get(&event.source_round).cloned() else {
-            let mut outcome = CapacityOcrcFeedbackOutcomeV1 {
+            let outcome = CapacityOcrcFeedbackOutcomeV1 {
                 source_round: event.source_round,
                 label_id: event.label_id.clone(),
                 disposition: OcrcFeedbackDispositionV1::NotTracked,
@@ -1262,11 +1262,11 @@ mod tests {
     fn empirical_risk_bound_matches_scalar_formula() {
         let p = policy();
         let bound = capacity_ocrc_risk_bound_v1(&p, 10_000).unwrap();
-        let load = 3.0;
+        let load = 0.75 + 0.50 + 0.25;
         let ratio = load / 2.0;
         let h = ratio - 1.0 - ratio.ln();
         let expected = 4.0 / (0.2 * 10_000.0)
-            + 3.0 / (1.0 * 10_000.0)
+            + 3.0 / (0.25 * 10_000.0)
             + (-2.0 * h).exp();
         assert!((bound.risk_gap_upper_bound - expected).abs() < 1.0e-12);
     }
@@ -1280,6 +1280,20 @@ mod tests {
         assert!(optimized.proxy_delay_survival.windows(2).all(|pair| pair[0] >= pair[1]));
         let load: f64 = optimized.proxy_delay_survival.iter().skip(1).sum();
         assert!(load <= 2.0 + 1.0e-12);
+    }
+
+    #[test]
+    fn bernoulli_proxy_optimizer_is_no_worse_than_neighbouring_grid_points() {
+        let optimized = optimize_capacity_ocrc_proxy_v1(2, 8, 10_000, 4096).unwrap();
+        let p = optimized.bernoulli_survival_probability;
+        let objective = optimized.objective_value;
+        for neighbour in [p - 0.25 / 4096.0, p + 0.25 / 4096.0] {
+            if neighbour > 0.0 && neighbour <= 0.25 {
+                assert!(
+                    objective <= proxy_objective(neighbour, 2, 8, 10_000) + 1.0e-12
+                );
+            }
+        }
     }
 
     #[test]
