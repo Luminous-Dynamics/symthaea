@@ -15,29 +15,29 @@ The hypothesis is that complete, evidence- and cost-aware decision histories can
 
 The current Futures Laboratory fixture in the evolutionary-rescue example support code bundles candidate-usable observation streams with privileged observations, the hidden trajectory, first-extinction labels and other evaluator-derived fields. This is workable for trusted offline analysis, but it is not a safe object to pass wholesale to a candidate research policy.
 
-A first custody adapter is now authored at `examples/support/evolutionary_rescue_custody.rs`, with the materializer at `examples/evolutionary_rescue_split_capsules.rs`. It projects one observation view at a time and writes candidate observations/receipt to one output root and evaluator outcomes/manifest to a disjoint output root. The generator refuses overlapping roots and file overwrites, uses opaque UUID world IDs, computes BLAKE3 byte digests, writes the evaluator manifest last, and reads the files back to verify their digest joins.
+A first custody adapter is authored at `examples/support/evolutionary_rescue_custody.rs`, with its materializer at `examples/evolutionary_rescue_split_capsules.rs`. It projects one observation view at a time and writes a **custodian-only full replay archive** to one output root and evaluator outcomes/manifest to a disjoint output root. The generator refuses overlapping roots, requires fresh empty output roots, refuses file overwrites, uses opaque UUID world IDs, computes BLAKE3 byte digests, writes the evaluator manifest last, and reads the files back to verify digest joins.
 
-The current observation record still exposes only simulation tick and sample values; it does not yet provide physical event time, availability time, per-observation source digests or a calibrated observation envelope. Those semantics must be supplied through the #12407 observation-event work before treating the pilot as an asynchronous/irregular-observation benchmark.
+**Critical temporal boundary:** the replay archive contains the entire observation sequence, including observations that are in the future relative to early decisions. It is not candidate input and must never be mounted into the candidate process. A trusted replay driver reads the archive and emits only the observation prefix whose availability time is no later than the current decision time, packaged in a `CandidateDecisionContext`. The evaluator outcome capsule remains separately controlled. A full archive hash does not authorize exposing the full archive.
 
-The pilot must materialize three logically separate artifacts.
+The current source observation record exposes simulation tick and sample values only. It does not yet provide physical event time, availability time, per-observation source digests or a calibrated observation envelope. Those semantics must be supplied through #12407 before this pilot can support asynchronous/irregular-time replay.
 
-### Candidate observation capsule
+The pilot materializes three separate artifacts and a runtime-only candidate view.
 
-Contains only the one observation view permitted for that treatment, observation IDs, source digests, event and availability times, task-family identity, public scenario contract, permitted actions, resource/deadline constraints, and prior candidate-visible decisions.
+### Custodian-only replay observation archive
 
-It must not contain privileged observations, future trajectory values, extinction labels, post-run scores, or a seed mapping that reveals held-out assignments.
+Contains one permitted observation view for the treatment and the complete time-ordered stream. This archive may contain future observations relative to any particular decision. It is accessible to the trusted replay driver only, not to the candidate process. The driver must produce monotonically advancing decision prefixes and enforce the decision-time availability cutoff.
 
-### Evaluator outcome capsule
+### Candidate-visible decision context
 
-Held by a separate evaluator process or custody domain. Contains hidden trajectories and ground truth, privileged/oracle observations, evaluator-only labels and scores, sealed task/seed mappings, and outcome-resolution/adjudication records.
+For each decision, the driver provides only the currently available evidence prefix, task-family identity, public scenario contract, permitted action set, resource/deadline constraints and previous candidate-visible decisions. The context digest binds exactly that prefix. No future observation, seed mapping, privileged measurement, trajectory label or post-run score may enter this context.
 
-A Rust module boundary is not access control against malicious candidate code. Pass only the candidate capsule into the candidate process and retain evaluator data elsewhere.
+### Evaluator outcome capsule and manifest
 
-### Evidence manifest
+Held by a separate evaluator process or custody domain. Contains hidden trajectories and ground truth, privileged/oracle observations, evaluator-only labels and scores, sealed task/seed mappings, seed/split provenance and outcome-resolution/adjudication records. Its evaluator-only manifest binds source commit and the replay/evaluator capsule digests.
 
-Binds capsules without disclosing evaluator payloads: schema/simulator version, content digests, world/task-family identity and seed commitment, observation-policy version, generator/build/environment digests, lineage/receipt references and custody metadata.
+A Rust type boundary is not access control against malicious candidate code. The candidate process must receive only the time-valid decision context and must not be able to read either the full replay archive or evaluator storage. Separate directories are not sufficient without OS/service-level access controls.
 
-A digest proves byte identity, not truth, independence, access control or correct custody. BLAKE3 here is an integrity identifier, not an authenticated signature. Separate directories are not a security boundary by themselves: the operator must ensure candidate credentials cannot read evaluator storage, and the candidate process must never mount the evaluator root.
+A digest proves byte identity, not truth, independence, access control or correct custody. BLAKE3 here is an integrity identifier, not an authenticated signature. The ten fixed public seeds remain a plumbing pilot; they do not create a sealed held-out benchmark split.
 
 ## 3. Contract prototype
 
@@ -105,9 +105,9 @@ Use the existing Futures Laboratory substrate and its current forecast evidence 
 - Run `evolutionary_rescue_generate_worlds` once to materialize the ten source fixtures.
 - Run `evolutionary_rescue_split_capsules` against those frozen fixtures, choosing one view (`census`, `noisy-trait`, or `shuffled-trait`) for each campaign.
 - Give the materializer disjoint candidate/evaluator output roots and the exact source commit SHA.
-- The generator assigns opaque UUID world IDs, writes candidate observations plus a candidate receipt to the candidate root, and writes hidden outcomes plus the joined custody manifest to the evaluator root.
+- The generator assigns opaque UUID world IDs, writes the full observation archive plus its replay receipt to the replay-custodian root, and writes hidden outcomes plus the joined custody manifest to the evaluator root.
 - Verify capsule byte digests and receipt/manifest/world-ID linkage after disk readback.
-- Never pass the current combined serialized-world object or evaluator root into a candidate process.
+- Never pass the current combined serialized-world object, full replay archive or evaluator root into a candidate process. The trusted replay driver must construct and send only the time-valid evidence prefix.
 
 Ten worlds are a custody/schema plumbing pilot only, not a test of adaptive research decisions or a confirmatory scientific benchmark. The evolutionary-rescue fixture is a passive recorded forecast world; it does not expose a sufficiently rich, independently observed set of alternative experimental branches. Do not use its ten seeds to claim off-policy decision quality, counterfactual discovery or research-taste superiority.
 
@@ -280,8 +280,8 @@ Implemented in this branch:
 - seven authored custody tests and a capsule materializer example.
 
 Not implemented or not yet verified:
-- the ten worlds have not been generated or split in this environment;
-- the capsule utility does not enforce OS/service access control or launch isolated candidate/evaluator processes;
+- the ten worlds have not been generated or split in this environment; the existing source seed split is public and is not a sealed confirmatory split;
+- the capsule utility does not implement a time-prefix replay driver, enforce OS/service access control or launch isolated candidate/evaluator processes;
 - current fixture observation timestamps remain simulation ticks, not full #12407 event/availability-time semantics;
 - integration with existing ledger/archive/receipts/attestation;
 - executable replay policy, live-fidelity audit, external benchmark runner or R4.
