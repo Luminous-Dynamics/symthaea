@@ -533,6 +533,9 @@ fn update_context_hierarchy(
     identity: Option<&StreamingContextIdentityV1>,
     residual: f64,
 ) -> Result<(), GatedStreamingAdapterErrorV1> {
+    let Some(identity) = identity else {
+        return Ok(());
+    };
     let next_global_support = state
         .global_context_support_count
         .checked_add(1)
@@ -542,8 +545,7 @@ fn update_context_hierarchy(
         (1.0 - global_alpha) * state.global_context_residual_ema + global_alpha * residual;
     state.global_context_support_count = next_global_support;
 
-    if let Some(identity) = identity {
-        for (level, context_id) in context_entries(identity) {
+    for (level, context_id) in context_entries(identity) {
             let key = context_id_key(level, &context_id);
             let entry = state.contexts.entry(key).or_insert(StreamingContextStateV1 {
                 level,
@@ -565,7 +567,6 @@ fn update_context_hierarchy(
                     "local context candidate state is non-finite".into(),
                 ));
             }
-        }
     }
     if !state.global_context_residual_ema.is_finite() {
         return Err(GatedStreamingAdapterErrorV1(
@@ -609,7 +610,9 @@ pub fn calibrate_streaming_temporal_threshold_v1(
         threshold,
         receipt_sha256: String::new(),
     };
-    receipt.receipt_sha256 = json_sha256(&receipt.clone()).unwrap_or_default();
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    receipt.receipt_sha256 = json_sha256(&canonical)?;
     policy.temporal_activation_threshold = threshold;
     policy.temporal_threshold_calibration = Some(receipt);
     Ok(policy)
@@ -1106,6 +1109,7 @@ mod tests {
             minimum_context_support: 2,
             temporal_ema_alpha: 0.20,
             temporal_activation_threshold: 0.05,
+            temporal_threshold_calibration: None,
         }
     }
 
@@ -1126,7 +1130,7 @@ mod tests {
         event_id: &str,
         event_time: i64,
         prediction_time: i64,
-        context_key: Option<&str>,
+        context: Option<(&str, &str)>,
         features: Vec<f64>,
     ) -> StreamingPredictionInputV1 {
         StreamingPredictionInputV1 {
@@ -1142,7 +1146,12 @@ mod tests {
             selected_feature_indices: vec![0, 1],
             feature_vector: features,
             global_baseline_prediction: 10.0,
-            context_key: context_key.map(str::to_string),
+            context_identity: context.map(|(equipment_id, chamber_id)| {
+                StreamingContextIdentityV1 {
+                    equipment_id: Some(equipment_id.into()),
+                    chamber_id: Some(chamber_id.into()),
+                }
+            }),
         }
     }
 
@@ -1221,7 +1230,7 @@ mod tests {
                 "event-1",
                 100,
                 102,
-                Some("eqp-1/ch-1"),
+                Some(("eqp-1", "ch-1")),
                 vec![1.0, 2.0],
             ),
         )
@@ -1557,9 +1566,15 @@ mod tests {
             ),
         )
         .unwrap();
+        let context_key = context_id_key(
+            StreamingContextLevelV1::EquipmentChamber,
+            "8:eqp-1|4:ch-1",
+        );
         engine.adapter_state.contexts.insert(
-            "eqp-1/ch-1".into(),
+            context_key,
             StreamingContextStateV1 {
+                level: StreamingContextLevelV1::EquipmentChamber,
+                context_id: "8:eqp-1|4:ch-1".into(),
                 residual_ema: 0.25,
                 support_count: u64::MAX,
             },
@@ -1757,7 +1772,7 @@ mod tests {
                 "event-2",
                 113,
                 115,
-                Some("eqp-2/ch-9"),
+                Some(("eqp-2", "ch-9")),
                 vec![1.0, 0.0],
             ),
         )
@@ -1766,8 +1781,22 @@ mod tests {
             unseen_context.context_correction,
             engine.adapter_state.global_context_residual_ema
         );
-        assert!(engine.adapter_state.contexts.contains_key("eqp-1/ch-1"));
-        assert!(!engine.adapter_state.contexts.contains_key("eqp-2/ch-9"));
+        assert!(engine.adapter_state.contexts.contains_key(&context_id_key(
+            StreamingContextLevelV1::Equipment,
+            "eqp-1"
+        )));
+        assert!(engine.adapter_state.contexts.contains_key(&context_id_key(
+            StreamingContextLevelV1::Chamber,
+            "ch-1"
+        )));
+        assert!(engine.adapter_state.contexts.contains_key(&context_id_key(
+            StreamingContextLevelV1::EquipmentChamber,
+            "8:eqp-1|4:ch-1"
+        )));
+        assert!(!engine.adapter_state.contexts.contains_key(&context_id_key(
+            StreamingContextLevelV1::Equipment,
+            "eqp-2"
+        )));
     }
 
     #[test]
