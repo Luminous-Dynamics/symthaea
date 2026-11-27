@@ -192,7 +192,9 @@ struct PairRow {
     conflicts: usize,
     sufficient: bool,
     memory_cost: Option<CostReceiptWire>,
+    memory_cost_status: Option<String>,
     no_memory_cost: Option<CostReceiptWire>,
+    no_memory_cost_status: Option<String>,
     pair_block_id: Option<String>,
     world_cluster_id: Option<String>,
     query_id: Option<String>,
@@ -502,6 +504,8 @@ fn score(
         gain_sum=gain_sum.checked_add(gain).ok_or("aggregate gain overflow")?;
         if paired.memory_induced_harm{harms+=1;}
         if sufficient{sufficient_count+=1;}
+        let memory_cost_status=memory.cost_receipt.as_ref().map(validate_cost).transpose()?.map(str::to_owned);
+        let no_memory_cost_status=baseline.cost_receipt.as_ref().map(validate_cost).transpose()?.map(str::to_owned);
         rows.push(PairRow {
             episode_id:id.clone(),memory_action:paired.memory.chosen_action,
             no_memory_action:paired.no_memory.chosen_action,
@@ -514,7 +518,8 @@ fn score(
             admissible_precision:paired.memory.admissible_evidence_precision.map(|x|(x.numerator,x.denominator)),
             selected_count:memory.selected_evidence_ids.len(),selected_invalid,
             selected_required,required_count:required.len(),conflicts,sufficient,
-            memory_cost:memory.cost_receipt.clone(),no_memory_cost:baseline.cost_receipt.clone(),
+            memory_cost:memory.cost_receipt.clone(),memory_cost_status,
+            no_memory_cost:baseline.cost_receipt.clone(),no_memory_cost_status,
             pair_block_id:memory.pair_block_id.clone(),world_cluster_id:memory.world_cluster_id.clone(),
             query_id:memory.query_id.clone()
         });
@@ -533,7 +538,8 @@ fn score(
         "selected_required_count":row.selected_required,"required_evidence_count":row.required_count,
         "unresolved_contradiction_pairs":row.conflicts,"decision_sufficient":row.sufficient,
         "pair_block_id":row.pair_block_id,"world_cluster_id":row.world_cluster_id,"query_id":row.query_id,
-        "memory_cost_receipt":row.memory_cost,"no_memory_cost_receipt":row.no_memory_cost
+        "memory_cost_receipt":row.memory_cost,"memory_cost_validation_status":row.memory_cost_status,
+        "no_memory_cost_receipt":row.no_memory_cost,"no_memory_cost_validation_status":row.no_memory_cost_status
     })).collect();
     let report=json!({
         "schema_version":"mace_dsm_paired_report_v0_1",
