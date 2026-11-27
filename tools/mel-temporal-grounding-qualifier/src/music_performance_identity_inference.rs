@@ -1081,9 +1081,9 @@ mod tests {
         let mut input = fixture();
         for triad in &mut input.candidate.triads {
             triad.performance_stay.response.model_answer =
-                crate::music_performance_identity::MusicListenAnswerV1::ChoiceA;
+                crate::music_listen_bench::MusicListenAnswerV1::ChoiceA;
             triad.musical_flip.response.model_answer =
-                crate::music_performance_identity::MusicListenAnswerV1::ChoiceA;
+                crate::music_listen_bench::MusicListenAnswerV1::ChoiceA;
         }
         let report = audit_paired_musical_identity_comparison(&input).unwrap();
         assert!(
