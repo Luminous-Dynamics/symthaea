@@ -12,6 +12,9 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
+use super::gated_streaming_adapter::{
+    STREAMING_PREDICTION_RECEIPT_SCHEMA_V1, StreamingPredictionReceiptV1,
+};
 use super::label_consumption_guard::{
     LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
@@ -66,6 +69,9 @@ pub enum ShiftReasonCodeV1 {
     EventTimeRegression,
     DuplicateObservation,
     MissingQualifiedLabelReport,
+    MissingPredictionReceipt,
+    PredictionReceiptDigestMismatch,
+    MeasurementEventMismatch,
     LabelNotCurrentK1,
     LabelNotEligible,
     LabelReportDigestMismatch,
@@ -142,13 +148,14 @@ pub struct EvidenceShiftObservationV1 {
     pub scope_id: String,
     pub event_time_unix_seconds: i64,
     pub available_at_unix_seconds: i64,
+    pub measurement_event_id: Option<String>,
     pub clock_domain_id: String,
     pub nominal_baseline_manifest_sha256: String,
     pub channel: ShiftSignalChannelV1,
     /// For reference-standard and sensor channels; VM residual is computed
     /// from the qualified K1 corrected value minus prediction_value.
     pub observation_value: Option<f64>,
-    pub prediction_value: Option<f64>,
+    pub prediction_receipt: Option<StreamingPredictionReceiptV1>,
     pub label_report: Option<LabelConsumptionEligibilityReportV1>,
     pub reference_standard_id: Option<String>,
     pub reference_evidence_sha256: Option<String>,
@@ -354,6 +361,13 @@ fn normalize_channel_value(
             let Some(report) = observation.label_report.as_ref() else {
                 return Err(vec![ShiftReasonCodeV1::MissingQualifiedLabelReport]);
             };
+            let Some(prediction) = observation.prediction_receipt.as_ref() else {
+                return Err(vec![ShiftReasonCodeV1::MissingPredictionReceipt]);
+            };
+            let measurement_event_id = observation
+                .measurement_event_id
+                .as_deref()
+                .filter(|value| !value.trim().is_empty());
             if report.frontier != LabelEvidenceFrontierV1::CurrentAtK1 {
                 reasons.push(ShiftReasonCodeV1::LabelNotCurrentK1);
             }
@@ -373,17 +387,31 @@ fn normalize_channel_value(
             {
                 reasons.push(ShiftReasonCodeV1::LabelReportDigestMismatch);
             }
-            let Some(prediction) = observation.prediction_value else {
-                return Err(vec![ShiftReasonCodeV1::NonFiniteObservation]);
-            };
-            if !prediction.is_finite() || !report.qualified_corrected_value.is_finite() {
+            if measurement_event_id != Some(report.measurement_event_id.as_str())
+                || measurement_event_id != Some(prediction.measurement_event_id.as_str())
+            {
+                reasons.push(ShiftReasonCodeV1::MeasurementEventMismatch);
+            }
+            if prediction.schema != STREAMING_PREDICTION_RECEIPT_SCHEMA_V1
+                || prediction.clock_domain_id != observation.clock_domain_id
+                || prediction.event_time_unix_seconds != observation.event_time_unix_seconds
+                || prediction.prediction_at_unix_seconds > observation.available_at_unix_seconds
+                || prediction_receipt_digest(prediction)
+                    .map_err(|_| vec![ShiftReasonCodeV1::PredictionReceiptDigestMismatch])?
+                    != prediction.receipt_sha256
+            {
+                reasons.push(ShiftReasonCodeV1::PredictionReceiptDigestMismatch);
+            }
+            if !prediction.prediction_value.is_finite()
+                || !report.qualified_corrected_value.is_finite()
+            {
                 reasons.push(ShiftReasonCodeV1::NonFiniteObservation);
             }
             if !reasons.is_empty() {
                 return Err(reasons);
             }
             Ok((
-                Some(report.qualified_corrected_value - prediction),
+                Some(report.qualified_corrected_value - prediction.prediction_value),
                 Some(report.label_id.clone()),
             ))
         }
@@ -903,11 +931,12 @@ mod tests {
             scope_id: scope.into(),
             event_time_unix_seconds: time,
             available_at_unix_seconds: time + 1,
+            measurement_event_id: None,
             clock_domain_id: "fab-clock".into(),
             nominal_baseline_manifest_sha256: digest('a'),
             channel,
             observation_value: None,
-            prediction_value: None,
+            prediction_receipt: None,
             label_report: None,
             reference_standard_id: None,
             reference_evidence_sha256: None,
@@ -960,9 +989,38 @@ mod tests {
             time,
             ShiftSignalChannelV1::VmResidual,
         );
-        observation.prediction_value = Some(10.0);
+        let event_id = format!("event-{id}");
+        let mut prediction = StreamingPredictionReceiptV1 {
+            schema: STREAMING_PREDICTION_RECEIPT_SCHEMA_V1.into(),
+            sequence,
+            sample_id: format!("sample-{id}"),
+            measurement_event_id: event_id.clone(),
+            event_time_unix_seconds: time,
+            feature_available_at_unix_seconds: time,
+            prediction_at_unix_seconds: time,
+            clock_domain_id: "fab-clock".into(),
+            global_model_artifact_sha256: digest('1'),
+            feature_schema_sha256: digest('2'),
+            policy_sha256: digest('3'),
+            context_key: Some(scope.into()),
+            feature_vector_sha256: digest('4'),
+            selected_feature_indices: vec![0],
+            selected_feature_vector: vec![1.0],
+            global_baseline_prediction: 10.0,
+            feature_adapter_prediction: 0.0,
+            context_correction: 0.0,
+            temporal_correction: 0.0,
+            base_prediction: 10.0,
+            prediction_value: 10.0,
+            adapter_state_before_sha256: digest('5'),
+            adapter_state_after_sha256: digest('5'),
+            receipt_sha256: String::new(),
+        };
+        prediction.receipt_sha256 = prediction_receipt_digest(&prediction).unwrap();
+        observation.measurement_event_id = Some(event_id.clone());
+        observation.prediction_receipt = Some(prediction);
         observation.reference_standard_id = Some("transfer-standard-001".into());
-        observation.label_report = Some(label_report(label_id, &format!("event-{id}"), 10.0 + residual));
+        observation.label_report = Some(label_report(label_id, &event_id, 10.0 + residual));
         observation
     }
 
