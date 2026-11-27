@@ -33,8 +33,8 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
             f"expected {expected_count} paired trials for {expected_split}")
     candidate_ids = [row["task_id"] for row in candidates]
     audit_ids = [row["task_id"] for row in audits]
-    require(len(set(candidate_ids)) == 80, "candidate task IDs must be unique")
-    require(len(set(audit_ids)) == 80, "auditor task IDs must be unique")
+    require(len(set(candidate_ids)) == expected_count, "candidate task IDs must be unique")
+    require(len(set(audit_ids)) == expected_count, "auditor task IDs must be unique")
     require(set(candidate_ids) == set(audit_ids), "candidate and auditor task IDs do not align")
 
     candidate_by_id = {row["task_id"]: row for row in candidates}
@@ -88,7 +88,7 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
     expected = {"baseline", "counterfactual", "placebo", "source_removed"}
     require(all(value == expected for value in conditions_per_template.values()),
             "each template must have all four paired conditions")
-    print("CEDAR-Bench generated streams: 80/80 candidate and auditor trials align; no condition/gold leakage detected")
+    print(f"CEDAR-Bench {expected_split} streams: {expected_count}/{expected_count} candidate and auditor trials align; no condition/gold leakage detected")
 
 
 def main() -> int:
