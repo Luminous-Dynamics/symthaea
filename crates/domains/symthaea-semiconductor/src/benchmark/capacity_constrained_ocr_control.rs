@@ -1369,8 +1369,18 @@ mod tests {
                 advance_capacity_ocrc_round_v1(&mut engine, &round_input(1, 2, vec![])).unwrap();
             let r2 = advance_capacity_ocrc_round_v1(
                 &mut engine,
-                &round_input(2, 0, vec![feedback(1, 2, 10.0, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy)]),
-            ).unwrap();
+                &round_input(
+                    2,
+                    0,
+                    vec![feedback(
+                        1,
+                        2,
+                        10.0,
+                        LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                    )],
+                ),
+            )
+            .unwrap();
             vec![r1.receipt_sha256, r2.receipt_sha256]
         }
         assert_eq!(run(), run());
@@ -1385,7 +1395,23 @@ mod tests {
         let mut engine = create_capacity_ocrc_engine_v1("ca-ocrc-evicted", p).unwrap();
         advance_capacity_ocrc_round_v1(&mut engine, &round_input(1, 0, vec![])).unwrap();
         advance_capacity_ocrc_round_v1(&mut engine, &round_input(2, 0, vec![])).unwrap();
-        let receipt = advance_capacity_ocrc_round_v1(&mut engine, &round_input(3, 0, vec![feedback(1, 3, 10.0, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy)])).unwrap();
-        assert_eq!(receipt.feedback_outcomes[0].disposition, OcrcFeedbackDispositionV1::NotTracked);
+        let receipt = advance_capacity_ocrc_round_v1(
+            &mut engine,
+            &round_input(
+                3,
+                0,
+                vec![feedback(
+                    1,
+                    3,
+                    10.0,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                )],
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.feedback_outcomes[0].disposition,
+            OcrcFeedbackDispositionV1::NotTracked
+        );
     }
 }
