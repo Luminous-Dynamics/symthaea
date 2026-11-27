@@ -1,0 +1,114 @@
+{
+  "schema_version": "luminous.neuroalign.candidate-matrix.v1",
+  "audit_date": "2026-11-27",
+  "audited_main_sha": "1099539fa43a4578948ab152a622ac1bca04efdb",
+  "status": "source_audit_only_no_runtime_or_dataset_execution",
+  "programme_issue": 14054,
+  "candidates": [
+    {
+      "id": "bge_m3_layer_activations",
+      "sources": [
+        "src/perception/layer_extractor.rs",
+        "src/perception/bge_m3.rs",
+        "src/perception/modern_embeddings.rs"
+      ],
+      "dimensions": {
+        "layers": 24,
+        "hidden": 1024
+      },
+      "feature_gate": "neural-bridge",
+      "candidate_lane": "brain_score_language",
+      "readiness": "source_path_exists_model_load_unverified_adapter_missing",
+      "known_gaps": [
+        "Hugging Face model revision and exact weight digests not pinned",
+        "layer extractor passes no expected SHA-256 to integrity wrapper",
+        "no Brain-Score Language ArtificialSubject adapter",
+        "UnifiedEmbedder embed_batch is sequential"
+      ],
+      "primary_question": "Do preregistered BGE-M3 layers predict held-out human language neural or behavioural measurements?"
+    },
+    {
+      "id": "bge_m3_hdc_projection",
+      "sources": [
+        "src/perception/neural_bridge.rs",
+        "src/perception/neural_bridge_v2.rs"
+      ],
+      "dimension": 16384,
+      "feature_gate": "neural-bridge",
+      "candidate_lane": "brain_score_language_ablation",
+      "readiness": "trained_probe_artifact_required",
+      "known_gaps": [
+        "default probe artifact path is models/neural_bridge/probe_weights_bge_m3.npy",
+        "encoder_only creates a zero-filled projection",
+        "probe training corpus, training split, checkpoint digest and validation lineage must be bound"
+      ],
+      "primary_question": "Does a provenance-pinned trained HDC projection preserve or improve predictive structure relative to raw BGE-M3 activations?"
+    },
+    {
+      "id": "patch_hdc_cfc_vision",
+      "sources": [
+        "crates/domains/symthaea-vision-manifold/src/encoder.rs",
+        "crates/domains/symthaea-vision-manifold/src/manifold.rs",
+        "crates/domains/symthaea-vision-manifold/src/types.rs"
+      ],
+      "feature_gate": "vision-manifold",
+      "candidate_lane": "ctdb_and_conditional_brain_score_vision",
+      "readiness": "active_crate_optional_feature_no_pretrained_vision_backbone",
+      "known_gaps": [
+        "root vision-manifold feature is optional and not part of root default features",
+        "no pretrained visual backbone",
+        "read-only feature/trajectory export receipt not yet defined",
+        "no CtDB or Brain-Score adapter verified"
+      ],
+      "primary_question": "Does CfC temporal state add computation/prediction value over patch-HDC and matched temporal baselines?"
+    },
+    {
+      "id": "nlb_neural_population",
+      "sources": [
+        "external: https://github.com/neurallatents/nlb_tools"
+      ],
+      "candidate_lane": "nlb21",
+      "readiness": "later_requires_dataset_native_neural_population_interface",
+      "known_gaps": [
+        "official baseline reproduction required",
+        "test split is public since January 2026; keep out of tuning",
+        "Symthaea neural latent/co-smoothing interface not yet qualified"
+      ],
+      "primary_question": "Can Symthaea model held-out neural population activity under official NLB task protocols?"
+    },
+    {
+      "id": "falcon_neural_decoding",
+      "sources": [
+        "external: https://snel-repo.github.io/falcon/"
+      ],
+      "candidate_lane": "falcon",
+      "readiness": "later_requires_sensorimotor_decoder_and_recalibration_protocol",
+      "known_gaps": [
+        "no qualified sensorimotor decoder adapter in this research slice",
+        "must match task-specific train/held-out/recalibration protocol"
+      ],
+      "primary_question": "Can Symthaea decode neural activity robustly under held-out-session and recalibration conditions?"
+    }
+  ],
+  "benchmark_policy": {
+    "separate_lanes": [
+      "neural_and_behavioral_predictivity",
+      "computation_through_dynamics",
+      "neural_population_decoding",
+      "sensorimotor_decoding",
+      "resource_efficiency"
+    ],
+    "no_composite_score": true,
+    "no_consciousness_inference": true,
+    "required_controls": [
+      "linear_or_ridge",
+      "task_specific_official_baseline",
+      "matched_recurrent_baseline",
+      "data_or_label_permutation",
+      "time_shift_or_alignment_control",
+      "held_out_subject_or_session",
+      "held_out_task_or_stimulus_family"
+    ],
+    "promotion": "official_baseline_reproduction_plus_preregistered_paired_holdout_improvement_or_noninferior_quality_with_measured_resource_gain"
+  }
+}
