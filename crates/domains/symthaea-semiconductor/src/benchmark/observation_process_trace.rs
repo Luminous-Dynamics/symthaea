@@ -370,7 +370,7 @@ fn validate_operational(
                 || op.measurement_value.is_none_or(|value| !value.is_finite())
                 || op
                     .standard_uncertainty_upper_bound
-                    .is_none_or(|value| !value.is_finite() || value < 0.0)
+                    .is_some_and(|value| !value.is_finite() || value < 0.0)
             {
                 return Err(ObservationProcessTraceErrorV1(format!(
                     "round {} measured label identity/value/uncertainty is incomplete",
@@ -389,10 +389,10 @@ fn validate_operational(
                 || Some(report.label_revision) != op.label_revision
                 || report.measurement_event_id != row.measurement_event_id
                 || Some(report.label_sha256.as_str()) != op.label_payload_sha256.as_deref()
-                || Some(report.qualified_corrected_value) != op.measurement_value
+                || !report.qualified_corrected_value.is_finite()
                 || report
                     .qualified_standard_uncertainty_upper_bound
-                    .is_none_or(|value| !value.is_finite() || value < 0.0)
+                    .is_some_and(|value| !value.is_finite() || value < 0.0)
                 || report.qualified_standard_uncertainty_upper_bound
                     != op.standard_uncertainty_upper_bound
             {
@@ -419,6 +419,15 @@ fn validate_operational(
             if op.qualification_state != expected {
                 return Err(ObservationProcessTraceErrorV1(format!(
                     "round {} operational K1 state conflicts with its receipt",
+                    row.round_id
+                )));
+            }
+            if expected == OperationalQualificationStateV1::Eligible
+                && (op.measurement_value != Some(report.qualified_corrected_value)
+                    || op.standard_uncertainty_upper_bound.is_none())
+            {
+                return Err(ObservationProcessTraceErrorV1(format!(
+                    "round {} eligible K1 label must exactly match the qualified value and uncertainty bound",
                     row.round_id
                 )));
             }
