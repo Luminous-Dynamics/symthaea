@@ -160,6 +160,9 @@ pub struct AudioEvidenceVerificationReportV1 {
     pub context_manifest_recomputed: bool,
     pub request_body_sha256: String,
     pub request_body_bytes_recomputed: bool,
+    /// Every selected PCM window's bytes were present inside the request envelope.
+    pub request_body_audio_payloads_recomputed: bool,
+    pub request_body_audio_payload_byte_length: u64,
     /// Parsed request fields were checked against the exact materialization manifest.
     pub request_body_semantics_bound: bool,
     pub request_body_delivery_attested: bool,
@@ -233,6 +236,8 @@ struct ClientAudioWindowV1 {
     start_frame: u64,
     end_frame: u64,
     sha256: String,
+    /// Exact selected PCM bytes carried in the serialized client request.
+    payload_hex: String,
 }
 
 pub fn verify_audio_evidence_manifest_json(
@@ -345,7 +350,8 @@ pub fn verify_audio_evidence_manifest(
     }
     let client_request: ClientModelAudioRequestV1 = serde_json::from_slice(request_body_bytes)
         .map_err(|error| format!("invalid client model request body JSON: {error}"))?;
-    validate_client_request_body(&client_request, manifest)?;
+    let request_body_audio_payload_byte_length =
+        validate_client_request_body(&client_request, manifest, decoded_pcm_bytes)?;
 
     if manifest.decoded_pcm.sample_rate_hz == 0 || manifest.decoded_pcm.channels == 0 {
         return Err("decoded PCM sample rate and channel count must be positive".into());
@@ -491,6 +497,8 @@ pub fn verify_audio_evidence_manifest(
         context_manifest_recomputed: true,
         request_body_sha256,
         request_body_bytes_recomputed: true,
+        request_body_audio_payloads_recomputed: true,
+        request_body_audio_payload_byte_length,
         request_body_semantics_bound: true,
         request_body_delivery_attested: false,
         verified_window_count: verified_windows.len(),
@@ -506,7 +514,8 @@ pub fn verify_audio_evidence_manifest(
 fn validate_client_request_body(
     request: &ClientModelAudioRequestV1,
     manifest: &AudioEvidenceWindowManifestV1,
-) -> Result<(), String> {
+    decoded_pcm_bytes: &[u8],
+) -> Result<u64, String> {
     if request.schema != "mel-client-model-request-v1"
         || request.experiment_unit_id != manifest.experiment_unit_id
         || request.query_id != manifest.query_id
@@ -521,28 +530,109 @@ fn validate_client_request_body(
     {
         return Err("client request body semantics differ from the exact evidence manifest".into());
     }
-    if request.audio_windows.len() != manifest.windows.len() {
+    if request.audio_windows.len() != manifest.context.items.len() {
         return Err(
-            "client request body window count differs from materialized evidence windows".into(),
+            "client request body window count differs from ordered materialized context".into(),
         );
     }
-    for (index, (request_window, manifest_window)) in request
+
+    let bytes_per_frame = u64::from(manifest.decoded_pcm.channels)
+        .checked_mul(manifest.decoded_pcm.sample_format.bytes_per_sample())
+        .ok_or_else(|| "request payload bytes-per-frame overflow".to_string())?;
+    let mut total_payload_bytes = 0_u64;
+
+    // The request's actual order is the context manifest order, not the order
+    // in which window definitions happen to appear in the outer manifest.
+    for (index, (request_window, context_item)) in request
         .audio_windows
         .iter()
-        .zip(&manifest.windows)
+        .zip(&manifest.context.items)
         .enumerate()
     {
-        if request_window.window_id != manifest_window.window_id
-            || request_window.start_frame != manifest_window.start_frame
-            || request_window.end_frame != manifest_window.end_frame
-            || request_window.sha256 != manifest_window.window_pcm_sha256
+        let window = manifest
+            .windows
+            .iter()
+            .find(|window| window.window_id == context_item.window_id)
+            .ok_or_else(|| {
+                format!(
+                    "ordered context references missing window {}",
+                    context_item.window_id
+                )
+            })?;
+
+        if request_window.window_id != context_item.window_id
+            || request_window.window_id != window.window_id
+            || request_window.start_frame != window.start_frame
+            || request_window.end_frame != window.end_frame
+            || request_window.sha256 != window.window_pcm_sha256
+            || request_window.sha256 != context_item.payload_sha256
         {
             return Err(format!(
-                "client request body window {index} does not match the exact materialized frame slice"
+                "client request body window {index} does not match the ordered materialized frame slice"
             ));
         }
+
+        let start_byte = window
+            .start_frame
+            .checked_mul(bytes_per_frame)
+            .ok_or_else(|| format!("request window {} offset overflow", window.window_id))?;
+        let end_byte = window
+            .end_frame
+            .checked_mul(bytes_per_frame)
+            .ok_or_else(|| format!("request window {} end overflow", window.window_id))?;
+        let start = usize::try_from(start_byte)
+            .map_err(|_| format!("request window {} offset exceeds host usize", window.window_id))?;
+        let end = usize::try_from(end_byte)
+            .map_err(|_| format!("request window {} end exceeds host usize", window.window_id))?;
+        let pcm_slice = decoded_pcm_bytes
+            .get(start..end)
+            .ok_or_else(|| format!("request window {} is outside decoded PCM bytes", window.window_id))?;
+
+        let request_payload = decode_hex_payload(&request_window.payload_hex)
+            .map_err(|error| format!("request window {} payload: {error}", window.window_id))?;
+        if request_payload.as_slice() != pcm_slice {
+            return Err(format!(
+                "client request body window {} does not contain the exact selected PCM bytes",
+                window.window_id
+            ));
+        }
+        let payload_sha256 = sha256_hex(&request_payload);
+        if payload_sha256 != window.window_pcm_sha256 {
+            return Err(format!(
+                "client request body window {} payload digest mismatch",
+                window.window_id
+            ));
+        }
+        total_payload_bytes = total_payload_bytes
+            .checked_add(request_payload.len() as u64)
+            .ok_or_else(|| "total request audio payload byte count overflow".to_string())?;
     }
-    Ok(())
+    Ok(total_payload_bytes)
+}
+
+fn decode_hex_payload(value: &str) -> Result<Vec<u8>, String> {
+    if value.len() % 2 != 0 {
+        return Err("payload_hex must have an even number of hexadecimal digits".into());
+    }
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len() / 2);
+    for (index, pair) in bytes.chunks_exact(2).enumerate() {
+        let high = hex_nibble(pair[0])
+            .ok_or_else(|| format!("invalid hexadecimal digit at byte {}", index * 2))?;
+        let low = hex_nibble(pair[1])
+            .ok_or_else(|| format!("invalid hexadecimal digit at byte {}", index * 2 + 1))?;
+        decoded.push((high << 4) | low);
+    }
+    Ok(decoded)
+}
+
+fn hex_nibble(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        b'A'..=b'F' => Some(value - b'A' + 10),
+        _ => None,
+    }
 }
 
 fn validate_context(
