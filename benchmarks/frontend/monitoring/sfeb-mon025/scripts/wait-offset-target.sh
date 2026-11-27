@@ -9,7 +9,8 @@ CONNECT_URL="$(printenv MON025_CONNECT_URL || true)"
 [ -n "$CONNECT_URL" ] || CONNECT_URL="http://127.0.0.1:8083"
 case "$CONNECTOR" in *[!A-Za-z0-9_-]*|'') echo "invalid connector name" >&2; exit 64 ;; esac
 case "$TARGET" in lsn_events_processed_1|transactional_message) ;; *) echo "invalid target" >&2; exit 64 ;; esac
-case "$TIMEOUT_SECONDS:$INTERVAL_SECONDS" in *[!0-9:]*|'') echo "timeout and interval must be positive integers" >&2; exit 64 ;; esac
+case "$TIMEOUT_SECONDS" in *[!0-9]*|'') echo "timeout must be a positive integer" >&2; exit 64 ;; esac
+case "$INTERVAL_SECONDS" in *[!0-9]*|'') echo "interval must be a positive integer" >&2; exit 64 ;; esac
 [ "$TIMEOUT_SECONDS" -gt 0 ] && [ "$INTERVAL_SECONDS" -gt 0 ] || { echo "timeout and interval must be positive" >&2; exit 64; }
 [ ! -e "$OUT_DIR" ] || { echo "output directory already exists" >&2; exit 73; }
 mkdir -p "$(dirname "$OUT_DIR")"

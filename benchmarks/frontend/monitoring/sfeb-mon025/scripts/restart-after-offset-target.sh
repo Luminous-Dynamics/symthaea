@@ -9,10 +9,9 @@ jq -e '.profile == "mon033-postgres-offset-target-v1" and .target_reached == tru
   echo "target proof invalid; refusing restart" >&2; exit 65;
 }
 [ -f "$ROOT/.env" ] || { echo ".env is required" >&2; exit 66; }
-grep -Eq '^COMPOSE_PROJECT_NAME=mon025-[A-Za-z0-9_-]+$' "$ROOT/.env" || {
-  echo "COMPOSE_PROJECT_NAME must use the mon025- disposable-lab prefix" >&2; exit 64;
-}
-docker compose --env-file "$ROOT/.env" -f "$ROOT/compose/compose.yaml" --project-directory "$ROOT/compose" restart connect
+PROJECT_NAME="$(grep -E '^COMPOSE_PROJECT_NAME=' "$ROOT/.env" | tail -n1 | cut -d= -f2-)"
+case "$PROJECT_NAME" in mon025-[A-Za-z0-9_-]*) ;; *) echo "COMPOSE_PROJECT_NAME must use the mon025- disposable-lab prefix" >&2; exit 64 ;; esac
+docker compose -p "$PROJECT_NAME" --env-file "$ROOT/.env" -f "$ROOT/compose/compose.yaml" --project-directory "$ROOT/compose" restart connect
 CONNECT_URL="$(printenv MON025_CONNECT_URL || true)"
 [ -n "$CONNECT_URL" ] || CONNECT_URL="http://127.0.0.1:8083"
 attempt=0
