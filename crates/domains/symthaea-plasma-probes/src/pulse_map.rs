@@ -274,14 +274,13 @@ pub fn check_pulse_jacobians_central_difference(
         phase_rad: kick.phase_rad - difference_step,
         ..*kick
     };
-    let amplitude_denominator = if kick.amplitude >= difference_step {
-        2.0 * difference_step
+    let fd_v_amplitude = if kick.amplitude >= difference_step {
+        (amp_plus.apply(position, velocity)?.v - amp_minus.apply(position, velocity)?.v)
+            / (2.0 * difference_step)
     } else {
-        kick.amplitude + difference_step
+        (amp_plus.apply(position, velocity)?.v - kick.apply(position, velocity)?.v)
+            / difference_step
     };
-    let fd_v_amplitude = (amp_plus.apply(position, velocity)?.v
-        - amp_minus.apply(position, velocity)?.v)
-        / amplitude_denominator;
     let fd_v_phase = (phase_plus.apply(position, velocity)?.v
         - phase_minus.apply(position, velocity)?.v)
         / (2.0 * difference_step);
@@ -411,6 +410,22 @@ mod tests {
         .kinetic_energy_delta(0.7, 1.2)
         .unwrap();
         assert!(delta * reverse <= 0.0);
+    }
+
+    #[test]
+    fn amplitude_zero_uses_a_valid_forward_difference_at_the_admissible_boundary() {
+        let kick = SinusoidalVelocityKick::new(
+            -std::f64::consts::PI,
+            2.0 * std::f64::consts::PI,
+            2,
+            0.0,
+            0.37,
+        )
+        .unwrap();
+        let check = check_pulse_jacobians_central_difference(&kick, 0.23, -0.4, 1.0e-6).unwrap();
+        assert!(check.state_jacobian_max_abs_error < 1.0e-10);
+        assert!(check.parameter_jacobian_max_abs_error < 1.0e-6);
+        assert!(check.symplectic_defect < 1.0e-14);
     }
 
     #[test]
