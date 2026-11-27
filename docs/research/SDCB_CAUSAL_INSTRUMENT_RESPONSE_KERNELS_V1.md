@@ -263,3 +263,7 @@ For adjacent unit windows the expected matrix is:
 The authoring-runtime SciPy `dblquad` checks used absolute/relative tolerances 1e-13. These are independent numerical references, not Rust execution. The bridge adds four authored tests, all uncompiled/unexecuted.
 
 A positive sensor-inlet calibration control is also authored: the two observationally equivalent passive models have different sensor-only step responses (0.8646647167633873 versus 0.11750309741540454 at t=0.5). The test demonstrates that an excitation applied directly at the sensor inlet breaks the pole-label equivalence, whereas an upstream excitation through the unknown first-order process/sensor cascade need not.
+
+A further executable identifiability control now evaluates the frequency response of the unit-DC-gain physical relaxation + first-order sensor cascade:
+`H(s)=lambda*mu/((s+lambda)*(s+mu))`.
+The magnitude is `(lambda/hypot(lambda,omega))*(mu/hypot(mu,omega))`; phase is `-atan2(omega,lambda)-atan2(omega,mu)`. A new test verifies identical magnitude and phase under the same pole-swap transformation across six frequencies. This demonstrates that even an upstream frequency sweep cannot label the two poles for this symmetric cascade. The sensor-inlet frequency response remains a separate observable and can break that ambiguity. The standalone response source now has twenty-four authored Rust tests; the interval bridge has four.
