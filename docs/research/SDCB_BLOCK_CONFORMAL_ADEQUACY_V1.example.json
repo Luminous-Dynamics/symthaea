@@ -99,6 +99,6 @@
   "previously_consumed_epoch_ids": [],
   "previously_consumed_unit_ids": [],
   "notes": [
-    "Synthetic rank fixture; exchangeability is assumed, not inferred."
+    "Synthetic rank fixture; exchangeability is assumed, not inferred. Digest values are illustrative fixed SHA-256 identifiers; real campaigns must bind the actual frozen model and scoring protocol bytes."
   ]
 }
