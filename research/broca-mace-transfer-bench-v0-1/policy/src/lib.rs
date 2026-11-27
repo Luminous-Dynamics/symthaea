@@ -675,10 +675,17 @@ impl QualifiedGroup {
         self.source_families.insert(item.source_family);
         self.source_root_digests.insert(item.source_root_digest);
         if item.event_id >= 100 {
+            let same_digest = self.estimand_digest == Some(item.causal_identification.estimand_digest);
+            let same_semantic = self.semantic_estimand == Some(item.causal_identification.semantic_estimand);
             eprintln!(
-                "MACE group add action={:?} event={} state=({:?},{:?}) item=({:?},{:?})",
+                "MACE group add action={:?} event={} mixed_before={} digest_present={} semantic_present={} same_digest={} same_semantic={} state=({:?},{:?}) item=({:?},{:?})",
                 item.action,
                 item.event_id,
+                self.mixed_estimands,
+                self.estimand_digest.is_some(),
+                self.semantic_estimand.is_some(),
+                same_digest,
+                same_semantic,
                 self.estimand_digest,
                 self.semantic_estimand.map(|value| value.canonical_digest()),
                 item.causal_identification.estimand_digest,
