@@ -23,6 +23,7 @@ Copy `.env.example` to `.env`, set both local-only passwords, and assign a fresh
 ```sh
 cp .env.example .env
 # Edit .env: set MON025_DB_PASSWORD, MON025_CONNECTOR_DB_PASSWORD and a unique COMPOSE_PROJECT_NAME.
+bash scripts/static-preflight.sh
 bash scripts/labctl.sh preflight
 bash scripts/labctl.sh up 18
 bash scripts/capture-run-manifest.sh 18 mon025-run-001
@@ -32,6 +33,7 @@ bash scripts/verify-cdc-events.sh 18 baseline 2
 bash scripts/capture-source-boundary.sh 18
 bash scripts/seed-batch.sh 18 mon025-run-001 100
 bash scripts/verify-cdc-events.sh 18 mon025-run-001 100
+bash scripts/verify-transaction-metadata.sh 18 mon025-run-001 100
 ```
 
 To run the PostgreSQL 19 lane, use `bash scripts/labctl.sh up 19`, provision the connector role for major 19, register the connector, then verify the `baseline` snapshot before seeding. Do not run the two source majors under the same connector identity/slot simultaneously.
@@ -81,9 +83,9 @@ The Compose restore service remains isolated on loopback-only port 56418/56419. 
 - `compose/postgres/001-mon025-schema.sql` — database surfaces and seed fixture.
 - `compose/postgres/state-manifest.sql` — independent SQL manifest query for rows, schema, indexes, constraints, triggers, routines, extensions, sequences, large objects, views, partitions, unlogged data and authorization state.
 - `compose/restore/restore-entrypoint.sh` — isolated physical restore and PITR.
-- `scripts/` — preflight, lifecycle, least-privilege connector provisioning, deterministic workload, independent CDC readback, physical backup verification, WAL archive sealing, LSN/timeline recovery, wait/restore verification, per-surface comparison and opt-in fault injection.
+- `scripts/` — static preflight, lifecycle, least-privilege connector provisioning, deterministic workload, independent CDC value readback, Debezium transaction-boundary verification, physical backup verification, WAL archive sealing, LSN/timeline recovery, wait/restore verification, per-surface comparison and opt-in fault injection.
 - `BENCHMARKS-v0.1.md` — matched comparison protocol and targets.
 
 ## Execution status
 
-No Docker/Podman runtime is available in the authoring environment. Therefore no image pull, Compose startup, live connector registration, PostgreSQL transaction, Kafka event capture, pgBackRest invocation, physical backup or restore was performed here. Static JSON and schema structure are intended to be checked before use. Exact-head shell syntax and Compose parsing have not yet been run; live integration remains pending.
+No Docker/Podman runtime is available in the authoring environment. Therefore no image pull, Compose startup, live connector registration, PostgreSQL transaction, Kafka event capture, pgBackRest invocation, physical backup or restore was performed here. Run `bash scripts/static-preflight.sh` locally to validate the JSON structure and shell syntax; optional JSON Schema validation, ShellCheck and Compose parsing run when those tools are installed. Live integration remains pending.
