@@ -25,6 +25,10 @@ pub enum ChallengeSearchError {
     InvalidObjective,
     /// The supplied Lipschitz envelope overflowed floating-point arithmetic.
     NonFiniteUpperBound,
+    /// An objective sample reports a different response branch.
+    ResponseBranchChanged,
+    /// A full-order response sample did not pass its convergence contract.
+    FullOrderResponseUnqualified,
 }
 
 /// Search termination. Only ConditionalGapSatisfied establishes the requested
@@ -107,6 +111,32 @@ impl ScalarChallengeSearchConfig {
     }
 }
 
+/// One objective evaluation returned by the registered response oracle.
+///
+/// Every sample must identify the same response branch and confirm that its
+/// full-order reference trajectory passed the independently registered
+/// convergence contract. Unqualified samples cannot contribute to a bound.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChallengeObjectiveSample {
+    pub objective_value: f64,
+    pub branch_id: String,
+    pub full_order_reference_converged: bool,
+}
+
+impl ChallengeObjectiveSample {
+    pub fn new(
+        objective_value: f64,
+        branch_id: impl Into<String>,
+        full_order_reference_converged: bool,
+    ) -> Self {
+        Self {
+            objective_value,
+            branch_id: branch_id.into(),
+            full_order_reference_converged,
+        }
+    }
+}
+
 /// Result of the scalar separation oracle.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScalarChallengeSearchReport {
@@ -145,7 +175,7 @@ pub fn search_scalar_response_challenge<F>(
     mut evaluate: F,
 ) -> Result<ScalarChallengeSearchReport, ChallengeSearchError>
 where
-    F: FnMut(f64) -> Result<f64, ChallengeSearchError>,
+    F: FnMut(f64) -> Result<ChallengeObjectiveSample, ChallengeSearchError>,
 {
     config.validate()?;
 
@@ -153,7 +183,7 @@ where
     if initial_midpoint <= config.lower_bound || initial_midpoint >= config.upper_bound {
         return Err(ChallengeSearchError::InvalidConfiguration);
     }
-    let initial_value = evaluate_checked(&mut evaluate, initial_midpoint)?;
+    let initial_value = evaluate_checked(&mut evaluate, initial_midpoint, &config.branch_id)?;
     let initial_upper = upper_envelope(
         initial_value,
         config.lipschitz_constant,
@@ -200,7 +230,8 @@ where
                 continue;
             }
 
-            let sample_value = evaluate_checked(&mut evaluate, sample_parameter)?;
+            let sample_value =
+                evaluate_checked(&mut evaluate, sample_parameter, &config.branch_id)?;
             evaluations = evaluations
                 .checked_add(1)
                 .ok_or(ChallengeSearchError::InvalidConfiguration)?;
@@ -241,15 +272,22 @@ where
 fn evaluate_checked<F>(
     evaluate: &mut F,
     parameter: f64,
+    expected_branch_id: &str,
 ) -> Result<f64, ChallengeSearchError>
 where
-    F: FnMut(f64) -> Result<f64, ChallengeSearchError>,
+    F: FnMut(f64) -> Result<ChallengeObjectiveSample, ChallengeSearchError>,
 {
-    let value = evaluate(parameter)?;
-    if !value.is_finite() || value < 0.0 {
+    let sample = evaluate(parameter)?;
+    if sample.branch_id != expected_branch_id {
+        return Err(ChallengeSearchError::ResponseBranchChanged);
+    }
+    if !sample.full_order_reference_converged {
+        return Err(ChallengeSearchError::FullOrderResponseUnqualified);
+    }
+    if !sample.objective_value.is_finite() || sample.objective_value < 0.0 {
         return Err(ChallengeSearchError::InvalidObjective);
     }
-    Ok(value)
+    Ok(sample.objective_value)
 }
 
 fn upper_envelope(
@@ -306,7 +344,13 @@ mod tests {
     fn interior_worst_case_is_found_and_conditionally_bounded() {
         // The objective has an interior maximum at 0.37; its boundary values
         // are strictly smaller. L=2.52 bounds |f'(x)| on [0, 1].
-        let objective = |parameter: f64| Ok(3.0 - 2.0 * (parameter - 0.37).powi(2));
+        let objective = |parameter: f64| {
+            Ok(ChallengeObjectiveSample::new(
+                3.0 - 2.0 * (parameter - 0.37).powi(2),
+                "echo-branch-2",
+                true,
+            ))
+        };
         let config = ScalarChallengeSearchConfig::new(
             0.0,
             1.0,
@@ -345,7 +389,11 @@ mod tests {
             certificate(),
         );
         let report = search_scalar_response_challenge(&config, |parameter| {
-            Ok(3.0 - 2.0 * (parameter - 0.37).powi(2))
+            Ok(ChallengeObjectiveSample::new(
+                3.0 - 2.0 * (parameter - 0.37).powi(2),
+                "echo-branch-2",
+                true,
+            ))
         })
         .unwrap();
         assert_eq!(
@@ -369,7 +417,9 @@ mod tests {
             "not-a-digest",
         );
         assert_eq!(
-            search_scalar_response_challenge(&invalid_hash, |_| Ok(0.5)),
+            search_scalar_response_challenge(&invalid_hash, |_| {
+                Ok(ChallengeObjectiveSample::new(0.5, "branch-a", true))
+            }),
             Err(ChallengeSearchError::InvalidConfiguration)
         );
 
@@ -384,8 +434,36 @@ mod tests {
             certificate(),
         );
         assert_eq!(
-            search_scalar_response_challenge(&valid, |_| Ok(f64::NAN)),
+            search_scalar_response_challenge(&valid, |_| {
+                Ok(ChallengeObjectiveSample::new(f64::NAN, "branch-a", true))
+            }),
             Err(ChallengeSearchError::InvalidObjective)
+        );
+    }
+
+    #[test]
+    fn branch_changes_and_unconverged_full_order_samples_are_rejected() {
+        let branch_config = ScalarChallengeSearchConfig::new(
+            0.0,
+            1.0,
+            1.0,
+            1.0e-2,
+            8,
+            "pulse_phase",
+            "branch-a",
+            certificate(),
+        );
+        assert_eq!(
+            search_scalar_response_challenge(&branch_config, |_| {
+                Ok(ChallengeObjectiveSample::new(0.5, "branch-b", true))
+            }),
+            Err(ChallengeSearchError::ResponseBranchChanged)
+        );
+        assert_eq!(
+            search_scalar_response_challenge(&branch_config, |_| {
+                Ok(ChallengeObjectiveSample::new(0.5, "branch-a", false))
+            }),
+            Err(ChallengeSearchError::FullOrderResponseUnqualified)
         );
     }
 
@@ -401,7 +479,10 @@ mod tests {
             "stable-branch",
             certificate(),
         );
-        let report = search_scalar_response_challenge(&config, |_| Ok(0.125)).unwrap();
+        let report = search_scalar_response_challenge(&config, |_| {
+            Ok(ChallengeObjectiveSample::new(0.125, "stable-branch", true))
+        })
+        .unwrap();
         assert_eq!(report.best_sampled_objective, 0.125);
         assert_eq!(report.global_upper_bound, 0.125);
         assert_eq!(report.evaluations, 1);
