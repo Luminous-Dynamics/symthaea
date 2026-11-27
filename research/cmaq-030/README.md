@@ -49,6 +49,8 @@ The profile set and certificate manifest are frozen by digest. A changed recover
 
 The candidate receives predicted option margins and profile/failure-domain identities from already qualified recovery-profile metadata. It does not receive reference margins, family labels or calibration residuals. The reference side is evaluator-only and must be produced by an independent reachability/certificate verifier or authenticated replay with exact state evidence.
 
+Each evaluator-only reference block is explicitly bound to the digest of the exact candidate margin block whose prediction error it scores. Candidate and reference blocks must also use identical cell identities and profile/failure-domain manifests. A correct residual attached to a different trajectory is not valid calibration evidence.
+
 ## Cluster-block calibration
 
 One calibration unit is one independent mechanism/environment cluster. Its score is the maximum one-sided optimism over all pre-registered rollouts, action/query cells and horizon prefixes.
@@ -74,6 +76,7 @@ Training, scale-validation, calibration and held-out evaluation clusters are dis
 9. A changed recovery portfolio or profile manifest invalidates the envelope.
 10. Candidate and reference profile/failure-domain manifests must match.
 11. Training/calibration/evaluation leakage and duplicate cluster IDs are rejected.
+12. Evaluator reference margin receipt is bound to the exact candidate margin-block digest.
 
 ## Matched benchmark matrix
 
