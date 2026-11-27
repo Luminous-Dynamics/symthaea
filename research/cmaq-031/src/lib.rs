@@ -621,12 +621,11 @@ mod tests {
         let mut monitor = monitor(1, 20);
         let mut alarmed = false;
         for i in 0..200 {
-            match monitor.observe(event(i, u64::MAX, 30_000 + i)).unwrap() {
-                MonitorUpdate::Quarantined { .. } => {
-                    alarmed = true;
-                    break;
-                }
-                _ => {}
+            if let MonitorUpdate::Quarantined { .. } =
+                monitor.observe(event(i, u64::MAX, 30_000 + i)).unwrap()
+            {
+                alarmed = true;
+                break;
             }
         }
         assert!(alarmed);
