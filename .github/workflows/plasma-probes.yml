@@ -67,7 +67,6 @@ jobs:
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/lib.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/rbkr.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/challenge_search.rs
-          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/challenge_search.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/response_balanced_contract_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/rbkr_public_api_smoke.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs
@@ -98,7 +97,6 @@ jobs:
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/validity_horizon.rs "${crate_dir}/src/validity_horizon.rs"
           cp crates/domains/symthaea-plasma-probes/src/rbkr.rs "${crate_dir}/src/rbkr.rs"
-          cp crates/domains/symthaea-plasma-probes/src/challenge_search.rs "${crate_dir}/src/challenge_search.rs"
           cp crates/domains/symthaea-plasma-probes/src/challenge_search.rs "${crate_dir}/src/challenge_search.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs "${crate_dir}/src/bin/kird_point_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/response_weighted_refinement_audit.rs "${crate_dir}/src/bin/response_weighted_refinement_audit.rs"
