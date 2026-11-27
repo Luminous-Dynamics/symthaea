@@ -1,6 +1,6 @@
 # SDCB cross-channel common-cause dependence stress v1
 
-**Status:** standalone Rust implementation and exact-head Rust 1.96 workflow authored. Formatting, five negative/metamorphic controls and the 24-condition report are pending. No empirical result is claimed until the exact committed source passes and its artifact is inspected.
+**Status:** standalone Rust implementation and exact-head Rust 1.96 workflow authored. Formatting, seven negative/metamorphic controls and the 24-condition report are pending. No empirical result is claimed until the exact committed source passes and its artifact is inspected.
 
 ## Research question
 
@@ -44,12 +44,13 @@ This direction must be confirmed separately for Gaussian and t5 common-scale mar
 
 ## Controls
 
-1. **Marginal invariance:** 50,000 seeded paths check that each channel's variance remains near one across low/high `gamma`.
-2. **Cross-correlation manipulation:** 50,000 seeded paths per setting check that observed contemporaneous correlation matches the declared `gamma`.
-3. **Gaussian regime-shift control:** both shift directions must have Wilson intervals separated from nominal.
-4. **Student-t5 common-scale control:** same two directions, separately tested.
-5. **Replay control:** identical source, seed and parameters produce identical report structures.
-6. **Grid receipt control:** exactly 24 finite rows with complete parameter and uncertainty fields.
+1. **Gaussian marginal invariance:** 50,000 seeded paths check that each channel's variance remains near one across low/high `gamma`.
+2. **Student-t5 marginal invariance:** 50,000 shared-scale paths check unit variance for both channels.
+3. **Cross-correlation manipulation:** 50,000 seeded paths per setting check that observed contemporaneous correlation matches the declared `gamma`.
+4. **Gaussian regime-shift control:** both shift directions must have Wilson intervals separated from nominal.
+5. **Student-t5 common-scale control:** same two directions, separately tested.
+6. **Replay control:** identical source, seed and parameters produce identical report structures.
+7. **Grid receipt control:** exactly 24 finite rows with complete parameter and uncertainty fields.
 
 ## Why this matters
 
