@@ -1070,6 +1070,7 @@ pub fn compute_ca_ocrc_risk_bound_v1(
             learning_rate: policy.learning_rate,
             tracking_capacity: k,
             maximum_delay_rounds: d_max,
+            population_scope: policy.population_scope,
             tracking_load: None,
             minimum_proxy_survival: None,
             bound: None,
@@ -1084,6 +1085,7 @@ pub fn compute_ca_ocrc_risk_bound_v1(
             learning_rate: policy.learning_rate,
             tracking_capacity: k,
             maximum_delay_rounds: d_max,
+            population_scope: policy.population_scope,
             tracking_load: Some(0.0),
             minimum_proxy_survival: Some(policy.proxy_survival[0]),
             bound: if policy.proxy_survival[0] == 1.0 { Some(common) } else { None },
@@ -1098,6 +1100,11 @@ pub fn compute_ca_ocrc_risk_bound_v1(
     }
     let minimum_survival = *policy.proxy_survival.last().unwrap();
     if k as u64 >= d_max + 1 {
+        if policy.proxy_survival.iter().any(|value| *value != 1.0) {
+            return Err(CaoOcrcErrorV1(
+                "K >= d_max+1 removes capacity saturation but does not remove proxy-delay feedback loss; the unlimited OCRC lemma requires F(a)=1 for every age".into(),
+            ));
+        }
         let bound = common + (d_max + 1) as f64 / horizon_rounds as f64;
         return Ok(CaoOcrcRiskBoundV1 {
             regime: CaoOcrcBoundRegimeV1::UnlimitedTrackingOcrcLemmaTwo,
@@ -1106,16 +1113,12 @@ pub fn compute_ca_ocrc_risk_bound_v1(
             learning_rate: policy.learning_rate,
             tracking_capacity: k,
             maximum_delay_rounds: d_max,
+            population_scope: policy.population_scope,
             tracking_load: Some(tracking_load),
             minimum_proxy_survival: Some(minimum_survival),
             bound: Some(bound),
             corollary_one_regime_applicable: false,
         });
-    }
-    if k as u64 > d_max {
-        return Err(CaoOcrcErrorV1(
-            "capacity regime is inconsistent with maximum-delay boundary".into(),
-        ));
     }
     if minimum_survival <= 0.0 || tracking_load <= 0.0 {
         return Err(CaoOcrcErrorV1(
@@ -1134,6 +1137,7 @@ pub fn compute_ca_ocrc_risk_bound_v1(
         learning_rate: policy.learning_rate,
         tracking_capacity: k,
         maximum_delay_rounds: d_max,
+        population_scope: policy.population_scope,
         tracking_load: Some(tracking_load),
         minimum_proxy_survival: Some(minimum_survival),
         bound: Some(bound),
@@ -1232,6 +1236,7 @@ mod tests {
             initial_threshold: 0.5,
             tracking_capacity: capacity,
             maximum_feedback_delay_rounds: d_max,
+            population_scope: CaoOcrcPopulationScopeV1::QualifiedMeasuredStreamOnly,
             proxy_survival: survival,
         }
     }
