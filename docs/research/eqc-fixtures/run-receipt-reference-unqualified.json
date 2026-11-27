@@ -57,5 +57,6 @@
     "failure_containment": true
   },
   "qualified": false,
-  "timestamp": "2026-11-27T05:30:00Z"
+  "timestamp": "2026-11-27T05:30:00Z",
+  "expected_disposition": "allow"
 }
