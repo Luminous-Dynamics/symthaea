@@ -83,6 +83,10 @@ struct PhaseTimings {
     retrieval_ns: u64,
     evidence_resolution_verification_ns: u64,
     policy_application_ns: u64,
+    /// Residual wall time not assigned to one of the non-overlapping phases
+    /// above (candidate materialization, coordinator bookkeeping, hashing,
+    /// serialization preparation and timer granularity).
+    unattributed_coordinator_ns: u64,
     total_ns: u64,
 }
 
@@ -551,6 +555,12 @@ fn execute_arm(
         }
     });
     let latency_ns = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+    let measured_phase_sum = memory_selection_ns
+        .saturating_add(index_build_ns)
+        .saturating_add(retrieval_ns)
+        .saturating_add(evidence_resolution_verification_ns)
+        .saturating_add(policy_application_ns);
+    let unattributed_coordinator_ns = latency_ns.saturating_sub(measured_phase_sum);
     CandidateRun {
         decision,
         retrieved_ids,
@@ -563,6 +573,7 @@ fn execute_arm(
             retrieval_ns,
             evidence_resolution_verification_ns,
             policy_application_ns,
+            unattributed_coordinator_ns,
             total_ns: latency_ns,
         },
         latency_ns,
@@ -705,6 +716,7 @@ fn candidate_record(
             "retrieval_ns": result.phase_timings.retrieval_ns,
             "evidence_resolution_verification_ns": result.phase_timings.evidence_resolution_verification_ns,
             "policy_application_ns": result.phase_timings.policy_application_ns,
+            "unattributed_coordinator_ns": result.phase_timings.unattributed_coordinator_ns,
             "total_wall_ns": result.phase_timings.total_ns
         },
         "input_tokens": 0,
@@ -1013,6 +1025,7 @@ fn contrast_record(
             ("retrieval", base.phase_timings.retrieval_ns, treat.phase_timings.retrieval_ns),
             ("evidence_resolution_verification", base.phase_timings.evidence_resolution_verification_ns, treat.phase_timings.evidence_resolution_verification_ns),
             ("policy_application", base.phase_timings.policy_application_ns, treat.phase_timings.policy_application_ns),
+            ("unattributed_coordinator", base.phase_timings.unattributed_coordinator_ns, treat.phase_timings.unattributed_coordinator_ns),
             ("total_wall", base.phase_timings.total_ns, treat.phase_timings.total_ns),
         ];
         for (phase, baseline_ns, treatment_ns) in phase_rows {
@@ -1315,6 +1328,11 @@ fn run() -> Result<(), String> {
     ];
     let summary = json!({
         "schema_version": SCHEMA_VERSION,
+        "cost_measurement_mode": "per_arm_wall_clock_phase_timings_only",
+        "unmeasured_cost_stages": [
+            "ingestion", "maintenance", "database_storage", "network",
+            "gpu", "llm", "external_tools", "durable_write"
+        ],
         "record_type": "paired_summary",
         "run_id": run_id,
         "source_revision": source_revision,
@@ -1374,6 +1392,7 @@ mod tests {
                 retrieval_ns: 2,
                 evidence_resolution_verification_ns: 3,
                 policy_application_ns: 1,
+                unattributed_coordinator_ns: 2,
                 total_ns: 10,
             },
             latency_ns: 10,
@@ -1399,6 +1418,7 @@ mod tests {
                 retrieval_ns: 3,
                 evidence_resolution_verification_ns: 4,
                 policy_application_ns: 1,
+                unattributed_coordinator_ns: 1,
                 total_ns: 12,
             },
             latency_ns: 12,
@@ -1522,8 +1542,9 @@ mod tests {
                 .saturating_add(phases.index_build_ns)
                 .saturating_add(phases.retrieval_ns)
                 .saturating_add(phases.evidence_resolution_verification_ns)
-                .saturating_add(phases.policy_application_ns);
-            assert!(phases.total_ns >= measured_sum);
+                .saturating_add(phases.policy_application_ns)
+                .saturating_add(phases.unattributed_coordinator_ns);
+            assert_eq!(phases.total_ns, measured_sum);
             assert_eq!(phases.total_ns, result.latency_ns);
             let record = candidate_record("timing-test", task, arm, &result);
             for key in [
@@ -1532,6 +1553,7 @@ mod tests {
                 "retrieval_ns",
                 "evidence_resolution_verification_ns",
                 "policy_application_ns",
+                "unattributed_coordinator_ns",
                 "total_wall_ns",
             ] {
                 assert!(record["phase_timings_ns"][key].as_u64().is_some());
