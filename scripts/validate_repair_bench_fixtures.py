@@ -58,7 +58,7 @@ def validate() -> None:
         (sum(v == "observation" for v in nodes.values()),
          sum(v == "analysis" for v in nodes.values()),
          sum(v == "claim" for v in nodes.values()),
-         sum(v == "decision" for v in nodes.values())) == (6, 2, 4, 2),
+         sum(v == "decision" for v in nodes.values())) == (7, 2, 4, 2),
         "baseline graph cardinalities differ from the declared first-slice fixture",
     )
 
@@ -70,7 +70,33 @@ def validate() -> None:
             require(0 <= start < end <= len(data_bytes), f"{observation['id']}: CSV span out of range")
             actual = data_bytes[start:end].decode("utf-8")
             require(actual == observation["raw_lexeme"], f"{observation['id']}: CSV span does not resolve")
-        elif locator["kind"] != "JSON_POINTER":
+        elif locator["kind"] == "JSON_POINTER":
+            source_artifact = artifacts[observation["artifact_id"]]
+            json_document = json.loads(source_artifact["raw_bytes_utf8"])
+            pointer = locator["pointer"]
+            target = json_document
+            if pointer:
+                require(pointer.startswith("/"), f"{observation['id']}: invalid JSON Pointer")
+                for encoded_part in pointer[1:].split("/"):
+                    part = encoded_part.replace("~1", "/").replace("~0", "~")
+                    if isinstance(target, list):
+                        require(part.isdigit() and int(part) < len(target),
+                                f"{observation['id']}: JSON Pointer list index invalid")
+                        target = target[int(part)]
+                    else:
+                        require(isinstance(target, dict) and part in target,
+                                f"{observation['id']}: JSON Pointer target missing")
+                        target = target[part]
+            if isinstance(target, str):
+                require(target == observation["raw_lexeme"],
+                        f"{observation['id']}: JSON Pointer string value mismatch")
+            elif isinstance(target, (dict, list)):
+                require(json.dumps(target, separators=(",", ":"), ensure_ascii=False) == observation["raw_lexeme"],
+                        f"{observation['id']}: JSON Pointer structured raw lexeme mismatch")
+            else:
+                require(str(target) == observation["raw_lexeme"],
+                        f"{observation['id']}: JSON Pointer scalar raw lexeme mismatch")
+        else:
             raise ValueError(f"{observation['id']}: unknown locator kind {locator['kind']}")
 
     for source, target in baseline["edges"]:
@@ -117,6 +143,9 @@ def validate() -> None:
         for i, group in enumerate(groups):
             for other in groups[i + 1:]:
                 require(group.isdisjoint(other), f"{event['event_id']}: expected outcome groups overlap")
+        combined = set().union(*groups)
+        require(combined == set(nodes),
+                f"{event['event_id']}: expected outcomes do not partition the complete baseline graph")
         ignored = expected.get("ignored_untrusted", [])
         require(all(isinstance(value, str) for value in ignored),
                 f"{event['event_id']}: ignored-untrusted records must be string IDs")
@@ -158,7 +187,7 @@ def validate() -> None:
     require(scoped_mean == 19.0 and scoped_mean < protocol["threshold_C"],
             "E07 scope correction should change the mean but leave the threshold result false")
 
-    print("REPAIR-Bench fixture: 2 raw artifact hashes, 6 source locators, 14 graph nodes and 12 events passed consistency checks")
+    print("REPAIR-Bench fixture: 2 raw artifact hashes, 7 source locators, 15 graph nodes and 12 events passed consistency checks")
     print("This validates fixture consistency only; expected transitions still require independent review.")
 
 
