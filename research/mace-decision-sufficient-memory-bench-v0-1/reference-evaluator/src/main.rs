@@ -400,9 +400,11 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
         if forbidden.contains(event_id) { forbidden_n += 1; }
         if admissible(event, &c.candidate, &forbidden) { admissible_n += 1; }
     }
+    // A contradiction visible anywhere in retrieved context remains a
+    // conflict until the protocol can carry an explicit resolution receipt.
     let contradiction_pairs = c.candidate.source_events.iter()
-        .filter(|e| e.relation_to_parent == Some(Relation::Contradicts) && selected.contains(&e.event_id))
-        .map(|e| e.parent_event_ids.iter().filter(|parent| selected.contains(*parent)).count())
+        .filter(|e| e.relation_to_parent == Some(Relation::Contradicts) && retrieved.contains(&e.event_id))
+        .map(|e| e.parent_event_ids.iter().filter(|parent| retrieved.contains(*parent)).count())
         .sum::<usize>();
     let loss_map: BTreeMap<&str, f64> = p.evaluator_private.action_losses.iter().map(|x| (x.action.as_str(), x.loss)).collect();
     let loss = *loss_map.get(r.action.as_str()).ok_or_else(|| format!("{id}: action has no loss"))?;
@@ -595,7 +597,7 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
             "declared_no_memory_reference_gain": "Task-authored reference action loss minus this arm loss; this is not a separately executed no-memory agent arm.",
             "worse_than_declared_reference": "This arm loss exceeds the task-authored reference action loss; this is not a paired no-memory system comparison.",
             "admissible_evidence": "Current at query time and observed no later than the query, not superseded/retracted, not untrusted, and not evaluator-labelled forbidden.",
-            "decision_sufficient": "Minimum loss, all required evidence selected, no invalid evidence selected, and no co-retrieved contradiction pair; v0.1 has no explicit conflict-resolution receipt.",
+            "decision_sufficient": "Minimum loss, all required evidence selected, no invalid evidence selected, and no contradiction pair present in retrieved context; v0.1 has no explicit conflict-resolution receipt.",
             "cost": "Counters are candidate-reported. Latency is summarized only when supplied; this evaluator does not independently measure it."
         },
         "limitations": [
