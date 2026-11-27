@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon031-upstream-recovery-regression-matrix-v1.schema.json",
+  "title": "MON-031 Version-Specific Upstream Recovery Regression Matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "version", "reviewed_at", "scenarios"],
+  "properties": {
+    "profile": {"const": "mon031-upstream-recovery-regression-matrix-v1"},
+    "version": {"const": "1.0.0"},
+    "reviewed_at": {"type": "string", "format": "date"},
+    "scenarios": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "component", "version_profile", "class", "claim", "upstream_url", "evidence", "expected", "status"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "component": {"type": "string", "minLength": 1},
+          "version_profile": {"type": "string", "minLength": 1},
+          "class": {"enum": ["known-version-hazard", "upstream-fixed-regression"]},
+          "claim": {"type": "string", "minLength": 1},
+          "upstream_url": {"type": "string", "format": "uri"},
+          "evidence": {"type": "string", "minLength": 1},
+          "expected": {"type": "string", "minLength": 1},
+          "status": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

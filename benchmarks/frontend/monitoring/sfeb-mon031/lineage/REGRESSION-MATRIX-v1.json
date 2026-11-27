@@ -1,0 +1,95 @@
+{
+  "profile": "mon031-upstream-recovery-regression-matrix-v1",
+  "version": "1.0.0",
+  "reviewed_at": "2026-11-27",
+  "scenarios": [
+    {
+      "id": "MON031-PG187-INC-BASE",
+      "component": "PostgreSQL",
+      "version_profile": "18.7",
+      "class": "known-version-hazard",
+      "claim": "An incremental backup chain is eligible only when its full base was created on 18.7 or later after the 18.7 update.",
+      "upstream_url": "https://www.postgresql.org/docs/release/18.7/",
+      "evidence": "PostgreSQL 18.7 release notes state existing incremental backup files should not be trusted and recommend a new full backup after updating.",
+      "expected": "block-pre-18.7-full-base",
+      "status": "policy-implemented-runtime-adapter-pending"
+    },
+    {
+      "id": "MON031-DBZ2889-LSN1",
+      "component": "Debezium PostgreSQL connector",
+      "version_profile": "3.7.1.Final with Kafka Connect 4.3.1",
+      "class": "upstream-fixed-regression",
+      "claim": "A restart at the lsn_events_processed=1 offset boundary must not lose an already committed source change.",
+      "upstream_url": "https://debezium.io/releases/3.7/release-notes.html",
+      "evidence": "DBZ-2889 is listed among PostgreSQL changes-lost-on-restart fixes in 3.7.1.Final.",
+      "expected": "all-source-events-accounted-for; exact-replays-may-be-deduplicated",
+      "status": "test-design-pending-live-connect-offset-observer"
+    },
+    {
+      "id": "MON031-DBZ2889-LOGICAL-MSG",
+      "component": "Debezium PostgreSQL connector",
+      "version_profile": "3.7.1.Final with Kafka Connect 4.3.1",
+      "class": "upstream-fixed-regression",
+      "claim": "A restart when the stored offset is at a transactional logical message must not omit subsequent committed row changes.",
+      "upstream_url": "https://debezium.io/releases/3.7/release-notes.html",
+      "evidence": "DBZ-2889 covers offsets stored at transactional logical messages.",
+      "expected": "logical-message-and-subsequent-row-history-reconciled",
+      "status": "test-design-pending-live-connect-offset-observer"
+    },
+    {
+      "id": "MON031-DBZ2894-DECODERBUFS",
+      "component": "Debezium PostgreSQL decoderbufs plugin",
+      "version_profile": "3.7.1.Final; optional plugin lane",
+      "class": "upstream-fixed-regression",
+      "claim": "A BEGIN sharing a stored LSN must not cause a processed row to be emitted again or skipped incorrectly.",
+      "upstream_url": "https://debezium.io/releases/3.7/release-notes.html",
+      "evidence": "DBZ-2894 identifies decoderbufs BEGIN/LSN skip behavior fixed in 3.7.1.Final.",
+      "expected": "source-history-exactly-reconciled-with-explicit-replay-counts",
+      "status": "optional-plugin-not-in-default-pgoutput-profile"
+    },
+    {
+      "id": "MON031-KAFKA20732-TIERED-RETENTION",
+      "component": "Apache Kafka broker",
+      "version_profile": "4.3.2",
+      "class": "upstream-fixed-regression",
+      "claim": "Leader election must not cause size-based retention to delete data that remains within the local/remote retention policy.",
+      "upstream_url": "https://kafka.apache.org/blog/2026/10/23/apache-kafka-4.3.2-release-announcement/",
+      "evidence": "KAFKA-20732 is listed as a tiered-storage data-loss fix in 4.3.2.",
+      "expected": "all-retained-records-remain-readable-after-leader-election",
+      "status": "tiered-storage-extension-lane-not-in-single-broker-baseline"
+    },
+    {
+      "id": "MON031-KAFKA20979-TIME-INDEX",
+      "component": "Apache Kafka broker",
+      "version_profile": "4.3.2",
+      "class": "upstream-fixed-regression",
+      "claim": "A broker restart must not truncate the time index such that segments still inside retention are deleted.",
+      "upstream_url": "https://kafka.apache.org/blog/2026/10/23/apache-kafka-4.3.2-release-announcement/",
+      "evidence": "KAFKA-20979 is listed as a data-loss fix in 4.3.2.",
+      "expected": "retention-window-records-remain-readable-after-restart",
+      "status": "requires-time-retention-fixture-and-restart-experiment"
+    },
+    {
+      "id": "MON031-PGBR60-ANNOTATE-MULTIREPO",
+      "component": "pgBackRest",
+      "version_profile": "2.60.1",
+      "class": "upstream-fixed-regression",
+      "claim": "Annotating a backup found in a non-default repository must not overwrite backup.info in the default repository.",
+      "upstream_url": "https://pgbackrest.org/news.html",
+      "evidence": "pgBackRest 2.60.1 fixes annotate writing backup.info to the default repository; upstream notes describe multi-repository behavior.",
+      "expected": "default-and-selected-repository-metadata-remain-correct-and-restorable",
+      "status": "requires-two-repository-encrypted-and-unencrypted-fixture"
+    },
+    {
+      "id": "MON031-PGBR60-SFTP-INCR",
+      "component": "pgBackRest",
+      "version_profile": "2.60.1",
+      "class": "upstream-fixed-regression",
+      "claim": "A block-incremental restore using SFTP storage must recover successfully across reconnect behavior.",
+      "upstream_url": "https://pgbackrest.org/news.html",
+      "evidence": "pgBackRest 2.60.1 fixes a possible block incremental restore failure on SFTP storage and SFTP handle use after reconnect.",
+      "expected": "restored-state-matches-independent-source-manifest",
+      "status": "SFTP-extension-lane-not-in-default-local-native-backup"
+    }
+  ]
+}
