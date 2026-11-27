@@ -263,7 +263,7 @@ fn run_suite(trials: u64) -> Vec<RegimeReport> {
         MarginalFamily::Gaussian,
         MarginalFamily::StandardizedStudentT5CommonScale,
     ] {
-        for (calibration_rho, test_rho) in [(0.05, 0.95), (0.95, 0.05)] {
+        for (calibration_rho, test_rho) in [(0.05_f64, 0.95_f64), (0.95_f64, 0.05_f64)] {
             for block_len in [8_usize, 32_usize] {
                 // Independent seed domain relative to the exploratory 2,500-trial grid.
                 let base_seed = 0x5344_4343_5000_0000
