@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod ca_ocrc_bounded;
 pub mod calibration_requalification;
+pub mod cluster_audit_design;
 pub mod delayed_aci;
 pub mod dtco_manifest;
 pub mod label_consumption_guard;
@@ -182,4 +183,16 @@ pub use observation_process_ledger::{
     ObservationProcessFunnelV1, ObservationProcessInputV1, ObservationProcessReportV1,
     ObservationProcessRoundV1, ObservationRiskControllerV1, PhysicalAcquisitionRecordV1,
     PhysicalAcquisitionStateV1, PhysicalSelectionDesignKindV1, evaluate_observation_process_v1,
+};
+
+pub use cluster_audit_design::{
+    CLUSTER_AUDIT_DESIGN_SCHEMA_V1, CLUSTER_AUDIT_FRAME_SCHEMA_V1,
+    CLUSTER_AUDIT_INPUT_SCHEMA_V1, CLUSTER_AUDIT_RANDOMIZATION_ALGORITHM_V1,
+    CLUSTER_AUDIT_RECORD_SCHEMA_V1, CLUSTER_AUDIT_REPORT_SCHEMA_V1,
+    ClusterAuditDesignV1, ClusterAuditErrorV1, ClusterAuditFrameClusterV1,
+    ClusterAuditFrameUnitV1, ClusterAuditInputV1, ClusterAuditPopulationFrameV1,
+    ClusterAuditRecordV1, ClusterAuditReportV1, ClusterAuditStatusV1,
+    ClusterAuditStratumPlanV1, ClusterAuditStratumReportV1, ClusterAuditUnitOutcomeV1,
+    ReferenceAuditQualificationV1, evaluate_cluster_audit_v1, seal_cluster_audit_frame_v1,
+    seal_cluster_audit_record_v1,
 };
