@@ -233,20 +233,29 @@ type Failover struct{
 	StandbySlot SlotState
 	OldPrimaryFenced bool
 	TimelineHistoryDigest,HandoffManifestDigest string
+	TimelineHistoryWitnessed bool
+	TimelineHistoryParent uint32
+	ForkLSN LSN
 	HandoffWitnessed bool
 }
 func ValidateFailover(f Failover,durable LSN)Result{
-	c:=[]string{"same-cluster-database-slot","timeline-transition","standby-slot-ready","old-primary-fenced","handoff-sealed"}
+	c:=[]string{"same-cluster-database-slot","timeline-transition","verified-parent-timeline-fork","standby-slot-ready","old-primary-fenced","handoff-sealed"}
+	if !profileOK(f.Prior)||!profileOK(f.Next){return out(Indeterminate,"prior or promoted source profile incomplete",c...)}
+	if d,r:=validateWALLevel(f.Prior);d!=Qualified{return out(d,"prior WAL level: "+r,c...)}
+	if d,r:=validateWALLevel(f.Next);d!=Qualified{return out(d,"next WAL level: "+r,c...)}
 	if f.Prior.SystemIdentifier!=f.Next.SystemIdentifier||f.Prior.DatabaseOID!=f.Next.DatabaseOID||f.Prior.DatabaseName!=f.Next.DatabaseName||f.Prior.SlotName!=f.Next.SlotName||f.Prior.OutputPlugin!=f.Next.OutputPlugin{return out(Divergent,"failover changes cluster/database/slot/plugin identity",c...)}
+	if f.Prior.ServerMajor!=f.Next.ServerMajor{return out(Denied,"physical failover changes PostgreSQL major version",c...)}
 	if f.Prior.TimelineID==f.Next.TimelineID||f.Next.TimelineID==0||f.Next.SourceEpoch==f.Prior.SourceEpoch{return out(Denied,"failover must create new timeline and source epoch",c...)}
-	if !present(f.TimelineHistoryDigest){return out(Indeterminate,"timeline history digest missing",c...)}
+	if !present(f.TimelineHistoryDigest)||!f.TimelineHistoryWitnessed||f.TimelineHistoryParent!=f.Prior.TimelineID||f.ForkLSN==0{return out(Indeterminate,"verified timeline history does not bind the prior timeline and fork point",c...)}
+	if durable>f.ForkLSN{return out(Denied,"durable evidence lies beyond the promoted standby timeline fork; history is not shared",c...)}
 	s:=f.StandbySlot
 	if s.SlotType!="logical"||s.DatabaseOID!=f.Prior.DatabaseOID||s.DatabaseName!=f.Prior.DatabaseName||s.SlotName!=f.Prior.SlotName||s.OutputPlugin!=f.Prior.OutputPlugin{return out(Denied,"standby slot database/name/plugin identity mismatch",c...)}
-	if !s.OnStandby||!s.Failover||!s.Synced||s.Temporary||s.InvalidationReason!=""||(s.WALStatus!="reserved"&&s.WALStatus!="extended"){return out(Denied,"standby logical slot is not persistent, synced, failover-enabled and valid",c...)}
-	if s.RestartLSN==nil||*s.RestartLSN>durable{return out(Indeterminate,"standby slot does not retain required durable evidence range",c...)}
-	if s.ConfirmedFlushLSN!=nil&&*s.ConfirmedFlushLSN>durable{return out(Denied,"standby acknowledgement exceeds durable evidence",c...)}
-	if s.StandbyReplayLSN==nil||*s.StandbyReplayLSN<durable{return out(Indeterminate,"standby has not received/replayed through durable evidence boundary",c...)}
+	if !s.OnStandby||!s.Failover||!s.Synced||s.Temporary||s.TwoPhase||s.InvalidationReason!=""||(s.WALStatus!="reserved"&&s.WALStatus!="extended"){return out(Denied,"standby logical slot is not persistent, synced, failover-enabled and valid for the supported transaction profile",c...)}
+	if s.RestartLSN==nil||s.StandbyReplayLSN==nil{return out(Indeterminate,"standby slot restart/replay position unavailable",c...)}
+	if *s.StandbyReplayLSN<f.ForkLSN{return out(Indeterminate,"standby has not replayed through the verified timeline fork point",c...)}
+	if *s.RestartLSN>*s.StandbyReplayLSN{return out(Indeterminate,"standby restart_lsn is ahead of its replay position",c...)}
+	if s.ConfirmedFlushLSN!=nil&&*s.ConfirmedFlushLSN>durable{return out(Denied,"standby logical slot acknowledged beyond the shared durable evidence boundary",c...)}
 	if !f.OldPrimaryFenced{return out(Indeterminate,"old primary not independently fenced after promotion",c...)}
 	if !f.HandoffWitnessed||!present(f.HandoffManifestDigest){return out(Indeterminate,"timeline/source-epoch handoff not sealed and independently witnessed",c...)}
-	return out(Qualified,"failover lineage and slot continuity supported for declared boundary",c...)
+	return out(Qualified,"failover lineage and slot continuity supported through the authenticated shared fork boundary",c...)
 }
