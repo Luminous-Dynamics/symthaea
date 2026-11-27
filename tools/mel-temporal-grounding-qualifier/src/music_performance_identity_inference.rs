@@ -626,10 +626,16 @@ mod tests {
             right.response.audio_sha256 = audio;
             left.response.variant_id.push_str("-additional");
             right.response.variant_id = left.response.variant_id.clone();
-            left.take_identity_sha256 = format!("{:064x}", 0xa000_u64 + index as u64);
-            right.take_identity_sha256 = left.take_identity_sha256.clone();
-            left.performance_identity_sha256 = format!("{:064x}", 0xb000_u64 + index as u64);
-            right.performance_identity_sha256 = left.performance_identity_sha256.clone();
+        }
+        for extra in [&mut baseline_extra, &mut candidate_extra] {
+            let take = "a".repeat(64);
+            let performance = "b".repeat(64);
+            extra.clean.take_identity_sha256 = take.clone();
+            extra.musical_flip.take_identity_sha256 = take;
+            extra.clean.performance_identity_sha256 = performance.clone();
+            extra.musical_flip.performance_identity_sha256 = performance;
+            extra.performance_stay.take_identity_sha256 = "c".repeat(64);
+            extra.performance_stay.performance_identity_sha256 = "d".repeat(64);
         }
         expanded.baseline.triads.push(baseline_extra);
         expanded.candidate.triads.push(candidate_extra);
