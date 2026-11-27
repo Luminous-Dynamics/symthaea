@@ -40,10 +40,17 @@ pub struct PairedBlockOutcome {
     pub scenario_family: String,
     pub source_pair_sha256: String,
     pub scenario_manifest_sha256: String,
+    pub ground_truth_receipt_sha256: String,
     pub score_definition_sha256: String,
+    pub calibration_reference_sha256: String,
+    pub tie_protocol_sha256: String,
     pub closure_manifest_sha256: String,
     pub baseline_build_sha256: String,
     pub candidate_build_sha256: String,
+    pub baseline_configuration_sha256: String,
+    pub candidate_configuration_sha256: String,
+    pub alpha_numerator: u128,
+    pub alpha_denominator: u128,
     pub baseline: ArmOutcome,
     pub candidate: ArmOutcome,
 }
@@ -57,6 +64,9 @@ pub enum BenchmarkError {
     EmptyScenarioFamily,
     DuplicateEffectiveBlock,
     InvalidDigest(&'static str),
+    InvalidAlpha,
+    BenchmarkContractMismatch,
+    DuplicateSourcePair,
     DetectionDelayExceedsHorizon,
     ProgressOutOfRange,
     InvalidExposureInterval,
@@ -245,10 +255,22 @@ pub fn evaluate_paired(
     }
 
     let mut seen = HashSet::with_capacity(blocks.len());
+    let mut source_pairs = HashSet::with_capacity(blocks.len());
+    let contract = &blocks[0];
     for block in blocks {
         validate_block(block, horizon_us)?;
         if !seen.insert(block.effective_block_id.as_str()) {
             return Err(BenchmarkError::DuplicateEffectiveBlock);
+        }
+        if !source_pairs.insert(block.source_pair_sha256.as_str()) {
+            return Err(BenchmarkError::DuplicateSourcePair);
+        }
+        if block.alpha_numerator != contract.alpha_numerator
+            || block.alpha_denominator != contract.alpha_denominator
+            || block.calibration_reference_sha256 != contract.calibration_reference_sha256
+            || block.tie_protocol_sha256 != contract.tie_protocol_sha256
+        {
+            return Err(BenchmarkError::BenchmarkContractMismatch);
         }
     }
 
@@ -340,12 +362,22 @@ fn validate_block(
     for (digest, label) in [
         (&block.source_pair_sha256, "source_pair_sha256"),
         (&block.scenario_manifest_sha256, "scenario_manifest_sha256"),
+        (&block.ground_truth_receipt_sha256, "ground_truth_receipt_sha256"),
         (&block.score_definition_sha256, "score_definition_sha256"),
+        (&block.calibration_reference_sha256, "calibration_reference_sha256"),
+        (&block.tie_protocol_sha256, "tie_protocol_sha256"),
         (&block.closure_manifest_sha256, "closure_manifest_sha256"),
         (&block.baseline_build_sha256, "baseline_build_sha256"),
         (&block.candidate_build_sha256, "candidate_build_sha256"),
+        (&block.baseline_configuration_sha256, "baseline_configuration_sha256"),
+        (&block.candidate_configuration_sha256, "candidate_configuration_sha256"),
     ] {
         validate_digest(digest, label)?;
+    }
+    if block.alpha_numerator == 0 || block.alpha_denominator == 0
+        || block.alpha_numerator >= block.alpha_denominator
+    {
+        return Err(BenchmarkError::InvalidAlpha);
     }
     for arm in [&block.baseline, &block.candidate] {
         if arm.detection_delay_us.is_some_and(|delay| delay > horizon_us) {
@@ -617,10 +649,17 @@ mod tests {
             scenario_family: family.into(),
             source_pair_sha256: SHA_A.into(),
             scenario_manifest_sha256: SHA_B.into(),
+            ground_truth_receipt_sha256: SHA_A.into(),
             score_definition_sha256: SHA_C.into(),
+            calibration_reference_sha256: SHA_B.into(),
+            tie_protocol_sha256: SHA_C.into(),
             closure_manifest_sha256: SHA_A.into(),
             baseline_build_sha256: SHA_B.into(),
             candidate_build_sha256: SHA_C.into(),
+            baseline_configuration_sha256: SHA_B.into(),
+            candidate_configuration_sha256: SHA_C.into(),
+            alpha_numerator: 1,
+            alpha_denominator: 20,
             baseline: arm(baseline),
             candidate: arm(candidate),
         }
@@ -721,6 +760,57 @@ mod tests {
                 1
             ),
             Err(BenchmarkError::DuplicateEffectiveBlock)
+        );
+    }
+
+    #[test]
+    fn alpha_calibration_reference_and_tie_contract_must_match_across_blocks() {
+        let mut blocks = [
+            block("b1", "urban", Some(10), Some(10)),
+            block("b2", "urban", Some(10), Some(9)),
+        ];
+        blocks[1].alpha_numerator = 1;
+        blocks[1].alpha_denominator = 10;
+        assert_eq!(
+            evaluate_paired(&blocks, 100, 50, 1),
+            Err(BenchmarkError::BenchmarkContractMismatch)
+        );
+
+        blocks[1] = block("b2", "urban", Some(10), Some(9));
+        blocks[1].calibration_reference_sha256 = SHA_A.into();
+        assert_eq!(
+            evaluate_paired(&blocks, 100, 50, 1),
+            Err(BenchmarkError::BenchmarkContractMismatch)
+        );
+
+        blocks[1] = block("b2", "urban", Some(10), Some(9));
+        blocks[1].tie_protocol_sha256 = SHA_A.into();
+        assert_eq!(
+            evaluate_paired(&blocks, 100, 50, 1),
+            Err(BenchmarkError::BenchmarkContractMismatch)
+        );
+    }
+
+    #[test]
+    fn duplicate_source_pair_is_rejected() {
+        let first = block("b1", "urban", Some(10), Some(9));
+        let mut second = block("b2", "urban", Some(10), Some(8));
+        second.source_pair_sha256 = first.source_pair_sha256.clone();
+        assert_eq!(
+            evaluate_paired(&[first, second], 100, 50, 1),
+            Err(BenchmarkError::DuplicateSourcePair)
+        );
+    }
+
+    #[test]
+    fn invalid_alpha_binding_is_rejected() {
+        let mut first = block("b1", "urban", Some(10), Some(9));
+        let second = block("b2", "urban", Some(10), Some(8));
+        first.alpha_numerator = 1;
+        first.alpha_denominator = 1;
+        assert_eq!(
+            evaluate_paired(&[first, second], 100, 50, 1),
+            Err(BenchmarkError::InvalidAlpha)
         );
     }
 
