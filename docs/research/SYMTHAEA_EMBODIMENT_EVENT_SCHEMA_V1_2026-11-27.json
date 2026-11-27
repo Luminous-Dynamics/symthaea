@@ -8,6 +8,7 @@
   "required": [
     "schema",
     "session_id",
+    "clock_domain_id",
     "event_id",
     "sequence",
     "observed_at_monotonic_ns",
@@ -131,6 +132,13 @@
         "local_sensitive",
         "restricted"
       ]
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$",
+      "description": "Opaque monotonic clock epoch identifier. Raw timestamps from different clock domains are not comparable."
     }
   },
   "allOf": [
