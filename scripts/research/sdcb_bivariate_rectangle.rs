@@ -607,6 +607,8 @@ mod tests {
         close(result.probabilities[1][1], 0.5, 2.0e-13);
         close(result.probability_sum, 1.0, 2.0e-13);
         assert!(result.marginalization_error < 2.0e-13);
+        assert!(result.cell_diagnostics.iter().flatten().all(|cell| cell.covariance_rank == 1));
+        assert!(result.cell_diagnostics.iter().flatten().all(|cell| cell.outer_integrand_evaluations == 0));
     }
 
     #[test]
@@ -619,6 +621,8 @@ mod tests {
         close(result.probabilities[1][0], 0.5, 2.0e-13);
         close(result.probabilities[1][1], 0.0, 0.0);
         close(result.probability_sum, 1.0, 2.0e-13);
+        assert!(result.cell_diagnostics.iter().flatten().all(|cell| cell.covariance_rank == 1));
+        assert!(result.cell_diagnostics.iter().flatten().all(|cell| cell.outer_integrand_evaluations == 0));
     }
 
     #[test]
