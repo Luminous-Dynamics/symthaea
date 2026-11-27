@@ -391,7 +391,11 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
     let mut control_ids = HashSet::new();
     for control in &task.negative_controls {
         if !allowed_controls.contains(&control.as_str()) || !control_ids.insert(control.as_str()) {
-            bail!("{}: unknown or duplicate negative control '{}'", task.task_id, control);
+            bail!(
+                "{}: unknown or duplicate negative control '{}'",
+                task.task_id,
+                control
+            );
         }
     }
     let mut provenance_ids = HashSet::new();
@@ -411,7 +415,11 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
         .contains(&item.as_str())
             || !provenance_ids.insert(item.as_str())
         {
-            bail!("{}: unknown or duplicate provenance field '{}'", task.task_id, item);
+            bail!(
+                "{}: unknown or duplicate provenance field '{}'",
+                task.task_id,
+                item
+            );
         }
     }
     for required in REQUIRED_PROVENANCE {
