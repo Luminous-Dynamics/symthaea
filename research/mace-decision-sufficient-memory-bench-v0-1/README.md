@@ -1,7 +1,7 @@
 # MACE Decision-Sufficient Memory Benchmark
 
 **Version:** 0.1.0  
-**Status:** paired evaluator core and LongMemEval-V2 LAFS helper pass exact-head Rust 1.96 validation (45 tests); separate temporal BM25/RRF reference (17 tests) and strict candidate JSON-to-index adapter (21 tests, committed nested lock, locked metadata and Clippy) pass exact-head validation; live production Add/Search integration, benchmark execution and external result reproduction remain pending  
+**Status:** paired evaluator core and LongMemEval-V2 LAFS helper pass exact-head Rust 1.96 validation (45 tests); the original temporal BM25/RRF reference (17 tests) and prior strict adapter revision (21 tests, committed nested lock, locked metadata and Clippy) have exact-head passes; the current follow-on adds archive-wide lineage-closure and cycle auditing plus stricter wire bounds, with exact-head qualification pending. Live production Add/Search integration, benchmark execution and external result reproduction remain pending  
 **Tracking:** [issue #13893](https://github.com/Luminous-Dynamics/symthaea/issues/13893)
 
 ## Thesis
@@ -79,7 +79,7 @@ The native profile may expose typed evidence and lifecycle operations that are n
 
 ### Conventional retrieval reference
 
-A separate dependency-free temporal BM25 and weighted-RRF reference is under `baselines/`. It consumes raw candidate-visible source text, applies scope and bitemporal filters before computing BM25 corpus statistics, and accepts independently produced ranked channels for validated RRF composition. This makes a conventional lexical control explicit; it does not reproduce Resurface/Khipu/InsightMem, implement dense retrieval or replace the paired decision evaluator. See [MACE_TEMPORAL_BM25_BASELINE_V0_1.md](../../docs/research/MACE_TEMPORAL_BM25_BASELINE_V0_1.md). A strict Serde adapter under `baselines/adapter/` now decodes the frozen candidate-only JSON fixture, executes the index/RRF path and resolves results by exact event ID; its separate locked Cargo workflow is the wire-adapter qualification gate.
+A separate dependency-free temporal BM25 and weighted-RRF reference is under `baselines/`. It consumes raw candidate-visible source text, applies scope and bitemporal filters before computing BM25 corpus statistics, and accepts independently produced ranked channels for validated RRF composition. This makes a conventional lexical control explicit; it does not reproduce Resurface/Khipu/InsightMem, implement dense retrieval or replace the paired decision evaluator. See [MACE_TEMPORAL_BM25_BASELINE_V0_1.md](../../docs/research/MACE_TEMPORAL_BM25_BASELINE_V0_1.md). A strict Serde adapter under `baselines/adapter/` decodes the frozen candidate-only JSON fixture, executes the index/RRF path, resolves results by exact event ID and exposes an archive-wide lineage audit (resolved/missing/cross-scope parent edges and cycle components). The audit is diagnostic and does not confer inherited authority; its separate locked Cargo workflow is the wire-adapter qualification gate.
 
 ### AML-compatible profiles
 
