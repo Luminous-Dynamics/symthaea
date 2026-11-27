@@ -805,7 +805,81 @@ impl SplitMix64V1 {
     }
 }
 
+fn valid_ratio_v1(
+    ratio: Option<CountRatioV1>,
+    expected_denominator: Option<u64>,
+) -> bool {
+    match ratio {
+        Some(value) => {
+            value.denominator > 0
+                && value.numerator <= value.denominator
+                && expected_denominator.map_or(true, |expected| value.denominator == expected)
+        }
+        None => expected_denominator.map_or(true, |expected| expected == 0),
+    }
+}
+
+fn valid_run_score_v1(score: &RunScoreV1) -> bool {
+    let retrieved_partition = score
+        .admissible_returned_evidence_count
+        .checked_add(score.inadmissible_returned_evidence_count);
+    let selected_partition = score
+        .admissible_decision_support_evidence_count
+        .checked_add(score.inadmissible_decision_support_evidence_count);
+    let retrieved_lineage = score
+        .retrieved_distinct_source_family_count
+        .checked_add(score.retrieved_unknown_source_family_count)
+        .zip(score.retrieved_distinct_source_root_count
+            .checked_add(score.retrieved_unknown_source_root_count));
+    let selected_lineage = score
+        .decision_support_distinct_source_family_count
+        .checked_add(score.decision_support_unknown_source_family_count)
+        .zip(score.decision_support_distinct_source_root_count
+            .checked_add(score.decision_support_unknown_source_root_count));
+    let recall_shapes_match = match (
+        score.retrieved_required_evidence_recall,
+        score.required_evidence_recall,
+    ) {
+        (Some(retrieved), Some(selected)) => retrieved.denominator == selected.denominator,
+        (None, None) => true,
+        _ => false,
+    };
+    let required_is_complete = score.required_evidence_recall
+        .map_or(true, |ratio| ratio.numerator == ratio.denominator);
+
+    if score.decision_regret_micros != score.decision_loss_micros.saturating_sub(score.oracle_loss_micros)
+        || score.decision_optimal != (score.decision_regret_micros == 0)
+        || retrieved_partition != Some(score.returned_evidence_count)
+        || selected_partition != Some(score.decision_support_evidence_count)
+        || score.decision_support_evidence_count > score.returned_evidence_count
+        || !valid_ratio_v1(score.admissible_evidence_precision, Some(score.returned_evidence_count))
+        || !valid_ratio_v1(
+            score.decision_support_evidence_precision,
+            Some(score.decision_support_evidence_count),
+        )
+        || !valid_ratio_v1(score.retrieved_required_evidence_recall, None)
+        || !valid_ratio_v1(score.required_evidence_recall, None)
+        || !recall_shapes_match
+        || retrieved_lineage.is_none_or(|(families, roots)| families > score.returned_evidence_count || roots > score.returned_evidence_count)
+        || selected_lineage.is_none_or(|(families, roots)| families > score.decision_support_evidence_count || roots > score.decision_support_evidence_count)
+        || score.unresolved_decision_support_contradiction_pair_count
+            > score.unresolved_retrieved_contradiction_pair_count
+    {
+        return false;
+    }
+
+    !score.decision_sufficient
+        || (score.decision_optimal
+            && score.inadmissible_returned_evidence_count == 0
+            && score.inadmissible_decision_support_evidence_count == 0
+            && score.unresolved_retrieved_contradiction_pair_count == 0
+            && required_is_complete)
+}
+
 fn validate_paired_score(score: &PairedScoreV1) -> Result<(), EvaluationErrorV1> {
+    if !valid_run_score_v1(&score.memory) || !valid_run_score_v1(&score.no_memory) {
+        return Err(EvaluationErrorV1::InvalidPairedScore);
+    }
     if score.episode_id.trim().is_empty()
         || score.downstream_policy_digest.len() != 64
         || !score
@@ -823,6 +897,15 @@ fn validate_paired_score(score: &PairedScoreV1) -> Result<(), EvaluationErrorV1>
         || score.no_memory.returned_evidence_count != 0
         || score.no_memory.admissible_returned_evidence_count != 0
         || score.no_memory.inadmissible_returned_evidence_count != 0
+        || score.no_memory.decision_support_evidence_count != 0
+        || score.no_memory.admissible_decision_support_evidence_count != 0
+        || score.no_memory.inadmissible_decision_support_evidence_count != 0
+        || score.no_memory.decision_support_distinct_source_family_count != 0
+        || score.no_memory.decision_support_unknown_source_family_count != 0
+        || score.no_memory.decision_support_distinct_source_root_count != 0
+        || score.no_memory.decision_support_unknown_source_root_count != 0
+        || score.no_memory.unresolved_retrieved_contradiction_pair_count != 0
+        || score.no_memory.unresolved_decision_support_contradiction_pair_count != 0
         || score.memory.admissible_returned_evidence_count
             .checked_add(score.memory.inadmissible_returned_evidence_count)
             != Some(score.memory.returned_evidence_count)
@@ -1073,6 +1156,31 @@ mod tests {
                 denominator: 1,
             })
         );
+    }
+
+    #[test]
+    fn paired_validation_rejects_tampered_evidence_partitions() {
+        let mut paired = score_paired(
+            &case(),
+            &run("mace", "hold", &["signed-current"]),
+            &run("no-memory", "abstain", &[]),
+        ).expect("valid paired result");
+        paired.memory.inadmissible_returned_evidence_count += 1;
+        assert_eq!(validate_paired_score(&paired), Err(EvaluationErrorV1::InvalidPairedScore));
+    }
+
+    #[test]
+    fn paired_validation_rejects_falsely_sufficient_retrieved_context() {
+        let mut memory = run("mace", "hold", &["signed-current", "expired-account"]);
+        memory.decision_support_evidence_ids = vec!["signed-current".to_owned()];
+        let mut paired = score_paired(
+            &case(),
+            &memory,
+            &run("no-memory", "abstain", &[]),
+        ).expect("candidate score remains structurally valid");
+        assert!(!paired.memory.decision_sufficient);
+        paired.memory.decision_sufficient = true;
+        assert_eq!(validate_paired_score(&paired), Err(EvaluationErrorV1::InvalidPairedScore));
     }
 
     #[test]
