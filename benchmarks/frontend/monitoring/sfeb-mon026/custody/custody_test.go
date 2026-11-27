@@ -318,3 +318,19 @@ func TestSignatureBindsKeyIdentity(t *testing.T) {
 		t.Fatalf("changing signer identity must invalidate signature: %+v", r)
 	}
 }
+
+func TestValidChainedBundleQualifies(t *testing.T) {
+	root, m, _, private, policy := testFixture(t)
+	m.Sequence = 2
+	previousRoot := digestBytes([]byte("previous-manifest-root"))
+	m.PreviousRootSHA256 = previousRoot
+	if err := SignManifest(&m, "custody-key-1", private); err != nil {
+		t.Fatal(err)
+	}
+	policy.ExpectedSequence = 2
+	policy.ExpectedPreviousRoot = previousRoot
+	r := VerifyBundle(root, m, policy)
+	if r.Verdict != VerdictQualified {
+		t.Fatalf("expected valid chained bundle, got %+v", r)
+	}
+}
