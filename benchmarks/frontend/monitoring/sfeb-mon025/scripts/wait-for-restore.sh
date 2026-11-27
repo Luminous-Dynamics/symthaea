@@ -12,7 +12,7 @@ TARGET_LSN="${3:-}"
 TARGET_TIMELINE="${4:-}"
 TIMEOUT_SECONDS="${5:-180}"
 case "$MAJOR" in 18|19) ;; *) echo "usage: $0 18|19 restore18|restore19 HEX/HEX TIMELINE_ID [timeout_seconds]" >&2; exit 64 ;; esac
-[[ "$SERVICE" == "restore18" || "$SERVICE" == "restore19" ]] || { echo "service must be a restore target" >&2; exit 64; }
+[[ "$SERVICE" == "restore$MAJOR" ]] || { echo "service must match the selected PostgreSQL major" >&2; exit 64; }
 [[ "$TARGET_LSN" =~ ^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$ ]] || { echo "invalid target LSN" >&2; exit 64; }
 [[ "$TARGET_TIMELINE" =~ ^[1-9][0-9]*$ ]] || { echo "invalid target timeline" >&2; exit 64; }
 target_timeline_hex="$(printf "%08X" "$TARGET_TIMELINE")"
