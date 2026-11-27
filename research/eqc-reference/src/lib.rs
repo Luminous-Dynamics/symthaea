@@ -804,8 +804,7 @@ mod tests {
             .expect("expired control task exists");
         assert_eq!(reference_disposition(expired), "deny");
         let mut expiry_relaxed = expired.clone();
-        expiry_relaxed.authority_snapshot.valid_until =
-            Some("2026-11-27T00:00:00Z".into());
+        expiry_relaxed.authority_snapshot.valid_until = Some("2026-11-27T00:00:00Z".into());
         assert_eq!(reference_disposition(&expiry_relaxed), "allow");
 
         let wrong_scope = corpus
