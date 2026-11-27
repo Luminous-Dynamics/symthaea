@@ -454,8 +454,8 @@ mod tests {
 
     #[test]
     fn same_form_semantic_update_uses_shorter_transition() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
-        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000000000");
+        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1200000000");
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         assert_eq!(plan.kind(), TransitionKind::SameFormUpdate);
         assert_eq!(plan.duration_ns(), 90_000_000);
@@ -568,12 +568,12 @@ mod tests {
 
     #[test]
     fn transition_weights_are_linear_and_reach_target_before_expiry() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
-        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000000000");
+        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "1200000000");
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         let start = plan.weights_at(CLOCK, 200).unwrap();
-        let middle = plan.weights_at(CLOCK, 290_000_200).unwrap();
-        let end = plan.weights_at(CLOCK, 380_000_200).unwrap();
+        let middle = plan.weights_at(CLOCK, 90_000_200).unwrap();
+        let end = plan.weights_at(CLOCK, 180_000_200).unwrap();
         assert_eq!(start.source_opacity, 1.0);
         assert_eq!(start.target_opacity, 0.0);
         assert!((middle.source_opacity - 0.5).abs() < 0.0001);
