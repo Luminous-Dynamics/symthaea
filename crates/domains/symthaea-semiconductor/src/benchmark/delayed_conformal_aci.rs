@@ -706,7 +706,11 @@ pub fn deliver_delayed_aci_feedback_v1(
                 reasons.push(DelayedAciReasonV1::FixedDelayScheduleMismatch);
             }
             if let Some(phase) = prediction.feedback_phase {
-                if engine.next_feedback_sequence_by_phase[phase as usize] != prediction.sequence {
+                let phase_index = phase as usize;
+                if phase != prediction.sequence % delay_steps
+                    || engine.next_feedback_sequence_by_phase[phase_index] != prediction.sequence
+                    || engine.phase_alpha_states[phase_index] != prediction.alpha_state_used
+                {
                     reasons.push(DelayedAciReasonV1::FeedbackPhaseOrderMismatch);
                 }
             }
