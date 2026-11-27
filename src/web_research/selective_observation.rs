@@ -22,8 +22,7 @@ use std::collections::{BTreeMap, HashSet};
 
 const AURC_CONVENTION: &str =
     "Item-wise empirical AURC; expected over uniform within-tie permutations";
-const UNCERTAINTY_LIMITATION: &str =
-    "No confidence interval: requires joint inclusion probabilities or a design-valid clustered variance estimator";
+const UNCERTAINTY_LIMITATION: &str = "No confidence interval: requires joint inclusion probabilities or a design-valid clustered variance estimator";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -67,6 +66,9 @@ pub struct PropensitySupportDiagnostics {
     pub zero_probability_records: usize,
     pub invalid_probability_records: usize,
     pub invalid_prediction_confidence_records: usize,
+    /// Pending records with inclusion probability 1.0 contradict a design that
+    /// defines inclusion as "label observed by this frozen evaluation cutoff".
+    pub pending_certain_inclusion_records: usize,
     pub positive_support_for_entire_cohort: bool,
     pub maximum_inverse_probability_weight: Option<f64>,
     pub kish_effective_sample_size: Option<f64>,
@@ -250,14 +252,16 @@ pub fn evaluate_selective_observation(
             (
                 None,
                 Some(
-                    "population risk is not identifiable from this cohort: every record needs a known, strictly positive adjudication inclusion probability".to_owned(),
+                    "population risk is not identifiable: every record needs a known, strictly                      positive adjudication inclusion probability"
+                        .to_owned(),
                 ),
             )
         } else if diagnostics.invalid_prediction_confidence_records > 0 {
             (
                 None,
                 Some(
-                    "population estimate withheld because the candidate emitted invalid confidence values".to_owned(),
+                    "population estimate withheld because the candidate emitted invalid                      confidence values"
+                        .to_owned(),
                 ),
             )
         } else if diagnostics.kish_effective_sample_size.unwrap_or(0.0)
@@ -299,6 +303,7 @@ fn support_diagnostics(records: &[SelectiveObservationRecord]) -> PropensitySupp
     let mut zero_probability_records = 0;
     let mut invalid_probability_records = 0;
     let mut invalid_prediction_confidence_records = 0;
+    let mut pending_certain_inclusion_records = 0;
     let mut weights = Vec::new();
 
     for record in records {
@@ -323,6 +328,9 @@ fn support_diagnostics(records: &[SelectiveObservationRecord]) -> PropensitySupp
             Some(probability) if record.prediction.adjudicated_truth.is_some() => {
                 weights.push(1.0 / probability);
             }
+            Some(probability) if probability == 1.0 => {
+                pending_certain_inclusion_records += 1;
+            }
             Some(_) => {}
         }
     }
@@ -330,7 +338,8 @@ fn support_diagnostics(records: &[SelectiveObservationRecord]) -> PropensitySupp
     let positive_support_for_entire_cohort = !records.is_empty()
         && missing_probability_records == 0
         && zero_probability_records == 0
-        && invalid_probability_records == 0;
+        && invalid_probability_records == 0
+        && pending_certain_inclusion_records == 0;
     let sum_weights = weights.iter().sum::<f64>();
     let sum_squared_weights = weights.iter().map(|weight| weight * weight).sum::<f64>();
     let kish_effective_sample_size = (sum_squared_weights > 0.0)
@@ -344,6 +353,7 @@ fn support_diagnostics(records: &[SelectiveObservationRecord]) -> PropensitySupp
         zero_probability_records,
         invalid_probability_records,
         invalid_prediction_confidence_records,
+        pending_certain_inclusion_records,
         positive_support_for_entire_cohort,
         maximum_inverse_probability_weight: weights.iter().copied().reduce(f64::max),
         kish_effective_sample_size,
@@ -449,7 +459,10 @@ fn compute_population_report(
     let mut targets = config.target_coverages.clone();
     targets.sort_by(f64::total_cmp);
     for target in targets {
-        if let Some(point) = curve.iter().find(|point| point.point.coverage_in_full_cohort >= target) {
+        if let Some(point) = curve
+            .iter()
+            .find(|point| point.point.coverage_in_full_cohort >= target)
+        {
             operating_points.push(PropensityWeightedOperatingPoint {
                 target_coverage: target,
                 achieved_coverage: point.point.coverage_in_full_cohort,
@@ -502,12 +515,16 @@ fn compute_population_report(
         observed_model_policy,
         uncertainty_limitation: UNCERTAINTY_LIMITATION.to_owned(),
         assumptions: vec![
-            "The target population is the complete frozen prediction cohort; all candidate predictions are available for every record.".to_owned(),
+            "The target population is the complete frozen prediction cohort; all candidate              predictions are available for every record."
+                .to_owned(),
             "Every record has a known, strictly positive adjudication inclusion probability.".to_owned(),
             "The inclusion probability is assigned using only pre-label information.".to_owned(),
-            "Conditional ignorability and the declared sampling design are external assumptions; this evaluator cannot verify them.".to_owned(),
-            "Horvitz-Thompson estimates are not clipped and may leave [0, 1] in finite samples.".to_owned(),
-            "Wilson intervals from the adjudicated-only lane are not valid for these weighted estimates.".to_owned(),
+            "Conditional ignorability and the declared sampling design are external assumptions;              this evaluator cannot verify them."
+                .to_owned(),
+            "Horvitz-Thompson estimates are not clipped and may leave [0, 1] in finite samples."
+                .to_owned(),
+            "Wilson intervals from the adjudicated-only lane are not valid for these weighted              estimates."
+                .to_owned(),
         ],
     }
 }
@@ -614,12 +631,32 @@ fn stratify_population(
                     None,
                     Some("stratum has zero, missing or invalid adjudication support".to_owned()),
                 )
+            } else if diagnostics.pending_certain_inclusion_records > 0 {
+                (
+                    None,
+                    Some(
+                        "population estimate withheld: pending labels have inclusion probability 1.0 under a design defined at this evaluation cutoff".to_owned(),
+                    ),
+                )
+            } else if diagnostics.pending_certain_inclusion_records > 0 {
+                (
+                    None,
+                    Some("stratum has pending records with certain inclusion".to_owned()),
+                )
+            } else if diagnostics.invalid_prediction_confidence_records > 0 {
+                (
+                    None,
+                    Some("stratum contains invalid candidate confidence values".to_owned()),
+                )
             } else if diagnostics.kish_effective_sample_size.unwrap_or(0.0)
                 < config.minimum_sample_size as f64
             {
                 (
                     None,
-                    Some("stratum effective sample size is below the configured minimum".to_owned()),
+                    Some(
+                        "stratum effective sample size is below the configured minimum"
+                            .to_owned(),
+                    ),
                 )
             } else {
                 (Some(compute_population_report(&group, design, config)), None)
@@ -639,7 +676,12 @@ fn stratify_population(
 mod tests {
     use super::*;
 
-    fn prediction(id: &str, confidence: f64, predicted: bool, truth: Option<bool>) -> SelectivePredictionRecord {
+    fn prediction(
+        id: &str,
+        confidence: f64,
+        predicted: bool,
+        truth: Option<bool>,
+    ) -> SelectivePredictionRecord {
         SelectivePredictionRecord {
             id: id.to_owned(),
             predicted_label: predicted,
@@ -752,7 +794,7 @@ mod tests {
     }
 
     #[test]
-    fn unknown_sampling_mechanism_is_not_represented_as_randomized() {
+    fn empty_sampling_design_id_is_rejected() {
         let design = AdjudicationSamplingDesign {
             design_id: String::new(),
             ..design()
@@ -773,6 +815,42 @@ mod tests {
         assert_eq!(
             evaluate_selective_observation(&[], &design, &config()).unwrap_err(),
             SelectiveObservationError::EmptyConditioningVariable
+        );
+    }
+
+    #[test]
+    fn invalid_prediction_confidence_blocks_population_estimation() {
+        let mut invalid = prediction("invalid", f64::NAN, true, Some(true));
+        invalid.predicted_confidence = f64::NAN;
+        let records = vec![
+            observed(invalid, Some(1.0)),
+            observed(prediction("valid", 0.5, true, Some(true)), Some(1.0)),
+        ];
+        let report = evaluate_selective_observation(&records, &design(), &config()).unwrap();
+        assert_eq!(report.diagnostics.invalid_prediction_confidence_records, 1);
+        assert!(report.population_report.is_none());
+    }
+
+    #[test]
+    fn certain_inclusion_cannot_remain_pending_at_the_frozen_cutoff() {
+        let records = vec![
+            observed(prediction("labelled", 0.9, true, Some(true)), Some(1.0)),
+            observed(prediction("pending", 0.2, true, None), Some(1.0)),
+        ];
+        let report = evaluate_selective_observation(&records, &design(), &config()).unwrap();
+        assert_eq!(report.diagnostics.pending_certain_inclusion_records, 1);
+        assert!(report.population_report.is_none());
+    }
+
+    #[test]
+    fn duplicate_cohort_ids_are_rejected() {
+        let records = vec![
+            observed(prediction("same", 0.9, true, Some(true)), Some(1.0)),
+            observed(prediction("same", 0.8, true, Some(false)), Some(1.0)),
+        ];
+        assert_eq!(
+            evaluate_selective_observation(&records, &design(), &config()).unwrap_err(),
+            SelectiveObservationError::DuplicateRecordId("same".to_owned())
         );
     }
 
