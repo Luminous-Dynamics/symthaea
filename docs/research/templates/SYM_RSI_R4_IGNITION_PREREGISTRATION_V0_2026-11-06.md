@@ -57,6 +57,7 @@ For an R4 claim, report selection-independent confirmation, round-by-round devel
 
 A five-seed paired pilot is a floor for estimating variance where feasible; it is not a universal confirmatory sample size. The confirmatory count must be fixed from a preregistered precision/power analysis before sealed confirmation is accessed.
 
+The `experiment.claim_profile.selected_claims` field must be `none` or a comma-separated list of the exact enabled claim-flag names (for example, `product_improvement,repeatability`). The semantic checker rejects unknown/duplicate names, missing flags and any mismatch between this list and the eight boolean flags.
 ## Authority boundaries
 
 - #10497 owns the R4 scientific design and acceptance criteria.
