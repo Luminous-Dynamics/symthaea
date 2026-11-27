@@ -1,6 +1,6 @@
 # SDCB causal instrument-response kernels v1
 
-**Status:** The standalone scalar OU + first-order response analytic reference is authored in `scripts/research/sdcb_exponential_response.rs` with twenty Rust tests. The tests are not compiled or executed in this environment. No integration into the existing interval-observation module, high-rate experiment, physical qualification, or SOTA result is claimed.
+**Status:** The standalone scalar OU + first-order response analytic reference is authored in `scripts/research/sdcb_exponential_response.rs` with twenty-one Rust tests. The tests are not compiled or executed in this environment. No integration into the existing interval-observation module, high-rate experiment, physical qualification, or SOTA result is claimed.
 
 ## 1. Motivation
 
@@ -65,7 +65,7 @@ Do not claim arbitrary nonlinear hysteresis in M0. Hysteresis must be represente
 `dz = (x-z)/tau_s dt`.
 It computes the stationary covariance, exact 2x2 transition matrix, future/past cross-covariance, filtered-sensor autocovariance, normalized step response, and first-order frequency response. It includes the repeated-root case (equal latent and sensor rates) and uses exp_m1-based rate-gap formulas near that case.
 
-Twenty Rust tests are authored for stationary covariance, equal-rate and distinct-rate fixtures, zero lag, near-equal-rate continuity, step response, -3 dB / phase behavior, invalid inputs and negative elapsed time. An independent authoring-runtime check using SciPy matrix exponential and continuous Lyapunov solution reproduced the distinct-rate transition/cross-covariance fixture to below 2e-15 absolute difference. This is an independent numerical calculation, not Rust execution, crate compilation, CI, or physical sensor validation.
+Twenty-one Rust tests are authored for stationary covariance, equal-rate and distinct-rate fixtures, zero lag, near-equal-rate continuity, step response, -3 dB / phase behavior, invalid inputs and negative elapsed time. An independent authoring-runtime check using SciPy matrix exponential and continuous Lyapunov solution reproduced the distinct-rate transition/cross-covariance fixture to below 2e-15 absolute difference. This is an independent numerical calculation, not Rust execution, crate compilation, CI, or physical sensor validation.
 An additional independent convolution identity is used to test the state-space covariance calculation. With q = mu*sigma^2/(lambda+mu), for h >= 0 and mu != lambda:
 `C_zz(h) = q * (mu*exp(-lambda*h) - lambda*exp(-mu*h)) / (mu-lambda)`.
 At equal rates mu=lambda, the continuous limit is
@@ -218,3 +218,5 @@ New regressions cover a subnormal rate ratio with a large variance, subnormal ra
 
 
 The same 50,000-case sweep also exercised the stationary filtered variance across rates/variances spanning approximately 10^-300 to 10^300. After adding a two-order evaluation for subnormal mu/lambda ratios, a separate 100,000-case mpmath comparison of the stationary covariance scalar found maximum 2 ulps error and maximum relative discrepancy 3.5e-16 on normal-range results. This is independent numerical stress evidence, not Rust execution or formal proof.
+
+The normalized step response now evaluates `1-exp(-mu*t)` through `-expm1(-mu*t)`, adding an FMA-derived correction for the rounded rate-times-time product. This avoids cancellation to zero for small response fractions. An authored regression checks a (10^{-20}) response fraction; an independent Python check confirmed the expm1 result retains that value while direct `1-exp(-x)` rounds to zero.
