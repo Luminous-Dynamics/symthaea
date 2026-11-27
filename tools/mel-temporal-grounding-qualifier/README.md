@@ -85,7 +85,7 @@ The dataset, target-property references and pairing manifests are digest-shaped 
 
 The `music_performance_identity_inference` module composes the authoritative #13947 reducer for baseline and candidate runs. It requires exact item/pair/source-work/target-property/factor/audio/question/option-map/performer/take/performance/instrument/renderer alignment; only model/prompt/runtime/decoding identity and answers may differ.
 
-The primary estimand is an equal-source-work mean: each source work contributes one within-cluster mean regardless of its number of triads. A fixed-seed paired cluster bootstrap resamples source works and uses the same sampled clusters for both runs. It reports candidate improvement separately for performance-STAY false-difference, musical-FLIP miss and joint-exact rates. It does not resample individual triads.
+The primary estimand is an equal-source-work mean: each source work contributes one within-cluster mean regardless of its number of triads. A fixed-seed paired cluster bootstrap resamples source works and uses the same sampled clusters for both runs. It reports candidate improvement separately for performance-STAY false-difference, musical-FLIP miss and joint-exact rates. It does not resample individual triads. It also emits by-property, property×STAY-factor and property×FLIP-factor strata, each with its own source-work support count; strata below the 30-work floor have no bootstrap intervals even when the overall corpus meets the floor.
 
 Run the synthetic 30-source-work comparison with:
 
