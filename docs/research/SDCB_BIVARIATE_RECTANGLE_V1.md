@@ -1,6 +1,6 @@
 # SDCB bivariate Gaussian rectangle reference v1
 
-**Status:** bounded, two-channel numerical reference authored in Rust. Eleven tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
+**Status:** bounded, two-channel numerical reference with scale-aware covariance validation, a table-wide evaluation budget and metamorphic controls. Fifteen tests are authored; exact-head Rust 1.96 execution is gated by the dedicated workflow. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
 
 ## 1. Why this increment
 
@@ -30,13 +30,13 @@ P(\ell_1<Y_1\le u_1,\ell_2<Y_2\le u_2)
 \right] dz .
 \]
 
-The implementation uses deterministic adaptive Simpson integration for the outer conditional integral. Inner standard-normal interval masses reuse the direct-tail 64-point Gauss–Legendre routine from #13944. It splits the integration range at conditional-transition locations (including several conditional-standard-deviation offsets) so a narrow high-correlation transition is less likely to hide between initial samples.
+The implementation uses deterministic adaptive Simpson integration for the outer conditional integral. Both the coarse pass and recursive refinement consume an explicit function-evaluation budget. A joint-bin table shares one aggregate budget across all cells rather than resetting the limit for each rectangle. Inner standard-normal interval masses reuse the direct-tail 64-point Gauss–Legendre routine from #13944. It splits the integration range at conditional-transition locations (including several conditional-standard-deviation offsets) so a narrow high-correlation transition is less likely to hide between initial samples.
 
 This is a low-dimensional reference method. The reported outer refinement difference is an **error indicator**, not a formally certified total error bound. Inner quadrature and total results must still be checked against independent high-precision calculations.
 
 ## 3. Covariance and tail policy
 
-- Requires a finite, symmetric, strictly positive-definite 2×2 covariance matrix.
+- Requires a finite, symmetric, strictly positive-definite 2×2 covariance matrix. Symmetry is checked relative to the magnitude of the covariance entries, so tiny-unit matrices receive the same relative treatment as order-one matrices.
 - No diagonal jitter, eigenvalue flooring, or silent covariance repair.
 - Exact rank deficiency / duplicate channels return SingularCovarianceUnsupported.
 - Correlation condition estimates above \(10^8\) return IllConditionedCovarianceUnsupported.
@@ -73,7 +73,7 @@ These are mathematical numerical fixtures, not measured sensor probabilities. Or
 
 ## 6. Tests and limits
 
-The authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, exact duplicate-channel rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, and bounded evaluation.
+The authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, exact duplicate-channel rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, bounded evaluation, scale-relative covariance symmetry, invariance under channel permutation and positive rescaling, a high-correlation orthant, and aggregate joint-table budget exhaustion.
 
 Not implemented:
 - trivariate or general n-variate integration;
@@ -100,7 +100,7 @@ Peterlin's reported near/above-100× speedups are for the paper's tested high-di
 
 ## 8. Evidence boundary
 
-- Source and fixtures are authored; Rust has not been compiled or executed here.
+- Source and fixtures are authored. The exact-source Rust 1.96 workflow is the execution gate; no test result is claimed before it completes.
 - No CI pass is claimed.
 - Independent mathematical fixtures are not sensor observations.
 - No external package tournament, real sensor dataset, or physical validation is claimed.
