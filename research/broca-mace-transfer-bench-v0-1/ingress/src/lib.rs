@@ -1,5 +1,7 @@
 pub mod claims;
 pub mod providers;
+mod evidence_use;
+pub use evidence_use::{revalidate_for_use_v1, EvidenceUseContextV1, EvidenceUseReceiptV1, EvidenceUseRejectV1};
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -223,6 +225,8 @@ pub struct EvidenceReceiptBundle {
     pub task_id: String,
     pub canonical_event_hash: String,
     pub authority_receipt_digest: String,
+    pub event_valid_from_ms: i64,
+    pub event_valid_until_ms: Option<i64>,
     pub event_occurred_at_ms: i64,
     pub authority_received_at_ms: i64,
     pub lineage_digest: String,
@@ -540,6 +544,8 @@ pub fn ingest_as_known(
             task_id: event.task_id,
             canonical_event_hash: event.canonical_event_hash,
             authority_receipt_digest: event.authority_receipt_digest,
+            event_valid_from_ms: event.valid_from_ms,
+            event_valid_until_ms: event.valid_until_ms,
             event_occurred_at_ms: event.occurred_at_ms,
             authority_received_at_ms: event.received_at_ms,
             lineage_digest: lineage.receipt_digest,
@@ -3202,6 +3208,125 @@ mod tests {
         let observed = ingest_as_known(&raw(), query(180, 250), &verifier).unwrap();
         assert!(!observed.experience.delayed_horizon_complete);
         assert!(!is_qualified(&observed.experience, Query { scope: scope() }));
+    }
+    #[test]
+    fn use_time_revalidation_emits_a_scope_and_policy_bound_receipt() {
+        let prior = ingest_as_known(&raw(), query(180, 250), &TestVerifier::default()).unwrap();
+        let context = EvidenceUseContextV1 {
+            purpose_code: "mace.dsm.eval".into(),
+            required_scope: scope(),
+            consumer_policy_sha256: "a".repeat(64),
+            require_complete_dependency_lineage: false,
+        };
+        let receipt = revalidate_for_use_v1(
+            &raw(), &prior, query(180, 270), &context, &TestVerifier::default()
+        ).unwrap();
+        assert_eq!(receipt.event_id, 42);
+        assert_eq!(receipt.valid_from_ms, 100);
+        assert_eq!(receipt.valid_until_ms, Some(300));
+        assert_eq!(receipt.prior_known_at_ms, 250);
+        assert_eq!(receipt.known_at_ms, 270);
+        assert_eq!(receipt.lifecycle_status_as_known, SourceLifecycleStatus::Active);
+        assert!(receipt.verify_integrity());
+        assert!(receipt.has_verified_ingress_provenance());
+        let encoded = receipt.to_json_value();
+        assert_eq!(encoded["schema_version"], "mace_evidence_use_receipt_v1");
+        assert_eq!(encoded["verification_custody"], "originating_process_only");
+        assert!(encoded.get("verified_in_process").is_none());
+        let mut tampered = receipt.clone();
+        tampered.purpose_code = "different-purpose".into();
+        assert!(!tampered.verify_integrity());
+    }
+
+    #[test]
+    fn use_time_revalidation_rejects_a_source_revoked_after_ingestion() {
+        let prior = ingest_as_known(&raw(), query(180, 250), &TestVerifier::default()).unwrap();
+        let context = EvidenceUseContextV1 {
+            purpose_code: "mace.dsm.eval".into(),
+            required_scope: scope(),
+            consumer_policy_sha256: "a".repeat(64),
+            require_complete_dependency_lineage: false,
+        };
+        let verifier = TestVerifier {
+            retracted_at_ms: Some(260),
+            ..TestVerifier::default()
+        };
+        assert_eq!(
+            revalidate_for_use_v1(&raw(), &prior, query(180, 270), &context, &verifier),
+            Err(EvidenceUseRejectV1::RevalidationRejected(IngestReject::RetractedAsKnown))
+        );
+    }
+
+    #[test]
+    fn use_time_revalidation_rejects_changed_source_identity_and_untrusted_origin() {
+        let prior = ingest_as_known(&raw(), query(180, 250), &TestVerifier::default()).unwrap();
+        let context = EvidenceUseContextV1 {
+            purpose_code: "mace.dsm.eval".into(),
+            required_scope: scope(),
+            consumer_policy_sha256: "a".repeat(64),
+            require_complete_dependency_lineage: false,
+        };
+        let changed = TestVerifier {
+            vary_lineage_by_event: true,
+            ..TestVerifier::default()
+        };
+        assert_eq!(
+            revalidate_for_use_v1(&raw(), &prior, query(180, 270), &context, &changed),
+            Err(EvidenceUseRejectV1::SourceIdentityChanged)
+        );
+        let untrusted = TestVerifier {
+            trust_status: SourceTrustStatus::Untrusted,
+            ..TestVerifier::default()
+        };
+        assert_eq!(
+            revalidate_for_use_v1(&raw(), &prior, query(180, 270), &context, &untrusted),
+            Err(EvidenceUseRejectV1::SourceNotTrustedForScope)
+        );
+    }
+
+    #[test]
+    fn use_time_revalidation_can_veto_unknown_ancestry_and_future_receipts() {
+        let prior = ingest_as_known(&raw(), query(180, 250), &TestVerifier::default()).unwrap();
+        let strict = EvidenceUseContextV1 {
+            purpose_code: "mace.dsm.eval".into(),
+            required_scope: scope(),
+            consumer_policy_sha256: "a".repeat(64),
+            require_complete_dependency_lineage: true,
+        };
+        assert_eq!(
+            revalidate_for_use_v1(&raw(), &prior, query(180, 270), &strict, &TestVerifier::default()),
+            Err(EvidenceUseRejectV1::DependencyLineageIncomplete)
+        );
+        let permissive = EvidenceUseContextV1 { require_complete_dependency_lineage: false, ..strict };
+        assert_eq!(
+            revalidate_for_use_v1(&raw(), &prior, query(180, 210), &permissive, &TestVerifier::default()),
+            Err(EvidenceUseRejectV1::RevalidationRejected(IngestReject::RecordedAfterKnownAt))
+        );
+    }
+
+    #[test]
+    fn use_time_revalidation_rejects_malformed_purpose_and_policy_identity() {
+        let prior = ingest_as_known(&raw(), query(180, 250), &TestVerifier::default()).unwrap();
+        let invalid_purpose = EvidenceUseContextV1 {
+            purpose_code: "User Tristan".into(),
+            required_scope: scope(),
+            consumer_policy_sha256: "a".repeat(64),
+            require_complete_dependency_lineage: false,
+        };
+        assert_eq!(
+            revalidate_for_use_v1(&raw(), &prior, query(180, 270), &invalid_purpose, &TestVerifier::default()),
+            Err(EvidenceUseRejectV1::InvalidPurposeCode)
+        );
+        let invalid_policy = EvidenceUseContextV1 {
+            purpose_code: "mace.dsm.eval".into(),
+            required_scope: scope(),
+            consumer_policy_sha256: "not-a-digest".into(),
+            require_complete_dependency_lineage: false,
+        };
+        assert_eq!(
+            revalidate_for_use_v1(&raw(), &prior, query(180, 270), &invalid_policy, &TestVerifier::default()),
+            Err(EvidenceUseRejectV1::InvalidConsumerPolicyDigest)
+        );
     }
 }
 
