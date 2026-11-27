@@ -171,7 +171,7 @@ fn median(values: &mut [f64]) -> Result<f64, ContextResidualCohortErrorV1> {
     }
     values.sort_by(f64::total_cmp);
     let middle = values.len() / 2;
-    let result = if values.len() % 2 == 0 {
+    let result = if values.len().is_multiple_of(2) {
         values[middle - 1] / 2.0 + values[middle] / 2.0
     } else {
         values[middle]
