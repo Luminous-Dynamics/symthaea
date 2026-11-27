@@ -25,6 +25,7 @@ pub enum EvidenceUseRejectV1 {
     InvalidPurposeCode,
     InvalidConsumerPolicyDigest,
     ScopeMismatch,
+    KnownAtRegression,
     PriorReceiptMismatch,
     SourceIdentityChanged,
     SourceAssessmentChanged,
@@ -253,6 +254,9 @@ pub fn revalidate_for_use_v1(
     if raw.scope != context.required_scope || prior.experience.scope != context.required_scope {
         return Err(EvidenceUseRejectV1::ScopeMismatch);
     }
+    if current_query.known_at_ms < prior.as_known.known_at_ms {
+        return Err(EvidenceUseRejectV1::KnownAtRegression);
+    }
     if raw.event_id != prior.experience.event_id
         || raw.payload_sha256 != prior.receipts.raw_event_digest
         || raw.scope != prior.experience.scope
@@ -277,6 +281,7 @@ pub fn revalidate_for_use_v1(
         || after.upstream_source_id != before.upstream_source_id
         || after.source_artifact_digest != before.source_artifact_digest
         || after.transformation_digest != before.transformation_digest
+        || after.source_acquisition_mode != before.source_acquisition_mode
         || after.source_issuer_id != before.source_issuer_id
     {
         return Err(EvidenceUseRejectV1::SourceIdentityChanged);
@@ -286,6 +291,11 @@ pub fn revalidate_for_use_v1(
     }
     if after.calibration_digest != before.calibration_digest
         || after.calibration_revision != before.calibration_revision
+        || after.measurement_unit != before.measurement_unit
+        || after.measurement_instrument_id != before.measurement_instrument_id
+        || after.calibration_method_id != before.calibration_method_id
+        || current.experience.measurement_error_bound.to_bits() != prior.experience.measurement_error_bound.to_bits()
+        || after.outcome_success != before.outcome_success
         || after.causal_assessment_digest != before.causal_assessment_digest
         || after.causal_identification != before.causal_identification
         || after.outcome_digest != before.outcome_digest
