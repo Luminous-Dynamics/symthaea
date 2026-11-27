@@ -1,0 +1,319 @@
+                if relation["classifier_provenance"].is_object() {
+                    relation["classifier_provenance"]["evidence_prefix_sha256"] =
+                        Value::String(prefix.clone());
+                }
+            }
+        }
+        state.to_string()
+    }
+
+    fn offer(
+        offer_id: &str,
+        kind: ActionKind,
+        claim: Option<&str>,
+        evidence: Option<&str>,
+        cost: &[(&str, u64)],
+    ) -> ActionOffer {
+        ActionOffer {
+            offer_id: offer_id.to_owned(),
+            kind,
+            target_claim_id: claim.map(str::to_owned),
+            target_evidence_id: evidence.map(str::to_owned),
+            resource_cost: cost
+                .iter()
+                .map(|(key, value)| (key.to_string(), *value))
+                .collect(),
+        }
+    }
+
+    fn input(state: String, offers: Vec<ActionOffer>) -> PolicyInput {
+        PolicyInput {
+            research_state_json: state,
+            permitted_action_offers: offers,
+            remaining_budget: [
+                ("query_units".to_owned(), 10),
+                ("experiment_units".to_owned(), 10),
+                ("review_minutes".to_owned(), 10),
+            ]
+            .into_iter()
+            .collect(),
+        }
+    }
+
+    #[test]
+    fn unclassified_retrieval_selects_only_an_offered_classifier_action() {
+        let input = input(
+            artifact_verified_state(0),
+            vec![offer(
+                "classify-claim-a",
+                ActionKind::ClassifyClaimSource,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
+            )],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(decision.disposition, DecisionDisposition::Selected);
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("classify-claim-a")
+        );
+        assert_eq!(
+            decision.selected_action_kind,
+            Some(ActionKind::ClassifyClaimSource)
+        );
+    }
+
+    #[test]
+    fn unknown_resource_dimensions_fail_closed() {
+        let mut input = input(sample_state(0), vec![]);
+        input.remaining_budget.insert(String::new(), 1);
+        assert!(decide(&input).is_err());
+    }
+
+    #[test]
+    fn unknown_integrity_requires_verification_before_classification() {
+        let input = input(
+            sample_state(0),
+            vec![
+                offer(
+                    "verify-artifact",
+                    ActionKind::VerifyArtifact,
+                    Some("claim-a"),
+                    Some("ev-a1"),
+                    &[
+                        ("query_units", 0),
+                        ("experiment_units", 0),
+                        ("review_minutes", 1),
+                    ],
+                ),
+                offer(
+                    "classify-claim-a",
+                    ActionKind::ClassifyClaimSource,
+                    Some("claim-a"),
+                    Some("ev-a1"),
+                    &[
+                        ("query_units", 1),
+                        ("experiment_units", 0),
+                        ("review_minutes", 1),
+                    ],
+                ),
+            ],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("verify-artifact")
+        );
+        assert_eq!(
+            decision.reason_codes,
+            vec!["ARTIFACT_NOT_YET_CAPTURED_AND_INTEGRITY_VERIFIED"]
+        );
+    }
+
+    #[test]
+    fn unknown_correction_status_must_be_resolved_before_claim_use() {
+        let mut state: Value = serde_json::from_str(&artifact_verified_state(0)).unwrap();
+        state["evidence"][0]["correction_status"] = Value::String("UNKNOWN".to_owned());
+        let input = input(
+            state.to_string(),
+            vec![offer(
+                "check-source-corrections",
+                ActionKind::VerifyArtifact,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
+            )],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("check-source-corrections")
+        );
+        assert_eq!(
+            decision.reason_codes,
+            vec!["SOURCE_CORRECTION_STATUS_NOT_YET_VERIFIED"]
+        );
+    }
+
+    #[test]
+    fn fetched_but_not_captured_source_requires_artifact_verification() {
+        let mut state: Value = serde_json::from_str(&sample_state(1)).unwrap();
+        state["evidence"][0]["retrieval_state"] = Value::String("FETCHED".to_owned());
+        let evidence = state["evidence"].as_array().unwrap().clone();
+        let episode = get_str(&state, "research_episode_id").unwrap().to_owned();
+        let sequence = state["evidence_prefix"]["sequence_number"]
+            .as_u64()
+            .unwrap();
+        let prefix =
+            typed_research_state_contract::evidence_prefix_sha256(&episode, sequence, &evidence);
+        state["evidence_prefix"]["prefix_sha256"] = Value::String(prefix.clone());
+        for relation in state["claims"][0]["evidence_relations"]
+            .as_array_mut()
+            .unwrap()
+        {
+            if relation["classifier_provenance"].is_object() {
+                relation["classifier_provenance"]["evidence_prefix_sha256"] =
+                    Value::String(prefix.clone());
+            }
+        }
+        let input = input(
+            state.to_string(),
+            vec![offer(
+                "verify-before-use",
+                ActionKind::VerifyArtifact,
+                Some("claim-b"),
+                Some("ev-b1"),
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
+            )],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("verify-before-use")
+        );
+    }
+
+    #[test]
+    fn deterministic_replay_returns_identical_decision() {
+        let input = input(
+            artifact_verified_state(0),
+            vec![offer(
+                "classify-claim-a",
+                ActionKind::ClassifyClaimSource,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
+            )],
+        );
+        let first = decide(&input).unwrap();
+        let second = decide(&input).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn resource_dimension_mismatch_in_offer_is_rejected() {
+        let input = input(
+            artifact_verified_state(0),
+            vec![offer(
+                "classify-missing-review-dimension",
+                ActionKind::ClassifyClaimSource,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[("query_units", 1), ("experiment_units", 0)],
+            )],
+        );
+        assert!(decide(&input).is_err());
+    }
+
+    #[test]
+    fn action_offer_change_changes_offer_digest_not_state_digest() {
+        let state = artifact_verified_state(0);
+        let first_input = input(
+            state.clone(),
+            vec![offer(
+                "classify-a",
+                ActionKind::ClassifyClaimSource,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
+            )],
+        );
+        let second_input = input(
+            state,
+            vec![offer(
+                "classify-b",
+                ActionKind::ClassifyClaimSource,
+                Some("claim-a"),
+                Some("ev-a1"),
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
+            )],
+        );
+        let first = decide(&first_input).unwrap();
+        let second = decide(&second_input).unwrap();
+        assert_eq!(first.research_state_sha256, second.research_state_sha256);
+        assert_ne!(first.action_offers_sha256, second.action_offers_sha256);
+    }
+
+    #[test]
+    fn no_permitted_action_causes_abstention() {
+        let decision = decide(&input(sample_state(0), vec![])).unwrap();
+        assert_eq!(decision.disposition, DecisionDisposition::Abstain);
+        assert_eq!(decision.reason_codes, vec!["NO_FEASIBLE_PERMITTED_ACTION"]);
+    }
+
+    #[test]
+    fn retracted_source_is_refreshed_before_using_its_old_support_label() {
+        let mut state: Value = serde_json::from_str(&sample_state(1)).unwrap();
+        state["evidence"][0]["correction_status"] = Value::String("RETRACTED".to_owned());
+        let input = input(
+            state.to_string(),
+            vec![offer(
+                "refresh-retracted",
+                ActionKind::RetrieveOrRecapture,
+                Some("claim-b"),
+                Some("ev-b1"),
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 0),
+                ],
+            )],
+        );
+        let decision = decide(&input).unwrap();
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("refresh-retracted")
+        );
+        assert_eq!(
+            decision.reason_codes,
+            vec!["SOURCE_CORRECTED_RETRACTED_OR_SUPERSEDED"]
+        );
+    }
+
+    #[test]
+    fn refuted_adjudication_requests_discriminating_work_not_repeat_adjudication() {
+        let mut state: Value = serde_json::from_str(&sample_state(1)).unwrap();
+        state["decision_context"]["risk_class"] = Value::String("HIGH".to_owned());
+        state["claims"][0]["truth_adjudication"] = serde_json::json!({
+            "status": "ADJUDICATED",
+            "result": "REFUTED",
+            "authority_id": "independent-reviewer",
+            "evidence_reference": "urn:adjudication:refuted",
+            "adjudicated_at": "2026-11-25T10:10:00Z"
+        });
+        let input = input(
+            state.to_string(),
+            vec![offer(
+                "discriminate",
+                ActionKind::RequestDiscriminatingExperiment,
+                Some("claim-b"),
+                None,
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 2),
+                    ("review_minutes", 0),
