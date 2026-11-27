@@ -2,7 +2,7 @@
 
 **Status:** benchmark design and synthetic contract only. No Vlasov–Poisson–Dougherty solver was executed by this work, no entropy/positivity theorem was proved for an RBKR extension, and no speedup or physical result is claimed.
 
-K-RESP-C is a separate collisional track. It must not be merged into K-RESP-1, which is collisionless Vlasov–Poisson and studies pulse/echo response.
+K-RESP-C is a separate collisional track. It must not be merged into K-RESP-1, which is collisionless Vlasov–Poisson and studies pulse/echo response. It is specifically the **Dougherty VPD** track. Coulomb **Landau VPL** echo-growth work is tracked separately in [K-RESP-CL](../kresp-cl-coulomb/README.md); do not reuse its collision operator, source theorem, entropy identity, or reference metrics here.
 
 ## Why this track exists
 
