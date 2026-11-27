@@ -89,11 +89,11 @@ fn constrain_standard_normal(
     let x_lower = (lower - mean) / loading;
     let x_upper = (upper - mean) / loading;
     if loading > 0.0 {
-        *z_lower = z_lower.max(x_lower);
-        *z_upper = z_upper.min(x_upper);
+        *z_lower = (*z_lower).max(x_lower);
+        *z_upper = (*z_upper).min(x_upper);
     } else {
-        *z_lower = z_lower.max(x_upper);
-        *z_upper = z_upper.min(x_lower);
+        *z_lower = (*z_lower).max(x_upper);
+        *z_upper = (*z_upper).min(x_lower);
     }
     *z_lower < *z_upper
 }
@@ -195,14 +195,13 @@ pub fn bivariate_gaussian_rectangle(
     if lower[0] > upper[0] || lower[1] > upper[1] {
         return Err(RectangleError::InvalidBounds);
     }
-    let scale = covariance.iter().flatten().fold(1.0_f64, |m, x| m.max(x.abs()));
-    if (covariance[0][1] - covariance[1][0]).abs() > 1.0e-12 * scale {
+    if covariance[0][1] != covariance[1][0] {
         return Err(RectangleError::AsymmetricCovariance);
     }
     let v1 = covariance[0][0];
     let v2 = covariance[1][1];
     if v1 < 0.0 || v2 < 0.0 { return Err(RectangleError::InvalidVariance); }
-    let c12 = 0.5 * (covariance[0][1] + covariance[1][0]);
+    let c12 = covariance[0][1];
 
     if v1 == 0.0 && v2 == 0.0 {
         if c12 != 0.0 { return Err(RectangleError::CovarianceNotPositiveSemidefinite); }
@@ -228,8 +227,7 @@ pub fn bivariate_gaussian_rectangle(
     }
     let rho = (c12 / s1) / s2;
     if !rho.is_finite() { return Err(RectangleError::NumericFailure); }
-    let psd_roundoff = 64.0 * f64::EPSILON;
-    if rho.abs() > 1.0 + psd_roundoff {
+    if rho.abs() > 1.0 {
         return Err(RectangleError::CovarianceNotPositiveSemidefinite);
     }
     if rho.abs() >= 1.0 {
@@ -509,6 +507,17 @@ mod tests {
                 [-1.0, -1.0], [1.0, 1.0],
             ),
             Err(RectangleError::CovarianceNotPositiveSemidefinite)
+        );
+    }
+
+    #[test]
+    fn even_small_covariance_asymmetry_is_not_silently_averaged() {
+        assert_eq!(
+            bivariate_gaussian_rectangle(
+                [0.0, 0.0], [[1.0, 0.2], [0.2000000000001, 1.0]],
+                [-1.0, -1.0], [1.0, 1.0],
+            ),
+            Err(RectangleError::AsymmetricCovariance)
         );
     }
 
