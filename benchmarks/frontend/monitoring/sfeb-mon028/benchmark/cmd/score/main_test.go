@@ -4,7 +4,8 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/hex"\n\t"encoding/json"
+	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,7 +71,6 @@ func TestVerifyCustodyBundleAcceptsTrustedExactSuite(t *testing.T) {
 	if result.Verdict!=custody.VerdictQualified || manifest.RunID!=runID {
 		t.Fatalf("expected trusted suite custody, got result=%+v manifest=%+v",result,manifest)
 	}
-	_ = policy
 }
 
 func TestVerifyCustodyBundleRejectsUndeclaredSuiteArtifact(t *testing.T) {
