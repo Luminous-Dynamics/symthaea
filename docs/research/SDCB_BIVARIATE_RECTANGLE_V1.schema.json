@@ -72,6 +72,76 @@
       "items": {
         "type": "string"
       }
+    },
+    "rank_deficient_case": {
+      "type": "object",
+      "required": [
+        "id",
+        "mean",
+        "covariance",
+        "lower",
+        "upper",
+        "expected_probability",
+        "expected_covariance_rank"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "mean": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "covariance": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "lower": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "upper": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "expected_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "expected_covariance_rank": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }
