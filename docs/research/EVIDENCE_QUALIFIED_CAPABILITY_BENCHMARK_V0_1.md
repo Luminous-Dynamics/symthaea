@@ -366,9 +366,11 @@ A digest establishes byte identity, not authorship, truth, independent execution
 
 ### Stage 0 — Protocol and task validity
 
-- Freeze v0.1 task schema, result schema and receipt schema.
+- Freeze v0.1 task, receipt, and system-observation schemas.
 - Build a small public seed set with positive, no-op and adversarial controls.
-- Implement independent verifier and pristine replay harness.
+- Validate every task with a two-sided reference/no-op gate.
+- Define the adapter observation contract and six-dimension non-compensatory evaluator.
+- Keep the live-system adapter and independent pristine replay as a separate qualification step.
 - Publish a task-validity report and all exclusions.
 
 ### Stage 1 — Two pilots
@@ -412,4 +414,8 @@ This is a research direction. It should be considered successful only after the 
 - ASME, [Verification, Validation and Uncertainty Quantification resources](https://www.asme.org/codes-standards/publications-information/verification-validation-uncertainty).
 - NASA, [CFD verification assessment](https://www.grc.nasa.gov/www/wind/valid/tutorial/verassess.html).
 - NIST, [AI Risk Management Framework: Generative AI Profile](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence) (NIST AI 600-1; a risk-management reference, not a task leaderboard).
-- MLCommons, [MLPerf Inference submission guide](https://docs.mlcommons.org/inference/submission/).
+- MLCommons, [MLPerf Inference submission guide](https://docs.mlcommons.org/inference/submission/) (closed/open divisions and matched scenarios).
+- Vals AI, [Terminal-Bench 2.0](https://www.vals.ai/benchmarks/terminal-bench-2) (marked archived because of score saturation).
+- Godot Rapier, [same-machine scene performance results](https://godot.rapier.rs/docs/documentation/performance/) (Godot 4.7, M1, release, rendering excluded).
+- Jolt Physics, [cross-platform determinism notes](https://jrouwe.github.io/JoltPhysicsDocs/5.5.0/) (including the stated optional-mode performance trade-off and API-specific caveats).
+- ASME, [VVUQ 20.1-2024: Multivariate Metric for Validation](https://www.asme.org/codes-standards/find-codes-standards/vvuq201-vvuq-20-1-multivariate-metric-for-validation).
