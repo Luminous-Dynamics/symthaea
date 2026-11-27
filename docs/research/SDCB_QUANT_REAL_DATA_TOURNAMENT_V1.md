@@ -28,6 +28,18 @@ However, the article's Data Availability Statement says the data supporting its 
 
 The article also assumes independent identically distributed measurement errors per instrument in its base model. SDCB's common-cause/reference-chain/device-drift extension is a deliberately broader model and must be compared first on the article's stated assumptions, then on separate dependence/misspecification tracks.
 
+### Published known-answer results to reproduce before claiming improvement
+
+The paper's six-case simulation offers frozen regression/calibration controls:
+- The nominal expected sensor-performance pass percentage is 95%.
+- When process variability is ignored, reported percentages drop to 72.9% in the DU-ML-YH, DU-MH-YH, SU-ML-YH and SU-MH-YH scenarios; incorporating the process variability restores these to 95%.
+- In the DU-MH-YL scenario, the reported parameter-interval coverage CP(a)/CP(b) is 94.7%/94.8% for OLS and 93.8%/93.7% for C-GDR.
+- In the SU-ML-YH scenario, OLS reports 38.8%/37.4% parameter coverage, while C-GDR reports 91.7%/91.4%.
+- In the SU-MH-YH scenario, OLS reports 76.2%/74.4%, YB-GDR 95.7%/95.7%, and C-GDR 93.7%/93.5%.
+
+These published values establish an important comparison rule: **do not claim OLS, GDR, C-GDR or SDCB is universally best.** Reproduce the instrument-uncertainty/process-variability regimes individually. Then test whether SDCB improves calibration coverage, decision loss or collocation cost under matched assumptions and held-out data. The table values are targets for replication, not results from our code.
+
+
 ## 3. Acquisition and custody manifest
 
 Before downloading or processing, freeze:
