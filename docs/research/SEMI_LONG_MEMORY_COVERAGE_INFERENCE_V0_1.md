@@ -172,7 +172,7 @@ Current module contains:
 - K1/source/clock/sequence/model/policy/adapter-state checks;
 - explicit no-IID and no-population-claim flags.
 
-Seven Rust unit tests cover the critical normalization, zero-variance, invalid-beta, regime-boundary, quantile and block-variance contracts. Two independent integration tests recompute the Appendix C.1 procedure on a seeded synthetic Gaussian-linear power-law residual stream and verify that an out-of-range \(\widehat\beta\) is returned as UNKNOWN rather than clipped.
+Seven Rust unit tests cover the critical normalization, zero-variance, invalid-beta, regime-boundary, quantile and block-variance contracts. Six integration tests include an independent Appendix C.1 oracle on a seeded synthetic Gaussian-linear power-law residual stream, an explicit out-of-range-beta UNKNOWN control, K1-unqualified and non-adjacent-window rejection, insufficient paired-block handling, and deterministic input-order replay.
 
 ## Benchmark tournament
 
