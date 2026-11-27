@@ -180,8 +180,34 @@ struct PairEntry {
     candidate_sha256: String,
 }
 
+#[derive(Default)]
+struct SourceLineageInventory {
+    distinct_source_families: BTreeSet<String>,
+    distinct_source_roots: BTreeSet<String>,
+    events_without_source_family: usize,
+    events_without_source_root: usize,
+}
+
+fn source_lineage_inventory(events: &[&SourceEvent]) -> SourceLineageInventory {
+    let mut inventory = SourceLineageInventory::default();
+    for event in events {
+        if let Some(family) = &event.source_family {
+            inventory.distinct_source_families.insert(family.clone());
+        } else {
+            inventory.events_without_source_family += 1;
+        }
+        if let Some(root) = &event.source_root_sha256 {
+            inventory.distinct_source_roots.insert(root.clone());
+        } else {
+            inventory.events_without_source_root += 1;
+        }
+    }
+    inventory
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct ScoreRow {
+
     episode_id: String,
     family: String,
     seed: u64,
@@ -197,6 +223,8 @@ struct ScoreRow {
     worse_than_declared_no_memory_reference: bool,
     changed_action_vs_declared_no_memory_reference: bool,
     retrieved_evidence_count: usize,
+    retrieved_distinct_source_family_count: usize,
+    retrieved_unknown_source_family_count: usize,
     retrieved_distinct_source_root_count: usize,
     retrieved_unknown_source_root_count: usize,
     admissible_retrieved_evidence_count: usize,
@@ -206,6 +234,8 @@ struct ScoreRow {
     forbidden_retrieved_count: usize,
     retrieved_evidence_precision: Option<f64>,
     selected_evidence_count: usize,
+    selected_distinct_source_family_count: usize,
+    selected_unknown_source_family_count: usize,
     selected_distinct_source_root_count: usize,
     selected_unknown_source_root_count: usize,
     admissible_evidence_count: usize,
@@ -419,32 +449,33 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
     let forbidden: BTreeSet<String> = p.evaluator_private.forbidden_evidence_ids.iter().cloned().collect();
     let required: BTreeSet<String> = p.evaluator_private.required_evidence_ids.iter().cloned().collect();
     let mut retrieved: BTreeSet<String> = BTreeSet::new();
-    let mut retrieved_roots: BTreeSet<String> = BTreeSet::new();
-    let mut retrieved_unknown_roots = 0usize;
     let (mut admissible_retrieved_n, mut stale_retrieved_n, mut untrusted_retrieved_n, mut forbidden_retrieved_n) = (0usize, 0usize, 0usize, 0usize);
     for event_id in &r.retrieved_evidence_ids {
         if !retrieved.insert(event_id.clone()) { return Err(format!("{id}: duplicate retrieved evidence {event_id}")); }
         let event = event_map.get(event_id.as_str()).ok_or_else(|| format!("{id}: unknown retrieved evidence {event_id}"))?;
-        if let Some(root) = &event.source_root_sha256 { retrieved_roots.insert(root.clone()); } else { retrieved_unknown_roots += 1; }
         if !current_at(event, c.candidate.query_time_ms) || invalidated(event_id, &c.candidate.source_events, c.candidate.query_time_ms) { stale_retrieved_n += 1; }
         if event.authority_tier == AuthorityTier::Untrusted { untrusted_retrieved_n += 1; }
         if forbidden.contains(event_id) { forbidden_retrieved_n += 1; }
         if admissible(event, &c.candidate, &forbidden) { admissible_retrieved_n += 1; }
     }
     let mut selected: BTreeSet<String> = BTreeSet::new();
-    let mut selected_roots: BTreeSet<String> = BTreeSet::new();
-    let mut selected_unknown_roots = 0usize;
     let (mut admissible_n, mut stale_n, mut untrusted_n, mut forbidden_n) = (0usize, 0usize, 0usize, 0usize);
     for event_id in &r.selected_evidence_ids {
         if !selected.insert(event_id.clone()) { return Err(format!("{id}: duplicate selected evidence {event_id}")); }
         if !retrieved.contains(event_id) { return Err(format!("{id}: selected evidence was not in retrieved evidence set: {event_id}")); }
         let event = event_map.get(event_id.as_str()).ok_or_else(|| format!("{id}: unknown selected evidence {event_id}"))?;
-        if let Some(root) = &event.source_root_sha256 { selected_roots.insert(root.clone()); } else { selected_unknown_roots += 1; }
         if !current_at(event, c.candidate.query_time_ms) || invalidated(event_id, &c.candidate.source_events, c.candidate.query_time_ms) { stale_n += 1; }
         if event.authority_tier == AuthorityTier::Untrusted { untrusted_n += 1; }
         if forbidden.contains(event_id) { forbidden_n += 1; }
         if admissible(event, &c.candidate, &forbidden) { admissible_n += 1; }
     }
+    let retrieved_events: Vec<&SourceEvent> = r.retrieved_evidence_ids.iter()
+        .map(|event_id| event_map[event_id.as_str()]).collect();
+    let selected_events: Vec<&SourceEvent> = r.selected_evidence_ids.iter()
+        .map(|event_id| event_map[event_id.as_str()]).collect();
+    let retrieved_lineage = source_lineage_inventory(&retrieved_events);
+    let selected_lineage = source_lineage_inventory(&selected_events);
+
     // A contradiction visible anywhere in retrieved context remains a
     // conflict until the protocol can carry an explicit resolution receipt.
     let contradiction_pairs = c.candidate.source_events.iter()
@@ -473,8 +504,10 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
         worse_than_declared_no_memory_reference: loss > declared_no_memory_reference_loss + 1e-9,
         changed_action_vs_declared_no_memory_reference: r.action != p.evaluator_private.no_memory_action,
         retrieved_evidence_count: r.retrieved_evidence_ids.len(),
-        retrieved_distinct_source_root_count: retrieved_roots.len(),
-        retrieved_unknown_source_root_count: retrieved_unknown_roots,
+        retrieved_distinct_source_family_count: retrieved_lineage.distinct_source_families.len(),
+        retrieved_unknown_source_family_count: retrieved_lineage.events_without_source_family,
+        retrieved_distinct_source_root_count: retrieved_lineage.distinct_source_roots.len(),
+        retrieved_unknown_source_root_count: retrieved_lineage.events_without_source_root,
         admissible_retrieved_evidence_count: admissible_retrieved_n,
         invalid_retrieved_evidence_count: r.retrieved_evidence_ids.len().saturating_sub(admissible_retrieved_n),
         stale_or_superseded_retrieved_count: stale_retrieved_n,
@@ -484,8 +517,10 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
             Some(admissible_retrieved_n as f64 / r.retrieved_evidence_ids.len() as f64)
         },
         selected_evidence_count: r.selected_evidence_ids.len(),
-        selected_distinct_source_root_count: selected_roots.len(),
-        selected_unknown_source_root_count: selected_unknown_roots,
+        selected_distinct_source_family_count: selected_lineage.distinct_source_families.len(),
+        selected_unknown_source_family_count: selected_lineage.events_without_source_family,
+        selected_distinct_source_root_count: selected_lineage.distinct_source_roots.len(),
+        selected_unknown_source_root_count: selected_lineage.events_without_source_root,
         admissible_evidence_count: admissible_n, invalid_evidence_count: invalid_n,
         stale_or_superseded_evidence_count: stale_n, untrusted_evidence_count: untrusted_n,
         forbidden_evidence_count: forbidden_n, unresolved_contradiction_pairs: contradiction_pairs,
@@ -536,8 +571,12 @@ fn aggregate(key: &str, rows: &[ScoreRow]) -> serde_json::Value {
         "decision_sufficiency_rate": rows.iter().filter(|r| r.decision_sufficient).count() as f64 / n,
         "decision_change_vs_declared_reference_rate": rows.iter().filter(|r| r.changed_action_vs_declared_no_memory_reference).count() as f64 / n,
         "mean_retrieved_evidence_precision": average(rows.iter().filter_map(|r| r.retrieved_evidence_precision)),
+        "mean_retrieved_distinct_source_families": average(rows.iter().map(|r| r.retrieved_distinct_source_family_count as f64)),
+        "retrieved_events_without_source_family": rows.iter().map(|r| r.retrieved_unknown_source_family_count).sum::<usize>(),
         "mean_retrieved_distinct_source_roots": average(rows.iter().map(|r| r.retrieved_distinct_source_root_count as f64)),
         "retrieved_events_without_source_root": rows.iter().map(|r| r.retrieved_unknown_source_root_count).sum::<usize>(),
+        "mean_selected_distinct_source_families": average(rows.iter().map(|r| r.selected_distinct_source_family_count as f64)),
+        "selected_events_without_source_family": rows.iter().map(|r| r.selected_unknown_source_family_count).sum::<usize>(),
         "mean_selected_distinct_source_roots": average(rows.iter().map(|r| r.selected_distinct_source_root_count as f64)),
         "selected_events_without_source_root": rows.iter().map(|r| r.selected_unknown_source_root_count).sum::<usize>(),
         "invalid_retrieved_evidence_uses": rows.iter().map(|r| r.invalid_retrieved_evidence_count).sum::<usize>(),
@@ -871,6 +910,26 @@ mod tests {
                 candidate_digest(&episode.episode_id, episode.seed, &episode.family, &episode.candidate).unwrap());
         }
         assert_eq!(seen.len(), pairs.episodes.len());
+    }
+
+    #[test] fn source_lineage_deduplicates_upstream_roots_not_event_counts(){
+        let first=event("e1".into(),"supplier-v1".into(),1,0,None,AuthorityTier::Verified,0,"v1",Relation::Asserts,vec![]);
+        let second=event("e2".into(),"supplier-v2".into(),2,0,None,AuthorityTier::Verified,0,"v2",Relation::Supersedes,vec!["e1".into()]);
+        let independent=event("e3".into(),"other-source".into(),3,0,None,AuthorityTier::Verified,0,"other",Relation::Asserts,vec![]);
+        let mut same_root=second.clone();
+        same_root.source_root_sha256=first.source_root_sha256.clone();
+        same_root.source_family=first.source_family.clone();
+        let inventory=source_lineage_inventory(&[&first,&same_root,&independent]);
+        assert_eq!(inventory.distinct_source_families.len(),2);
+        assert_eq!(inventory.distinct_source_roots.len(),2);
+        assert_eq!(inventory.events_without_source_family,0);
+        assert_eq!(inventory.events_without_source_root,0);
+        let mut unknown=independent.clone();
+        unknown.source_family=None;
+        unknown.source_root_sha256=None;
+        let partial=source_lineage_inventory(&[&unknown]);
+        assert_eq!(partial.events_without_source_family,1);
+        assert_eq!(partial.events_without_source_root,1);
     }
 
     #[test] fn valid_time_is_half_open_and_observation_time_prevents_future_leakage(){
