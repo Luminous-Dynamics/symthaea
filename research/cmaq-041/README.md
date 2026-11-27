@@ -28,9 +28,10 @@ The evaluator returns both an overall scorecard and a sorted per-family breakdow
 
 - intervention-required episodes;
 - timely warnings versus late/missing warnings;
+- timely quarantine entry versus late/missing quarantine entry;
 - fallback completions before deadline versus late/missing completions;
-- p50 and p90 warning lead time and fallback completion lead time over positive timely leads;
-- false quarantines on safe episodes;
+- p50 and p90 warning, quarantine and fallback-completion lead times over positive timely leads;
+- false warnings and false quarantines as separate counts on safe episodes;
 - unnecessary fallback starts on safe episodes;
 - safety violations;
 - safe operating exposure in microseconds;
