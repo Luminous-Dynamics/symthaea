@@ -59,6 +59,41 @@ cargo test --manifest-path tools/rite-bench/Cargo.toml --locked
 cargo clippy --manifest-path tools/rite-bench/Cargo.toml --locked --all-targets -- -D warnings
 ~~~
 
+## Proposed research targets (aspirational, not achieved results)
+
+These are proposed stretch goals for Symthaea and the Luminous evaluation stack. They are not current measurements, leaderboard entries, or guarantees. A target is only comparable when the benchmark version, model, agent scaffold, tool access, prompts, judge, run budget, and scoring implementation are held constant.
+
+| Evaluation | Current reference point | Proposed target |
+|---|---|---|
+| SCI-AGENT-EXAM | The October 2026 paper reports a leading mean score of 80.9, while 26.0% of that system's runs exceed the 0.95 success threshold. | Mean >=85 and >=70% of runs above 0.95, on the same task release and evaluation protocol. Publish both, plus each task-type/domain breakdown. |
+| DeepResearch Bench II | 132 tasks and 9,430 expert-derived binary rubrics; its paper reports the strongest evaluated systems below 50% rubric satisfaction. The public leaderboard has since migrated and reports a GPT-5.5 judge change. | >=60% rubric pass under a pinned judge version; re-run all baselines after any judge migration. |
+| Autonomous Science Bench 0.1 | Six pilot tasks; ten configurations ran three trials per task. The top reported configuration resolved 72.2% of trials at $190.23 total. The benchmark authors explicitly caution that small differences with three trials are not meaningful. | >=80% resolution with lower cost per resolution than the matched baseline; expand to >=20 trials per task before a superiority claim. |
+| BrowseComp | 1,266 hard-to-find, short-answer browsing tasks; its authors note that this format is not equivalent to open-ended research reports. | Establish a same-version, same-tool baseline first; target >=5 percentage-point improvement with paired confidence intervals and no hidden increase in cost. |
+
+Internal qualification gates to trial on expert-authored, sealed tasks:
+
+| RITE axis | Proposed threshold |
+|---|---:|
+| Selective risk at >=80% answer coverage | <=5% |
+| Brier score for confidence in decision correctness | <=0.10 |
+| Fixed 10-bin expected calibration error | <=0.05 |
+| Claim citation precision | >=95% |
+| Required independent decision-support origins | 100% of tasks meeting the oracle's minimum |
+| Counterfactual oracle accuracy | >=95% |
+| Source-removal oracle accuracy | >=95% |
+| Placebo invariance | >=99% |
+| Required independent replay | 100% |
+| Declared resource-budget compliance | 100% |
+
+These internal thresholds are qualification gates, not averages to optimize at the expense of another axis. For example, an agent cannot compensate for an unsafe or unsupported claim by being cheaper or faster. Publish coverage and every denominator next to each rate.
+
+## External benchmark references
+
+- [SCI-AGENT-EXAM](https://arxiv.org/abs/2610.32441)
+- [Autonomous Science Bench 0.1](https://asb.open-ssi.org/)
+- [DeepResearch Bench II paper](https://arxiv.org/abs/2601.08536) and [current leaderboard/methodology notice](https://agentresearchlab.com/benchmarks/deepresearch-bench-ii/)
+- [BrowseComp](https://openai.com/index/browsecomp/)
+
 ## Qualification and claims boundary
 
 The unit tests are synthetic contract tests. They prove that the evaluator computes its defined metrics and rejects selected malformed records; they do **not** establish model performance, benchmark validity on real scientific work, or superiority over any commercial system.
