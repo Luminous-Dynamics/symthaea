@@ -150,7 +150,7 @@ For each episode:
 3. Submit the original decision query and declared evidence/observation budget.
 4. Accept ranked `retrieved_evidence_ids` from the memory system.
 5. Resolve every returned ID independently against canonical source records; compute admissibility, source-family/root lineage and contradiction relationships evaluator-side.
-6. Pass a selected evidence packet to the frozen downstream decision policy and record its IDs separately as `decision_support_evidence_ids`. The selected set must be a unique subset of the retrieved set. The JSON contract is [candidate-run-v0.1.schema.json](schemas/candidate-run-v0.1.schema.json); the Rust scorer enforces the cross-field subset invariant that JSON Schema cannot express. This records the policy input builder's selected IDs, not proof that a generative model attended to or cited each item; exact serialized-context exposure is a separate receipt requirement tracked by [#13722](https://github.com/Luminous-Dynamics/symthaea/issues/13722).
+6. Pass a selected evidence packet to the frozen downstream decision policy and record its IDs separately as `decision_support_evidence_ids`. The selected set must be a unique subset of the retrieved set. The paired-score validator also rechecks that selected counts, precision/recall ratios, lineage counts and conflict metrics remain consistent with retrieved totals before a result enters cluster aggregation. The JSON contract is [candidate-run-v0.1.schema.json](schemas/candidate-run-v0.1.schema.json); the Rust scorer enforces the cross-field subset invariant that JSON Schema cannot express. This records the policy input builder's selected IDs, not proof that a generative model attended to or cited each item; exact serialized-context exposure is a separate receipt requirement tracked by [#13722](https://github.com/Luminous-Dynamics/symthaea/issues/13722).
 7. Score the chosen action using evaluator-private state and loss tables. Keep retrieval precision/recall distinct from decision-support precision/recall.
 
 This separates the memory subsystem's evidence contribution from the downstream model's ability to answer. A later end-to-end agent experiment may be added, but it must be reported separately.
@@ -250,7 +250,7 @@ Never label an estimate as measured cost. Cost-per-decision-gain and cost-per-va
 - **H6 — governance is part of capability:** poisoning resistance, deletion and isolation should predict downstream decision safety, not be treated as unrelated operational checkboxes.
 - **H7 — evidence has measurable causal influence:** leave-one-out interventions on returned evidence identify items whose presence improves or worsens the frozen downstream decision. The signal should remain reproducible under fixed reader, seed and evidence-resolution rules.
 
-These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator now contains 25 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
+These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator now contains 28 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
 
 ## Baselines and industry comparison
 
@@ -358,7 +358,7 @@ For AML, keep the independent target of +3 absolute points over the published op
 
 - Build a dependency-light Rust finite-world generator and scorer.
 - Keep latent state, loss tables, admissibility/required-evidence labels and oracle selection evaluator-private and physically separate from candidate inputs.
-- Implement paired scoring, cluster identities, deterministic replay and digest-bound receipts. The Rust core now scores retrieved evidence separately from policy-used decision support, verifies selected IDs are a retrieved subset, and reports source-family/root diversity plus unresolved retrieved conflicts. Implement deterministic cluster-bootstrap confidence intervals for mean paired gain and memory-induced harm rate.
+- Implement paired scoring, cluster identities, deterministic replay and digest-bound receipts. The Rust core now scores retrieved evidence separately from policy-input evidence, verifies selected IDs are a retrieved subset, reports source-family/root diversity plus unresolved retrieved conflicts, and revalidates paired-score partitions/ratios before cluster aggregation. Implement deterministic cluster-bootstrap confidence intervals for mean paired gain and memory-induced harm rate.
 - Add frozen-policy leave-one-out evidence interventions; treat interaction/Shapley analysis as a later extension.
 - Reject missing arms, unmatched pairs, duplicate event identities and invalid evidence references. Add held-out tests for decision-support identity, common-root duplicates, unknown roots, and contradictions present in retrieved context but not selected for use.
 
