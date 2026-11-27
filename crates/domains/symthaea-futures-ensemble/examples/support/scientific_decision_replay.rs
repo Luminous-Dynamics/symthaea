@@ -916,6 +916,10 @@ mod tests {
         r.recorded_action_payload_digest = None;
         assert!(r.validate_against(&c, &p).is_err());
         r.execution_receipt_ref = None;
+        r.outcome_label = None;
+        r.evaluator_evidence.clear();
+        r.finalized_at_ms = None;
+        r.independent_adjudication_ref = None;
         assert!(r.validate_against(&c, &p).is_ok());
 
         r.outcome_status = OutcomeStatus::UnsupportedCounterfactual;
