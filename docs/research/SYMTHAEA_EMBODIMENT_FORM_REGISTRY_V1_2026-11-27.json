@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea.embodiment-form-registry.v1.schema.json",
+  "schema": "symthaea.embodiment-form-registry.v1",
+  "version": "1.0.0",
+  "status": "proposed_registry",
+  "generated_on": "2026-11-27",
+  "identity_model": {
+    "cognitive_source": "one_shared_symthaea_identity",
+    "form_is_agent": false,
+    "form_is_presentation_adapter": true,
+    "canonical_event_schema": "symthaea.embodiment-event.v1",
+    "canonical_cue_source": "symthaea-soma::embodiment_projection::CanonicalCue",
+    "independent_personality_claim": false,
+    "renderer_authority": false
+  },
+  "global_policy": {
+    "camera_default": "off",
+    "microphone_default": "off",
+    "raw_media_retention_default": "none",
+    "remote_media_transmission_default": "disabled",
+    "actuator_commands_default": "disabled",
+    "user_form_preference_precedes_automatic_suggestion": true,
+    "global_pause_control_required": true,
+    "global_return_to_canonical_form_required": true,
+    "every_cue_has_accessible_text_fallback": true,
+    "reduced_motion_required_for_every_form": true,
+    "static_fallback_required_for_every_form": true,
+    "color_alone_may_not_encode_critical_state": true,
+    "emotion_inference_is_never_treated_as_measured_fact": true,
+    "evidence_visuals_require_source_receipt_reference": true
+  },
+  "all_event_kinds": [
+    "conversation.listening",
+    "conversation.speaking",
+    "conversation.turn_state",
+    "conversation.backchannel",
+    "attention.focus",
+    "expression.intent",
+    "cognition.uncertainty",
+    "evidence.status",
+    "user.control"
+  ],
+  "forms": [
+    {
+      "id": "living_constellation",
+      "label": "Living Constellation",
+      "role": "canonical_default_presence",
+      "description": "A fluid topology of luminous nodes and filaments.",
+      "visual_grammar": [
+        "filament_flow",
+        "node_pulse",
+        "topology_shift",
+        "uncertainty_branch",
+        "provenance_beacon"
+      ],
+      "visual_event_kinds": [
+        "conversation.listening",
+        "conversation.speaking",
+        "conversation.turn_state",
+        "conversation.backchannel",
+        "attention.focus",
+        "expression.intent",
+        "cognition.uncertainty",
+        "evidence.status",
+        "user.control"
+      ],
+      "fallback": "accessible_text",
+      "reduced_motion": "static_topology_with_state_highlights",
+      "low_power": "two_dimensional_sparse_nodes",
+      "sensors_required": [],
+      "actuators_required": [],
+      "claims": [
+        "presentation_only",
+        "shared_cognitive_source"
+      ]
+    },
+    {
+      "id": "puppet_theatre",
+      "label": "Puppet Theatre",
+      "role": "expressive_storytelling_and_explanation",
+      "description": "A stylized puppet or cast of stage roles that express one shared source of events.",
+      "visual_grammar": [
+        "pose",
+        "gesture",
+        "stage_position",
+        "prop",
+        "silhouette"
+      ],
+      "visual_event_kinds": [
+        "conversation.listening",
+        "conversation.speaking",
+        "conversation.turn_state",
+        "conversation.backchannel",
+        "attention.focus",
+        "expression.intent",
+        "cognition.uncertainty",
+        "evidence.status",
+        "user.control"
+      ],
+      "fallback": "accessible_text",
+      "reduced_motion": "pose_cards_and_captioned_stage_state",
+      "low_power": "two_dimensional_pose_library",
+      "role_label_required": true,
+      "multiple_puppets_imply_multiple_agents": false,
+      "sensors_required": [],
+      "actuators_required": [],
+      "claims": [
+        "presentation_only",
+        "stage_role_is_not_agent_identity"
+      ]
+    },
+    {
+      "id": "mycelial_being",
+      "label": "Mycelial Being",
+      "role": "relationships_memory_and_provenance",
+      "description": "A branching network emphasizing relations, paths, and knowledge dependencies.",
+      "visual_grammar": [
+        "branching_growth",
+        "path_highlight",
+        "node_connection",
+        "separation",
+        "provenance_path"
+      ],
+      "visual_event_kinds": [
+        "conversation.turn_state",
+        "attention.focus",
+        "expression.intent",
+        "cognition.uncertainty",
+        "evidence.status",
+        "user.control"
+      ],
+      "fallback": "accessible_text",
+      "reduced_motion": "static_graph_with_focus_outline",
+      "low_power": "sparse_graph_projection",
+      "sensors_required": [],
+      "actuators_required": [],
+      "claims": [
+        "presentation_only",
+        "edges_require_source_references"
+      ]
+    },
+    {
+      "id": "swarm",
+      "label": "Swarm",
+      "role": "distributed_activity_and_collective_visualization",
+      "description": "A particle system expressing cohesion, dispersion, and synchronized activity.",
+      "visual_grammar": [
+        "particle_density",
+        "cohesion",
+        "dispersion",
+        "synchronized_pulse",
+        "cluster_separation"
+      ],
+      "visual_event_kinds": [
+        "conversation.listening",
+        "conversation.speaking",
+        "conversation.turn_state",
+        "conversation.backchannel",
+        "attention.focus",
+        "cognition.uncertainty",
+        "evidence.status",
+        "user.control"
+      ],
+      "fallback": "accessible_text",
+      "reduced_motion": "static_cluster_map",
+      "low_power": "bounded_particle_count_and_lower_update_rate",
+      "sensors_required": [],
+      "actuators_required": [],
+      "claims": [
+        "presentation_only",
+        "particle_count_is_not_agent_count"
+      ]
+    },
+    {
+      "id": "living_instrument",
+      "label": "Living Instrument",
+      "role": "rhythm_and_creative_collaboration",
+      "description": "A kinetic instrument-like form expressing timing, rhythm, and resonant structure.",
+      "visual_grammar": [
+        "rhythm",
+        "resonance",
+        "tone_curve",
+        "kinetic_vibration",
+        "phrase_boundary"
+      ],
+      "visual_event_kinds": [
+        "conversation.listening",
+        "conversation.speaking",
+        "conversation.turn_state",
+        "conversation.backchannel",
+        "expression.intent",
+        "cognition.uncertainty",
+        "user.control"
+      ],
+      "fallback": "accessible_text",
+      "reduced_motion": "static_score_or_waveform",
+      "low_power": "low_resolution_envelope_display",
+      "sensors_required": [],
+      "actuators_required": [],
+      "audio_output_default": "disabled",
+      "claims": [
+        "presentation_only",
+        "no_sound_without_user_permission"
+      ]
+    },
+    {
+      "id": "hearth_companion",
+      "label": "Hearth Companion",
+      "role": "ambient_physical_presence",
+      "description": "A low-power tabletop display or kinetic object for an optional physical presence.",
+      "visual_grammar": [
+        "ambient_light",
+        "slow_kinetic_motion",
+        "simple_spatial_signal",
+        "optional_haptic_pulse"
+      ],
+      "visual_event_kinds": [
+        "conversation.listening",
+        "conversation.speaking",
+        "conversation.turn_state",
+        "conversation.backchannel",
+        "expression.intent",
+        "user.control"
+      ],
+      "fallback": "accessible_text",
+      "reduced_motion": "steady_light_or_static_display",
+      "low_power": "single_led_or_low_refresh_display",
+      "sensors_required": [],
+      "actuators_required": [],
+      "haptics_default": "disabled",
+      "physical_actuation_default": "disabled",
+      "claims": [
+        "presentation_only",
+        "physical_outputs_require_separate_authorization"
+      ]
+    },
+    {
+      "id": "cognitive_mandala",
+      "label": "Cognitive Mandala",
+      "role": "introspection_and_explanatory_visualization",
+      "description": "A layered geometric view of attention, uncertainty, provenance, and current interaction state.",
+      "visual_grammar": [
+        "concentric_layers",
+        "radial_segments",
+        "competing_branches",
+        "provenance_paths",
+        "focus_region"
+      ],
+      "visual_event_kinds": [
+        "conversation.turn_state",
+        "attention.focus",
+        "expression.intent",
+        "cognition.uncertainty",
+        "evidence.status",
+        "user.control"
+      ],
+      "fallback": "accessible_text",
+      "reduced_motion": "static_layered_diagram",
+      "low_power": "sparse_vector_glyphs",
+      "sensors_required": [],
+      "actuators_required": [],
+      "claims": [
+        "presentation_only",
+        "not_a_consciousness_measure"
+      ]
+    }
+  ]
+}
