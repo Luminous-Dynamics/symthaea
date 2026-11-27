@@ -11,7 +11,9 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use cmaq_031_anytime_calibration_monitor::{CalibrationRankReference, CalibrationRankScore};
+use cmaq_031_anytime_calibration_monitor::{
+    AnytimeCalibrationMonitor, CalibrationRankReference, CalibrationRankScore, MonitorError,
+};
 use cmaq_036_common_cause_closure::{
     ClosureManifest, EvidenceSplit, IndependentBlock, KeyReceiptBinding, SplitCount,
 };
@@ -68,8 +70,32 @@ pub struct ClosureAdmissionDiagnostics {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClosureQualifiedRankReference {
-    pub reference: CalibrationRankReference,
-    pub diagnostics: ClosureAdmissionDiagnostics,
+    reference: CalibrationRankReference,
+    diagnostics: ClosureAdmissionDiagnostics,
+}
+
+impl ClosureQualifiedRankReference {
+    /// Read-only diagnostics; the reference itself remains owned by this wrapper.
+    pub fn diagnostics(&self) -> &ClosureAdmissionDiagnostics {
+        &self.diagnostics
+    }
+
+    /// Read-only view of the admitted effective-block calibration scores.
+    pub fn calibration_scores(&self) -> &[CalibrationRankScore] {
+        &self.reference.scores
+    }
+
+    /// Consume the closure-qualified reference directly into the CMAQ-031 monitor.
+    ///
+    /// The raw reference cannot be moved out of this wrapper, preventing callers
+    /// from accidentally discarding the closure provenance during normal use.
+    pub fn into_monitor(
+        self,
+        alpha_numerator: u32,
+        alpha_denominator: u32,
+    ) -> Result<AnytimeCalibrationMonitor, MonitorError> {
+        AnytimeCalibrationMonitor::new(self.reference, alpha_numerator, alpha_denominator)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -543,11 +569,10 @@ mod tests {
 
         assert_eq!(closure.calibration_raw_unit_count, 4);
         assert_eq!(closure.calibration_effective_block_count, 2);
-        assert_eq!(result.reference.scores.len(), 2);
+        assert_eq!(result.calibration_scores().len(), 2);
         assert_eq!(
             result
-                .reference
-                .scores
+                .calibration_scores()
                 .iter()
                 .map(|score| score.score_units)
                 .collect::<Vec<_>>(),
@@ -571,7 +596,7 @@ mod tests {
         let (closure, binding, attestations) = fixture();
         let qualified =
             build_closure_qualified_rank_reference(&closure, &binding, &attestations).unwrap();
-        assert!(AnytimeCalibrationMonitor::new(qualified.reference, 1, 20).is_ok());
+        assert!(qualified.into_monitor(1, 20).is_ok());
     }
 
     #[test]
