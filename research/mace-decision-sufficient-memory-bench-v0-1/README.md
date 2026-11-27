@@ -1,7 +1,7 @@
 # MACE Decision-Sufficient Memory Benchmark
 
 **Version:** 0.1.0  
-**Status:** paired evaluator core and LongMemEval-V2 LAFS helper pass exact-head Rust 1.96 validation (45 tests); the original temporal BM25/RRF reference (17 tests) and prior strict adapter revision (21 tests, committed nested lock, locked metadata and Clippy) have exact-head passes; the current follow-on adds archive-wide lineage-closure and cycle auditing plus stricter wire bounds, with exact-head qualification pending. Live production Add/Search integration, benchmark execution and external result reproduction remain pending  
+**Status:** paired evaluator core and LongMemEval-V2 LAFS helper pass exact-head Rust 1.96 validation (45 tests); temporal BM25/RRF reference passes 19/19 tests; strict candidate adapter passes 26/26 tests, cargo metadata --locked and strict Clippy on exact head `5f7357b40114a7c340199cfd8dcfb01bc4ef354e`. The adapter includes source-lineage closure/cycle audit and strict wire bounds. Live production Add/Search integration, benchmark execution and external result reproduction remain pending  
 **Tracking:** [issue #13893](https://github.com/Luminous-Dynamics/symthaea/issues/13893)
 
 ## Thesis
