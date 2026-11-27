@@ -359,6 +359,19 @@ The field should move from **answer benchmarking** to **evidence-carrying capabi
 
 This is a research direction. It should be considered successful only after the protocol, independent verifiers, public seed corpus and exact-head receipts have been implemented and externally challenged.
 
+## 12. Implemented v0.1 seed and exact-head evidence
+
+The first standalone reference evaluator is implemented in `research/eqc-rust/`, outside the main Symthaea Cargo workspace. Its locked dependencies, task/receipt schemas, synthetic inputs and runner are independently reproducible.
+
+Exact-head run on 2026-11-27:
+- Source head: `39f0a9e2f43ba4f289d756dd3b5a40de94c0ad6a`.
+- Toolchain: Rust 1.96.0.
+- Workflow: [EQC Standalone Reference Qualification, run #14](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45946327074).
+- Result: **success**; 25 Rust tests passed, 0 failed; four seed tasks passed the reference contract; report and source evidence artifact uploaded.
+- Schema validator: pinned `jsonschema 0.63.2`, Draft 2020-12 meta-schema checks for both contracts, all four tasks schema-valid, receipt conditional qualification tests and explicit `date-time` format validation.
+
+The run qualifies the evaluator, task/receipt schemas and synthetic reference corpus only. It does not demonstrate that a real agent can safely execute a clinical workflow. A separate Mycelix Health system-under-test adapter is tracked in [Mycelix Health issue #359](https://github.com/Luminous-Dynamics/mycelix-health/issues/359), which requires synthetic Tryorama conductor episodes, independent source-chain before/after observation and zero-mutation denial controls.
+
 ## 11. References
 
 - Scale Labs, [SWE-Bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2) and [V2 methodology](https://labs.scale.com/blog/swe-bench-pro-v2) (September 22, 2026).
