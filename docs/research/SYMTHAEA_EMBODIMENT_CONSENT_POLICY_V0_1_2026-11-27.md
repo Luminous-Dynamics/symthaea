@@ -24,16 +24,16 @@ The event stream is not an authority system. Canonical projection preserves mean
 The Rust module at crates/domains/symthaea-soma/src/embodiment_policy.rs adds a renderer-independent policy gate.
 
 - A new policy instance starts paused, reduced-motion enabled, with zero grants.
-- Grants are session- and monotonic-clock-domain-scoped, expire, and name output channel, destination, allowed forms, and maximum intensity.
-- The same output scope is replaced on grant refresh; an older broader grant cannot remain active behind a narrower replacement.
+- Grants are session- and monotonic-clock-domain-scoped, expire, and name output channel, destination, allowed forms, and maximum intensity. Each exact grant version has a unique opaque `grant_id`.
+- The same output scope is replaced on grant refresh; each refresh must use a new `grant_id`, and a permit issued under the old grant is rejected by the final recheck.
 - Pause, event cancellation, and per-channel revocation deny subsequent evaluations.
 - Local-sensitive cues are restricted to local-private destinations.
 - Restricted cues are denied by this policy version.
 - A visual request is static while reduced motion is enabled.
 - Requested output intensity is clamped to the grant maximum without rewriting the semantic cue or its epistemic metadata.
-- The function returns a presentation permit and performs no rendering, sensor capture, network transmission, or actuation.
+- The function returns an opaque, process-local presentation permit. Permit fields are private, it cannot be deserialized through the public API, and downstream adapters use read-only accessors. The permit performs no rendering, sensor capture, network transmission, or actuation.
 
-The policy is intentionally small and synchronous. The production caller must serialize policy updates and presentation checks in a synchronization domain that makes pause/revocation visible before a subsequent output tick.
+The policy is intentionally small and synchronous. The production caller must serialize policy updates and presentation checks in a synchronization domain that makes pause/revocation visible before a subsequent output tick. It must call `recheck_permit()` immediately before renderer submission; that recheck validates the exact grant ID, expiry, cancellation, current policy and current motion preference.
 
 ## Trust and safety boundaries
 
@@ -96,12 +96,14 @@ Required deterministic negative controls:
 - pause or channel revocation between decision and output;
 - non-finite or out-of-range intensity;
 - reduced-motion enabled;
-- grant narrowed after a broader grant.
+- grant narrowed after a broader grant;
+- permit minted under grant version N, then rechecked after replacement with grant version N+1.
 
 Targets (not results):
 - zero unauthorized permits across the complete deterministic negative-control corpus;
 - 100% agreement with expected allow/deny decisions;
 - local pause/revocation effective before the next renderer update;
+- a permit from a replaced grant version is never accepted under the new grant;
 - p99 policy evaluation below 1 ms on a named device at 10,000 decisions/s, measured rather than inferred;
 - no semantic or provenance change caused by intensity clamping or motion reduction;
 - no camera/microphone activation from any presentation grant.
