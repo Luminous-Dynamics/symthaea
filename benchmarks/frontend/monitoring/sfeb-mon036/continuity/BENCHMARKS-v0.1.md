@@ -8,9 +8,9 @@ MON-036 is a selective claim-disposition evaluator, not a CDC engine or recovery
 
 Environment: Linux/amd64, Go 1.23.2, Intel Xeon Platinum 8573C.
 
-- \`go vet ./...\`: pass.
-- \`go test ./...\`: pass.
-- \`go test -race ./...\`: pass.
+- `go vet ./...`: pass.
+- `go test ./...`: pass.
+- `go test -race ./...`: pass.
 - Five repetitions, 100 claims x 1,000 unrelated events: approximately 3.01–3.66 ms/op, 1.318 MB/op, 8,428–8,429 allocations/op.
 
 This is a local algorithm microbenchmark, not an end-to-end product comparison or SOTA claim. The workload intentionally tests event-index selectivity: 1,000 events are unrelated to all 100 claims.
