@@ -35,7 +35,7 @@ cp -a "$BACKUP_DIR/." "$PGDATA/"
 chown -R postgres:postgres "$PGDATA"
 
 cat >> "$PGDATA/postgresql.auto.conf" <<EOF
-restore_command = 'cp /source-data/mon025-archive/%f %p'
+restore_command = 'cp $MON025_SOURCE_DATA_DIR/mon025-archive/%f %p'
 recovery_target_time = '$MON025_RECOVERY_TARGET_TIME'
 recovery_target_action = 'pause'
 recovery_target_inclusive = 'true'
