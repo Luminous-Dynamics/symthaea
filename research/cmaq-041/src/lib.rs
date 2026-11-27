@@ -307,7 +307,10 @@ fn validate_episode(episode: &EpisodeTrace) -> Result<(), EvaluationError> {
         }
     }
 
-    match (episode.intervention_required, episode.recoverability_deadline_us) {
+    match (
+        episode.intervention_required,
+        episode.recoverability_deadline_us,
+    ) {
         (true, None) => return Err(EvaluationError::MissingRecoverabilityDeadline),
         (false, Some(_)) => return Err(EvaluationError::UnexpectedRecoverabilityDeadline),
         (true, Some(deadline)) if deadline > episode.duration_us => {
@@ -330,31 +333,25 @@ fn validate_episode(episode: &EpisodeTrace) -> Result<(), EvaluationError> {
     if episode.fallback_completed_us.is_some() && episode.fallback_started_us.is_none() {
         return Err(EvaluationError::FallbackCompletedWithoutStart);
     }
-    if let (Some(start), Some(completed)) = (
-        episode.fallback_started_us,
-        episode.fallback_completed_us,
-    ) {
+    if let (Some(start), Some(completed)) =
+        (episode.fallback_started_us, episode.fallback_completed_us)
+    {
         if completed < start {
             return Err(EvaluationError::EventOrderViolation);
         }
     }
-    if let (Some(warning), Some(quarantined)) =
-        (episode.first_warning_us, episode.quarantined_us)
-    {
+    if let (Some(warning), Some(quarantined)) = (episode.first_warning_us, episode.quarantined_us) {
         if quarantined < warning {
             return Err(EvaluationError::EventOrderViolation);
         }
     }
-    if let (Some(quarantined), Some(start)) =
-        (episode.quarantined_us, episode.fallback_started_us)
+    if let (Some(quarantined), Some(start)) = (episode.quarantined_us, episode.fallback_started_us)
     {
         if start < quarantined {
             return Err(EvaluationError::EventOrderViolation);
         }
     }
-    if let (Some(warning), Some(start)) =
-        (episode.first_warning_us, episode.fallback_started_us)
-    {
+    if let (Some(warning), Some(start)) = (episode.first_warning_us, episode.fallback_started_us) {
         if start < warning {
             return Err(EvaluationError::EventOrderViolation);
         }
@@ -385,14 +382,12 @@ fn nearest_rank(sorted: &[u64], numerator: usize, denominator: usize) -> Option<
     }
     let quotient = sorted.len() / denominator;
     let remainder = sorted.len() % denominator;
-    let rank = quotient
-        .checked_mul(numerator)?
-        .checked_add(
-            remainder
-                .checked_mul(numerator)?
-                .checked_add(denominator - 1)?
-                / denominator,
-        )?;
+    let rank = quotient.checked_mul(numerator)?.checked_add(
+        remainder
+            .checked_mul(numerator)?
+            .checked_add(denominator - 1)?
+            / denominator,
+    )?;
     sorted.get(rank.saturating_sub(1)).copied()
 }
 
@@ -536,7 +531,9 @@ mod tests {
         episode.evidence.source_trace_sha256 = "not-a-sha256".into();
         assert_eq!(
             evaluate(&[episode]),
-            Err(EvaluationError::InvalidEvidenceDigest("source_trace_sha256"))
+            Err(EvaluationError::InvalidEvidenceDigest(
+                "source_trace_sha256"
+            ))
         );
     }
 
