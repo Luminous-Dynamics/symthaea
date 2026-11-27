@@ -14,13 +14,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::selection_risk_bounds::{
-    IndependentAuditLossObservationV1, SelectionAuditDesignV1, SelectionRiskInputV1,
-    SelectionRiskReportV1, SELECTION_RISK_INPUT_SCHEMA_V1,
-    evaluate_selection_adjusted_population_risk_v1,
+    IndependentAuditLossObservationV1, SELECTION_RISK_INPUT_SCHEMA_V1, SelectionAuditDesignV1,
+    SelectionRiskInputV1, SelectionRiskReportV1, evaluate_selection_adjusted_population_risk_v1,
 };
 
-pub const OBSERVATION_PROCESS_SCHEMA_V1: &str =
-    "luminous.semi-bench.observation-process.v1";
+pub const OBSERVATION_PROCESS_SCHEMA_V1: &str = "luminous.semi-bench.observation-process.v1";
 pub const OBSERVATION_PROCESS_REPORT_SCHEMA_V1: &str =
     "luminous.semi-bench.observation-process-report.v1";
 
@@ -240,26 +238,20 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn json_sha256<T: Serialize + ?Sized>(
-    value: &T,
-) -> Result<String, ObservationProcessErrorV1> {
+fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, ObservationProcessErrorV1> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         ObservationProcessErrorV1(format!("canonical JSON serialization failed: {error}"))
     })?;
     Ok(format!("{:x}", Sha256::digest(bytes)))
 }
 
-fn canonical_rounds(
-    rounds: &[ObservationProcessRoundV1],
-) -> Vec<ObservationProcessRoundV1> {
+fn canonical_rounds(rounds: &[ObservationProcessRoundV1]) -> Vec<ObservationProcessRoundV1> {
     let mut canonical = rounds.to_vec();
     canonical.sort_by_key(|row| row.round_id);
     canonical
 }
 
-fn report_digest(
-    report: &ObservationProcessReportV1,
-) -> Result<String, ObservationProcessErrorV1> {
+fn report_digest(report: &ObservationProcessReportV1) -> Result<String, ObservationProcessErrorV1> {
     let mut canonical = report.clone();
     canonical.report_sha256.clear();
     json_sha256(&canonical)
@@ -277,9 +269,7 @@ fn validate_optional_digest(
     Ok(())
 }
 
-fn validate_acquisition(
-    row: &ObservationProcessRoundV1,
-) -> Result<(), ObservationProcessErrorV1> {
+fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), ObservationProcessErrorV1> {
     let acquisition = &row.acquisition;
     validate_optional_digest(
         acquisition.selection_design_sha256.as_deref(),
@@ -324,7 +314,10 @@ fn validate_acquisition(
             row.round_id
         )));
     }
-    if acquisition.selected_at_round.is_some_and(|selected| selected > row.round_id) {
+    if acquisition
+        .selected_at_round
+        .is_some_and(|selected| selected > row.round_id)
+    {
         return Err(ObservationProcessErrorV1(format!(
             "round {} selection timestamp is from a future round",
             row.round_id
@@ -365,7 +358,10 @@ fn validate_acquisition(
             }
         }
         PhysicalAcquisitionStateV1::Measured => {
-            if acquisition.operational_measurement_method_sha256.as_deref().is_none_or(|value| !valid_sha256(value))
+            if acquisition
+                .operational_measurement_method_sha256
+                .as_deref()
+                .is_none_or(|value| !valid_sha256(value))
                 || acquisition.selected_at_round.is_none()
                 || acquisition.measured_at_unix_seconds.is_none()
             {
@@ -394,13 +390,22 @@ fn validate_qualification(
     row: &ObservationProcessRoundV1,
 ) -> Result<(), ObservationProcessErrorV1> {
     let qualification = &row.qualification;
-    validate_optional_digest(qualification.label_payload_sha256.as_deref(), "qualification.label_payload_sha256")?;
-    validate_optional_digest(qualification.report_sha256.as_deref(), "qualification.report_sha256")?;
+    validate_optional_digest(
+        qualification.label_payload_sha256.as_deref(),
+        "qualification.label_payload_sha256",
+    )?;
+    validate_optional_digest(
+        qualification.report_sha256.as_deref(),
+        "qualification.report_sha256",
+    )?;
     validate_optional_digest(
         qualification.qualified_loss_evidence_sha256.as_deref(),
         "qualification.qualified_loss_evidence_sha256",
     )?;
-    if qualification.label_revision.is_some_and(|revision| revision == 0) {
+    if qualification
+        .label_revision
+        .is_some_and(|revision| revision == 0)
+    {
         return Err(ObservationProcessErrorV1(format!(
             "round {} has a zero label revision",
             row.round_id
@@ -520,11 +525,14 @@ fn validate_qualification(
             )));
         }
     }
-    if qualification.report_available_at_unix_seconds.is_some_and(|report_available| {
-        qualification
-            .label_available_at_unix_seconds
-            .is_some_and(|label_available| report_available < label_available)
-    }) {
+    if qualification
+        .report_available_at_unix_seconds
+        .is_some_and(|report_available| {
+            qualification
+                .label_available_at_unix_seconds
+                .is_some_and(|label_available| report_available < label_available)
+        })
+    {
         return Err(ObservationProcessErrorV1(format!(
             "round {} K1 report predates physical label availability",
             row.round_id
@@ -538,7 +546,10 @@ fn validate_tracking(
     row: &ObservationProcessRoundV1,
 ) -> Result<(), ObservationProcessErrorV1> {
     let tracking = &row.tracking;
-    validate_optional_digest(tracking.action_receipt_sha256.as_deref(), "tracking.action_receipt_sha256")?;
+    validate_optional_digest(
+        tracking.action_receipt_sha256.as_deref(),
+        "tracking.action_receipt_sha256",
+    )?;
     if tracking
         .proxy_survival_probability
         .is_some_and(|probability| {
@@ -555,7 +566,10 @@ fn validate_tracking(
         tracking.state,
         FeedbackTrackingStateV1::UnlimitedReceived | FeedbackTrackingStateV1::TrackedReceived
     );
-    if requires_controller_receipt != tracking.controller_feedback_received_at_unix_seconds.is_some()
+    if requires_controller_receipt
+        != tracking
+            .controller_feedback_received_at_unix_seconds
+            .is_some()
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} controller receipt timestamp does not match its feedback tracking state",
@@ -597,9 +611,7 @@ fn validate_tracking(
 
     if input.controller == ObservationRiskControllerV1::CapacityAwareOcrcBounded {
         let physically_measured = row.acquisition.state == PhysicalAcquisitionStateV1::Measured;
-        if physically_measured
-            == (tracking.state == FeedbackTrackingStateV1::NotApplicable)
-        {
+        if physically_measured == (tracking.state == FeedbackTrackingStateV1::NotApplicable) {
             return Err(ObservationProcessErrorV1(format!(
                 "round {} CA-OCRC tracking is NOT_APPLICABLE exactly when no physical measurement exists",
                 row.round_id
@@ -676,7 +688,9 @@ fn validate_tracking(
             }
         }
         ObservationRiskControllerV1::CapacityAwareOcrcBounded => {
-            let maximum_delay = input.maximum_feedback_delay_rounds.expect("policy validated");
+            let maximum_delay = input
+                .maximum_feedback_delay_rounds
+                .expect("policy validated");
             match tracking.state {
                 FeedbackTrackingStateV1::NotApplicable => {
                     // No physical measurement exists for this population round;
@@ -696,7 +710,9 @@ fn validate_tracking(
                     }
                 }
                 FeedbackTrackingStateV1::CapacityDenied => {
-                    if !tracking.proxy_delay_rounds.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
+                    if !tracking
+                        .proxy_delay_rounds
+                        .is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
                         || tracking.action_receipt_sha256.is_none()
                         || tracking.tracking_slot_id.is_some()
                         || tracking.tracking_end_round.is_some()
@@ -735,7 +751,9 @@ fn validate_tracking(
                     if tracking.action_receipt_sha256.is_none()
                         || !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
                         || tracking.tracking_slot_id.is_none()
-                        || !ended.is_some_and(|end| end >= row.round && end < row.round + proxy.unwrap_or(0) as u64)
+                        || !ended.is_some_and(|end| {
+                            end >= row.round && end < row.round + proxy.unwrap_or(0) as u64
+                        })
                         || tracking.actual_feedback_delay_rounds.is_some_and(|actual| {
                             ended.is_some_and(|end| actual <= end.saturating_sub(row.round))
                         })
@@ -754,9 +772,9 @@ fn validate_tracking(
                         || tracking.tracking_slot_id.is_none()
                         || tracking.tracking_end_round
                             != Some(row.round.saturating_add(proxy.unwrap_or(0) as u64))
-                        || tracking.actual_feedback_delay_rounds.is_some_and(|actual| {
-                            actual <= proxy.unwrap_or(-1) as u64
-                        })
+                        || tracking
+                            .actual_feedback_delay_rounds
+                            .is_some_and(|actual| actual <= proxy.unwrap_or(-1) as u64)
                         || tracking.proxy_survival_probability.is_some()
                     {
                         return Err(ObservationProcessErrorV1(format!(
@@ -781,9 +799,12 @@ fn validate_tracking(
                         )));
                     }
                     let actual = actual.expect("validated actual delay");
-                    if !tracking.proxy_survival_probability.is_some_and(|probability| {
-                        probability.is_finite() && probability > 0.0 && probability <= 1.0
-                    }) {
+                    if !tracking
+                        .proxy_survival_probability
+                        .is_some_and(|probability| {
+                            probability.is_finite() && probability > 0.0 && probability <= 1.0
+                        })
+                    {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} tracked feedback requires a positive inverse-survival denominator",
                             row.round_id
@@ -845,9 +866,7 @@ fn validate_tracking(
     Ok(())
 }
 
-fn maximum_tracking_occupancy(
-    rows: &[ObservationProcessRoundV1],
-) -> u64 {
+fn maximum_tracking_occupancy(rows: &[ObservationProcessRoundV1]) -> u64 {
     let mut occupancy_by_round: BTreeMap<u64, i64> = BTreeMap::new();
     for row in rows {
         let tracking = &row.tracking;
@@ -890,7 +909,10 @@ fn assumption_state(
     }
     let mut reasons = Vec::new();
     if !input.delay_contract_declared_and_enforced || input.delay_contract_sha256.is_none() {
-        reasons.push("The physical feedback-delay contract is not independently declared and enforced.".into());
+        reasons.push(
+            "The physical feedback-delay contract is not independently declared and enforced."
+                .into(),
+        );
     }
 
     match input.controller {
@@ -901,7 +923,10 @@ fn assumption_state(
                 row.tracking.state == FeedbackTrackingStateV1::UnlimitedReceived
                     && row.tracking.actual_feedback_delay_rounds != Some(fixed_delay)
             }) {
-                reasons.push("At least one ACI outcome arrived outside the declared fixed-delay schedule.".into());
+                reasons.push(
+                    "At least one ACI outcome arrived outside the declared fixed-delay schedule."
+                        .into(),
+                );
                 return (ControllerAssumptionStateV1::DelayContractExceeded, reasons);
             }
             if rows.iter().any(|row| {
@@ -914,25 +939,38 @@ fn assumption_state(
             }
             for row in rows {
                 if row.acquisition.state != PhysicalAcquisitionStateV1::Measured {
-                    reasons.push(format!("round {} has no completed physical measurement", row.round_id));
+                    reasons.push(format!(
+                        "round {} has no completed physical measurement",
+                        row.round_id
+                    ));
                 }
                 if row.qualification.state != K1QualificationStateV1::Eligible {
-                    reasons.push(format!("round {} has no K1-qualified outcome", row.round_id));
+                    reasons.push(format!(
+                        "round {} has no K1-qualified outcome",
+                        row.round_id
+                    ));
                 }
                 if row.tracking.state != FeedbackTrackingStateV1::UnlimitedReceived
                     || row.tracking.actual_feedback_delay_rounds != Some(fixed_delay)
                 {
-                    reasons.push(format!("round {} does not have complete fixed-delay feedback", row.round_id));
+                    reasons.push(format!(
+                        "round {} does not have complete fixed-delay feedback",
+                        row.round_id
+                    ));
                 }
             }
         }
         ObservationRiskControllerV1::CapacityAwareOcrcBounded => {
             let maximum_delay = input.maximum_feedback_delay_rounds.unwrap_or(0);
             if rows.iter().any(|row| {
-                row.tracking.actual_feedback_delay_rounds
+                row.tracking
+                    .actual_feedback_delay_rounds
                     .is_some_and(|delay| delay > maximum_delay)
             }) {
-                reasons.push("At least one physical feedback result exceeded the declared maximum delay.".into());
+                reasons.push(
+                    "At least one physical feedback result exceeded the declared maximum delay."
+                        .into(),
+                );
                 return (ControllerAssumptionStateV1::DelayContractExceeded, reasons);
             }
             if maximum_occupancy > input.tracking_capacity.unwrap_or(0) {
@@ -940,7 +978,10 @@ fn assumption_state(
                     "Observed peak tracking occupancy {maximum_occupancy} exceeded declared capacity {}.",
                     input.tracking_capacity.unwrap_or(0)
                 ));
-                return (ControllerAssumptionStateV1::TrackingCapacityExceeded, reasons);
+                return (
+                    ControllerAssumptionStateV1::TrackingCapacityExceeded,
+                    reasons,
+                );
             }
             if rows.iter().any(|row| {
                 row.acquisition.state == PhysicalAcquisitionStateV1::SelectedPending
@@ -952,21 +993,32 @@ fn assumption_state(
             }
             for row in rows {
                 if row.acquisition.state != PhysicalAcquisitionStateV1::Measured {
-                    reasons.push(format!("round {} has no completed physical measurement", row.round_id));
+                    reasons.push(format!(
+                        "round {} has no completed physical measurement",
+                        row.round_id
+                    ));
                 }
                 if row.qualification.state != K1QualificationStateV1::Eligible {
-                    reasons.push(format!("round {} has no K1-qualified physical outcome", row.round_id));
+                    reasons.push(format!(
+                        "round {} has no K1-qualified physical outcome",
+                        row.round_id
+                    ));
                 }
                 if !row
                     .tracking
                     .actual_feedback_delay_rounds
                     .is_some_and(|delay| delay <= maximum_delay)
                 {
-                    reasons.push(format!("round {} has no observed delay within the bounded-delay contract", row.round_id));
+                    reasons.push(format!(
+                        "round {} has no observed delay within the bounded-delay contract",
+                        row.round_id
+                    ));
                 }
             }
             if maximum_occupancy > input.tracking_capacity.unwrap_or(0) {
-                reasons.push("Observed concurrent tracking occupancy exceeded declared capacity.".into());
+                reasons.push(
+                    "Observed concurrent tracking occupancy exceeded declared capacity.".into(),
+                );
                 return (
                     ControllerAssumptionStateV1::TrackingCapacityExceeded,
                     reasons,
@@ -976,10 +1028,7 @@ fn assumption_state(
     }
 
     if !input.delay_contract_declared_and_enforced || input.delay_contract_sha256.is_none() {
-        return (
-            ControllerAssumptionStateV1::DeclaredButNotVerified,
-            reasons,
-        );
+        return (ControllerAssumptionStateV1::DeclaredButNotVerified, reasons);
     }
     if !reasons.is_empty() {
         return (
@@ -1011,7 +1060,10 @@ fn validate_policy(input: &ObservationProcessInputV1) -> Result<(), ObservationP
         input.controller_policy_sha256.as_deref(),
         "controller_policy_sha256",
     )?;
-    validate_optional_digest(input.delay_contract_sha256.as_deref(), "delay_contract_sha256")?;
+    validate_optional_digest(
+        input.delay_contract_sha256.as_deref(),
+        "delay_contract_sha256",
+    )?;
 
     match input.controller {
         ObservationRiskControllerV1::None => {
@@ -1203,7 +1255,10 @@ pub fn evaluate_observation_process_v1(
                 qualified_round_ids.push(row.round_id);
                 qualified_losses.push(super::selection_risk_bounds::QualifiedLossObservationV1 {
                     round_id: row.round_id,
-                    loss: row.qualification.qualified_loss.expect("validated eligible loss"),
+                    loss: row
+                        .qualification
+                        .qualified_loss
+                        .expect("validated eligible loss"),
                     evidence_receipt_sha256: row
                         .qualification
                         .qualified_loss_evidence_sha256
@@ -1222,10 +1277,12 @@ pub fn evaluate_observation_process_v1(
         }
         match row.tracking.state {
             FeedbackTrackingStateV1::NotApplicable => funnel.feedback_not_applicable += 1,
-            FeedbackTrackingStateV1::UnlimitedPending | FeedbackTrackingStateV1::AdmittedPending => {
+            FeedbackTrackingStateV1::UnlimitedPending
+            | FeedbackTrackingStateV1::AdmittedPending => {
                 funnel.feedback_pending += 1;
             }
-            FeedbackTrackingStateV1::UnlimitedReceived | FeedbackTrackingStateV1::TrackedReceived => {
+            FeedbackTrackingStateV1::UnlimitedReceived
+            | FeedbackTrackingStateV1::TrackedReceived => {
                 funnel.feedback_received += 1;
             }
             FeedbackTrackingStateV1::UnlimitedForfeited
@@ -1306,8 +1363,10 @@ pub fn evaluate_observation_process_v1(
             "source ledger digest does not match canonical observation rows".into(),
         ));
     }
-    let population_risk = evaluate_selection_adjusted_population_risk_v1(&risk_input)
-        .map_err(|error| ObservationProcessErrorV1(format!("population-risk evaluation failed: {error}")))?;
+    let population_risk =
+        evaluate_selection_adjusted_population_risk_v1(&risk_input).map_err(|error| {
+            ObservationProcessErrorV1(format!("population-risk evaluation failed: {error}"))
+        })?;
     let mut canonical_input = input.clone();
     canonical_input.rounds = rows.clone();
     let mut report = ObservationProcessReportV1 {
@@ -1404,19 +1463,20 @@ mod tests {
                 tracking_slot_id: None,
                 tracking_end_round: None,
                 action_receipt_sha256: matches!(
-                tracking,
-                FeedbackTrackingStateV1::UnlimitedReceived
-                    | FeedbackTrackingStateV1::UnlimitedForfeited
-                    | FeedbackTrackingStateV1::ProxyNotTracked
-                    | FeedbackTrackingStateV1::CapacityDenied
-                    | FeedbackTrackingStateV1::Evicted
-                    | FeedbackTrackingStateV1::ProxyExpired
-                    | FeedbackTrackingStateV1::TrackedReceived
-            )
-            .then(|| digest('1')),
+                    tracking,
+                    FeedbackTrackingStateV1::UnlimitedReceived
+                        | FeedbackTrackingStateV1::UnlimitedForfeited
+                        | FeedbackTrackingStateV1::ProxyNotTracked
+                        | FeedbackTrackingStateV1::CapacityDenied
+                        | FeedbackTrackingStateV1::Evicted
+                        | FeedbackTrackingStateV1::ProxyExpired
+                        | FeedbackTrackingStateV1::TrackedReceived
+                )
+                .then(|| digest('1')),
                 controller_feedback_received_at_unix_seconds: matches!(
                     tracking,
-                    FeedbackTrackingStateV1::UnlimitedReceived | FeedbackTrackingStateV1::TrackedReceived
+                    FeedbackTrackingStateV1::UnlimitedReceived
+                        | FeedbackTrackingStateV1::TrackedReceived
                 )
                 .then_some(108 + round_id as i64 * 10),
                 controller_update_applied: tracking == FeedbackTrackingStateV1::UnlimitedReceived
@@ -1434,9 +1494,14 @@ mod tests {
         let source_ledger_sha256 = json_sha256(&rounds).unwrap();
         let (policy, delay, max_delay, capacity, declared, delay_sha) = match controller {
             ObservationRiskControllerV1::None => (None, None, None, None, false, None),
-            ObservationRiskControllerV1::FixedDelayAci => {
-                (Some(digest('2')), Some(1), None, None, true, Some(digest('3')))
-            }
+            ObservationRiskControllerV1::FixedDelayAci => (
+                Some(digest('2')),
+                Some(1),
+                None,
+                None,
+                true,
+                Some(digest('3')),
+            ),
             ObservationRiskControllerV1::CapacityAwareOcrcBounded => (
                 Some(digest('4')),
                 None,
@@ -1536,7 +1601,9 @@ mod tests {
         never_selected.acquisition.state = PhysicalAcquisitionStateV1::Measured;
         never_selected.acquisition.selected_at_round = Some(1);
         never_selected.acquisition.measured_at_unix_seconds = Some(115);
-        never_selected.acquisition.operational_measurement_method_sha256 = Some(digest('0'));
+        never_selected
+            .acquisition
+            .operational_measurement_method_sha256 = Some(digest('0'));
         assert!(validate_acquisition(&never_selected).is_err());
     }
 
@@ -1556,7 +1623,10 @@ mod tests {
         assert_eq!(report.funnel.feedback_not_applicable, 1);
         assert_eq!(report.funnel.proxy_not_tracked, 0);
         assert_eq!(report.funnel.capacity_denied, 0);
-        assert_eq!(report.controller_assumption_state, ControllerAssumptionStateV1::InvalidatedByMissingOrUnqualifiedOutcome);
+        assert_eq!(
+            report.controller_assumption_state,
+            ControllerAssumptionStateV1::InvalidatedByMissingOrUnqualifiedOutcome
+        );
         assert_eq!(report.population_risk.missing_count, 1);
     }
 
@@ -1579,11 +1649,15 @@ mod tests {
         assert_eq!(report.funnel.k1_eligible, 1);
         assert_eq!(report.funnel.capacity_denied, 1);
         assert_eq!(report.funnel.not_selected, 0);
-        assert_eq!(report.population_risk.population_risk_exactly_identified, true);
+        assert_eq!(
+            report.population_risk.population_risk_exactly_identified,
+            true
+        );
     }
 
     #[test]
-    fn capacity_denied_but_physically_qualified_label_still_counts_as_observed_population_evidence() {
+    fn capacity_denied_but_physically_qualified_label_still_counts_as_observed_population_evidence()
+    {
         let mut denied = row(
             1,
             PhysicalAcquisitionStateV1::Measured,
@@ -1645,7 +1719,9 @@ mod tests {
         received.tracking.proxy_survival_probability = Some(0.5);
         received.tracking.tracking_slot_id = Some(101);
         received.tracking.tracking_end_round = Some(2);
-        received.tracking.controller_feedback_received_at_unix_seconds = Some(119);
+        received
+            .tracking
+            .controller_feedback_received_at_unix_seconds = Some(119);
         received.tracking.controller_update_applied = true;
         let data = input(
             ObservationRiskControllerV1::CapacityAwareOcrcBounded,
@@ -1788,7 +1864,10 @@ mod tests {
         let data = input(ObservationRiskControllerV1::None, vec![measured]);
         let report = evaluate_observation_process_v1(&data).unwrap();
         assert_eq!(report.population_risk.population_point_estimate, Some(1.0));
-        assert_eq!(report.population_risk.point_estimate_method.as_deref(), Some("complete_qualified_population"));
+        assert_eq!(
+            report.population_risk.point_estimate_method.as_deref(),
+            Some("complete_qualified_population")
+        );
     }
 
     #[test]
@@ -1825,7 +1904,10 @@ mod tests {
             confidence_delta: 0.05,
             independent_of_operational_qualification: true,
         });
-        data.independent_audit_design.as_mut().unwrap().reference_method_sha256 = digest('d');
+        data.independent_audit_design
+            .as_mut()
+            .unwrap()
+            .reference_method_sha256 = digest('d');
         data.rounds[0].independent_audit = Some(IndependentAuditObservationV1 {
             round_id: 1,
             loss: 1.0,
@@ -1894,8 +1976,15 @@ mod tests {
         received.tracking.proxy_survival_probability = Some(0.5);
         received.tracking.tracking_slot_id = Some(101);
         received.tracking.tracking_end_round = Some(2);
-        received.tracking.controller_feedback_received_at_unix_seconds =
-            Some(received.qualification.report_available_at_unix_seconds.unwrap() - 1);
+        received
+            .tracking
+            .controller_feedback_received_at_unix_seconds = Some(
+            received
+                .qualification
+                .report_available_at_unix_seconds
+                .unwrap()
+                - 1,
+        );
         received.tracking.controller_update_applied = true;
         let data = input(
             ObservationRiskControllerV1::CapacityAwareOcrcBounded,
