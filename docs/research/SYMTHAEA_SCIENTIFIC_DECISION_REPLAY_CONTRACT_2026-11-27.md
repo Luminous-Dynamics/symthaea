@@ -43,7 +43,7 @@ A digest proves byte identity, not truth, independence, access control or correc
 
 The new support module defines:
 - CandidateDecisionContext: decision-time evidence, permitted action set, context digest, budget, deadline, and a digest-bound decision objective (valuation mode, declared utility unit and loss-table reference where applicable).
-- DecisionProposal: selected action, prospective probability distribution, policy lineage, assignment mechanism and causal-design declaration.
+- DecisionProposal: selected action identity, digest of the exact selected action payload (for example, the submitted design batch), prospective probability distribution, policy lineage, assignment mechanism and causal-design declaration.
 - EvaluatorResolution: evaluator-owned execution status, outcome-resolution state, observed-action support, evidence references and actual-cost completeness.
 
 Candidate-visible types do not contain ground truth or future outcome labels. EvaluatorResolution is separate and must not be serialized into the candidate process input stream.
@@ -53,7 +53,7 @@ Validation covers:
 - every decision is bound to a frozen downstream decision/loss contract; raw entropy or information gain is not substituted for decision value;
 - selected actions belong to the permitted set;
 - prospective probabilities sum exactly to one million parts per million;
-- randomized assignment records a nonzero propensity and protocol reference;
+- randomized assignment records a complete probability distribution over permitted action identities and exact payload digests, with nonzero propensity for the selected action;
 - causal-design claims include identification-assumption digests;
 - randomized-controlled claims require randomized assignment;
 - unsupported counterfactuals cannot carry observed actions, outcome labels or outcome evidence;
@@ -119,7 +119,7 @@ The actual decision-policy comparison should run through #11012 and #10921, reus
 
 Use fixed script, fixed sequential/best-of-N, static threshold, state-contingent adaptive and matched-cost random-branch controllers from #11012. Keep model, available roles, coder, API/tools, context and total cost fixed; only the orchestration policy changes. Apply the decision episode to each actual batch submission, binding the research-state/evidence prefix, selected-design payload digest, predictions, resource estimate, next-action rule and actual lab job/result identity. Keep the benchmark-owned discovery and learning gates intact.
 
-The pinned compatibility adapter currently has 38 authored tests and recorded exact-head isolated workflow evidence on its stated head, but it has not executed a campaign or reached the upstream verifier. The next evidence level is an offline fixture/decision-trace bridge, followed by a replay campaign—not a claim based on schema conformance.
+The pinned compatibility adapter currently has 38 authored tests and recorded exact-head isolated workflow evidence on its stated head, but it has not executed a campaign or reached the upstream verifier. The next bridge should use the selected-action payload digest to bind an AS-Bench submission to its exact design IDs, followed by a replay campaign—not a claim based on schema conformance.
 
 Example capsule commands (replace paths and source SHA with actual campaign values):
 
@@ -271,7 +271,7 @@ These are paper/author-reported baselines unless independently reproduced under 
 
 Implemented in this branch:
 - candidate-visible decision context and prospective proposal, including a decision-objective reference;
-- outcome distribution, full randomized action propensities and causal-design declarations;
+- outcome distribution, full randomized action propensities over action/payload identities, exact selected-payload binding and causal-design declarations;
 - evaluator-owned resolution and distinct execution/outcome states;
 - validation for look-ahead evidence, action support, unsupported counterfactuals, delayed/censored/indeterminate outcomes and cost completeness;
 - nine authored decision-contract tests;
