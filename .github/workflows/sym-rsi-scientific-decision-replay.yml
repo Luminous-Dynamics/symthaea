@@ -34,6 +34,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
