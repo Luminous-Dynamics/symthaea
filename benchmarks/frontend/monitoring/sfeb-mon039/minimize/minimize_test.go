@@ -274,11 +274,22 @@ func TestMissingObservationFaultArrayIsRejected(t *testing.T) {
 
 func TestObservationReceiptDigestBindsEveryObservationField(t *testing.T) {
 	o:=makeObservation([]string{"fault-a"},Blocked,testDigest("failure"),codeRevision,true)
-	o.TrialID="other-trial"
+	o.Complete=false
 	in:=baseInput([]string{"fault-a"},[]Observation{o})
 	got:=Minimize(in)
 	if got.CampaignVerdict!=Blocked {
-		t.Fatalf("modified trial identity with unchanged receipt digest must block: %+v",got)
+		t.Fatalf("modified completeness field with unchanged receipt digest must block: %+v",got)
+	}
+}
+
+func TestObservationTrialIdentityMustMatch(t *testing.T) {
+	o:=makeObservation([]string{"fault-a"},Blocked,testDigest("failure"),codeRevision,true)
+	o.TrialID="other-trial"
+	o.OutcomeReceiptSHA256=ObservationReceiptDigest(o)
+	in:=baseInput([]string{"fault-a"},[]Observation{o})
+	got:=Minimize(in)
+	if got.CampaignVerdict!=Blocked {
+		t.Fatalf("observation from another trial must block: %+v",got)
 	}
 }
 
