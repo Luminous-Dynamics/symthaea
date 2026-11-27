@@ -77,9 +77,7 @@ pub fn build_calibration_rank_reference(
     )?;
     validate_sha256(&binding.scope_sha256, "scope_sha256")?;
 
-    if binding.calibration_manifest_sha256
-        != calibration.qualified.calibration_manifest_sha256
-    {
+    if binding.calibration_manifest_sha256 != calibration.qualified.calibration_manifest_sha256 {
         return Err(BridgeError::CalibrationManifestMismatch);
     }
     if binding.scope_spec != calibration.qualified.spec {
@@ -94,7 +92,9 @@ pub fn build_calibration_rank_reference(
     let mut by_cluster = HashMap::with_capacity(attestations.len());
     for attestation in attestations {
         if attestation.independent_cluster_id.trim().is_empty() {
-            return Err(BridgeError::EmptyIdentity("attestation.independent_cluster_id"));
+            return Err(BridgeError::EmptyIdentity(
+                "attestation.independent_cluster_id",
+            ));
         }
         validate_sha256(
             &attestation.block_manifest_sha256,
@@ -117,10 +117,7 @@ pub fn build_calibration_rank_reference(
             "attestation.tie_break_receipt_sha256",
         )?;
         if by_cluster
-            .insert(
-                attestation.independent_cluster_id.as_str(),
-                attestation,
-            )
+            .insert(attestation.independent_cluster_id.as_str(), attestation)
             .is_some()
         {
             return Err(BridgeError::DuplicateAttestation);
@@ -156,20 +153,14 @@ pub fn build_calibration_rank_reference(
             return Err(BridgeError::AttestedScoreMismatch("score_units"));
         }
         if attestation.block_manifest_sha256 != score.block_manifest_sha256 {
-            return Err(BridgeError::AttestedScoreMismatch(
-                "block_manifest_sha256",
-            ));
+            return Err(BridgeError::AttestedScoreMismatch("block_manifest_sha256"));
         }
-        if attestation.candidate_margin_block_sha256
-            != score.candidate_margin_block_sha256
-        {
+        if attestation.candidate_margin_block_sha256 != score.candidate_margin_block_sha256 {
             return Err(BridgeError::AttestedScoreMismatch(
                 "candidate_margin_block_sha256",
             ));
         }
-        if attestation.reference_margin_receipt_sha256
-            != score.reference_margin_receipt_sha256
-        {
+        if attestation.reference_margin_receipt_sha256 != score.reference_margin_receipt_sha256 {
             return Err(BridgeError::AttestedScoreMismatch(
                 "reference_margin_receipt_sha256",
             ));
@@ -308,12 +299,8 @@ mod tests {
                     independent_cluster_id: score.independent_cluster_id.clone(),
                     score_units: score.score_units,
                     block_manifest_sha256: score.block_manifest_sha256.clone(),
-                    candidate_margin_block_sha256: score
-                        .candidate_margin_block_sha256
-                        .clone(),
-                    reference_margin_receipt_sha256: score
-                        .reference_margin_receipt_sha256
-                        .clone(),
+                    candidate_margin_block_sha256: score.candidate_margin_block_sha256.clone(),
+                    reference_margin_receipt_sha256: score.reference_margin_receipt_sha256.clone(),
                     aggregate_score_receipt_sha256: digest(letter),
                     tie_break_key: 100 + index as u64,
                     tie_break_receipt_sha256: digest(char::from(b'k' + index as u8)),
