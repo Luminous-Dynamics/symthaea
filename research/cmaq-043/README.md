@@ -42,7 +42,7 @@ The crate uses rational arithmetic with checked u128 products and gcd reduction.
 
 The reciprocal Ville threshold is also exposed as an exact rational pair. A logarithmic threshold is available only as a display/interop value.
 
-AllocationLedger is constructed from one immutable BudgetPlan and refuses a different plan/inventory/global-alpha binding. It consumes each stream ID and each hierarchy-index triple at most once in memory. It computes the receipt before mutating its ledger, so overflow or validation errors leave the ledger unchanged.
+AllocationLedger is constructed from one immutable BudgetPlan and refuses a different plan/inventory/global-alpha binding. It enforces one-to-one identity/index bindings for assets, channels within assets, and deployments within asset/channel pairs. It consumes each stream ID and each hierarchy-index triple at most once in memory. It computes the receipt before mutating its ledger, so overflow or validation errors leave the ledger unchanged.
 
 ## Durability and trust boundary
 
