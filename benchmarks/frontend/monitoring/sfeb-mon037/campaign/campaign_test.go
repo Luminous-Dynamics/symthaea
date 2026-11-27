@@ -276,3 +276,31 @@ func TestFixtureDigestDerivationCannotRunForRuntimeCandidate(t *testing.T) {
 		t.Fatal("offline fixture digest derivation failed")
 	}
 }
+
+
+func TestBoundaryClaimMustBePresentAndAllLayersMustShareBoundary(t *testing.T) {
+	in := fixture()
+	in.Boundary.ClaimID = "not-required"
+	if got := Evaluate(in); got.ComponentVerdict != Blocked {
+		t.Fatalf("boundary claim outside required claim set must block: %+v", got)
+	}
+
+	in = fixture()
+	in.Boundary.SourceEpoch = "primary-epoch-002"
+	if got := Evaluate(in); got.ComponentVerdict != Blocked {
+		t.Fatalf("boundary mutation after component evidence must block: %+v", got)
+	}
+}
+
+func TestComponentBoundaryMismatchBlocks(t *testing.T) {
+	in := fixture()
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(in.Components.ObserverResult, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	envelope["boundary_sha256"] = json.RawMessage(`"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`)
+	in.Components.ObserverResult, _ = json.Marshal(envelope)
+	if got := Evaluate(in); got.ComponentVerdict != Blocked {
+		t.Fatalf("observer result bound to another recovery boundary must block: %+v", got)
+	}
+}
