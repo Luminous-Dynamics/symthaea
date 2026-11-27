@@ -136,7 +136,10 @@ pub fn assess_recovery_portfolio(
         }
         for (field, digest) in [
             ("prefix.context_scope_sha256", &prefix.context_scope_sha256),
-            ("prefix.state_evidence_sha256", &prefix.state_evidence_sha256),
+            (
+                "prefix.state_evidence_sha256",
+                &prefix.state_evidence_sha256,
+            )
             (
                 "prefix.reachability_evidence_sha256",
                 &prefix.reachability_evidence_sha256,
