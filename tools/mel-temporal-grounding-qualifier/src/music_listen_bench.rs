@@ -515,9 +515,7 @@ fn flip_factor_compatible(task: MusicListenTaskV1, factor: MusicListenFlipFactor
 /// Shared by the official MusicListenBench v1 adapter and independent
 /// property-scoped extensions. This intentionally returns no relation for
 /// unparseable or abstaining answers.
-pub fn predicted_relation_for_variant(
-    variant: &MusicListenVariantV1,
-) -> Option<MusicalRelationV1> {
+pub fn predicted_relation_for_variant(variant: &MusicListenVariantV1) -> Option<MusicalRelationV1> {
     match variant.model_answer {
         MusicListenAnswerV1::ChoiceA => Some(variant.option_a_relation),
         MusicListenAnswerV1::ChoiceB => Some(variant.option_b_relation),

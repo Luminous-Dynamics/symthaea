@@ -12,8 +12,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::music_listen_bench::{
-    predicted_relation_for_variant, sha256_hex, MusicalRelationV1, MusicListenAnswerV1,
-    MusicListenVariantV1,
+    MusicListenAnswerV1, MusicListenVariantV1, MusicalRelationV1, predicted_relation_for_variant,
+    sha256_hex,
 };
 
 const CASE_SCHEMA_V1: &str = "mel-performance-invariance-case-v1";
@@ -353,11 +353,7 @@ pub fn audit_performance_invariance_case(
             })
             .collect();
         if !indices.is_empty() {
-            by_target_property.push(summarize_indices(
-                Some(target_property),
-                &scored,
-                &indices,
-            ));
+            by_target_property.push(summarize_indices(Some(target_property), &scored, &indices));
         }
     }
 
@@ -375,9 +371,8 @@ pub fn audit_performance_invariance_case(
                 })
                 .collect();
             if !indices.is_empty() {
-                let metric = variant_metrics(
-                    indices.iter().map(|index| scored[*index].performance_stay),
-                );
+                let metric =
+                    variant_metrics(indices.iter().map(|index| scored[*index].performance_stay));
                 by_performance_factor.push(PerformanceFactorMetricsV1 {
                     target_property,
                     factor,
@@ -402,9 +397,8 @@ pub fn audit_performance_invariance_case(
                 })
                 .collect();
             if !indices.is_empty() {
-                let metric = variant_metrics(
-                    indices.iter().map(|index| scored[*index].musical_flip),
-                );
+                let metric =
+                    variant_metrics(indices.iter().map(|index| scored[*index].musical_flip));
                 by_musical_flip_factor.push(MusicalFlipFactorMetricsV1 {
                     target_property,
                     factor,
@@ -469,9 +463,7 @@ fn validate_triad(triad: &PerformanceTriadV1, index: usize) -> Result<(), String
         validate_digest(value, &format!("triads[{index}].{label}"))?;
     }
 
-    if triad.clean.performance_condition_sha256
-        != triad.musical_flip.performance_condition_sha256
-    {
+    if triad.clean.performance_condition_sha256 != triad.musical_flip.performance_condition_sha256 {
         return Err(format!(
             "triads[{index}] musical FLIP must hold the performance condition constant"
         ));
@@ -483,10 +475,7 @@ fn validate_triad(triad: &PerformanceTriadV1, index: usize) -> Result<(), String
             "triads[{index}] performance STAY must bind a distinct performance condition"
         ));
     }
-    if !performance_stay_factor_compatible(
-        triad.target_property,
-        triad.performance_stay_factor,
-    ) {
+    if !performance_stay_factor_compatible(triad.target_property, triad.performance_stay_factor) {
         return Err(format!(
             "triads[{index}] performance-STAY factor {:?} is not valid for target property {:?}",
             triad.performance_stay_factor, triad.target_property
@@ -552,7 +541,9 @@ fn validate_triad(triad: &PerformanceTriadV1, index: usize) -> Result<(), String
             return Err(format!("triads[{index}] repeats a variant ID"));
         }
         if !audio_digests.insert(variant.audio_sha256.as_str()) {
-            return Err(format!("triads[{index}] reuses audio bytes across variants"));
+            return Err(format!(
+                "triads[{index}] reuses audio bytes across variants"
+            ));
         }
         if variant.question != canonical_question {
             return Err(format!(
@@ -835,18 +826,12 @@ fn require_text(value: &str, label: &str) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    const LINEAGE: &str =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const COMPOSITION: &str =
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    const MODEL: &str =
-        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-    const PROMPT: &str =
-        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
-    const RUNTIME: &str =
-        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-    const DECODING: &str =
-        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    const LINEAGE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const COMPOSITION: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const MODEL: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const PROMPT: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    const RUNTIME: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    const DECODING: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
     fn digest(ch: char) -> String {
         ch.to_string().repeat(64)
@@ -874,14 +859,14 @@ mod tests {
     fn question_for(target_property: MusicalTargetPropertyV1) -> &'static str {
         match target_property {
             MusicalTargetPropertyV1::ChordQuality => "Are these chord qualities the same?",
-            MusicalTargetPropertyV1::RootPitchClass => "Do these clips share the same chord root pitch class?",
+            MusicalTargetPropertyV1::RootPitchClass => {
+                "Do these clips share the same chord root pitch class?"
+            }
             MusicalTargetPropertyV1::ChordVoicing => "Do these chords have the same voicing?",
             MusicalTargetPropertyV1::RelativeIntervalSequence => {
                 "Is the ordered melodic interval sequence the same?"
             }
-            MusicalTargetPropertyV1::MelodicContour => {
-                "Is the melodic contour the same?"
-            }
+            MusicalTargetPropertyV1::MelodicContour => "Is the melodic contour the same?",
             MusicalTargetPropertyV1::RhythmicRatioPattern => {
                 "Is the rhythmic ratio pattern the same?"
             }
@@ -1018,8 +1003,7 @@ mod tests {
             true,
         )]);
         assert!(audit_performance_invariance_case(&input).is_err());
-        input.triads[0].performance_stay_factor =
-            PerformanceVariationFactorV1::DifferentTake;
+        input.triads[0].performance_stay_factor = PerformanceVariationFactorV1::DifferentTake;
         assert!(audit_performance_invariance_case(&input).is_ok());
     }
 
@@ -1106,7 +1090,9 @@ mod tests {
             true,
             true,
         )]);
-        input.triads[0].performance_stay.performance_condition_sha256 =
+        input.triads[0]
+            .performance_stay
+            .performance_condition_sha256 =
             input.triads[0].clean.performance_condition_sha256.clone();
         assert!(audit_performance_invariance_case(&input).is_err());
     }
@@ -1163,7 +1149,9 @@ mod tests {
         second.performance_stay.answer.audio_sha256 = digest('2');
         second.musical_flip.answer.audio_sha256 = digest('3');
         second.runtime_identity_sha256 = digest('7');
-        assert!(audit_performance_invariance_case(&case(vec![first.clone(), second.clone()])).is_err());
+        assert!(
+            audit_performance_invariance_case(&case(vec![first.clone(), second.clone()])).is_err()
+        );
 
         second.runtime_identity_sha256 = first.runtime_identity_sha256.clone();
         second.clean.answer.variant_id = first.clean.answer.variant_id.clone();
@@ -1205,7 +1193,9 @@ mod tests {
             true,
         );
         second.source_lineage_sha256 = digest('9');
-        assert!(audit_performance_invariance_case(&case(vec![first.clone(), second.clone()])).is_err());
+        assert!(
+            audit_performance_invariance_case(&case(vec![first.clone(), second.clone()])).is_err()
+        );
 
         second.composition_sha256 = digest('8');
         second.clean.answer.audio_sha256 = digest('8');
@@ -1329,9 +1319,18 @@ mod tests {
         assert_eq!(report.by_target_property.len(), 3);
         assert_eq!(report.by_performance_factor.len(), 3);
         assert_eq!(report.by_musical_flip_factor.len(), 3);
-        assert_eq!(report.by_target_property[0].target_property, Some(MusicalTargetPropertyV1::ChordQuality));
-        assert_eq!(report.by_target_property[1].target_property, Some(MusicalTargetPropertyV1::RootPitchClass));
-        assert_eq!(report.by_target_property[2].target_property, Some(MusicalTargetPropertyV1::RelativeIntervalSequence));
+        assert_eq!(
+            report.by_target_property[0].target_property,
+            Some(MusicalTargetPropertyV1::ChordQuality)
+        );
+        assert_eq!(
+            report.by_target_property[1].target_property,
+            Some(MusicalTargetPropertyV1::RootPitchClass)
+        );
+        assert_eq!(
+            report.by_target_property[2].target_property,
+            Some(MusicalTargetPropertyV1::RelativeIntervalSequence)
+        );
         assert_eq!(report.source_lineage_count, 1);
         assert!(!report.confirmatory_lineage_floor_met);
     }
