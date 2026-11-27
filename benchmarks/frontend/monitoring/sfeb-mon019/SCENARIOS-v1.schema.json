@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/frontend/monitoring/sfeb-mon019/SCENARIOS-v1.schema.json",
+  "title": "MON-019 Causal Provenance Scenario Corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_id",
+    "corpus_version",
+    "status",
+    "purpose",
+    "decision_semantics",
+    "scenarios"
+  ],
+  "properties": {
+    "corpus_id": {
+      "const": "MON-019-CAUSAL-PROVENANCE"
+    },
+    "corpus_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "status": {
+      "enum": [
+        "research_seed",
+        "frozen_confirmatory",
+        "retired"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "qualified",
+        "denied",
+        "indeterminate",
+        "divergent"
+      ],
+      "properties": {
+        "qualified": {
+          "type": "string",
+          "minLength": 1
+        },
+        "denied": {
+          "type": "string",
+          "minLength": 1
+        },
+        "indeterminate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "divergent": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "family",
+          "description",
+          "expected_decision",
+          "reason_code",
+          "required_control",
+          "severity",
+          "tags",
+          "positive_control"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(GRAPH|INPUT|GROUND|ACTIVITY|CAUSAL|EFFECT|INDEPENDENCE|PRIVACY)-[0-9]{3}$"
+          },
+          "family": {
+            "enum": [
+              "graph",
+              "input_integrity",
+              "grounding",
+              "activity_capture",
+              "causal_order",
+              "effect_composition",
+              "independence",
+              "privacy"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_decision": {
+            "enum": [
+              "qualified",
+              "denied",
+              "indeterminate",
+              "divergent"
+            ]
+          },
+          "reason_code": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "required_control": {
+            "enum": [
+              "continue_to_action_gate",
+              "continue_to_effect_gate",
+              "continue_to_physical_gate",
+              "must_deny",
+              "must_hold",
+              "must_surface_divergence",
+              "must_not_infer_causality",
+              "must_block_retry_until_reconciliation",
+              "must_preserve_claim_ceiling"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "critical",
+              "high",
+              "medium"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "positive_control": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
