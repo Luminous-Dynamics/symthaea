@@ -20,6 +20,8 @@
 //! reduced-motion change hides the active scene. The adapter never uses Bevy's
 //! wall/game clock as a substitute for the source monotonic clock.
 
+use bevy::color::Alpha;
+use bevy::sprite_render::AlphaMode2d;
 use bevy::prelude::*;
 use symthaea_soma::embodiment_policy::{
     DenialReason, OutputChannel, PresentationPermit, PresentationPolicy,
@@ -29,6 +31,10 @@ use symthaea_soma::embodiment_receipt::{
 };
 use symthaea_soma::embodiment_scene::{
     EmbodimentSceneFrame, SceneGlyph, SceneMotion, SceneRole,
+};
+use symthaea_soma::embodiment_transition::{
+    plan_transition, SceneContinuityDescriptor, SceneTransitionPlan, TransitionError,
+    TransitionKind, TransitionPolicy,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,6 +60,7 @@ pub enum AdapterError {
     PolicyUnavailable,
     PermitChangedAfterAuthorization,
     PolicyDenied(DenialReason),
+    ContinuityPlanRejected(TransitionError),
     QueueRevisionExhausted,
 }
 
@@ -319,10 +326,29 @@ impl LatestSceneSubmissionAck {
 #[derive(Resource, Default)]
 struct ActiveScene {
     submission: Option<AuthorizedSceneSubmission>,
+    group_id: u64,
+}
+
+#[derive(Resource, Default)]
+struct ActiveSceneTransition {
+    source_submission: Option<AuthorizedSceneSubmission>,
+    source_group_id: u64,
+    plan: Option<SceneTransitionPlan>,
 }
 
 #[derive(Component)]
 struct RenderedSceneEntity;
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+struct SceneGroupId(u64);
+
+#[derive(Component, Clone)]
+struct SceneMaterialFade {
+    group_id: u64,
+    material: Handle<ColorMaterial>,
+    base_color: Color,
+    base_alpha: f32,
+}
 
 #[derive(Component, Clone)]
 struct SceneFrameGuard {
@@ -371,10 +397,17 @@ impl Plugin for SymthaeaSceneRendererPlugin {
             .init_resource::<SceneSubmissionQueue>()
             .init_resource::<LatestSceneSubmissionAck>()
             .init_resource::<ActiveScene>()
+            .init_resource::<ActiveSceneTransition>()
             .add_systems(Startup, setup_camera)
             .add_systems(
                 Update,
-                (render_pending_scene, enforce_active_scene, animate_scene_elements).chain(),
+                (
+                    render_pending_scene,
+                    enforce_active_scene,
+                    apply_transition_weights,
+                    animate_scene_elements,
+                )
+                    .chain(),
             );
     }
 }
@@ -392,61 +425,142 @@ fn render_pending_scene(
     policy: Option<Res<PresentationPolicyState>>,
     mut latest_ack: ResMut<LatestSceneSubmissionAck>,
     mut active: ResMut<ActiveScene>,
-    existing: Query<Entity, With<RenderedSceneEntity>>,
+    mut transition: ResMut<ActiveSceneTransition>,
+    existing: Query<(Entity, &SceneGroupId), With<RenderedSceneEntity>>,
     mut last_revision: Local<u64>,
 ) {
     if queue.revision() == *last_revision {
         return;
     }
     *last_revision = queue.revision();
-
-    for entity in &existing {
-        commands.entity(entity).despawn();
-    }
-    active.submission = None;
     latest_ack.latest = None;
 
-    let Some(submission) = queue.pending.as_ref() else { return; };
-    let frame = submission.frame();
+    let Some(submission) = queue.pending.as_ref() else {
+        for (entity, _) in &existing { commands.entity(entity).despawn(); }
+        active.submission = None;
+        transition.source_submission = None;
+        transition.plan = None;
+        return;
+    };
 
-    let Some(policy) = policy else {
+    let Some(policy) = policy.as_ref() else {
+        for (entity, _) in &existing { commands.entity(entity).despawn(); }
+        active.submission = None;
+        transition.source_submission = None;
+        transition.plan = None;
         latest_ack.latest = Some(rejected_ack(submission, AdapterError::PolicyUnavailable));
         return;
     };
 
-    if !clock.is_changed() || !clock.permits_frame(frame) {
-        latest_ack.latest = Some(rejected_ack(submission, AdapterError::ClockUnavailable));
-        return;
-    }
-    let Some(now) = clock.now_monotonic_ns() else {
-        latest_ack.latest = Some(rejected_ack(submission, AdapterError::ClockUnavailable));
-        return;
-    };
-    let Some(clock_id) = clock.clock_domain_id() else {
-        latest_ack.latest = Some(rejected_ack(submission, AdapterError::ClockUnavailable));
-        return;
-    };
-
-    let refreshed = match policy.policy().recheck_permit(
-        submission.permit(),
-        &now.to_string(),
-        clock_id,
-    ) {
+    let refreshed = match recheck_live_submission(submission, &clock, clock.is_changed(), policy) {
         Ok(permit) => permit,
         Err(reason) => {
-            latest_ack.latest = Some(rejected_ack(submission, AdapterError::PolicyDenied(reason)));
+            for (entity, _) in &existing { commands.entity(entity).despawn(); }
+            active.submission = None;
+            transition.source_submission = None;
+            transition.plan = None;
+            latest_ack.latest = Some(rejected_ack(submission, reason));
             return;
         }
     };
-    if &refreshed != submission.permit() {
-        latest_ack.latest = Some(rejected_ack(submission, AdapterError::PermitChangedAfterAuthorization));
-        return;
+
+    // Superseding an in-flight transition uses a hard cut. We deliberately
+    // avoid a three-scene overlap with ambiguous authority and blend weights.
+    let mut source_submission = active.submission.clone();
+    let mut source_group_id = active.group_id;
+    if transition.plan.is_some() {
+        for (entity, _) in &existing { commands.entity(entity).despawn(); }
+        source_submission = None;
+        transition.source_submission = None;
+        transition.plan = None;
+        active.submission = None;
     }
 
+    if let Some(source) = source_submission.as_ref() {
+        if recheck_live_submission(source, &clock, clock.is_changed(), policy).is_err() {
+            for (entity, group) in &existing {
+                if group.0 == source_group_id { commands.entity(entity).despawn(); }
+            }
+            source_submission = None;
+            active.submission = None;
+        }
+    }
+
+    let planned_transition = if let Some(source) = source_submission.as_ref() {
+        let source_descriptor = match SceneContinuityDescriptor::from_frame(source.frame()) {
+            Ok(value) => value,
+            Err(error) => {
+                for (entity, _) in &existing { commands.entity(entity).despawn(); }
+                active.submission = None;
+                transition.source_submission = None;
+                transition.plan = None;
+                latest_ack.latest = Some(rejected_ack(submission, AdapterError::ContinuityPlanRejected(error)));
+                return;
+            }
+        };
+        let target_descriptor = match SceneContinuityDescriptor::from_frame(submission.frame()) {
+            Ok(value) => value,
+            Err(error) => {
+                for (entity, _) in &existing { commands.entity(entity).despawn(); }
+                active.submission = None;
+                transition.source_submission = None;
+                transition.plan = None;
+                latest_ack.latest = Some(rejected_ack(submission, AdapterError::ContinuityPlanRejected(error)));
+                return;
+            }
+        };
+        let Some(clock_id) = clock.clock_domain_id() else {
+            latest_ack.latest = Some(rejected_ack(submission, AdapterError::ClockUnavailable));
+            return;
+        };
+        let Some(now) = clock.now_monotonic_ns() else {
+            latest_ack.latest = Some(rejected_ack(submission, AdapterError::ClockUnavailable));
+            return;
+        };
+        match plan_transition(
+            Some(&source_descriptor),
+            &target_descriptor,
+            TransitionPolicy::default(),
+            clock_id,
+            &now.to_string(),
+        ) {
+            Ok(plan) => Some(plan),
+            Err(error) => {
+                for (entity, _) in &existing { commands.entity(entity).despawn(); }
+                active.submission = None;
+                transition.source_submission = None;
+                transition.plan = None;
+                latest_ack.latest = Some(rejected_ack(submission, AdapterError::ContinuityPlanRejected(error)));
+                return;
+            }
+        }
+    } else {
+        None
+    };
+
+    let target_group_id = queue.revision();
+    let crossfade = planned_transition.as_ref().is_some_and(|plan| {
+        plan.duration_ns() > 0
+            && matches!(
+                plan.kind(),
+                TransitionKind::SameFormUpdate
+                    | TransitionKind::CrossFormSameCue
+                    | TransitionKind::CrossFormNewCue
+            )
+    });
+
+    if !crossfade {
+        for (entity, _) in &existing { commands.entity(entity).despawn(); }
+        transition.source_submission = None;
+        transition.plan = None;
+    }
+
+    let frame = submission.frame();
     let expires = frame.effective_permit_expires_at_monotonic_ns().to_owned();
     let clock_domain_id = frame.clock_domain_id().to_owned();
     commands.spawn((
         RenderedSceneEntity,
+        SceneGroupId(target_group_id),
         SceneFrameGuard {
             clock_domain_id: clock_domain_id.clone(),
             effective_expires_at_monotonic_ns: expires.clone(),
@@ -468,20 +582,28 @@ fn render_pending_scene(
         let base_scale = Vec3::splat(amplitude);
         let rotation = Quat::from_rotation_z(angle);
         let mesh = meshes.add(mesh_for_glyph(element.glyph));
-        let material = materials.add(ColorMaterial::from_color(color_for_role(element.role)));
+        let base_color = color_for_role(element.role);
+        let material = materials.add(ColorMaterial {
+            color: base_color,
+            alpha_mode: AlphaMode2d::Blend,
+            ..default()
+        });
         commands.spawn((
             Mesh2d(mesh),
-            MeshMaterial2d(material),
-            Transform {
-                translation: base_translation,
-                rotation,
-                scale: base_scale,
-            },
+            MeshMaterial2d(material.clone()),
+            Transform { translation: base_translation, rotation, scale: base_scale },
             if amplitude > 0.0 { Visibility::Visible } else { Visibility::Hidden },
             RenderedSceneEntity,
+            SceneGroupId(target_group_id),
             SceneFrameGuard {
                 clock_domain_id: clock_domain_id.clone(),
                 effective_expires_at_monotonic_ns: expires.clone(),
+            },
+            SceneMaterialFade {
+                group_id: target_group_id,
+                material,
+                base_color,
+                base_alpha: base_color.alpha(),
             },
             SceneElementPresentation {
                 role: element.role,
@@ -503,7 +625,61 @@ fn render_pending_scene(
         element_count: count,
         permit: Some(refreshed),
     });
+
     active.submission = Some(submission.clone());
+    active.group_id = target_group_id;
+    if crossfade {
+        transition.source_submission = source_submission;
+        transition.source_group_id = source_group_id;
+        transition.plan = planned_transition;
+    } else {
+        transition.source_submission = None;
+        transition.plan = None;
+    }
+}
+
+fn recheck_live_submission(
+    submission: &AuthorizedSceneSubmission,
+    clock: &SceneClock,
+    clock_fresh: bool,
+    policy: &PresentationPolicyState,
+) -> Result<PresentationPermit, AdapterError> {
+    let frame = submission.frame();
+    if !clock_fresh || !clock.permits_frame(frame) {
+        return Err(AdapterError::ClockUnavailable);
+    }
+    let Some(now) = clock.now_monotonic_ns() else { return Err(AdapterError::ClockUnavailable); };
+    let Some(clock_id) = clock.clock_domain_id() else { return Err(AdapterError::ClockUnavailable); };
+    let refreshed = policy.policy()
+        .recheck_permit(submission.permit(), &now.to_string(), clock_id)
+        .map_err(AdapterError::PolicyDenied)?;
+    if &refreshed != submission.permit() {
+        return Err(AdapterError::PermitChangedAfterAuthorization);
+    }
+    Ok(refreshed)
+}
+
+fn set_group_opacity(
+    group_id: u64,
+    opacity: f32,
+    materials: &mut Assets<ColorMaterial>,
+    fades: &Query<&SceneMaterialFade>,
+) {
+    let opacity = opacity.clamp(0.0, 1.0);
+    for fade in fades {
+        if fade.group_id == group_id {
+            if let Some(material) = materials.get_mut(&fade.material) {
+                material.alpha_mode = AlphaMode2d::Blend;
+                material.color = fade.base_color.with_alpha(
+                    transition_alpha(fade.base_alpha, opacity),
+                );
+            }
+        }
+    }
+}
+
+fn transition_alpha(base_alpha: f32, opacity: f32) -> f32 {
+    base_alpha.clamp(0.0, 1.0) * opacity.clamp(0.0, 1.0)
 }
 
 fn enforce_active_scene(
@@ -511,48 +687,90 @@ fn enforce_active_scene(
     clock: Res<SceneClock>,
     policy: Option<Res<PresentationPolicyState>>,
     mut active: ResMut<ActiveScene>,
-    rendered: Query<(Entity, &SceneFrameGuard), With<RenderedSceneEntity>>,
+    mut transition: ResMut<ActiveSceneTransition>,
+    rendered: Query<(Entity, &SceneGroupId), With<RenderedSceneEntity>>,
+    fades: Query<&SceneMaterialFade>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let Some(submission) = active.submission.as_ref() else { return; };
-    let frame = submission.frame();
+    let Some(target) = active.submission.clone() else { return; };
+    let source = transition.source_submission.clone();
+    let source_group_id = transition.source_group_id;
+    let target_group_id = active.group_id;
 
-    let Some(policy) = policy else {
-        for (entity, _) in &rendered {
-            commands.entity(entity).despawn();
+    let target_valid = policy.as_ref().is_some_and(|state| {
+        recheck_live_submission(&target, &clock, clock.is_changed(), state).is_ok()
+    });
+    let source_valid = source.as_ref().is_some_and(|source| {
+        policy.as_ref().is_some_and(|state| {
+            recheck_live_submission(source, &clock, clock.is_changed(), state).is_ok()
+        })
+    });
+
+    match (source.is_some(), target_valid, source_valid) {
+        (true, true, true) => {}
+        (true, true, false) => {
+            for (entity, group) in &rendered {
+                if group.0 == source_group_id { commands.entity(entity).despawn(); }
+            }
+            transition.source_submission = None;
+            transition.plan = None;
+            set_group_opacity(target_group_id, 1.0, &mut materials, &fades);
         }
-        active.submission = None;
-        return;
-    };
-
-    let valid_clock = clock.is_changed()
-        && clock.permits_frame(frame)
-        && clock.now_monotonic_ns().is_some_and(|now| {
-            rendered.iter().all(|(_, guard)| {
-                guard.clock_domain_id == frame.clock_domain_id()
-                    && guard.effective_expires_at_monotonic_ns
-                        .parse::<u64>()
-                        .is_ok_and(|expires| is_before_expiry(now, expires))
-            })
-        });
-    let policy_still_allows = match (clock.now_monotonic_ns(), clock.clock_domain_id()) {
-        (Some(now), Some(clock_id)) => policy.policy().recheck_permit(
-            submission.permit(),
-            &now.to_string(),
-            clock_id,
-        ).is_ok_and(|permit| &permit == submission.permit()),
-        _ => false,
-    };
-
-    if valid_clock && policy_still_allows {
-        return;
-    }
-
-    for (entity, guard) in &rendered {
-        if guard.clock_domain_id == frame.clock_domain_id() {
-            commands.entity(entity).despawn();
+        (true, false, true) => {
+            for (entity, group) in &rendered {
+                if group.0 == target_group_id { commands.entity(entity).despawn(); }
+            }
+            active.submission = source;
+            active.group_id = source_group_id;
+            transition.source_submission = None;
+            transition.plan = None;
+            set_group_opacity(source_group_id, 1.0, &mut materials, &fades);
+        }
+        (true, false, false) => {
+            for (entity, group) in &rendered {
+                if group.0 == source_group_id || group.0 == target_group_id {
+                    commands.entity(entity).despawn();
+                }
+            }
+            active.submission = None;
+            transition.source_submission = None;
+            transition.plan = None;
+        }
+        (false, true, _) => {}
+        (false, false, _) => {
+            for (entity, group) in &rendered {
+                if group.0 == target_group_id { commands.entity(entity).despawn(); }
+            }
+            active.submission = None;
         }
     }
-    active.submission = None;
+}
+
+fn apply_transition_weights(
+    mut commands: Commands,
+    clock: Res<SceneClock>,
+    active: Res<ActiveScene>,
+    mut transition: ResMut<ActiveSceneTransition>,
+    rendered: Query<(Entity, &SceneGroupId), With<RenderedSceneEntity>>,
+    fades: Query<&SceneMaterialFade>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    let Some(plan) = transition.plan.clone() else { return; };
+    let Some(clock_id) = clock.clock_domain_id() else { return; };
+    let Some(now) = clock.now_monotonic_ns() else { return; };
+    let Ok(weights) = plan.weights_at(clock_id, now) else { return; };
+
+    set_group_opacity(transition.source_group_id, weights.source_opacity, &mut materials, &fades);
+    set_group_opacity(active.group_id, weights.target_opacity, &mut materials, &fades);
+
+    if weights.progress >= 1.0 {
+        for (entity, group) in &rendered {
+            if group.0 == transition.source_group_id { commands.entity(entity).despawn(); }
+        }
+        transition.source_submission = None;
+        transition.plan = None;
+        set_group_opacity(active.group_id, 1.0, &mut materials, &fades);
+    }
 }
 
 fn animate_scene_elements(
@@ -712,5 +930,22 @@ mod tests {
         assert_eq!(clock.clock_domain_id(), Some("clock:scene-1"));
         assert_eq!(clock.now_monotonic_ns(), Some(100));
         assert!(!clock.permits_frame_clock_id("clock:other"));
+    }
+
+    #[test]
+    fn transition_alpha_is_multiplicative_and_never_exceeds_base_alpha() {
+        for base in [0.0, 0.2, 0.5, 1.0] {
+            for opacity in [0.0, 0.1, 0.5, 1.0] {
+                let alpha = transition_alpha(base, opacity);
+                assert!(alpha >= 0.0 && alpha <= base);
+            }
+        }
+    }
+
+    #[test]
+    fn transition_alpha_clamps_both_inputs() {
+        assert_eq!(transition_alpha(0.8, -1.0), 0.0);
+        assert_eq!(transition_alpha(0.8, 2.0), 0.8);
+        assert_eq!(transition_alpha(2.0, 0.5), 0.5);
     }
 }
