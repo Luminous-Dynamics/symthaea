@@ -24,7 +24,7 @@ schema_state AS (
     WHERE n.nspname = 'public'
       AND c.relname IN ('ledger', 'sequence_probe', 'ledger_partitioned',
                         'ledger_partitioned_2026', 'ledger_partitioned_default',
-                        'volatile_cache', 'large_object_ref')
+                        'volatile_cache', 'large_object_ref', 'ledger_summary')
 ),
 sequence_state AS (
     SELECT jsonb_build_object('last_value', last_value, 'is_called', is_called) AS state
@@ -41,6 +41,33 @@ materialized_state AS (
         'hex'
     ) AS digest
     FROM public.ledger_summary AS m
+),
+partition_rows_state AS (
+    SELECT encode(
+        digest(convert_to(coalesce(string_agg(to_jsonb(p)::text, E'\\n' ORDER BY occurred_on, id), ''), 'UTF8'), 'sha256'),
+        'hex'
+    ) AS digest
+    FROM public.ledger_partitioned AS p
+),
+unlogged_state AS (
+    SELECT encode(
+        digest(convert_to(coalesce(string_agg(to_jsonb(u)::text, E'\\n' ORDER BY cache_key), ''), 'UTF8'), 'sha256'),
+        'hex'
+    ) AS digest
+    FROM public.volatile_cache AS u
+),
+role_state AS (
+    SELECT coalesce(jsonb_agg(jsonb_build_object(
+        'role', r.rolname,
+        'superuser', r.rolsuper,
+        'inherit', r.rolinherit,
+        'create_role', r.rolcreaterole,
+        'create_db', r.rolcreatedb,
+        'replication', r.rolreplication,
+        'login', r.rolcanlogin
+    ) ORDER BY r.rolname), '[]'::jsonb) AS state
+    FROM pg_roles AS r
+    WHERE r.rolname IN ('mon025', 'mon025_auditor')
 ),
 partition_state AS (
     SELECT coalesce(jsonb_agg(jsonb_build_object(
@@ -70,6 +97,8 @@ SELECT jsonb_build_object(
     'large_object_digest', (SELECT digest FROM large_object_state),
     'materialized_view_digest', (SELECT digest FROM materialized_state),
     'partition_state', (SELECT state FROM partition_state),
-    'acl_state', (SELECT state FROM acl_state),
-    'unlogged_row_count', (SELECT count(*) FROM public.volatile_cache)
+    'partition_rows_digest', (SELECT digest FROM partition_rows_state),
+    'unlogged_digest', (SELECT digest FROM unlogged_state),
+    'role_state', (SELECT state FROM role_state),
+    'acl_state', (SELECT state FROM acl_state)
 )::text;
