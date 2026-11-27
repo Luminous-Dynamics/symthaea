@@ -108,9 +108,20 @@ Use the existing Futures Laboratory substrate and its current forecast evidence 
 - Verify capsule byte digests and receipt/manifest/world-ID linkage after disk readback.
 - Never pass the current combined serialized-world object or evaluator root into a candidate process.
 
-Ten worlds are a pipeline pilot, not a confirmatory scientific benchmark.
+Ten worlds are a custody/schema plumbing pilot only, not a test of adaptive research decisions or a confirmatory scientific benchmark. The evolutionary-rescue fixture is a passive recorded forecast world; it does not expose a sufficiently rich, independently observed set of alternative experimental branches. Do not use its ten seeds to claim off-policy decision quality, counterfactual discovery or research-taste superiority.
 
-Example commands (replace paths and source SHA with the actual campaign values):
+### Active research-decision experiment — use the existing AS-Bench adapter
+
+The actual decision-policy comparison should run through #11012 and #10921, reusing [PR #10947](https://github.com/Luminous-Dynamics/symthaea/pull/10947)'s pinned Lab API v1 compatibility contract rather than creating another client or evaluator.
+
+- **Nuclease replay:** four rounds of 96 chosen designs from a 20,000-design pool. It supplies multi-round experiment selection and observed replay outcomes. Discovery and held-out NDCG@100 learning gates remain separate.
+- **Propylene digital twin:** three rounds of 20 designs from a 736-design pool. It tests asynchronous/twin compatibility and adaptive design ranking. Preserve the 96 published measurements versus 884 surrogate outputs; do not describe twin results as live measurements.
+
+Use fixed script, fixed sequential/best-of-N, static threshold, state-contingent adaptive and matched-cost random-branch controllers from #11012. Keep model, available roles, coder, API/tools, context and total cost fixed; only the orchestration policy changes. Apply the decision episode to each actual batch submission, binding the research-state/evidence prefix, selected-design payload digest, predictions, resource estimate, next-action rule and actual lab job/result identity. Keep the benchmark-owned discovery and learning gates intact.
+
+The pinned compatibility adapter currently has 38 authored tests and recorded exact-head isolated workflow evidence on its stated head, but it has not executed a campaign or reached the upstream verifier. The next evidence level is an offline fixture/decision-trace bridge, followed by a replay campaign—not a claim based on schema conformance.
+
+Example capsule commands (replace paths and source SHA with actual campaign values):
 
 ```sh
 cargo run --release --example evolutionary_rescue_generate_worlds -p symthaea-futures-ensemble
@@ -119,9 +130,9 @@ cargo run --release --example evolutionary_rescue_split_capsules -p symthaea-fut
 
 The materializer creates both roots if absent, rejects equal/nested roots, refuses to overwrite existing files, writes the manifest last, and reads all four output artifacts back before accepting the pair. It does not set filesystem ACLs, create separate OS identities or launch the candidate/evaluator processes. Those are required deployment controls, not provided by this fixture utility.
 
-### Pilot 1 — compare decision policies
+### Pilot 1 — compare decision policies on AS-Bench
 
-Freeze task generator, simulator, executor, evaluator and per-treatment resource ceiling. Branch policies from the same decision histories.
+Use the Nuclease replay campaign as the first active choice environment; add the Propylene twin only as a separate backend/generalization lane. Freeze task generator, campaign version, executor, evaluator, role/tool/model set and per-treatment resource ceiling. Branch policies from the same initial evidence and task instance.
 
 | Arm | Replay signal | Question |
 |---|---|---|
@@ -135,11 +146,15 @@ Freeze task generator, simulator, executor, evaluator and per-treatment resource
 
 Use the same fixed executor/coder in the primary decision-policy comparison. Add an end-to-end interaction lane after the isolated researcher effect is measured.
 
-### Pilot 2 — live replay-fidelity audit
+### Pilot 2 — replay-to-live / replay-to-twin evidence audit
+
+Compare predicted action/policy rankings with actual selected-action outcomes only on supported task states. Mark unobserved branches unsupported. Distinguish replay-table outcomes, surrogate twin outputs and actual physical measurements as different evidence classes.
+
+### Pilot 3 — live replay-fidelity and decision audit
 
 Preregister a sample of candidate policy decisions for live execution. Estimate replay-vs-live ranking agreement and top-k recall; report selection regret and policy coverage; stratify by task family and support; retain not-run, failed, censored and indeterminate outcomes. Do not promote from replay-only evidence.
 
-### Pilot 3 — matched-start R4
+### Pilot 4 — matched-start R4
 
 Use #10497 and its existing owners. Earlier and successor meta-improvers must start from the same inner agent, repository, task state, verified memory, harness, model/backend and evaluator epoch. Match realized total cost, not allocated budget. Include outer-proposer inference, inner inference, tools, failed proposals, replay generation, builds, execution, evaluator, monitoring, human review and independent confirmation.
 
