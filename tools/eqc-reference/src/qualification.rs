@@ -308,7 +308,8 @@ pub fn qualify_observation(
         reasons.push("required provenance identity or digest is missing/invalid".to_owned());
     }
     if !replay_claim_consistency {
-        reasons.push("adapter-declared replay failed or its result digest did not match".to_owned());
+        reasons
+            .push("adapter-declared replay failed or its result digest did not match".to_owned());
     }
     if !failure_containment {
         reasons.push("observed state mutations violate the task's containment contract".to_owned());
@@ -426,10 +427,9 @@ mod tests {
             .canonicalize()
             .expect("repository root resolves");
         let schema_path = root.join("docs/research/eqc-system-observation-v0.1.schema.json");
-        let schema: Value = serde_json::from_slice(
-            &std::fs::read(schema_path).expect("read observation schema"),
-        )
-        .expect("observation schema parses");
+        let schema: Value =
+            serde_json::from_slice(&std::fs::read(schema_path).expect("read observation schema"))
+                .expect("observation schema parses");
         let validator = jsonschema::options()
             .offline()
             .should_validate_formats(true)
