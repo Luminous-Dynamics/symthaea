@@ -15,6 +15,8 @@ CMAQ-035 established an internal comparison between fixed and ONS betting. CMAQ-
 | PRM-fixed-4 | Fixed two-sided four-component order / dispersion portfolio | Fixed-bet baseline |
 | PRM-positive-only | Fixed positive Order and Dispersion bets | Directional ablation |
 | PRM-spectrum | CMAQ-038 fixed-bet multi-resolution Haar contrasts over the complete finite rank grid | CMAQ exploratory extension; not part of the published PRM reproduction |
+| PF-CCTM | Liu, Prinster & Orabona (2026), restarting universal portfolio for fixed-reference CCTM | New published late-shift baseline; must reproduce from the paper/reference implementation |
+| PRM-restart-spectrum | CMAQ-040: Haar rank-spectrum features × heavy-tailed restart-time mixture × fixed betting-rate grid | CMAQ exploratory compositional extension; not the PF-CCTM algorithm |
 | CS-risk | Anytime confidence-sequence monitor of a matched running/rolling average risk | Complementary estimand, not a like-for-like per-instance drift detector |
 
 Do not implement CCTM by multiplying repeated marginal conformal p-values or by using a rolling empirical breach rate. Implement its actual conditional calibration and martingale construction from the reference paper/code.
@@ -63,11 +65,12 @@ Any serially dependent cell must be labelled assumption-violating for PRM unless
 2. Recover published simulator equations, parameter settings, seeds and CCTM setup; record any missing information explicitly.
 3. Implement CCTM faithfully and write fixed example vectors against the paper/reference code.
 4. Reproduce the paper's headline curves before adding CMAQ-specific shifts.
-5. Use a shared immutable calibration reference and common-random-number deployment streams for all PRM/CCTM arms.
-6. Randomize ties using the same valid mechanism for calibration and deployment; simulation RNG remains clearly non-cryptographic.
-7. Pre-register all cell combinations, replication counts, quantiles and exclusions.
-8. Store per-replication alarm times / no-alarm indicators plus seed, configuration and source hashes. Aggregate CSVs alone are insufficient.
-9. Publish code, artifact hashes, confidence intervals and the full run command.
+5. Reproduce the PF-CCTM restarting universal portfolio separately from the published equations, including its three-asset wealth process, Dirichlet(1/2,1/2,1/2) universal portfolio, heavy-tailed start weights, and finite-reference confidence band. Do not label a simpler restart mixture as PF-CCTM.
+6. Use a shared immutable calibration reference and common-random-number deployment streams for all PRM/CCTM arms.
+7. Randomize ties using the same valid mechanism for calibration and deployment; simulation RNG remains clearly non-cryptographic.
+8. Pre-register all cell combinations, replication counts, quantiles and exclusions.
+9. Store per-replication alarm times / no-alarm indicators plus seed, configuration and source hashes. Aggregate CSVs alone are insufficient.
+10. Publish code, artifact hashes, confidence intervals and the full run command.
 
 ## CCTM reproduction details that must be frozen
 
@@ -108,6 +111,18 @@ CMAQ-038 adds a pre-registered dyadic Haar rank-spectrum mixture with 2n directi
 
 The additional feature bank can increase sensitivity to shape changes but distributes the e-process mixture mass over more components. It must therefore be assessed on the full null-alarm / detection-power / delay / runtime frontier; higher feature count is not itself evidence of improvement.
 
+## Late-shift baseline added after the original matrix freeze
+
+The 12 October 2026 paper by Liu, Prinster & Orabona, *Monitoring for Shifts at Unknown Times: Parameter-Free Conditional Conformal Martingales* (arXiv:2610.17343), is a direct and material comparator. It reframes the CCTM betting problem as a three-asset portfolio, then mixes restarted universal portfolios over every possible start time using
+
+\[\pi_s=\ln 2\left(\frac{1}{\ln(s+1)}-\frac{1}{\ln(s+2)}\right),\qquad r_t=\frac{\ln 2}{\ln(t+2)}.\]
+
+The paper proves anytime false-alarm control for its CCTM construction and gives a logarithmic-in-shift-time restart cost; it also reports substantially flatter delay across late shifts than the ONS CCTM baseline. Reproduce the paper's own method and assumptions before comparing it to PRM. In particular, its fixed-reference DKW correction and calibration-conditional validity statement are not interchangeable with the PRM's exact predictive-rank martingale and marginal anytime guarantee.
+
+CMAQ-040 is a separate composition experiment: it applies a heavy-tailed mixture over possible restart times to fixed-bet predictive-rank Haar components, with a finite pre-registered betting-rate grid. Each feature/rate/direction account is itself a predictive-rank e-process; the restart mixture is a normalized mixture of those processes. This is not a reproduction of the paper's Dirichlet universal portfolio, does not inherit its optimality theorem, and should not be called parameter-free. Its purpose is to test whether feature-space coverage and late-onset adaptation compose effectively under the exact PRM null.
+
+The late-shift matrix must include shift times 0, 100, 500, 2,000 and 8,000, and report delay from the true shift time—not from stream start. Report null wealth and false alarms over the *entire* deployment horizon, not just post-change windows. Use a long null prelude to detect performance degradation that short-horizon synthetic tests cannot expose.
+
 ## Current internal CMAQ-035 result is not SOTA evidence
 
 At n=99, alpha=0.05 and horizon 500, an internal 10,000-replication experiment found:
@@ -121,6 +136,7 @@ This is enough to motivate broader replication, not enough to claim reproduction
 ## Prior art
 
 - Kuang & Xia (2026), *Anytime-Valid Distribution Shift Detection via Predictive Rank Martingales* — predictive rank law, order/dispersion features, ONS betting and CCTM comparisons.
+- Liu, Prinster & Orabona (2026), *Monitoring for Shifts at Unknown Times: Parameter-Free Conditional Conformal Martingales* — three-asset portfolio formulation, restarting universal portfolio, heavy-tailed start-time allocation and logarithmic shift-time regret.
 - Fang (2026), *Anytime Valid Conformal Prediction on Streaming Time Series* — confidence sequences for running / rolling average miscoverage; complementary target.
 - WATCH (ICML 2025) — weighted conformal test martingales for covariate / concept shift diagnosis.
 - Timans et al. (UAI 2025) — continuous monitoring of bounded risk violations under unknown shift with testing-by-betting.
