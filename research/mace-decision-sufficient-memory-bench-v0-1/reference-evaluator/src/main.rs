@@ -111,7 +111,6 @@ struct Response {
     action: String,
     selected_evidence_ids: Vec<String>,
     observation_requests: usize,
-    observation_cost_units: f64,
     cost: Cost,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -156,6 +155,7 @@ struct ScoreRow {
     decision_sufficient: bool,
     attack_case: bool,
     observation_requests: usize,
+    observation_cost_units: f64,
     cost: Cost,
 }
 
