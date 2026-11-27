@@ -163,7 +163,7 @@ where
         self.rights_verifier.verify_current_use(
             &exposure.evidence_id,
             &receipt.payload_sha256,
-            &receipt.source_root_digest.to_hex(),
+            &hex_lower(receipt.source_root_digest.as_bytes()),
             &exposure.admissibility_receipt_sha256,
             &expected.use_purpose_code,
             expected.use_scope,
