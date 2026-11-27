@@ -222,12 +222,14 @@ pub fn run_scenario(
         if let Some(delay) = ons_delay {
             ons.alarm_delays.push(delay);
         }
-        match (fixed_delay, ons_delay) {
-            (Some(fixed), Some(adaptive)) if adaptive < fixed => ons_wins += 1,
-            (Some(fixed), Some(adaptive)) if fixed < adaptive => fixed_bet_wins += 1,
-            (Some(_), None) => fixed_bet_wins += 1,
-            (None, Some(_)) => ons_wins += 1,
-            _ => paired_ties += 1,
+        if scenario != Scenario::Null {
+            match (fixed_delay, ons_delay) {
+                (Some(fixed), Some(adaptive)) if adaptive < fixed => ons_wins += 1,
+                (Some(fixed), Some(adaptive)) if fixed < adaptive => fixed_bet_wins += 1,
+                (Some(_), None) => fixed_bet_wins += 1,
+                (None, Some(_)) => ons_wins += 1,
+                _ => paired_ties += 1,
+            }
         }
     }
 
@@ -439,13 +441,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for row in result.csv_rows() {
             println!("{row}");
         }
-        println!(
-            "#paired,{},ons_wins={},fixed_wins={},ties={}",
-            result.scenario.as_str(),
-            result.ons_wins,
-            result.fixed_bet_wins,
-            result.paired_ties
-        );
+        if result.scenario == Scenario::Null {
+            println!("#paired,null,comparison=not_applicable");
+        } else {
+            println!(
+                "#paired,{},ons_wins={},fixed_wins={},ties={}",
+                result.scenario.as_str(),
+                result.ons_wins,
+                result.fixed_bet_wins,
+                result.paired_ties
+            );
+        }
     }
     eprintln!(
         "SIMULATION ONLY: replications={} horizon={} seed={} calibration_n={} alpha={}/{} rng=SplitMix64(non-cryptographic)",
