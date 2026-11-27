@@ -510,12 +510,18 @@ fn flip_factor_compatible(task: MusicListenTaskV1, factor: MusicListenFlipFactor
     )
 }
 
-fn score_variant(variant: &MusicListenVariantV1) -> ScoredVariantV1 {
-    let predicted = match variant.model_answer {
+pub(crate) fn decode_semantic_relation(
+    variant: &MusicListenVariantV1,
+) -> Option<MusicalRelationV1> {
+    match variant.model_answer {
         MusicListenAnswerV1::ChoiceA => Some(variant.option_a_relation),
         MusicListenAnswerV1::ChoiceB => Some(variant.option_b_relation),
         MusicListenAnswerV1::Unparseable | MusicListenAnswerV1::Abstain => None,
-    };
+    }
+}
+
+fn score_variant(variant: &MusicListenVariantV1) -> ScoredVariantV1 {
+    let predicted = decode_semantic_relation(variant);
     ScoredVariantV1 {
         predicted,
         correct: predicted == Some(variant.expected_relation),
@@ -609,7 +615,7 @@ fn rate(numerator: usize, denominator: usize) -> Option<f64> {
     (denominator > 0).then(|| numerator as f64 / denominator as f64)
 }
 
-fn validate_digest(value: &str, label: &str) -> Result<(), String> {
+pub(crate) fn validate_digest(value: &str, label: &str) -> Result<(), String> {
     if value.len() != 64
         || !value
             .bytes()
@@ -627,7 +633,7 @@ fn require_text(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     let mut output = String::with_capacity(64);
     for byte in digest {
