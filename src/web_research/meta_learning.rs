@@ -349,7 +349,10 @@ impl EpistemicLearner {
             return 0.5;
         }
 
-        let correct = adjudicated.iter().filter(|was_correct| **was_correct).count();
+        let correct = adjudicated
+            .iter()
+            .filter(|was_correct| **was_correct)
+            .count();
         correct as f32 / adjudicated.len() as f32
     }
 
@@ -545,7 +548,25 @@ mod tests {
             "unadjudicated predictions must not train domain expertise"
         );
         assert!(
-            learner.get_source_credibility("self-referential.example").is_none(),
+            learner
+                .get_source_credibility("self-referential.example")
+                .is_none(),
+            "unadjudicated predictions must not train source credibility"
+        );
+    }
+        assert_eq!(stats.accuracy, 0.5);
+        assert_eq!(stats.source_count, 0);
+        assert_eq!(stats.domain_count, 0);
+        assert!(!learner.is_ready());
+        assert_eq!(
+            learner.get_domain_expertise("science"),
+            0.5,
+            "unadjudicated predictions must not train domain expertise"
+        );
+        assert!(
+            learner
+                .get_source_credibility("self-referential.example")
+                .is_none(),
             "unadjudicated predictions must not train source credibility"
         );
     }
@@ -599,7 +620,9 @@ mod tests {
         assert!(learner.is_ready());
         assert_eq!(stats.accuracy, 0.5);
         assert!(
-            learner.get_source_credibility("adjudicated.example").is_some(),
+            learner
+                .get_source_credibility("adjudicated.example")
+                .is_some(),
             "pending records must not evict the measured source calibration"
         );
     }
