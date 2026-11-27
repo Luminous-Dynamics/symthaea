@@ -1,0 +1,13 @@
+[package]
+name = "cmaq-032-recoverability-monitor-bridge"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Typed evidence handoff from recovery-margin calibration to anytime monitoring"
+
+[dependencies]
+cmaq-030-recoverability-margin = { path = "../cmaq-030" }
+cmaq-031-anytime-calibration-monitor = { path = "../cmaq-031" }
+
+[workspace]
