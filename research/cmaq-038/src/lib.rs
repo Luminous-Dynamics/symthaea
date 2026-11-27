@@ -275,11 +275,33 @@ impl RankSpectrumMonitor {
             .checked_add(1)
             .ok_or(SpectrumError::CounterOverflow)?;
 
+        // One prefix scan per observation makes evaluation O(m log m) rather
+        // than rescanning all m buckets for each of O(m) Haar contrasts.
+        let mut weighted_prefix = Vec::with_capacity(self.rank_counts.len() + 1);
+        weighted_prefix.push(0i128);
+        for count in &self.rank_counts {
+            let weight = i128::from(*count)
+                .checked_add(1)
+                .ok_or(SpectrumError::ArithmeticOverflow)?;
+            let next = weighted_prefix
+                .last()
+                .copied()
+                .ok_or(SpectrumError::ArithmeticOverflow)?
+                .checked_add(weight)
+                .ok_or(SpectrumError::ArithmeticOverflow)?;
+            weighted_prefix.push(next);
+        }
+
         let mut next_log_wealths = Vec::with_capacity(self.components.len());
         let mut next_payoffs = Vec::with_capacity(self.components.len());
 
         for component in &self.components {
-            let base_payoff = self.centered_payoff(&component.contrast, rank_one_based, next_seen)?;
+            let base_payoff = self.centered_payoff_from_prefix(
+                &component.contrast,
+                rank_one_based,
+                next_seen,
+                &weighted_prefix,
+            )?;
             let payoff = base_payoff * component.direction.sign() as f64;
             if !payoff.is_finite() || !(-1.0 - 1e-12..=1.0 + 1e-12).contains(&payoff) {
                 return Err(SpectrumError::InvalidPredictivePayoff);
@@ -342,27 +364,56 @@ impl RankSpectrumMonitor {
         rank_one_based: usize,
         observation_index_one_based: u64,
     ) -> Result<f64, SpectrumError> {
+        let mut weighted_prefix = Vec::with_capacity(self.rank_counts.len() + 1);
+        weighted_prefix.push(0i128);
+        for count in &self.rank_counts {
+            let weight = i128::from(*count)
+                .checked_add(1)
+                .ok_or(SpectrumError::ArithmeticOverflow)?;
+            let next = weighted_prefix
+                .last()
+                .copied()
+                .ok_or(SpectrumError::ArithmeticOverflow)?
+                .checked_add(weight)
+                .ok_or(SpectrumError::ArithmeticOverflow)?;
+            weighted_prefix.push(next);
+        }
+        self.centered_payoff_from_prefix(
+            contrast,
+            rank_one_based,
+            observation_index_one_based,
+            &weighted_prefix,
+        )
+    }
+
+    fn centered_payoff_from_prefix(
+        &self,
+        contrast: &HaarContrast,
+        rank_one_based: usize,
+        observation_index_one_based: u64,
+        weighted_prefix: &[i128],
+    ) -> Result<f64, SpectrumError> {
+        if weighted_prefix.len() != self.rank_counts.len() + 1 {
+            return Err(SpectrumError::InvalidPredictivePayoff);
+        }
         let total = (self.calibration_count as u128)
             .checked_add(u128::from(observation_index_one_based))
             .ok_or(SpectrumError::ArithmeticOverflow)?;
         let total_i128 = i128::try_from(total).map_err(|_| SpectrumError::ArithmeticOverflow)?;
 
-        // Haar values are code/2 with code in {-1, 0, +1}. Integer arithmetic
-        // keeps the predictive centering exact until the final f64 conversion.
-        let mut weighted_code_sum = 0i128;
-        for (bucket, count) in self.rank_counts.iter().enumerate() {
-            let weight = u128::from(*count)
-                .checked_add(1)
-                .ok_or(SpectrumError::ArithmeticOverflow)?;
-            let weight = i128::try_from(weight).map_err(|_| SpectrumError::ArithmeticOverflow)?;
-            let term = weight
-                .checked_mul(contrast.code_for_bucket(bucket))
-                .ok_or(SpectrumError::ArithmeticOverflow)?;
-            weighted_code_sum = weighted_code_sum
-                .checked_add(term)
-                .ok_or(SpectrumError::ArithmeticOverflow)?;
-        }
+        // The Haar code is +1 on [start, midpoint), -1 on [midpoint, end),
+        // and zero elsewhere. Prefix sums produce its predictable mean in O(1).
+        let positive_mass = weighted_prefix[contrast.midpoint]
+            .checked_sub(weighted_prefix[contrast.start])
+            .ok_or(SpectrumError::ArithmeticOverflow)?;
+        let negative_mass = weighted_prefix[contrast.end]
+            .checked_sub(weighted_prefix[contrast.midpoint])
+            .ok_or(SpectrumError::ArithmeticOverflow)?;
+        let weighted_code_sum = positive_mass
+            .checked_sub(negative_mass)
+            .ok_or(SpectrumError::ArithmeticOverflow)?;
 
+        // Haar values are code/2. Keep predictive centering exact until f64.
         let observed_code = contrast.code_for_rank(rank_one_based);
         let observed_term = observed_code
             .checked_mul(total_i128)
@@ -445,6 +496,25 @@ impl RankSpectrumMonitor {
             .iter()
             .map(|component| component.log_weight.exp())
             .sum()
+    }
+
+    /// Number of positive-direction Haar contrasts at each active resolution.
+    pub fn contrast_counts_by_resolution(&self) -> Vec<usize> {
+        let mut counts = vec![0usize; self.resolution_levels];
+        for component in &self.components {
+            if component.direction == Direction::Positive {
+                counts[component.contrast.resolution_level] += 1;
+            }
+        }
+        counts
+    }
+
+    /// Diagnostic snapshot of the last centered payoff for every directional component.
+    pub fn last_centered_payoffs(&self) -> Vec<f64> {
+        self.components
+            .iter()
+            .map(|component| component.last_centered_payoff)
+            .collect()
     }
 
     #[cfg(test)]
