@@ -250,3 +250,56 @@ Do not infer a passing build or benchmark from an authored test, queued CI run, 
 ## 9. Current status
 
 No Symthaea embodiment benchmark scores are claimed by this plan. No renderer implementation, VideoFDB run, user study, or hardware qualification is included in this documentation-only proposal. The immediate implementation task is the typed event contract and deterministic replay harness.
+
+
+## 10. Competitive snapshot refresh — VideoFDB v1.4 (2026-11-25)
+
+The current official leaderboard lists 13 full-duplex systems and 10 cascaded systems in the architecture filters. Results must be compared within the relevant architecture and modality, not by sorting a single overall column.
+
+### Perception
+
+| Entry | Architecture | Overall | TOR alignment / median latency |
+|---|---|---:|---:|
+| Anam Cara-5 Preview | Cascaded, closed, AV2AV | 3.87/5 | 87.88% / 920 ms |
+| Tavus Griffin Lite | Full-duplex, closed, AV2AV | 3.85/5 | 90.63% / 200 ms |
+| MAUI + MiniCPM-o 4.5 | Full-duplex, closed, AV2A | 3.83/5 | 83.58% / 760 ms |
+| Atmanity Causeur | Full-duplex, closed, AV2A | 3.82/5 | 88.06% / 1,400 ms |
+| MiniCPM-o 4.5 | Full-duplex, open, AV2A | 3.40/5 | 73% / 720 ms |
+
+### Generation
+
+| Entry | Architecture | Overall | TOR alignment / median latency |
+|---|---|---:|---:|
+| Anam Cara-5 Preview | Cascaded, closed, AV2AV | 4.44/5 | 80.00% / 920 ms |
+| Tavus Griffin Lite | Full-duplex, closed, AV2AV | 4.20/5 | 48.78% / 1,200 ms |
+| Atmanity Causeur + Atmee v2 | Cascaded, closed, AV2AV | 4.16/5 | 62.75% / 1,200 ms |
+
+Leaderboard timing is task-specific TOR alignment and median latency, not an end-to-end application latency guarantee. The top perception aggregate and the strongest full-duplex timing result belong to different entries. The highest generation aggregate is from a cascaded entry; it must not be presented as evidence that cascaded systems solve full-duplex nonverbal behavior.
+
+VideoFDB reports 237 dyadic clips across 11 nonverbal conversational dynamics and separates perception from generation. Its project report also identifies the risk of low-rate frame sampling missing fast events, while raising the sampling rate globally can overload cross-modal attention. These observations motivate the event-triggered temporal-attention proposal; they do not prove that the proposed policy will outperform uniform sampling.
+
+Official snapshot:
+- https://research.nvidia.com/labs/amri/projects/video-fdb/leaderboard.html
+- https://research.nvidia.com/labs/amri/projects/video-fdb/
+- https://arxiv.org/abs/2605.30256
+
+### Consequence for our target
+
+Do not set "beat 3.87/4.44" as one undifferentiated goal. Report at least:
+- matched full-duplex AV2AV perception and generation;
+- matched AV2A perception;
+- perception and generation separately;
+- TOR alignment and latency separately;
+- per-dynamic scores and sample counts;
+- open/closed, full-duplex/cascaded, and model/provider status.
+
+Our competitive objective is a Pareto improvement across task quality, timing, cross-form consistency, privacy, accessibility, and local compute—not a single aggregate score.
+
+## 11. New benchmark track — event-triggered temporal attention
+
+The VideoFDB sampling findings motivate a new track described in
+`SYMTHAEA_DYNAMIC_TEMPORAL_ATTENTION_V0_1_2026-11-27.md`.
+
+Compare fixed 1, 2 and 4 FPS with a bounded event-triggered 0.5–4 FPS policy and an oracle upper bound, all matched by average frame count, pixel count, and compute budget. Report per-dynamic recall, event detection delay, false triggers/minute, TOR alignment, latency, compute, energy, and privacy behavior.
+
+This is a research hypothesis. The trigger, sampler, dataset run, and any superiority claim are not implemented or measured yet.
