@@ -1,7 +1,7 @@
 version = 4
 
 [[package]]
-name = "cmaq-028-recovery-option-portfolio"
+name = "cmaq-028-recovery-portfolio"
 version = "0.1.0"
 
 [[package]]
@@ -12,6 +12,6 @@ version = "0.1.0"
 name = "cmaq-034-quarantine-recovery-handoff"
 version = "0.1.0"
 dependencies = [
- "cmaq-028-recovery-option-portfolio",
+ "cmaq-028-recovery-portfolio",
  "cmaq-031-anytime-calibration-monitor",
 ]
