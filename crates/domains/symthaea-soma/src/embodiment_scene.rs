@@ -86,7 +86,6 @@ pub struct EmbodimentSceneFrame {
     pub epistemic_status: EpistemicStatus,
     pub privacy_class: PrivacyClass,
     pub source: EventSource,
-    pub evidence_refs: Vec<String>,
     pub observed_at_monotonic_ns: String,
     pub expires_at_monotonic_ns: String,
     /// Privacy-aware, non-colour-only textual equivalent of the essential cue.
@@ -255,7 +254,6 @@ pub fn compile_scene(
         epistemic_status: cue.epistemic_status,
         privacy_class: cue.privacy_class,
         source: cue.source.clone(),
-        evidence_refs: cue.evidence_refs.clone(),
         observed_at_monotonic_ns: cue.observed_at_monotonic_ns.clone(),
         expires_at_monotonic_ns: cue.expires_at_monotonic_ns.clone(),
         accessible_description: cue.accessible_description(),
@@ -333,7 +331,6 @@ mod tests {
             expires_at_monotonic_ns: "900".to_owned(),
             epistemic_status: EpistemicStatus::Measured,
             confidence: None,
-            evidence_refs: vec!["evidence:trace-1".to_owned()],
             privacy_class: privacy,
         };
         let mut policy = PresentationPolicy::new(SESSION, CLOCK).unwrap();
