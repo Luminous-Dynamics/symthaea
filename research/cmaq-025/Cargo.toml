@@ -1,0 +1,9 @@
+[package]
+name = "cmaq-025-identifiability"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Finite evaluator for intervention-response identifiability under observational aliasing"
+
+[workspace]
