@@ -493,8 +493,8 @@ fn bootstrap_interval(
         )?);
     }
     means.sort_unstable();
-    let low = percentile_nearest_rank(&means, 2, 100)?;
-    let high = percentile_nearest_rank(&means, 98, 100)?;
+    let low = percentile_nearest_rank(&means, 25, 1_000)?;
+    let high = percentile_nearest_rank(&means, 975, 1_000)?;
     Ok((low, high))
 }
 
@@ -711,6 +711,13 @@ mod tests {
         assert_eq!(report.paired.candidate_wins, 3);
         assert_eq!(report.paired.candidate_losses, 0);
         assert!(report.paired.bootstrap_95_high_us.unwrap() < 0);
+    }
+
+    #[test]
+    fn percentile_endpoints_use_nearest_rank_2_5_and_97_5_percent() {
+        let sorted = (1..=40).collect::<Vec<i64>>();
+        assert_eq!(percentile_nearest_rank(&sorted, 25, 1_000), Ok(1));
+        assert_eq!(percentile_nearest_rank(&sorted, 975, 1_000), Ok(39));
     }
 
     #[test]
