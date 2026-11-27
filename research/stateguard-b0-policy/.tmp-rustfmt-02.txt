@@ -1,0 +1,320 @@
+    strictly_better
+}
+
+fn same_cost(left: &BTreeMap<String, u64>, right: &BTreeMap<String, u64>) -> bool {
+    left == right
+}
+
+fn fits_budget(cost: &BTreeMap<String, u64>, budget: &BTreeMap<String, u64>) -> bool {
+    if cost.len() != budget.len() || !cost.keys().eq(budget.keys()) {
+        return false;
+    }
+    cost.iter().all(|(dimension, amount)| {
+        budget
+            .get(dimension)
+            .is_some_and(|remaining| amount <= remaining)
+    })
+}
+
+fn offer_matches_need(offer: &ActionOffer, need: &PolicyNeed) -> bool {
+    let claim_matches = offer.target_claim_id.as_deref() == need.claim_id.as_deref()
+        || (offer.kind == ActionKind::Escalate && offer.target_claim_id.is_none());
+    let evidence_matches = need.evidence_id.is_none()
+        || offer.target_evidence_id.as_deref() == need.evidence_id.as_deref()
+        || offer.kind == ActionKind::Escalate;
+    need.action_kinds.contains(&offer.kind) && claim_matches && evidence_matches
+}
+
+fn abstain(
+    state_sha256: String,
+    evidence_prefix_sha256: String,
+    action_offers_sha256: String,
+    reason: &str,
+) -> PolicyDecision {
+    PolicyDecision {
+        policy_id: POLICY_ID.to_owned(),
+        policy_version: POLICY_VERSION.to_owned(),
+        disposition: DecisionDisposition::Abstain,
+        selected_offer_id: None,
+        selected_action_kind: None,
+        target_claim_id: None,
+        target_evidence_id: None,
+        reason_codes: vec![reason.to_owned()],
+        research_state_sha256: state_sha256,
+        evidence_prefix_sha256,
+        action_offers_sha256,
+        resource_estimate: BTreeMap::new(),
+    }
+}
+
+fn stop(
+    state_sha256: String,
+    evidence_prefix_sha256: String,
+    action_offers_sha256: String,
+) -> PolicyDecision {
+    PolicyDecision {
+        policy_id: POLICY_ID.to_owned(),
+        policy_version: POLICY_VERSION.to_owned(),
+        disposition: DecisionDisposition::Stop,
+        selected_offer_id: None,
+        selected_action_kind: None,
+        target_claim_id: None,
+        target_evidence_id: None,
+        reason_codes: vec!["ALL_CLAIMS_SUFFICIENT_FOR_CURRENT_DECISION".to_owned()],
+        research_state_sha256: state_sha256,
+        evidence_prefix_sha256,
+        action_offers_sha256,
+        resource_estimate: BTreeMap::new(),
+    }
+}
+
+fn select_offer(
+    need: &PolicyNeed,
+    offers: &[ActionOffer],
+    budget: &BTreeMap<String, u64>,
+) -> Result<Option<ActionOffer>, String> {
+    for kind in &need.action_kinds {
+        let mut feasible: Vec<ActionOffer> = offers
+            .iter()
+            .filter(|offer| offer.kind == *kind && offer_matches_need(offer, need))
+            .filter(|offer| fits_budget(&offer.resource_cost, budget))
+            .cloned()
+            .collect();
+        if feasible.is_empty() {
+            continue;
+        }
+        feasible.sort_by(|left, right| left.offer_id.cmp(&right.offer_id));
+        let nondominated: Vec<ActionOffer> = feasible
+            .iter()
+            .filter(|candidate| {
+                !feasible.iter().any(|other| {
+                    other.offer_id != candidate.offer_id
+                        && pareto_dominates(&other.resource_cost, &candidate.resource_cost)
+                })
+            })
+            .cloned()
+            .collect();
+
+        if nondominated.len() == 1 {
+            return Ok(nondominated.into_iter().next());
+        }
+        if nondominated
+            .iter()
+            .all(|offer| same_cost(&offer.resource_cost, &nondominated[0].resource_cost))
+        {
+            return Ok(nondominated
+                .into_iter()
+                .min_by(|a, b| a.offer_id.cmp(&b.offer_id)));
+        }
+        return Err("PARETO_INCOMPARABLE_PERMITTED_OFFERS".to_owned());
+    }
+    Ok(None)
+}
+
+/// Choose one action from the permitted offer list, abstain, or stop.
+///
+/// This is a deterministic baseline. It never executes the selected action and
+/// never creates a new permission or tool offer.
+pub fn decide(input: &PolicyInput) -> Result<PolicyDecision, Vec<PolicyIssue>> {
+    let validation = validate_state(&input.research_state_json).map_err(|issues| {
+        issues
+            .into_iter()
+            .map(|item| PolicyIssue {
+                path: item.path,
+                message: item.message,
+            })
+            .collect::<Vec<_>>()
+    })?;
+    let state: Value = serde_json::from_str(&input.research_state_json).map_err(|error| {
+        vec![PolicyIssue {
+            path: "$".to_owned(),
+            message: format!("invalid ResearchState JSON: {error}"),
+        }]
+    })?;
+    let evidence_prefix_sha256 = get_str(
+        state.get("evidence_prefix").unwrap_or(&Value::Null),
+        "prefix_sha256",
+    )
+    .unwrap_or_default()
+    .to_owned();
+    let action_offer_bytes =
+        serde_json::to_vec(&input.permitted_action_offers).map_err(|error| {
+            vec![PolicyIssue {
+                path: "permitted_action_offers".to_owned(),
+                message: format!("cannot serialize action offers: {error}"),
+            }]
+        })?;
+    let action_offers_sha256 = sha256_hex(&action_offer_bytes);
+
+    let mut issues = Vec::new();
+    for dimension in input.remaining_budget.keys() {
+        if dimension.trim().is_empty() {
+            issue(
+                &mut issues,
+                "remaining_budget",
+                "resource dimension names must be non-empty",
+            );
+        }
+    }
+    let mut offer_ids = HashSet::new();
+    let known_claims: HashSet<&str> = array(&state, "claims")
+        .into_iter()
+        .flatten()
+        .filter_map(|claim| get_str(claim, "claim_id"))
+        .collect();
+    let known_evidence: HashSet<&str> = array(&state, "evidence")
+        .into_iter()
+        .flatten()
+        .filter_map(|evidence| get_str(evidence, "evidence_id"))
+        .collect();
+
+    for (index, offer) in input.permitted_action_offers.iter().enumerate() {
+        if offer.offer_id.trim().is_empty() {
+            issue(
+                &mut issues,
+                format!("permitted_action_offers[{index}].offer_id"),
+                "offer ID must be non-empty",
+            );
+        }
+        if !offer_ids.insert(offer.offer_id.clone()) {
+            issue(
+                &mut issues,
+                format!("permitted_action_offers[{index}].offer_id"),
+                "duplicate permitted offer ID",
+            );
+        }
+        if let Some(claim_id) = offer.target_claim_id.as_deref() {
+            if !known_claims.contains(claim_id) {
+                issue(
+                    &mut issues,
+                    format!("permitted_action_offers[{index}].target_claim_id"),
+                    "offer references unknown claim",
+                );
+            }
+        }
+        if let Some(evidence_id) = offer.target_evidence_id.as_deref() {
+            if !known_evidence.contains(evidence_id) {
+                issue(
+                    &mut issues,
+                    format!("permitted_action_offers[{index}].target_evidence_id"),
+                    "offer references unknown evidence",
+                );
+            }
+        }
+        if !offer.resource_cost.keys().eq(input.remaining_budget.keys()) {
+            issue(
+                &mut issues,
+                format!("permitted_action_offers[{index}].resource_cost"),
+                "cost vector must use exactly the same named dimensions as the remaining budget",
+            );
+        }
+    }
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+
+    let decision = state.get("decision_context").unwrap_or(&Value::Null);
+    let risk_class = get_str(decision, "risk_class").unwrap_or("UNKNOWN");
+    let mut needs = Vec::new();
+    for claim in array(&state, "claims").into_iter().flatten() {
+        if let Some(need) = need_for_claim(&state, claim, risk_class) {
+            needs.push(need);
+        }
+    }
+    needs.sort_by(|left, right| {
+        left.priority
+            .cmp(&right.priority)
+            .then_with(|| left.claim_id.cmp(&right.claim_id))
+    });
+
+    if needs.is_empty() {
+        return Ok(stop(
+            validation.state_sha256,
+            evidence_prefix_sha256,
+            action_offers_sha256,
+        ));
+    }
+
+    let need = &needs[0];
+    match select_offer(
+        need,
+        &input.permitted_action_offers,
+        &input.remaining_budget,
+    ) {
+        Ok(Some(offer)) => Ok(PolicyDecision {
+            policy_id: POLICY_ID.to_owned(),
+            policy_version: POLICY_VERSION.to_owned(),
+            disposition: DecisionDisposition::Selected,
+            selected_offer_id: Some(offer.offer_id),
+            selected_action_kind: Some(offer.kind),
+            target_claim_id: need.claim_id.clone(),
+            target_evidence_id: need.evidence_id.clone(),
+            reason_codes: need.reason_codes.clone(),
+            research_state_sha256: validation.state_sha256,
+            evidence_prefix_sha256,
+            action_offers_sha256,
+            resource_estimate: offer.resource_cost,
+        }),
+        Ok(None) => Ok(abstain(
+            validation.state_sha256,
+            evidence_prefix_sha256,
+            action_offers_sha256,
+            "NO_FEASIBLE_PERMITTED_ACTION",
+        )),
+        Err(reason) => Ok(abstain(
+            validation.state_sha256,
+            evidence_prefix_sha256,
+            action_offers_sha256,
+            &reason,
+        )),
+    }
+}
+
+pub fn decide_json(input_json: &str) -> Result<String, Vec<PolicyIssue>> {
+    let input: PolicyInput = serde_json::from_str(input_json).map_err(|error| {
+        vec![PolicyIssue {
+            path: "$".to_owned(),
+            message: format!("invalid policy input: {error}"),
+        }]
+    })?;
+    let decision = decide(&input)?;
+    serde_json::to_string_pretty(&decision).map_err(|error| {
+        vec![PolicyIssue {
+            path: "decision".to_owned(),
+            message: format!("cannot serialize policy decision: {error}"),
+        }]
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_state(index: usize) -> String {
+        let pack: Value = serde_json::from_str(include_str!(
+            "../typed-research-state/fixtures/research-state-examples-v0.1.json"
+        ))
+        .unwrap();
+        pack["examples"][index]["state"].to_string()
+    }
+
+    fn artifact_verified_state(index: usize) -> String {
+        let mut state: Value = serde_json::from_str(&sample_state(index)).unwrap();
+        for item in state["evidence"].as_array_mut().unwrap() {
+            if item["integrity_status"] == "UNKNOWN" {
+                item["integrity_status"] = Value::String("CLEAN".to_owned());
+            }
+            if item["correction_status"] == "UNKNOWN" {
+                item["correction_status"] = Value::String("NONE".to_owned());
+            }
+        }
+        let evidence = state["evidence"].as_array().unwrap().clone();
+        let episode = get_str(&state, "research_episode_id").unwrap().to_owned();
+        let sequence = state["evidence_prefix"]["sequence_number"]
+            .as_u64()
+            .unwrap();
+        let prefix =
+            typed_research_state_contract::evidence_prefix_sha256(&episode, sequence, &evidence);
+        state["evidence_prefix"]["prefix_sha256"] = Value::String(prefix.clone());
+        for claim in state["claims"].as_array_mut().unwrap() {
+            for relation in claim["evidence_relations"].as_array_mut().unwrap() {
