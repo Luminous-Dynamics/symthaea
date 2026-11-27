@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn exact_deadline_is_late_and_missing_events_are_misses() {
-        let at_deadline = hazard("h1", "merge", Some(800), Some(810), Some(800));
+        let at_deadline = hazard("h1", "merge", Some(800), Some(800), Some(800));
         let missing = hazard("h2", "merge", None, None, None);
         let score = evaluate(&[at_deadline, missing]).unwrap();
         assert_eq!(score.overall.timely_warnings, 0);
