@@ -16,7 +16,9 @@
     "replay",
     "authority_audit",
     "validity",
-    "attestation"
+    "attestation",
+    "decision_reason",
+    "admitted_skill_digest_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -267,7 +269,9 @@
       "additionalProperties": false,
       "required": [
         "algorithm",
+        "canonicalization",
         "key_id",
+        "signed_payload_digest_sha256",
         "signature_base64"
       ],
       "properties": {
@@ -280,8 +284,14 @@
         },
         "signature_base64": {
           "type": "string",
-          "minLength": 80,
-          "maxLength": 100
+          "pattern": "^[A-Za-z0-9+/]{86}==$"
+        },
+        "canonicalization": {
+          "const": "RFC8785-JCS"
+        },
+        "signed_payload_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       }
     }
@@ -351,6 +361,28 @@
                 "const": true
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "rejected",
+              "quarantined"
+            ]
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "admitted_skill_digest_sha256": {
+            "type": "null"
           }
         }
       }
