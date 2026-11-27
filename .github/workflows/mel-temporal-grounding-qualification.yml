@@ -160,6 +160,9 @@ jobs:
               and $statement.predicate.actual_output_tokens == 128
               and $statement.predicate.max_wall_time_ms == 30000
               and $statement.predicate.elapsed_wall_time_ms == 4000
+              and $statement.predicate.request_body_bytes_recomputed == true
+              and $statement.predicate.request_body_semantics_bound == true
+              and $statement.predicate.request_body_delivery_attested == false
               and $statement.predicate.runner_receipt_verified == false
               and $statement.predicate.model_input_attested == false)
           ' "$RUNNER_TEMP/audio-evidence-in-toto-payload.json" > /dev/null
