@@ -60,7 +60,7 @@ Stopped, Failed and NotSubmitted are terminal. A second terminal transition is r
 
 Observation sources distinguish adapter callbacks, compositor reports, audio-device loopback, haptic-driver acknowledgement, and external observers. The source is disclosed, not treated as proof of independence. The observer type must match the authorized output channel.
 
-Every receipt preserves session, clock domain, event and grant identity, event sequence, semantic event kind, event expiry, grant expiry, effective permit expiry, source/build provenance, epistemic status, privacy class, form, output channel/destination, intensity, motion mode, adapter build and observer metadata. The initial decision timestamp and every transition timestamp retain their clock-domain identifiers; an Authorized record uses the policy clock, while Submitted/Observed/Stopped use the adapter/output-observer clocks. No raw audio/video is included.
+Every receipt preserves session, clock domain, event and grant identity, the complete canonical-cue digest, event sequence, semantic event kind, event expiry, grant expiry, effective permit expiry, source/build provenance, epistemic status, privacy class, form, output channel/destination, intensity, motion mode, adapter build and observer metadata. The initial decision timestamp and every transition timestamp retain their clock-domain identifiers; an Authorized record uses the policy clock, while Submitted/Observed/Stopped use the adapter/output-observer clocks. No raw audio/video is included.
 
 ## Integrity and trust limits
 
@@ -89,7 +89,7 @@ The fixture file is a research artifact; it is not yet consumed automatically by
 
 ## Tests and qualification
 
-Fifteen Rust tests are authored for:
+Sixteen Rust tests are authored for:
 - permit versus submission distinction;
 - required final policy recheck;
 - rejection of submission acknowledgements carrying a stale pre-authorization permit;
@@ -105,6 +105,7 @@ Fifteen Rust tests are authored for:
 - denial leaving the state unchanged;
 - digest-chain verification;
 - separate source and renderer clock domains;
+- canonical cue digest preservation in the receipt;
 - observer/source compatibility with the output channel.
 
 These tests have **not** been compiled or executed. The branch's GitHub workflows have returned skipped, not passed. No actual renderer or hardware output observer is integrated yet.
