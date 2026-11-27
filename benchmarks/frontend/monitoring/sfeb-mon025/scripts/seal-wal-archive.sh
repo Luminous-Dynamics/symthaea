@@ -22,7 +22,7 @@ segment="$("${DC[@]}" exec -T -e PGPASSWORD="$MON025_DB_PASSWORD" "postgres$MAJO
 switch_lsn="$("${DC[@]}" exec -T -e PGPASSWORD="$MON025_DB_PASSWORD" "postgres$MAJOR" \
   psql -X -q -A -t -h 127.0.0.1 -U "${MON025_DB_USER:-mon025}" -d "${MON025_DB_NAME:-mon025}" \
   -v ON_ERROR_STOP=1 -c "SELECT pg_switch_wal()::text")"
-archive_dir="/var/lib/postgresql/$MAJOR/docker/mon025-archive"
+archive_dir="/wal-archive"
 archived=false
 for attempt in $(seq 1 60); do
   if "${DC[@]}" exec -T "postgres$MAJOR" sh -c "test -s '$archive_dir/$segment'"; then
