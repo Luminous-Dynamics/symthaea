@@ -76,7 +76,7 @@ pub struct PairedMetricInferenceV1 {
     pub candidate_improvement_interval: Option<PercentileIntervalV1>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PairedMusicalIdentityStratumV1 {
     pub target_property: crate::music_performance_identity::MusicalIdentityPropertyV1,
     pub performance_stay_factor: Option<crate::music_performance_identity::PerformanceStayFactorV1>,
@@ -89,6 +89,7 @@ pub struct PairedMusicalIdentityStratumV1 {
     pub joint_exact: PairedMetricInferenceV1,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PairedMusicalIdentityComparisonReportV1 {
     pub schema: &'static str,
     pub bootstrap_method: &'static str,
