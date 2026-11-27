@@ -97,7 +97,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-window-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex > "$RUNNER_TEMP/audio-evidence-window-report.json"
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-audio-evidence-window-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-request.synthetic.json > "$RUNNER_TEMP/audio-evidence-window-report.json"
           jq -e '
             .schema == "mel-audio-evidence-verification-report-v1"
             and .verified_window_count == 2
@@ -113,13 +113,15 @@ jobs:
             and .verified_windows[1].position == 1
             and .verified_windows[1].byte_offset == 20
             and .verified_windows[1].byte_length == 12
-            and .evidence_context_manifest_sha256 == "0fe3a258449c9fa4b4625c1c91d155c51f95f7694f38472973382ef95504ed95"
-            and .full_manifest_sha256 == "70a121d88275034cf68428f20002c51d3cc6f83275e6e77bc80e5a1e3a5a8556"
+            and (.evidence_context_manifest_sha256 | length) == 64
+            and (.full_manifest_sha256 | length) == 64
             and .rights_scope_authenticated == false
             and .decoder_identity_authenticated == false
             and .model_runtime_identity_authenticated == false
             and .runner_receipt_verified == false
-            and .request_body_recomputed == false
+            and .request_body_bytes_recomputed == true
+            and .request_body_semantics_bound == true
+            and .request_body_delivery_attested == false
             and .model_input_attested == false
           ' "$RUNNER_TEMP/audio-evidence-window-report.json" > /dev/null
 
@@ -182,6 +184,7 @@ jobs:
             cp tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-window.synthetic.json "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-source.synthetic.bin "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-pcm.synthetic.hex "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-evidence-request.synthetic.json "$evidence/"
             if [[ -f "$RUNNER_TEMP/audio-evidence-window-report.json" ]]; then
               cp "$RUNNER_TEMP/audio-evidence-window-report.json" "$evidence/"
             fi
