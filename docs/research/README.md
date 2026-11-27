@@ -33,6 +33,8 @@ event contract.
 - [Embodiment benchmark plan](SYMTHAEA_EMBODIMENT_BENCHMARK_PLAN_V0_1_2026-11-27.md)
 - [Dynamic temporal attention](SYMTHAEA_DYNAMIC_TEMPORAL_ATTENTION_V0_1_2026-11-27.md)
 - [Consent and presentation policy](SYMTHAEA_EMBODIMENT_CONSENT_POLICY_V0_1_2026-11-27.md)
+- [Presentation grant schema](SYMTHAEA_PRESENTATION_CONSENT_GRANT_SCHEMA_V1_2026-11-27.json)
+- [Presentation grant fixtures](SYMTHAEA_PRESENTATION_CONSENT_GRANT_FIXTURES_V1_2026-11-27.json)
 - [Competitive baselines and differentiation](SYMTHAEA_EMBODIMENT_COMPETITIVE_BASELINES_V0_1_2026-11-27.md)
 - [Event schema](SYMTHAEA_EMBODIMENT_EVENT_SCHEMA_V1_2026-11-27.json)
 - [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
