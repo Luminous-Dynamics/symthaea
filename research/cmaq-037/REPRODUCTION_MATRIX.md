@@ -123,6 +123,21 @@ CMAQ-040 is a separate composition experiment: it applies a heavy-tailed mixture
 
 The late-shift matrix must include shift times 0, 100, 500, 2,000 and 8,000, and report delay from the true shift time—not from stream start. Report null wealth and false alarms over the *entire* deployment horizon, not just post-change windows. Use a long null prelude to detect performance degradation that short-horizon synthetic tests cannot expose.
 
+## PF-CCTM reproduction target and caveats
+
+The current PF-CCTM paper reports, for n=1,000 on ImageNet-C at t0=8,000 clean observations, median delay 50.5 rounds for its restarting universal portfolio versus 244.5 rounds for CCTM; detection power and misses are reported separately. On the synthetic sharp-shift setting with t0=4,000 and unit mean shift, the reported medians are 54 vs 216 rounds. These are paper-reported results, not independently replicated CMAQ results.
+
+The paper's ImageNet-C grid is n in {100, 250, 500, 1,000, 4,000}, 10 seeds, 15 severity-5 corruptions, and t0 in {0, 125, 250, 500, 1,000, 2,000, 4,000, 8,000}; every change-point run observes 2,000 rounds after the shift. Its null check uses the remaining clean holdout and 100 seeds for n in {100, 500, 4,000}. Match the original data split, predictor outputs, calibration prefix, clean prelude, shift stream, and no-false-alarm conditioning before comparing. Count missed detections as infinity for medians and as horizon+1 in capped means; never drop misses from the denominator.
+
+Important qualification: the PF-CCTM paper itself reports one false alarm among 300 clean null streams for its restarting portfolio at n=4,000; its CCTM baseline has zero in that table and standard CTM has one to three percent. Its other experiment tables and seeds should be reproduced as published rather than reducing the result to the headline late-shift ratio. The restart portfolio's false-alarm statistic, wealth statistic and power-after-no-false-alarm are distinct quantities.
+
+The following are **paper replication targets**, not guaranteed CMAQ thresholds:
+- t0=8,000, n=1,000, ImageNet-C: reproduce the reported PF-CCTM median around 50.5 and CCTM around 244.5 under the identical clean/shift partition and warm-up accounting.
+- t0=4,000, n=1,000, synthetic sharp shift d=1: reproduce the reported PF-CCTM median around 54 and CCTM around 216.
+- Report false-alarm rate, conditional power, unconditional miss fraction, median and capped mean delay together for each arm and cell.
+
+Only after this faithful baseline reproduction should CMAQ-040's separate PRM restart mixture be compared. Theoretical validity differs: PF-CCTM's portfolio martingale and PRM's exact conditional predictive-rank martingale have different score/p-value assumptions and their guarantees must not be transferred between them.
+
 ## Current internal CMAQ-035 result is not SOTA evidence
 
 At n=99, alpha=0.05 and horizon 500, an internal 10,000-replication experiment found:
