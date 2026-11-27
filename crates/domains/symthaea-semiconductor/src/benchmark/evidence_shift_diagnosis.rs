@@ -556,76 +556,75 @@ fn classify(
     let mut contradicting = Vec::new();
     let mut reasons = Vec::new();
 
-    let (state, recommendation) =
-        if (residual_alert || sensor_alert) && reference_alert {
-            supporting.extend([
-                ShiftSignalChannelV1::VmResidual,
-                ShiftSignalChannelV1::ReferenceStandardResidual,
-            ]);
-            reasons.push(ShiftReasonCodeV1::ResidualAndReferenceBothShifted);
-            (
-                ShiftDiagnosticStateV1::CommonCauseOrMixedShift,
-                ShiftAdaptationRecommendationV1::Hold,
-            )
-        } else if reference_alert {
-            supporting.push(ShiftSignalChannelV1::ReferenceStandardResidual);
-            (
-                ShiftDiagnosticStateV1::MeasurementSystemShiftSuspected,
-                ShiftAdaptationRecommendationV1::Hold,
-            )
-        } else if sensor_alert {
-            supporting.push(ShiftSignalChannelV1::SensorObservabilityScore);
-            if residual_alert {
-                supporting.push(ShiftSignalChannelV1::VmResidual);
-            }
-            (
-                ShiftDiagnosticStateV1::SensorObservabilityShift,
-                ShiftAdaptationRecommendationV1::Hold,
-            )
-        } else if residual_alert {
+    let (state, recommendation) = if (residual_alert || sensor_alert) && reference_alert {
+        supporting.extend([
+            ShiftSignalChannelV1::VmResidual,
+            ShiftSignalChannelV1::ReferenceStandardResidual,
+        ]);
+        reasons.push(ShiftReasonCodeV1::ResidualAndReferenceBothShifted);
+        (
+            ShiftDiagnosticStateV1::CommonCauseOrMixedShift,
+            ShiftAdaptationRecommendationV1::Hold,
+        )
+    } else if reference_alert {
+        supporting.push(ShiftSignalChannelV1::ReferenceStandardResidual);
+        (
+            ShiftDiagnosticStateV1::MeasurementSystemShiftSuspected,
+            ShiftAdaptationRecommendationV1::Hold,
+        )
+    } else if sensor_alert {
+        supporting.push(ShiftSignalChannelV1::SensorObservabilityScore);
+        if residual_alert {
             supporting.push(ShiftSignalChannelV1::VmResidual);
-            if reference_stable {
-                contradicting.push(ShiftSignalChannelV1::ReferenceStandardResidual);
-            }
-            if sensor_stable {
-                contradicting.push(ShiftSignalChannelV1::SensorObservabilityScore);
-            }
-            if reference_stable && sensor_stable && process_marker_recent {
-                (
-                    ShiftDiagnosticStateV1::ProcessShiftSuspected,
-                    ShiftAdaptationRecommendationV1::RequestMetrology,
-                )
-            } else {
-                reasons.push(ShiftReasonCodeV1::ResidualShiftWithoutIdentifyingEvidence);
-                (
-                    ShiftDiagnosticStateV1::Unresolved,
-                    ShiftAdaptationRecommendationV1::Hold,
-                )
-            }
-        } else if residual.is_none_or(|entry| entry.observations == 0) {
-            reasons.push(ShiftReasonCodeV1::MissingDetectorChannel);
+        }
+        (
+            ShiftDiagnosticStateV1::SensorObservabilityShift,
+            ShiftAdaptationRecommendationV1::Hold,
+        )
+    } else if residual_alert {
+        supporting.push(ShiftSignalChannelV1::VmResidual);
+        if reference_stable {
+            contradicting.push(ShiftSignalChannelV1::ReferenceStandardResidual);
+        }
+        if sensor_stable {
+            contradicting.push(ShiftSignalChannelV1::SensorObservabilityScore);
+        }
+        if reference_stable && sensor_stable && process_marker_recent {
             (
-                ShiftDiagnosticStateV1::InsufficientEvidence,
-                ShiftAdaptationRecommendationV1::Hold,
-            )
-        } else if !residual.is_some_and(|entry| entry.stable_reference_window)
-            || !reference_stable
-            || !sensor_stable
-        {
-            reasons.push(ShiftReasonCodeV1::InsufficientIndependentEvidence);
-            (
-                ShiftDiagnosticStateV1::InsufficientEvidence,
-                ShiftAdaptationRecommendationV1::Hold,
+                ShiftDiagnosticStateV1::ProcessShiftSuspected,
+                ShiftAdaptationRecommendationV1::RequestMetrology,
             )
         } else {
-            if process_marker_recent {
-                reasons.push(ShiftReasonCodeV1::ProcessMarkerWithoutMeasuredShift);
-            }
+            reasons.push(ShiftReasonCodeV1::ResidualShiftWithoutIdentifyingEvidence);
             (
-                ShiftDiagnosticStateV1::Nominal,
-                ShiftAdaptationRecommendationV1::Continue,
+                ShiftDiagnosticStateV1::Unresolved,
+                ShiftAdaptationRecommendationV1::Hold,
             )
-        };
+        }
+    } else if residual.is_none_or(|entry| entry.observations == 0) {
+        reasons.push(ShiftReasonCodeV1::MissingDetectorChannel);
+        (
+            ShiftDiagnosticStateV1::InsufficientEvidence,
+            ShiftAdaptationRecommendationV1::Hold,
+        )
+    } else if !residual.is_some_and(|entry| entry.stable_reference_window)
+        || !reference_stable
+        || !sensor_stable
+    {
+        reasons.push(ShiftReasonCodeV1::InsufficientIndependentEvidence);
+        (
+            ShiftDiagnosticStateV1::InsufficientEvidence,
+            ShiftAdaptationRecommendationV1::Hold,
+        )
+    } else {
+        if process_marker_recent {
+            reasons.push(ShiftReasonCodeV1::ProcessMarkerWithoutMeasuredShift);
+        }
+        (
+            ShiftDiagnosticStateV1::Nominal,
+            ShiftAdaptationRecommendationV1::Continue,
+        )
+    };
     supporting.sort();
     supporting.dedup();
     contradicting.sort();
@@ -742,33 +741,32 @@ pub fn observe_evidence_shift_v1(
     if early_reasons.is_empty()
         && let Some(value) = standardized_value
     {
-            if !value.is_finite() {
+        if !value.is_finite() {
+            early_reasons.push(ShiftReasonCodeV1::NonFiniteObservation);
+        } else {
+            let config = engine
+                .policy
+                .channels
+                .get(&observation.channel)
+                .expect("validated policy has all detector channels");
+            let standardized = (value - config.baseline_mean) / config.baseline_standard_deviation;
+            if !standardized.is_finite()
+                || standardized.abs() > engine.policy.maximum_absolute_standardized_value
+            {
                 early_reasons.push(ShiftReasonCodeV1::NonFiniteObservation);
             } else {
-                let config = engine
-                    .policy
-                    .channels
-                    .get(&observation.channel)
-                    .expect("validated policy has all detector channels");
-                let standardized =
-                    (value - config.baseline_mean) / config.baseline_standard_deviation;
-                if !standardized.is_finite()
-                    || standardized.abs() > engine.policy.maximum_absolute_standardized_value
-                {
-                    early_reasons.push(ShiftReasonCodeV1::NonFiniteObservation);
-                } else {
-                    let key = (state_scope.clone(), observation.channel);
-                    let state = update_channel_state(
-                        engine.channel_states.get(&key),
-                        config,
-                        standardized,
-                        observation.event_time_unix_seconds,
-                        &observation.observation_id,
-                    );
-                    engine.channel_states.insert(key, state);
-                }
+                let key = (state_scope.clone(), observation.channel);
+                let state = update_channel_state(
+                    engine.channel_states.get(&key),
+                    config,
+                    standardized,
+                    observation.event_time_unix_seconds,
+                    &observation.observation_id,
+                );
+                engine.channel_states.insert(key, state);
             }
         }
+    }
 
     if early_reasons.is_empty()
         && let Some(marker) = observation.process_event_marker.as_ref()
