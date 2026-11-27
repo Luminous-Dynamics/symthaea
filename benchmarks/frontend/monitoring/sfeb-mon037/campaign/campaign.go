@@ -318,8 +318,20 @@ func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
  txProofs:=map[string]struct{}{};byTx:=map[string][]Event{};for _,e:=range unique{byTx[e.TransactionID]=append(byTx[e.TransactionID],e)}
  for _,p:=range in.Transactions{if !validID(p.TransactionID)||p.ExpectedEventCount<=0{txn.block("transaction_proof_malformed");continue};if _,ok:=txProofs[p.TransactionID];ok{txn.block("duplicate_transaction_proof:"+p.TransactionID);continue};txProofs[p.TransactionID]=struct{}{};records:=byTx[p.TransactionID]
  if len(records)!=p.ExpectedEventCount{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":event_count")};if !p.BeginObserved||!p.EndObserved{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":begin_end")};if p.EndEventCount!=p.ExpectedEventCount{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":end_count")}
- order:=make([]int,0,len(records));collections:=map[string]int{};rowCollectionOrders:=map[string][]int{};for _,e:=range records{order=append(order,e.TotalOrder);collections[e.DataCollection]++;if e.Operation!="MESSAGE"{rowCollectionOrders[e.DataCollection]=append(rowCollectionOrders[e.DataCollection],e.CollectionOrder)}};sort.Ints(order);for i,n:=range order{if n!=i+1{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":total_order");break}};for collection,orders:=range rowCollectionOrders{sort.Ints(orders);for i,n:=range orders{if n!=i+1{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":row_collection_order:"+collection);break}}}
- if len(collections)!=len(p.DataCollections){r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":data_collections")}else{for topic,n:=range collections{if p.DataCollections[topic]!=n{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":collection_count:"+topic)}}}}
+ order:=make([]int,0,len(records));rowCollectionOrders:=map[string][]int{};rowCollectionCounts:=map[string]int{};rowCount:=0;messageCount:=0
+ for _,e:=range records{
+  order=append(order,e.TotalOrder)
+  if e.Operation=="MESSAGE"{messageCount++;continue}
+  rowCount++;rowCollectionCounts[e.DataCollection]++;rowCollectionOrders[e.DataCollection]=append(rowCollectionOrders[e.DataCollection],e.CollectionOrder)
+ }
+ sort.Ints(order);for i,n:=range order{if n!=i+1{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":total_order");break}}
+ for collection,orders:=range rowCollectionOrders{sort.Ints(orders);for i,n:=range orders{if n!=i+1{r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":row_collection_order:"+collection);break}}}
+ declaredRowCount,rowDeclared:=p.DataCollections["public.ledger"]
+ declaredMessageCount:=0;declaredMessageLabels:=0;malformedCollectionCount:=false
+ for label,n:=range p.DataCollections{if n<0{malformedCollectionCount=true};if label!="public.ledger"{declaredMessageCount+=n;if n>0{declaredMessageLabels++}}}
+ if malformedCollectionCount||!rowDeclared||len(rowCollectionCounts)!=1||rowCollectionCounts["public.ledger"]!=rowCount||declaredRowCount!=rowCount||declaredMessageCount!=messageCount||(messageCount>0&&declaredMessageLabels==0)||(messageCount==0&&declaredMessageLabels>0){
+  r.TransactionViolations=append(r.TransactionViolations,p.TransactionID+":data_collections")
+ }}
  for id:=range byTx{if _,ok:=txProofs[id];!ok{r.TransactionViolations=append(r.TransactionViolations,id+":proof_missing")}};if len(r.TransactionViolations)>0{sort.Strings(r.TransactionViolations);txn.block("transaction_not_closed")}
 }
 func checkSurfaces(in Input,r *Reconciliation,f *flags){
