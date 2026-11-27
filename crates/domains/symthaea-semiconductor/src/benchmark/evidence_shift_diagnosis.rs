@@ -825,9 +825,10 @@ pub fn observe_evidence_shift_v1(
         let age = assessment_time.saturating_sub(marker.event_time_unix_seconds);
         age >= 0 && age as u64 <= engine.policy.process_event_context_window_seconds
     });
+    let early_reasons_empty = early_reasons.is_empty();
     let (mut diagnostic_state, mut recommendation, mut supporting, mut contradicting, mut reasons) =
         classify(&channel_assessments, process_marker_recent);
-    if !early_reasons.is_empty() {
+    if !early_reasons_empty {
         diagnostic_state = ShiftDiagnosticStateV1::InsufficientEvidence;
         recommendation = ShiftAdaptationRecommendationV1::Hold;
         reasons.extend(early_reasons);
@@ -876,7 +877,7 @@ pub fn observe_evidence_shift_v1(
 
     // Invalid or out-of-order observations are not consumed by the detector.
     // Valid process markers are retained separately as contextual evidence.
-    if early_reasons.is_empty() {
+    if early_reasons_empty {
         engine.last_stream_sequence = observation.stream_sequence;
         engine.last_scope_event_times.insert(
             observation.scope_id.clone(),
