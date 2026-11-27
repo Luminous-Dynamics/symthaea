@@ -56,14 +56,15 @@
     conflicting_event_ids: $conflicts,
     conflicting_begin_ids: $begin_conflicts,
     conflicting_end_ids: $end_conflicts,
-    events_without_transaction_id: ([$events[] | select(.transaction_id == null)] | length),
+    events_without_transaction_id: ([$events[] | select(.transaction_id == null or .transaction_id == "")] | length),
+    invalid_event_ids: ([$events[] | select((.event_id | type) != "string" or .event_id == "")] | length),
     transaction_groups: $checks,
     complete: (
       (($events | length) == $expected)
       and (($conflicts | length) == 0)
       and (($begin_conflicts | length) == 0)
       and (($end_conflicts | length) == 0)
-      and (all($events[]; .transaction_id != null))
+      and (all($events[]; (.event_id | type) == "string" and .event_id != "" and (.transaction_id | type) == "string" and .transaction_id != ""))
       and (all($checks[]; .boundary_pair_complete and .event_count_matches and .total_order_contiguous and .collection_order_contiguous))
     )
   }
