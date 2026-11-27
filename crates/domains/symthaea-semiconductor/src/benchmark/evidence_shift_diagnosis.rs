@@ -769,7 +769,6 @@ pub fn observe_evidence_shift_v1(
                 }
             }
         }
-    }
 
     if early_reasons.is_empty()
         && let Some(marker) = observation.process_event_marker.as_ref()
