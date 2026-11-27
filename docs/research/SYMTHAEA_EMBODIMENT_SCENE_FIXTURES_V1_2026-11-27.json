@@ -1,0 +1,384 @@
+{
+  "schema_version": "symthaea.embodiment-scene-fixtures.v1",
+  "purpose": "Wire-shape and privacy fixtures. Cue/permit digest agreement and scene semantic correctness are enforced by Rust tests.",
+  "positive": [
+    {
+      "id": "living_constellation",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-1",
+        "canonical_cue_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "grant_id": "grant-v1",
+        "sequence": 0,
+        "event_kind": "conversation.listening",
+        "semantic_key": "conversation.listening.active",
+        "form": "living_constellation",
+        "motion_mode": "static",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1",
+          "build_id": "build-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "State reported by the source.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "star_node",
+            "weight": null,
+            "motion": "static"
+          }
+        ]
+      }
+    },
+    {
+      "id": "puppet_theatre",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-2",
+        "canonical_cue_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "grant_id": "grant-v1",
+        "sequence": 1,
+        "event_kind": "conversation.speaking",
+        "semantic_key": "conversation.speaking.active",
+        "form": "puppet_theatre",
+        "motion_mode": "dynamic",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1",
+          "build_id": "build-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "State reported by the source.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "marionette_joint",
+            "weight": null,
+            "motion": "pulse"
+          }
+        ]
+      }
+    },
+    {
+      "id": "mycelial_being",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-3",
+        "canonical_cue_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "grant_id": "grant-v1",
+        "sequence": 2,
+        "event_kind": "conversation.turn_state",
+        "semantic_key": "conversation.turn.yield",
+        "form": "mycelial_being",
+        "motion_mode": "static",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1",
+          "build_id": "build-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "State reported by the source.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "hypha_node",
+            "weight": null,
+            "motion": "static"
+          }
+        ]
+      }
+    },
+    {
+      "id": "swarm",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-4",
+        "canonical_cue_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "grant_id": "grant-v1",
+        "sequence": 3,
+        "event_kind": "conversation.backchannel",
+        "semantic_key": "conversation.backchannel",
+        "form": "swarm",
+        "motion_mode": "static",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1",
+          "build_id": "build-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "State reported by the source.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "particle",
+            "weight": null,
+            "motion": "static"
+          }
+        ]
+      }
+    },
+    {
+      "id": "living_instrument",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-5",
+        "canonical_cue_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "grant_id": "grant-v1",
+        "sequence": 4,
+        "event_kind": "attention.focus",
+        "semantic_key": "attention.focus",
+        "form": "living_instrument",
+        "motion_mode": "static",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1",
+          "build_id": "build-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "State reported by the source.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "resonator",
+            "weight": null,
+            "motion": "static"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hearth_companion",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-6",
+        "canonical_cue_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "grant_id": "grant-v1",
+        "sequence": 5,
+        "event_kind": "expression.intent",
+        "semantic_key": "expression.intent",
+        "form": "hearth_companion",
+        "motion_mode": "static",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1",
+          "build_id": "build-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "State reported by the source.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "ember",
+            "weight": null,
+            "motion": "static"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cognitive_mandala",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-7",
+        "canonical_cue_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "grant_id": "grant-v1",
+        "sequence": 6,
+        "event_kind": "cognition.uncertainty",
+        "semantic_key": "evidence.status",
+        "form": "cognitive_mandala",
+        "motion_mode": "static",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1",
+          "build_id": "build-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "State reported by the source.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "mandala_center",
+            "weight": null,
+            "motion": "static"
+          }
+        ]
+      }
+    }
+  ],
+  "negative": [
+    {
+      "id": "raw_evidence_refs_disallowed",
+      "expected": "schema_reject",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-1",
+        "canonical_cue_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "grant_id": "grant-v1",
+        "sequence": 0,
+        "event_kind": "conversation.listening",
+        "semantic_key": "conversation.listening.active",
+        "form": "living_constellation",
+        "motion_mode": "static",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "Listening state reported active.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "star_node",
+            "weight": null,
+            "motion": "static"
+          }
+        ],
+        "evidence_refs": [
+          "private:raw-ref"
+        ]
+      }
+    },
+    {
+      "id": "missing_cue_digest",
+      "expected": "schema_reject",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-1",
+        "grant_id": "grant-v1",
+        "sequence": 0,
+        "event_kind": "conversation.listening",
+        "semantic_key": "conversation.listening.active",
+        "form": "living_constellation",
+        "motion_mode": "static",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "Listening state reported active.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "star_node",
+            "weight": null,
+            "motion": "static"
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid_digest_shape",
+      "expected": "schema_reject",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-1",
+        "canonical_cue_digest": "not-a-digest",
+        "grant_id": "grant-v1",
+        "sequence": 0,
+        "event_kind": "conversation.listening",
+        "semantic_key": "conversation.listening.active",
+        "form": "living_constellation",
+        "motion_mode": "static",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "Listening state reported active.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "star_node",
+            "weight": null,
+            "motion": "static"
+          }
+        ]
+      }
+    },
+    {
+      "id": "unbounded_weight",
+      "expected": "schema_reject",
+      "frame": {
+        "schema": "symthaea.embodiment-scene.v1",
+        "session_id": "scene-session",
+        "clock_domain_id": "clock:scene-epoch-1",
+        "event_id": "event-1",
+        "canonical_cue_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "grant_id": "grant-v1",
+        "sequence": 0,
+        "event_kind": "conversation.listening",
+        "semantic_key": "conversation.listening.active",
+        "form": "living_constellation",
+        "motion_mode": "static",
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "source": {
+          "component": "dialogue",
+          "instance_id": "dialogue-1"
+        },
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "900",
+        "accessible_description": "Listening state reported active.",
+        "elements": [
+          {
+            "role": "core",
+            "glyph": "star_node",
+            "weight": 1.25,
+            "motion": "static"
+          }
+        ]
+      }
+    }
+  ]
+}
