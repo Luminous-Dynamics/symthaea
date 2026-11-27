@@ -1,0 +1,648 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sat-independent-memory-witness-profile-v0.1.schema.json",
+  "title": "SAT Independent Memory Witness Profile v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "profile_status",
+    "state_namespace_digest",
+    "consensus_assumption",
+    "quorum_policy",
+    "freshness_policy",
+    "operators",
+    "independence_domains",
+    "independence_assessment",
+    "recovery_policy",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sat-independent-memory-witness-profile/v0.1"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile_status": {
+      "enum": [
+        "synthetic_example",
+        "deployment_candidate",
+        "independently_reviewed"
+      ]
+    },
+    "state_namespace_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "consensus_assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "witness_count",
+        "quorum_size",
+        "max_byzantine",
+        "honest_witness_rule"
+      ],
+      "properties": {
+        "witness_count": {
+          "const": 4
+        },
+        "quorum_size": {
+          "const": 3
+        },
+        "max_byzantine": {
+          "const": 1
+        },
+        "honest_witness_rule": {
+          "const": "durable_single_successor_per_state_generation_predecessor"
+        }
+      }
+    },
+    "quorum_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transition_digest_must_match",
+        "predecessor_digest_must_match",
+        "operation_id_is_idempotent",
+        "commit_requires_quorum"
+      ],
+      "properties": {
+        "transition_digest_must_match": {
+          "const": true
+        },
+        "predecessor_digest_must_match": {
+          "const": true
+        },
+        "operation_id_is_idempotent": {
+          "const": true
+        },
+        "commit_requires_quorum": {
+          "const": true
+        },
+        "conflicting_successor_must_be_rejected": {
+          "const": true
+        }
+      }
+    },
+    "freshness_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "max_checkpoint_age_seconds",
+        "trusted_time_profile_digest",
+        "offline_behavior",
+        "freshness_mechanism"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "fresh_quorum_required",
+            "bounded_staleness_downgrade",
+            "offline_not_evaluable"
+          ]
+        },
+        "max_checkpoint_age_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "trusted_time_profile_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "offline_behavior": {
+          "enum": [
+            "hold_reads_and_writes",
+            "allow_declared_low_risk_reads_only",
+            "not_evaluable"
+          ]
+        },
+        "freshness_mechanism": {
+          "enum": [
+            "nonce_bound_quorum_challenge",
+            "trusted_time_expiry",
+            "monotonic_client_checkpoint",
+            "combined",
+            "none"
+          ]
+        }
+      }
+    },
+    "operators": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operator_id",
+          "organization_id",
+          "administrative_domain_id",
+          "identity_provider_domain_id",
+          "key_custody_domain_id",
+          "backup_restore_domain_id",
+          "control_plane_domain_id",
+          "deployment_region",
+          "witness_software_digest",
+          "witness_policy_digest",
+          "signing_key_profile",
+          "governance_evidence_ref",
+          "durability_profile"
+        ],
+        "properties": {
+          "operator_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "organization_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "administrative_domain_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "identity_provider_domain_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "key_custody_domain_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "backup_restore_domain_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "control_plane_domain_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "deployment_region": {
+            "type": "string",
+            "minLength": 1
+          },
+          "endpoint_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "witness_software_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "witness_policy_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "signing_key_profile": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key_id",
+              "algorithm",
+              "status",
+              "public_key_fingerprint"
+            ],
+            "properties": {
+              "key_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "algorithm": {
+                "enum": [
+                  "ed25519",
+                  "ecdsa_p256",
+                  "rsa_pss_sha256",
+                  "other_declared"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "active",
+                  "pending",
+                  "revoked",
+                  "test_only"
+                ]
+              },
+              "public_key_fingerprint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "valid_from": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "valid_until": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          },
+          "governance_evidence_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "durability_profile": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "commit_durable_before_receipt",
+              "anti_rollback_mechanism",
+              "witness_backup_policy_digest",
+              "rollback_detection_evidence_ref"
+            ],
+            "properties": {
+              "commit_durable_before_receipt": {
+                "const": true
+              },
+              "anti_rollback_mechanism": {
+                "enum": [
+                  "hardware_monotonic_counter",
+                  "remote_consensus_with_admin_isolation",
+                  "externally_monitored_append_only_log",
+                  "software_only",
+                  "unknown"
+                ]
+              },
+              "witness_backup_policy_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "rollback_detection_evidence_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "independence_domains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operator_ids",
+        "organization_ids",
+        "administrative_domain_ids",
+        "identity_provider_domain_ids",
+        "key_custody_domain_ids",
+        "backup_restore_domain_ids",
+        "control_plane_domain_ids",
+        "known_shared_dependencies"
+      ],
+      "properties": {
+        "operator_ids": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "organization_ids": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "administrative_domain_ids": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "identity_provider_domain_ids": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "key_custody_domain_ids": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "backup_restore_domain_ids": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "control_plane_domain_ids": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "known_shared_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dependency_type",
+              "dependency_id",
+              "affected_operator_ids",
+              "consequence"
+            ],
+            "properties": {
+              "dependency_type": {
+                "enum": [
+                  "organization",
+                  "administrator",
+                  "identity_provider",
+                  "key_custody",
+                  "backup_restore",
+                  "control_plane",
+                  "network",
+                  "software_supply_chain",
+                  "time_source",
+                  "other"
+                ]
+              },
+              "dependency_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "affected_operator_ids": {
+                "type": "array",
+                "minItems": 2,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "consequence": {
+                "type": "string",
+                "minLength": 10
+              }
+            }
+          }
+        }
+      }
+    },
+    "independence_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reviewer_identity",
+        "review_date",
+        "evidence_refs",
+        "common_cause_cut_sets_reported"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_assessed",
+            "reviewed_independent",
+            "failed_independence_gate"
+          ]
+        },
+        "reviewer_identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "review_date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "common_cause_cut_sets_reported": {
+          "type": "boolean"
+        },
+        "decision_notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "recovery_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unknown_outcome_policy",
+        "idempotency_conflict_policy",
+        "witness_unavailable_policy",
+        "stale_store_policy",
+        "erasure_replay_policy"
+      ],
+      "properties": {
+        "unknown_outcome_policy": {
+          "const": "reconcile_same_operation_id_before_new_mutation"
+        },
+        "idempotency_conflict_policy": {
+          "const": "reject_same_id_different_transition_digest"
+        },
+        "witness_unavailable_policy": {
+          "enum": [
+            "continue_with_quorum",
+            "hold_below_quorum",
+            "not_evaluable"
+          ]
+        },
+        "stale_store_policy": {
+          "const": "do_not_serve_until_reconciled"
+        },
+        "erasure_replay_policy": {
+          "const": "apply_witnessed_erasure_or_hold"
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_retention",
+        "witness_receipts_signed",
+        "checkpoint_verification",
+        "independent_replay_required"
+      ],
+      "properties": {
+        "receipt_retention": {
+          "enum": [
+            "durable",
+            "ephemeral",
+            "not_declared"
+          ]
+        },
+        "witness_receipts_signed": {
+          "type": "boolean"
+        },
+        "checkpoint_verification": {
+          "enum": [
+            "none",
+            "signature_only",
+            "inclusion_and_consistency",
+            "inclusion_consistency_and_freshness"
+          ]
+        },
+        "independent_replay_required": {
+          "type": "boolean"
+        },
+        "transparency_log_profile_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "profile_status": {
+            "const": "independently_reviewed"
+          }
+        },
+        "required": [
+          "profile_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "independence_assessment": {
+            "properties": {
+              "status": {
+                "const": "reviewed_independent"
+              },
+              "reviewer_identity": {
+                "type": "string",
+                "minLength": 1
+              },
+              "review_date": {
+                "type": "string",
+                "format": "date"
+              },
+              "evidence_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile_status": {
+            "const": "synthetic_example"
+          }
+        },
+        "required": [
+          "profile_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "independence_assessment": {
+            "properties": {
+              "status": {
+                "const": "not_assessed"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "freshness_policy": {
+            "properties": {
+              "mode": {
+                "const": "fresh_quorum_required"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          }
+        },
+        "required": [
+          "freshness_policy"
+        ]
+      },
+      "then": {
+        "properties": {
+          "freshness_policy": {
+            "properties": {
+              "freshness_mechanism": {
+                "enum": [
+                  "nonce_bound_quorum_challenge",
+                  "trusted_time_expiry",
+                  "monotonic_client_checkpoint",
+                  "combined"
+                ]
+              }
+            },
+            "required": [
+              "freshness_mechanism"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
