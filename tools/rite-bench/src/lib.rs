@@ -314,6 +314,7 @@ pub enum EvaluationError {
     DuplicateTaskId(String),
     InvalidConfidence(String),
     EmptyCitationSourceId(String),
+    DuplicateCitationSourceId { task_id: String, source_id: String },
     EmptyCitationOriginId(String),
     EmptyBudgetLimits(String),
     UnexpectedReplayEvidence(String),
@@ -332,6 +333,9 @@ impl fmt::Display for EvaluationError {
             }
             Self::EmptyCitationSourceId(id) => {
                 write!(f, "citation source identity is empty: {id}")
+            }
+            Self::DuplicateCitationSourceId { task_id, source_id } => {
+                write!(f, "duplicate citation source identity for task {task_id}: {source_id}")
             }
             Self::EmptyCitationOriginId(id) => {
                 write!(f, "citation provenance origin is empty: {id}")
@@ -390,9 +394,17 @@ fn validate(records: &[TaskRecord]) -> Result<(), EvaluationError> {
         {
             return Err(EvaluationError::InvalidConfidence(task_id.to_string()));
         }
+        let mut source_ids = HashSet::new();
         for citation in &record.citations {
-            if citation.source_id.trim().is_empty() {
+            let source_id = citation.source_id.trim();
+            if source_id.is_empty() {
                 return Err(EvaluationError::EmptyCitationSourceId(task_id.to_string()));
+            }
+            if !source_ids.insert(source_id) {
+                return Err(EvaluationError::DuplicateCitationSourceId {
+                    task_id: task_id.to_string(),
+                    source_id: source_id.to_string(),
+                });
             }
             if citation.origin_id.trim().is_empty() {
                 return Err(EvaluationError::EmptyCitationOriginId(task_id.to_string()));
@@ -870,6 +882,29 @@ mod tests {
                 Err(EvaluationError::InvalidConfidence(_))
             ));
         }
+    }
+
+    #[test]
+    fn rejects_duplicate_citation_source_identity_within_task() {
+        let mut record = task("duplicate-source", Decision::Supported, Decision::Supported);
+        record.citations = vec![
+            CitationRecord {
+                source_id: "source-1".to_string(),
+                origin_id: "origin-a".to_string(),
+                eligible_for_claim: true,
+                supports_expected_decision: true,
+            },
+            CitationRecord {
+                source_id: "source-1".to_string(),
+                origin_id: "origin-b".to_string(),
+                eligible_for_claim: true,
+                supports_expected_decision: true,
+            },
+        ];
+        assert!(matches!(
+            evaluate(&[record]),
+            Err(EvaluationError::DuplicateCitationSourceId { .. })
+        ));
     }
 
     #[test]
