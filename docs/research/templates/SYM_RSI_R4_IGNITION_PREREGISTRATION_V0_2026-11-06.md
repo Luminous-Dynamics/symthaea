@@ -6,6 +6,8 @@
 
 ## Purpose
 
+The completed preregistration document cannot embed the Git commit that contains itself without a self-reference. `experiment.protocol_contract_commit` therefore identifies the exact protocol/checker implementation commit used when freezing the protocol. The commit containing the completed preregistration document is derived from Git after the document is committed and must be bound externally by the existing canonical run receipt/attestation; do not guess or pre-fill that future commit SHA.
+
 Freeze the exact same-start, matched-total-budget comparison between an evolved outer-loop researcher and a fixed/incumbent or human-authored reference researcher before confirmatory outcomes are accessed.
 
 The JSON file is intentionally populated with `__REQUIRED_BEFORE_PREREGISTRATION__` placeholders. The presence of a syntactically valid JSON file does not mean the experiment is ready. The template must be completed, independently reviewed and committed before execution or outcome observation.
