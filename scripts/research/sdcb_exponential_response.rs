@@ -85,6 +85,29 @@ impl FirstOrderResponseOu {
         self.mu
     }
 
+    pub fn process_variance(&self) -> f64 {
+        self.process_variance
+    }
+
+    /// Continuous-time linear-SDE matrices for the coupled physical/sensor
+    /// state S=[x,z]:
+    ///   dS = A S dt + G dW,  Qc = G G^T.
+    ///
+    /// The sensor has no independent process noise here; acquisition/electronics
+    /// noise is supplied separately at the observation layer.
+    pub fn continuous_time_matrices(
+        &self,
+    ) -> Result<([[f64; 2]; 2], [[f64; 2]; 2]), ResponseModelError> {
+        let diffusion = (self.lambda * self.process_variance) * 2.0;
+        if !diffusion.is_finite() || diffusion < 0.0 {
+            return Err(ResponseModelError::NumericalFailure);
+        }
+        Ok((
+            [[-self.lambda, 0.0], [self.mu, -self.mu]],
+            [[diffusion, 0.0], [0.0, 0.0]],
+        ))
+    }
+
     /// Stationary covariance of [x, z].
     ///
     /// P = [[var(x), cov(x,z)],
