@@ -513,6 +513,17 @@ mod tests {
     }
 
     #[test]
+    fn zero_variance_with_nonzero_cross_covariance_is_not_psd() {
+        assert_eq!(
+            bivariate_gaussian_rectangle(
+                [0.0, 0.0], [[0.0, 0.1], [0.1, 1.0]],
+                [-1.0, -1.0], [1.0, 1.0],
+            ),
+            Err(RectangleError::CovarianceNotPositiveSemidefinite)
+        );
+    }
+
+    #[test]
     fn ill_conditioned_covariance_is_unsupported_without_jitter() {
         assert_eq!(
             bivariate_gaussian_rectangle([0.0, 0.0], [[1.0, 0.999999999], [0.999999999, 1.0]],
