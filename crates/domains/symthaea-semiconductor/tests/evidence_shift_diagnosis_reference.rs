@@ -3,10 +3,10 @@
 use std::collections::BTreeMap;
 
 use symthaea_semiconductor::benchmark::{
-    EVIDENCE_SHIFT_OBSERVATION_SCHEMA_V1, EVIDENCE_SHIFT_POLICY_SCHEMA_V1,
-    EvidenceShiftMonitorV1, EvidenceShiftObservationV1, EvidenceShiftPolicyV1,
-    ShiftChannelPolicyV1, ShiftDiagnosticStateV1, ShiftSignalChannelV1,
-    create_evidence_shift_monitor_v1, observe_evidence_shift_v1,
+    EVIDENCE_SHIFT_OBSERVATION_SCHEMA_V1, EVIDENCE_SHIFT_POLICY_SCHEMA_V1, EvidenceShiftMonitorV1,
+    EvidenceShiftObservationV1, EvidenceShiftPolicyV1, ShiftChannelPolicyV1,
+    ShiftDiagnosticStateV1, ShiftSignalChannelV1, create_evidence_shift_monitor_v1,
+    observe_evidence_shift_v1,
 };
 
 fn digest(ch: char) -> String {
@@ -33,16 +33,16 @@ fn policy() -> EvidenceShiftPolicyV1 {
         maximum_absolute_standardized_value: 50.0,
         channels: BTreeMap::from([
             (ShiftSignalChannelV1::VmResidual, config.clone()),
-            (ShiftSignalChannelV1::ReferenceStandardResidual, config.clone()),
+            (
+                ShiftSignalChannelV1::ReferenceStandardResidual,
+                config.clone(),
+            ),
             (ShiftSignalChannelV1::SensorObservabilityScore, config),
         ]),
     }
 }
 
-fn observation(
-    sequence: u64,
-    value: f64,
-) -> EvidenceShiftObservationV1 {
+fn observation(sequence: u64, value: f64) -> EvidenceShiftObservationV1 {
     EvidenceShiftObservationV1 {
         schema: EVIDENCE_SHIFT_OBSERVATION_SCHEMA_V1.into(),
         observation_id: format!("reference-{sequence}"),
@@ -98,15 +98,12 @@ fn independent_reference_recurrence(values: &[f64]) -> Vec<OracleState> {
 }
 
 fn production_replay(values: &[f64]) -> (EvidenceShiftMonitorV1, Vec<String>) {
-    let mut monitor =
-        create_evidence_shift_monitor_v1("shift-oracle-engine", policy()).unwrap();
+    let mut monitor = create_evidence_shift_monitor_v1("shift-oracle-engine", policy()).unwrap();
     let mut digests = Vec::new();
     for (index, value) in values.iter().enumerate() {
-        let result = observe_evidence_shift_v1(
-            &mut monitor,
-            &observation(index as u64 + 1, *value),
-        )
-        .unwrap();
+        let result =
+            observe_evidence_shift_v1(&mut monitor, &observation(index as u64 + 1, *value))
+                .unwrap();
         digests.push(result.assessment_sha256);
     }
     (monitor, digests)
