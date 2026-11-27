@@ -37,6 +37,7 @@ pub struct SceneContinuityDescriptor {
     session_id: String,
     clock_domain_id: String,
     event_id: String,
+    grant_id: String,
     canonical_cue_digest: String,
     sequence: u64,
     form: EmbodimentForm,
@@ -52,6 +53,7 @@ impl SceneContinuityDescriptor {
         session_id: impl Into<String>,
         clock_domain_id: impl Into<String>,
         event_id: impl Into<String>,
+        grant_id: impl Into<String>,
         canonical_cue_digest: impl Into<String>,
         sequence: u64,
         form: EmbodimentForm,
@@ -63,12 +65,14 @@ impl SceneContinuityDescriptor {
         let session_id = session_id.into();
         let clock_domain_id = clock_domain_id.into();
         let event_id = event_id.into();
+        let grant_id = grant_id.into();
         let canonical_cue_digest = canonical_cue_digest.into();
         let observed_at_monotonic_ns = observed_at_monotonic_ns.into();
         let effective_expires_at_monotonic_ns = effective_expires_at_monotonic_ns.into();
         validate_identifier(&session_id)?;
         validate_identifier(&clock_domain_id)?;
         validate_identifier(&event_id)?;
+        validate_identifier(&grant_id)?;
         if canonical_cue_digest.len() != 64
             || !canonical_cue_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
         {
@@ -86,6 +90,7 @@ impl SceneContinuityDescriptor {
             session_id,
             clock_domain_id,
             event_id,
+            grant_id,
             canonical_cue_digest: canonical_cue_digest.to_ascii_lowercase(),
             sequence,
             form,
@@ -101,6 +106,7 @@ impl SceneContinuityDescriptor {
             frame.session_id(),
             frame.clock_domain_id(),
             frame.event_id(),
+            frame.grant_id(),
             frame.canonical_cue_digest(),
             frame.sequence(),
             frame.form(),
@@ -114,6 +120,7 @@ impl SceneContinuityDescriptor {
     pub fn session_id(&self) -> &str { &self.session_id }
     pub fn clock_domain_id(&self) -> &str { &self.clock_domain_id }
     pub fn event_id(&self) -> &str { &self.event_id }
+    pub fn grant_id(&self) -> &str { &self.grant_id }
     pub fn canonical_cue_digest(&self) -> &str { &self.canonical_cue_digest }
     pub fn sequence(&self) -> u64 { self.sequence }
     pub fn form(&self) -> EmbodimentForm { self.form }
@@ -294,6 +301,10 @@ pub fn plan_transition(
     if source.event_id == target.event_id && source.canonical_cue_digest != target.canonical_cue_digest {
         return Err(TransitionError::EventContentMismatch);
     }
+    let source_observed = parse_monotonic_ns(&source.observed_at_monotonic_ns)?;
+    if target_observed < source_observed {
+        return Err(TransitionError::ClockRegression);
+    }
     let same_event = source.event_id == target.event_id;
     if same_event {
         if source.sequence != target.sequence {
@@ -307,8 +318,14 @@ pub fn plan_transition(
     let source_expired = source_expires <= now;
     let same_form = source.form == target.form;
     let same_cue = source.canonical_cue_digest == target.canonical_cue_digest;
-    let no_change = same_event && same_cue && same_form;
+    let same_authority = source.grant_id == target.grant_id
+        && target.effective_expires_at_monotonic_ns >= source.effective_expires_at_monotonic_ns;
+    let same_intensity = (source.effective_intensity - target.effective_intensity).abs() <= f32::EPSILON;
+    let no_change = same_event && same_cue && same_form && same_authority && same_intensity
+        && source.motion_mode == target.motion_mode;
     let requires_hard_cut = source_expired
+        || !same_authority
+        || target.effective_intensity < source.effective_intensity
         || source.motion_mode == MotionMode::Static
         || target.motion_mode == MotionMode::Static
         || source.effective_intensity <= 0.0
@@ -397,7 +414,7 @@ mod tests {
         expires: &str,
     ) -> SceneContinuityDescriptor {
         SceneContinuityDescriptor::new(
-            SESSION, CLOCK, id, digest, sequence, form, motion, intensity, "100", expires,
+            SESSION, CLOCK, id, "grant-v1", digest, sequence, form, motion, intensity, "100", expires,
         ).unwrap()
     }
 
@@ -442,11 +459,11 @@ mod tests {
     fn session_and_clock_mismatch_are_rejected() {
         let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
         let wrong_session = SceneContinuityDescriptor::new(
-            "other-session", CLOCK, "event-2", DIGEST_B, 2, EmbodimentForm::Swarm, MotionMode::Dynamic, 0.8, "200", "1200",
+            "other-session", CLOCK, "event-2", "grant-v1", DIGEST_B, 2, EmbodimentForm::Swarm, MotionMode::Dynamic, 0.8, "200", "1200",
         ).unwrap();
         assert_eq!(plan_transition(Some(&source), &wrong_session, TransitionPolicy::default(), CLOCK, "250"), Err(TransitionError::WrongSession));
         let wrong_clock = SceneContinuityDescriptor::new(
-            SESSION, "clock:other", "event-2", DIGEST_B, 2, EmbodimentForm::Swarm, MotionMode::Dynamic, 0.8, "200", "1200",
+            SESSION, "clock:other", "event-2", "grant-v1", DIGEST_B, 2, EmbodimentForm::Swarm, MotionMode::Dynamic, 0.8, "200", "1200",
         ).unwrap();
         assert_eq!(plan_transition(Some(&source), &wrong_clock, TransitionPolicy::default(), "clock:other", "250"), Err(TransitionError::WrongClockDomain));
     }
@@ -456,6 +473,42 @@ mod tests {
         let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
         let target = descriptor("event-1", 1, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "1200");
         assert_eq!(plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200"), Err(TransitionError::EventContentMismatch));
+    }
+
+    #[test]
+    fn grant_change_forces_a_hard_cut_even_for_the_same_cue() {
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let target = SceneContinuityDescriptor::new(
+            SESSION, CLOCK, "event-1", "grant-v2", DIGEST_A, 1,
+            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "200", "1200",
+        ).unwrap();
+        let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "250").unwrap();
+        assert_eq!(plan.kind(), TransitionKind::HardCut);
+        assert_eq!(plan.duration_ns(), 0);
+    }
+
+    #[test]
+    fn reduced_intensity_forces_a_hard_cut_so_old_output_cannot_linger() {
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let target = SceneContinuityDescriptor::new(
+            SESSION, CLOCK, "event-2", "grant-v1", DIGEST_B, 2,
+            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.2, "200", "1200",
+        ).unwrap();
+        let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "250").unwrap();
+        assert_eq!(plan.kind(), TransitionKind::HardCut);
+    }
+
+    #[test]
+    fn regressing_target_observation_time_is_rejected() {
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let target = SceneContinuityDescriptor::new(
+            SESSION, CLOCK, "event-2", "grant-v1", DIGEST_B, 2,
+            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "90", "1200",
+        ).unwrap();
+        assert_eq!(
+            plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "250"),
+            Err(TransitionError::ClockRegression)
+        );
     }
 
     #[test]
