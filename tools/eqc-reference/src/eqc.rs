@@ -129,6 +129,8 @@ pub struct EqcReport {
     pub reference_pass_count: usize,
     pub no_op_fails_positive_controls: bool,
     pub allow_all_fails_negative_controls: bool,
+    pub task_schema_validated: bool,
+    pub receipt_schema_meta_validated: bool,
     pub tasks: Vec<TaskReport>,
 }
 
@@ -158,9 +160,69 @@ pub fn validate_corpus_file(path: &Path, repository_root: &Path) -> anyhow::Resu
     }
     let bytes = fs::read(&corpus_path)
         .with_context(|| format!("read EQC seed corpus {}", corpus_path.display()))?;
-    let corpus: Corpus = serde_json::from_slice(&bytes)
-        .with_context(|| format!("parse EQC seed corpus {}", corpus_path.display()))?;
-    validate_corpus(&corpus, &bytes, &root)
+    let corpus_value: Value = serde_json::from_slice(&bytes)
+        .with_context(|| format!("parse EQC seed JSON {}", corpus_path.display()))?;
+    let task_schema_path = root.join("docs/research/eqc-task-v0.1.schema.json");
+    let receipt_schema_path = root.join("docs/research/eqc-run-receipt-v0.1.schema.json");
+
+    let task_values = corpus_value
+        .get("tasks")
+        .and_then(Value::as_array)
+        .context("EQC corpus must contain a tasks array")?;
+    validate_schema_instances(&task_schema_path, task_values)?;
+    validate_schema_definition(&receipt_schema_path)?;
+
+    let corpus: Corpus = serde_json::from_value(corpus_value)
+        .with_context(|| format!("deserialize EQC seed corpus {}", corpus_path.display()))?;
+    let mut report = validate_corpus(&corpus, &bytes, &root)?;
+    report.task_schema_validated = true;
+    report.receipt_schema_meta_validated = true;
+    Ok(report)
+}
+
+fn load_schema(path: &Path) -> anyhow::Result<Value> {
+    let bytes = fs::read(path)
+        .with_context(|| format!("read JSON Schema {}", path.display()))?;
+    let schema: Value = serde_json::from_slice(&bytes)
+        .with_context(|| format!("parse JSON Schema {}", path.display()))?;
+    jsonschema::meta::validate(&schema)
+        .with_context(|| format!("JSON Schema meta-validation failed for {}", path.display()))?;
+    Ok(schema)
+}
+
+fn validate_schema_definition(path: &Path) -> anyhow::Result<()> {
+    let schema = load_schema(path)?;
+    jsonschema::options()
+        .offline()
+        .should_validate_formats(true)
+        .build(&schema)
+        .with_context(|| format!("compile offline Draft 2020-12 schema {}", path.display()))?;
+    Ok(())
+}
+
+fn validate_schema_instances(path: &Path, instances: &[Value]) -> anyhow::Result<()> {
+    let schema = load_schema(path)?;
+    let validator = jsonschema::options()
+        .offline()
+        .should_validate_formats(true)
+        .build(&schema)
+        .with_context(|| format!("compile offline Draft 2020-12 schema {}", path.display()))?;
+
+    for (index, instance) in instances.iter().enumerate() {
+        let errors = validator
+            .iter_errors(instance)
+            .map(|error| format!("{} at {}", error, error.instance_path()))
+            .collect::<Vec<_>>();
+        if !errors.is_empty() {
+            bail!(
+                "JSON Schema validation failed for {} instance {}: {}",
+                path.display(),
+                index,
+                errors.join("; ")
+            );
+        }
+    }
+    Ok(())
 }
 
 fn validate_corpus(
@@ -263,6 +325,8 @@ fn validate_corpus(
         reference_pass_count,
         no_op_fails_positive_controls,
         allow_all_fails_negative_controls,
+        task_schema_validated: false,
+        receipt_schema_meta_validated: false,
         tasks: reports,
     })
 }
