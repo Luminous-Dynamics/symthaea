@@ -1167,14 +1167,8 @@ mod tests {
             })
             .collect();
         let scaled_profile = compute_unitizing_profile(&scaled, 60 * scale).unwrap();
-        assert!(
-            (scaled_profile.u_alpha_nominal.unwrap() - 0.509_032_735_310_107_6).abs()
-                < 1e-12
-        );
-        assert!(
-            (scaled_profile.u_alpha_binary.unwrap() - 0.412_463_363_258_039_56).abs()
-                < 1e-12
-        );
+        assert!((scaled_profile.u_alpha_nominal.unwrap() - 0.509_032_735_310_107_6).abs() < 1e-12);
+        assert!((scaled_profile.u_alpha_binary.unwrap() - 0.412_463_363_258_039_56).abs() < 1e-12);
         assert!(
             (baseline.u_alpha_nominal.unwrap() - scaled_profile.u_alpha_nominal.unwrap()).abs()
                 > 1e-4
