@@ -1,0 +1,558 @@
+{
+  "schema_version": 2,
+  "run_id": "synthetic-replay-receipt-not-measured",
+  "run_kind": "synthetic-not-measured",
+  "dataset_id": "synthetic-dataset-not-measured",
+  "dataset_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "transformation_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "stream_id": "synthetic-replay-stream-not-measured",
+  "stream_length_ticks": 5,
+  "replay_driver_repository_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "replay_driver_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "environment_seed": 41,
+  "event_ledger_sha256": "9a97eec0a23db69615e7d81eb74a602f7a3bf9910f263c6a3b9b3c6e8dfafa70",
+  "events": [
+    {
+      "sequence_index": 0,
+      "event_id": "e0",
+      "observed_at_tick": 0,
+      "available_at_tick": 0,
+      "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "sequence_index": 1,
+      "event_id": "e1",
+      "observed_at_tick": 1,
+      "available_at_tick": 1,
+      "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "sequence_index": 2,
+      "event_id": "e2",
+      "observed_at_tick": 2,
+      "available_at_tick": 2,
+      "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "sequence_index": 3,
+      "event_id": "e3",
+      "observed_at_tick": 3,
+      "available_at_tick": 3,
+      "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "sequence_index": 4,
+      "event_id": "e4",
+      "observed_at_tick": 4,
+      "available_at_tick": 4,
+      "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "arms": [
+    {
+      "arm_id": "no-adapt",
+      "repository_head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "configuration_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "policy_seed": 100,
+      "oracle_channel_access": false,
+      "deliveries": [
+        {
+          "event_id": "e0",
+          "delivered_at_tick": 0
+        },
+        {
+          "event_id": "e1",
+          "delivered_at_tick": 1
+        },
+        {
+          "event_id": "e2",
+          "delivered_at_tick": 2
+        },
+        {
+          "event_id": "e3",
+          "delivered_at_tick": 3
+        },
+        {
+          "event_id": "e4",
+          "delivered_at_tick": 4
+        }
+      ],
+      "decisions": [
+        {
+          "decision_tick": 0,
+          "observed_event_ids": [
+            "e0"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 1,
+          "observed_event_ids": [
+            "e0",
+            "e1"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 2,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 3,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2",
+            "e3"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 4,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2",
+            "e3",
+            "e4"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "arm_id": "detector-triggered",
+      "repository_head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "configuration_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "policy_seed": 101,
+      "oracle_channel_access": false,
+      "deliveries": [
+        {
+          "event_id": "e0",
+          "delivered_at_tick": 0
+        },
+        {
+          "event_id": "e1",
+          "delivered_at_tick": 1
+        },
+        {
+          "event_id": "e2",
+          "delivered_at_tick": 2
+        },
+        {
+          "event_id": "e3",
+          "delivered_at_tick": 3
+        },
+        {
+          "event_id": "e4",
+          "delivered_at_tick": 4
+        }
+      ],
+      "decisions": [
+        {
+          "decision_tick": 0,
+          "observed_event_ids": [
+            "e0"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 1,
+          "observed_event_ids": [
+            "e0",
+            "e1"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 2,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 3,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2",
+            "e3"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 4,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2",
+            "e3",
+            "e4"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "arm_id": "detector-benefit-gated",
+      "repository_head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "configuration_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "policy_seed": 102,
+      "oracle_channel_access": false,
+      "deliveries": [
+        {
+          "event_id": "e0",
+          "delivered_at_tick": 0
+        },
+        {
+          "event_id": "e1",
+          "delivered_at_tick": 1
+        },
+        {
+          "event_id": "e2",
+          "delivered_at_tick": 2
+        },
+        {
+          "event_id": "e3",
+          "delivered_at_tick": 3
+        },
+        {
+          "event_id": "e4",
+          "delivered_at_tick": 4
+        }
+      ],
+      "decisions": [
+        {
+          "decision_tick": 0,
+          "observed_event_ids": [
+            "e0"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 1,
+          "observed_event_ids": [
+            "e0",
+            "e1"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 2,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 3,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2",
+            "e3"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 4,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2",
+            "e3",
+            "e4"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "arm_id": "staged-verify-rollback",
+      "repository_head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "configuration_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "policy_seed": 103,
+      "oracle_channel_access": false,
+      "deliveries": [
+        {
+          "event_id": "e0",
+          "delivered_at_tick": 0
+        },
+        {
+          "event_id": "e1",
+          "delivered_at_tick": 1
+        },
+        {
+          "event_id": "e2",
+          "delivered_at_tick": 2
+        },
+        {
+          "event_id": "e3",
+          "delivered_at_tick": 3
+        },
+        {
+          "event_id": "e4",
+          "delivered_at_tick": 4
+        }
+      ],
+      "decisions": [
+        {
+          "decision_tick": 0,
+          "observed_event_ids": [
+            "e0"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 1,
+          "observed_event_ids": [
+            "e0",
+            "e1"
+          ],
+          "action": "stage",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 2,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2"
+          ],
+          "action": "verify",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "verification_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
+          "decision_tick": 3,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2",
+            "e3"
+          ],
+          "action": "commit",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 4,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2",
+            "e3",
+            "e4"
+          ],
+          "action": "rollback",
+          "state_before_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "candidate_state_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "verification_evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "arm_id": "oracle-timed",
+      "repository_head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "configuration_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "policy_seed": 104,
+      "oracle_channel_access": true,
+      "deliveries": [
+        {
+          "event_id": "e0",
+          "delivered_at_tick": 0
+        },
+        {
+          "event_id": "e1",
+          "delivered_at_tick": 1
+        },
+        {
+          "event_id": "e2",
+          "delivered_at_tick": 2
+        },
+        {
+          "event_id": "e3",
+          "delivered_at_tick": 3
+        },
+        {
+          "event_id": "e4",
+          "delivered_at_tick": 4
+        }
+      ],
+      "decisions": [
+        {
+          "decision_tick": 0,
+          "observed_event_ids": [
+            "e0"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 1,
+          "observed_event_ids": [
+            "e0",
+            "e1"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 2,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 3,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2",
+            "e3"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        },
+        {
+          "decision_tick": 4,
+          "observed_event_ids": [
+            "e0",
+            "e1",
+            "e2",
+            "e3",
+            "e4"
+          ],
+          "action": "no-op",
+          "state_before_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state_after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_sha256": null,
+          "candidate_state_sha256": null,
+          "verification_evidence_sha256": null
+        }
+      ]
+    }
+  ]
+}
