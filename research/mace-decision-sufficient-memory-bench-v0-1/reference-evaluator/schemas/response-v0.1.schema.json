@@ -8,22 +8,41 @@
     "schema_version",
     "episode_id",
     "arm_id",
+    "candidate_sha256",
     "action",
     "selected_evidence_ids",
     "observation_requests",
     "cost"
   ],
   "properties": {
-    "schema_version": { "const": "mace_dsm_response_v0_1" },
-    "episode_id": { "type": "string", "minLength": 1 },
-    "arm_id": { "type": "string", "minLength": 1, "maxLength": 160 },
-    "action": { "type": "string", "minLength": 1 },
+    "schema_version": {
+      "const": "mace_dsm_response_v0_1"
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "arm_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1
+    },
     "selected_evidence_ids": {
       "type": "array",
       "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
-    "observation_requests": { "type": "integer", "minimum": 0 },
+    "observation_requests": {
+      "type": "integer",
+      "minimum": 0
+    },
     "cost": {
       "type": "object",
       "additionalProperties": false,
@@ -36,18 +55,42 @@
         "latency_us"
       ],
       "properties": {
-        "ingest_operations": { "type": "integer", "minimum": 0 },
-        "query_operations": { "type": "integer", "minimum": 0 },
-        "maintenance_operations": { "type": "integer", "minimum": 0 },
-        "retained_bytes": { "type": "integer", "minimum": 0 },
-        "returned_bytes": { "type": "integer", "minimum": 0 },
+        "ingest_operations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_operations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maintenance_operations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retained_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "returned_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
         "latency_us": {
           "oneOf": [
-            { "type": "integer", "minimum": 0 },
-            { "type": "null" }
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       }
+    },
+    "candidate_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
