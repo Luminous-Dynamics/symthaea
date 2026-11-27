@@ -10,9 +10,9 @@
 use std::collections::{HashMap, HashSet};
 
 use cmaq_028_recovery_option_portfolio::{
-    assess_recovery_portfolio, PortfolioAssessment, PortfolioDisposition, PortfolioError,
-    PortfolioRequest, PreviousOutcome as PortfolioPreviousOutcome, RecoveryOption,
-    SelectedRecoveryOption,
+    PortfolioAssessment, PortfolioDisposition, PortfolioError, PortfolioRequest,
+    PreviousOutcome as PortfolioPreviousOutcome, RecoveryOption, SelectedRecoveryOption,
+    assess_recovery_portfolio,
 };
 use cmaq_031_anytime_calibration_monitor::MonitorUpdate;
 
@@ -125,22 +125,13 @@ pub fn handoff_after_calibration_quarantine(
         });
     }
 
-    validate_sha256(
-        &reconciliation.current_state_sha256,
-        "current_state_sha256",
-    )?;
+    validate_sha256(&reconciliation.current_state_sha256, "current_state_sha256")?;
     validate_sha256(
         &reconciliation.current_state_receipt_sha256,
         "current_state_receipt_sha256",
     )?;
-    validate_sha256(
-        &reconciliation.plant_model_sha256,
-        "plant_model_sha256",
-    )?;
-    validate_sha256(
-        &reconciliation.context_scope_sha256,
-        "context_scope_sha256",
-    )?;
+    validate_sha256(&reconciliation.plant_model_sha256, "plant_model_sha256")?;
+    validate_sha256(&reconciliation.context_scope_sha256, "context_scope_sha256")?;
 
     if portfolio_request.plant_model_sha256 != reconciliation.plant_model_sha256 {
         return Err(HandoffError::Portfolio(PortfolioError::ScopeMismatch(
@@ -149,25 +140,20 @@ pub fn handoff_after_calibration_quarantine(
     }
     if portfolio_request.prefixes.len() != 1
         || portfolio_request.prefixes[0].step != 0
-        || portfolio_request.prefixes[0].context_scope_sha256
-            != reconciliation.context_scope_sha256
+        || portfolio_request.prefixes[0].context_scope_sha256 != reconciliation.context_scope_sha256
     {
         return Ok(RecoveryHandoffAssessment {
             disposition: HandoffDisposition::RejectedNonImmediateAssessment,
             calibration_profile_sha256: quarantine.calibration_profile_sha256.clone(),
             monitor_scope_sha256: quarantine.monitor_scope_sha256.clone(),
             current_state_sha256: Some(reconciliation.current_state_sha256.clone()),
-            current_state_receipt_sha256: Some(
-                reconciliation.current_state_receipt_sha256.clone(),
-            ),
+            current_state_receipt_sha256: Some(reconciliation.current_state_receipt_sha256.clone()),
             portfolio_assessment: None,
         });
     }
 
     if required_independent_options == 0 {
-        return Err(HandoffError::Portfolio(
-            PortfolioError::ZeroRequiredOptions,
-        ));
+        return Err(HandoffError::Portfolio(PortfolioError::ZeroRequiredOptions));
     }
     if options.is_empty() {
         return Ok(RecoveryHandoffAssessment {
@@ -175,19 +161,14 @@ pub fn handoff_after_calibration_quarantine(
             calibration_profile_sha256: quarantine.calibration_profile_sha256.clone(),
             monitor_scope_sha256: quarantine.monitor_scope_sha256.clone(),
             current_state_sha256: Some(reconciliation.current_state_sha256.clone()),
-            current_state_receipt_sha256: Some(
-                reconciliation.current_state_receipt_sha256.clone(),
-            ),
+            current_state_receipt_sha256: Some(reconciliation.current_state_receipt_sha256.clone()),
             portfolio_assessment: None,
         });
     }
 
-    let assessment = assess_recovery_portfolio(
-        options,
-        portfolio_request,
-        required_independent_options,
-    )
-    .map_err(HandoffError::Portfolio)?;
+    let assessment =
+        assess_recovery_portfolio(options, portfolio_request, required_independent_options)
+            .map_err(HandoffError::Portfolio)?;
 
     if matches!(
         &assessment.disposition,
@@ -198,9 +179,7 @@ pub fn handoff_after_calibration_quarantine(
             calibration_profile_sha256: quarantine.calibration_profile_sha256.clone(),
             monitor_scope_sha256: quarantine.monitor_scope_sha256.clone(),
             current_state_sha256: Some(reconciliation.current_state_sha256.clone()),
-            current_state_receipt_sha256: Some(
-                reconciliation.current_state_receipt_sha256.clone(),
-            ),
+            current_state_receipt_sha256: Some(reconciliation.current_state_receipt_sha256.clone()),
             portfolio_assessment: Some(assessment),
         });
     }
@@ -221,9 +200,7 @@ pub fn handoff_after_calibration_quarantine(
             calibration_profile_sha256: quarantine.calibration_profile_sha256.clone(),
             monitor_scope_sha256: quarantine.monitor_scope_sha256.clone(),
             current_state_sha256: Some(reconciliation.current_state_sha256.clone()),
-            current_state_receipt_sha256: Some(
-                reconciliation.current_state_receipt_sha256.clone(),
-            ),
+            current_state_receipt_sha256: Some(reconciliation.current_state_receipt_sha256.clone()),
             portfolio_assessment: Some(assessment),
         });
     }
@@ -243,9 +220,7 @@ pub fn handoff_after_calibration_quarantine(
             calibration_profile_sha256: quarantine.calibration_profile_sha256.clone(),
             monitor_scope_sha256: quarantine.monitor_scope_sha256.clone(),
             current_state_sha256: Some(reconciliation.current_state_sha256.clone()),
-            current_state_receipt_sha256: Some(
-                reconciliation.current_state_receipt_sha256.clone(),
-            ),
+            current_state_receipt_sha256: Some(reconciliation.current_state_receipt_sha256.clone()),
             portfolio_assessment: Some(assessment),
         });
     }
@@ -405,7 +380,10 @@ mod tests {
             2,
         )
         .unwrap();
-        assert_eq!(result.disposition, HandoffDisposition::BlockUntilReconciliation);
+        assert_eq!(
+            result.disposition,
+            HandoffDisposition::BlockUntilReconciliation
+        );
         assert!(result.portfolio_assessment.is_none());
     }
 
