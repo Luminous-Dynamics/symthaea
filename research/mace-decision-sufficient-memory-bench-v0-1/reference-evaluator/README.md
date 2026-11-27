@@ -75,7 +75,7 @@ Cost fields are candidate-reported receipts. Unknown operation counts, bytes or 
 
 ## Tests
 
-Eight authored unit tests cover:
+Ten authored unit tests cover:
 - half-open valid-time windows and future-observation exclusion;
 - observed supersession/retraction and rejection of untrusted lifecycle events;
 - untrusted source evidence rejection;
