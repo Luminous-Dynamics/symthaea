@@ -587,7 +587,7 @@ Safety behavior:
 
 The material fade changes presentation opacity only; it does not change scene semantics, semantic confidence or policy-authorized intensity. The adapter's ECS acknowledgement is not a compositor observation.
 
-**Evidence status:** source implementation committed; 118 Rust tests authored (109 core and 9 adapter), none compiled or executed; no Bevy runtime/display, compositor observer or device qualification. Bevy dependency resolution and lockfile are still pending. The adapter README records the current limitations.
+**Evidence status:** source implementation committed; 124 Rust tests authored (109 core and 15 adapter), none compiled or executed; no Bevy runtime/display, compositor observer or device qualification. Bevy dependency resolution and lockfile are still pending. The adapter README records the current limitations.
 
 See:
 - `SYMTHAEA_CROSS_FORM_CONTINUITY_V0_1_2026-11-27.md`

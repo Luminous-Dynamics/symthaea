@@ -108,7 +108,7 @@ A benchmark result is publishable only when the exact evaluated head, environmen
 - Renderer-neutral event, projection, policy, receipt, scene, turn-control and continuity modules are present.
 - The isolated Bevy adapter now integrates the continuity planner with separate source/target scene groups, explicit alpha blending and live permit rechecks for both groups during transitions.
 - Superseding an unfinished transition uses a hard cut; a denied target clears both groups rather than restoring prior output.
-- Nine adapter tests and 109 core tests are authored (118 total), none compiled or executed.
+- Fifteen adapter tests and 109 core tests are authored (124 total), none compiled or executed.
 - No Bevy display/runtime, compositor observation, InteractionBench, TurnBench, StreamEval or VideoFDB evaluation has been executed.
 - No claim of SOTA superiority, consciousness, sentience or subjective experience is made.
 
@@ -121,3 +121,20 @@ A benchmark result is publishable only when the exact evaluated head, environmen
 - VideoFDB: https://research.nvidia.com/labs/amri/projects/video-fdb/
 - VideoFDB leaderboard: https://research.nvidia.com/labs/amri/projects/video-fdb/leaderboard.html
 - StreamEval: https://streameval.ai/
+
+
+## 9. Cross-event causal verifier invariants
+
+The JSON Schema checks event shape. A separate trace verifier must check relationships that JSON Schema cannot express across array entries. At minimum it must reject:
+1. duplicate or regressing event sequence numbers within a session/clock stream;
+2. regressing monotonic event timestamps, or chunk arrival earlier than its recorded source timestamp;
+3. turn decisions emitted after their deadline, backdated, or duplicated for one candidate;
+4. presentation without a preceding matching authorization for the same session, event digest, grant, channel, destination and form;
+5. actions without a preceding authorization sequence and action-specific authority;
+6. visible frames at or after grant/event effective expiry, following revocation, or following a stop/cancel observation;
+7. an event ID reused with a different canonical cue digest;
+8. a grounding answer whose cited support sequence is absent, future-dated or unrelated to its declared context;
+9. Submitted treated as Observed without a qualified observer identity and matching output/frame digest;
+10. an output-stop receipt that precedes the final visible frame or is absent after a required stop.
+
+The verifier must preserve clock-domain identity and never compare monotonic timestamps from different domains. It must report every rejected sample and reason, not silently discard invalid traces. These are implementation requirements; the verifier has not yet been written or run.

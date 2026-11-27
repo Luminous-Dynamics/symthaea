@@ -50,4 +50,4 @@ Generate and review the package lockfile first, then use the exact committed loc
 
 ## Current tests
 
-Nine Rust adapter tests are authored, including monotonic clock regression, exact expiry, cross-domain rejection, authorized-intensity clamping, zero-intensity output, animation caps, and transition alpha bounds. The main Soma event, projection, policy, receipt, scene, turn-control and transition modules contain 109 authored tests, for 118 authored Rust tests total. None has been compiled or executed. Current draft-PR GitHub Actions results must be read from the exact head and are not inferred from this document.
+Fifteen Rust adapter tests are authored, including monotonic clock regression, exact expiry, cross-domain rejection, authorized-intensity clamping, zero-intensity output, animation caps, and transition alpha bounds. The main Soma event, projection, policy, receipt, scene, turn-control and transition modules contain 109 authored tests, for 124 authored Rust tests total. None has been compiled or executed. Current draft-PR GitHub Actions results must be read from the exact head and are not inferred from this document.

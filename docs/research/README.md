@@ -60,7 +60,7 @@ event contract.
 The renderer-independent event, projection, policy, receipt, scene, turn-control and continuity modules live under
 `crates/domains/symthaea-soma/src/`. A standalone Bevy 0.20.1 adapter has transition-aware source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
-All 118 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
+All 124 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
 
 ## Theoretical Foundations
 
