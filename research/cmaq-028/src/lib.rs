@@ -532,7 +532,7 @@ mod tests {
     fn context_mismatch_removes_an_option_without_averaging() {
         let options = vec![
             option("covers", '1', 'c', 10, 4, 2, 2),
-            option("wrong-context", '2', 'x', 10, 4, 1, 1),
+            option("wrong-context", '2', 'f', 10, 4, 1, 1),
         ];
         let r = request(vec![prefix(0, 'c', 5)]);
         let assessment = assess_recovery_portfolio(&options, &r, 2).unwrap();
