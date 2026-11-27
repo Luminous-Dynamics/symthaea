@@ -1,0 +1,36 @@
+{
+  "schema_version": "sdcb_ou_window_covariance.v1",
+  "process": {
+    "id": "shared-ou-factor",
+    "stationary_variance": 1,
+    "correlation_time_seconds": 1
+  },
+  "windows": [
+    {
+      "id": "long",
+      "start_seconds": 0,
+      "end_seconds": 2
+    },
+    {
+      "id": "short",
+      "start_seconds": 1,
+      "end_seconds": 2
+    },
+    {
+      "id": "duplicate-long",
+      "start_seconds": 0,
+      "end_seconds": 2
+    },
+    {
+      "id": "later",
+      "start_seconds": 3,
+      "end_seconds": 4
+    }
+  ],
+  "shared_white_noise_spectral_density": 0.2,
+  "notes": [
+    "Synthetic analytic fixture only.",
+    "Times are seconds relative to a declared epoch.",
+    "Duplicate windows must have identical OU-factor averages, not independent information."
+  ]
+}
