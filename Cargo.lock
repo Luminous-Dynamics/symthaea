@@ -18559,6 +18559,7 @@ dependencies = [
  "nalgebra 0.34.2",
  "ndarray",
  "num-complex",
+ "nvml-wrapper",
  "once_cell",
  "ordered-float 4.6.0",
  "ort",
