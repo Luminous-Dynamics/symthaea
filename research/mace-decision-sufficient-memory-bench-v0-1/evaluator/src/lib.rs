@@ -100,6 +100,8 @@ pub struct EvidenceInfluenceV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PairedScoreV1 {
     pub episode_id: String,
+    pub downstream_policy_digest: String,
+    pub decision_seed: u64,
     pub memory: RunScoreV1,
     pub no_memory: RunScoreV1,
     /// Positive means memory lowered decision loss; negative means memory
@@ -575,7 +577,13 @@ impl SplitMix64V1 {
 }
 
 fn validate_paired_score(score: &PairedScoreV1) -> Result<(), EvaluationErrorV1> {
-    if score.memory.system_id == score.no_memory.system_id
+    if score.episode_id.trim().is_empty()
+        || score.downstream_policy_digest.len() != 64
+        || !score
+            .downstream_policy_digest
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        || score.memory.system_id == score.no_memory.system_id
         || score.memory.oracle_loss_micros != score.no_memory.oracle_loss_micros
         || score.memory.decision_loss_micros.checked_sub(score.memory.oracle_loss_micros)
             != Some(score.memory.decision_regret_micros)
