@@ -17969,6 +17969,7 @@ dependencies = [
  "symthaea-causal-reasoning",
  "symthaea-cell-foundry",
  "symthaea-chronicle",
+ "url",
  "symthaea-circuits",
  "symthaea-clime",
  "symthaea-clinical",
