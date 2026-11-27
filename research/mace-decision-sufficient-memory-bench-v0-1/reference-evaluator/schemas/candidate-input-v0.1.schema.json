@@ -9,7 +9,8 @@
     "episode_id",
     "seed",
     "family",
-    "candidate"
+    "candidate",
+    "candidate_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -165,6 +166,10 @@
           "minimum": 0
         }
       }
+    },
+    "candidate_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
