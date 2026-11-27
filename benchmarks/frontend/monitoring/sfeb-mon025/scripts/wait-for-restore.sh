@@ -15,7 +15,6 @@ case "$MAJOR" in 18|19) ;; *) echo "usage: $0 18|19 restore18|restore19 HEX/HEX 
 [[ "$SERVICE" == "restore$MAJOR" ]] || { echo "service must match the selected PostgreSQL major" >&2; exit 64; }
 [[ "$TARGET_LSN" =~ ^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$ ]] || { echo "invalid target LSN" >&2; exit 64; }
 [[ "$TARGET_TIMELINE" =~ ^[1-9][0-9]*$ ]] || { echo "invalid target timeline" >&2; exit 64; }
-target_timeline_hex="$(printf "%08X" "$TARGET_TIMELINE")"
 [[ "$TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || { echo "timeout must be a positive integer" >&2; exit 64; }
 [ -f "$ENV_FILE" ] || { echo ".env is required" >&2; exit 66; }
 # shellcheck disable=SC1090
@@ -27,7 +26,7 @@ for ((attempt=1; attempt<=TIMEOUT_SECONDS; attempt++)); do
   if "${DC[@]}" exec -T "$SERVICE" pg_isready -U "${MON025_DB_USER:-mon025}" -d "${MON025_DB_NAME:-mon025}" >/dev/null 2>&1; then
     ready="$("${DC[@]}" exec -T -e PGPASSWORD="$MON025_DB_PASSWORD" "$SERVICE" \
       psql -X -q -A -t -h 127.0.0.1 -U "${MON025_DB_USER:-mon025}" -d "${MON025_DB_NAME:-mon025}" \
-      -v ON_ERROR_STOP=1 -c "SELECT (pg_is_in_recovery() AND pg_last_wal_replay_lsn() IS NOT NULL AND pg_last_wal_replay_lsn() >= '$TARGET_LSN'::pg_lsn AND substring(pg_walfile_name(pg_last_wal_replay_lsn()) from 1 for 8) = '$target_timeline_hex')::text")" || true
+      -v ON_ERROR_STOP=1 -c "SELECT (pg_is_in_recovery() AND pg_last_wal_replay_lsn() IS NOT NULL AND pg_last_wal_replay_lsn() >= '$TARGET_LSN'::pg_lsn AND (SELECT timeline_id FROM pg_split_walfile_name(pg_walfile_name(pg_last_wal_replay_lsn()))) = '$TARGET_TIMELINE'::bigint)::text")" || true
     if [ "$ready" = "true" ]; then
       observed="$("${DC[@]}" exec -T -e PGPASSWORD="$MON025_DB_PASSWORD" "$SERVICE" \
         psql -X -q -A -t -h 127.0.0.1 -U "${MON025_DB_USER:-mon025}" -d "${MON025_DB_NAME:-mon025}" \
