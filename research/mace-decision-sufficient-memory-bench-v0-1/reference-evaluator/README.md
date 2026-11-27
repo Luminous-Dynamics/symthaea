@@ -16,6 +16,10 @@ Split combined episode records into candidate-visible and evaluator-private JSON
 
 A candidate adapter consumes only the candidate stream, conforming to schemas/candidate-input-v0.1.schema.json, and emits one response per episode and arm, conforming to schemas/response-v0.1.schema.json. The response echoes the candidate row's candidate_sha256 and contains a selected action, resolved evidence identifiers, observation-request count and candidate-reported resource counters. The scorer verifies that the echoed digest matches both the candidate row and evaluator-private commitment.
 
+Run the Rust unit tests when a Rust 2024 toolchain is available:
+
+    cargo test --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml
+
 Score a balanced set of candidate responses:
 
     cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- score /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl /tmp/dsm-responses.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/arms-v0.1.json /tmp/dsm-report.json
@@ -37,6 +41,16 @@ Run the six synthetic positive-control records against the six source episodes a
 - Untrusted and evaluator-labelled forbidden records are inadmissible. The evaluator does not interpret similarity, authority tiers or uncertainty as proof of truth.
 - Required-evidence recall, valid-evidence precision, stale/forbidden/untrusted use, unresolved contradiction co-retrieval, regret, gain/worsening versus the declared reference action, decision sufficiency and resource counters are reported independently.
 - The episode's no_memory_action is a task-authored reference action, not a measured memory-system baseline. The report labels this comparison as a declared reference only. To measure true paired system impact, execute a real no-memory arm and list its ID in the arm manifest's optional no_memory_arm_id field; the report then emits per-arm matched gain and harm rates against that executed no-memory arm.
+
+For a real paired comparison, the arm manifest can declare, for example:
+
+    {
+      "schema_version": "mace_dsm_arm_manifest_v0_1",
+      "expected_arm_ids": ["no_memory", "mace_memory"],
+      "no_memory_arm_id": "no_memory"
+    }
+
+The scorer rejects a baseline ID not present in expected_arm_ids and reports matched per-episode gain, worsening rate, harm count, improvement count and ties for each other arm. The included fixture manifest intentionally omits this field because its sole "synthetic-qualified-control" row is not a no-memory agent execution.
 - Action loss is compared to the evaluator's minimum-loss action. Matching the no-memory action or full-context action is not itself evidence of correctness.
 
 ## Trust and execution boundary
