@@ -29,6 +29,20 @@ func run() int {
 		fmt.Fprintf(os.Stderr, "artifact root: %v\n", err)
 		return 66
 	}
+	manifestAbs, err := filepath.Abs(*manifestOut)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "manifest output: %v\n", err)
+		return 66
+	}
+	requestAbs, err := filepath.Abs(*requestOut)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "signing request output: %v\n", err)
+		return 66
+	}
+	if manifestAbs == requestAbs {
+		fmt.Fprintln(os.Stderr, "manifest and signing request outputs must be different paths")
+		return 64
+	}
 	for _, output := range []string{*indexPath, *manifestOut, *requestOut} {
 		absolute, err := filepath.Abs(output)
 		if err != nil {
