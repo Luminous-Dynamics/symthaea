@@ -67,6 +67,18 @@ A five-seed paired pilot is a floor for estimating variance where feasible; it i
 
 This template is not itself an evaluator, signer, receipt, archive, statistical authority or promotion mechanism.
 
+## Canonical inclusive-budget digest (v1 extension)
+
+The Rust validator now recomputes `budget.shared_envelope_digest` instead of only checking that each arm repeats the same digest string. The v1 preimage is compact serde JSON for a fixed-order struct containing:
+
+- domain `symthaea.r4.inclusive-budget-envelope` and schema version `1`;
+- accounting boundary, total budget and currency/price basis;
+- all twelve per-arm resource caps;
+- failure-accounting policy; and
+- same-envelope, inclusive-cost, failed/invalid/retry inclusion, and human-review/rework inclusion flags.
+
+The lowercase SHA-256 digest must match `shared_envelope_digest` and both arm bindings. Any change to a cap or other cost-bearing field without recomputing the digest is rejected. This binds the *declared envelope*, not realized costs: source authentication and actual spend still belong to the existing receipt/accounting authorities.
+
 ## Semantic readiness contract (v0 extension)
 
 The companion Rust reference validator checks invariants that JSON Schema cannot express by itself:
