@@ -1,6 +1,6 @@
 # SDCB Dependence-Regime Envelope Contract v1
 
-**Status:** standalone Rust reference contract and exact-head Rust 1.96 workflow authored. Results are pending formatting, strict-warning compilation and the negative-control suite. This increment is stacked on #13990; it does not change production SDCB assessment.
+**Status:** exact-source Rust 1.96 workflow passed on code head `0708fb7a5e20d0c0321aa8f5c3a07e04a15a4031`: Rustfmt check passed; `rustc -D warnings --test` compiled and all **10/10 negative-control tests passed** ([workflow run](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46004270255)). This increment is stacked on #13990; it does not change production SDCB assessment.
 
 ## Motivation
 
