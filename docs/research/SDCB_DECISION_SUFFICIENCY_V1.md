@@ -6,26 +6,26 @@
 
 Mechanism identifiability and decision sufficiency are different properties.
 
-Let \\(\theta\) denote a candidate physical/instrument mechanism, and let \\(E\) be the complete observation and intervention protocol presently available. Define observational equivalence by
+Let \(\theta\) denote a candidate physical/instrument mechanism, and let \(E\) be the complete observation and intervention protocol presently available. Define observational equivalence by
 
-\\[
+\[
 \theta \sim_E \theta'
 \quad\Longleftrightarrow\quad
 P_\theta(Y_E\in B)=P_{\theta'}(Y_E\in B)
 \quad\text{for every measurable }B.
-\\]
+\]
 
 For a zero-mean Gaussian process, the complete finite-dimensional observation law is determined by its mean function and covariance kernel. Equality of a few sampled autocovariance values is not by itself a general proof of equivalence; the frozen pole-swap reference proves equality of the full covariance function under the declared OU + first-order response family.
 
 A mechanism is identifiable within a candidate class only when its observational-equivalence class is a singleton under the declared protocol. An estimator selecting one member of a non-singleton class has not identified that member, even if its point estimate is stable or its predictive fit is excellent.
 
-Now let \\(L(a,\theta)\) be the declared terminal decision loss. A mechanism class \\(C\) can be decision-sufficient without being identifiable when
+Now let \(L(a,\theta)\) be the declared terminal decision loss. A mechanism class \(C\) can be decision-sufficient without being identifiable when
 
-\\[
+\[
 \bigcap_{\theta\in C}
 \operatorname*{argmin}_{a\in\mathcal A} L(a,\theta)
 \ne \varnothing.
-\\]
+\]
 
 In words: at least one terminal action is optimal for every mechanism still compatible with the evidence. The decision may be settled while the physical explanation remains unresolved.
 
@@ -33,37 +33,37 @@ The reverse case is also important: if the optimal action differs across members
 
 ## 2. Robust and Bayesian estimands remain separate
 
-For an equivalence class \\(C\), the prior-free robust terminal risk is
+For an equivalence class \(C\), the prior-free robust terminal risk is
 
-\\[
+\[
 R_{\rm rob}(C)=
 \min_{a\in\mathcal A}\max_{\theta\in C}L(a,\theta).
-\\]
+\]
 
-For a probe \\(e\) with possible outcomes \\(o\), let \\(C_{e,o}\subseteq C\) contain the mechanisms consistent with that outcome. With guaranteed outcome support and no probabilities, the worst-case continuation risk is
+For a probe \(e\) with possible outcomes \(o\), let \(C_{e,o}\subseteq C\) contain the mechanisms consistent with that outcome. With guaranteed outcome support and no probabilities, the worst-case continuation risk is
 
-\\[
+\[
 R_{\rm rob}(C\mid e)=
 \max_{o:\,C_{e,o}\ne\varnothing}R_{\rm rob}(C_{e,o}).
-\\]
+\]
 
-A robust decision-value improvement is the reduction from \\(R_{\rm rob}(C)\) to \\(R_{\rm rob}(C\mid e)\). The exact finite-horizon, outcome-adaptive policy value and resource-vector feasibility remain owned by #13567. This fixture does not implement a second planner.
+A robust decision-value improvement is the reduction from \(R_{\rm rob}(C)\) to \(R_{\rm rob}(C\mid e)\). The exact finite-horizon, outcome-adaptive policy value and resource-vector feasibility remain owned by #13567. This fixture does not implement a second planner.
 
-For a defensible prior \\(p(\theta)\) and a fully specified likelihood, Bayesian Bayes risk is
+For a defensible prior \(p(\theta)\) and a fully specified likelihood, Bayesian Bayes risk is
 
-\\[
+\[
 R_{\rm B}(p)=
 \min_{a\in\mathcal A}
 \mathbb E_{\theta\sim p}[L(a,\theta)].
-\\]
+\]
 
-The expected value of sample information for probe \\(e\) is
+The expected value of sample information for probe \(e\) is
 
-\\[
+\[
 \operatorname{EVSI}(e)=R_{\rm B}(p)
 -\mathbb E_{o\sim P(o\mid e,p)}
 \left[R_{\rm B}(p(\theta\mid o,e))\right].
-\\]
+\]
 
 The fixture's 0.5/0.5 prior is an evaluator-created synthetic prior, not an empirical belief. Bayesian results must not be blended with the prior-free robust result.
 
