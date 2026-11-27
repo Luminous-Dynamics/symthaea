@@ -21,7 +21,7 @@ The offline runner executes MON-025 static preflight and parser fixtures, MON-02
 - SQL source truth, observed Kafka capture, transaction metadata, topic/partition inventory, required database surfaces and surface dispositions have canonical record-set digests plus completeness manifest references.
 - Each event includes both Kafka topic and Debezium data_collection label. END.data_collections is reconciled against collection labels, not inferred from topic names.
 - Missing, extra, conflicting or mismatched event IDs block.
-- Exact replays are recorded; without a digest-bound idempotency proof they remain indeterminate.
+- Exact duplicate replays are recorded; qualification requires a digest-bound idempotency proof and a coverage digest over the exact duplicate event IDs.
 - Transaction BEGIN/END, expected event counts, END.event_count, row counts, logical-message counts and transaction total_order are checked.
 - Kafka offsets are checked monotonically within topic/partition. Row collection_order is checked within each transaction and collection. Logical-message labels are not assumed globally stable across transactions.
 - V1 refuses to infer a global order across multiple Kafka partitions.
