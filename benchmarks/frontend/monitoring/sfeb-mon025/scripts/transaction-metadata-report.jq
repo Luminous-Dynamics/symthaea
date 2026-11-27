@@ -1,5 +1,5 @@
 [
-  $rows[0] | to_entries[] | . as $entry | $entry.value
+  $rows | to_entries[] | . as $entry | $entry.value
   | select((.payload.after? // null) != null and .payload.after.batch_id == $batch)
   | {
       observed_index: $entry.key,
@@ -14,11 +14,11 @@
 | ($raw_events | group_by(.event_id)) as $event_groups
 | [ $event_groups[] | select((map(del(.observed_index) | tojson) | unique | length) > 1) | .[0].event_id ] as $conflicts
 | [ $event_groups[] | sort_by(.observed_index) | .[0] ] as $events
-| [ $tx[0][] | .payload | select(.status? == "BEGIN") ] as $raw_begins
+| [ $tx[] | .payload | select(.status? == "BEGIN") ] as $raw_begins
 | ($raw_begins | group_by(.id)) as $begin_groups
 | [ $begin_groups[] | select((map(tojson) | unique | length) > 1) | .[0].id ] as $begin_conflicts
 | [ $begin_groups[] | .[0] ] as $begins
-| [ $tx[0][] | .payload | select(.status? == "END") ] as $raw_ends
+| [ $tx[] | .payload | select(.status? == "END") ] as $raw_ends
 | ($raw_ends | group_by(.id)) as $end_groups
 | [ $end_groups[] | select((map(tojson) | unique | length) > 1) | .[0].id ] as $end_conflicts
 | [ $end_groups[] | .[0] ] as $ends
