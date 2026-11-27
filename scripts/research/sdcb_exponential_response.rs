@@ -400,13 +400,14 @@ mod tests {
 
     #[test]
     fn subnormal_rate_gap_avoids_intermediate_product_underflow() {
-        let mu = 1.0 / f64::MAX;
-        let lambda = mu.next_up();
-        let tau = 1.0 / mu;
-        let model = FirstOrderResponseOu::new(lambda, 1.0, tau).unwrap();
-        let transition = model.transition_matrix(1.0).unwrap();
-        assert!(transition[1][0] > 0.0);
-        close(transition[1][0], mu, mu * 1.0e-12);
+        let tau = f64::MAX / 2.0;
+        let mu = 1.0 / tau;
+        for lambda in [mu.next_down(), mu.next_up()] {
+            let model = FirstOrderResponseOu::new(lambda, 1.0, tau).unwrap();
+            let transition = model.transition_matrix(1.0).unwrap();
+            assert!(transition[1][0] > 0.0);
+            close(transition[1][0], mu, mu * 1.0e-12);
+        }
     }
 
     #[test]
