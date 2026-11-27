@@ -166,8 +166,16 @@ fn hex(bytes: &[u8]) -> String {
     out
 }
 fn digest(bytes: &[u8]) -> String { hex(&Sha256::digest(bytes)) }
-fn candidate_digest(candidate: &Candidate) -> Result<String, String> {
-    let bytes = serde_json::to_vec(candidate).map_err(|e| e.to_string())?;
+#[derive(Serialize)]
+struct CandidateBinding<'a> {
+    episode_id: &'a str,
+    seed: u64,
+    family: &'a str,
+    candidate: &'a Candidate,
+}
+fn candidate_digest(episode_id: &str, seed: u64, family: &str, candidate: &Candidate) -> Result<String, String> {
+    let binding = CandidateBinding { episode_id, seed, family, candidate };
+    let bytes = serde_json::to_vec(&binding).map_err(|e| e.to_string())?;
     let mut h = Sha256::new();
     h.update(CANDIDATE_DOMAIN);
     h.update((bytes.len() as u64).to_be_bytes());
@@ -254,7 +262,7 @@ fn prepare(source: &str, candidate_path: &str, private_path: &str) -> Result<(),
     for e in episodes {
         validate_episode(&e)?;
         if !seen.insert(e.episode_id.clone()) { return Err(format!("duplicate episode {}", e.episode_id)); }
-        let binding = candidate_digest(&e.candidate)?;
+        let binding = candidate_digest(&e.episode_id, e.seed, &e.family, &e.candidate)?;
         candidates.push(CandidateRow {
             schema_version: CANDIDATE_SCHEMA.into(), episode_id: e.episode_id.clone(),
             seed: e.seed, family: e.family.clone(), candidate_sha256: binding.clone(), candidate: e.candidate,
@@ -288,7 +296,7 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
         p.episode_id != *id || p.seed != c.seed || p.family != c.family {
         return Err(format!("{id}: schema or candidate/private/response identity mismatch"));
     }
-    let computed_candidate_sha256 = candidate_digest(&c.candidate)?;
+    let computed_candidate_sha256 = candidate_digest(&c.episode_id, c.seed, &c.family, &c.candidate)?;
     if computed_candidate_sha256 != c.candidate_sha256 ||
         computed_candidate_sha256 != p.candidate_sha256 ||
         computed_candidate_sha256 != r.candidate_sha256 {
@@ -561,7 +569,7 @@ mod tests {
     }
     #[test] fn bad_memory_is_measured_against_no_memory_separately_from_regret(){
         let e=generated_episode(0,77);
-        let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.candidate).unwrap(),candidate:e.candidate.clone()};
+        let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id, e.seed, &e.family, &e.candidate).unwrap(),candidate:e.candidate.clone()};
         let p=PrivateRow{schema_version:PRIVATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.candidate).unwrap(),evaluator_private:e.evaluator_private.clone()};
         let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"bad-memory".into(),candidate_sha256:c.candidate_sha256.clone(),action:"use_old_account".into(),selected_evidence_ids:vec!["event-000000-old".into()],observation_requests:0,cost:Cost{ingest_operations:1,query_operations:1,maintenance_operations:0,retained_bytes:10,returned_bytes:10,latency_us:None}};
         let s=score_one(&c,&p,&r).unwrap();
