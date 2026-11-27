@@ -44,6 +44,10 @@ pub struct EvaluatorCaseV1 {
 pub struct CandidateRunV1 {
     pub episode_id: String,
     pub system_id: String,
+    /// Digest of the frozen downstream decision policy / reader configuration.
+    pub downstream_policy_digest: String,
+    /// Fixed seed shared across paired and leave-one-out policy executions.
+    pub decision_seed: u64,
     pub chosen_action: String,
     /// Ordered evidence IDs returned by Search / evidence resolution.
     pub retrieved_evidence_ids: Vec<String>,
@@ -136,7 +140,7 @@ pub enum CostReceiptErrorV1 {
 }
 
 impl CostReceiptV1 {
-    /// Ensure non-overlapping measured phases do not exceed total wall time.
+    /// Ensure non-overlapping measured phases, including residual, equal wall time.
     pub fn validate(&self) -> Result<(), CostReceiptErrorV1> {
         let p = self.phases;
         let sum = [
@@ -176,6 +180,9 @@ pub enum EvaluationErrorV1 {
     RequiredEvidenceIsNotAdmissible,
     EpisodeMismatch,
     SameSystemUsedForBothArms,
+    EmptyDownstreamPolicyDigest,
+    DownstreamPolicyMismatch,
+    DecisionSeedMismatch,
     InvalidCandidateAction,
     DuplicateReturnedEvidenceId,
     NoMemoryArmContainsEvidence,
@@ -280,6 +287,9 @@ fn validate_candidate(
     if candidate.system_id.is_empty() {
         return Err(EvaluationErrorV1::EmptySystemId);
     }
+    if candidate.downstream_policy_digest.is_empty() {
+        return Err(EvaluationErrorV1::EmptyDownstreamPolicyDigest);
+    }
     if !contains(&case.allowed_actions, &candidate.chosen_action) {
         return Err(EvaluationErrorV1::InvalidCandidateAction);
     }
@@ -360,6 +370,12 @@ pub fn score_paired(
     if memory.system_id == no_memory.system_id {
         return Err(EvaluationErrorV1::SameSystemUsedForBothArms);
     }
+    if memory.downstream_policy_digest != no_memory.downstream_policy_digest {
+        return Err(EvaluationErrorV1::DownstreamPolicyMismatch);
+    }
+    if memory.decision_seed != no_memory.decision_seed {
+        return Err(EvaluationErrorV1::DecisionSeedMismatch);
+    }
     if no_memory.chosen_action != case.no_memory_action {
         return Err(EvaluationErrorV1::NoMemoryArmActionMismatch);
     }
@@ -417,6 +433,14 @@ pub fn score_leave_one_out(
         }
         if ablation.output_without_evidence.system_id != full.system_id {
             return Err(EvaluationErrorV1::AblationSystemMismatch);
+        }
+        if ablation.output_without_evidence.downstream_policy_digest
+            != full.downstream_policy_digest
+        {
+            return Err(EvaluationErrorV1::DownstreamPolicyMismatch);
+        }
+        if ablation.output_without_evidence.decision_seed != full.decision_seed {
+            return Err(EvaluationErrorV1::DecisionSeedMismatch);
         }
         validate_candidate(case, &ablation.output_without_evidence)?;
 
@@ -491,6 +515,8 @@ mod tests {
         CandidateRunV1 {
             episode_id: "known-answer/0001".to_owned(),
             system_id: system.to_owned(),
+            downstream_policy_digest: "frozen-reader-sha256:known-answer-v1".to_owned(),
+            decision_seed: 4101,
             chosen_action: action.to_owned(),
             retrieved_evidence_ids: evidence.iter().map(|id| (*id).to_owned()).collect(),
         }
@@ -547,6 +573,8 @@ mod tests {
         let without = CandidateRunV1 {
             episode_id: full.episode_id.clone(),
             system_id: full.system_id.clone(),
+            downstream_policy_digest: full.downstream_policy_digest.clone(),
+            decision_seed: full.decision_seed,
             chosen_action: "abstain".to_owned(),
             retrieved_evidence_ids: vec![],
         };
@@ -599,6 +627,42 @@ mod tests {
             &run("no-memory", "abstain", &["signed-current"]),
         );
         assert_eq!(error, Err(EvaluationErrorV1::NoMemoryArmContainsEvidence));
+    }
+
+    #[test]
+    fn paired_arms_require_identical_downstream_policy_digest() {
+        let memory = run("mace", "hold", &["signed-current"]);
+        let mut baseline = run("no-memory", "abstain", &[]);
+        baseline.downstream_policy_digest = "different-reader".to_owned();
+        assert_eq!(
+            score_paired(&case(), &memory, &baseline),
+            Err(EvaluationErrorV1::DownstreamPolicyMismatch)
+        );
+    }
+
+    #[test]
+    fn leave_one_out_requires_identical_downstream_policy_digest() {
+        let full = run("mace", "hold", &["signed-current"]);
+        let mut without = CandidateRunV1 {
+            episode_id: full.episode_id.clone(),
+            system_id: full.system_id.clone(),
+            downstream_policy_digest: full.downstream_policy_digest.clone(),
+            decision_seed: full.decision_seed,
+            chosen_action: "abstain".to_owned(),
+            retrieved_evidence_ids: vec![],
+        };
+        without.downstream_policy_digest = "different-reader".to_owned();
+        assert_eq!(
+            score_leave_one_out(
+                &case(),
+                &full,
+                &[EvidenceAblationV1 {
+                    removed_evidence_id: "signed-current".to_owned(),
+                    output_without_evidence: without,
+                }],
+            ),
+            Err(EvaluationErrorV1::DownstreamPolicyMismatch)
+        );
     }
 
     #[test]
