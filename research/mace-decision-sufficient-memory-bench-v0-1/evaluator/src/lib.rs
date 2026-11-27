@@ -641,6 +641,17 @@ mod tests {
     }
 
     #[test]
+    fn paired_arms_require_identical_decision_seed() {
+        let memory = run("mace", "hold", &["signed-current"]);
+        let mut baseline = run("no-memory", "abstain", &[]);
+        baseline.decision_seed = 4102;
+        assert_eq!(
+            score_paired(&case(), &memory, &baseline),
+            Err(EvaluationErrorV1::DecisionSeedMismatch)
+        );
+    }
+
+    #[test]
     fn leave_one_out_requires_identical_downstream_policy_digest() {
         let full = run("mace", "hold", &["signed-current"]);
         let mut without = CandidateRunV1 {
