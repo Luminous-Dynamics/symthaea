@@ -516,3 +516,59 @@ Proposed internal target:
 - per-style recall floor >= 0.92.
 
 These are targets, not results. The metric must not be combined with VideoFDB TOR alignment or avatar response latency.
+
+
+## 14. New benchmark track — polyembodiment state continuity and instruction following
+
+Use StreamEval v1 as an external task reference, especially its avatar dialogue and
+avatar performance lanes. The benchmark contains 300 scripted sessions lasting
+15–300 seconds; it separates task execution, state consistency, visual fidelity and
+A/V coordination. The current avatar-performance leader, Vidu S2 Avatar, has
+99.60 A/V sync and 97.25 stability but only 36.90 Following. Its 81.71 Overall
+includes a +5 custom-avatar bonus; report its 76.71 content-only score when
+comparing content metrics. The high visual/synchronization scores alongside low
+Following indicate that live instruction execution remains a meaningful challenge.
+
+Symthaea's extension must add the capability StreamEval does not by itself qualify:
+explicitly consented, digest-bound, cross-form semantic invariance and observed
+output outcomes.
+
+### Protocol
+
+- Freeze a 15/30/60/120/300-second synthetic interaction suite with timed
+  presentation requests, form changes, new events, privacy downgrades,
+  intensity reduction, reduced-motion, pause/cancel and grant revocation.
+- Replay identical canonical cues across the seven forms.
+- Keep every update causal and release commands only at their scheduled input time.
+- Recheck both source and target permits throughout any transition.
+- Score task following, state preservation, A/V coordination (when available),
+  semantic digest invariance, authorization accuracy, time-to-follow, stale
+  output duration, recovery and resource use separately.
+- Include negative controls: revoked grant, shorter target expiry, privacy
+  class change, content digest mismatch, missing clock, stale event, cancel
+  during cross-fade and policy resource removal.
+- A renderer must stop showing the source frame by source expiry even if the
+  target has not completed its transition.
+
+### Proposed targets (not results)
+
+- 100% semantic digest preservation for same-cue morphs across all seven forms.
+- 100% execution of valid, authorized form/appearance requests within the
+  predeclared transition budget.
+- Zero display after source/target effective permit expiry or policy revocation.
+- Zero cross-fades across privacy-class changes, grant/version changes or
+  permission/intensity tightening.
+- >=95% human-rated state/meaning preservation across forms.
+- p95 same-form update <=90 ms and p95 cross-form morph <=180 ms on named hardware.
+- >=95% correct recovery after pause/cancel/interruption; no old output restored
+  without a fresh permit.
+- Report p50/p95/p99 latency, transition duration, dropped frames, stale-output
+  exposure, CPU/GPU/RAM/energy and user comprehension.
+
+Do not optimize for smoothness at the expense of consent, interruption or privacy.
+A hard cut is the correct output when authority tightens.
+
+Source:
+- https://arxiv.org/abs/2610.28402
+- https://streameval.ai/
+
