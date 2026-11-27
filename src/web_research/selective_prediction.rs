@@ -113,7 +113,9 @@ impl std::fmt::Display for RiskCoverageError {
         match self {
             Self::EmptyRecordId => write!(formatter, "record IDs must not be empty"),
             Self::DuplicateRecordId(id) => write!(formatter, "duplicate record ID: {id}"),
-            Self::ZeroMinimumSampleSize => write!(formatter, "minimum sample size must be positive"),
+            Self::ZeroMinimumSampleSize => {
+                write!(formatter, "minimum sample size must be positive")
+            },
             Self::InvalidCoverageTarget(value) => {
                 write!(formatter, "coverage target must be finite and in (0, 1]: {value}")
             }
@@ -637,14 +639,26 @@ fn stratify(
         let mut groups = BTreeMap::<String, Vec<&SelectivePredictionRecord>>::new();
         for record in records {
             let value = match dimension {
-                StratificationDimension::Domain => record.domain.as_deref().unwrap_or("unknown").to_string(),
-                StratificationDimension::SourceFamily => record.source_family.as_deref().unwrap_or("unknown").to_string(),
+                StratificationDimension::Domain => record
+                    .domain
+                    .as_deref()
+                    .unwrap_or("unknown")
+                    .to_string(),
+                StratificationDimension::SourceFamily => record
+                    .source_family
+                    .as_deref()
+                    .unwrap_or("unknown")
+                    .to_string(),
                 StratificationDimension::DelayedOrCensored => match record.delayed_or_censored {
                     Some(true) => "delayed_or_censored".to_string(),
                     Some(false) => "not_delayed_or_censored".to_string(),
                     None => "unknown".to_string(),
                 },
-                StratificationDimension::Adjudicator => record.adjudicator.as_deref().unwrap_or("unknown").to_string(),
+                StratificationDimension::Adjudicator => record
+                    .adjudicator
+                    .as_deref()
+                    .unwrap_or("unknown")
+                    .to_string(),
             };
             groups.entry(value).or_default().push(record);
         }
@@ -673,7 +687,12 @@ mod tests {
         }
     }
 
-    fn record(id: &str, confidence: f64, predicted: bool, truth: Option<bool>) -> SelectivePredictionRecord {
+    fn record(
+        id: &str,
+        confidence: f64,
+        predicted: bool,
+        truth: Option<bool>,
+    ) -> SelectivePredictionRecord {
         SelectivePredictionRecord {
             id: id.to_string(),
             predicted_label: predicted,
@@ -888,7 +907,8 @@ mod tests {
         let pending = SelectivePredictionRecord::from_claim_correctness("pending", 0.95, None);
         assert_eq!(pending.adjudicated_truth, None);
         assert!(pending.predicted_label);
-        let adjudicated = SelectivePredictionRecord::from_claim_correctness("done", 0.95, Some(false));
+        let adjudicated =
+            SelectivePredictionRecord::from_claim_correctness("done", 0.95, Some(false));
         assert_eq!(adjudicated.adjudicated_truth, Some(false));
     }
 
