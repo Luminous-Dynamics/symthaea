@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
+use crate::evidence_digest::canonical_json_sha256;
 use crate::temporal_grounding::{
     AudioArtifactClockV1, FrameIntervalV1, GroundTruthStateV1, GroundingPredictionStateV1,
     TEMPORAL_GROUNDING_SCHEMA_V1, TemporalGroundTruthV1, TemporalGroundingOutcomeV1,
@@ -47,6 +48,35 @@ pub struct MultiAnnotatorTemporalCaseV1 {
     pub plan: TemporalGroundingPlanV1,
     pub prediction: TemporalGroundingPredictionV1,
     pub annotations: Vec<IndependentTemporalAnnotationV1>,
+}
+
+#[derive(Serialize)]
+struct AnnotationRecordCommitmentV1<'a> {
+    schema: &'static str,
+    query_id: &'a str,
+    query_text: &'a str,
+    artifact: &'a AudioArtifactClockV1,
+    annotation_policy_version: &'a str,
+    annotator_id_sha256: &'a str,
+    state: GroundTruthStateV1,
+    intervals: &'a [FrameIntervalV1],
+    status_reason: &'a Option<String>,
+}
+
+#[derive(Serialize)]
+struct AnnotationManifestEntryV1<'a> {
+    annotator_id_sha256: &'a str,
+    annotation_sha256: &'a str,
+}
+
+#[derive(Serialize)]
+struct AnnotationManifestCommitmentV1<'a> {
+    schema: &'static str,
+    query_id: &'a str,
+    query_text: &'a str,
+    artifact: &'a AudioArtifactClockV1,
+    annotation_policy_version: &'a str,
+    annotations: Vec<AnnotationManifestEntryV1<'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -166,6 +196,11 @@ pub struct MultiAnnotatorGroundingReportV1 {
     /// Prediction indices with no match in any eligible Present annotation.
     pub unmatched_prediction_indices: Vec<usize>,
     /// Digest-shaped references are not cryptographically authenticated here.
+    /// Canonical annotation-set digest was recomputed from the submitted records.
+    pub annotation_manifest_digest_recomputed: bool,
+    /// Every per-annotator digest was recomputed from its scoped record contents.
+    pub annotation_record_digests_recomputed: bool,
+    /// Digest recomputation is integrity, not proof of annotator identity/signature.
     pub annotation_manifest_authenticated: bool,
     pub annotator_receipts_authenticated: bool,
     /// This adapter preserves disagreement; it does not calculate formal IAA.
@@ -227,6 +262,8 @@ pub fn audit_multi_annotator_case(
     if case.prediction.artifact != case.artifact {
         return Err("prediction artifact differs from the multi-annotator case artifact".into());
     }
+
+    validate_annotation_commitments(case)?;
 
     let mut annotator_ids = BTreeSet::new();
     let mut annotation_digests = BTreeSet::new();
@@ -316,6 +353,8 @@ pub fn audit_multi_annotator_case(
         audio_sha256: case.artifact.audio_sha256.clone(),
         annotation_policy_version: case.annotation_policy_version.clone(),
         annotation_manifest_sha256: case.annotation_manifest_sha256.clone(),
+        annotation_manifest_digest_recomputed: true,
+        annotation_record_digests_recomputed: true,
         plan: case.plan.clone(),
         prediction: case.prediction.clone(),
         summary,
@@ -330,6 +369,53 @@ pub fn audit_multi_annotator_case(
         synthetic_consensus_ground_truth_created: false,
         population_confidence_interval_computed: false,
     })
+}
+
+fn validate_annotation_commitments(
+    case: &MultiAnnotatorTemporalCaseV1,
+) -> Result<(), String> {
+    let mut manifest_entries = Vec::with_capacity(case.annotations.len());
+    for (index, annotation) in case.annotations.iter().enumerate() {
+        let record = AnnotationRecordCommitmentV1 {
+            schema: "mel-temporal-annotation-record-v1",
+            query_id: &case.query_id,
+            query_text: &case.query_text,
+            artifact: &case.artifact,
+            annotation_policy_version: &case.annotation_policy_version,
+            annotator_id_sha256: &annotation.annotator_id_sha256,
+            state: annotation.state,
+            intervals: &annotation.intervals,
+            status_reason: &annotation.status_reason,
+        };
+        let recomputed = canonical_json_sha256(&record)
+            .map_err(|error| format!("failed canonicalizing annotation record {index}: {error}"))?;
+        if recomputed != annotation.annotation_sha256 {
+            return Err(format!(
+                "annotation record digest mismatch at panel index {index}"
+            ));
+        }
+        manifest_entries.push(AnnotationManifestEntryV1 {
+            annotator_id_sha256: &annotation.annotator_id_sha256,
+            annotation_sha256: &annotation.annotation_sha256,
+        });
+    }
+    manifest_entries.sort_by(|left, right| {
+        left.annotator_id_sha256.cmp(right.annotator_id_sha256)
+    });
+    let manifest = AnnotationManifestCommitmentV1 {
+        schema: "mel-temporal-annotation-manifest-v1",
+        query_id: &case.query_id,
+        query_text: &case.query_text,
+        artifact: &case.artifact,
+        annotation_policy_version: &case.annotation_policy_version,
+        annotations: manifest_entries,
+    };
+    let recomputed = canonical_json_sha256(&manifest)
+        .map_err(|error| format!("failed canonicalizing annotation manifest: {error}"))?;
+    if recomputed != case.annotation_manifest_sha256 {
+        return Err("annotation manifest digest mismatch".into());
+    }
+    Ok(())
 }
 
 fn pairwise_annotation_concordance(
