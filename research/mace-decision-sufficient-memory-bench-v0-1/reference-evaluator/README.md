@@ -14,7 +14,7 @@ Split combined episode records into candidate-visible and evaluator-private JSON
 
     cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- prepare /tmp/dsm-episodes.jsonl /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl
 
-A candidate adapter consumes only the candidate stream, conforming to schemas/candidate-input-v0.1.schema.json, and emits one response per episode and arm, conforming to schemas/response-v0.1.schema.json. The response echoes the candidate row's candidate_sha256, carries an arm_binding_sha256 derived from that digest and the declared arm ID, and contains a selected action, resolved evidence identifiers, observation-request count and candidate-reported resource counters. The scorer verifies both bindings against the candidate row, evaluator-private commitment and preregistered arm ID.
+A candidate adapter consumes only the candidate stream, conforming to schemas/candidate-input-v0.1.schema.json, and emits one response per episode and arm, conforming to schemas/response-v0.1.schema.json. The response echoes the candidate row's candidate_sha256, carries an arm_binding_sha256 derived from that digest and the declared arm ID, and contains a selected action, separate retrieved_evidence_ids and selected_evidence_ids (the latter must be a subset of the former), observation-request count and candidate-reported resource counters. The scorer verifies both bindings against the candidate row, evaluator-private commitment and preregistered arm ID.
 
 Run the Rust unit tests when a Rust 2024 toolchain is available:
 
@@ -33,13 +33,13 @@ Run the six synthetic positive-control records against the six source episodes a
 ## Evaluator semantics
 
 - Every candidate response must resolve to a known episode and an allowed action.
-- The evidence and observation budgets are enforced before scoring. The response arm IDs must match the preregistered arm manifest; an arm cannot disappear because its output is missing.
+- The evidence and observation budgets are enforced before scoring. Retrieved IDs are validated and scored separately from decision-support IDs; selected IDs must be drawn from the retrieved set. The response arm IDs must match the preregistered arm manifest; an arm cannot disappear because its output is missing.
 - Each episode has exactly one response per arm declared in a separate preregistered arm manifest. Undeclared arms, missing and duplicate episode/arm pairs are rejected; no arm can silently drop hard episodes.
 - Candidate-visible and evaluator-private inventories must match exactly. The candidate row and private record commit to a domain-separated SHA-256 digest of the exact identity-bound typed candidate projection; the response must echo the same digest. The private stream has its own evaluator-only schema at schemas/evaluator-private-v0.1.schema.json. Modified or mismatched candidate/response inputs are rejected. This binds the response record to the presented input and declared arm to prevent accidental cross-arm relabelling; it is not a signature, response-payload attestation or proof that the adapter reasoned from the input.
 - Knowledge time is explicit: an event is not available before observed_at_ms. Valid time is half-open: valid-from is inclusive and valid-until is exclusive. A supersession/retraction only invalidates its parent once that change has itself been observed and reached its valid-from time; later observations cannot leak into earlier decisions.
-- Superseded or retracted parent records are stale at query time. A contradiction edge does not itself erase its parent; co-retrieving contradictory records is measured, and v0.1 fails decision-sufficiency closed when a conflicting pair is returned because the response protocol does not yet carry an explicit conflict-resolution receipt.
+- Superseded or retracted parent records are stale at query time. A contradiction edge does not itself erase its parent; retrieving contradictory records is measured separately from selecting evidence to support an action, and v0.1 fails decision-sufficiency closed when a conflicting pair appears anywhere in retrieved context because the response protocol does not yet carry an explicit conflict-resolution receipt.
 - Untrusted and evaluator-labelled forbidden records are inadmissible. The evaluator does not interpret similarity, authority tiers or uncertainty as proof of truth.
-- Required-evidence recall, valid-evidence precision, stale/forbidden/untrusted use, unresolved contradiction co-retrieval, regret, gain/worsening versus the declared reference action, decision sufficiency and resource counters are reported independently.
+- Retrieval precision and selected-evidence precision are separate. Required-evidence recall, stale/forbidden/untrusted retrieval, invalid selected evidence, unresolved contradiction in retrieved context, regret, gain/worsening versus the declared reference action, decision sufficiency and resource receipts are reported independently.
 - The episode's no_memory_action is a task-authored reference action, not a measured memory-system baseline. The report labels this comparison as a declared reference only. To measure true paired system impact, execute a real no-memory arm and list its ID in the arm manifest's optional no_memory_arm_id field; the report then emits per-arm matched gain and harm rates against that executed no-memory arm.
 
 For a real paired comparison, the arm manifest can declare, for example:
@@ -59,12 +59,12 @@ The prepare command creates two files but does not enforce a process boundary. F
 
 The SHA-256 binding checks content consistency; it is not a signature, custody proof, independent authority attestation or evaluator-secrecy guarantee. A serious external challenge should move the scorer, private labels, seed derivation and scoring key material to evaluator-controlled custody before reporting an official result.
 
-Cost fields are candidate-reported counters. The evaluator does not independently measure CPU, memory, energy, storage, network, latency or monetary cost. Latency is aggregated only when present. Do not describe absent latency as zero or convert operation counters into measured cost.
+Cost fields are candidate-reported receipts. Unknown operation counts, bytes or latency remain null; aggregation reports both the number of rows with a reported value and the sum of reported values, never treating missing values as zero. A detailed receipt can retain phase timings (memory selection, index build, retrieval, evidence resolution/verification, policy application, unattributed coordinator, total wall), token/model/tool-call counts, measured-or-estimated index/sidecar byte labels and explicit unmeasured stages. The evaluator does not independently measure CPU, memory, energy, storage, network, latency or monetary cost. Do not describe absent latency as zero or convert operation counters into measured cost.
 
 ## Known limitations
 
 - The first deterministic generator covers temporal drift, contradiction, revocation and insufficient evidence. The original six seed episodes additionally contain poisoning and compression examples; the current generator does not yet generate those families.
-- The current episode schema has one scope per episode, not per source event. Cross-tenant isolation and event-level authorization require a later schema revision before they can be qualified.
+- The current episode schema has one scope per episode, not per source event. Cross-tenant isolation and event-level authorization require a later schema revision before they can be qualified. The paired runner's richer `Experience` source-root and causal qualification metadata cannot be reconstructed from retrieved event IDs alone; an adapter must receive the candidate-visible source-event projection, not invent these fields.
 - Source authority, required/forbidden evidence and loss tables are synthetic benchmark labels. Real-world qualification needs the independent trust and custody chain.
 - Uncertainty ppm is preserved but not calibrated and is not used as a probability.
 - Observation requests are scored as actions and budget use; no physical or external probe is executed.
@@ -76,7 +76,8 @@ Cost fields are candidate-reported counters. The evaluator does not independentl
 Authored unit tests cover:
 - half-open valid-time boundaries and observed-at knowledge-time boundaries;
 - untrusted lifecycle events cannot revoke trusted evidence;
-- response-to-candidate digest mismatch rejection;
+- response-to-candidate and response-to-arm binding mismatch rejection;
+- retrieved evidence is distinct from decision-support evidence and selection must be a retrieved subset;
 - the distinction between contradiction and supersession/retraction;
 - rejection of cyclic/duplicate evidence ancestry;
 - co-retrieved conflicts cannot silently pass decision sufficiency;
