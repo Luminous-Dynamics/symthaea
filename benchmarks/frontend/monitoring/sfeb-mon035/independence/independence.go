@@ -104,7 +104,7 @@ func validSHA256(value string) bool {
 func validIdentifier(value string) bool {
 	return value != "" && len(value) <= MaxIdentifierBytes &&
 		strings.TrimSpace(value) == value &&
-		!strings.ContainsAny(value, " \\t\\r\\n")
+		!strings.ContainsAny(value, " \t\r\n")
 }
 
 func Evaluate(in Input) Result {
