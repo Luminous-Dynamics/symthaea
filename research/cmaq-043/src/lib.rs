@@ -475,12 +475,25 @@ mod tests {
     #[test]
     fn same_stream_id_cannot_claim_another_scope() {
         let plan = plan();
-        let mut ledger = AllocationLedger::default();
+        let mut ledger = AllocationLedger::new(&plan);
         ledger.allocate_once(&plan, &scope(1, 1, 1, "same-stream")).unwrap();
         assert_eq!(
             ledger.allocate_once(&plan, &scope(2, 1, 1, "same-stream")),
             Err(BudgetError::DuplicateStreamId)
         );
+    }
+
+    #[test]
+    fn ledger_is_bound_to_exactly_one_budget_plan() {
+        let first_plan = plan();
+        let other_plan =
+            BudgetPlan::new(1, 20, INVENTORY_SHA.into(), PLAN_SHA.into()).unwrap();
+        let mut ledger = AllocationLedger::new(&first_plan);
+        assert_eq!(
+            ledger.allocate_once(&other_plan, &scope(1, 1, 1, "stream")),
+            Err(BudgetError::PlanMismatch)
+        );
+        assert_eq!(ledger.allocation_count(), 0);
     }
 
     #[test]
