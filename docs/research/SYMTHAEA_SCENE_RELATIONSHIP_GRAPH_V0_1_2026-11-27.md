@@ -82,6 +82,7 @@ The `RendererLayoutOnly` origin is not a semantic edge and must not be presented
 
 - Every node ID is unique within one frame.
 - Every relation endpoint refers to an existing node in the same frame.
+- The graph envelope carries the exact canonical semantic key and visual channel; a runtime verifier enforces that `attention_to` is derived only from an `attention.focus` cue and `handoff_to` only from a `conversation.turn.yield` cue.
 - No relation is created from array order or proximity.
 - Relation kind is an explicit allowlisted enum.
 - Renderer layout may transform coordinates and visual style, but not the relation kind or direction.
@@ -156,7 +157,7 @@ Two machine-readable artifacts have now been added:
 - `SYMTHAEA_SCENE_GRAPH_SCHEMA_V2_2026-11-27.json`: Draft 2020-12 structural schema for frame identity, canonical cue digest, scene-graph digest, seven forms, privacy/destination, epistemic status, nodes, typed semantic relations, layout-only attachments, and effective expiry.
 - `SYMTHAEA_SCENE_GRAPH_FIXTURES_V2_2026-11-27.json`: two positive fixtures and four negative graph cases (duplicate node IDs, dangling relation endpoint, layout-only relation forged as semantic, and local-sensitive remote destination).
 
-The schema deliberately keeps semantic relations separate from renderer layout attachments. It currently permits only two source-field-bound semantic relation kinds: `attention_to` and `handoff_to`. Other relation kinds require explicit canonical event fields and a reviewed schema extension.
+The schema deliberately keeps semantic relations separate from renderer layout attachments. It carries the exact semantic key and declares the visual channel, and currently permits only two source-field-bound semantic relation kinds: `attention_to` and `handoff_to`. The runtime verifier must additionally enforce that `attention_to` corresponds to `attention.focus` and `handoff_to` corresponds to `conversation.turn.yield`; structural JSON Schema validation cannot perform the required source-cue/digest comparison. Other relation kinds require explicit canonical event fields and a reviewed schema extension.
 
 Structural schema validation and causal endpoint verification are separate. The duplicate-ID and dangling-endpoint cases are expected to pass structural JSON shape validation but must be rejected by the runtime graph verifier. The schema and fixtures have been authored but have not been run through an independent Draft 2020-12 validator; no Rust graph compiler/verifier or Bevy edge renderer exists yet.
 
