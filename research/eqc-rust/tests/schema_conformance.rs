@@ -3,12 +3,10 @@
 use jsonschema::draft202012;
 use serde_json::{json, Value};
 
-const TASK_SCHEMA: &str =
-    include_str!("../../../docs/research/eqc-task-v0.1.schema.json");
+const TASK_SCHEMA: &str = include_str!("../../../docs/research/eqc-task-v0.1.schema.json");
 const RECEIPT_SCHEMA: &str =
     include_str!("../../../docs/research/eqc-run-receipt-v0.1.schema.json");
-const SEED_CORPUS: &str =
-    include_str!("../../../docs/research/eqc-seed-corpus-v0.1.json");
+const SEED_CORPUS: &str = include_str!("../../../docs/research/eqc-seed-corpus-v0.1.json");
 const RECEIPT_SAMPLE: &str =
     include_str!("../../../docs/research/eqc-fixtures/run-receipt-reference-unqualified.json");
 
