@@ -85,7 +85,7 @@ pub struct EvidenceSetContextV1 {
 #[derive(Clone, Copy, Debug)]
 pub struct EvidenceSetCandidateV1<'a> {
     pub evidence_id: &'a str,
-    pub representation_sha256: &'a str,
+    pub representation_sha256: String,
     pub token_cost: u64,
     pub relevance_score_micros: u64,
     pub required: bool,
@@ -222,7 +222,7 @@ fn candidate_digest(candidates: &[EvidenceSetCandidateV1<'_>]) -> String {
     let mut h = Sha256::new(); h.update(b"luminous:mace:evidence-set-candidates:v1\0");
     h.update((values.len() as u64).to_be_bytes());
     for c in values {
-        put_text(&mut h,c.evidence_id); put_text(&mut h,c.representation_sha256);
+        put_text(&mut h,c.evidence_id); put_text(&mut h,&c.representation_sha256);
         h.update(c.token_cost.to_be_bytes()); h.update(c.relevance_score_micros.to_be_bytes());
         h.update([u8::from(c.required)]); h.update(c.receipt.event_id.to_be_bytes());
         put_text(&mut h,&c.receipt.canonical_sha256);
@@ -323,7 +323,7 @@ pub fn select_evidence_set_v1(
     let mut indices=BTreeMap::new(); let mut events=BTreeSet::new(); let mut states=Vec::new();
     for (i,c) in candidates.iter().enumerate(){
         if !valid_id(c.evidence_id){return Err(fail(EvidenceSetObstructionReasonV1::InvalidCandidateId,vec![c.evidence_id.into()],vec![]));}
-        if !valid_sha(c.representation_sha256){return Err(fail(EvidenceSetObstructionReasonV1::InvalidCandidateDigest,vec![c.evidence_id.into()],vec![]));}
+        if !valid_sha(&c.representation_sha256){return Err(fail(EvidenceSetObstructionReasonV1::InvalidCandidateDigest,vec![c.evidence_id.into()],vec![]));}
         if indices.insert(c.evidence_id,i).is_some(){return Err(fail(EvidenceSetObstructionReasonV1::DuplicateEvidenceId,vec![c.evidence_id.into()],vec![]));}
         if !events.insert(c.receipt.event_id){return Err(fail(EvidenceSetObstructionReasonV1::DuplicateEventId,vec![c.evidence_id.into()],vec![]));}
         states.push(receipt_exclusion(c.receipt,context).map_or(CandidateState::Admissible,CandidateState::Excluded));
@@ -433,9 +433,7 @@ pub fn select_evidence_set_v1(
     };
     let mut excluded=Vec::new();
     for (i,c) in candidates.iter().enumerate(){
-        if mask&(1u64<<i)!=0{
-
-        }else{
+        if mask&(1u64<<i)==0{
             let reason=match states[i]{CandidateState::Admissible=>CandidateExclusionReasonV1::NotSelectedByOptimizer,CandidateState::Excluded(r)=>r};
             excluded.push(ExcludedEvidenceV1{evidence_id:c.evidence_id.to_owned(),reason});
         }
