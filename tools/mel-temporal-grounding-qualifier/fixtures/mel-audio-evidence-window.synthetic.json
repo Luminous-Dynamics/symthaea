@@ -53,13 +53,13 @@
         "payload_sha256": "74cac05eac42e84ae16f372efbe5354a1fa5e03b39ae90df4a9dcd81a59fb792"
       }
     ],
-    "context_manifest_sha256": "288760a0b5e96a9fc87bb801bbf9fb6422e73d283be2706afe7118de8e808a32"
+    "context_manifest_sha256": "e1bbb312a8a96da98d8f609c16c5b393fb26a9ffba2fd75eb156b315d9cfccb6"
   },
   "query_text": "Identify every piano entrance in the supplied recording.",
   "source_lineage_id": "synthetic-source-lineage-001",
   "target_source_lineage_id": "synthetic-source-lineage-001",
   "request_body": {
-    "body_sha256": "a93528c8fc47a15de50927eb61355ff89360b5698281de7dd9bc1b61104de616",
+    "body_sha256": "dc5b16547c8ea6dc45bd12733c4c491ee9a566766a58b7cb2fd02b9ccbc0f0e8",
     "byte_length": 1136,
     "content_type": "application/json"
   }
