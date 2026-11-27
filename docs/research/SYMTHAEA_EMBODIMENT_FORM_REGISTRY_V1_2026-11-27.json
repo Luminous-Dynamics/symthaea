@@ -1,6 +1,4 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luminousdynamics.io/schemas/symthaea.embodiment-form-registry.v1.schema.json",
   "schema": "symthaea.embodiment-form-registry.v1",
   "version": "1.0.0",
   "status": "proposed_registry",
