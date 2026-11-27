@@ -76,7 +76,9 @@
             "slot": 1
           }
         ],
-        "accessible_description": "Attention focus is active. Evidence marker is present."
+        "accessible_description": "Attention focus is active. Evidence marker is present.",
+        "semantic_key": "attention.focus",
+        "channel": "visual"
       }
     },
     {
@@ -136,7 +138,9 @@
             "slot": 0
           }
         ],
-        "accessible_description": "Sensitive interaction cue; details omitted from generic presentation."
+        "accessible_description": "Sensitive interaction cue; details omitted from generic presentation.",
+        "semantic_key": "conversation.turn.yield",
+        "channel": "visual"
       }
     }
   ],
@@ -184,7 +188,9 @@
         ],
         "relations": [],
         "layout_attachments": [],
-        "accessible_description": "Test"
+        "accessible_description": "Test",
+        "semantic_key": "attention.focus",
+        "channel": "visual"
       }
     },
     {
@@ -227,7 +233,9 @@
           }
         ],
         "layout_attachments": [],
-        "accessible_description": "Test"
+        "accessible_description": "Test",
+        "semantic_key": "attention.focus",
+        "channel": "visual"
       }
     },
     {
@@ -281,7 +289,9 @@
           }
         ],
         "layout_attachments": [],
-        "accessible_description": "Test"
+        "accessible_description": "Test",
+        "semantic_key": "conversation.listening.active",
+        "channel": "visual"
       }
     },
     {
@@ -316,7 +326,9 @@
         ],
         "relations": [],
         "layout_attachments": [],
-        "accessible_description": "Test"
+        "accessible_description": "Test",
+        "semantic_key": "attention.focus",
+        "channel": "visual"
       }
     }
   ]
