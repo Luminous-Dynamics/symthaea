@@ -123,10 +123,7 @@ impl Metrics {
             return None;
         }
         let count = u64::try_from(self.safe_progress_observations).ok()?;
-        let rounded = self
-            .safe_useful_progress_ppm_sum
-            .checked_add(count / 2)?
-            / count;
+        let rounded = self.safe_useful_progress_ppm_sum.checked_add(count / 2)? / count;
         u32::try_from(rounded).ok()
     }
 }
@@ -219,17 +216,14 @@ impl Accumulator {
 
     fn finish(mut self) -> Result<Metrics, EvaluationError> {
         self.metrics.effective_block_count = self.effective_block_ids.len();
-        self.metrics.safe_operating_time_us =
-            union_exposure_us(&mut self.safe_exposure_intervals)?;
+        self.metrics.safe_operating_time_us = union_exposure_us(&mut self.safe_exposure_intervals)?;
         self.warning_leads_us.sort_unstable();
         self.quarantine_leads_us.sort_unstable();
         self.fallback_leads_us.sort_unstable();
         self.metrics.warning_lead_p50_us = nearest_rank(&self.warning_leads_us, 50, 100);
         self.metrics.warning_lead_p90_us = nearest_rank(&self.warning_leads_us, 90, 100);
-        self.metrics.quarantine_lead_p50_us =
-            nearest_rank(&self.quarantine_leads_us, 50, 100);
-        self.metrics.quarantine_lead_p90_us =
-            nearest_rank(&self.quarantine_leads_us, 90, 100);
+        self.metrics.quarantine_lead_p50_us = nearest_rank(&self.quarantine_leads_us, 50, 100);
+        self.metrics.quarantine_lead_p90_us = nearest_rank(&self.quarantine_leads_us, 90, 100);
         self.metrics.fallback_completion_lead_p50_us =
             nearest_rank(&self.fallback_leads_us, 50, 100);
         self.metrics.fallback_completion_lead_p90_us =
@@ -310,14 +304,35 @@ fn validate_episode(episode: &EpisodeTrace) -> Result<(), EvaluationError> {
     }
     for (digest, label) in [
         (&episode.evidence.source_trace_sha256, "source_trace_sha256"),
-        (&episode.evidence.scenario_manifest_sha256, "scenario_manifest_sha256"),
-        (&episode.evidence.ground_truth_receipt_sha256, "ground_truth_receipt_sha256"),
+        (
+            &episode.evidence.scenario_manifest_sha256,
+            "scenario_manifest_sha256",
+        ),
+        (
+            &episode.evidence.ground_truth_receipt_sha256,
+            "ground_truth_receipt_sha256",
+        ),
         (&episode.evidence.system_build_sha256, "system_build_sha256"),
-        (&episode.evidence.monitor_build_sha256, "monitor_build_sha256"),
-        (&episode.evidence.fallback_policy_sha256, "fallback_policy_sha256"),
-        (&episode.evidence.score_definition_sha256, "score_definition_sha256"),
-        (&episode.evidence.score_receipt_sha256, "score_receipt_sha256"),
-        (&episode.evidence.closure_manifest_sha256, "closure_manifest_sha256"),
+        (
+            &episode.evidence.monitor_build_sha256,
+            "monitor_build_sha256",
+        ),
+        (
+            &episode.evidence.fallback_policy_sha256,
+            "fallback_policy_sha256",
+        ),
+        (
+            &episode.evidence.score_definition_sha256,
+            "score_definition_sha256",
+        ),
+        (
+            &episode.evidence.score_receipt_sha256,
+            "score_receipt_sha256",
+        ),
+        (
+            &episode.evidence.closure_manifest_sha256,
+            "closure_manifest_sha256",
+        ),
         (
             &episode.evidence.closure_authority_receipt_sha256,
             "closure_authority_receipt_sha256",
