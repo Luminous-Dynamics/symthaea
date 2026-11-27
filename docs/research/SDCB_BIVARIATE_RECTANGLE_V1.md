@@ -93,7 +93,7 @@ These are mathematical numerical fixtures, not measured sensor probabilities. Or
 
 ## 6. Tests and limits
 
-The 26 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, duplicate-channel tables with zero off-diagonal support, perfect-anti-correlation tables with zero diagonal support, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, even-small-asymmetry rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, bound-context preservation/rejection (including per-channel window and calibration versions), per-cell diagnostic alignment, and bounded evaluation, including a no-overrun check for the outer integrand-evaluation budget.
+The 26 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, duplicate-channel tables with zero off-diagonal support and rank-one diagnostics, perfect-anti-correlation tables with zero diagonal support and rank-one diagnostics, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, even-small-asymmetry rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, bound-context preservation/rejection (including per-channel window and calibration versions), per-cell diagnostic alignment, and bounded evaluation, including a no-overrun check for the outer integrand-evaluation budget.
 
 Not implemented:
 - trivariate or general n-variate integration;
