@@ -1,0 +1,221 @@
+{
+  "schema_version": "mace_procedure_proposal_v0_1",
+  "proposal_id": "proposal-release-gate-check-0001",
+  "skill_name": "verify-release-gate",
+  "summary": "Read and verify a signed release-gate result without deploying or changing the target system.",
+  "objective": "Determine whether a named release candidate has an independently verifiable release-gate result. Return the gate status and source receipts. This procedure is read-only: it must not deploy, publish, alter configuration, approve a release, or grant permissions.",
+  "task_family": "release-readiness-check",
+  "scope": {
+    "namespace": "synthetic:release-engineering:fixture",
+    "purpose": "public research fixture for schema and lifecycle validation only"
+  },
+  "created_at_utc": "2026-11-27T00:00:00Z",
+  "applicability": {
+    "environment_constraints": [
+      "The requested release candidate identifier is explicit.",
+      "The signed release-gate endpoint is available through an authenticated read-only interface."
+    ],
+    "positive_conditions": [
+      "A release-gate record exists for the exact candidate identifier.",
+      "The verifier can resolve the signing key from a configured trust store."
+    ],
+    "excluded_conditions": [
+      "The signature is invalid or the signer is not trusted.",
+      "The record belongs to a different candidate identifier.",
+      "The caller requests deployment, publication, approval or mutation."
+    ],
+    "supported_platforms": [
+      "linux-x86_64"
+    ],
+    "dependency_constraints": [
+      "release-gate-reader >= 1.0",
+      "signature-verifier >= 1.0"
+    ]
+  },
+  "required_permissions": [
+    "release_gate.read",
+    "trust_store.read"
+  ],
+  "steps": [
+    {
+      "step_id": "read-gate-record",
+      "action": "read_release_gate_record",
+      "purpose": "Retrieve the signed release-gate record for the exact candidate identifier.",
+      "preconditions": [
+        "Candidate identifier is present and well-formed.",
+        "Read-only release-gate access is authorized."
+      ],
+      "inputs": [
+        {
+          "name": "candidate_id",
+          "value_type": "string",
+          "required": true,
+          "description": "Exact immutable release candidate identifier."
+        }
+      ],
+      "expected_observations": [
+        "Returned record contains the exact candidate identifier and a signature envelope."
+      ],
+      "declared_effects": [
+        "read"
+      ],
+      "failure_policy": "abort",
+      "source_event_refs": [
+        "trace-event-001"
+      ]
+    },
+    {
+      "step_id": "verify-signature",
+      "action": "verify_release_gate_signature",
+      "purpose": "Verify the release-gate record using the configured trust store.",
+      "preconditions": [
+        "A signature envelope was returned.",
+        "The trust-store key identifier is present."
+      ],
+      "inputs": [
+        {
+          "name": "record_digest",
+          "value_type": "opaque_reference",
+          "required": true
+        },
+        {
+          "name": "signer_key_id",
+          "value_type": "string",
+          "required": true
+        }
+      ],
+      "expected_observations": [
+        "Verifier returns a signature-valid result bound to the exact record digest."
+      ],
+      "declared_effects": [
+        "read",
+        "execute"
+      ],
+      "failure_policy": "abort",
+      "source_event_refs": [
+        "trace-event-002"
+      ]
+    },
+    {
+      "step_id": "check-candidate-binding",
+      "action": "compare_candidate_identifier",
+      "purpose": "Ensure the signed record refers to the requested candidate and not a nearby or previous release.",
+      "preconditions": [
+        "Signature verification passed."
+      ],
+      "inputs": [
+        {
+          "name": "requested_candidate_id",
+          "value_type": "string",
+          "required": true
+        },
+        {
+          "name": "signed_candidate_id",
+          "value_type": "string",
+          "required": true
+        }
+      ],
+      "expected_observations": [
+        "Requested and signed candidate identifiers match exactly."
+      ],
+      "declared_effects": [
+        "read"
+      ],
+      "failure_policy": "abort",
+      "source_event_refs": [
+        "trace-event-003"
+      ]
+    },
+    {
+      "step_id": "report-gate-status",
+      "action": "emit_read_only_gate_summary",
+      "purpose": "Return the verified gate status and evidence references without changing release state.",
+      "preconditions": [
+        "Signature verification passed.",
+        "Candidate identifiers match exactly."
+      ],
+      "inputs": [
+        {
+          "name": "gate_status",
+          "value_type": "string",
+          "required": true
+        },
+        {
+          "name": "record_digest",
+          "value_type": "opaque_reference",
+          "required": true
+        }
+      ],
+      "expected_observations": [
+        "Summary identifies the candidate, gate state and signed record digest."
+      ],
+      "declared_effects": [
+        "read"
+      ],
+      "failure_policy": "abstain",
+      "source_event_refs": [
+        "trace-event-004"
+      ]
+    }
+  ],
+  "postconditions": [
+    "The reported result is bound to the exact candidate identifier and signed record digest.",
+    "No deployment, approval, publication, configuration change or other mutation was performed.",
+    "If verification or candidate binding is unknown or failed, the procedure abstains and returns no positive clearance claim."
+  ],
+  "failure_modes": [
+    {
+      "condition": "Signature invalid or trust key unavailable.",
+      "safe_response": "Abort and report that the gate result could not be verified.",
+      "evidence_refs": [
+        "trace-event-002"
+      ]
+    },
+    {
+      "condition": "Signed candidate identifier differs from requested identifier.",
+      "safe_response": "Abort and report candidate-binding mismatch.",
+      "evidence_refs": [
+        "trace-event-003"
+      ]
+    },
+    {
+      "condition": "Any caller requests a deployment or approval action.",
+      "safe_response": "Refuse the mutation and return only the read-only gate result, if one was verified.",
+      "evidence_refs": [
+        "trace-event-004"
+      ]
+    }
+  ],
+  "source_traces": [
+    {
+      "trace_id": "synthetic-trace-release-gate-0001",
+      "trace_digest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "event_ids": [
+        "trace-event-001",
+        "trace-event-002",
+        "trace-event-003",
+        "trace-event-004"
+      ]
+    }
+  ],
+  "environment_fingerprint": {
+    "os": "linux",
+    "architecture": "x86_64",
+    "runtime_versions": {
+      "release-gate-reader": "1.0.0",
+      "signature-verifier": "1.0.0"
+    },
+    "repository_digest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "toolchain_digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "rollback_suggestion": [
+    "No system mutation is permitted by this procedure; discard the read-only result and re-query the signed gate record if the source changes."
+  ],
+  "unresolved_questions": [
+    "The synthetic fixture does not define a production trust-root distribution or key-rotation policy."
+  ],
+  "export_formats": [
+    "mace-procedure-json",
+    "agentskills-skill-md"
+  ]
+}
