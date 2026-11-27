@@ -10,6 +10,7 @@ use base64::Engine;
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use broca_mace_policy::{Objective, Regime, Scope};
 use std::collections::BTreeSet;
 
 pub const MACE_CONTEXT_EXPOSURE_SCHEMA_V1: &str = "mace_context_exposure_receipt_v0_1";
@@ -177,6 +178,13 @@ pub struct MaceExpectedExposureBindingV1<'a> {
     pub encryption_profile_sha256: &'a str,
     pub access_policy_sha256: &'a str,
     pub retention_policy_sha256: &'a str,
+    /// Independent bitemporal snapshot and consumer purpose for revalidation.
+    pub use_valid_at_ms: i64,
+    pub use_known_at_ms: i64,
+    pub use_purpose_code: &'a str,
+    pub use_consumer_policy_sha256: &'a str,
+    pub use_scope: Scope,
+    pub require_complete_dependency_lineage: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -195,7 +203,7 @@ pub enum MaceContextExposureRejectV1 {
     InvalidAdmissionStatus, DuplicateDeniedEvidence, DeniedEvidenceExposed,
     InvalidResponseBinding, InvalidSignatureAlgorithm, InvalidSignatureEncoding,
     InvalidObserverKeyId, UnknownObserverKey, SignatureMismatch,
-    EvidenceAdmissionRejected, MemoryExposureInNoMemoryArm,
+    EvidenceAdmissionRejected, UseTimeBindingInvalid, MemoryExposureInNoMemoryArm,
     ObserverSigningFailed, CanonicalizationFailed,
 }
 
@@ -302,6 +310,29 @@ pub fn parse_and_verify_mace_context_exposure_receipt_v1(
     Ok(VerifiedMaceContextExposureReceiptV1 { receipt })
 }
 
+fn validate_expected_use_binding(
+    expected: &MaceExpectedExposureBindingV1<'_>,
+) -> Result<(), MaceContextExposureRejectV1> {
+    validate_identifier(expected.use_purpose_code, 64)
+        .map_err(|_| MaceContextExposureRejectV1::UseTimeBindingInvalid)?;
+    validate_sha256(expected.use_consumer_policy_sha256)
+        .map_err(|_| MaceContextExposureRejectV1::UseTimeBindingInvalid)?;
+    Ok(())
+}
+
+fn scope_codes(scope: Scope) -> (&'static str, &'static str) {
+    let regime = match scope.regime {
+        Regime::Baseline => "baseline",
+        Regime::Shifted => "shifted",
+    };
+    let objective = match scope.objective {
+        Objective::Quality => "quality",
+        Objective::Cost => "cost",
+        Objective::Speed => "speed",
+    };
+    (regime, objective)
+}
+
 fn verify_receipt_bindings(
     receipt: &MaceContextExposureReceiptV1,
     expected: &MaceExpectedExposureBindingV1<'_>,
@@ -341,6 +372,8 @@ fn verify_receipt_bindings(
     if receipt.model_revision != expected.model_revision { return Err(MaceContextExposureRejectV1::WrongModelRevision); }
     if receipt.clock_profile_sha256 != expected.clock_profile_sha256 { return Err(MaceContextExposureRejectV1::WrongClockProfile); }
     if receipt.observer_profile_sha256 != expected.observer_profile_sha256 { return Err(MaceContextExposureRejectV1::WrongObserverProfile); }
+    validate_expected_use_binding(expected)?;
+
     if receipt.capture.capture_point != "serialized_request_before_network_send" {
         return Err(MaceContextExposureRejectV1::InvalidCapturePoint);
     }
@@ -518,6 +551,7 @@ pub fn sign_mace_context_exposure_receipt_v1(
 ) -> Result<MaceContextExposureReceiptV1, MaceContextExposureRejectV1> {
     validate_identifier(signer.key_id(), 256)
         .map_err(|_| MaceContextExposureRejectV1::InvalidObserverKeyId)?;
+    validate_expected_use_binding(expected)?;
     receipt.signature.algorithm = "Ed25519".to_owned();
     receipt.signature.key_id = signer.key_id().to_owned();
     receipt.signature.signature_base64.clear();
@@ -648,6 +682,11 @@ mod tests {
             clock_profile_sha256: D8, observer_profile_sha256: D9,
             storage_profile_sha256: D1, encryption_profile_sha256: D2,
             access_policy_sha256: D3, retention_policy_sha256: D4,
+            use_valid_at_ms: 100, use_known_at_ms: 200,
+            use_purpose_code: "mace.context.exposure",
+            use_consumer_policy_sha256: D5,
+            use_scope: Scope { regime: Regime::Baseline, objective: Objective::Quality },
+            require_complete_dependency_lineage: true,
         }
     }
     fn fixture() -> (MaceContextExposureReceiptV1, SigningKey, Vec<u8>) {
