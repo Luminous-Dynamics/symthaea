@@ -2,7 +2,7 @@
 
 **Status:** Rust reference implementation authored; exact-head compilation and test execution are pending. The included responses are synthetic conformance fixtures, not model runs or benchmark scores.
 
-This package adds an executable bridge for the episode contract in the parent DSM proposal. It does not replace the existing causal-transfer harness, paired intervention runner, dependency-knockout audit, or decision-sufficiency receipt verifier.
+This package adds an executable bridge for the episode contract in the parent DSM proposal. Its Cargo manifest declares a nested workspace so it remains isolated from the repository's root workspace globs. It does not replace the existing causal-transfer harness, paired intervention runner, dependency-knockout audit, or decision-sufficiency receipt verifier.
 
 ## Commands
 
