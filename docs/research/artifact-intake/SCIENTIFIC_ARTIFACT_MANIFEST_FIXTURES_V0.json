@@ -234,6 +234,183 @@
           }
         }
       }
+    },
+    {
+      "case_id": "malformed_csv_row_width",
+      "expected_disposition": "MALFORMED",
+      "expected_acceptance": "schema_valid_fail_closed_no_observations",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "acquisition": {
+          "receipt_id": "acq-receipt-malformed-csv",
+          "receipt_content_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "requested_uri": "https://data.example.test/malformed.csv",
+          "final_uri": "https://data.example.test/malformed.csv",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "text/csv",
+          "detected_content_type": "text/csv",
+          "filename": "malformed.csv",
+          "encoding": "utf-8"
+        },
+        "raw": {
+          "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "byte_length": 32,
+          "capture_ref": "cas://sha256/5555555555555555555555555555555555555555555555555555555555555555"
+        },
+        "parser": {
+          "parser_id": "symthaea.delimited-text",
+          "parser_version": "0.1.0",
+          "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "MALFORMED",
+          "derived_payload_sha256": null,
+          "observations": [],
+          "issues": [
+            {
+              "reason_code": "CSV_RECORD_WIDTH_MISMATCH",
+              "message": "A data record has a different number of fields from the declared header."
+            }
+          ],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 32,
+            "elapsed_ms": 1,
+            "observations_emitted": 0
+          }
+        }
+      }
+    },
+    {
+      "case_id": "input_byte_limit",
+      "expected_disposition": "LIMIT_EXCEEDED",
+      "expected_acceptance": "schema_valid_fail_closed_no_observations",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "acquisition": {
+          "receipt_id": "acq-receipt-input-limit",
+          "receipt_content_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+          "requested_uri": "https://data.example.test/large.csv",
+          "final_uri": "https://data.example.test/large.csv",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "text/csv",
+          "detected_content_type": "text/csv",
+          "filename": "large.csv",
+          "encoding": "utf-8"
+        },
+        "raw": {
+          "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+          "byte_length": 8192,
+          "capture_ref": "cas://sha256/6666666666666666666666666666666666666666666666666666666666666666"
+        },
+        "parser": {
+          "parser_id": "symthaea.delimited-text",
+          "parser_version": "0.1.0",
+          "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "LIMIT_EXCEEDED",
+          "derived_payload_sha256": null,
+          "observations": [],
+          "issues": [
+            {
+              "reason_code": "MAX_INPUT_BYTES_EXCEEDED",
+              "message": "The parser stopped at the configured input-byte ceiling."
+            }
+          ],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 4096,
+            "elapsed_ms": 1,
+            "observations_emitted": 0
+          }
+        }
+      }
+    },
+    {
+      "case_id": "partial_csv_diagnostic_only",
+      "expected_disposition": "PARTIAL",
+      "expected_acceptance": "diagnostic_only_not_policy_usable",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "acquisition": {
+          "receipt_id": "acq-receipt-partial-csv",
+          "receipt_content_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+          "requested_uri": "https://data.example.test/partial.csv",
+          "final_uri": "https://data.example.test/partial.csv",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "text/csv",
+          "detected_content_type": "text/csv",
+          "filename": "study.csv",
+          "encoding": "utf-8"
+        },
+        "raw": {
+          "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+          "byte_length": 64,
+          "capture_ref": "cas://sha256/7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "parser": {
+          "parser_id": "symthaea.delimited-text",
+          "parser_version": "0.1.0",
+          "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "PARTIAL",
+          "derived_payload_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+          "observations": [
+            {
+              "observation_id": "study-row-0-temperature",
+              "locator": {
+                "kind": "CSV_CELL",
+                "record_index": 0,
+                "column_index": 1,
+                "column_name": "temperature_C",
+                "byte_start": 28,
+                "byte_end": 33
+              },
+              "raw_lexeme": "21.50",
+              "value_kind": "DECIMAL",
+              "unit_lexeme": "degC"
+            }
+          ],
+          "issues": [
+            {
+              "reason_code": "CSV_ROW_PARTIAL_FAILURE",
+              "message": "One record was rejected; retained observations are diagnostic only."
+            }
+          ],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 64,
+            "elapsed_ms": 4,
+            "observations_emitted": 1
+          }
+        }
+      }
     }
   ],
   "cross_field_invariants": [
@@ -243,6 +420,7 @@
     "parse.usage.elapsed_ms must not exceed parse.limits.max_elapsed_ms",
     "parse.usage.observations_emitted must equal parse.observations.length and not exceed parse.limits.max_observations",
     "For CSV_CELL, byte_start must be strictly less than byte_end and the span must resolve inside raw.byte_length",
-    "A non-PARSED disposition is never sufficient for downstream claim support or decision use"
+    "A non-PARSED disposition is never sufficient for downstream claim support or decision use",
+    "PARTIAL observations and derived payloads are diagnostic only and cannot be promoted into claim support or decision inputs."
   ]
 }
