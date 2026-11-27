@@ -473,7 +473,25 @@ mod tests {
         assert!(report.dimensions.budget_compliance);
         assert_eq!(report.resource_usage["human_interventions"], 0);
         assert!(report.resource_usage["energy_millijoules"].is_null());
-        assert!(report.reasons.is_empty());
+        assert_eq!(report.reasons.len(), 1);
+        assert!(report.reasons[0].contains("no trusted observer attestation"));
+    }
+
+    #[test]
+    fn adapter_cannot_self_attest_independence_to_qualify() {
+        let task = task();
+        let mut observation = valid_observation(&task);
+        observation["verifier"]["independent"] = json!(true);
+        observation["verifier"]["replay"] = json!("passed");
+        let report = qualify_observation(&task, &observation).unwrap();
+
+        assert!(report.contract_checks_pass);
+        assert!(!report.independent_evidence_verified);
+        assert!(!report.qualified);
+        assert_eq!(
+            report.qualification_status,
+            "unqualified_untrusted_adapter_observation"
+        );
     }
 
     #[test]
