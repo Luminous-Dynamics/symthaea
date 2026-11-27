@@ -70,7 +70,7 @@ The synthetic case deliberately includes one wrong CLEAN answer and one unparsea
 
 The `music_performance_identity` module extends, but does not modify, the official MusicListenBench v1.0 CLEAN/FLIP/STAY protocol. Each case is a CLEAN / Performance-STAY / Musical-FLIP triad. It distinguishes chord quality, root pitch class, voicing, relative interval sequence, melodic contour, rhythmic ratio, pulse rate and instrument family.
 
-Performance-STAY factors are typed as a different take by the same performer, a different performer on the same instrument family, strum/articulation change, expressive timing change, a different tempo with the same rhythmic-ratio pattern, or a different renderer for the same performance. The evaluator checks the corresponding identity metadata. Musical-FLIP must change exactly the declared target-property family; it cannot be treated as a generic waveform difference.
+Performance-STAY factors are typed as a different take by the same performer, a different performer on the same instrument family, strum/articulation change, expressive timing change, a different tempo with the same rhythmic-ratio pattern, or a different renderer for the same performance. The evaluator checks the corresponding identity metadata. The validator additionally requires the exact canonical question for the declared target property (same question bytes and recomputed digest across all three arms); a generic "target musical property" prompt or a correctly rehashed mismatched-property prompt is rejected. Musical-FLIP must change exactly the declared target-property family; it cannot be treated as a generic waveform difference.
 
 Run the synthetic eight-triad extension panel with:
 
