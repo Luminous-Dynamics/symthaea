@@ -96,15 +96,15 @@ observer-channel compatibility, and per-clock monotonicity. Verify every
 ledger digest and previous-digest link.
 
 **Hard gate:**
-- 100% expected transition outcomes on frozen fixtures;
+- 100% expected transition outcomes on frozen fixtures; final policy authorization and adapter-acknowledged submission are separate records;
 - zero accepted invalid transitions or second terminal outcomes;
-- missing output observation remains OutcomeUnknown, never Observed or Stopped;
+- authorization does not count as submission; a submitted receipt requires adapter acknowledgement; missing output observation remains OutcomeUnknown, never Observed or Stopped;
 - Stopped requires a named observer reporting a stopped output state;
 - receipt chain verification succeeds for every unmodified accepted trace;
 - source and output timestamps are never compared across unrelated clock domains.
 
 Targets (not results):
-- p99 permit-recheck-to-submission overhead below 1 ms on named hardware;
+- p99 final policy-recheck-to-Authorized-record overhead below 1 ms on named hardware; report adapter acceptance latency separately;
 - p95 submission-to-observation latency below 100 ms for the local visual renderer;
 - cancellation-to-observed-stop p95 below one render update;
 - zero raw-media data in receipt records;
