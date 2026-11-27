@@ -67,6 +67,7 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
                 and "allowed_citation_source_ids" in audit["citation_contract"]
                 and "forbidden_decoy_source_ids" in audit["citation_contract"]
                 and "origin_groups" in audit["citation_contract"]
+                and "support_origin_groups" in audit["citation_contract"]
                 and "independent_origin_count" in audit["citation_contract"]
                 and "minimum_independent_origins" in audit["citation_contract"]
                 and "corroboration_available" in audit["citation_contract"],
@@ -82,9 +83,19 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
         origin_groups = {key: sorted(value) for key, value in sorted(origin_groups.items())}
         require(origin_groups == audit["citation_contract"]["origin_groups"],
                 f"{task_id}: source-origin grouping differs between candidate and auditor streams")
-        independent_count = len(origin_groups)
+        allowed_sources = set(audit["citation_contract"]["allowed_citation_source_ids"])
+        support_origin_groups: dict[str, list[str]] = {}
+        for source in candidate["sources"]:
+            if source["source_id"] in allowed_sources:
+                support_origin_groups.setdefault(source["origin_id"], []).append(source["source_id"])
+        support_origin_groups = {
+            key: sorted(value) for key, value in sorted(support_origin_groups.items())
+        }
+        require(support_origin_groups == audit["citation_contract"]["support_origin_groups"],
+                f"{task_id}: support-origin groups differ from eligible support source IDs")
+        independent_count = len(support_origin_groups)
         require(independent_count == audit["citation_contract"]["independent_origin_count"],
-                f"{task_id}: independent-origin count mismatch")
+                f"{task_id}: independent supporting-origin count mismatch")
         require(audit["citation_contract"]["corroboration_available"]
                 == (independent_count >= audit["citation_contract"]["minimum_independent_origins"]),
                 f"{task_id}: corroboration-availability flag is incorrect")
