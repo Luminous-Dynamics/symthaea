@@ -54,11 +54,19 @@ pub struct CalibrationConfigV1 {
     pub evaluator_code_sha256: String,
     pub threshold_grid_sha256: String,
     pub thresholds: Vec<f64>,
+    pub threshold_selection_method: ThresholdSelectionMethodV1,
     pub risk_target_alpha: f64,
     pub familywise_delta: f64,
     pub unacceptable_loss_threshold: f64,
     pub minimum_independent_clusters: usize,
     pub exchangeability_justified_by_design: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThresholdSelectionMethodV1 {
+    FixedSequenceCluster,
+    BonferroniSimultaneous,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -106,7 +114,10 @@ pub struct GroupCertificateV1 {
     /// Bound on P(independent cluster has at least one unsafe accepted case).
     pub risk_upper_bound: Option<f64>,
     pub mean_selective_loss: Option<f64>,
+    /// Probability that an independent cluster contains at least one accepted case.
     pub coverage: Option<f64>,
+    /// Descriptive equal-cluster-weighted fraction of individual decisions accepted.
+    pub decision_coverage: Option<f64>,
     pub multiplicity_adjusted_delta: Option<f64>,
     pub risk_bound_method: String,
     pub certificate_scope: CertificateScopeV1,
@@ -280,10 +291,14 @@ fn validate_config(config: &CalibrationConfigV1) -> Result<(), CalibrationReject
     }
     let mut previous = None;
     for threshold in &config.thresholds {
-        if !threshold.is_finite() || !(0.0..=1.0).contains(threshold)
-            || previous.is_some_and(|value| *threshold <= value) {
+        if !threshold.is_finite() || !(0.0..=1.0).contains(threshold) {
             return Err(CalibrationRejectV1::InvalidThresholdGrid);
         }
+        let invalid_order = match config.threshold_selection_method {
+            ThresholdSelectionMethodV1::FixedSequenceCluster => previous.is_some_and(|value| *threshold >= value),
+            ThresholdSelectionMethodV1::BonferroniSimultaneous => previous.is_some_and(|value| *threshold <= value),
+        };
+        if invalid_order { return Err(CalibrationRejectV1::InvalidThresholdGrid); }
         previous = Some(*threshold);
     }
     if digest_serialized(&config.thresholds)? != config.threshold_grid_sha256 {
@@ -392,6 +407,7 @@ struct Stats {
     empirical_rate: f64,
     risk_upper: f64,
     coverage: f64,
+    decision_coverage: f64,
     mean_loss: f64,
 }
 
@@ -413,7 +429,7 @@ fn threshold_stats(rows: &[&CalibrationExampleV1], threshold: f64, loss_limit: f
     let mut accepted_examples=0;
     let mut accepted_clusters=0;
     let mut unsafe_clusters=0;
-    let mut coverage_sum=0.0;
+    let mut decision_coverage_sum=0.0;
     let mut loss_sum=0.0;
     for (total,accepted,unsafe_cluster,loss,count) in clusters.values() {
         if *accepted>0 {
@@ -422,13 +438,15 @@ fn threshold_stats(rows: &[&CalibrationExampleV1], threshold: f64, loss_limit: f
             accepted_examples+=accepted;
             loss_sum+=loss/ *count as f64;
         }
-        coverage_sum+=*accepted as f64/ *total as f64;
+        decision_coverage_sum+=*accepted as f64/ *total as f64;
     }
     let risk_upper=clopper_pearson_upper_v1(unsafe_clusters,accepted_clusters,delta)?;
     Some(Stats {
         threshold, accepted_examples, hard_rejected, accepted_clusters, unsafe_clusters,
         empirical_rate:unsafe_clusters as f64/accepted_clusters as f64,
-        risk_upper, coverage:coverage_sum/clusters.len() as f64,
+        risk_upper,
+        coverage:accepted_clusters as f64/clusters.len() as f64,
+        decision_coverage:decision_coverage_sum/clusters.len() as f64,
         mean_loss:loss_sum/accepted_clusters as f64,
     })
 }
@@ -470,7 +488,7 @@ fn blank_certificate(config:&CalibrationConfigV1,manifest:&str,group:&GroupSpecV
         calibration_cluster_count:cluster_count,calibration_example_count:example_count,
         accepted_example_count:0,hard_gate_rejected_count:hard_rejected,accepted_cluster_count:0,
         unsafe_cluster_count:0,risk_target_alpha:config.risk_target_alpha,threshold:None,
-        empirical_cluster_unsafe_rate:None,risk_upper_bound:None,mean_selective_loss:None,coverage:None,
+        empirical_cluster_unsafe_rate:None,risk_upper_bound:None,mean_selective_loss:None,coverage:None,decision_coverage:None,
         multiplicity_adjusted_delta:None,risk_bound_method:RISK_BOUND_METHOD_V1.into(),
         certificate_scope:CertificateScopeV1::GroupConditional,parent_fallback_group_id:None,
         parent_fallback_certificate_sha256:None,distribution_shift_detected:group.distribution_shift_detected,
@@ -507,16 +525,26 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
         threshold_count:config.thresholds.len(),group_count:groups.len(),
         calibration_method:"hierarchical_group_conditional_exact_cluster_risk".into(),
         risk_target_alpha:config.risk_target_alpha,familywise_delta:config.familywise_delta,
-        multiplicity_method:"bonferroni_over_group_threshold_hypotheses".into(),
+        multiplicity_method:match config.threshold_selection_method {
+            ThresholdSelectionMethodV1::FixedSequenceCluster => "bonferroni_over_groups_fixed_sequence_over_thresholds".into(),
+            ThresholdSelectionMethodV1::BonferroniSimultaneous => "bonferroni_over_group_threshold_hypotheses".into(),
+        },
         resampling_unit:"independent_declared_cluster".into(),
         exchangeability_status:if config.exchangeability_justified_by_design{"justified_by_sampling_design"}else{"not_established"}.into(),
-        threshold_selection:"calibration_split_only".into(),
+        threshold_selection:match config.threshold_selection_method {
+            ThresholdSelectionMethodV1::FixedSequenceCluster => "fixed_sequence_cluster_acceptance_prefix".into(),
+            ThresholdSelectionMethodV1::BonferroniSimultaneous => "simultaneous_bonferroni_on_calibration_split".into(),
+        },
         unacceptable_loss_threshold:config.unacceptable_loss_threshold,
         minimum_independent_clusters:config.minimum_independent_clusters,
         evaluator_custody:"public_diagnostic_only".into(),manifest_sha256:String::new()
     };
     manifest.manifest_sha256=digest_serialized(&manifest)?;
-    let adjusted_delta=config.familywise_delta/(groups.len()*config.thresholds.len()) as f64;
+    let hypothesis_count = match config.threshold_selection_method {
+        ThresholdSelectionMethodV1::FixedSequenceCluster => groups.len(),
+        ThresholdSelectionMethodV1::BonferroniSimultaneous => groups.len().checked_mul(config.thresholds.len()).ok_or(CalibrationRejectV1::InvalidConfig)?,
+    };
+    let adjusted_delta=config.familywise_delta/hypothesis_count as f64;
 
     let mut ordered:Vec<&GroupSpecV1>=groups.values().collect();
     ordered.sort_by_key(|group|hierarchy_depth(&group.group_id,&groups).unwrap_or(usize::MAX));
@@ -537,10 +565,19 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
             cert.status=RiskStatusV1::NotEstimableInsufficientCalibrationClusters;
         }else{
             let mut stats=Vec::new();
-            for threshold in &config.thresholds{
-                if let Some(value)=threshold_stats(&rows,*threshold,config.unacceptable_loss_threshold,adjusted_delta)
-                    && value.accepted_clusters>=config.minimum_independent_clusters {
-                    stats.push(value);
+            for threshold in &config.thresholds {
+                let Some(value) = threshold_stats(&rows, *threshold, config.unacceptable_loss_threshold, adjusted_delta) else {
+                    if config.threshold_selection_method == ThresholdSelectionMethodV1::FixedSequenceCluster { break; }
+                    continue;
+                };
+                if value.accepted_clusters < config.minimum_independent_clusters {
+                    if config.threshold_selection_method == ThresholdSelectionMethodV1::FixedSequenceCluster { break; }
+                    continue;
+                }
+                let certified = value.risk_upper <= config.risk_target_alpha;
+                stats.push(value);
+                if !certified && config.threshold_selection_method == ThresholdSelectionMethodV1::FixedSequenceCluster {
+                    break;
                 }
             }
             if let Some(best)=stats.iter().filter(|s|s.risk_upper<=config.risk_target_alpha).max_by(|a,b|{
@@ -558,6 +595,7 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
                 cert.risk_upper_bound=Some(best.risk_upper);
                 cert.mean_selective_loss=Some(best.mean_loss);
                 cert.coverage=Some(best.coverage);
+                cert.decision_coverage=Some(best.decision_coverage);
                 cert.multiplicity_adjusted_delta=Some(adjusted_delta);
             }else if let Some(best)=stats.iter().min_by(|a,b|{
                 a.risk_upper.total_cmp(&b.risk_upper)
@@ -574,6 +612,7 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
                 cert.risk_upper_bound=Some(best.risk_upper);
                 cert.mean_selective_loss=Some(best.mean_loss);
                 cert.coverage=Some(best.coverage);
+                cert.decision_coverage=Some(best.decision_coverage);
                 cert.multiplicity_adjusted_delta=Some(adjusted_delta);
             }else{
                 cert.status=RiskStatusV1::NotEstimableInsufficientCalibrationClusters;
@@ -594,6 +633,7 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
                         cert.risk_upper_bound=parent.risk_upper_bound;
                         cert.mean_selective_loss=parent.mean_selective_loss;
                         cert.coverage=parent.coverage;
+                        cert.decision_coverage=parent.decision_coverage;
                         cert.multiplicity_adjusted_delta=parent.multiplicity_adjusted_delta;
                         cert.certificate_scope=CertificateScopeV1::ParentFallback;
                         cert.parent_fallback_group_id=Some(parent.group_id.clone());
@@ -698,7 +738,8 @@ mod tests{
             sufficiency_score_definition_sha256:digest("score"),decision_loss_definition_sha256:digest("loss"),
             decision_policy_sha256:digest("policy"),candidate_code_sha256:digest("candidate"),
             evaluator_code_sha256:digest("evaluator"),threshold_grid_sha256:digest_serialized(&thresholds).unwrap(),
-            thresholds,risk_target_alpha:0.1,familywise_delta:0.05,unacceptable_loss_threshold:0.5,
+            thresholds,threshold_selection_method:ThresholdSelectionMethodV1::FixedSequenceCluster,
+            risk_target_alpha:0.1,familywise_delta:0.05,unacceptable_loss_threshold:0.5,
             minimum_independent_clusters:minimum,exchangeability_justified_by_design:true
         }
     }
@@ -720,7 +761,7 @@ mod tests{
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let mut rows=examples(80,"root",0.9,0.0);
         for row in rows.iter_mut().take(20){row.sufficiency_score=0.2;row.decision_loss=1.0;}
-        let cfg=config(&groups,&rows,vec![0.0,0.5,0.8],30);
+        let cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
         assert!(result.manifest.verify_integrity());
         let cert=&result.certificates[0];
@@ -735,7 +776,7 @@ mod tests{
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let mut rows=examples(40,"root",1.0,0.0);
         for row in &mut rows{row.hard_gates_pass=false;}
-        let cfg=config(&groups,&rows,vec![0.0,0.5],30);
+        let cfg=config(&groups,&rows,vec![0.5,0.0],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
         let cert=&result.certificates[0];
         assert_eq!(cert.status,RiskStatusV1::NotEstimableInsufficientCalibrationClusters);
@@ -754,7 +795,7 @@ mod tests{
     #[test]
     fn unsafe_clusters_are_risk_exceeds_target_not_not_estimable(){
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
-        let rows=examples(100,"root",0.9,1.0);let cfg=config(&groups,&rows,vec![0.0,0.5],30);
+        let rows=examples(100,"root",0.9,1.0);let cfg=config(&groups,&rows,vec![0.5,0.0],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
         assert_eq!(result.certificates[0].status,RiskStatusV1::RiskExceedsTarget);
         assert!(result.certificates[0].risk_upper_bound.unwrap()>cfg.risk_target_alpha);
@@ -769,7 +810,7 @@ mod tests{
         rows.push(CalibrationExampleV1{run_id:"run-001".into(),independent_cluster_id:"leaf-one".into(),
             group_id:"leaf".into(),sufficiency_score:0.9,hard_gates_pass:true,decision_loss:0.0,
             outcome_receipt_sha256:digest("leaf-one")});
-        let cfg=config(&groups,&rows,vec![0.0,0.5],30);
+        let cfg=config(&groups,&rows,vec![0.5,0.0],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
         let leaf=result.certificates.iter().find(|value|value.group_id=="leaf").unwrap();
         assert_eq!(leaf.status,RiskStatusV1::ParentGroupFallback);
@@ -779,11 +820,11 @@ mod tests{
     #[test]
     fn shift_and_unjustified_exchangeability_suspend_certification(){
         let shifted=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:true}];
-        let rows=examples(40,"root",0.9,0.0);let cfg=config(&shifted,&rows,vec![0.0,0.5],30);
+        let rows=examples(40,"root",0.9,0.0);let cfg=config(&shifted,&rows,vec![0.5,0.0],30);
         let result=calibrate_selective_evidence_v1(&cfg,&shifted,&rows).unwrap();
         assert_eq!(result.certificates[0].status,RiskStatusV1::UnsupportedDistributionShift);
         let stable=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
-        let mut cfg=config(&stable,&rows,vec![0.0,0.5],30);cfg.exchangeability_justified_by_design=false;
+        let mut cfg=config(&stable,&rows,vec![0.5,0.0],30);cfg.exchangeability_justified_by_design=false;
         let result=calibrate_selective_evidence_v1(&cfg,&stable,&rows).unwrap();
         assert_eq!(result.certificates[0].status,RiskStatusV1::NotEstimableExchangeabilityNotEstablished);
     }
@@ -793,10 +834,10 @@ mod tests{
             GroupSpecV1{group_id:"a".into(),parent_group_id:Some("b".into()),allow_parent_fallback:false,distribution_shift_detected:false},
             GroupSpecV1{group_id:"b".into(),parent_group_id:Some("a".into()),allow_parent_fallback:false,distribution_shift_detected:false}
         ];
-        let rows=examples(40,"a",0.9,0.0);let cfg=config(&cyclic,&rows,vec![0.0,0.5],30);
+        let rows=examples(40,"a",0.9,0.0);let cfg=config(&cyclic,&rows,vec![0.5,0.0],30);
         assert_eq!(calibrate_selective_evidence_v1(&cfg,&cyclic,&rows),Err(CalibrationRejectV1::GroupHierarchyCycle));
         let stable=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
-        let rows=examples(40,"root",0.9,0.0);let mut cfg=config(&stable,&rows,vec![0.0,0.5],30);
+        let rows=examples(40,"root",0.9,0.0);let mut cfg=config(&stable,&rows,vec![0.5,0.0],30);
         cfg.calibration_data_sha256=digest("wrong");
         assert_eq!(calibrate_selective_evidence_v1(&cfg,&stable,&rows),Err(CalibrationRejectV1::CalibrationDataDigestMismatch));
     }
@@ -805,7 +846,7 @@ mod tests{
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let mut rows=examples(80,"root",0.9,0.0);
         for row in rows.iter_mut().take(20) { row.sufficiency_score=0.2; row.decision_loss=1.0; }
-        let cfg=config(&groups,&rows,vec![0.0,0.5,0.8],30);
+        let cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();let cert=&result.certificates[0];
         assert_eq!(cert.threshold,Some(0.5));
         let assessment=assess_decision_v1(&DecisionInputV1{
@@ -820,7 +861,7 @@ mod tests{
     #[test]
     fn acceptance_requires_matching_group_certificate_and_hard_gates(){
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
-        let rows=examples(100,"root",0.9,0.0);let cfg=config(&groups,&rows,vec![0.0,0.5],30);
+        let rows=examples(100,"root",0.9,0.0);let cfg=config(&groups,&rows,vec![0.5,0.0],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();let cert=&result.certificates[0];
         let input=DecisionInputV1{group_id:"root".into(),sufficiency_score:0.9,
         sufficiency_score_definition_sha256:cfg.sufficiency_score_definition_sha256.clone(),
@@ -837,7 +878,7 @@ mod tests{
     #[test]
     fn tampered_certificate_cannot_authorize_acceptance(){
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
-        let rows=examples(100,"root",0.9,0.0);let cfg=config(&groups,&rows,vec![0.0,0.5],30);
+        let rows=examples(100,"root",0.9,0.0);let cfg=config(&groups,&rows,vec![0.5,0.0],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
         let mut cert=result.certificates[0].clone();cert.threshold=Some(0.99);
         assert!(!cert.verify_integrity());assert!(!cert.is_usable());
@@ -847,7 +888,7 @@ mod tests{
     fn changed_decision_policy_cannot_reuse_a_valid_certificate() {
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(100,"root",0.9,0.0);
-        let cfg=config(&groups,&rows,vec![0.0,0.5],30);
+        let cfg=config(&groups,&rows,vec![0.5,0.0],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
         let cert=&result.certificates[0];
         let input=DecisionInputV1{
@@ -869,7 +910,7 @@ mod tests{
     fn changed_score_definition_or_group_hierarchy_cannot_reuse_certificate() {
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(100,"root",0.9,0.0);
-        let cfg=config(&groups,&rows,vec![0.0,0.5],30);
+        let cfg=config(&groups,&rows,vec![0.5,0.0],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
         let cert=&result.certificates[0];
         let mut input=DecisionInputV1{
@@ -893,6 +934,54 @@ mod tests{
         assert_eq!(hierarchy_mismatch.action,DecisionActionV1::Abstain);
         assert_eq!(hierarchy_mismatch.status,DecisionAssessmentStatusV1::AbstainedNotEstimable);
         assert_eq!(hierarchy_mismatch.risk_upper_bound,None);
+    }
+
+
+    #[test]
+    fn fixed_sequence_uses_groupwise_delta_and_stops_at_first_failed_prefix() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let mut rows=examples(80,"root",0.9,0.0);
+        for row in rows.iter_mut().take(20) { row.sufficiency_score=0.2; row.decision_loss=1.0; }
+        let mut cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
+        cfg.risk_target_alpha=0.05;
+        let fixed=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let fixed_cert=&fixed.certificates[0];
+        assert_eq!(fixed_cert.status,RiskStatusV1::Certified);
+        assert_eq!(fixed_cert.threshold,Some(0.5));
+        assert_eq!(fixed_cert.multiplicity_adjusted_delta,Some(0.05));
+
+        let mut simultaneous=cfg.clone();
+        simultaneous.threshold_selection_method=ThresholdSelectionMethodV1::BonferroniSimultaneous;
+        simultaneous.thresholds.reverse();
+        simultaneous.threshold_grid_sha256=digest_serialized(&simultaneous.thresholds).unwrap();
+        let bonf=calibrate_selective_evidence_v1(&simultaneous,&groups,&rows).unwrap();
+        let bonf_cert=&bonf.certificates[0];
+        assert_ne!(bonf_cert.status,RiskStatusV1::Certified);
+        assert_eq!(bonf_cert.multiplicity_adjusted_delta,Some(0.05/3.0));
+    }
+
+    #[test]
+    fn cluster_and_decision_coverage_are_reported_separately() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let mut rows=examples(40,"root",0.9,0.0);
+        let mut repeated=rows[0].clone();
+        repeated.sufficiency_score=0.1;
+        repeated.decision_loss=1.0;
+        rows.push(repeated);
+        let cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
+        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let cert=&result.certificates[0];
+        assert_eq!(cert.accepted_cluster_count,40);
+        assert_eq!(cert.coverage,Some(1.0));
+        assert!(cert.decision_coverage.is_some_and(|value|value<1.0));
+    }
+
+    #[test]
+    fn fixed_sequence_rejects_non_descending_sufficiency_grid() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let rows=examples(40,"root",0.9,0.0);
+        let cfg=config(&groups,&rows,vec![0.0,0.5],30);
+        assert_eq!(calibrate_selective_evidence_v1(&cfg,&groups,&rows),Err(CalibrationRejectV1::InvalidThresholdGrid));
     }
 
 }
