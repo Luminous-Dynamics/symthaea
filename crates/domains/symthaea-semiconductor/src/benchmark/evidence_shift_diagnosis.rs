@@ -235,6 +235,14 @@ fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, EvidenceShift
     Ok(sha256_hex(&bytes))
 }
 
+fn prediction_receipt_digest(
+    receipt: &StreamingPredictionReceiptV1,
+) -> Result<String, EvidenceShiftErrorV1> {
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    json_sha256(&canonical)
+}
+
 fn report_digest(
     report: &LabelConsumptionEligibilityReportV1,
 ) -> Result<String, EvidenceShiftErrorV1> {
