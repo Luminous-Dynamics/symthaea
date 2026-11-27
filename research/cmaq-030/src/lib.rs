@@ -383,7 +383,12 @@ fn score_calibration_unit(
             "reference_block_spec",
         ));
     }
-    validate_cell_inventory(&reference.cells, spec)?;
+    let reference_identities: Vec<CellIdentity> = reference
+        .cells
+        .iter()
+        .map(|cell| cell.identity.clone())
+        .collect();
+    validate_cell_inventory(&reference_identities, spec)?;
     if candidate.cells.len() != reference.cells.len() {
         return Err(MarginCalibrationError::InvalidCellInventory);
     }
@@ -459,32 +464,33 @@ fn validate_candidate_block(
             "candidate_block_spec",
         ));
     }
-    validate_cell_inventory(&candidate.cells, spec)
+    let identities: Vec<CellIdentity> = candidate
+        .cells
+        .iter()
+        .map(|cell| cell.identity.clone())
+        .collect();
+    validate_cell_inventory(&identities, spec)
 }
 
 fn validate_cell_inventory(
-    cells: &[CandidateMarginCell],
+    identities: &[CellIdentity],
     spec: &RecoveryMarginBlockSpec,
 ) -> Result<(), MarginCalibrationError> {
     let expected = expected_cell_count(spec)?;
-    if cells.len() != expected {
+    if identities.len() != expected {
         return Err(MarginCalibrationError::InvalidCellInventory);
     }
-    let mut identities = HashSet::new();
-    for cell in cells {
-        if cell.identity.rollout_index >= spec.rollouts_per_cluster
-            || cell.identity.action_query_cell_index >= spec.action_query_cell_count
-            || cell.identity.prefix_step > spec.horizon_steps
+    let mut seen = HashSet::new();
+    for identity in identities {
+        if identity.rollout_index >= spec.rollouts_per_cluster
+            || identity.action_query_cell_index >= spec.action_query_cell_count
+            || identity.prefix_step > spec.horizon_steps
         {
             return Err(MarginCalibrationError::InvalidCellInventory);
         }
-        if !identities.insert(cell.identity.clone()) {
+        if !seen.insert(identity.clone()) {
             return Err(MarginCalibrationError::DuplicateCellIdentity);
         }
-        kth_largest_independent_margin(
-            &cell.option_margins,
-            spec.required_independent_domains,
-        )?;
     }
     Ok(())
 }
@@ -831,8 +837,15 @@ mod tests {
     fn maximum_optimism_over_any_prefix_controls_cluster_score() {
         let mut c = candidate_block(10);
         let mut r = reference_block(1, 10, 2);
-        c.cells[1].option_margins[0].margin_units += 30;
-        r.cells[1].option_margins[0].margin_units = c.cells[1].option_margins[0].margin_units - 25;
+        // Raise domain A so domain B is the limiting kth margin, then
+        // overstate domain B by 25 units at prefix 1.
+        c.cells[1].option_margins[0].margin_units += 100;
+        c.cells[1].option_margins[1].margin_units += 100;
+        c.cells[1].option_margins[2].margin_units += 30;
+        r.cells[1].option_margins[0].margin_units += 100;
+        r.cells[1].option_margins[1].margin_units += 100;
+        r.cells[1].option_margins[2].margin_units =
+            c.cells[1].option_margins[2].margin_units - 25;
         assert_eq!(score_calibration_unit(&c, &r, &spec()).unwrap(), 25);
     }
 
@@ -853,7 +866,9 @@ mod tests {
     fn nonpositive_calibrated_margin_prevents_commitment() {
         let calibration = qualified();
         let mut forecast = runtime_forecast();
-        forecast.block.cells[1].option_margins[1].margin_units = -100;
+        // Remove the second independent recovery domain, not a duplicate
+        // profile within the first domain.
+        forecast.block.cells[1].option_margins[2].margin_units = -100;
         let assessment =
             apply_recoverability_margin_calibration(&calibration, &forecast).unwrap();
         assert!(matches!(
