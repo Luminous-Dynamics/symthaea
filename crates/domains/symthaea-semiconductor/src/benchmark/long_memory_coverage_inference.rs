@@ -53,6 +53,7 @@ pub struct GaussianLinearLongMemoryEvidenceV1 {
     pub absolute_error_score_definition_sha256: String,
     pub assumption_evidence_sha256: String,
     pub gaussian_iid_innovations_declared: bool,
+    pub zero_mean_residuals_declared: bool,
     pub regularly_varying_coefficients_declared: bool,
     pub fixed_predictor_independent_of_calibration_and_test_declared: bool,
     /// Declared positive leading coefficient scale c in a_j ~ c*j^(-beta).
@@ -331,7 +332,13 @@ fn validate_adjacent_scores(
             }
             *stored = Some(observed.clone());
         }
-        signed_residuals.push(report.qualified_corrected_value - prediction.prediction_value);
+        let signed_residual = report.qualified_corrected_value - prediction.prediction_value;
+        if !score.is_finite() || !signed_residual.is_finite() {
+            return Err(LongMemoryCoverageErrorV1(
+                "absolute score or signed residual overflowed/non-finite".into(),
+            ));
+        }
+        signed_residuals.push(signed_residual);
         scores.push(score);
         sequences.push(prediction.sequence);
     }
