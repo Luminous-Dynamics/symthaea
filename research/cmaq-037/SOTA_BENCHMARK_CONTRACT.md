@@ -17,6 +17,7 @@ Keep these methods separate; do not merge their guarantees or silently borrow th
 | CMAQ-038 | Full dyadic rank-histogram spectrum | Exploratory CMAQ arm |
 | CMAQ-040 | Rank spectrum × restart-time mixture | Exploratory CMAQ arm |
 | CMAQ-045 | Rank spectrum × predictable history contexts | Exploratory CMAQ arm |
+| CMAQ-046 | Predictable OCO witness × convex-target support residual × conditional-mean e-process | Exploratory conditional-mean arm; fixed-bet subset, distinct null contract |
 
 For every method, freeze source revision, dependencies, score mapping, reference set, ties, warm-up, alpha, horizon and stopping rule. The CCTM/PF-CCTM arms operate on their own stated score/p-value contracts; a PRM result cannot be presented as a reproduction of either.
 
@@ -64,6 +65,23 @@ A smaller smoke run may test wiring but cannot estimate a five-percent false-ala
 **Recoverability shifts:** increasing residual variance, decreasing barrier/recoverability margin, delayed actuation, fallback degradation, and simultaneous sensor/control disturbances. Ground-truth deadlines must come from independent plant/scenario evaluation, not from the detector.
 
 For every generator, store its source, parameters, seed, split, effective block ID, rank/score receipt and exact build digest.
+
+### Conditional-mean vector residual experiments (CMAQ-046)
+
+These are a separate experimental family, not extra repetitions of the PRM rank-null grid.
+
+Freeze a residual vector r_t, compact convex target S, dimension d, observation norm bound R, score/sensor build and target digest before each run. Under the null, test the adaptive conditional-mean restriction E[r_t | F_(t-1)] ∈ S. The benchmark alternatives should include:
+- unknown-direction mean shifts toward all registered faces/corners of the box;
+- one-coordinate and coordinated multi-coordinate violations;
+- gradual and transient mean departures;
+- cross-coordinate cancellation, where a fixed scalar projection can remain near zero;
+- marginally unchanged noise variance/tails as negative controls, demonstrating that a conditional-mean detector need not detect scale-only changes;
+- adaptive but valid conditional means that move within S over time;
+- heteroskedastic and serially dependent noise whose conditional means remain in S.
+
+Compare adaptive OCO witness, fixed compass-direction e-mixture, coordinate-wise scalar e-processes, and matched multivariate sequential baselines. All arms must use the same bounded residual vectors, target, norm bound, alpha and stopping horizon. The conditional-mean null must be generated and tested directly; PRM/CCTM guarantees cannot be transferred to this arm.
+
+Report conditional-mean null full-horizon false-alarm probability, miss fraction, true-onset delay with H+1 miss penalty, worst orientation, pathwise distance/residual/regret identity error, p99 update latency, memory and dimension scaling. Use CMAQ-044 for paired effective-block inference. The empirical distance to S is a diagnostic, not a valid stopping rule; rejection uses the e-process threshold.
 
 ## 4. Primary estimands: no survivor-only reporting
 
