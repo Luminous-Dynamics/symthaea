@@ -292,7 +292,7 @@ fn glyphs_for_form(form: EmbodimentForm) -> (SceneGlyph, SceneGlyph, SceneGlyph)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::embodiment_event::{EvidenceState, EventSource};
+    use crate::embodiment_event::{BackchannelSignal, EvidenceState, EventSource, ExpressionChannel, ExpressionIntentKind, UserControlAction};
     use crate::embodiment_policy::{ConsentGrant, PresentationPolicy, PresentationRequest};
 
     const SESSION: &str = "scene-session";
@@ -399,6 +399,51 @@ mod tests {
     }
 
     #[test]
+    fn all_nine_semantic_event_kinds_produce_nonempty_accessible_scenes() {
+        let cues = vec![
+            SemanticCue::Listening { active: true },
+            SemanticCue::Speaking { active: true, segment_id: "segment-9".to_owned() },
+            SemanticCue::TurnState { state: TurnState::Yield, target: None },
+            SemanticCue::Backchannel { signal: BackchannelSignal::VisualAck, intensity: 0.4 },
+            SemanticCue::AttentionFocus { target: "topic-1".to_owned(), strength: Some(0.7) },
+            SemanticCue::ExpressionIntent {
+                intent: ExpressionIntentKind::Caution,
+                intensity: 0.5,
+                channel: Some(ExpressionChannel::Light),
+            },
+            SemanticCue::Uncertainty {
+                subject: "hypothesis-1".to_owned(),
+                level: 0.6,
+                calibration_ref: None,
+            },
+            SemanticCue::EvidenceStatus {
+                subject_id: "evidence-1".to_owned(),
+                status: EvidenceState::Unverified,
+                verifier_receipt_ref: None,
+            },
+            SemanticCue::UserControl {
+                action: UserControlAction::ChooseForm,
+                form_id: Some("puppet_theatre".to_owned()),
+                target_event_id: None,
+                enabled: None,
+                intensity: None,
+            },
+        ];
+        assert_eq!(cues.len(), 9);
+        for semantic in cues {
+            let (canonical, permit) = fixture(
+                EmbodimentForm::LivingConstellation,
+                PrivacyClass::Public,
+                semantic,
+            );
+            let frame = compile_scene(&canonical, &permit).unwrap();
+            assert!(!frame.elements.is_empty());
+            assert!(!frame.accessible_description.is_empty());
+            assert_eq!(frame.canonical_cue_digest, permit.cue_digest());
+        }
+    }
+
+    #[test]
     fn reduced_motion_forces_all_scene_elements_static() {
         let (cue, permit) = fixture(
             EmbodimentForm::LivingConstellation,
@@ -420,6 +465,10 @@ mod tests {
         let frame = compile_scene(&cue, &permit).unwrap();
         assert!(!frame.accessible_description.contains("private-person"));
         assert!(frame.accessible_description.contains("Sensitive interaction cue"));
+        let serialized = serde_json::to_string(&frame).unwrap();
+        assert!(!serialized.contains("private-person"));
+        assert!(!serialized.contains("evidence:trace-1"));
+        assert!(serialized.contains(&frame.canonical_cue_digest));
     }
 
     #[test]
