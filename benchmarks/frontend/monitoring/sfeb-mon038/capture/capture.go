@@ -221,13 +221,13 @@ func Evaluate(in Input)Result{
  if in.ProducerFencedAt.IsZero(){f.hold("producer_fence_time_missing","producer fence timestamp is missing")}else if !in.CaptureStartedAt.IsZero()&&in.ProducerFencedAt.After(in.CaptureStartedAt){f.block("producer_fenced_after_capture_started","fence must precede partition range capture")}
  if !in.TopicInventoryComplete||len(in.TopicInventory)==0{f.hold("topic_inventory_incomplete","complete topic/partition inventory is required")}
  if !validDigest(in.TopicInventorySHA256){f.hold("topic_inventory_digest_missing","topic inventory digest is missing")}else if in.TopicInventorySHA256!=topicInventoryDigest(in.TopicInventory){f.block("topic_inventory_digest_mismatch","topic inventory content does not match its digest")}
- if len(in.TopicInventory)>MaxTopics||len(in.PartitionCaptures)>MaxPartitions{f.block("inventory_limit_exceeded","topic or partition count exceeds v1 limits")}
+ if len(in.TopicInventory)>MaxTopics||len(in.PartitionCaptures)>MaxPartitions||len(in.BusinessEvents)>MaxRecords{f.block("input_limit_exceeded","topic, partition receipt or business-event count exceeds v1 limits");out.CaptureVerdict=f.verdict();out.CampaignVerdict=out.CaptureVerdict;out.Issues=f.sortedIssues();out.ReasonCodes=f.codes();return out}
  if !validDigest(in.PartitionRangesSHA256){f.hold("partition_range_digest_missing","partition range vector digest is absent")}else if in.PartitionRangesSHA256!=partitionRangesDigest(in.PartitionCaptures){f.block("partition_range_digest_mismatch","partition range vector differs from its digest")}
  if !validDigest(in.BusinessEventsSHA256){f.hold("business_event_digest_missing","business event set digest is absent")}else if in.BusinessEventsSHA256!=businessEventsDigest(in.BusinessEvents){f.block("business_event_digest_mismatch","business event set differs from its digest")}
- if len(in.BusinessEvents)>MaxRecords{f.block("business_event_limit_exceeded","business event count exceeds v1 limit")}
 
  inventory:=map[string]TopicInventory{}
  kafkaClusters:=map[string]struct{}{}
+ topicIDs:=map[string]string{}
  expectedPartitions:=0
  for _,t:=range in.TopicInventory{
   if !validID(t.ClusterID)||!validID(t.Topic)||!validID(t.TopicID)||t.PartitionCount<1||t.PartitionCount>MaxPartitions{f.block("topic_inventory_entry_invalid",t.Topic);continue}
@@ -235,6 +235,8 @@ func Evaluate(in Input)Result{
   if _,ok:=inventory[key];ok{f.block("topic_inventory_duplicate",t.Topic);continue}
   inventory[key]=t
   kafkaClusters[t.ClusterID]=struct{}{}
+  topicKey:=t.ClusterID+"\\x00"+t.TopicID
+  if previous,ok:=topicIDs[topicKey];ok&&previous!=t.Topic{f.block("duplicate_topic_id",t.Topic)}else{topicIDs[topicKey]=t.Topic}
   if expectedPartitions>MaxPartitions-t.PartitionCount { expectedPartitions=MaxPartitions+1 } else { expectedPartitions+=t.PartitionCount }
   if !validDigest(t.ConfigSHA256){f.hold("topic_config_digest_missing",t.Topic)}
   if t.CleanupPolicy!="delete"{
@@ -278,6 +280,7 @@ func Evaluate(in Input)Result{
   if !validDigest(p.RecordsSHA256){f.hold("partition_record_digest_missing",p.Topic)}else if p.RecordsSHA256!=recordsDigest(p.Records){f.block("partition_record_digest_mismatch",p.Topic)}
   if !validDigest(p.ManifestSHA256){f.hold("partition_manifest_digest_missing",p.Topic)}else if p.ManifestSHA256!=rangeManifestDigest(p){f.block("partition_manifest_digest_mismatch",p.Topic)}
   if !validDigest(t.ConfigSHA256){/* already reported at inventory */}
+  if len(p.Records)>MaxRecords-recordTotal{f.block("captured_record_limit_exceeded","captured record count exceeds v1 limit");recordTotal=MaxRecords+1;continue}
   lastOffset:=int64(-1)
   for _,r:=range p.Records{
    recordTotal++
