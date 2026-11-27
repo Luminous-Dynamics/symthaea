@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODULE="$ROOT/benchmark"
+READER_MODULE="$ROOT/../sfeb-mon029/reader"
 
 for command in go jq; do
   command -v "$command" >/dev/null 2>&1 || {
@@ -42,7 +43,17 @@ go vet ./...
 go test ./...
 go test -race ./...
 go test -run '^$' -fuzz FuzzPairKeyDeterministic -fuzztime=30s
-go test -run '^$' -bench BenchmarkScoreRun -benchmem -count=10
+go test -run '^
+echo "MON-028 and MON-029 local Go, race, vet, fuzz and benchmark checks passed."
+echo "This script does not run PostgreSQL/Kafka/restore experiments."
+ -bench BenchmarkScoreRun -benchmem -count=10
+(
+  cd "$READER_MODULE"
+  find . -type f -name '*.go' -print0 | xargs -0 gofmt -w
+  go vet ./...
+  go test ./...
+  go test -race ./...
+)
 
 echo "MON-028 local Go, race, vet, fuzz and benchmark checks passed."
 echo "This script does not run PostgreSQL/Kafka/restore experiments."

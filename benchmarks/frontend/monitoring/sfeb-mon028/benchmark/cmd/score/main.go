@@ -15,6 +15,7 @@ import (
 
 	custody "luminousdynamics/mon026-custody"
 	"luminousdynamics/mon028-benchmark"
+	verifiedreader "luminousdynamics/mon029-reader"
 )
 
 func main() { os.Exit(run()) }
@@ -77,11 +78,6 @@ func verifyCustodyBundle(root,manifestPath,artifactPath,keyID string,pub ed25519
 	return manifest,result,nil
 }
 
-func readBundleArtifact[T any](root,relative string) (T,error) {
-	var zero T
-	full:=filepath.Join(root,filepath.FromSlash(relative))
-	return decodeStrictFile[T](full)
-}
 
 func run() int {
 	suiteRoot:=flag.String("suite-bundle-root","","artifact root containing the benchmark suite")
@@ -129,7 +125,7 @@ func run() int {
 		return 64
 	}
 
-	_,suiteCustody,err:=verifyCustodyBundle(*suiteRoot,*suiteManifestPath,*suiteArtifact,*suiteKeyID,suitePub,
+	suiteManifest,suiteCustody,err:=verifyCustodyBundle(*suiteRoot,*suiteManifestPath,*suiteArtifact,*suiteKeyID,suitePub,
 		*suiteRunID,*suiteSequence,*suitePrevious,*suiteClock,*suiteMaxAge,*suiteMaxUncertainty)
 	if err!=nil {
 		_ = json.NewEncoder(os.Stdout).Encode(suiteCustody)
@@ -146,9 +142,9 @@ func run() int {
 		return 2
 	}
 
-	suite,err:=readBundleArtifact[benchmark.Suite](*suiteRoot,*suiteArtifact)
+	suite,err:=verifiedreader.ReadArtifactMatchingManifestDigest[benchmark.Suite](*suiteRoot,*suiteArtifact,suiteManifest)
 	if err!=nil { fmt.Fprintf(os.Stderr,"read suite artifact: %v\n",err); return 65 }
-	result,err:=readBundleArtifact[benchmark.CampaignResult](*resultRoot,*resultArtifact)
+	result,err:=verifiedreader.ReadArtifactMatchingManifestDigest[benchmark.CampaignResult](*resultRoot,*resultArtifact,resultManifest)
 	if err!=nil { fmt.Fprintf(os.Stderr,"read candidate result artifact: %v\n",err); return 65 }
 	score,err:=benchmark.ScoreRun(suite,result)
 	if err!=nil { fmt.Fprintf(os.Stderr,"score candidate result: %v\n",err); return 2 }
@@ -168,7 +164,7 @@ func run() int {
 			fmt.Fprintln(os.Stderr,"selected baseline artifact is not in the signed result inventory")
 			return 2
 		}
-		baseline,readErr:=readBundleArtifact[benchmark.CampaignResult](*resultRoot,*baselineArtifact)
+		baseline,readErr:=verifiedreader.ReadArtifactMatchingManifestDigest[benchmark.CampaignResult](*resultRoot,*baselineArtifact,resultManifest)
 		if readErr!=nil { fmt.Fprintf(os.Stderr,"read baseline result artifact: %v\n",readErr); return 65 }
 		comparison,compareErr:=benchmark.CompareMatched(suite,baseline,result)
 		if compareErr!=nil { fmt.Fprintf(os.Stderr,"matched comparison: %v\n",compareErr); return 2 }
