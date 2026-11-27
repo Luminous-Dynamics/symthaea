@@ -178,7 +178,7 @@ The academic hybrid arm must use the AML-designated embedding model when it is i
 - Keep answer-generation and judge configurations fixed when an external benchmark requires them.
 - Freeze commit SHAs, model identifiers, prompts, index parameters, retrieval limits, corpus generator, seeds, machine configuration and evaluator version in the run manifest. Enforce an identical downstream-policy digest and decision seed across no-memory, memory and leave-one-out interventions. The versioned [run-manifest schema](schemas/run-manifest-v0.1.schema.json) binds these configurations and applies the AML Academic model restrictions and top_k=100 ceiling.
 - Use separate development and held-out generator seeds. No tuning on held-out results.
-- Cluster-bootstrap at the independent world/episode-cluster level. Do not treat correlated questions from one world as independent samples.
+- Cluster-bootstrap at the independent world/episode-cluster level. Do not treat correlated questions from one world as independent samples. The dependency-free Rust scorer now implements deterministic whole-cluster resampling and reports 95% percentile intervals for paired mean memory gain and memory-induced harm rate; all episodes from a sampled world move together.
 - Publish per-family results and uncertainty intervals. A single composite score is optional only as a secondary, explicitly defined view.
 
 ## Metrics
@@ -192,7 +192,7 @@ Do not collapse these dimensions into one unqualified score.
 - **Memory-induced harm rate:** fraction of paired episodes where access to memory increases loss relative to the no-memory policy.
 - **Decision-sufficiency rate:** fraction of episodes where the returned admissible evidence is sufficient for the frozen policy to attain the best action it could take with all admissible evidence.
 - **Action-change justification:** among cases where memory changes the action, the fraction where that change is supported by valid, current evidence and reduces realised loss.
-- **Evidence-level counterfactual influence:** re-run the same frozen downstream policy with each returned evidence ID withheld in turn. Report how removing each item changes decision loss. This is leave-one-out attribution, not Shapley attribution; interacting evidence items require additional subset interventions. Every rerun must carry the same downstream-policy digest and decision seed; a changed reader or seed invalidates the intervention.
+- **Evidence-level counterfactual influence:** re-run the same frozen downstream policy with each returned evidence ID withheld in turn. Report how removing each item changes decision loss. This is leave-one-out attribution, not Shapley attribution; interacting evidence items require additional subset interventions. Every rerun must carry the same downstream-policy digest and decision seed; a changed reader or seed invalidates the intervention. Aggregate paired results using world-cluster bootstrap intervals rather than treating individual questions as independent observations.
 
 ### Evidence quality
 
@@ -281,13 +281,22 @@ A recent preprint on memory lifecycle modelling is relevant to local merge, supe
 
 ### LongMemEval-V2 competitive targets
 
-The published AgentRunbook-C reference is 74.9% Small Overall at 108.3 seconds and 70.1% Medium Overall at 139.9 seconds. The V2 leaderboard computes LAFS Gain over a fixed reference frontier using 1–200 second latency budgets.
+The official page describes the fixed reference frontier and a 1–200 second log-latency budget. The live leaderboard now reports these leading operating points:
+
+| System | LAFS gain | Accuracy | Query latency |
+|---|---:|---:|---:|
+| AgentRunbook-C v2 Online | +2.823 | 75.6% | 130.5 s |
+| Perpetual Recall V3 | +1.096 | 53.2% | 1.96 s |
+| OPS-Agentic-Memory-v1 | +0.322 | 81.4% | 153.6 s |
+
+The published baseline AgentRunbook-C reference is 74.9% Small Overall at 108.3 seconds and 70.1% Medium Overall at 139.9 seconds. The top LAFS gain is not the same as the top raw accuracy: OPS has 81.4% at 153.6 seconds but only +0.322 LAFS. The operating point matters. Source: https://xiaowu0162.github.io/longmemeval-v2/
 
 MACE target sequence:
-- First qualify the exact official harness and report its reader, memory budget, latency and all five ability-family scores.
-- Match or exceed AgentRunbook-C accuracy at a lower query-latency operating point.
-- Stretch target: positive delta LAFS over the published reference frontier, with no loss of evidence traceability or governance correctness.
-- Do not compare AML scores, DSM decision-regret values and LongMemEval-V2 accuracy/LAFS as a shared scale.
+- **First qualification:** reproduce the official harness and frozen reader, and report Small/Medium accuracy, all five ability families, query latency, memory/query budget and exact hardware.
+- **Fast-path target:** beat the Perpetual Recall V3 +1.096 LAFS reference while keeping p95 query latency below 2 seconds, under the same official reader and hardware budget. This is a stretch target, not a prediction.
+- **Frontier target:** exceed the current +2.823 LAFS leader while preserving evidence traceability and governance controls.
+- **Raw-accuracy stretch:** challenge the 81.4% OPS result, but do not claim superiority unless the latency/accuracy frontier also improves.
+- **Do not compare AML scores, DSM decision-regret values and LongMemEval-V2 accuracy/LAFS as a shared scale.**
 
 ## Initial gates and target setting
 
@@ -316,7 +325,7 @@ For AML, keep the independent target of +3 absolute points over the published op
 
 - Build a dependency-light Rust finite-world generator and scorer.
 - Keep latent state, loss tables, admissibility/required-evidence labels and oracle selection evaluator-private and physically separate from candidate inputs.
-- Implement paired scoring, cluster identities, deterministic replay and digest-bound receipts.
+- Implement paired scoring, cluster identities, deterministic replay and digest-bound receipts. Implement deterministic cluster-bootstrap confidence intervals for mean paired gain and memory-induced harm rate.
 - Add frozen-policy leave-one-out evidence interventions; treat interaction/Shapley analysis as a later extension.
 - Reject missing arms, unmatched pairs, duplicate event identities and invalid evidence references.
 
