@@ -258,6 +258,15 @@ func bindBoundary(label,actual,expected string,f *flags) {
 }
 func checkBoundaryBindings(in Input,f *flags) {
  if !recoveryBoundaryComplete(in.Boundary) { f.hold("recovery_boundary_incomplete"); return }
+ requiredClaims:=map[string]struct{}{}
+ for _,id:=range in.RequiredClaimIDs {
+  if !validID(id) { f.block("required_claim_id_invalid"); continue }
+  if _,ok:=requiredClaims[id];ok { f.block("duplicate_required_claim_id:"+id) }
+  requiredClaims[id]=struct{}{}
+ }
+ if _,ok:=requiredClaims[in.Boundary.ClaimID];!ok {
+  f.block("recovery_boundary_claim_not_in_required_claims")
+ }
  expected:=recoveryBoundaryDigest(in.Boundary)
  bindBoundary("source_truth",in.SourceTruthBoundarySHA256,expected,f)
  bindBoundary("observed_capture",in.ObservedCaptureBoundarySHA256,expected,f)
@@ -370,6 +379,7 @@ func Evaluate(in Input)Result{
  checkOffset(in,fs["mon033_offset"]);checkTimeline(in,fs["mon034_timeline"]);checkObservers(in,fs["mon035_observers"]);checkContinuity(in,fs["mon036_continuity"])
  reconcileEvents(in,&out.Reconciliation,fs["cdc_reconciliation"],fs["transaction_closure"])
  checkSurfaces(in,&out.Reconciliation,fs["surface_coverage"]);checkRestore(in,fs["restore_readiness"])
+ out.Components=append(out.Components,status("shared_recovery_boundary",fs["shared_recovery_boundary"]))
  for _,n:=range names[:8]{out.Components=append(out.Components,status(n,fs[n]))}
  domain:=newFlags();merge(domain,fs["shared_recovery_boundary"],"shared_recovery_boundary");for _,n:=range names[:8]{merge(domain,fs[n],n)};out.ComponentVerdict=domain.verdict()
  checkProofGraph(in,out.ComponentVerdict,fs["mon024_proof_graph"]);out.Components=append(out.Components,status("mon024_proof_graph",fs["mon024_proof_graph"]))
