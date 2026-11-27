@@ -56,11 +56,13 @@ Use VideoFDB's published protocol and dataset if its terms permit. Do not claim 
 Report separate perception and generation scores. Preserve the four communication channels and the event families: dialogue/turn-taking, gaze/attention, face/expression, and body/gesture.
 
 Project target:
-- beat the v1.4 perception overall reference of 3.87/5;
-- beat the v1.4 generation overall reference of 4.44/5;
-- report every rubric axis and sample count, not only an aggregate.
+- target >= 4.0/5 on matched full-duplex perception and >= 4.5/5 on matched full-duplex AV2AV generation as stretch goals;
+- target >= 90% TOR alignment with <= 500 ms median TOR latency on perception;
+- separately target >= 80% TOR alignment with <= 920 ms median TOR latency on generation;
+- compare to the best matching full-duplex architecture/modality, not merely the highest overall row;
+- report every rubric axis, sample count, architecture, modality, weight availability and model/provider status.
 
-These are stretch goals, not current Symthaea results. Use official splits, preserve per-sample outputs, and do not tune on the evaluation set.
+These are ambitious stretch targets, not current Symthaea results. They are deliberately stricter than the leading full-duplex reference in some dimensions and must be revised only through preregistered feasibility work, not after looking at held-out results. The highest aggregate perception and generation entries in VideoFDB v1.4 are cascaded; the leading full-duplex perception reference is Tavus Griffin Lite at 3.85/5 and 90.63% TOR alignment / 200 ms median latency. The leading full-duplex generation reference listed is Tavus Griffin Lite at 4.20/5 and 48.78% / 1,200 ms. Use official splits, preserve per-sample outputs, and do not tune on the evaluation set.
 
 ### E2 — Turn-taking and response timing
 
