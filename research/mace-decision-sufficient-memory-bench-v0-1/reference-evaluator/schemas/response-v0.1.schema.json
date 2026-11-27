@@ -11,6 +11,7 @@
     "candidate_sha256",
     "arm_binding_sha256",
     "action",
+    "retrieved_evidence_ids",
     "selected_evidence_ids",
     "observation_requests",
     "cost"
@@ -57,24 +58,59 @@
       ],
       "properties": {
         "ingest_operations": {
-          "type": "integer",
-          "minimum": 0
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "query_operations": {
-          "type": "integer",
-          "minimum": 0
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "maintenance_operations": {
-          "type": "integer",
-          "minimum": 0
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "retained_bytes": {
-          "type": "integer",
-          "minimum": 0
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "returned_bytes": {
-          "type": "integer",
-          "minimum": 0
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "latency_us": {
           "oneOf": [
@@ -86,6 +122,160 @@
               "type": "null"
             }
           ]
+        },
+        "detailed_receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "unmeasured_cost_stages"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": "mace_dsm_detailed_cost_receipt_v0_1"
+            },
+            "latency_ns": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "phase_timings_ns": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "memory_selection_ns",
+                "index_build_ns",
+                "retrieval_ns",
+                "evidence_resolution_verification_ns",
+                "policy_application_ns",
+                "unattributed_coordinator_ns",
+                "total_wall_ns"
+              ],
+              "properties": {
+                "memory_selection_ns": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "index_build_ns": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "retrieval_ns": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "evidence_resolution_verification_ns": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "policy_application_ns": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "unattributed_coordinator_ns": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "total_wall_ns": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "input_tokens": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "model_calls": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "tool_calls": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "external_tool_calls": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "index_bytes": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "index_bytes_kind": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 100
+            },
+            "evidence_sidecar_bytes": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_sidecar_bytes_kind": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 100
+            },
+            "unmeasured_cost_stages": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },
@@ -96,6 +286,14 @@
     "arm_binding_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "retrieved_evidence_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   }
 }
