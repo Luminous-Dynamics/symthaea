@@ -21,7 +21,7 @@ jobs:
   dependence-stress:
     name: Rust 1.96 AR(1) block-exchangeability stress
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,8 +55,8 @@ jobs:
           {
             echo "source_commit=$(git rev-parse HEAD)"
             rustc --version
-            echo "experiment=AR(1) stationary Gaussian; rho=0.95; calibration_blocks=39; alpha=0.10; trials=5000 per grid point"
-            echo "grid=block_len:{1,8,32}; design:independent_blocks,one_serial_path; embargo_gap:{0,16,64} for serial path"
+            echo "experiment=AR(1) stationary Gaussian; rho={0,0.5,0.8,0.9,0.95,0.99}; calibration_blocks=39; alpha=0.10; trials=5000 per grid point"
+            echo "grid=block_len:{1,8,32}; design:independent_blocks,one_serial_path; embargo_gap:{0,16,64} for serial path; 72 total conditions"
           } > "$RUNNER_TEMP/sdcb-block-dependence/manifest.txt"
       - name: Upload reproducible coverage report
         if: always()
