@@ -224,6 +224,29 @@ fn independent_normalization(n: usize, beta: f64) -> f64 {
 }
 
 #[test]
+fn permuted_identical_frozen_stream_replays_to_the_same_block_distribution_receipt() {
+    let n = 256;
+    let m = 256;
+    let model = digest('9');
+    let residuals = synthetic_power_law_residuals(19, n + m, 0.85);
+    let rows = residuals
+        .iter()
+        .enumerate()
+        .map(|(index, value)| observation(index as u64 + 1, *value, &model))
+        .collect::<Vec<_>>();
+    let mut value = input(rows[..n].to_vec(), rows[n..].to_vec(), &model);
+    let first = evaluate_long_memory_coverage_inference_v1(&value).unwrap();
+    value.calibration.reverse();
+    value.test.reverse();
+    let second = evaluate_long_memory_coverage_inference_v1(&value).unwrap();
+    assert_eq!(first.report_sha256, second.report_sha256);
+    assert_eq!(
+        first.normalized_block_distribution_sha256,
+        second.normalized_block_distribution_sha256
+    );
+}
+
+#[test]
 fn estimated_beta_outside_the_stationary_long_memory_range_is_unknown_not_clipped() {
     let n = 256;
     let model = digest('9');
