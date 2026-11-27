@@ -217,3 +217,15 @@ The same evidence rules apply: exact arithmetic and schema parsing are not Rust 
 The full-covariance Gaussian reference now includes an exact finite-scenario maximin selection path. One shared action subset is evaluated under every declared prior/residual covariance scenario, and the objective minimizes the worst-case scientific posterior variance. This is not a continuous distributionally robust guarantee; the scenario envelope must be justified and its provenance retained.
 
 The frozen two-scenario control places the residual correlation on science-A/reference in one scenario and science-B/reference in the other. The same selected subset is used for both. The scenario-specific posterior variances and binding worst-case result are retained in the report.
+
+
+## Dynamic temporal covariance follow-on — 27 November 2026
+
+This increment bridges existing discrete Markov drift references (#13793 and #13804) with continuous full-covariance design (#13881/#13882). It is not a second binary drift oracle.
+
+- `docs/research/SDCB_DYNAMIC_COVARIANCE_BELIEF_V1.md`: continuous-time state-space formulation for physical-process, shared, reference-chain and device-local states; interval-integrated covariance; Bayesian covariance-model uncertainty separated from robust support sets; dynamic adaptive-policy and evidence boundaries.
+- `scripts/research/sdcb_ou_window_covariance.rs`: standalone scalar stationary OU covariance oracle for arbitrary rectangular averaging windows, including overlap, duplicate-window, disjoint-window and shared white-noise controls.
+- `docs/research/SDCB_TEMPORAL_MOBILE_REFERENCE_TOURNAMENT_V1.md`: preregistered task families and matched temporal, calibration, experiment-design, mobile-reference and edge comparators.
+- Versioned example, expected-result fixture and JSON Schema accompany the OU primitive.
+
+The exact OU primitive is a bounded foundation, not a completed vector state-space filter or adaptive laboratory planner. Eight Rust tests are authored but not compiled/executed here; no raw dataset, physical measurement, or hosted workflow pass is claimed. Follow-on increments are vector OU propagation, interval-integrated mobile-reference observations, covariance-model posterior updates, and an elapsed-time-aware adaptive policy.
