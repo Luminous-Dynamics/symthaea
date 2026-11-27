@@ -9,9 +9,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::process::ExitCode;
 
-use mel_temporal_grounding_qualifier::music_performance_identity::{
-    audit_musical_performance_identity_json,
-};
+use mel_temporal_grounding_qualifier::music_performance_identity::audit_musical_performance_identity_json;
 
 fn read_input() -> Result<String, String> {
     let mut args = env::args_os().skip(1);

@@ -12,8 +12,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::music_listen_bench::{
-    decode_semantic_relation, sha256_hex, validate_digest, MusicListenAnswerV1,
-    MusicListenVariantV1, MusicalRelationV1,
+    MusicListenAnswerV1, MusicListenVariantV1, MusicalRelationV1, decode_semantic_relation,
+    sha256_hex, validate_digest,
 };
 
 const CASE_SCHEMA_V1: &str = "mel-music-performance-identity-case-v1";
@@ -228,7 +228,10 @@ pub fn audit_musical_performance_identity(
     case: &MusicalPerformanceIdentityCaseV1,
 ) -> Result<MusicalPerformanceIdentityReportV1, String> {
     if case.schema != CASE_SCHEMA_V1 {
-        return Err(format!("unsupported performance identity schema: {}", case.schema));
+        return Err(format!(
+            "unsupported performance identity schema: {}",
+            case.schema
+        ));
     }
     require_text(&case.benchmark_id, "benchmark_id")?;
     require_text(&case.benchmark_version, "benchmark_version")?;
@@ -264,10 +267,16 @@ pub fn audit_musical_performance_identity(
 
     for triad in &case.triads {
         if !item_ids.insert(triad.item_id.as_str()) {
-            return Err(format!("duplicate performance identity item_id: {}", triad.item_id));
+            return Err(format!(
+                "duplicate performance identity item_id: {}",
+                triad.item_id
+            ));
         }
         if !pair_ids.insert(triad.pair_id.as_str()) {
-            return Err(format!("duplicate performance identity pair_id: {}", triad.pair_id));
+            return Err(format!(
+                "duplicate performance identity pair_id: {}",
+                triad.pair_id
+            ));
         }
         lineages.insert(triad.source_work_lineage_sha256.as_str());
         performers.insert(triad.clean.performer_identity_sha256.as_str());
@@ -296,9 +305,18 @@ pub fn audit_musical_performance_identity(
             source_work_lineage_sha256: triad.source_work_lineage_sha256.clone(),
             target_property: triad.target_property,
             clean_performer_identity_sha256: triad.clean.performer_identity_sha256.clone(),
-            performance_stay_performer_identity_sha256: triad.performance_stay.performer_identity_sha256.clone(),
-            performance_stay_take_identity_sha256: triad.performance_stay.take_identity_sha256.clone(),
-            performance_stay_renderer_identity_sha256: triad.performance_stay.renderer_identity_sha256.clone(),
+            performance_stay_performer_identity_sha256: triad
+                .performance_stay
+                .performer_identity_sha256
+                .clone(),
+            performance_stay_take_identity_sha256: triad
+                .performance_stay
+                .take_identity_sha256
+                .clone(),
+            performance_stay_renderer_identity_sha256: triad
+                .performance_stay
+                .renderer_identity_sha256
+                .clone(),
             clean_predicted_relation: clean,
             performance_stay_predicted_relation: performance_stay,
             musical_flip_predicted_relation: musical_flip,
@@ -353,7 +371,10 @@ pub fn audit_musical_performance_identity(
                 factor,
                 items: indices.len(),
                 false_difference_rate: rate(
-                    indices.iter().filter(|index| !scored[**index].performance_stay_correct).count(),
+                    indices
+                        .iter()
+                        .filter(|index| !scored[**index].performance_stay_correct)
+                        .count(),
                     indices.len(),
                 ),
             }
@@ -382,7 +403,10 @@ pub fn audit_musical_performance_identity(
                 factor,
                 items: indices.len(),
                 miss_rate: rate(
-                    indices.iter().filter(|index| !scored[**index].musical_flip_correct).count(),
+                    indices
+                        .iter()
+                        .filter(|index| !scored[**index].musical_flip_correct)
+                        .count(),
                     indices.len(),
                 ),
             }
@@ -431,8 +455,14 @@ fn validate_triad(triad: &MusicalPerformanceIdentityTriadV1, index: usize) -> Re
     require_text(&triad.item_id, &format!("triads[{index}].item_id"))?;
     require_text(&triad.pair_id, &format!("triads[{index}].pair_id"))?;
     for (value, label) in [
-        (&triad.source_work_lineage_sha256, "source_work_lineage_sha256"),
-        (&triad.target_property_reference_sha256, "target_property_reference_sha256"),
+        (
+            &triad.source_work_lineage_sha256,
+            "source_work_lineage_sha256",
+        ),
+        (
+            &triad.target_property_reference_sha256,
+            "target_property_reference_sha256",
+        ),
         (&triad.pairing_manifest_sha256, "pairing_manifest_sha256"),
         (&triad.model_identity_sha256, "model_identity_sha256"),
         (&triad.system_prompt_sha256, "system_prompt_sha256"),
@@ -456,8 +486,16 @@ fn validate_triad(triad: &MusicalPerformanceIdentityTriadV1, index: usize) -> Re
 
     let variants = [
         ("clean", &triad.clean, MusicalRelationV1::Same),
-        ("performance_stay", &triad.performance_stay, MusicalRelationV1::Same),
-        ("musical_flip", &triad.musical_flip, MusicalRelationV1::Different),
+        (
+            "performance_stay",
+            &triad.performance_stay,
+            MusicalRelationV1::Same,
+        ),
+        (
+            "musical_flip",
+            &triad.musical_flip,
+            MusicalRelationV1::Different,
+        ),
     ];
     let mut variant_ids = BTreeSet::new();
     let mut audio_digests = BTreeSet::new();
@@ -467,7 +505,9 @@ fn validate_triad(triad: &MusicalPerformanceIdentityTriadV1, index: usize) -> Re
             return Err(format!("triads[{index}] duplicate variant_id"));
         }
         if !audio_digests.insert(variant.response.audio_sha256.as_str()) {
-            return Err(format!("triads[{index}] variants must have distinct audio digests"));
+            return Err(format!(
+                "triads[{index}] variants must have distinct audio digests"
+            ));
         }
     }
 
@@ -475,28 +515,32 @@ fn validate_triad(triad: &MusicalPerformanceIdentityTriadV1, index: usize) -> Re
     let stay = &triad.performance_stay;
     let flip = &triad.musical_flip;
     if clean.take_identity_sha256 == stay.take_identity_sha256
-        && triad.performance_stay_factor != PerformanceStayFactorV1::DifferentRendererSamePerformance
+        && triad.performance_stay_factor
+            != PerformanceStayFactorV1::DifferentRendererSamePerformance
     {
         return Err(format!(
             "triads[{index}] performance-STAY must use a distinct take for the declared performance variation"
         ));
     }
     if clean.performance_identity_sha256 == stay.performance_identity_sha256
-        && triad.performance_stay_factor != PerformanceStayFactorV1::DifferentRendererSamePerformance
+        && triad.performance_stay_factor
+            != PerformanceStayFactorV1::DifferentRendererSamePerformance
     {
         return Err(format!(
             "triads[{index}] performance-STAY must identify a different performance realization"
         ));
     }
     if clean.take_identity_sha256 != stay.take_identity_sha256
-        && triad.performance_stay_factor == PerformanceStayFactorV1::DifferentRendererSamePerformance
+        && triad.performance_stay_factor
+            == PerformanceStayFactorV1::DifferentRendererSamePerformance
     {
         return Err(format!(
             "triads[{index}] renderer-only STAY must retain the same take identity"
         ));
     }
     if clean.performance_identity_sha256 != stay.performance_identity_sha256
-        && triad.performance_stay_factor == PerformanceStayFactorV1::DifferentRendererSamePerformance
+        && triad.performance_stay_factor
+            == PerformanceStayFactorV1::DifferentRendererSamePerformance
     {
         return Err(format!(
             "triads[{index}] renderer-only STAY must retain the same performance identity"
@@ -534,16 +578,34 @@ fn validate_variant(
     expected: MusicalRelationV1,
 ) -> Result<(), String> {
     let response = &variant.response;
-    require_text(&response.variant_id, &format!("triads[{triad_index}].{label}.variant_id"))?;
-    require_text(&response.question, &format!("triads[{triad_index}].{label}.question"))?;
+    require_text(
+        &response.variant_id,
+        &format!("triads[{triad_index}].{label}.variant_id"),
+    )?;
+    require_text(
+        &response.question,
+        &format!("triads[{triad_index}].{label}.question"),
+    )?;
     for (value, name) in [
         (&response.audio_sha256, "audio_sha256"),
         (&response.question_sha256, "question_sha256"),
         (&variant.take_identity_sha256, "take_identity_sha256"),
-        (&variant.performance_identity_sha256, "performance_identity_sha256"),
-        (&variant.performer_identity_sha256, "performer_identity_sha256"),
-        (&variant.instrument_family_sha256, "instrument_family_sha256"),
-        (&variant.renderer_identity_sha256, "renderer_identity_sha256"),
+        (
+            &variant.performance_identity_sha256,
+            "performance_identity_sha256",
+        ),
+        (
+            &variant.performer_identity_sha256,
+            "performer_identity_sha256",
+        ),
+        (
+            &variant.instrument_family_sha256,
+            "instrument_family_sha256",
+        ),
+        (
+            &variant.renderer_identity_sha256,
+            "renderer_identity_sha256",
+        ),
     ] {
         validate_digest(value, &format!("triads[{triad_index}].{label}.{name}"))?;
     }
@@ -576,15 +638,22 @@ fn validate_performance_stay_metadata(
     let same_instrument = clean.instrument_family_sha256 == stay.instrument_family_sha256;
     let same_renderer = clean.renderer_identity_sha256 == stay.renderer_identity_sha256;
     let changed_take = clean.take_identity_sha256 != stay.take_identity_sha256;
-    let changed_performance =
-        clean.performance_identity_sha256 != stay.performance_identity_sha256;
+    let changed_performance = clean.performance_identity_sha256 != stay.performance_identity_sha256;
 
     let valid = match triad.performance_stay_factor {
         PerformanceStayFactorV1::DifferentTakeSamePerformer => {
-            same_performer && same_instrument && same_renderer && changed_take && changed_performance
+            same_performer
+                && same_instrument
+                && same_renderer
+                && changed_take
+                && changed_performance
         }
         PerformanceStayFactorV1::DifferentPerformerSameInstrument => {
-            !same_performer && same_instrument && same_renderer && changed_take && changed_performance
+            !same_performer
+                && same_instrument
+                && same_renderer
+                && changed_take
+                && changed_performance
         }
         PerformanceStayFactorV1::StrumOrArticulationChange => {
             matches!(
@@ -602,8 +671,7 @@ fn validate_performance_stay_metadata(
         PerformanceStayFactorV1::ExpressiveTimingChange => {
             !matches!(
                 triad.target_property,
-                MusicalIdentityPropertyV1::RhythmicRatio
-                    | MusicalIdentityPropertyV1::PulseRate
+                MusicalIdentityPropertyV1::RhythmicRatio | MusicalIdentityPropertyV1::PulseRate
             ) && same_performer
                 && same_instrument
                 && same_renderer
@@ -636,36 +704,38 @@ fn validate_performance_stay_metadata(
     Ok(())
 }
 
-fn flip_compatible(
-    property: MusicalIdentityPropertyV1,
-    factor: MusicalFlipFactorV1,
-) -> bool {
+fn flip_compatible(property: MusicalIdentityPropertyV1, factor: MusicalFlipFactorV1) -> bool {
     matches!(
         (property, factor),
-        (MusicalIdentityPropertyV1::ChordQuality, MusicalFlipFactorV1::ChordQualityChange)
-            | (MusicalIdentityPropertyV1::RootPitchClass, MusicalFlipFactorV1::RootPitchClassChange)
-            | (MusicalIdentityPropertyV1::Voicing, MusicalFlipFactorV1::VoicingChange)
-            | (
-                MusicalIdentityPropertyV1::RelativeIntervalSequence,
-                MusicalFlipFactorV1::RelativeIntervalSequenceChange
-            )
-            | (
-                MusicalIdentityPropertyV1::MelodicContour,
-                MusicalFlipFactorV1::MelodicContourChange
-            )
-            | (MusicalIdentityPropertyV1::RhythmicRatio, MusicalFlipFactorV1::RhythmicRatioChange)
-            | (MusicalIdentityPropertyV1::PulseRate, MusicalFlipFactorV1::PulseRateChange)
-            | (
-                MusicalIdentityPropertyV1::InstrumentFamily,
-                MusicalFlipFactorV1::InstrumentFamilyChange
-            )
+        (
+            MusicalIdentityPropertyV1::ChordQuality,
+            MusicalFlipFactorV1::ChordQualityChange
+        ) | (
+            MusicalIdentityPropertyV1::RootPitchClass,
+            MusicalFlipFactorV1::RootPitchClassChange
+        ) | (
+            MusicalIdentityPropertyV1::Voicing,
+            MusicalFlipFactorV1::VoicingChange
+        ) | (
+            MusicalIdentityPropertyV1::RelativeIntervalSequence,
+            MusicalFlipFactorV1::RelativeIntervalSequenceChange
+        ) | (
+            MusicalIdentityPropertyV1::MelodicContour,
+            MusicalFlipFactorV1::MelodicContourChange
+        ) | (
+            MusicalIdentityPropertyV1::RhythmicRatio,
+            MusicalFlipFactorV1::RhythmicRatioChange
+        ) | (
+            MusicalIdentityPropertyV1::PulseRate,
+            MusicalFlipFactorV1::PulseRateChange
+        ) | (
+            MusicalIdentityPropertyV1::InstrumentFamily,
+            MusicalFlipFactorV1::InstrumentFamilyChange
+        )
     )
 }
 
-fn stay_compatible(
-    property: MusicalIdentityPropertyV1,
-    factor: PerformanceStayFactorV1,
-) -> bool {
+fn stay_compatible(property: MusicalIdentityPropertyV1, factor: PerformanceStayFactorV1) -> bool {
     match factor {
         PerformanceStayFactorV1::DifferentTakeSamePerformer
         | PerformanceStayFactorV1::DifferentPerformerSameInstrument => true,
@@ -741,9 +811,11 @@ fn summarize_indices(
     scored: &[ScoredIdentityTriadV1],
     indices: &[usize],
 ) -> MusicalIdentityMetricsV1 {
-    let clean = variant_metrics(indices.iter().map(|index| {
-        (scored[*index].clean_correct, scored[*index].clean_answer)
-    }));
+    let clean = variant_metrics(
+        indices
+            .iter()
+            .map(|index| (scored[*index].clean_correct, scored[*index].clean_answer)),
+    );
     let performance_stay = variant_metrics(indices.iter().map(|index| {
         (
             scored[*index].performance_stay_correct,
@@ -751,7 +823,10 @@ fn summarize_indices(
         )
     }));
     let musical_flip = variant_metrics(indices.iter().map(|index| {
-        (scored[*index].musical_flip_correct, scored[*index].musical_flip_answer)
+        (
+            scored[*index].musical_flip_correct,
+            scored[*index].musical_flip_answer,
+        )
     }));
     let clean_correct: Vec<_> = indices
         .iter()
@@ -878,7 +953,13 @@ mod tests {
         answer: MusicListenAnswerV1,
     ) -> MusicalIdentityVariantV1 {
         MusicalIdentityVariantV1 {
-            response: response(id, &digest(audio), "Is the target musical property the same?", expected, answer),
+            response: response(
+                id,
+                &digest(audio),
+                "Is the target musical property the same?",
+                expected,
+                answer,
+            ),
             take_identity_sha256: digest(take),
             performance_identity_sha256: digest(performance),
             performer_identity_sha256: digest(performer),
@@ -919,7 +1000,11 @@ mod tests {
             MusicalRelationV1::Same,
             MusicListenAnswerV1::ChoiceA,
         );
-        let flip_instrument = if property == MusicalIdentityPropertyV1::InstrumentFamily { 'c' } else { '5' };
+        let flip_instrument = if property == MusicalIdentityPropertyV1::InstrumentFamily {
+            'c'
+        } else {
+            '5'
+        };
         let musical_flip = variant(
             "musical-flip",
             'd',
@@ -972,9 +1057,17 @@ mod tests {
         assert_eq!(report.overall.clean.accuracy, Some(1.0));
         assert_eq!(report.overall.performance_stay.accuracy, Some(1.0));
         assert_eq!(report.overall.musical_flip.accuracy, Some(1.0));
-        assert_eq!(report.overall.performance_stay_false_difference_rate, Some(0.0));
+        assert_eq!(
+            report.overall.performance_stay_false_difference_rate,
+            Some(0.0)
+        );
         assert_eq!(report.overall.musical_flip_miss_rate, Some(0.0));
-        assert_eq!(report.overall.joint_clean_performance_stay_musical_flip_exact_rate, Some(1.0));
+        assert_eq!(
+            report
+                .overall
+                .joint_clean_performance_stay_musical_flip_exact_rate,
+            Some(1.0)
+        );
         assert_eq!(report.source_work_clusters, 1);
         assert!(!report.confirmatory_source_work_floor_met);
         assert!(!report.target_property_reference_authenticated);
@@ -990,9 +1083,17 @@ mod tests {
         );
         item.musical_flip.response.model_answer = MusicListenAnswerV1::ChoiceA;
         let report = audit_musical_performance_identity(&case(vec![item])).unwrap();
-        assert_eq!(report.overall.performance_stay_false_difference_rate, Some(0.0));
+        assert_eq!(
+            report.overall.performance_stay_false_difference_rate,
+            Some(0.0)
+        );
         assert_eq!(report.overall.musical_flip_miss_rate, Some(1.0));
-        assert_eq!(report.overall.joint_clean_performance_stay_musical_flip_exact_rate, Some(0.0));
+        assert_eq!(
+            report
+                .overall
+                .joint_clean_performance_stay_musical_flip_exact_rate,
+            Some(0.0)
+        );
     }
 
     #[test]
@@ -1006,7 +1107,10 @@ mod tests {
         item.performance_stay.response.model_answer = MusicListenAnswerV1::ChoiceB;
         let report = audit_musical_performance_identity(&case(vec![item])).unwrap();
         assert_eq!(report.overall.clean.accuracy, Some(0.0));
-        assert_eq!(report.overall.performance_stay_false_difference_rate, Some(1.0));
+        assert_eq!(
+            report.overall.performance_stay_false_difference_rate,
+            Some(1.0)
+        );
         assert_eq!(report.overall.musical_flip_miss_rate, Some(0.0));
     }
 
@@ -1045,7 +1149,8 @@ mod tests {
         );
         assert!(audit_musical_performance_identity(&case(vec![item.clone()])).is_ok());
         let mut bad = item;
-        bad.performance_stay.performer_identity_sha256 = bad.clean.performer_identity_sha256.clone();
+        bad.performance_stay.performer_identity_sha256 =
+            bad.clean.performer_identity_sha256.clone();
         assert!(audit_musical_performance_identity(&case(vec![bad])).is_err());
     }
 
@@ -1144,7 +1249,8 @@ mod tests {
             MusicalFlipFactorV1::ChordQualityChange,
         );
         let mut reused_audio = item.clone();
-        reused_audio.performance_stay.response.audio_sha256 = reused_audio.clean.response.audio_sha256.clone();
+        reused_audio.performance_stay.response.audio_sha256 =
+            reused_audio.clean.response.audio_sha256.clone();
         assert!(audit_musical_performance_identity(&case(vec![reused_audio])).is_err());
 
         let mut duplicate_pair = triad(
@@ -1153,7 +1259,9 @@ mod tests {
             MusicalFlipFactorV1::RootPitchClassChange,
         );
         duplicate_pair.pair_id = item.pair_id.clone();
-        assert!(audit_musical_performance_identity(&case(vec![item.clone(), duplicate_pair])).is_err());
+        assert!(
+            audit_musical_performance_identity(&case(vec![item.clone(), duplicate_pair])).is_err()
+        );
 
         let mut model_drift = triad(
             MusicalIdentityPropertyV1::RootPitchClass,
