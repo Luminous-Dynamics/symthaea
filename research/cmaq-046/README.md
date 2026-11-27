@@ -107,6 +107,22 @@ Run:
     cargo +1.100.0 test --manifest-path research/cmaq-046/Cargo.toml --locked
     cargo +1.100.0 clippy --manifest-path research/cmaq-046/Cargo.toml --locked --all-targets -- -D warnings
 
+## Paired unknown-direction probe
+
+Run from the repository root:
+
+    cargo +1.100.0 run --release --manifest-path research/cmaq-046/Cargo.toml --locked --bin approachability_probe -- 1000 2000 20261127 1000 > cmaq-046-results.csv
+
+The executable compares:
+- adaptive OCO approachability e-process;
+- fixed equal mixture over eight compass-direction e-processes.
+
+Both receive identical two-dimensional observations, target box, norm bound, alpha and residual normalization. Under the null, each coordinate receives independent symmetric noise with zero conditional mean inside the target box. Under the alternative, after the frozen pre-change prefix, the mean shifts in one of eight orientations unknown to the detector; the same bounded noise remains.
+
+The probe reports full-stream null alarm counts, pre-change false alarms, post-change detections, misses and median delay from true onset. It is a narrow synthetic test of direction adaptation, not a general result or comparison against PRM/CCTM.
+
+The CI run is deliberately small and is a wiring smoke check only. Full statistical qualification needs at least 10,000 independent null streams per primary cell and 5,000 alternatives per orientation, with confidence intervals and CMAQ-044 paired effective-block inference.
+
 ## Required comparisons
 
 Compare the adaptive OCO direction against:
