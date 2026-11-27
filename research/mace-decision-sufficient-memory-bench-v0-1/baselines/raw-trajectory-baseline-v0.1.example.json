@@ -7,7 +7,14 @@
       "observed_at_ms": 100,
       "valid_from_ms": 90,
       "valid_until_ms": 300,
-      "text": "Pump P-17 pressure inspection completed. Calibration certificate CAL-41 was current during the inspection."
+      "text": "Pump P-17 pressure inspection completed. Calibration certificate CAL-41 was current during the inspection.",
+      "source_id": "workorder-031-source",
+      "authority_tier": "authenticated",
+      "uncertainty_ppm": 10000,
+      "relation_to_parent": "asserts",
+      "parent_event_ids": [],
+      "source_family": "sensor_network",
+      "source_root_digest_sha256": "d8bfc86aeb1fe3a86d4e6e5fbde5c080a3f16b097a95d98c940648bfeb56d8f1"
     },
     {
       "document_id": "workorder-032",
@@ -15,7 +22,14 @@
       "observed_at_ms": 120,
       "valid_from_ms": 110,
       "valid_until_ms": null,
-      "text": "Pump P-18 vibration inspection completed. Pressure remained within the approved operating band."
+      "text": "Pump P-18 vibration inspection completed. Pressure remained within the approved operating band.",
+      "source_id": "workorder-032-source",
+      "authority_tier": "authenticated",
+      "uncertainty_ppm": 10000,
+      "relation_to_parent": "asserts",
+      "parent_event_ids": [],
+      "source_family": "sensor_network",
+      "source_root_digest_sha256": "d8bfc86aeb1fe3a86d4e6e5fbde5c080a3f16b097a95d98c940648bfeb56d8f1"
     },
     {
       "document_id": "certificate-041",
@@ -23,7 +37,14 @@
       "observed_at_ms": 80,
       "valid_from_ms": 80,
       "valid_until_ms": 220,
-      "text": "Calibration certificate CAL-41 authorizes reference use for pressure channel P-17."
+      "text": "Calibration certificate CAL-41 authorizes reference use for pressure channel P-17.",
+      "source_id": "certificate-041-v1",
+      "authority_tier": "verified",
+      "uncertainty_ppm": 5000,
+      "relation_to_parent": "asserts",
+      "parent_event_ids": [],
+      "source_family": "supplier_registry",
+      "source_root_digest_sha256": "ad74977d718be3043ed9ae57f75765a53724767753b8933e6c81bd94f7068019"
     },
     {
       "document_id": "late-correction-041",
@@ -31,7 +52,16 @@
       "observed_at_ms": 400,
       "valid_from_ms": 150,
       "valid_until_ms": null,
-      "text": "Correction: certificate CAL-41 was invalid from 150 milliseconds."
+      "text": "Correction: certificate CAL-41 was invalid from 150 milliseconds.",
+      "source_id": "certificate-041-correction",
+      "authority_tier": "verified",
+      "uncertainty_ppm": 5000,
+      "relation_to_parent": "retracts",
+      "parent_event_ids": [
+        "certificate-041"
+      ],
+      "source_family": "supplier_registry",
+      "source_root_digest_sha256": "ad74977d718be3043ed9ae57f75765a53724767753b8933e6c81bd94f7068019"
     },
     {
       "document_id": "other-tenant-001",
@@ -39,7 +69,14 @@
       "observed_at_ms": 90,
       "valid_from_ms": 90,
       "valid_until_ms": null,
-      "text": "Pump P-17 pressure inspection and calibration history for a separate laboratory."
+      "text": "Pump P-17 pressure inspection and calibration history for a separate laboratory.",
+      "source_id": "separate-lab-workorder-001",
+      "authority_tier": "authenticated",
+      "uncertainty_ppm": 10000,
+      "relation_to_parent": "asserts",
+      "parent_event_ids": [],
+      "source_family": "sensor_network",
+      "source_root_digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     }
   ],
   "query": {
@@ -51,13 +88,20 @@
   "ranked_channels": [
     {
       "channel_id": "entity",
-      "weight": 1.0,
-      "document_ids": ["workorder-031", "certificate-041", "workorder-032"]
+      "weight": 1,
+      "document_ids": [
+        "workorder-031",
+        "certificate-041",
+        "workorder-032"
+      ]
     },
     {
       "channel_id": "date",
       "weight": 0.5,
-      "document_ids": ["certificate-041", "workorder-031"]
+      "document_ids": [
+        "certificate-041",
+        "workorder-031"
+      ]
     }
   ],
   "rrf_k": 60,
