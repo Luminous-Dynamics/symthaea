@@ -114,7 +114,7 @@ func TestOneSidedClopperPearsonKnownAnswers(t *testing.T){
 	lower29:=OneSidedClopperPearsonLower(29,29,0.95)
 	lower28:=OneSidedClopperPearsonLower(28,29,0.95)
 	if lower29<0.9018||lower29>0.9019{t.Fatalf("29/29 exact lower bound unexpected: %.12f",lower29)}
-	if lower28>=0.90||lower28<0.898{t.Fatalf("28/29 exact lower bound unexpected: %.12f",lower28)}
+	if lower28>=0.90||lower28<0.846||lower28>0.847{t.Fatalf("28/29 exact lower bound unexpected: %.12f",lower28)}
 }
 func TestConfidenceBoundIsMonotonicInSuccessCount(t *testing.T){
 	prev:=0.0
