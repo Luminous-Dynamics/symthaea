@@ -808,6 +808,11 @@ jobs:
           assert linearization["pulse_time_finite_difference_cross_check_required"] is True
           assert linearization["pulse_time_sensitivity_convention"] == "scheduled_reset_D_R_f_minus_plus_R_t_minus_f_plus"
           assert linearization["pulse_time_sensitivity_status"] == "synthetic_not_computed"
+          assert linearization["distribution_pulse_pullback_required"] is True
+          assert linearization["distribution_pulse_remap_mass_ledger_required"] is True
+          assert linearization["distribution_pulse_pullback_status"] == "first_order_piecewise_constant_module_only"
+          assert linearization["distribution_pulse_remap_jacobian_status"] == "not_implemented_solver_adapter_required"
+          assert linearization["distribution_pulse_boundary_outflow_disposition"] == "UNQUALIFIED_UNLESS_GRID_CONVERGENCE_OR_EXPLICIT_BOUNDARY_ERROR"
           assert horizon["start_time"] == checkpoint["time"]
           assert checkpoint["first_pulse_applied"] is True
           assert checkpoint["second_pulse_not_yet_applied"] is True
