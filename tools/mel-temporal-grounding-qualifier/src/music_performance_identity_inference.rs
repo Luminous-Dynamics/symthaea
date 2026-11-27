@@ -367,10 +367,10 @@ fn validate_pair_structure(
     Ok(())
 }
 
-fn triad_map<'a>(
-    case: &'a MusicalPerformanceIdentityCaseV1,
+fn triad_map(
+    case: &MusicalPerformanceIdentityCaseV1,
 ) -> Result<
-    BTreeMap<&'a str, &'a crate::music_performance_identity::MusicalPerformanceIdentityTriadV1>,
+    BTreeMap<&str, &crate::music_performance_identity::MusicalPerformanceIdentityTriadV1>,
     String,
 > {
     let mut output = BTreeMap::new();
@@ -405,9 +405,9 @@ fn variant_structure_matches(
         && baseline.renderer_identity_sha256 == candidate.renderer_identity_sha256
 }
 
-fn index_results<'a>(
-    report: &'a MusicalPerformanceIdentityReportV1,
-) -> Result<BTreeMap<&'a str, &'a MusicalIdentityTriadResultV1>, String> {
+fn index_results(
+    report: &MusicalPerformanceIdentityReportV1,
+) -> Result<BTreeMap<&str, &MusicalIdentityTriadResultV1>, String> {
     let mut output = BTreeMap::new();
     for result in &report.triad_results {
         if output.insert(result.item_id.as_str(), result).is_some() {
