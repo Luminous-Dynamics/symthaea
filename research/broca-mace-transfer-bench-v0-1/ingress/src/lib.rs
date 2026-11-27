@@ -1925,7 +1925,7 @@ mod tests {
             }
             let applies_to_event = self
                 .lifecycle_event_id
-                .map_or(true, |target| target == event_id);
+                .is_none_or(|target| target == event_id);
             if applies_to_event
                 && self.retracted_at_ms.is_some_and(|at| at <= known_at_ms)
             {
