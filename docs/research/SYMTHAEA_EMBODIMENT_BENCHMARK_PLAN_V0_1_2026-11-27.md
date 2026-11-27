@@ -494,7 +494,9 @@ This is a research hypothesis. The trigger, sampler, dataset run, and any superi
 ## 12. New benchmark track — calibrated reciprocal turn control
 
 TurnBench is the new external event-level baseline for end-of-turn and interruption decisions. Use the protocol in
-`SYMTHAEA_TURN_CONTROL_BENCHMARK_V0_1_2026-11-27.md`.
+`SYMTHAEA_TURN_CONTROL_BENCHMARK_V0_1_2026-11-27.md`. The CPU-side qualifying gate is implemented in
+`embodiment_turn_control.rs` and specified in `SYMTHAEA_CAUSAL_TURN_GATE_V0_1_2026-11-27.md`.
+It is not a detector and has not been evaluated on audio.
 
 TurnBench v1 has a documented ranking vulnerability: multiple/late fallbacks and recall-only ranking allow simple VAD systems to score deceptively well. Symthaea will therefore:
 - report official v1 recall together with false-positive rate and latency, never recall-only rank;
