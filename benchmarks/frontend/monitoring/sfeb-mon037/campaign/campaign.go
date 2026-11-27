@@ -100,12 +100,14 @@ type Input struct {
  SurfaceInventoryComplete bool `json:"surface_inventory_complete"`
  SurfaceInventorySHA256 string `json:"surface_inventory_sha256"`
  RequiredSurfaceIDsSHA256 string `json:"required_surface_ids_sha256"`
+ SurfaceAssertionsSHA256 string `json:"surface_assertions_sha256"`
  SourceTruthComplete bool `json:"source_truth_complete"`
  SourceTruthManifestSHA256 string `json:"source_truth_manifest_sha256"`
  SourceEventsSHA256 string `json:"source_events_sha256"`
  ObservedCaptureComplete bool `json:"observed_capture_complete"`
  ObservedCaptureManifestSHA256 string `json:"observed_capture_manifest_sha256"`
  ObservedEventsSHA256 string `json:"observed_events_sha256"`
+ TopicPartitionsSHA256 string `json:"topic_partitions_sha256"`
  TransactionReportComplete bool `json:"transaction_report_complete"`
  TransactionReportSHA256 string `json:"transaction_report_sha256"`
  TransactionProofsSHA256 string `json:"transaction_proofs_sha256"`
@@ -202,6 +204,16 @@ func surfaceIDsDigest(ids []string) string {
  sort.Strings(copyIDs)
  return canonicalDigest(copyIDs)
 }
+func topicPartitionsDigest(values []TopicPartition) string {
+ copyValues:=append([]TopicPartition(nil),values...)
+ sort.Slice(copyValues,func(i,j int)bool{return copyValues[i].Topic<copyValues[j].Topic})
+ return canonicalDigest(copyValues)
+}
+func surfaceAssertionsDigest(values []Surface) string {
+ copyValues:=append([]Surface(nil),values...)
+ sort.Slice(copyValues,func(i,j int)bool{return copyValues[i].ID<copyValues[j].ID})
+ return canonicalDigest(copyValues)
+}
 func checkRecordManifest(label string,complete bool,artifactSHA,recordsSHA,expectedSHA string,f *flags) {
  if !complete||!validDigest(artifactSHA)||!validDigest(recordsSHA) {
   f.hold(label+"_manifest_missing_or_incomplete")
@@ -295,7 +307,7 @@ func checkContinuity(in Input,f *flags){
  for _,id:=range required{ds:=claims[id];if len(ds)!=1{f.hold("claim_missing_or_ambiguous:"+id);continue};switch ds[0]{case "retain":case "revalidate":f.hold("claim_revalidation_required:"+id);case "invalidate":f.block("claim_invalidated:"+id);case "unresolved":f.hold("claim_unresolved:"+id);default:f.hold("claim_disposition_invalid:"+id)}}
 }
 func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
- r.ExpectedEvents=len(in.SourceEvents);r.ObservedEvents=len(in.ObservedEvents);if len(in.SourceEvents)==0{cdc.hold("source_truth_missing")};checkRecordManifest("source_truth",in.SourceTruthComplete,in.SourceTruthManifestSHA256,in.SourceEventsSHA256,sourceEventsDigest(in.SourceEvents),cdc);checkRecordManifest("observed_capture",in.ObservedCaptureComplete,in.ObservedCaptureManifestSHA256,in.ObservedEventsSHA256,observedEventsDigest(in.ObservedEvents),cdc);checkRecordManifest("transaction_report",in.TransactionReportComplete,in.TransactionReportSHA256,in.TransactionProofsSHA256,transactionProofsDigest(in.Transactions),txn)
+ r.ExpectedEvents=len(in.SourceEvents);r.ObservedEvents=len(in.ObservedEvents);if len(in.SourceEvents)==0{cdc.hold("source_truth_missing")};checkRecordManifest("source_truth",in.SourceTruthComplete,in.SourceTruthManifestSHA256,in.SourceEventsSHA256,sourceEventsDigest(in.SourceEvents),cdc);checkRecordManifest("observed_capture",in.ObservedCaptureComplete,in.ObservedCaptureManifestSHA256,in.ObservedEventsSHA256,observedEventsDigest(in.ObservedEvents),cdc);checkRecordManifest("topic_partition_inventory",in.ObservedCaptureComplete,in.ObservedCaptureManifestSHA256,in.TopicPartitionsSHA256,topicPartitionsDigest(in.TopicPartitions),cdc);checkRecordManifest("transaction_report",in.TransactionReportComplete,in.TransactionReportSHA256,in.TransactionProofsSHA256,transactionProofsDigest(in.Transactions),txn)
  want:=map[string]Event{};for _,e:=range in.SourceEvents{if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validID(e.DataCollection)||!validDigest(e.PayloadSHA256)||e.TotalOrder<1||e.CollectionOrder<1{cdc.block("source_event_malformed");continue};if _,ok:=want[e.EventID];ok{cdc.block("duplicate_source_event_id:"+e.EventID)};want[e.EventID]=e}
  got:=map[string][]Event{};unique:=map[string]Event{};for _,e:=range in.ObservedEvents{if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validID(e.DataCollection)||!validDigest(e.PayloadSHA256)||e.TotalOrder<1||e.CollectionOrder<1||e.Partition<0||e.Offset<0{cdc.block("observed_event_malformed");continue};got[e.EventID]=append(got[e.EventID],e);if _,ok:=unique[e.EventID];!ok{unique[e.EventID]=e}}
  r.UniqueObservedEvents=len(unique)
@@ -335,7 +347,7 @@ func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
  for id:=range byTx{if _,ok:=txProofs[id];!ok{r.TransactionViolations=append(r.TransactionViolations,id+":proof_missing")}};if len(r.TransactionViolations)>0{sort.Strings(r.TransactionViolations);txn.block("transaction_not_closed")}
 }
 func checkSurfaces(in Input,r *Reconciliation,f *flags){
- if in.SurfaceScope!="full_state"&&in.SurfaceScope!="row_stream"{f.hold("surface_scope_invalid")};if len(in.Surfaces)==0{f.hold("surface_inventory_missing")};if len(in.RequiredSurfaceIDs)==0{f.hold("required_surface_inventory_missing")};checkRecordManifest("surface_inventory",in.SurfaceInventoryComplete,in.SurfaceInventorySHA256,in.RequiredSurfaceIDsSHA256,surfaceIDsDigest(in.RequiredSurfaceIDs),f)
+ if in.SurfaceScope!="full_state"&&in.SurfaceScope!="row_stream"{f.hold("surface_scope_invalid")};if len(in.Surfaces)==0{f.hold("surface_inventory_missing")};if len(in.RequiredSurfaceIDs)==0{f.hold("required_surface_inventory_missing")};checkRecordManifest("surface_inventory",in.SurfaceInventoryComplete,in.SurfaceInventorySHA256,in.RequiredSurfaceIDsSHA256,surfaceIDsDigest(in.RequiredSurfaceIDs),f);checkRecordManifest("surface_assertions",in.SurfaceInventoryComplete,in.SurfaceInventorySHA256,in.SurfaceAssertionsSHA256,surfaceAssertionsDigest(in.Surfaces),f)
  required:=map[string]struct{}{};for _,id:=range in.RequiredSurfaceIDs{if !validID(id){f.block("required_surface_id_invalid");continue};if _,ok:=required[id];ok{f.block("duplicate_required_surface_id:"+id)};required[id]=struct{}{}}
  seen:=map[string]struct{}{};for _,s:=range in.Surfaces{if !validID(s.ID){f.block("surface_id_invalid");continue};if _,ok:=seen[s.ID];ok{f.block("duplicate_surface:"+s.ID);continue};seen[s.ID]=struct{}{};if _,ok:=required[s.ID];!ok{f.block("surface_not_in_required_inventory:"+s.ID)};r.SurfaceCounts[s.Disposition]++
  switch s.Disposition{case "covered":if !validDigest(s.SourceSHA256)||!validDigest(s.RestoredSHA256){f.hold("surface_digest_missing:"+s.ID)}else if s.SourceSHA256!=s.RestoredSHA256{f.block("surface_digest_mismatch:"+s.ID)}
