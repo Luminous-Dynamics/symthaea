@@ -312,6 +312,7 @@ These are paper/author-reported or benchmark-host-supplied baselines unless inde
 
 Implemented in this branch:
 - candidate-visible decision context and prospective proposal, including a decision-objective reference and required exact ResearchState/evidence-prefix/action-offer-list SHA-256 bindings from #13665/#11015;
+- versioned canonical candidate-context SHA-256 over all candidate-visible decision fields; the validator recomputes it and rejects time, phase, objective, evidence, offer, state or budget substitution without a matching digest;
 - outcome distribution, full randomized action propensities over action/payload identities, exact selected-payload binding and causal-design declarations;
 - versioned AS-Bench batch payload SHA-256 over campaign, stage, manifest, ID field and exact ordered design IDs;
 - evaluator-owned resolution and distinct execution/outcome states;
@@ -327,6 +328,12 @@ Not implemented or not yet verified:
 - current fixture observation timestamps remain simulation ticks, not full #12407 event/availability-time semantics;
 - integration with existing ledger/archive/receipts/attestation;
 - executable replay policy, live-fidelity audit, external benchmark runner or R4.
+
+Follow-on candidate-context integrity gate:
+- The candidate-visible context digest was added after the last confirmed green head `bddab8d62ebd9afb1df4a8863371385d60b9a386`; the standalone harness therefore has 34 authored tests, not 33.
+- The first follow-on run passed rustfmt but reported 32/34 tests because two negative tests changed a context field while retaining the previous context digest. The digest guard correctly rejected those stale specimens before the tests reached their intended semantic assertions.
+- Those tests now recompute the canonical context digest after the mutation, ensuring they test the look-ahead and decision-objective guards rather than the earlier digest guard.
+- The exact current PR head is `371a9f6ac1f381954d408ba78ec0691380d1e494`; focused Rust 1.96 run 84 is queued. No 34/34 or Clippy pass is claimed for this follow-on until that run completes.
 
 Verification boundary (exact tested code head `bddab8d62ebd9afb1df4a8863371385d60b9a386`):
 - Focused Rust 1.96 PR and push workflow runs both succeeded after the standalone dependency lockfile was committed.
