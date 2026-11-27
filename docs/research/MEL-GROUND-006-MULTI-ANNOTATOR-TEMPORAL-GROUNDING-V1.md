@@ -171,3 +171,24 @@ Pairs with nonmatching dispositions, including Present/Absent, do not receive fa
 
 This is a descriptive pairwise agreement view for one query, not chance-corrected reliability. The adapter explicitly leaves Cohen's kappa, Fleiss' kappa and Krippendorff's alpha unset. Formal reliability requires a multi-query corpus with preregistered items, raters, tolerance policy, missingness treatment and a justified chance model. For event intervals, report event F1/count agreement separately from matched IoU and boundary deviation; a single kappa over discretized time bins can change substantially with the chosen bin width.
 
+
+
+## Canonical integrity commitments — 27 November 2026
+
+The adapter now recomputes two deterministic SHA-256 commitments using the shared production `canonical_json_sha256` implementation:
+
+1. **Annotation record commitment:** includes schema, query ID/text, exact artifact clock/digest, annotation policy version, opaque annotator-ID digest, state, raw intervals and status reason.
+2. **Annotation manifest commitment:** includes the same scope plus the sorted list of annotator-ID / annotation-record-digest pairs.
+
+Consequences:
+- Reordering the submitted annotation array does not change the manifest digest.
+- Mutating an interval, disposition, reason, policy, or panel membership without updating the commitment fails closed.
+- All original records remain intact; the digest binds them but does not authenticate a person or prove that an independent listening/annotation process occurred.
+
+The output explicitly distinguishes:
+- `annotation_record_digests_recomputed = true`;
+- `annotation_manifest_digest_recomputed = true`;
+- `annotator_receipts_authenticated = false`;
+- `annotation_manifest_authenticated = false`.
+
+This raises the integrity floor but does not replace signatures, trusted timestamping, rater-role/assignment receipts, or consent/purpose verification. Those require the independent provenance owners and a real annotation workflow.
