@@ -8,7 +8,7 @@
 //! entry point for autonomous web research.
 
 use anyhow::{Context, Result};
-use futures::{stream, StreamExt};
+use futures::{StreamExt, stream};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -172,10 +172,8 @@ impl WebResearcher {
 
         // Search queries are concurrent, but their results are restored to
         // the planned query order before page candidates are constructed.
-        let mut search_results = bounded_map_ordered(
-            indexed_queries,
-            concurrency,
-            |query_rank, search_query| {
+        let mut search_results =
+            bounded_map_ordered(indexed_queries, concurrency, |query_rank, search_query| {
                 let deadline = deadline.clone();
                 async move {
                     let attempt_started = Instant::now();
@@ -210,9 +208,8 @@ impl WebResearcher {
                         }
                     }
                 }
-            },
-        )
-        .await;
+            })
+            .await;
         search_results.sort_by_key(|(query_rank, _)| *query_rank);
 
         let prior_acquisition_incomplete = acquisition_receipts
@@ -272,9 +269,8 @@ impl WebResearcher {
             },
         )
         .await;
-        page_results.sort_by_key(|(_, page)| {
-            (page.candidate.query_rank, page.candidate.source_rank)
-        });
+        page_results
+            .sort_by_key(|(_, page)| (page.candidate.query_rank, page.candidate.source_rank));
 
         let mut all_sources: Vec<SourceEvidence> = Vec::new();
         let mut all_claims: Vec<String> = Vec::new();
@@ -370,7 +366,10 @@ impl WebResearcher {
         let overall_confidence = if verified_claims.is_empty() {
             0.3
         } else {
-            verified_claims.iter().map(|claim| claim.confidence).sum::<f32>()
+            verified_claims
+                .iter()
+                .map(|claim| claim.confidence)
+                .sum::<f32>()
                 / verified_claims.len() as f32
         };
         let epistemic_status = self.aggregate_epistemic_status(&verified_claims);
@@ -378,7 +377,9 @@ impl WebResearcher {
 
         let result = WebResearchResult {
             title: primary_title,
-            url: all_sources.first().map_or(String::new(), |source| source.url.clone()),
+            url: all_sources
+                .first()
+                .map_or(String::new(), |source| source.url.clone()),
             content: primary_content,
             summary,
             source_type: all_sources
@@ -469,12 +470,13 @@ impl WebResearcher {
                         normalized_provider.as_str(),
                         "serper" | "brave" | "searxng" | "searx"
                     );
-                    let missing_api_key = matches!(normalized_provider.as_str(), "serper" | "brave")
-                        && self
-                            .config
-                            .search_api_key
-                            .as_deref()
-                            .is_none_or(|key| key.trim().is_empty());
+                    let missing_api_key =
+                        matches!(normalized_provider.as_str(), "serper" | "brave")
+                            && self
+                                .config
+                                .search_api_key
+                                .as_deref()
+                                .is_none_or(|key| key.trim().is_empty());
                     let outcome = if !supported || missing_api_key {
                         AcquisitionOutcome::ProviderFailed
                     } else if found.is_empty() {
@@ -483,9 +485,13 @@ impl WebResearcher {
                         AcquisitionOutcome::ResultsFound
                     };
                     let reason = if !supported {
-                        Some(format!("unsupported configured search provider: {provider}"))
+                        Some(format!(
+                            "unsupported configured search provider: {provider}"
+                        ))
                     } else if missing_api_key {
-                        Some(format!("configured provider {provider} requires an API key"))
+                        Some(format!(
+                            "configured provider {provider} requires an API key"
+                        ))
                     } else {
                         None
                     };
@@ -673,7 +679,8 @@ impl WebResearcher {
             seeded_urls.push("https://search.nixos.org/packages".to_string());
         }
         if query_lower.contains("hdc") || query_lower.contains("hypervector") {
-            seeded_urls.push("https://en.wikipedia.org/wiki/Hyperdimensional_computing".to_string());
+            seeded_urls
+                .push("https://en.wikipedia.org/wiki/Hyperdimensional_computing".to_string());
             seeded_urls.push("https://arxiv.org/abs/2112.15425".to_string());
         }
         if query_lower.contains("python") {
@@ -924,7 +931,12 @@ impl WebResearcher {
     }
 
     fn search_provider_endpoint(&self) -> Option<String> {
-        let provider = self.config.search_provider.as_deref()?.trim().to_lowercase();
+        let provider = self
+            .config
+            .search_provider
+            .as_deref()?
+            .trim()
+            .to_lowercase();
         match provider.as_str() {
             "serper" => Some(
                 self.config
@@ -932,12 +944,11 @@ impl WebResearcher {
                     .clone()
                     .unwrap_or_else(|| "https://google.serper.dev/search".to_string()),
             ),
-            "brave" => Some(
-                self.config
-                    .search_endpoint
-                    .clone()
-                    .unwrap_or_else(|| "https://api.search.brave.com/res/v1/web/search".to_string()),
-            ),
+            "brave" => {
+                Some(self.config.search_endpoint.clone().unwrap_or_else(|| {
+                    "https://api.search.brave.com/res/v1/web/search".to_string()
+                }))
+            },
             "searxng" | "searx" => Some(
                 self.config
                     .search_endpoint
@@ -1114,10 +1125,7 @@ impl WebResearcher {
     }
 
     /// Fetch, capture and extract a page while preserving a complete attempt receipt.
-    async fn fetch_and_extract_with_receipt(
-        &self,
-        candidate: PageCandidate,
-    ) -> PageAcquisition {
+    async fn fetch_and_extract_with_receipt(&self, candidate: PageCandidate) -> PageAcquisition {
         let started = Instant::now();
         let response = self.client.get(&candidate.url).send().await;
         let mut response = match response {
@@ -1191,10 +1199,7 @@ impl WebResearcher {
 
         if let Some(content_type_value) = content_type.as_deref() {
             let lower = content_type_value.to_lowercase();
-            if lower.contains("pdf")
-                || lower.contains("octet-stream")
-                || lower.contains("zip")
-            {
+            if lower.contains("pdf") || lower.contains("octet-stream") || lower.contains("zip") {
                 let mut receipt = make_receipt(
                     candidate.query_rank,
                     Some(candidate.source_rank),
@@ -1907,8 +1912,8 @@ mod tests {
 
     #[tokio::test]
     async fn bounded_map_respects_limit_and_restores_planned_order() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
 
         let active = Arc::new(AtomicUsize::new(0));
         let peak = Arc::new(AtomicUsize::new(0));
@@ -2026,9 +2031,11 @@ mod tests {
                 .count(),
             2
         );
-        assert!(plan.receipts.iter().all(|receipt| {
-            receipt.outcome != AcquisitionOutcome::BudgetExceeded
-        }));
+        assert!(
+            plan.receipts
+                .iter()
+                .all(|receipt| { receipt.outcome != AcquisitionOutcome::BudgetExceeded })
+        );
         assert_eq!(plan.receipts[0].query_rank, 0);
         assert_eq!(plan.receipts[0].source_rank, Some(1));
         assert_eq!(plan.receipts[1].query_rank, 1);
@@ -2055,10 +2062,7 @@ mod tests {
         assert_eq!(plan.candidates.len(), 2);
         assert!(plan.acquisition_incomplete);
         assert_eq!(plan.receipts.len(), 1);
-        assert_eq!(
-            plan.receipts[0].outcome,
-            AcquisitionOutcome::BudgetExceeded
-        );
+        assert_eq!(plan.receipts[0].outcome, AcquisitionOutcome::BudgetExceeded);
         assert_eq!(
             plan.receipts[0].reason_code.as_deref(),
             Some("MAX_SOURCES_PER_RESEARCH")
