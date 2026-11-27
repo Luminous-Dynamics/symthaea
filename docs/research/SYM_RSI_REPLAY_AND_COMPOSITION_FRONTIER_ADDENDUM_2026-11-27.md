@@ -285,3 +285,36 @@ No stage establishes unbounded self-improvement, general intelligence, conscious
 - Forecasting Research Institute RSI review (2026-11-24): https://forecastingresearch.org/research/recursive-self-improvement
 - RSIBench-Data: https://arxiv.org/abs/2607.25886
 - SelfImprove-Bench: https://arxiv.org/abs/2611.02797
+
+## 12. Existing low-cost replay substrate and first pilot
+
+A bounded starting point already exists in the Futures Laboratory:
+
+- `crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_common.rs` defines `SerializedWorld`, `record_world`, `load_world`, the world format version, independent train/test seed sets and the deterministic world-recording procedure.
+- `crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_generate_worlds.rs` writes ten reusable world trajectories: five train seeds ([11, 22, 33, 44, 55]) and five test seeds ([66, 77, 88, 99, 111]); each world records 11,000 simulation ticks.
+- `crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_architecture_ablation.rs` already consumes serialized worlds and compares multiple forecast/observation conditions.
+- `crates/domains/symthaea-futures-ensemble/src/evolutionary_rescue.rs` supplies the existing baseline ladder, including census-only and census-plus-trait FEP generators.
+- `crates/domains/symthaea-futures-ledger/src/lib.rs` already defines a replayable forecast evidence record containing scenario family, world seed, observation policy version/cutoff, belief-state hash, model and generator identities, predicted distribution, actual continuation, score, calibration bucket and wall-clock cost.
+
+### What this substrate is and is not
+
+This is a useful **recorded-world and forecast-replay substrate**, not a complete Dream-RSI discovery tree. It stores trajectories and observation streams; it does not yet record a research agent's full sequence of candidate-generation decisions, available branches, off-policy choices, evaluator feedback and search-policy versions. Therefore it can validate replay data integrity, world/observation support, forecast scoring and some policy-allocation questions, but it cannot by itself establish agent-level recursive self-improvement or Dream-RSI equivalence.
+
+At inspection time, the generator and ablation source were present on main, but the expected serialized JSON fixtures were not present at the checked paths. The generator must run to materialize them. This document does not claim that the fixtures were generated or that the pilot was executed.
+
+### First executable tranche
+
+1. Run the existing generator once to materialize the 10 train/test worlds; record toolchain, source SHA, fixture SHA-256 and exact configuration.
+2. Independently parse and validate format version, seed membership, tick continuity, stream lengths, terminal outcomes and absence of train/test seed overlap.
+3. Use the five training worlds to develop a small replay policy over *declared, actually available* observation/forecast actions. Keep evaluator truth and test-world trajectories out of the policy process.
+4. Add explicit action-support states: observed-and-supported, unavailable, unsupported and indeterminate. Never fill unsupported actions with oracle values or drop them from coverage.
+5. Score the frozen policy and fixed/random controls on the five test worlds; include no-information and shuffled-observation controls.
+6. Report per-world outcomes, calibration, support coverage, unsupported selection, Brier/log score where contractually valid, total execution cost and clustered uncertainty. Five test seeds are a pilot only; they cannot establish a high-confidence SOTA claim.
+7. Separately build the decision-level search-tree recorder required for Dream-RSI proper. Bind every candidate branch, parent, policy, evaluator output and actual cost to the established candidate archive and benchmark receipt/attestation owners. Do not retrofit forecast `EvidenceRecord` into a generic research ledger.
+
+### Stop/go criteria for the pilot
+
+- **Stop** on stale/malformed fixtures, train/test overlap, missing outcome rows, source/evaluator identity mismatch or unsupported actions being assigned fabricated outcomes.
+- **Proceed to a larger confirmatory study** only if replay policy ranking shows useful held-out agreement with live evaluation, improves the cost/quality frontier against fixed and random controls, and has no material calibration or protected-capability regression.
+- A positive forecast-replay pilot is evidence for a reusable replay substrate only. The discovery-tree policy result and R4 same-start improver result remain separate claims.
+
