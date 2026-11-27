@@ -24,6 +24,10 @@ The matcher allows memory method, implementation and adapter to differ. It freez
 
 These are externally reported references. Pin each paper/leaderboard version and protocol before running; do not infer local MACE performance from them.
 
+**AML participation status:** Cycle 2 is closed. Formal evaluation ended November 4, 2026 and official results were published November 19, 2026. A new MACE entry cannot join that completed cycle. Use the published tables as reference baselines and reproduce only where the released data, scorer, API terms and compute are accessible. The official platform evaluates participant-hosted Add/Search APIs; a repository-only Rust adapter is not yet a leaderboard submission. Prepare a hosted service package for the next announced cycle, but do not assume its dates or API version before the organizers publish them.
+
+**LongMemEval-V2 scope:** the official release contains 451 curated questions across five memory abilities, two domains and small/medium tiers, with haystacks reaching 115M tokens. The memory backend's interface is Insert/Query; a fixed reader answers from the returned length-bounded context. Reproduce both web and enterprise operating-point runs and use the official LAFS calculation.
+
 ## 3. MACE baseline ladder
 
 Run on identical raw sessions/trajectories and benchmark-native splits: no memory; full-history information reference; raw-session BM25 (#13346); dense; hybrid BM25+dense/RRF; structured facts or versioned key-value; episodic summary/cue-indexed hierarchy; causal/relational graph; typed-content/event-ID HDC; Liquid Broca recurrent-only; HDC + decision-sufficiency frontier/EVSI; and full evidence-gated MACE.
