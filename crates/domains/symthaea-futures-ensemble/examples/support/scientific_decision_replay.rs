@@ -935,6 +935,9 @@ mod tests {
     fn rejects_unbound_decision_value_or_loss_contract() {
         let mut c = context();
         c.decision_objective.mode = DecisionValueMode::NotQuantified;
+        c.context_digest = c
+            .canonical_context_sha256()
+            .expect("mutated context remains canonically serializable");
         assert!(c.validate().unwrap_err().contains("NotQuantified"));
     }
 
@@ -942,6 +945,9 @@ mod tests {
     fn rejects_lookahead_evidence() {
         let mut c = context();
         c.evidence_available_at_decision[0].available_at_ms = 101;
+        c.context_digest = c
+            .canonical_context_sha256()
+            .expect("mutated context remains canonically serializable");
         assert!(c.validate().unwrap_err().contains("look-ahead"));
     }
     #[test]
