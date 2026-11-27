@@ -74,6 +74,23 @@ The table is a fixed snapshot transcribed from the benchmark paper, not a contin
 
 Source: https://benchlm.ai/voice-benchmarks/full-duplex-bench-v3
 
+### Meta Muse Realtime Avatar — direct real-time embodiment comparator
+
+Meta's September 23, 2026 technical post describes Muse Realtime Avatar as a streaming system sharing speech tokens between voice generation and avatar video generation. It reports:
+- 448×768 portrait video at 25 FPS;
+- approximately 870 ms from the end of the user's turn to the first byte of the synchronized voice-and-video response;
+- 12 concurrent video-generation sessions on one GB200;
+- a causal chunked Diffusion Transformer with a rolling video-latent context;
+- a distilled two-step student versus a 120-evaluation teacher, described as a 60× reduction in model evaluations per chunk.
+
+Meta also reports a preference comparison against Runway Characters and HeyGen LiveAvatar, with raters preferring Muse overall and on most dimensions; its mannerism comparison with Runway was not statistically distinguishable from parity.
+
+These are Meta's own technical and preference-study claims, not an independent cross-provider benchmark. Its 870 ms metric is from end of turn to first synchronized response byte, not the same metric as Anam's client-measured response-start median or VideoFDB's turn-onset alignment. Keep all three separate.
+
+**Strategic implication:** visual realism and real-time avatar generation are now mature, highly optimized competition areas. Symthaea should not attempt to outspend these systems on photorealistic video generation. Its research advantage should be a verifiable interaction contract: user-controlled presentation, causal turn state, cross-form semantic invariance, calibrated uncertainty, privacy-minimized renderer inputs, and truthful observation receipts.
+
+Source: https://research.meta.ai/blog/bringing-your-muse-to-life
+
 ### InteractionBench — important voice-only complement
 
 The November 2, 2026 InteractionBench study covers 13 scenarios and reports 1,519 graded runs across seven systems. It evaluates conversational timing, spoken-task accuracy, whisper/volume control and long-conversation groundedness separately. The three hosted systems and the turn-based cascade answered 34–38 of 50 spoken items (68–76%); the strongest client-clock timing score is 86% for GPT-Live, while the server-clock reconstruction is 56%. Gemini Live whispered on 8/10 explicit requests; only 2 of 35 whispered requests across all seven systems received a quieter reply. Hosted-system groundedness ranges from 67–88%. These are benchmark-specific observations, not universal provider rankings.
@@ -81,6 +98,16 @@ The November 2, 2026 InteractionBench study covers 13 scenarios and reports 1,51
 The key methodological finding is that server-reported latency can be misleading: client-side timing included network delay, and a server-clock correction changed GPT-Live's timing aggregate from 86% to 56%. Symthaea should measure at the user's output device and preserve both source and client clocks.
 
 Source: https://arxiv.org/abs/2611.02430
+
+### TurnBench — turn-taking quality, with a scoring warning
+
+TurnBench reports a 30-hour dual-channel held-out corpus with 154 dialogues, 106 actors, six conversation styles and triple annotation (Fleiss' κ = 0.78). The current v1 leaderboard shows high recall but materially different latency/FPR trade-offs: Kuroko is 0.983 / 0.065 / 619 ms; Neosapience Nunchi v2 is 0.959 / 0.064 / 254 ms.
+
+The maintainers explicitly document that v1 can reward multiple and late predictions and ranks by recall, allowing simple VAD rules to perform deceptively well. They describe a planned v2 using per-frame probabilities and fixed hidden decision points.
+
+Symthaea must not optimize v1 recall alone. Use the official v1 scorer only as a diagnostic, always publish FPR and latency, and build a one-decision-per-hidden-event internal evaluation while preparing to adopt v2.
+
+Source: https://turnbench.sesame.com/
 
 ## Where Symthaea should differentiate
 
