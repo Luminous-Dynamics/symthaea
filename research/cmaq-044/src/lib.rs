@@ -267,9 +267,14 @@ pub fn evaluate_paired(
         }
         if block.alpha_numerator != contract.alpha_numerator
             || block.alpha_denominator != contract.alpha_denominator
+            || block.scenario_manifest_sha256 != contract.scenario_manifest_sha256
             || block.score_definition_sha256 != contract.score_definition_sha256
             || block.calibration_reference_sha256 != contract.calibration_reference_sha256
             || block.tie_protocol_sha256 != contract.tie_protocol_sha256
+            || block.baseline_build_sha256 != contract.baseline_build_sha256
+            || block.candidate_build_sha256 != contract.candidate_build_sha256
+            || block.baseline_configuration_sha256 != contract.baseline_configuration_sha256
+            || block.candidate_configuration_sha256 != contract.candidate_configuration_sha256
         {
             return Err(BenchmarkError::BenchmarkContractMismatch);
         }
@@ -426,8 +431,8 @@ fn paired_metrics(
     bootstrap_replicates: usize,
     seed: u64,
 ) -> Result<PairedMetrics, BenchmarkError> {
-    if deltas.len() < 2 {
-        return Err(BenchmarkError::TooFewBlocksForInterval);
+    if deltas.is_empty() {
+        return Err(BenchmarkError::EmptyEvaluation);
     }
     let mut sum = 0i128;
     let mut wins = 0usize;
@@ -791,6 +796,44 @@ mod tests {
 
         blocks[1] = block("b2", "urban", Some(10), Some(9));
         blocks[1].tie_protocol_sha256 = SHA_A.into();
+        assert_eq!(
+            evaluate_paired(&blocks, 100, 50, 1),
+            Err(BenchmarkError::BenchmarkContractMismatch)
+        );
+    }
+
+    #[test]
+    fn one_block_family_reports_point_estimate_without_bootstrap_interval() {
+        let report = evaluate_paired(
+            &[
+                block("b1", "single-family", Some(10), Some(5)),
+                block("b2", "another-family", Some(11), Some(8)),
+            ],
+            100,
+            100,
+            2,
+        )
+        .unwrap();
+        let family = &report.by_family["single-family"].paired;
+        assert_eq!(family.blocks, 1);
+        assert_eq!(family.mean_penalized_delay_delta_us, -5);
+        assert_eq!(family.bootstrap_95_low_us, None);
+        assert_eq!(family.bootstrap_95_high_us, None);
+    }
+
+    #[test]
+    fn build_and_configuration_contracts_must_match_across_blocks() {
+        let mut blocks = [
+            block("b1", "urban", Some(10), Some(10)),
+            block("b2", "urban", Some(10), Some(9)),
+        ];
+        blocks[1].candidate_build_sha256 = SHA_A.into();
+        assert_eq!(
+            evaluate_paired(&blocks, 100, 50, 1),
+            Err(BenchmarkError::BenchmarkContractMismatch)
+        );
+        blocks[1] = block("b2", "urban", Some(10), Some(9));
+        blocks[1].baseline_configuration_sha256 = SHA_A.into();
         assert_eq!(
             evaluate_paired(&blocks, 100, 50, 1),
             Err(BenchmarkError::BenchmarkContractMismatch)
