@@ -12,7 +12,7 @@ Composing subsystem outputs with independently captured SQL truth, Kafka capture
 | Known-answer controls | 100% exact expected component disposition |
 | Source/capture completeness | 100% complete and custody-verifiable manifests |
 | CDC reconciliation | 100% event identity, data_collection, payload and transaction accounting |
-| Duplicate handling | 100% conflicting duplicate detection; exact duplicate never silently discarded |
+| Duplicate handling | 100% conflicting duplicate detection; exact replay requires a digest-bound idempotency proof that covers the exact duplicate event-ID set | Replay identity mutation corpus |
 | Transaction closure | 100% detection of BEGIN/END/count/data_collections/total_order gaps |
 | Timeline | 100% ancestry/fork-boundary classification |
 | Observer independence | 100% detection of shared domains in the v1 mutation matrix |
