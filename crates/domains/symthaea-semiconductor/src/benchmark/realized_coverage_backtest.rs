@@ -326,7 +326,7 @@ fn normal_two_sided_critical_value(z: f64) -> f64 {
 
 /// Newey-West long-run variance of the Bernoulli miss-indicator mean with
 /// Bartlett weights. This is a named HAC baseline, not the functional-
-—dependence estimator in arXiv:2609.33868.
+dependence estimator in arXiv:2609.33868.
 fn hac_bartlett_standard_error(
     misses: &[f64],
     maximum_lag: usize,
