@@ -158,6 +158,155 @@ pub struct Scorecard {
     pub cost_per_correct_decision_micros_usd: Option<f64>,
 }
 
+impl Scorecard {
+    /// Export a deterministic CSV scorecard. Every metric includes its raw
+    /// numerator and denominator; an empty value denotes an undefined rate.
+    pub fn to_csv(&self) -> String {
+        let mut output =
+            String::from("metric,numerator,denominator,value,unit,direction\\n");
+        push_rate_row(
+            &mut output,
+            "decision_accuracy",
+            self.decision_accuracy,
+            "fraction",
+            "higher_is_better",
+        );
+        push_rate_row(
+            &mut output,
+            "answer_coverage",
+            self.answer_coverage,
+            "fraction",
+            "higher_is_better",
+        );
+        push_rate_row(
+            &mut output,
+            "selective_risk",
+            self.selective_risk,
+            "fraction",
+            "lower_is_better",
+        );
+        push_mean_row(
+            &mut output,
+            "brier_score",
+            self.brier_score,
+            "mean_squared_error",
+            "lower_is_better",
+        );
+        push_mean_row(
+            &mut output,
+            "expected_calibration_error_10_bin",
+            self.expected_calibration_error_10_bin,
+            "fraction",
+            "lower_is_better",
+        );
+        push_rate_row(
+            &mut output,
+            "citation_precision",
+            self.citation_precision,
+            "fraction",
+            "higher_is_better",
+        );
+        push_rate_row(
+            &mut output,
+            "independent_support_adequacy",
+            self.independent_support_adequacy,
+            "fraction",
+            "higher_is_better",
+        );
+        push_rate_row(
+            &mut output,
+            "counterfactual_oracle_accuracy",
+            self.counterfactual_oracle_accuracy,
+            "fraction",
+            "higher_is_better",
+        );
+        push_rate_row(
+            &mut output,
+            "source_removal_oracle_accuracy",
+            self.source_removal_oracle_accuracy,
+            "fraction",
+            "higher_is_better",
+        );
+        push_rate_row(
+            &mut output,
+            "placebo_invariance",
+            self.placebo_invariance,
+            "fraction",
+            "higher_is_better",
+        );
+        push_rate_row(
+            &mut output,
+            "replay_pass_rate",
+            self.replay_pass_rate,
+            "fraction",
+            "higher_is_better",
+        );
+        push_rate_row(
+            &mut output,
+            "budget_compliance",
+            self.budget_compliance,
+            "fraction",
+            "higher_is_better",
+        );
+        push_count_row(&mut output, "task_count", self.task_count, "tasks");
+        push_count_row(
+            &mut output,
+            "correct_decisions",
+            self.correct_decisions,
+            "decisions",
+        );
+        push_count_row(&mut output, "total_tokens", self.total_tokens, "tokens");
+        push_count_row(
+            &mut output,
+            "total_tool_calls",
+            self.total_tool_calls,
+            "calls",
+        );
+        push_count_row(
+            &mut output,
+            "total_wall_time_ms",
+            self.total_wall_time_ms,
+            "milliseconds",
+        );
+        push_count_row(
+            &mut output,
+            "total_cost_micros_usd",
+            self.total_cost_micros_usd,
+            "micro_usd",
+        );
+        let cost_value = self
+            .cost_per_correct_decision_micros_usd
+            .map(|value| value.to_string())
+            .unwrap_or_default();
+        output.push_str(&format!(
+            "cost_per_correct_decision_micros_usd,{},{},{cost_value},micro_usd_per_correct_decision,lower_is_better\\n",
+            self.total_cost_micros_usd, self.correct_decisions
+        ));
+        output
+    }
+}
+
+fn push_rate_row(output: &mut String, name: &str, rate: Rate, unit: &str, direction: &str) {
+    let value = rate.value().map(|value| value.to_string()).unwrap_or_default();
+    output.push_str(&format!(
+        "{name},{},{},{value},{unit},{direction}\\n",
+        rate.numerator, rate.denominator
+    ));
+}
+
+fn push_mean_row(output: &mut String, name: &str, mean: Mean, unit: &str, direction: &str) {
+    let numerator = mean.numerator.to_string();
+    let value = mean.value().map(|value| value.to_string()).unwrap_or_default();
+    output.push_str(&format!(
+        "{name},{numerator},{},{value},{unit},{direction}\\n",
+        mean.denominator
+    ));
+}
+
+fn push_count_row(output: &mut String, name: &str, value: u64, unit: &str) {
+    output.push_str(&format!("{name},{value},1,{value},{unit},neutral\\n"));
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvaluationError {
     EmptyDataset,
@@ -488,6 +637,23 @@ mod tests {
             },
             limits: None,
         }
+    }
+
+    #[test]
+    fn csv_export_is_stable_and_preserves_undefined_denominators() {
+        let result = evaluate(&[task(
+            "csv",
+            Decision::Supported,
+            Decision::Supported,
+        )])
+        .unwrap();
+        let csv = result.to_csv();
+        assert!(csv.starts_with(
+            "metric,numerator,denominator,value,unit,direction\\n"
+        ));
+        assert!(csv.contains("decision_accuracy,1,1,1,fraction,higher_is_better\\n"));
+        assert!(csv.contains("citation_precision,0,0,,fraction,higher_is_better\\n"));
+        assert!(csv.contains("cost_per_correct_decision_micros_usd,250,1,250,micro_usd_per_correct_decision,lower_is_better\\n"));
     }
 
     #[test]
