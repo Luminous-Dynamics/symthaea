@@ -32,7 +32,9 @@
         "not_estimable_insufficient_calibration_clusters",
         "unsupported_distribution_shift",
         "parent_group_fallback",
-        "rejected_hard_gate"
+        "rejected_hard_gate",
+        "risk_exceeds_target",
+        "not_estimable_exchangeability_not_established"
       ]
     },
     "threshold": {
@@ -68,7 +70,13 @@
         "resampling_unit",
         "exchangeability_status",
         "threshold_selection",
-        "evaluator_custody"
+        "evaluator_custody",
+        "threshold_grid_sha256",
+        "threshold_count",
+        "group_count",
+        "familywise_delta",
+        "unacceptable_loss_threshold",
+        "minimum_independent_clusters"
       ],
       "properties": {
         "schema_version": {
@@ -165,6 +173,31 @@
             "independent_reviewer",
             "public_diagnostic_only"
           ]
+        },
+        "threshold_grid_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "threshold_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "group_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "familywise_delta": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "unacceptable_loss_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_independent_clusters": {
+          "type": "integer",
+          "minimum": 2
         }
       }
     },
@@ -191,7 +224,14 @@
         "risk_bound_method",
         "certificate_scope",
         "distribution_shift_detected",
-        "minimum_cluster_requirement"
+        "minimum_cluster_requirement",
+        "accepted_cluster_count",
+        "unsafe_cluster_count",
+        "hard_gate_rejected_count",
+        "empirical_cluster_unsafe_rate",
+        "mean_selective_loss",
+        "adjusted_delta",
+        "parent_fallback_certificate_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -302,7 +342,8 @@
             "empirical_bernstein",
             "conformal_risk_control",
             "cluster_bootstrap_upper_bound",
-            "not_estimable"
+            "not_estimable",
+            "clopper_pearson_cluster_any_unsafe_v1"
           ]
         },
         "certificate_scope": {
@@ -332,6 +373,60 @@
         "minimum_cluster_requirement": {
           "type": "integer",
           "minimum": 2
+        },
+        "accepted_cluster_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unsafe_cluster_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_gate_rejected_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "empirical_cluster_unsafe_rate": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk_bound"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mean_selective_loss": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk_bound"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "adjusted_delta": {
+          "oneOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent_fallback_certificate_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "allOf": [
@@ -515,6 +610,19 @@
         "reason": {
           "type": "string",
           "maxLength": 2048
+        },
+        "group_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "threshold": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/threshold"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "allOf": [
