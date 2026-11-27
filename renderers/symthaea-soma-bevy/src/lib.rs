@@ -21,11 +21,9 @@
 //! wall/game clock as a substitute for the source monotonic clock.
 
 use bevy::prelude::*;
-use symthaea_soma::embodiment_event::{PrivacyClass};
 use symthaea_soma::embodiment_policy::{
-    DenialReason, MotionMode, OutputChannel, PresentationPermit, PresentationPolicy,
+    DenialReason, OutputChannel, PresentationPermit, PresentationPolicy,
 };
-use symthaea_soma::embodiment_projection::EmbodimentForm;
 use symthaea_soma::embodiment_receipt::{
     PresentationReceipt, ReceiptPhase,
 };
