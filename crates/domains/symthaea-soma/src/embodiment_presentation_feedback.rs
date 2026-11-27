@@ -91,6 +91,62 @@ pub struct WaylandPresentationFeedback {
     pub result: WaylandFeedbackResult,
 }
 
+impl WaylandPresentationFeedback {
+    /// Normalize the raw wp_presentation_feedback.presented event fields.
+    ///
+    /// The caller supplies the output learned from the preceding sync_output
+    /// event, if one was delivered. Zero refresh means the compositor did not
+    /// provide a usable refresh interval; sequence words are preserved exactly.
+    pub fn presented_from_protocol(
+        request_id: impl Into<String>,
+        surface_id: impl Into<String>,
+        frame_id: impl Into<String>,
+        clock_domain_id: impl Into<String>,
+        output_id: Option<String>,
+        seconds_high: u32,
+        seconds_low: u32,
+        nanoseconds: u32,
+        refresh_interval_ns: u32,
+        sequence_high: u32,
+        sequence_low: u32,
+        flags: u32,
+    ) -> Result<Self, PresentationFeedbackError> {
+        let presentation_timestamp_ns =
+            wayland_timestamp_ns(seconds_high, seconds_low, nanoseconds)?.to_string();
+        let sequence = ((sequence_high as u64) << 32) | sequence_low as u64;
+        Ok(Self {
+            request_id: request_id.into(),
+            surface_id: surface_id.into(),
+            frame_id: frame_id.into(),
+            clock_domain_id: clock_domain_id.into(),
+            result: WaylandFeedbackResult::Presented {
+                output_id,
+                presentation_timestamp_ns,
+                refresh_interval_ns: (refresh_interval_ns != 0)
+                    .then_some(refresh_interval_ns as u64),
+                sequence: Some(sequence),
+                flags,
+            },
+        })
+    }
+
+    /// Normalize the raw wp_presentation_feedback.discarded event.
+    pub fn discarded_from_protocol(
+        request_id: impl Into<String>,
+        surface_id: impl Into<String>,
+        frame_id: impl Into<String>,
+        clock_domain_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            request_id: request_id.into(),
+            surface_id: surface_id.into(),
+            frame_id: frame_id.into(),
+            clock_domain_id: clock_domain_id.into(),
+            result: WaylandFeedbackResult::Discarded,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PresentationOutcome {
@@ -420,7 +476,76 @@ mod tests {
     }
 
     #[test]
-    fn presented_feedback_yields_compositor_started_evidence() {
+    fn raw_wayland_presented_fields_are_combined_without_loss() {
+        let feedback = WaylandPresentationFeedback::presented_from_protocol(
+            "request-raw",
+            "surface-1",
+            "frame-request-raw",
+            CLOCK,
+            Some("output-1".to_owned()),
+            1,
+            2,
+            3,
+            16_666_667,
+            4,
+            5,
+            PRESENTATION_FLAG_VSYNC | PRESENTATION_FLAG_HW_CLOCK | 0x80,
+        ).unwrap();
+        match feedback.result {
+            WaylandFeedbackResult::Presented {
+                output_id,
+                presentation_timestamp_ns,
+                refresh_interval_ns,
+                sequence,
+                flags,
+            } => {
+                assert_eq!(output_id.as_deref(), Some("output-1"));
+                assert_eq!(presentation_timestamp_ns, "4294967298000000003");
+                assert_eq!(refresh_interval_ns, Some(16_666_667));
+                assert_eq!(sequence, Some((4_u64 << 32) | 5));
+                assert_eq!(flags, PRESENTATION_FLAG_VSYNC | PRESENTATION_FLAG_HW_CLOCK | 0x80);
+            }
+            WaylandFeedbackResult::Discarded => panic!("expected presented feedback"),
+        }
+    }
+
+    #[test]
+    fn zero_refresh_is_preserved_as_unavailable() {
+        let feedback = WaylandPresentationFeedback::presented_from_protocol(
+            "request-zero-refresh",
+            "surface-1",
+            "frame-request-zero-refresh",
+            CLOCK,
+            None,
+            0, 0, 100, 0, 0, 0, 0,
+        ).unwrap();
+        match feedback.result {
+            WaylandFeedbackResult::Presented { refresh_interval_ns, sequence, output_id, .. } => {
+                assert_eq!(refresh_interval_ns, None);
+                assert_eq!(sequence, Some(0));
+                assert_eq!(output_id, None);
+            }
+            WaylandFeedbackResult::Discarded => panic!("expected presented feedback"),
+        }
+    }
+
+    #[test]
+    fn malformed_raw_wayland_timestamp_is_rejected() {
+        assert_eq!(
+            WaylandPresentationFeedback::presented_from_protocol(
+                "request-invalid",
+                "surface-1",
+                "frame-invalid",
+                CLOCK,
+                None,
+                0, 1, 1_000_000_000, 0, 0, 0, 0,
+            ),
+            Err(PresentationFeedbackError::NanosecondsOutOfRange)
+        );
+    }
+
+    #[test]
+    fn discarded_feedback_never_becomes_observed() {
         let mut ledger = ledger();
         ledger.register_submission(submission("request-1")).unwrap();
         let record = ledger.record_feedback(presented("request-1")).unwrap();
