@@ -31,7 +31,11 @@ fn map_values(keys: &[&str], values: &[f64]) -> BTreeMap<String, f64> {
         .collect()
 }
 
-fn resource_costs(probe_units: u64, energy_units: u64, compute_units: u64) -> BTreeMap<String, u64> {
+fn resource_costs(
+    probe_units: u64,
+    energy_units: u64,
+    compute_units: u64,
+) -> BTreeMap<String, u64> {
     BTreeMap::from([
         ("probe_units".to_owned(), probe_units),
         ("sensor_energy_units".to_owned(), energy_units),
@@ -64,10 +68,7 @@ fn problem() -> SequentialRobustProblem {
             "recommend_fresh_attempt".to_owned(),
             map_values(&STATES, &[0.0, 0.0, 0.95, 0.95, 1.0, 1.0, 0.90, 1.0]),
         ),
-        (
-            "abstain".to_owned(),
-            map_values(&STATES, &[0.45; 8]),
-        ),
+        ("abstain".to_owned(), map_values(&STATES, &[0.45; 8])),
     ]);
 
     // An ordinary endpoint-journal read narrows known histories but retains
@@ -204,7 +205,10 @@ fn main() {
     assert!((dynamic.worst_case_terminal_loss - 0.30).abs() < 1e-12);
     assert!((exhaustive.worst_case_terminal_loss - 0.30).abs() < 1e-12);
     assert!(dynamic.policy_terminal_risk_gate_passed);
-    assert_eq!(dynamic.worst_case_terminal_loss, exhaustive.worst_case_terminal_loss);
+    assert_eq!(
+        dynamic.worst_case_terminal_loss,
+        exhaustive.worst_case_terminal_loss
+    );
 
     let SequentialPolicyNode::Probe {
         action_id,
