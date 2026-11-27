@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon039-counterfactual-fault-reduction-input-v1.schema.json",
+  "title": "MON-039 Counterfactual Fault Reduction Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "trial_id",
+    "mode",
+    "evaluated_at",
+    "scenario_sha256",
+    "recovery_boundary_sha256",
+    "code_revision",
+    "initial_fault_ids",
+    "observations"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon039-counterfactual-fault-reduction-input-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "trial_id": {
+      "$ref": "#/$defs/id"
+    },
+    "mode": {
+      "enum": [
+        "offline_fixture",
+        "runtime_candidate"
+      ]
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scenario_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "recovery_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "code_revision": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "initial_fault_ids": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "expected_failure_signature_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "observations": {
+      "type": "array",
+      "maxItems": 50000,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^\\S(?:[^\\r\\n]*\\S)?$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trial_id",
+        "fault_ids",
+        "fault_set_sha256",
+        "scenario_sha256",
+        "recovery_boundary_sha256",
+        "code_revision",
+        "observed_at",
+        "verdict",
+        "failure_signature_sha256",
+        "outcome_receipt_sha256",
+        "complete"
+      ],
+      "properties": {
+        "fault_ids": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "fault_set_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "scenario_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "recovery_boundary_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "code_revision": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "verdict": {
+          "enum": [
+            "qualified",
+            "blocked",
+            "indeterminate"
+          ]
+        },
+        "failure_signature_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "outcome_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "trial_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    }
+  }
+}

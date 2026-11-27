@@ -1,0 +1,141 @@
+{
+  "profile": "mon039-counterfactual-fault-reduction-input-v1",
+  "version": "1.0.0",
+  "trial_id": "trial-039-001",
+  "mode": "offline_fixture",
+  "evaluated_at": "2026-11-27T20:00:00Z",
+  "scenario_sha256": "d99a938939c8d6adff3c96a1b4ebd05989e231b0c0da24b2c86bda26feb63932",
+  "recovery_boundary_sha256": "ee4df0d1a62b60dd77c38b18a7e59bfb358b2022bb108a9f6c9638f5eb493f34",
+  "code_revision": "0123456789abcdef0123456789abcdef01234567",
+  "initial_fault_ids": [
+    "fault-a",
+    "fault-b",
+    "fault-c"
+  ],
+  "expected_failure_signature_sha256": "30100eb79964719053a37a1ef7fe2be0e9290f7639284a848565a99dc77ffa5e",
+  "observations": [
+    {
+      "fault_ids": [],
+      "fault_set_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "scenario_sha256": "d99a938939c8d6adff3c96a1b4ebd05989e231b0c0da24b2c86bda26feb63932",
+      "recovery_boundary_sha256": "ee4df0d1a62b60dd77c38b18a7e59bfb358b2022bb108a9f6c9638f5eb493f34",
+      "code_revision": "0123456789abcdef0123456789abcdef01234567",
+      "observed_at": "2026-11-27T19:59:00Z",
+      "verdict": "qualified",
+      "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
+      "outcome_receipt_sha256": "c5ed2f163f75e592af7d740370c6e0c068925488632026581e336bb268ca8e05",
+      "complete": true,
+      "trial_id": "trial-039-001"
+    },
+    {
+      "fault_ids": [
+        "fault-a"
+      ],
+      "fault_set_sha256": "f0a302cc0d7bd995acbcfbf6274e2f673bffb915f5067a6fb6982114ef2e4757",
+      "scenario_sha256": "d99a938939c8d6adff3c96a1b4ebd05989e231b0c0da24b2c86bda26feb63932",
+      "recovery_boundary_sha256": "ee4df0d1a62b60dd77c38b18a7e59bfb358b2022bb108a9f6c9638f5eb493f34",
+      "code_revision": "0123456789abcdef0123456789abcdef01234567",
+      "observed_at": "2026-11-27T19:59:00Z",
+      "verdict": "qualified",
+      "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
+      "outcome_receipt_sha256": "ad40abd70d3b31638cb8874ef4b096c5270a433a572ab5d927de36aaffc748e5",
+      "complete": true,
+      "trial_id": "trial-039-001"
+    },
+    {
+      "fault_ids": [
+        "fault-b"
+      ],
+      "fault_set_sha256": "aee951e5b43441d09d9f8eb53960666df05abe9dd182e7bdcb6c4169a492b2a2",
+      "scenario_sha256": "d99a938939c8d6adff3c96a1b4ebd05989e231b0c0da24b2c86bda26feb63932",
+      "recovery_boundary_sha256": "ee4df0d1a62b60dd77c38b18a7e59bfb358b2022bb108a9f6c9638f5eb493f34",
+      "code_revision": "0123456789abcdef0123456789abcdef01234567",
+      "observed_at": "2026-11-27T19:59:00Z",
+      "verdict": "qualified",
+      "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
+      "outcome_receipt_sha256": "7134ede8576d9f1847f82b5492f9f8b8f5ea59d40312ee549a2e6134e6b1dc61",
+      "complete": true,
+      "trial_id": "trial-039-001"
+    },
+    {
+      "fault_ids": [
+        "fault-a",
+        "fault-b"
+      ],
+      "fault_set_sha256": "525e8ac0ffad485129dbe3beaad9868f30277a1f9199ecc05cbd61732a96f281",
+      "scenario_sha256": "d99a938939c8d6adff3c96a1b4ebd05989e231b0c0da24b2c86bda26feb63932",
+      "recovery_boundary_sha256": "ee4df0d1a62b60dd77c38b18a7e59bfb358b2022bb108a9f6c9638f5eb493f34",
+      "code_revision": "0123456789abcdef0123456789abcdef01234567",
+      "observed_at": "2026-11-27T19:59:00Z",
+      "verdict": "qualified",
+      "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
+      "outcome_receipt_sha256": "5ad7bbccc941c314f6d9c5a700afd289ea1033f0ac114aa54f226cddde604482",
+      "complete": true,
+      "trial_id": "trial-039-001"
+    },
+    {
+      "fault_ids": [
+        "fault-c"
+      ],
+      "fault_set_sha256": "955f3c3e2fce7c97f0412f8d6f7a7756d586e23e29f5b64addca107338e4326b",
+      "scenario_sha256": "d99a938939c8d6adff3c96a1b4ebd05989e231b0c0da24b2c86bda26feb63932",
+      "recovery_boundary_sha256": "ee4df0d1a62b60dd77c38b18a7e59bfb358b2022bb108a9f6c9638f5eb493f34",
+      "code_revision": "0123456789abcdef0123456789abcdef01234567",
+      "observed_at": "2026-11-27T19:59:00Z",
+      "verdict": "qualified",
+      "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
+      "outcome_receipt_sha256": "1c1a1e1715dffa832ba697ccdcef1e212a2f5cbfbd827fb7a53d6ee13b251ef6",
+      "complete": true,
+      "trial_id": "trial-039-001"
+    },
+    {
+      "fault_ids": [
+        "fault-a",
+        "fault-c"
+      ],
+      "fault_set_sha256": "f5fc0a015d906c648d3e4306703dd343d2aa2bcb255e732ba3ea0bf40659ec11",
+      "scenario_sha256": "d99a938939c8d6adff3c96a1b4ebd05989e231b0c0da24b2c86bda26feb63932",
+      "recovery_boundary_sha256": "ee4df0d1a62b60dd77c38b18a7e59bfb358b2022bb108a9f6c9638f5eb493f34",
+      "code_revision": "0123456789abcdef0123456789abcdef01234567",
+      "observed_at": "2026-11-27T19:59:00Z",
+      "verdict": "blocked",
+      "failure_signature_sha256": "30100eb79964719053a37a1ef7fe2be0e9290f7639284a848565a99dc77ffa5e",
+      "outcome_receipt_sha256": "f25e7cf06622fbb8c6c495a2d3f88a91a2c74895ba5440d781d34b44e250829b",
+      "complete": true,
+      "trial_id": "trial-039-001"
+    },
+    {
+      "fault_ids": [
+        "fault-b",
+        "fault-c"
+      ],
+      "fault_set_sha256": "23a0285a66ccce326b4265bc3a5fc95c05c17a26a6e732f033236969e2ea6372",
+      "scenario_sha256": "d99a938939c8d6adff3c96a1b4ebd05989e231b0c0da24b2c86bda26feb63932",
+      "recovery_boundary_sha256": "ee4df0d1a62b60dd77c38b18a7e59bfb358b2022bb108a9f6c9638f5eb493f34",
+      "code_revision": "0123456789abcdef0123456789abcdef01234567",
+      "observed_at": "2026-11-27T19:59:00Z",
+      "verdict": "qualified",
+      "failure_signature_sha256": "20ac63f9f0852639cd46e81a8afdad72911ab6bb44a5ec2712d0511f1a6d72c6",
+      "outcome_receipt_sha256": "2c1b9490791b07e77258147e92186e7db3e838d136d5acfbbc37b9b63f89edf2",
+      "complete": true,
+      "trial_id": "trial-039-001"
+    },
+    {
+      "fault_ids": [
+        "fault-a",
+        "fault-b",
+        "fault-c"
+      ],
+      "fault_set_sha256": "24cb8d9d938ed7ceee97f850c67d7b0e79e312b4afd260590763548e8accb12a",
+      "scenario_sha256": "d99a938939c8d6adff3c96a1b4ebd05989e231b0c0da24b2c86bda26feb63932",
+      "recovery_boundary_sha256": "ee4df0d1a62b60dd77c38b18a7e59bfb358b2022bb108a9f6c9638f5eb493f34",
+      "code_revision": "0123456789abcdef0123456789abcdef01234567",
+      "observed_at": "2026-11-27T19:59:00Z",
+      "verdict": "blocked",
+      "failure_signature_sha256": "30100eb79964719053a37a1ef7fe2be0e9290f7639284a848565a99dc77ffa5e",
+      "outcome_receipt_sha256": "53b6fe03d1f1c049d60fbd991814980322c6c51ca56aa8b3548d214be12ddc28",
+      "complete": true,
+      "trial_id": "trial-039-001"
+    }
+  ]
+}
