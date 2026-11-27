@@ -87,6 +87,31 @@ pub struct CandidateRunV2 {
     pub cost: CostReceiptV2,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ResourceMeasurementComparisonV2 {
+    Measured,
+    Estimated,
+    Unknown,
+    NotApplicable,
+    Incomparable,
+}
+
+/// Positive delta means the memory arm used more of this resource.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResourceQuantityDeltaV2 {
+    pub memory_minus_no_memory: Option<i128>,
+    pub comparison: ResourceMeasurementComparisonV2,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PairedCostDeltaV2 {
+    pub retained_bytes: ResourceQuantityDeltaV2,
+    pub index_bytes: ResourceQuantityDeltaV2,
+    pub network_bytes: ResourceQuantityDeltaV2,
+    pub measured_cost_microunits: Option<i128>,
+    pub estimated_cost_microunits: Option<i128>,
+}
+
 /// Paired score v2 keeps decision scoring and both arms' cost evidence together.
 /// It does not collapse distinct cost dimensions into a weighted scalar.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -94,6 +119,49 @@ pub struct PairedScoreV2 {
     pub paired: PairedScoreV1,
     pub memory_cost: CostReceiptV2,
     pub no_memory_cost: CostReceiptV2,
+    pub cost_delta: PairedCostDeltaV2,
+}
+
+fn compare_resource_quantity_v2(
+    memory: ResourceQuantityV2,
+    no_memory: ResourceQuantityV2,
+) -> ResourceQuantityDeltaV2 {
+    use ResourceMeasurementComparisonV2 as Comparison;
+    match (memory.status, no_memory.status, memory.value, no_memory.value) {
+        (ResourceMeasurementStatusV2::Measured, ResourceMeasurementStatusV2::Measured, Some(left), Some(right)) => {
+            ResourceQuantityDeltaV2 {
+                memory_minus_no_memory: Some(i128::from(left) - i128::from(right)),
+                comparison: Comparison::Measured,
+            }
+        }
+        (ResourceMeasurementStatusV2::Estimated, ResourceMeasurementStatusV2::Estimated, Some(left), Some(right)) => {
+            ResourceQuantityDeltaV2 {
+                memory_minus_no_memory: Some(i128::from(left) - i128::from(right)),
+                comparison: Comparison::Estimated,
+            }
+        }
+        (ResourceMeasurementStatusV2::Unknown, ResourceMeasurementStatusV2::Unknown, None, None) => {
+            ResourceQuantityDeltaV2 { memory_minus_no_memory: None, comparison: Comparison::Unknown }
+        }
+        (ResourceMeasurementStatusV2::NotApplicable, ResourceMeasurementStatusV2::NotApplicable, None, None) => {
+            ResourceQuantityDeltaV2 { memory_minus_no_memory: None, comparison: Comparison::NotApplicable }
+        }
+        _ => ResourceQuantityDeltaV2 { memory_minus_no_memory: None, comparison: Comparison::Incomparable },
+    }
+}
+
+fn paired_cost_delta_v2(memory: CostReceiptV2, no_memory: CostReceiptV2) -> PairedCostDeltaV2 {
+    PairedCostDeltaV2 {
+        retained_bytes: compare_resource_quantity_v2(memory.retained_bytes, no_memory.retained_bytes),
+        index_bytes: compare_resource_quantity_v2(memory.index_bytes, no_memory.index_bytes),
+        network_bytes: compare_resource_quantity_v2(memory.network_bytes, no_memory.network_bytes),
+        measured_cost_microunits: memory.measured_cost_microunits
+            .zip(no_memory.measured_cost_microunits)
+            .map(|(left, right)| i128::from(left) - i128::from(right)),
+        estimated_cost_microunits: memory.estimated_cost_microunits
+            .zip(no_memory.estimated_cost_microunits)
+            .map(|(left, right)| i128::from(left) - i128::from(right)),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -111,10 +179,12 @@ pub fn score_paired_v2(
     no_memory.cost.validate().map_err(PairedEvaluationErrorV2::Cost)?;
     let paired = score_paired(case, &memory.run, &no_memory.run)
         .map_err(PairedEvaluationErrorV2::Decision)?;
+    let cost_delta = paired_cost_delta_v2(memory.cost, no_memory.cost);
     Ok(PairedScoreV2 {
         paired,
         memory_cost: memory.cost,
         no_memory_cost: no_memory.cost,
+        cost_delta,
     })
 }
 
@@ -1820,6 +1890,38 @@ mod tests {
         assert_eq!(result.memory_cost.retained_bytes, measured_bytes(128));
         assert_eq!(result.no_memory_cost.retained_bytes, measured_bytes(0));
         assert_eq!(result.memory_cost.network_bytes, unknown_bytes());
+    }
+
+    #[test]
+    fn paired_v2_reports_only_comparable_resource_deltas() {
+        let memory = CandidateRunV2 {
+            run: run("mace", "hold", &["signed-current"]),
+            cost: CostReceiptV2 {
+                measured_cost_microunits: Some(10),
+                estimated_cost_microunits: Some(20),
+                ..cost_v2(measured_bytes(128), measured_bytes(64), unknown_bytes())
+            },
+        };
+        let no_memory = CandidateRunV2 {
+            run: run("no-memory", "abstain", &[]),
+            cost: CostReceiptV2 {
+                measured_cost_microunits: Some(4),
+                estimated_cost_microunits: Some(8),
+                ..cost_v2(measured_bytes(0), ResourceQuantityV2 {
+                    value: Some(32),
+                    status: ResourceMeasurementStatusV2::Estimated,
+                }, unknown_bytes())
+            },
+        };
+        let result = score_paired_v2(&case(), &memory, &no_memory).expect("valid receipts");
+        assert_eq!(result.cost_delta.retained_bytes.memory_minus_no_memory, Some(128));
+        assert_eq!(result.cost_delta.retained_bytes.comparison, ResourceMeasurementComparisonV2::Measured);
+        assert_eq!(result.cost_delta.index_bytes.memory_minus_no_memory, None);
+        assert_eq!(result.cost_delta.index_bytes.comparison, ResourceMeasurementComparisonV2::Incomparable);
+        assert_eq!(result.cost_delta.network_bytes.memory_minus_no_memory, None);
+        assert_eq!(result.cost_delta.network_bytes.comparison, ResourceMeasurementComparisonV2::Unknown);
+        assert_eq!(result.cost_delta.measured_cost_microunits, Some(6));
+        assert_eq!(result.cost_delta.estimated_cost_microunits, Some(12));
     }
 
     #[test]
