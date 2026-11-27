@@ -275,8 +275,8 @@ impl RankSpectrumMonitor {
             .checked_add(1)
             .ok_or(SpectrumError::CounterOverflow)?;
 
-        // One prefix scan per observation makes evaluation O(m log m) rather
-        // than rescanning all m buckets for each of O(m) Haar contrasts.
+        // One prefix scan per observation makes evaluation O(m) rather than
+        // rescanning all m buckets for each of O(m) Haar contrasts.
         let mut weighted_prefix = Vec::with_capacity(self.rank_counts.len() + 1);
         weighted_prefix.push(0i128);
         for count in &self.rank_counts {
@@ -358,6 +358,7 @@ impl RankSpectrumMonitor {
         }
     }
 
+    #[cfg(test)]
     fn centered_payoff(
         &self,
         contrast: &HaarContrast,
