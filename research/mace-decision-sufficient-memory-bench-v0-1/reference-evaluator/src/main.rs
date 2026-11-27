@@ -565,6 +565,8 @@ mod tests {
         let p=PrivateRow{schema_version:PRIVATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.candidate).unwrap(),evaluator_private:e.evaluator_private.clone()};
         let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"bad-memory".into(),candidate_sha256:c.candidate_sha256.clone(),action:"use_old_account".into(),selected_evidence_ids:vec!["event-000000-old".into()],observation_requests:0,cost:Cost{ingest_operations:1,query_operations:1,maintenance_operations:0,retained_bytes:10,returned_bytes:10,latency_us:None}};
         let s=score_one(&c,&p,&r).unwrap();
+        let mut mismatched = r.clone(); mismatched.candidate_sha256 = "0".repeat(64);
+        assert!(score_one(&c,&p,&mismatched).is_err());
         assert_eq!(s.regret,12.0);assert!(s.memory_induced_harm);assert_eq!(s.memory_gain_vs_no_memory,-10.0);assert_eq!(s.stale_or_superseded_evidence_count,1);
     }
 }
