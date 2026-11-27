@@ -185,10 +185,7 @@ impl ArmAccumulator {
         Ok(())
     }
 
-    fn finish(
-        self,
-        block_count: usize,
-    ) -> Result<ArmMetrics, BenchmarkError> {
+    fn finish(self, block_count: usize) -> Result<ArmMetrics, BenchmarkError> {
         let safe_exposure_us = union_exposure_us(self.safe_exposure)?;
         let block_denominator =
             u128::try_from(block_count).map_err(|_| BenchmarkError::ArithmeticOverflow)?;
@@ -293,9 +290,8 @@ pub fn evaluate_paired(
         deltas.push(
             i64::try_from(candidate_delay)
                 .and_then(|candidate_value| {
-                    i64::try_from(baseline_delay).map(|baseline_value| {
-                        candidate_value - baseline_value
-                    })
+                    i64::try_from(baseline_delay)
+                        .map(|baseline_value| candidate_value - baseline_value)
                 })
                 .map_err(|_| BenchmarkError::ArithmeticOverflow)?,
         );
@@ -322,9 +318,8 @@ pub fn evaluate_paired(
             family_deltas.push(
                 i64::try_from(candidate_delay)
                     .and_then(|candidate_value| {
-                        i64::try_from(baseline_delay).map(|baseline_value| {
-                            candidate_value - baseline_value
-                        })
+                        i64::try_from(baseline_delay)
+                            .map(|baseline_value| candidate_value - baseline_value)
                     })
                     .map_err(|_| BenchmarkError::ArithmeticOverflow)?,
             );
@@ -355,10 +350,7 @@ pub fn evaluate_paired(
     })
 }
 
-fn validate_block(
-    block: &PairedBlockOutcome,
-    horizon_us: u64,
-) -> Result<(), BenchmarkError> {
+fn validate_block(block: &PairedBlockOutcome, horizon_us: u64) -> Result<(), BenchmarkError> {
     if block.effective_block_id.trim().is_empty() {
         return Err(BenchmarkError::EmptyBlockId);
     }
@@ -367,10 +359,7 @@ fn validate_block(
     }
     for (digest, label) in [
         (&block.source_pair_sha256, "source_pair_sha256"),
-        (
-            &block.scenario_manifest_sha256,
-            "scenario_manifest_sha256",
-        ),
+        (&block.scenario_manifest_sha256, "scenario_manifest_sha256"),
         (
             &block.ground_truth_receipt_sha256,
             "ground_truth_receipt_sha256",
