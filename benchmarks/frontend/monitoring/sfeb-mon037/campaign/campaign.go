@@ -175,11 +175,13 @@ func sourceEventsDigest(events []Event) string {
  copyEvents:=append([]Event(nil),events...)
  sort.Slice(copyEvents,func(i,j int)bool{
   a,b:=copyEvents[i],copyEvents[j]
-  if a.EventID!=b.EventID{return a.EventID<b.EventID}
-  if a.TransactionID!=b.TransactionID{return a.TransactionID<b.TransactionID}
-  if a.Topic!=b.Topic{return a.Topic<b.Topic}
+  ka:=[]string{a.EventID,a.TransactionID,a.Topic,a.DataCollection,a.Operation,a.PayloadSHA256}
+  kb:=[]string{b.EventID,b.TransactionID,b.Topic,b.DataCollection,b.Operation,b.PayloadSHA256}
+  for n:=range ka{if ka[n]!=kb[n]{return ka[n]<kb[n]}}
   if a.TotalOrder!=b.TotalOrder{return a.TotalOrder<b.TotalOrder}
-  return a.PayloadSHA256<b.PayloadSHA256
+  if a.CollectionOrder!=b.CollectionOrder{return a.CollectionOrder<b.CollectionOrder}
+  if a.Partition!=b.Partition{return a.Partition<b.Partition}
+  return a.Offset<b.Offset
  })
  return canonicalDigest(copyEvents)
 }
@@ -187,16 +189,19 @@ func observedEventsDigest(events []Event) string {
  copyEvents:=append([]Event(nil),events...)
  sort.Slice(copyEvents,func(i,j int)bool{
   a,b:=copyEvents[i],copyEvents[j]
-  if a.Topic!=b.Topic{return a.Topic<b.Topic}
+  ka:=[]string{a.Topic,a.EventID,a.TransactionID,a.DataCollection,a.Operation,a.PayloadSHA256}
+  kb:=[]string{b.Topic,b.EventID,b.TransactionID,b.DataCollection,b.Operation,b.PayloadSHA256}
   if a.Partition!=b.Partition{return a.Partition<b.Partition}
   if a.Offset!=b.Offset{return a.Offset<b.Offset}
-  return a.EventID<b.EventID
+  for n:=range ka{if ka[n]!=kb[n]{return ka[n]<kb[n]}}
+  if a.TotalOrder!=b.TotalOrder{return a.TotalOrder<b.TotalOrder}
+  return a.CollectionOrder<b.CollectionOrder
  })
  return canonicalDigest(copyEvents)
 }
 func transactionProofsDigest(proofs []TransactionProof) string {
  copyProofs:=append([]TransactionProof(nil),proofs...)
- sort.Slice(copyProofs,func(i,j int)bool{return copyProofs[i].TransactionID<copyProofs[j].TransactionID})
+ sort.Slice(copyProofs,func(i,j int)bool{if copyProofs[i].TransactionID!=copyProofs[j].TransactionID{return copyProofs[i].TransactionID<copyProofs[j].TransactionID};return canonicalDigest(copyProofs[i])<canonicalDigest(copyProofs[j])})
  return canonicalDigest(copyProofs)
 }
 func surfaceIDsDigest(ids []string) string {
@@ -206,12 +211,12 @@ func surfaceIDsDigest(ids []string) string {
 }
 func topicPartitionsDigest(values []TopicPartition) string {
  copyValues:=append([]TopicPartition(nil),values...)
- sort.Slice(copyValues,func(i,j int)bool{return copyValues[i].Topic<copyValues[j].Topic})
+ sort.Slice(copyValues,func(i,j int)bool{if copyValues[i].Topic!=copyValues[j].Topic{return copyValues[i].Topic<copyValues[j].Topic};return copyValues[i].PartitionCount<copyValues[j].PartitionCount})
  return canonicalDigest(copyValues)
 }
 func surfaceAssertionsDigest(values []Surface) string {
  copyValues:=append([]Surface(nil),values...)
- sort.Slice(copyValues,func(i,j int)bool{return copyValues[i].ID<copyValues[j].ID})
+ sort.Slice(copyValues,func(i,j int)bool{if copyValues[i].ID!=copyValues[j].ID{return copyValues[i].ID<copyValues[j].ID};if copyValues[i].Disposition!=copyValues[j].Disposition{return copyValues[i].Disposition<copyValues[j].Disposition};if copyValues[i].SourceSHA256!=copyValues[j].SourceSHA256{return copyValues[i].SourceSHA256<copyValues[j].SourceSHA256};if copyValues[i].RestoredSHA256!=copyValues[j].RestoredSHA256{return copyValues[i].RestoredSHA256<copyValues[j].RestoredSHA256};return copyValues[i].JustificationSHA256<copyValues[j].JustificationSHA256})
  return canonicalDigest(copyValues)
 }
 // DeriveFixtureRecordSetDigests is an authoring helper for public offline fixtures only.
