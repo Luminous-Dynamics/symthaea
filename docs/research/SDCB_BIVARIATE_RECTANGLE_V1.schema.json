@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/SDCB_BIVARIATE_RECTANGLE_V1.schema.json",
+  "title": "SDCB bivariate Gaussian rectangle fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "mean",
+    "covariance",
+    "lower",
+    "upper",
+    "expected_probability"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sdcb_bivariate_rectangle.v1"
+    },
+    "mean": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number"
+      }
+    },
+    "covariance": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "number"
+        }
+      }
+    },
+    "lower": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": [
+          "number",
+          "string"
+        ]
+      }
+    },
+    "upper": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": [
+          "number",
+          "string"
+        ]
+      }
+    },
+    "expected_probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "joint_bins": {
+      "type": "object"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rank_deficient_case": {
+      "type": "object",
+      "required": [
+        "id",
+        "mean",
+        "covariance",
+        "lower",
+        "upper",
+        "expected_probability",
+        "expected_covariance_rank"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "mean": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "covariance": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "lower": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "upper": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "expected_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "expected_covariance_rank": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "conditional_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_id",
+        "prediction_id",
+        "prediction_version",
+        "covariance_model_id",
+        "covariance_model_version",
+        "conditioning_state_id",
+        "conditioning_state_version",
+        "common_cause_id",
+        "reference_chain_id",
+        "reference_chain_evidence_version",
+        "common_cause_evidence_version",
+        "channels",
+        "measurement_action_id",
+        "trust_boundary"
+      ],
+      "properties": {
+        "episode_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prediction_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prediction_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "covariance_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "covariance_model_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "conditioning_state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditioning_state_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "common_cause_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "common_cause_evidence_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "channel_id",
+              "device_id",
+              "device_evidence_version",
+              "observation_window_id",
+              "capture_start_ms",
+              "capture_end_ms",
+              "calibration_context_id",
+              "calibration_epoch"
+            ],
+            "properties": {
+              "channel_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "device_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "device_evidence_version": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "observation_window_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "capture_start_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "capture_end_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "calibration_context_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "calibration_epoch": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "measurement_action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_boundary": {
+          "type": "string"
+        },
+        "reference_chain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_chain_evidence_version": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "numerical_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "inner_gauss_legendre_order",
+        "cutoff_sigma",
+        "outer_relative_tolerance",
+        "outer_absolute_tolerance",
+        "max_outer_integrand_evaluations",
+        "error_status"
+      ],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "inner_gauss_legendre_order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cutoff_sigma": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "outer_relative_tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "outer_absolute_tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_outer_integrand_evaluations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "error_status": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

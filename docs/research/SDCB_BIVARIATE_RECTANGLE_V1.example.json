@@ -1,0 +1,127 @@
+{
+  "schema_version": "sdcb_bivariate_rectangle.v1",
+  "mean": [
+    0,
+    0
+  ],
+  "covariance": [
+    [
+      1,
+      0.6
+    ],
+    [
+      0.6,
+      1
+    ]
+  ],
+  "lower": [
+    0,
+    0
+  ],
+  "upper": [
+    "Infinity",
+    "Infinity"
+  ],
+  "expected_probability": 0.35241638234956674,
+  "joint_bins": {
+    "thresholds_first": [
+      0
+    ],
+    "thresholds_second": [
+      0
+    ],
+    "probabilities": [
+      [
+        0.35241638234956674,
+        0.14758361765043326
+      ],
+      [
+        0.14758361765043326,
+        0.35241638234956674
+      ]
+    ],
+    "probability_sum": 1
+  },
+  "notes": [
+    "Synthetic standard-normal positive-orthant and two-bin fixture.",
+    "Orthant value is checked against 1/4 + asin(rho)/(2*pi).",
+    "Scalar marginal likelihoods use the #13944 reference."
+  ],
+  "rank_deficient_case": {
+    "id": "duplicate-two-channel-measurement",
+    "mean": [
+      0,
+      0
+    ],
+    "covariance": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    "lower": [
+      0,
+      0
+    ],
+    "upper": [
+      1,
+      1
+    ],
+    "expected_probability": 0.3413447460685429,
+    "expected_covariance_rank": 1,
+    "notes": [
+      "Both channels are exact duplicates: the joint event is one scalar event, not the product of two marginal probabilities.",
+      "The rank-one support evaluator integrates on the one-dimensional support; no jitter is applied."
+    ]
+  },
+  "conditional_context": {
+    "episode_id": "episode-17",
+    "prediction_id": "prediction-42",
+    "prediction_version": 3,
+    "covariance_model_id": "ou-coupled-v2",
+    "covariance_model_version": 2,
+    "conditioning_state_id": "h1-g0-deviceA0-deviceB1",
+    "conditioning_state_version": 8,
+    "common_cause_id": "shared-reference-bias-9",
+    "common_cause_evidence_version": 5,
+    "channels": [
+      {
+        "channel_id": "mobile-channel",
+        "device_id": "mobile-1",
+        "device_evidence_version": 4,
+        "observation_window_id": "mobile-window-1",
+        "capture_start_ms": 1000,
+        "capture_end_ms": 2000,
+        "calibration_context_id": "mobile-calibration-epoch-12",
+        "calibration_epoch": 12
+      },
+      {
+        "channel_id": "reference-channel",
+        "device_id": "reference-1",
+        "device_evidence_version": 7,
+        "observation_window_id": "reference-window-4",
+        "capture_start_ms": 1500,
+        "capture_end_ms": 4000,
+        "calibration_context_id": "reference-calibration-epoch-9",
+        "calibration_epoch": 9
+      }
+    ],
+    "measurement_action_id": "collocation-run-5",
+    "trust_boundary": "Caller-supplied identity propagation only; not authentication, digest verification, or evidence receipt.",
+    "reference_chain_id": "reference-ancestry-44",
+    "reference_chain_evidence_version": 3
+  },
+  "numerical_metadata": {
+    "method": "conditional-bivariate-adaptive-simpson-v1",
+    "inner_gauss_legendre_order": 64,
+    "cutoff_sigma": 12,
+    "outer_relative_tolerance": 2e-10,
+    "outer_absolute_tolerance": 1e-32,
+    "max_outer_integrand_evaluations": 1000000,
+    "error_status": "Outer refinement difference is an error indicator, not a certified total bound."
+  }
+}

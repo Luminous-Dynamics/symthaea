@@ -263,3 +263,50 @@ The fixed-threshold adequacy diagnostic now has an exact finite-rank calibration
 ## Gaussian-to-categorical likelihood adapter follow-on — 27 November 2026
 
 The next integration primitive is `scripts/research/sdcb_gaussian_bin_likelihoods.rs`. It converts a scalar Gaussian predictive observation (mean/variance) into a declared finite categorical outcome likelihood row using ordered instrument thresholds. It uses direct 64-point Gauss–Legendre integration of normal tail intervals to avoid cancellation of extreme probabilities. This is the adapter boundary to existing instrument-aware/common-cause finite selectors (#13762/#13793/#13804); it is not another policy planner. Thresholds must be actual instrument quantization or a preregistered benchmark partition. The current implementation does not support multivariate rectangle probabilities or full continuous posterior updates after binning. Eight Rust tests are authored but not compiled/executed here.
+
+
+## Bivariate correlated Gaussian rectangle follow-on — 27 November 2026
+
+The first M0 implementation for issue #13945 adds scripts/research/sdcb_bivariate_rectangle.rs. It evaluates a two-channel Gaussian rectangle by conditioning one variable and adaptively integrating the one-dimensional conditional interval probability. The inner normal interval masses reuse the scalar #13944 adapter. It also emits a complete two-channel joint-bin table and checks normalization plus recovery of both scalar marginals.
+
+The reference explicitly rejects singular PSD covariance, condition estimates above 1e8, and probabilities unresolved by its +/-12 sigma truncation budget. It applies no diagonal jitter. Its outer adaptive refinement difference is a diagnostic error indicator, not a certified total error bound. Eleven Rust tests are authored but not compiled/executed here. Frozen orthant fixtures use the analytic arcsine identity; other fixtures are independently cross-checked with a separate conditional integration implementation. This does not implement trivariate/Genz-QMC integration, demonstrate numerical SOTA, or validate physical sensor measurements.
+
+
+## Rank-aware bivariate Gaussian rectangle follow-on — 27 November 2026
+
+The bivariate rectangle oracle now evaluates rank-deficient positive-semidefinite 2x2 covariance directly on its support. Rank-one inputs (exact duplicate channels, perfect positive/negative correlation, and one deterministic coordinate) reduce to an intersection of scalar constraints on one standard-normal latent variable; rank-zero covariance is a deterministic rectangle-membership test. This prevents duplicate channels from being multiplied into fictitious independent evidence. Covariance symmetry is now exact, negative variances and non-PSD cross-covariances reject, and no jitter / eigenvalue flooring / near-symmetric averaging is applied.
+
+The implementation is a bounded bivariate rank-aware method. Seventeen Rust tests are authored but not compiled/executed. The independent Python transcription of the committed 64-point scalar tail quadrature plus adaptive Simpson method matches the five frozen SPD fixtures within the declared tolerances; rank-one/zero fixture values match their one-dimensional analytic Gaussian probabilities. These authoring-runtime checks are not Rust test execution or CI qualification. The outer Simpson refinement difference remains an error indicator, not a certified total error bound. General n-variate singular support integration, Genz/QMC, and matched package benchmarking remain future work.
+
+
+## SDCB tournament preregistration — 27 November 2026
+
+A new cross-track protocol is now documented in docs/research/SDCB_NUMERICAL_AND_DECISION_TOURNAMENT_V1.md. It separates low-dimensional numerical truth, matched published Genz workloads, singular-PSD/dependence integrity, temporal metrology/calibration, adaptive scientific decision value, and end-to-end scientific-agent evaluation. It records exact comparator assumptions and QMC-budget normalization requirements, defines per-track baselines and reporting, and keeps all superiority thresholds as targets until independently run. It composes #13567, #13739, #13691, #13805, #13280 and #13924 rather than creating parallel planners, ledgers or online calibration engines.
+
+
+## Bivariate oracle evaluation-budget correction — 27 November 2026
+
+The bivariate reference now checks a hard one-million-call budget before every initial three-call batch and every recursive two-call batch, preventing batch overrun. The reported counter is explicitly named outer-integrand evaluations; it does not count the fixed 64-point scalar inner quadrature nodes and must not be described as total floating-point operations. Eighteen Rust tests are authored but remain uncompiled/unexecuted.
+
+
+## State-bound joint likelihood adapter — 27 November 2026
+
+The bivariate likelihood reference now exposes a bound-result entry point. It preserves the exact caller-supplied prediction/model/conditioning-state IDs and versions, common-cause evidence version, both channel and device IDs/evidence versions, separate reference-chain ancestry ID/version, separate acquisition-window IDs/start/end timestamps and per-channel calibration contexts/epochs, plus measurement-action identity. The returned object also includes the conditional mean/covariance, per-channel threshold arrays and numerical method settings.
+
+The bound wrapper validates nonempty identities, distinct channel IDs, nonempty capture windows and consistent device evidence versions when both channels belong to the same device. It is an identity propagation envelope only: caller-supplied identifiers are not cryptographically authenticated and no source custody or receipt validity is proved. The adapter does not mutate #13805, authorize an experiment, or choose a policy. Call it separately for each explicit model/common/device conditioning assignment; state-marginalization belongs to the defined Bayesian/robust estimand downstream.
+
+The scalar Gaussian interval routine now caches the 64-point Gauss–Legendre rule with thread-safe OnceLock; the bivariate inner loop reuses it. The branch now has 25 authored bivariate tests and 9 scalar-adapter tests, all uncompiled/unexecuted. Two new negative controls require exact duplicate-channel bins to occupy only diagonal cells and perfect anti-correlation bins only off-diagonal cells.
+
+
+## Public QUANT air-quality real-data tournament — 27 November 2026
+
+A separate preregistration is now available in docs/research/SDCB_QUANT_REAL_DATA_TOURNAMENT_V1.md. It specifies the 52-device/three-site/2019–2022 CEDA QUANT data cohort, OGL v3 attribution, provider QC custody, device/site/time splits, matched OLS/GDR/C-GDR and temporal-state-space baselines, calibration coverage and decision-value metrics. It explicitly distinguishes the public CEDA low-cost sensor archive from the paper-specific one-minute reference series used by Kok and Tabandeh (2026), whose article says supporting data are available from the corresponding author on reasonable request.
+
+The CEDA catalogue and MAQS listing have been inspected, but the attempt to retrieve a small instrument CSV failed at the archive/file-download endpoint. No QUANT bytes were downloaded, no file checksum was generated and no raw data were parsed. This is a benchmark preregistration and data-access blocker, not a model result. The paper's published six-case numerical tables have been pinned as replication targets; SDCB must first reproduce OLS/GDR-family/C-GDR by their stated uncertainty regimes before claiming gains.
+
+
+## Per-cell joint-likelihood diagnostics and QUANT tracking — 27 November 2026
+
+The bivariate joint-bin adapter now preserves a per-outcome-cell diagnostics matrix aligned with the probabilities: covariance support rank, correlation and condition estimate where defined, truncation allowance, outer refinement indicator and outer-integrand evaluation count. The indicator is not a certified total error bound; the matrix supports audit but does not yet implement decision-margin-driven numerical refinement.
+
+The QUANT real-data protocol is tracked separately in #13974 and documented in docs/research/SDCB_QUANT_REAL_DATA_TOURNAMENT_V1.md. It requires data custody and instrument/QC metadata, leave-one-device/family/site and chronological splits, and exact reproduction of Kok–Tabandeh's OLS/GDR/C-GDR and short-window process-covariance results before SDCB superiority claims. The CEDA files have not been successfully acquired or parsed in this execution.

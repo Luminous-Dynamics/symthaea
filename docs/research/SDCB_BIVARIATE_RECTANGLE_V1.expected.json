@@ -1,0 +1,140 @@
+{
+  "schema_version": "sdcb_bivariate_rectangle.expected.v1",
+  "fixtures": [
+    {
+      "id": "independent-finite",
+      "probability": 0.32742270205361657,
+      "method": "independent adaptive conditional-normal quadrature"
+    },
+    {
+      "id": "positive-orthant-rho-0.6",
+      "probability": 0.35241638234956674,
+      "method": "analytic arcsine identity"
+    },
+    {
+      "id": "negative-orthant-rho-minus-0.75",
+      "probability": 0.11502672808130796,
+      "method": "analytic arcsine identity"
+    },
+    {
+      "id": "asymmetric-finite",
+      "probability": 0.35895496926483,
+      "method": "independent adaptive conditional-normal quadrature"
+    },
+    {
+      "id": "correlated-tail-8-to-9-rho-0.5",
+      "probability": 1.7805614713759896e-21,
+      "method": "independent adaptive conditional-normal quadrature"
+    }
+  ],
+  "tolerances": {
+    "analytic_orthant_absolute": 2e-10,
+    "independent_and_asymmetric_absolute": 5e-10,
+    "rare_tail_absolute": 2e-28,
+    "grid_normalization_absolute": 1e-9,
+    "scalar_marginalization_absolute": 1e-9
+  },
+  "claim_boundary": "Synthetic numerical reference only; not physical measurement, hosted CI, or SOTA evidence.",
+  "rank_deficient_cases": [
+    {
+      "id": "duplicate-channels-rank-one",
+      "covariance": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "lower": [
+        0,
+        0
+      ],
+      "upper": [
+        1,
+        1
+      ],
+      "probability": 0.3413447460685429,
+      "support_rank": 1
+    },
+    {
+      "id": "perfect-anticorrelation-rank-one",
+      "covariance": [
+        [
+          1,
+          -1
+        ],
+        [
+          -1,
+          1
+        ]
+      ],
+      "lower": [
+        0,
+        -1
+      ],
+      "upper": [
+        1,
+        0
+      ],
+      "probability": 0.3413447460685429,
+      "support_rank": 1
+    },
+    {
+      "id": "one-deterministic-channel",
+      "covariance": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "mean": [
+        2,
+        0
+      ],
+      "lower": [
+        1,
+        -0.5
+      ],
+      "upper": [
+        2,
+        0.5
+      ],
+      "probability": 0.3829249225480262,
+      "support_rank": 1
+    },
+    {
+      "id": "rank-zero-point-inside",
+      "covariance": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "mean": [
+        0,
+        2
+      ],
+      "lower": [
+        -1,
+        1
+      ],
+      "upper": [
+        0,
+        3
+      ],
+      "probability": 1,
+      "support_rank": 0
+    }
+  ]
+}

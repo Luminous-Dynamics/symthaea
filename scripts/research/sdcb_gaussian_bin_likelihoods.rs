@@ -3,7 +3,9 @@
 //! actual instrument quantization or a frozen benchmark outcome partition.
 //! Standard-normal tails use direct 64-point Gauss-Legendre integration.
 
-const N: usize = 64;
+use std::sync::OnceLock;
+
+pub const GAUSS_LEGENDRE_ORDER: usize = 64;
 const CUTOFF: f64 = 12.0;
 const SUM_TOL: f64 = 1.0e-11;
 const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
@@ -64,6 +66,29 @@ fn legendre_rule(n: usize) -> Result<Vec<(f64, f64)>, Error> {
     rule.sort_by(|a, b| a.0.total_cmp(&b.0));
     if rule.len() != n { return Err(Error::NumericFailure); }
     Ok(rule)
+}
+
+fn cached_legendre_rule() -> Result<&'static [(f64, f64)], Error> {
+    static RULE: OnceLock<Result<Vec<(f64, f64)>, Error>> = OnceLock::new();
+    match RULE.get_or_init(|| legendre_rule(GAUSS_LEGENDRE_ORDER)) {
+        Ok(rule) => Ok(rule.as_slice()),
+        Err(error) => Err(error.clone()),
+    }
+}
+
+/// Standard-normal probability for the half-open interval (lower, upper].
+/// The 64-point Gauss–Legendre rule is initialized once and reused across calls.
+pub fn standard_normal_interval_probability(
+    lower: f64,
+    upper: f64,
+) -> Result<f64, Error> {
+    if lower.is_nan() || upper.is_nan() || upper < lower {
+        return Err(Error::NumericFailure);
+    }
+    if lower == upper {
+        return Ok(0.0);
+    }
+    phi_interval(lower, upper, cached_legendre_rule()?)
 }
 
 fn integrate_phi(a: f64, b: f64, rule: &[(f64, f64)]) -> Result<f64, Error> {
@@ -129,14 +154,14 @@ pub fn gaussian_bin_likelihoods(
     } else {
         let sd = variance.sqrt();
         if !sd.is_finite() || sd <= 0.0 { return Err(Error::NumericFailure); }
-        let rule = legendre_rule(N)?;
+        let rule = cached_legendre_rule()?;
         let mut lower = f64::NEG_INFINITY;
         for (i, edge) in thresholds.iter().enumerate() {
             let upper = (*edge - mean) / sd;
-            probabilities[i] = phi_interval(lower, upper, &rule)?;
+            probabilities[i] = phi_interval(lower, upper, rule)?;
             lower = upper;
         }
-        probabilities[thresholds.len()] = phi_interval(lower, f64::INFINITY, &rule)?;
+        probabilities[thresholds.len()] = phi_interval(lower, f64::INFINITY, rule)?;
     }
     let sum: f64 = probabilities.iter().sum();
     if !sum.is_finite()
@@ -155,6 +180,20 @@ mod tests {
     use super::*;
     fn close(a:f64,b:f64,t:f64) {
         assert!((a-b).abs()<=t,"actual={a:.17}, expected={b:.17}, tolerance={t:e}");
+    }
+
+    #[test]
+    fn cached_interval_kernel_matches_direct_tail_known_answers() {
+        close(
+            standard_normal_interval_probability(8.0, 9.0).unwrap(),
+            6.21983198586573e-16,
+            1.0e-17,
+        );
+        close(
+            standard_normal_interval_probability(f64::NEG_INFINITY, f64::INFINITY).unwrap(),
+            1.0,
+            1.0e-15,
+        );
     }
 
     #[test]
