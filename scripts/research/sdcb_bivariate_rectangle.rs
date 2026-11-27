@@ -82,6 +82,10 @@ pub struct ConditionalLikelihoodContext {
     pub conditioning_state_version: u64,
     pub common_cause_id: String,
     pub common_cause_evidence_version: u64,
+    /// Calibration/reference-standard ancestry is distinct from a shared
+    /// physical or measurement-system common-cause state.
+    pub reference_chain_id: String,
+    pub reference_chain_evidence_version: u64,
     pub channels: [ChannelEvidenceBinding; 2],
     pub measurement_action_id: String,
 }
@@ -94,6 +98,7 @@ impl ConditionalLikelihoodContext {
             self.covariance_model_id.as_str(),
             self.conditioning_state_id.as_str(),
             self.common_cause_id.as_str(),
+            self.reference_chain_id.as_str(),
             self.measurement_action_id.as_str(),
             self.channels[0].channel_id.as_str(),
             self.channels[0].device_id.as_str(),
@@ -747,8 +752,10 @@ mod tests {
             covariance_model_version: 2,
             conditioning_state_id: "h1-g0-deviceA0-deviceB1".to_string(),
             conditioning_state_version: 8,
-            common_cause_id: "reference-chain-9".to_string(),
+            common_cause_id: "shared-reference-bias-9".to_string(),
             common_cause_evidence_version: 5,
+            reference_chain_id: "reference-ancestry-44".to_string(),
+            reference_chain_evidence_version: 3,
             channels: [
                 ChannelEvidenceBinding {
                     channel_id: "mobile-channel".to_string(),
@@ -783,6 +790,8 @@ mod tests {
         ).unwrap();
         assert_eq!(result.context, context);
         assert_eq!(result.context.common_cause_evidence_version, 5);
+        assert_eq!(result.context.reference_chain_id, "reference-ancestry-44");
+        assert_eq!(result.context.reference_chain_evidence_version, 3);
         assert_eq!(result.context.channels[0].device_evidence_version, 4);
         assert_eq!(result.context.channels[1].device_evidence_version, 7);
         assert_eq!(result.context.conditioning_state_version, 8);
