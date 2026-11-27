@@ -128,6 +128,15 @@ The runner must fail closed when:
 
 The competitive objective remains matched Pareto improvement in interaction quality, timing, visual grounding, semantic invariance, accessibility, privacy, and output assurance. Rights compliance is a hard gate, never a score that a strong model result can offset.
 
-## 7. Qualification status
+## 7. Machine-readable manifest and fixtures (2026-11-27)
+
+Two artifacts now define the provenance-gate record:
+
+- `SYMTHAEA_BENCHMARK_LICENSE_MANIFEST_SCHEMA_V1_2026-11-27.json`: Draft 2020-12 schema for dataset identity/version/digest, source, rights holder, license/version, access state, approved intended uses, permitted operations, commercial/training/derivative/publication scopes, model terms, retention/deletion policies, and the hard rule that raw media is not stored in public Git.
+- `SYMTHAEA_BENCHMARK_LICENSE_MANIFEST_FIXTURES_V1_2026-11-27.json`: one explicitly fictional test-only commercial-use grant plus six negative fixtures for commercial use of non-commercial data, training on evaluation-only data, unauthorized counterfactual derivatives, expired grants, raw media in Git, and intended use outside approved scope.
+
+All grant references and rights holders in these fixtures are fictional and do not constitute actual approval. The runtime gate must check both schema validity and the policy relation between `intended_use`, `approved_intended_uses`, `permitted_operations`, access state, and expiration. An accepted JSON shape is not a legal authorization.
+
+## 8. Qualification status
 
 This document records a conservative interpretation of the public benchmark terms as displayed on 2026-11-27. It is not legal advice and does not replace reviewing the full license/contract with qualified counsel. No dataset access has been requested or granted by this implementation. No licensed benchmark media has been downloaded, modified, or run through Symthaea as part of this work.
