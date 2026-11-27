@@ -295,6 +295,9 @@
     },
     "surface_assertions_sha256": {
       "$ref": "#/$defs/digest"
+    },
+    "deduplication_coverage_sha256": {
+      "$ref": "#/$defs/digest"
     }
   },
   "allOf": [
@@ -311,10 +314,14 @@
       },
       "then": {
         "required": [
-          "deduplication_proof_sha256"
+          "deduplication_proof_sha256",
+          "deduplication_coverage_sha256"
         ],
         "properties": {
           "deduplication_proof_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "deduplication_coverage_sha256": {
             "$ref": "#/$defs/digest"
           }
         }
