@@ -34,7 +34,7 @@
     {
       "cohort_id": "vpd-training-a",
       "kind": "two_stream_relaxation",
-      "end_time": 4,
+      "end_time": 8,
       "collision_frequency": 0.3,
       "initial_condition_parameters": {
         "density_perturbation_amplitude": 0.15,
@@ -48,9 +48,9 @@
       "external_drive_schedule": [
         {
           "start_time": 0,
-          "end_time": 4,
-          "amplitude": 0.35,
-          "frequency": 0.9
+          "end_time": 8,
+          "amplitude": 0,
+          "frequency": 0
         }
       ],
       "split_role": "training",
@@ -82,6 +82,56 @@
       "independent_initial_state_digest": "2222222222222222222222222222222222222222222222222222222222222222"
     },
     {
+      "cohort_id": "vpd-training-c",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "collision_frequency": 0.15,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.2,
+        "stream_speed": 1,
+        "temperature_plus": 0.45,
+        "temperature_minus": 0.8,
+        "mixture_weight_mean": 0.5,
+        "mixture_weight_amplitude": 0.04,
+        "velocity_shift_amplitude": 0.2
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.55,
+          "frequency": 1.4
+        }
+      ],
+      "split_role": "training",
+      "independent_initial_state_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "cohort_id": "vpd-training-d",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "collision_frequency": 0.4,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.16,
+        "stream_speed": 1.7,
+        "temperature_plus": 0.25,
+        "temperature_minus": 0.5,
+        "mixture_weight_mean": 0.5,
+        "mixture_weight_amplitude": 0.12,
+        "velocity_shift_amplitude": 0.22
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.45,
+          "frequency": 1.3
+        }
+      ],
+      "split_role": "training",
+      "independent_initial_state_digest": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
       "cohort_id": "vpd-validation-a",
       "kind": "sustained_heating",
       "end_time": 8,
@@ -104,10 +154,35 @@
         }
       ],
       "split_role": "validation",
-      "independent_initial_state_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+      "independent_initial_state_digest": "5555555555555555555555555555555555555555555555555555555555555555"
     },
     {
-      "cohort_id": "vpd-heldout-relaxation",
+      "cohort_id": "vpd-validation-b",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "collision_frequency": 0.3,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.14,
+        "stream_speed": 1.4,
+        "temperature_plus": 0.3,
+        "temperature_minus": 0.45,
+        "mixture_weight_mean": 0.48,
+        "mixture_weight_amplitude": 0.07,
+        "velocity_shift_amplitude": 0.18
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.5,
+          "frequency": 1.2
+        }
+      ],
+      "split_role": "validation",
+      "independent_initial_state_digest": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    {
+      "cohort_id": "vpd-heldout-two-stream-relaxation",
       "kind": "two_stream_relaxation",
       "end_time": 4,
       "collision_frequency": 0.35,
@@ -129,10 +204,35 @@
         }
       ],
       "split_role": "sealed_holdout",
-      "independent_initial_state_digest": "4444444444444444444444444444444444444444444444444444444444444444"
+      "independent_initial_state_digest": "7777777777777777777777777777777777777777777777777777777777777777"
     },
     {
-      "cohort_id": "vpd-heldout-drive-switch",
+      "cohort_id": "vpd-heldout-sustained-heating",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "collision_frequency": 0.2,
+      "initial_condition_parameters": {
+        "density_perturbation_amplitude": 0.1,
+        "stream_speed": 1.2,
+        "temperature_plus": 0.5,
+        "temperature_minus": 0.5,
+        "mixture_weight_mean": 0.5,
+        "mixture_weight_amplitude": 0.06,
+        "velocity_shift_amplitude": 0.1
+      },
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.7,
+          "frequency": 1.1
+        }
+      ],
+      "split_role": "sealed_holdout",
+      "independent_initial_state_digest": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "cohort_id": "vpd-heldout-drive-switching",
       "kind": "drive_switching",
       "end_time": 12,
       "collision_frequency": 0.2,
@@ -166,7 +266,7 @@
         }
       ],
       "split_role": "sealed_holdout",
-      "independent_initial_state_digest": "5555555555555555555555555555555555555555555555555555555555555555"
+      "independent_initial_state_digest": "9999999999999999999999999999999999999999999999999999999999999999"
     }
   ],
   "registered_qois": [
