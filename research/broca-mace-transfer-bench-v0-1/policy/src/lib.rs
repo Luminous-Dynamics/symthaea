@@ -154,7 +154,14 @@ impl EvidenceDigest256 {
     }
 
     pub const fn is_known(self) -> bool {
-        self.0 != [0; 32]
+        let mut index = 0;
+        while index < 32 {
+            if self.0[index] != 0 {
+                return true;
+            }
+            index += 1;
+        }
+        false
     }
 
     pub fn to_hex(self) -> String {
