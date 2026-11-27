@@ -913,6 +913,33 @@ mod tests {
     }
 
     #[test]
+    fn unique_confidences_match_conventional_itemwise_aurc() {
+        let records = vec![
+            record("highest-correct", 0.9, true, Some(true)),
+            record("middle-wrong", 0.8, true, Some(false)),
+            record("lowest-correct", 0.7, true, Some(true)),
+        ];
+        let report = evaluate_risk_coverage(&records, &config()).unwrap();
+        // Mean of the three prefix risks: (0 + 1/2 + 1/3) / 3 = 5/18.
+        assert!((report.report.aurc.unwrap() - 5.0 / 18.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn tie_averaged_aurc_is_invariant_to_input_order() {
+        let records = vec![
+            record("a", 0.9, true, Some(true)),
+            record("b", 0.9, true, Some(false)),
+            record("c", 0.5, false, Some(true)),
+            record("d", 0.2, true, Some(true)),
+        ];
+        let mut reversed = records.clone();
+        reversed.reverse();
+        let forward = evaluate_risk_coverage(&records, &config()).unwrap();
+        let backward = evaluate_risk_coverage(&reversed, &config()).unwrap();
+        assert_eq!(forward.report.aurc, backward.report.aurc);
+    }
+
+    #[test]
     fn disabling_stratification_does_not_change_overall_metrics() {
         let records = vec![
             record("a", 0.9, true, Some(true)),
