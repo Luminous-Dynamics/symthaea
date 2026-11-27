@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon024-scenarios-v1.schema.json",
+  "title": "MON-024 End-to-End Evidence Graph Scenario Seeds",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "classification",
+    "scenarios"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon024-end-to-end-evidence-graph-v1"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "classification": {
+      "const": "synthetic-descriptive-seeds"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "test_name",
+          "expected_verdict",
+          "expected_reason",
+          "mutation",
+          "notes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^MON024-[PN][0-9]{3}$"
+          },
+          "class": {
+            "enum": [
+              "positive_control",
+              "negative_control",
+              "indeterminate_control"
+            ]
+          },
+          "test_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_verdict": {
+            "enum": [
+              "qualified",
+              "blocked",
+              "indeterminate"
+            ]
+          },
+          "expected_reason": {
+            "type": "string"
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
