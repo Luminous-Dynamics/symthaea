@@ -102,6 +102,22 @@ fn run() -> Result<(), String> {
                 &encoded.evaluator_manifest_json,
             )?;
 
+            let disk_set = custody::EncodedCapsuleSet {
+                candidate_capsule_json: fs::read(candidate_root.join(format!("{world_id}.observations.json")))
+                    .map_err(|e| format!("read back candidate capsule {world_id}: {e}"))?,
+                candidate_receipt_json: fs::read(candidate_root.join(format!("{world_id}.receipt.json")))
+                    .map_err(|e| format!("read back candidate receipt {world_id}: {e}"))?,
+                evaluator_capsule_json: fs::read(evaluator_root.join(format!("{world_id}.outcomes.json")))
+                    .map_err(|e| format!("read back evaluator capsule {world_id}: {e}"))?,
+                evaluator_manifest_json: fs::read(evaluator_root.join(format!("{world_id}.manifest.json")))
+                    .map_err(|e| format!("read back evaluator manifest {world_id}: {e}"))?,
+                candidate_digest: encoded.candidate_digest.clone(),
+                evaluator_digest: encoded.evaluator_digest.clone(),
+            };
+            custody::verify_encoded_capsules(
+                &disk_set, &encoded.candidate_digest, &encoded.evaluator_digest,
+            )?;
+
             println!(
                 "materialized world_id={world_id} observation_policy={} candidate_digest={} evaluator_digest={}",
                 view.policy_id(), encoded.candidate_digest, encoded.evaluator_digest
