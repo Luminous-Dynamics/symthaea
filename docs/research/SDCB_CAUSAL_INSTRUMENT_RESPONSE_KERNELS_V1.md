@@ -1,6 +1,6 @@
 # SDCB causal instrument-response kernels v1
 
-**Status:** The standalone scalar OU + first-order response analytic reference is authored in `scripts/research/sdcb_exponential_response.rs` with twenty-three Rust tests. The tests are not compiled or executed in this environment. No integration into the existing interval-observation module, high-rate experiment, physical qualification, or SOTA result is claimed.
+**Status:** The standalone scalar OU + first-order response reference is authored in `scripts/research/sdcb_exponential_response.rs` with twenty-three Rust tests, and `scripts/research/sdcb_response_interval_bridge.rs` composes it with the existing #13940 interval-observation engine with four additional tests. The source-level bridge is authored, but neither Rust test file has been compiled or executed in this environment. No high-rate experiment, physical qualification, or SOTA result is claimed.
 
 ## 1. Motivation
 
