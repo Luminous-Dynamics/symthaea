@@ -693,6 +693,13 @@ pub fn advance_capacity_ocrc_round_v1(
     }
     prediction_receipt.tracking_occupancy_after_admission = candidate.tracked_rounds.len();
     prediction_receipt.receipt_sha256 = prediction_receipt_digest(&prediction_receipt)?;
+    if prediction_receipt.tracking_admitted {
+        candidate
+            .tracked_rounds
+            .get_mut(&prediction.round)
+            .expect("admitted round is present")
+            .prediction = prediction_receipt.clone();
+    }
 
     let mut feedback = input.qualified_feedback.clone();
     feedback.sort_by(|left, right| {
@@ -704,9 +711,11 @@ pub fn advance_capacity_ocrc_round_v1(
     let mut feedback_threshold_delta = 0.0_f64;
 
     for event in feedback {
-        if event.delivered_round != prediction.round {
+        if event.delivered_round != prediction.round || event.source_round == 0
+            || event.source_round > prediction.round
+        {
             return Err(CapacityOcrcErrorV1(
-                "feedback delivered_round must equal the current round".into(),
+                "feedback delivery round/source round is invalid".into(),
             ));
         }
         if !candidate.processed_feedback_rounds.insert(event.source_round) {
@@ -896,6 +905,21 @@ pub fn capacity_ocrc_risk_bound_v1(
         return Err(CapacityOcrcErrorV1("risk-bound horizon must be positive".into()));
     }
     let dmax = policy.maximum_feedback_delay as f64;
+    if policy.capacity as u64 >= policy.maximum_feedback_delay.saturating_add(1) {
+        return Ok(CapacityOcrcRiskBoundV1 {
+            horizon,
+            score_bound: policy.score_bound,
+            learning_rate: policy.learning_rate,
+            capacity: policy.capacity,
+            maximum_feedback_delay: policy.maximum_feedback_delay,
+            terminal_survival_probability: 1.0,
+            tracking_load: dmax,
+            saturation_term: 0.0,
+            risk_gap_upper_bound: policy.score_bound
+                / (policy.learning_rate * horizon as f64)
+                + (policy.maximum_feedback_delay as f64 + 1.0) / horizon as f64,
+        });
+    }
     if dmax == 0.0 {
         return Ok(CapacityOcrcRiskBoundV1 {
             horizon,
@@ -1121,7 +1145,7 @@ mod tests {
     }
 
     #[test]
-    fn paper_figure_one_capacity_two_tracking_sequence_is_exact() {
+    fn strict_equation_20_expiration_exposes_the_paper_figure_one_off_by_one() {
         let mut engine = create_capacity_ocrc_engine_v1("ca-ocrc-figure-1", policy()).unwrap();
         let r1 = advance_capacity_ocrc_round_v1(&mut engine, &round_input(1, 3, vec![])).unwrap();
         assert!(r1.prediction.tracking_admitted);
@@ -1135,10 +1159,19 @@ mod tests {
         assert!(!r3.prediction.tracking_admitted);
         assert_eq!(r3.tracking_occupancy_after_round, 2);
 
+        // Eq. (20) is strict: round 1 deadline is 1+3=4, so it is
+        // not evicted at the beginning of round 4. The figure/caption says
+        // it is evicted here, an off-by-one discrepancy in the paper.
         let r4 = advance_capacity_ocrc_round_v1(&mut engine, &round_input(4, 0, vec![])).unwrap();
-        assert_eq!(r4.evicted_rounds, vec![1]);
-        assert!(r4.prediction.tracking_admitted);
+        assert!(r4.evicted_rounds.is_empty());
+        assert!(!r4.prediction.tracking_admitted);
         assert_eq!(r4.tracking_occupancy_after_round, 2);
+
+        // If still pending, round 1 is expired at the beginning of round 5.
+        let r5 = advance_capacity_ocrc_round_v1(&mut engine, &round_input(5, 0, vec![])).unwrap();
+        assert_eq!(r5.evicted_rounds, vec![1]);
+        assert!(r5.prediction.tracking_admitted);
+        assert_eq!(r5.tracking_occupancy_after_round, 2);
     }
 
     #[test]
