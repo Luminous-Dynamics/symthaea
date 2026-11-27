@@ -44,7 +44,7 @@ A digest proves byte identity, not truth, independence, access control or correc
 ## 3. Contract prototype
 
 The new support module defines:
-- CandidateDecisionContext: decision-time evidence, permitted action set, context digest, budget, deadline, and a digest-bound decision objective (valuation mode, declared utility unit and loss-table reference where applicable).
+- CandidateDecisionContext: decision-time evidence, permitted action set, context digest, budget, deadline, and a digest-bound decision objective (valuation mode, declared utility unit and loss-table reference where applicable). It also carries the canonical SHA-256 identities supplied by #13665/#11015: exact serialized ResearchState, evidence prefix, and permitted-action-offer list. These are upstream references, not a duplicated evidence graph or action-offer authority.
 - DecisionProposal: selected action identity, digest of the exact selected action payload (for example, the submitted design batch), prospective probability distribution, policy lineage, assignment mechanism and causal-design declaration.
 - EvaluatorResolution: evaluator-owned execution status, outcome-resolution state, recorded action ID plus exact payload digest, evidence references and actual-cost completeness. `ActionSupport::RecordedAction` means the submitted action/payload was recorded; it does not imply that the scientific outcome has resolved.
 
@@ -251,7 +251,7 @@ This is a shared decision-episode contract, not a new scientific scheduler or de
 - #10064/#10369: execution isolation and trust roots.
 - #10630: evidence lifecycle and selective revalidation.
 
-The current futures ledger records forecast provenance and scored continuations. This contract is a decision-episode interface, not a competing ledger. Persistent writing should reference existing evidence/receipt identities and be assigned to an existing owner. Adapt this contract to the decision objective and event semantics in #12546 and #12407 rather than duplicating their calculations or observation model.
+The current futures ledger records forecast provenance and scored continuations. This contract is a decision-episode interface, not a competing ledger or ResearchState authority. #13665 owns the typed public ResearchState projection and its exact serialized SHA-256; #11015 owns prospective policy traces and binds the ResearchState digest, evidence-prefix digest and upstream permitted-action-offer-list digest. #13933 must consume those three upstream identities unchanged and add only scientific episode semantics: decision phase, selected action plus exact payload digest, prospective outcome, assignment mechanism, causal-design declaration and evaluator resolution. It must not reconstruct the evidence graph, re-hash a second state, mint new action offers or replace the canonical action trace. Persistent writing should reference existing evidence/receipt identities and be assigned to an existing owner. Adapt this contract to #13663/#13665/#11015, the decision objective and event semantics in #12546/#12407 rather than duplicating their state, calculations or observation model.
 
 ## 11. External research
 
@@ -273,7 +273,7 @@ These are paper/author-reported baselines unless independently reproduced under 
 ## 12. Implementation status and gates
 
 Implemented in this branch:
-- candidate-visible decision context and prospective proposal, including a decision-objective reference;
+- candidate-visible decision context and prospective proposal, including a decision-objective reference and required exact ResearchState/evidence-prefix/action-offer-list SHA-256 bindings from #13665/#11015;
 - outcome distribution, full randomized action propensities over action/payload identities, exact selected-payload binding and causal-design declarations;
 - evaluator-owned resolution and distinct execution/outcome states;
 - validation for look-ahead evidence, action support, unsupported counterfactuals, delayed/censored/indeterminate outcomes and cost completeness;
