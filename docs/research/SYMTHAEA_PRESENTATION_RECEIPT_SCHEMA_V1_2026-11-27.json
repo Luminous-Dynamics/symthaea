@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea/presentation-receipt-v1.json",
+  "title": "Symthaea Presentation Receipt v1",
+  "description": "One append-only lifecycle transition. An unkeyed digest chain detects accidental mutation but is not authentication, attestation, or trusted time.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "policy_version",
+    "receipt_id",
+    "attempt_id",
+    "transition_index",
+    "phase",
+    "session_id",
+    "source_clock_domain_id",
+    "event_id",
+    "grant_id",
+    "event_sequence",
+    "event_kind",
+    "source",
+    "epistemic_status",
+    "privacy_class",
+    "form",
+    "channel",
+    "destination",
+    "motion_mode",
+    "requested_intensity",
+    "effective_intensity",
+    "semantic_key",
+    "decision_clock",
+    "output_clock",
+    "adapter",
+    "observation",
+    "not_submitted_reason",
+    "failure_code",
+    "previous_digest",
+    "digest"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.presentation-receipt.v1"
+    },
+    "policy_version": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}:[0-9]+$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "transition_index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "permitted",
+        "submitted",
+        "observed",
+        "outcome_unknown",
+        "stopped",
+        "failed",
+        "not_submitted"
+      ]
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "source_clock_domain_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "grant_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "event_sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "event_kind": {
+      "type": "string",
+      "enum": [
+        "conversation.listening",
+        "conversation.speaking",
+        "conversation.turn_state",
+        "conversation.backchannel",
+        "attention.focus",
+        "expression.intent",
+        "cognition.uncertainty",
+        "evidence.status",
+        "user.control"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "instance_id"
+      ],
+      "properties": {
+        "component": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "instance_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "source_event_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "build_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        }
+      }
+    },
+    "epistemic_status": {
+      "type": "string",
+      "enum": [
+        "measured",
+        "derived",
+        "inferred",
+        "proposed",
+        "presentation_only"
+      ]
+    },
+    "privacy_class": {
+      "type": "string",
+      "enum": [
+        "public",
+        "local_sensitive",
+        "restricted"
+      ]
+    },
+    "form": {
+      "type": "string",
+      "enum": [
+        "living_constellation",
+        "puppet_theatre",
+        "mycelial_being",
+        "swarm",
+        "living_instrument",
+        "hearth_companion",
+        "cognitive_mandala"
+      ]
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "visual",
+        "audio",
+        "haptic",
+        "spatial"
+      ]
+    },
+    "destination": {
+      "type": "string",
+      "enum": [
+        "local_private",
+        "local_shared",
+        "remote"
+      ]
+    },
+    "motion_mode": {
+      "type": "string",
+      "enum": [
+        "dynamic",
+        "static"
+      ]
+    },
+    "requested_intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "effective_intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "semantic_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "decision_clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock_domain_id",
+        "monotonic_ns"
+      ],
+      "properties": {
+        "clock_domain_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "monotonic_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        }
+      }
+    },
+    "output_clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock_domain_id",
+        "monotonic_ns"
+      ],
+      "properties": {
+        "clock_domain_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "monotonic_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        }
+      }
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter_id",
+        "build_digest"
+      ],
+      "properties": {
+        "adapter_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "build_digest": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        }
+      }
+    },
+    "observation": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "observer_id",
+        "observer_build_digest",
+        "source",
+        "output_state"
+      ],
+      "properties": {
+        "observer_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "observer_build_digest": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "adapter_callback",
+            "compositor",
+            "audio_device_loopback",
+            "haptic_driver_acknowledgement",
+            "external_observer"
+          ]
+        },
+        "output_state": {
+          "type": "string",
+          "enum": [
+            "started",
+            "stopped"
+          ]
+        }
+      }
+    },
+    "not_submitted_reason": {
+      "enum": [
+        "permit_expired",
+        "policy_denied",
+        "user_cancelled",
+        "renderer_unavailable",
+        null
+      ]
+    },
+    "failure_code": {
+      "enum": [
+        "submission_rejected",
+        "renderer_unavailable",
+        "device_lost",
+        "observation_failed",
+        "output_interrupted",
+        "adapter_shutdown",
+        null
+      ]
+    },
+    "previous_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
