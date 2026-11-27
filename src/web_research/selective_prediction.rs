@@ -517,8 +517,16 @@ fn policy_summary(
             accepted_count as f64 / all.len() as f64
         },
         error_count: errors,
-        risk: enough.then_some(errors as f64 / accepted_count as f64),
-        risk_ci95: enough.then(|| wilson_interval(errors, accepted_count)).flatten(),
+        risk: if enough {
+            Some(errors as f64 / accepted_count as f64)
+        } else {
+            None
+        },
+        risk_ci95: if enough {
+            wilson_interval(errors, accepted_count)
+        } else {
+            None
+        },
         mean_decision_cost: decision_cost(all, accepted, config.decision_costs),
     }
 }
