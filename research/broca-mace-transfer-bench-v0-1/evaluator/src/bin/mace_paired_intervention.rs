@@ -51,7 +51,7 @@ enum Arm {
 }
 
 impl Arm {
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 8] = [
         Self::NoMemory,
         Self::ExactScopeScan,
         Self::ConventionalRetrieval,
