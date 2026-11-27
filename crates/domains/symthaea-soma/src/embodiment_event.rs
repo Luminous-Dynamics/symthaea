@@ -724,6 +724,36 @@ mod tests {
     }
 
     #[test]
+    fn accepts_supported_evidence_with_receipt_and_digest_reference() {
+        let mut event = listening_event(0, "event-0");
+        event.event_kind = EventKind::EvidenceStatus;
+        event.payload = EventPayload::EvidenceStatus(EvidenceStatusPayload {
+            subject_id: "claim-1".to_owned(),
+            status: EvidenceState::Supported,
+            verifier_receipt_ref: Some("receipt:verifier-1".to_owned()),
+        });
+        event.evidence_refs = vec!["sha256:abc123".to_owned()];
+        assert_eq!(event.validate(), Ok(()));
+    }
+
+    #[test]
+    fn accepts_cancel_for_an_already_observed_event() {
+        let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        let mut cancel = listening_event(1, "event-1");
+        cancel.event_kind = EventKind::UserControl;
+        cancel.payload = EventPayload::UserControl(UserControlPayload {
+            action: UserControlAction::Cancel,
+            form_id: None,
+            target_event_id: Some("event-0".to_owned()),
+            enabled: None,
+            intensity: None,
+        });
+        assert_eq!(validator.accept(&cancel, "300"), Ok(()));
+        assert_eq!(validator.last_sequence(), Some(1));
+    }
+
+    #[test]
     fn supported_evidence_receipt_must_be_a_valid_reference() {
         let mut event = listening_event(0, "event-0");
         event.event_kind = EventKind::EvidenceStatus;
