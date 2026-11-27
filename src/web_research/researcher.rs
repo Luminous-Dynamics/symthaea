@@ -948,7 +948,7 @@ impl WebResearcher {
                 Some(self.config.search_endpoint.clone().unwrap_or_else(|| {
                     "https://api.search.brave.com/res/v1/web/search".to_string()
                 }))
-            },
+            }
             "searxng" | "searx" => Some(
                 self.config
                     .search_endpoint
