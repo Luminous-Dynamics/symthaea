@@ -1,0 +1,36 @@
+name: CMAQ-030 recoverability margin conformal contract
+
+on:
+  push:
+    branches:
+      - research/cmaq-030-recoverability-margin-conformal-v0-1-20261127
+    paths:
+      - "research/cmaq-030/**"
+      - ".github/workflows/cmaq-030.yml"
+  pull_request:
+    paths:
+      - "research/cmaq-030/**"
+      - ".github/workflows/cmaq-030.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  margin-conformal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        working-directory: research/cmaq-030
+        run: cargo +1.100.0 fmt --all -- --check
+      - name: Run deterministic margin calibration tests
+        working-directory: research/cmaq-030
+        run: cargo +1.100.0 test --locked
+      - name: Strict Clippy
+        working-directory: research/cmaq-030
+        run: cargo +1.100.0 clippy --locked --all-targets -- -D warnings
