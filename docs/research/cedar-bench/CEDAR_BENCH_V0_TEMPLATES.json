@@ -151,7 +151,9 @@
             "json": {
               "results": [
                 {
-                  "estimate": "{{F1}}",
+                  "estimate": {
+                    "__CEDAR_FACT__": "F1"
+                  },
                   "population": "cohort-X"
                 }
               ]
@@ -780,7 +782,11 @@
           "/sources/1/metadata/batch_id"
         ]
       },
-      "expected": "SOURCE_CONFLICT_REPRESENTED"
+      "expected": "SOURCE_CONFLICT_REPRESENTED",
+      "source_removal": {
+        "remove_source_id": "metric-q-a",
+        "expected": "PARTIAL_CONFLICT_REQUIRES_ONE_SOURCE_CAVEAT"
+      }
     },
     {
       "id": "CEDAR-16",
