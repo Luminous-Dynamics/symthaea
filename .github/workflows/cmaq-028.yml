@@ -1,0 +1,36 @@
+name: CMAQ-028 recovery portfolio contract
+
+on:
+  push:
+    branches:
+      - research/cmaq-028-recovery-option-portfolio-v0-1-20261127
+    paths:
+      - "research/cmaq-028/**"
+      - ".github/workflows/cmaq-028.yml"
+  pull_request:
+    paths:
+      - "research/cmaq-028/**"
+      - ".github/workflows/cmaq-028.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recovery-portfolio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        working-directory: research/cmaq-028
+        run: cargo +1.100.0 fmt --all -- --check
+      - name: Run deterministic contract tests
+        working-directory: research/cmaq-028
+        run: cargo +1.100.0 test --locked
+      - name: Strict Clippy
+        working-directory: research/cmaq-028
+        run: cargo +1.100.0 clippy --locked --all-targets -- -D warnings
