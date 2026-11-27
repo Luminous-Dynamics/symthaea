@@ -25,6 +25,8 @@ func ParseLSN(s string) (LSN,error) {
 func (l LSN) String() string { return fmt.Sprintf("%X/%X",uint64(l)>>32,uint64(l)&0xffffffff) }
 
 type Profile struct {
+	ServerMajor uint16
+	ConfiguredWALLevel,EffectiveWALLevel string
 	SystemIdentifier string
 	DatabaseOID uint32
 	DatabaseName,SlotName,OutputPlugin string
@@ -73,7 +75,19 @@ type Manifest struct {
 type Result struct { Decision Decision; Reason string; Checked []string }
 func out(d Decision,s string,c ...string)Result{return Result{d,s,append([]string(nil),c...)}}
 func present(xs ...string)bool{for _,x:=range xs{if strings.TrimSpace(x)==""{return false}};return true}
-func profileOK(p Profile)bool{return present(p.SystemIdentifier,p.DatabaseName,p.SlotName,p.OutputPlugin,p.PluginProfileDigest,p.SchemaProfileDigest,p.SourceEpoch,p.SnapshotName,p.SnapshotDigest)&&p.DatabaseOID>0&&p.TimelineID>0&&p.ConsistentPoint!=nil}
+func profileOK(p Profile)bool{return (p.ServerMajor==18||p.ServerMajor==19)&&present(p.SystemIdentifier,p.DatabaseName,p.SlotName,p.OutputPlugin,p.PluginProfileDigest,p.SchemaProfileDigest,p.SourceEpoch,p.SnapshotName,p.SnapshotDigest)&&p.DatabaseOID>0&&p.TimelineID>0&&p.ConsistentPoint!=nil}
+func validateWALLevel(p Profile)(Decision,string){
+	if p.ServerMajor==18 {
+		if p.ConfiguredWALLevel!="logical"||p.EffectiveWALLevel!="logical"{return Denied,"PostgreSQL 18 requires configured and effective wal_level=logical for this profile"}
+		return Qualified,""
+	}
+	if p.ServerMajor==19 {
+		if p.EffectiveWALLevel!="logical"{return Denied,"PostgreSQL 19 effective_wal_level is not logical"}
+		if p.ConfiguredWALLevel!="logical"&&p.ConfiguredWALLevel!="replica"{return Indeterminate,"PostgreSQL 19 configured wal_level is outside the versioned profile"}
+		return Qualified,""
+	}
+	return Indeterminate,"unsupported PostgreSQL major version"
+}
 func slotMatches(p Profile,s SlotState)bool{return s.SlotType=="logical"&&s.DatabaseOID==p.DatabaseOID&&s.DatabaseName==p.DatabaseName&&s.SlotName==p.SlotName&&s.OutputPlugin==p.OutputPlugin}
 func slotHealth(s SlotState)(Decision,string){
 	if s.SlotType!="logical"{return Denied,"slot is not logical"}
@@ -85,7 +99,8 @@ func slotHealth(s SlotState)(Decision,string){
 }
 func ValidateInitialSnapshot(p Profile,s SlotState,point LSN,digest string)Result{
 	c:=[]string{"cluster-database-slot-plugin-identity","snapshot-consistent-point"}
-	if !profileOK(p){return out(Indeterminate,"source profile incomplete",c...)}
+	if !profileOK(p){return out(Indeterminate,"source profile incomplete or PostgreSQL major version unsupported",c...)}
+	if d,r:=validateWALLevel(p);d!=Qualified{return out(d,r,c...)}
 	if !slotMatches(p,s){return out(Denied,"slot identity/database/plugin does not match source profile",c...)}
 	if d,r:=slotHealth(s);d!=Qualified{return out(d,r,c...)}
 	if point!=*p.ConsistentPoint||digest!=p.SnapshotDigest||!present(digest){return out(Denied,"exported snapshot does not bind exact slot consistent point/profile",c...)}
@@ -94,7 +109,8 @@ func ValidateInitialSnapshot(p Profile,s SlotState,point LSN,digest string)Resul
 }
 func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
 	c:=[]string{"source-slot-profile","capture-range","decoded-event-order","durable-evidence-before-ack"}
-	if !profileOK(p){return out(Indeterminate,"source profile incomplete",c...)}
+	if !profileOK(p){return out(Indeterminate,"source profile incomplete or PostgreSQL major version unsupported",c...)}
+	if d,r:=validateWALLevel(p);d!=Qualified{return out(d,r,c...)}
 	if !slotMatches(p,s)||m.SourceEpoch!=p.SourceEpoch||m.TimelineID!=p.TimelineID||m.SlotName!=p.SlotName||m.DatabaseOID!=p.DatabaseOID||m.PluginProfileDigest!=p.PluginProfileDigest||m.SchemaProfileDigest!=p.SchemaProfileDigest{return out(Denied,"capture source/slot/plugin/timeline profile mismatch",c...)}
 	if d,r:=slotHealth(s);d!=Qualified{return out(d,r,c...)}
 	if s.TwoPhase { return out(Indeterminate,"two-phase decoding is not qualified by this capture profile",c...) }
