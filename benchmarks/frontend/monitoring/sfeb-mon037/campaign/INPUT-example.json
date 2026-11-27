@@ -172,5 +172,16 @@
         "evidence_not_runtime_independently_verified"
       ]
     }
-  }
+  },
+  "required_surface_ids": [
+    "heap",
+    "index",
+    "large-object"
+  ],
+  "source_truth_complete": true,
+  "source_truth_manifest_sha256": "c5c47db07e3a2055380c16d271acae1a1c44933a7ff244c891a65c29207a8525",
+  "observed_capture_complete": true,
+  "observed_capture_manifest_sha256": "5bc9c15baf7d2b5704d17ac3ee2ba15f4a64805b581ca0ac45bca888ba60e49e",
+  "transaction_report_complete": true,
+  "transaction_report_sha256": "013f2547dc5b7fc69f763ee1fad4ba38c541e3510acf2c95533034bdcd65ca48"
 }
