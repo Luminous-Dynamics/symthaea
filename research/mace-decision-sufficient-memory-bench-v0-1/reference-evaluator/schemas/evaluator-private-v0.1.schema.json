@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/schemas/evaluator-private-v0.1.schema.json",
+  "title": "MACE DSM Evaluator-Private Truth v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_id",
+    "seed",
+    "family",
+    "candidate_sha256",
+    "evaluator_private"
+  ],
+  "properties": {
+    "schema_version": { "const": "mace_dsm_evaluator_private_v0_1" },
+    "episode_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "seed": { "type": "integer", "minimum": 0 },
+    "family": {
+      "enum": [
+        "temporal_drift",
+        "contradiction",
+        "revocation",
+        "insufficient_evidence",
+        "poisoning",
+        "decision_sufficient_compression",
+        "streaming_update",
+        "forgetting_replay",
+        "scope_isolation"
+      ]
+    },
+    "candidate_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "evaluator_private": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "latent_state",
+        "action_losses",
+        "required_evidence_ids",
+        "forbidden_evidence_ids",
+        "no_memory_action",
+        "oracle_action",
+        "attack_case"
+      ],
+      "properties": {
+        "latent_state": { "type": "string", "minLength": 1 },
+        "action_losses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["action", "loss"],
+            "properties": {
+              "action": { "type": "string", "minLength": 1 },
+              "loss": { "type": "number" }
+            }
+          }
+        },
+        "required_evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "forbidden_evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "no_memory_action": { "type": "string", "minLength": 1 },
+        "oracle_action": { "type": "string", "minLength": 1 },
+        "attack_case": { "type": "boolean" },
+        "notes": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
