@@ -53,6 +53,14 @@ def derive_value(seed: bytes, template_id: str, fact: dict[str, Any], variant: s
     raise ValueError(f"unsupported value kind: {kind}")
 
 
+def distinct_value(seed: bytes, template_id: str, fact: dict[str, Any], baseline: str, variant: str) -> str:
+    for attempt in range(256):
+        candidate = derive_value(seed, template_id, fact, f"{variant}-{attempt}")
+        if candidate != baseline:
+            return candidate
+    raise ValueError(f"{template_id}/{fact['id']}: could not derive a distinct intervention value")
+
+
 def replace_markers(value: Any, markers: dict[str, str], fact_kinds: dict[str, str]) -> Any:
     if isinstance(value, dict):
         if set(value) == {FACT_SENTINEL}:
@@ -200,7 +208,7 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
 
     placebo_fact = dict(template["placebo"], id=template["placebo"].get("id", "P"))
     placebo_base = derive_value(seed, template_id, placebo_fact, "placebo-baseline")
-    placebo_counterfactual = derive_value(seed, template_id, placebo_fact, "placebo-counterfactual")
+    placebo_counterfactual = distinct_value(seed, template_id, placebo_fact, placebo_base, "placebo-counterfactual")
 
     candidate_rows: list[dict[str, Any]] = []
     audit_rows: list[dict[str, Any]] = []
