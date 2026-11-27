@@ -1,0 +1,60 @@
+name: SDCB Cross-Channel Common-Cause Stress
+
+on:
+  push:
+    branches:
+      - research/sdcb-cross-channel-common-cause-stress-2026-11-27
+    paths:
+      - "scripts/research/sdcb_cross_channel_common_cause_stress.rs"
+      - ".github/workflows/sdcb-cross-channel-common-cause-stress.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/research/sdcb_cross_channel_common_cause_stress.rs"
+      - ".github/workflows/sdcb-cross-channel-common-cause-stress.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-channel-stress:
+    name: Rust 1.96 two-channel dependence regime stress
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Generate rustfmt preview
+        run: rustfmt --edition 2024 scripts/research/sdcb_cross_channel_common_cause_stress.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-cross-channel-rustfmt-preview
+          path: scripts/research/sdcb_cross_channel_common_cause_stress.rs
+      - name: Restore exact committed source
+        run: git checkout -- scripts/research/sdcb_cross_channel_common_cause_stress.rs
+      - name: Check exact-source formatting
+        run: rustfmt --edition 2024 --check scripts/research/sdcb_cross_channel_common_cause_stress.rs
+      - name: Compile and run exact-source negative controls
+        run: |
+          rustc --edition=2024 -D warnings --test scripts/research/sdcb_cross_channel_common_cause_stress.rs -o /tmp/sdcb-cross-channel-tests
+          /tmp/sdcb-cross-channel-tests
+      - name: Generate full deterministic report
+        run: |
+          rustc --edition=2024 -D warnings scripts/research/sdcb_cross_channel_common_cause_stress.rs -o /tmp/sdcb-cross-channel
+          /tmp/sdcb-cross-channel > /tmp/sdcb-cross-channel-report.csv
+          test "$(wc -l < /tmp/sdcb-cross-channel-report.csv)" -eq 25
+          python3 -m json.tool <(printf '{"rows": %s}' "$(($(wc -l < /tmp/sdcb-cross-channel-report.csv)-1))") >/dev/null
+      - name: Upload report and manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-cross-channel-common-cause-report
+          path: /tmp/sdcb-cross-channel-report.csv
