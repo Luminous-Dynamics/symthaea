@@ -371,6 +371,14 @@ The serial-path results share the same path-level scale through calibration and 
 
 This is still a narrow synthetic model with 2,500 trials per condition. It is not a proof, general common-cause model, production detector or physical data result. The confirmatory path is 50,000–100,000+ trials per condition, independent seeds, negative rho, skew, time-varying scale, multi-factor/common-mode shocks and held-out regimes.
 
+### 9.8 Fail-closed dependence-envelope decision contract
+
+The research now has a small typed decision contract in #13991. A positive `QualifiedWithinEnvelope` state requires exact scope/marginal/model/score/block/alpha matching, a passing external model-adequacy diagnostic, sufficient sample count, canonical observation evidence digest, and the entire observed rho interval inside frozen inclusive bounds. Disjoint intervals or metadata mismatches are `NotQualified`; partial boundary overlap or incomplete diagnostics are `Inconclusive`.
+
+The exact-source Rust 1.96 workflow passed Rustfmt, `rustc -D warnings --test`, and **10/10 negative-control tests** on code head `0708fb7a5e20d0c0321aa8f5c3a07e04a15a4031` ([workflow](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46004270255)). The tests cover inclusive limits, fully contained/disjoint/overlapping intervals, model-family pairing, metadata mismatch, rejected/inconclusive diagnostics, insufficient samples, malformed digest and non-finite/reversed intervals.
+
+This contract is only a fail-closed reference. It shape-checks receipt hashes but does not authenticate them, verify reviewer authority, prove model adequacy or detect arbitrary dependence. Production integration must place the envelope behind an independent attestation boundary, bind it to exact calibration/test episode custody, and show that an inconclusive/out-of-envelope state cannot authorize a downstream mutation. It does not change production SDCB assessment.
+
 ## References
 
 - AML Cycle 2 official results (19 November 2026): https://agentmemoryleaderboard.ai/results/cycle-2/
