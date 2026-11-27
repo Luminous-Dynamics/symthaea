@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
       - name: Check workspace glob members
         run: python3 scripts/check_workspace_glob_members.py
-      - name: Resolve Cargo workspace metadata
-        run: cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
+      - name: Resolve Cargo workspace and verify the committed lockfile
+        run: cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
       - name: Verify STT formatting resolves from the root workspace
         run: cargo fmt --manifest-path Cargo.toml -p symthaea-stt -- --check
