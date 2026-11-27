@@ -76,6 +76,7 @@ jobs:
           jq empty docs/research/eqc-task-v0.1.schema.json
           jq empty docs/research/eqc-run-receipt-v0.1.schema.json
           jq empty docs/research/eqc-seed-corpus-v0.1.json
+          jq empty docs/research/eqc-system-observation-v0.1.schema.json
           for file in docs/research/eqc-fixtures/*.json; do jq empty "$file"; done
 
       - name: Check formatting
