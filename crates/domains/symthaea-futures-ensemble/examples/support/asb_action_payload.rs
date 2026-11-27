@@ -240,7 +240,10 @@ mod tests {
             .as_permitted_offer_ref("agentview-offer-17", 2, &permitted())
             .unwrap();
         assert_eq!(offer.offer_id, "agentview-offer-17");
-        assert_eq!(offer.action_payload_sha256, payload.payload_sha256().unwrap());
+        assert_eq!(
+            offer.action_payload_sha256,
+            payload.payload_sha256().unwrap()
+        );
     }
 
     #[test]
