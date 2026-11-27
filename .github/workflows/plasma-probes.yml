@@ -1050,7 +1050,10 @@ jobs:
 
           assert fixture["equation"] == "vlasov_poisson_landau_coulomb"
           assert fixture["collision_operator"] == "landau_coulomb"
-          assert fixture["benchmark_id"] == "KRESP-CL-VPL-1D1V"
+          assert fixture["benchmark_id"] == "KRESP-CL-VPL-3D3V"
+          assert fixture["domain"]["velocity_dimension"] == 3
+          assert len(fixture["domain"]["spatial_domain_lengths"]) == 3
+          assert all(length > 0 for length in fixture["domain"]["spatial_domain_lengths"])
           assert fixture["prior_art"]["arxiv_id"] == "2611.20080"
           assert fixture["prior_art"]["status"] == "literature_claim_not_reproduced_here"
           scaling = fixture["perturbation_scaling"]
@@ -1073,6 +1076,8 @@ jobs:
               assert math.isclose(item["computed_initial_perturbation_amplitude"], expected, rel_tol=1e-13, abs_tol=1e-15)
               assert item["computed_initial_perturbation_amplitude"] <= scaling["maximum_initial_perturbation_amplitude"]
               assert item["observation_horizon_fraction_of_nu_minus_one_third"] == scaling["observation_horizon_fraction_of_nu_minus_one_third"]
+              assert len(item["initial_spatial_modes"]) >= 2
+              assert all(len(mode) == 3 and any(component != 0 for component in mode) for mode in item["initial_spatial_modes"])
               assert item["forward_initialization"] is True
           assert fixture["reference_convergence"]["all_reference_trajectories_forward_integrated"] is True
           assert fixture["claim_boundary"] == {
@@ -1142,7 +1147,7 @@ jobs:
 
           assert fixture["equation"] == "vlasov_poisson_landau_coulomb"
           assert fixture["collision_operator"] == "landau_coulomb"
-          assert fixture["benchmark_id"] == "KRESP-CL-VPL-1D1V"
+          assert fixture["benchmark_id"] == "KRESP-CL-VPL-3D3V"
           assert fixture["prior_art"]["arxiv_id"] == "2611.20080"
           assert fixture["prior_art"]["status"] == "literature_claim_not_reproduced_here"
           scaling = fixture["perturbation_scaling"]
