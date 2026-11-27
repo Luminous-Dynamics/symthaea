@@ -956,6 +956,6 @@ mod tests {
                 .sum::<usize>(),
             report.overall.triads
         );
-        assert_eq!(report.confirmatory_lineage_floor_met, false);
+        assert!(!report.confirmatory_lineage_floor_met);
     }
 }
