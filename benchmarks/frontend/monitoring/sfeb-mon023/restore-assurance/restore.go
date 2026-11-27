@@ -110,7 +110,7 @@ type ServiceAcceptance struct {
 	TrafficEnabled,OldPrimaryFenced,StaleEndpointsFenced bool
 	ObserverID,ObserverControlRoot,ObserverIdentityDigest,ObserverMembershipDigest string
 	ObserverVerified bool
-	ReadyAt ClockStamp
+	FencingCompletedAt,TrafficEnabledAt,ReadyAt ClockStamp
 	EvidenceDigest string
 }
 type Request struct {
@@ -175,7 +175,7 @@ func Evaluate(req Request)Result{
 	if r.RPOUpperNanos>p.MaxRPOUpperNanos||r.DatabaseRTOUpperNanos>p.MaxDatabaseRTOUpperNanos{return done(Denied,"RPO or database RTO exceeds recovery objective",r)}
 	s:=req.Surface
 	if !s.Verified||!present(s.InventoryDigest,s.Scope,s.EvidenceDigest)||s.InventoryDigest!=p.SurfaceInventoryDigest||s.RequiredTotal<=0||s.RequiredCovered!=s.RequiredTotal{return done(Indeterminate,"MON-022 surface inventory result missing, incomplete or stale",r)}
-	if p.RequireFullDatabaseState()&&(!s.FullDatabaseState||len(s.Excluded)>0){return done(Denied,"full-state recovery plan has excluded/unqualified database surfaces",r)}
+	if p.RequireFullDatabaseStateFlag&&(!s.FullDatabaseState||len(s.Excluded)>0){return done(Denied,"full-state recovery plan has excluded/unqualified database surfaces",r)}
 	if !p.RequireFullDatabaseStateFlag&&s.Scope!="row_stream_continuity"&&s.Scope!="scoped_database_state"{return done(Indeterminate,"database recovery scope is unsupported or unnamed",r)}
 	if p.RequestedClaim==ServiceRecovered&&x.RecoveryState!="ready"{return done(Indeterminate,"validation-only paused restore cannot qualify service recovery",r)}
 	r.ExcludedSurfaces=append([]string(nil),s.Excluded...)
@@ -189,15 +189,21 @@ func Evaluate(req Request)Result{
 		if _,ok:=deps[d.ID];ok{return done(Divergent,"duplicate dependency evidence: "+d.ID,r)}
 		deps[d.ID]=d
 	}
+	requiredDependencyIDs:=map[string]bool{}
 	for _,id:=range p.RequiredDependencyIDs{
+		if requiredDependencyIDs[id]{return done(Divergent,"duplicate required dependency in recovery plan: "+id,r)}
+		requiredDependencyIDs[id]=true
 		d,ok:=deps[id]
 		if !ok{r.UnreadyDependencies=append(r.UnreadyDependencies,id);continue}
-		if !d.Verified||!present(d.VersionDigest,d.ControlRoot,d.EvidenceDigest)||!withinFreshness(d.ObservedAt,d.FreshUntil,req.EvaluatedAt){r.UnreadyDependencies=append(r.UnreadyDependencies,id);continue}
+		if !d.Required||!d.Verified||!present(d.VersionDigest,d.ControlRoot,d.EvidenceDigest)||!withinFreshness(d.ObservedAt,d.FreshUntil,req.EvaluatedAt){r.UnreadyDependencies=append(r.UnreadyDependencies,id);continue}
 		if !d.Ready{r.UnreadyDependencies=append(r.UnreadyDependencies,id)}
 	}
 	if len(r.UnreadyDependencies)>0{return done(Indeterminate,"one or more required dependencies are unavailable or unqualified",r)}
 	readSeen,writeSeen:=false,false
+	probeIDs:=map[string]bool{}
 	for _,probe:=range req.Probes{
+		if probeIDs[probe.ID]{return done(Divergent,"duplicate application probe ID: "+probe.ID,r)}
+		probeIDs[probe.ID]=true
 		if !present(probe.ID,probe.Kind){return done(Indeterminate,"application probe identity missing",r)}
 		if !probe.Required{continue}
 		if !probe.Verified||!present(probe.ApplicationReleaseDigest,probe.SuiteDigest,probe.EvidenceDigest)||probe.ApplicationReleaseDigest!=p.ApplicationReleaseDigest||probe.SuiteDigest!=p.InvariantSuiteDigest||!withinFreshness(probe.ObservedAt,probe.FreshUntil,req.EvaluatedAt){r.FailedProbes=append(r.FailedProbes,probe.ID);continue}
@@ -213,8 +219,9 @@ func Evaluate(req Request)Result{
 	if !readSeen||!writeSeen{return done(Indeterminate,"service recovery requires qualified read and safe write/readback probes",r)}
 	ac:=req.Acceptance
 	if !ac.TrafficEnabled||!ac.OldPrimaryFenced||!ac.StaleEndpointsFenced{return done(Denied,"traffic is not safely enabled after old-primary and endpoint fencing",r)}
-	if !ac.ObserverVerified||!present(ac.ObserverID,ac.ObserverControlRoot,ac.ObserverIdentityDigest,ac.ObserverMembershipDigest,ac.EvidenceDigest)||ac.ObserverControlRoot==p.SourceControlRoot||ac.ObserverControlRoot==x.ControlRoot{return done(Indeterminate,"independent service acceptance observer is not qualified",r)}
-	if !validStamp(ac.ReadyAt)||ac.ReadyAt.Domain!=p.IncidentAt.Domain{return done(Indeterminate,"service-ready timestamp is incomparable or untrusted",r)}
+	if !ac.ObserverVerified||!present(ac.ObserverID,ac.ObserverControlRoot,ac.ObserverIdentityDigest,ac.ObserverMembershipDigest,ac.EvidenceDigest)||ac.ObserverID==p.SourceSystem||ac.ObserverID==x.EnvironmentID||ac.ObserverControlRoot==p.SourceControlRoot||ac.ObserverControlRoot==x.ControlRoot{return done(Indeterminate,"independent service acceptance observer is not qualified",r)}
+	if !validStamp(ac.FencingCompletedAt)||!validStamp(ac.TrafficEnabledAt)||!validStamp(ac.ReadyAt)||ac.FencingCompletedAt.Domain!=p.IncidentAt.Domain||ac.TrafficEnabledAt.Domain!=p.IncidentAt.Domain||ac.ReadyAt.Domain!=p.IncidentAt.Domain{return done(Indeterminate,"service fencing/traffic/ready timestamps are incomparable or untrusted",r)}
+	if ac.FencingCompletedAt.UnixNanos<x.DatabaseReadyAt.UnixNanos||ac.TrafficEnabledAt.UnixNanos<ac.FencingCompletedAt.UnixNanos||ac.TrafficEnabledAt.UnixNanos<x.DatabaseReadyAt.UnixNanos||ac.ReadyAt.UnixNanos<ac.TrafficEnabledAt.UnixNanos{return done(Denied,"traffic or service acceptance preceded database readiness/fencing",r)}
 	r.ServiceRTOUpperNanos=(ac.ReadyAt.UnixNanos+ac.ReadyAt.UncertaintyNanos)-(p.IncidentAt.UnixNanos-p.IncidentAt.UncertaintyNanos)
 	if r.ServiceRTOUpperNanos<0{return done(Divergent,"service-ready time precedes incident boundary",r)}
 	if r.ServiceRTOUpperNanos>p.MaxServiceRTOUpperNanos{return done(Denied,"service RTO exceeds declared objective",r)}
