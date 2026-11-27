@@ -1,0 +1,6 @@
+{
+  "schema_version": "mace_dsm_arm_manifest_v0_1",
+  "expected_arm_ids": [
+    "synthetic-qualified-control"
+  ]
+}
