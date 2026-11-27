@@ -1929,7 +1929,7 @@ mod tests {
             let mut request = [0u8; 2048];
             let _ = stream.read(&mut request).await.unwrap();
             let response = format!(
-                "HTTP/1.1 302 Found\\r\\nLocation: http://{next_hop_addr}/internal\\r\\nContent-Length: 0\\r\\nConnection: close\\r\\n\\r\\n"
+                "HTTP/1.1 302 Found\r\nLocation: http://{next_hop_addr}/internal\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             );
             stream.write_all(response.as_bytes()).await.unwrap();
         });
