@@ -12,7 +12,7 @@ pub use bm25::{
     weighted_rrf_v1,
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 const SCHEMA_VERSION: &str = "mace_raw_trajectory_candidate_v0_1";
 
@@ -38,6 +38,7 @@ struct SourceDocumentWireV1 {
     scope_id: String,
     observed_at_ms: u64,
     valid_from_ms: u64,
+    #[serde(deserialize_with = "deserialize_required_option")]
     valid_until_ms: Option<u64>,
     authority_tier: AuthorityTierWireV1,
     uncertainty_ppm: u32,
@@ -113,6 +114,21 @@ fn default_rrf_k() -> u32 {
     60
 }
 
+fn deserialize_required_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
+}
+
+fn check_max_length(field: &str, value: &str, maximum: usize) -> Result<(), AdapterErrorV1> {
+    if value.chars().count() > maximum {
+        return Err(AdapterErrorV1::InvalidCandidateField(field.to_owned()));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResolvedEvidenceV1 {
     pub document_id: String,
@@ -139,6 +155,7 @@ pub struct FixtureExecutionV1 {
 pub enum AdapterErrorV1 {
     InvalidJson(String),
     UnsupportedSchemaVersion,
+    InvalidCandidateField(String),
     Index(String),
     Search(String),
     Fusion(String),
@@ -165,6 +182,37 @@ impl SourceDocumentWireV1 {
     }
 }
 
+fn validate_candidate_wire(fixture: &CandidateFixtureWireV1) -> Result<(), AdapterErrorV1> {
+    check_max_length("query.query_text", &fixture.query.query_text, 20_000)?;
+    check_max_length("query.scope_id", &fixture.query.scope_id, 256)?;
+    if fixture.query.top_k > 1_000
+        || fixture.top_k.is_some_and(|top_k| top_k > 1_000)
+    {
+        return Err(AdapterErrorV1::InvalidCandidateField("top_k".to_owned()));
+    }
+
+    for document in &fixture.documents {
+        check_max_length("document.document_id", &document.document_id, 256)?;
+        check_max_length("document.source_id", &document.source_id, 256)?;
+        check_max_length("document.scope_id", &document.scope_id, 256)?;
+        check_max_length("document.text", &document.text, 200_000)?;
+        if let Some(family) = &document.source_family {
+            check_max_length("document.source_family", family, 256)?;
+        }
+        for parent in &document.parent_event_ids {
+            check_max_length("document.parent_event_ids", parent, 256)?;
+        }
+    }
+
+    for channel in &fixture.ranked_channels {
+        check_max_length("ranked_channel.channel_id", &channel.channel_id, 128)?;
+        for document_id in &channel.document_ids {
+            check_max_length("ranked_channel.document_ids", document_id, 256)?;
+        }
+    }
+    Ok(())
+}
+
 /// Parse, validate, index, retrieve and resolve a frozen candidate-only fixture.
 ///
 /// Returned IDs are resolved by exact event identity. No text-similarity join
@@ -175,6 +223,7 @@ pub fn run_candidate_fixture_v1(json: &str) -> Result<FixtureExecutionV1, Adapte
     if fixture.schema_version != SCHEMA_VERSION {
         return Err(AdapterErrorV1::UnsupportedSchemaVersion);
     }
+    validate_candidate_wire(&fixture)?;
 
     let documents = fixture
         .documents
@@ -308,6 +357,38 @@ mod tests {
         assert_eq!(
             run_candidate_fixture_v1(&unsupported),
             Err(AdapterErrorV1::UnsupportedSchemaVersion)
+        );
+    }
+
+    #[test]
+    fn required_nullable_valid_until_field_cannot_be_omitted() {
+        let missing = FIXTURE.replace(
+            "            \"valid_until_ms\": 300,\n",
+            "",
+        );
+        assert!(matches!(
+            run_candidate_fixture_v1(&missing),
+            Err(AdapterErrorV1::InvalidJson(_))
+        ));
+    }
+
+    #[test]
+    fn documented_string_and_top_k_limits_are_enforced_before_indexing() {
+        let oversized_text = FIXTURE.replace(
+            "Pump P-17 pressure inspection completed.",
+            &"x".repeat(200_001),
+        );
+        assert_eq!(
+            run_candidate_fixture_v1(&oversized_text),
+            Err(AdapterErrorV1::InvalidCandidateField("document.text".into()))
+        );
+
+        let mut value: serde_json::Value = serde_json::from_str(FIXTURE).unwrap();
+        value["query"]["top_k"] = serde_json::json!(1_001);
+        let oversized_top_k = serde_json::to_string(&value).unwrap();
+        assert_eq!(
+            run_candidate_fixture_v1(&oversized_top_k),
+            Err(AdapterErrorV1::InvalidCandidateField("top_k".into()))
         );
     }
 
