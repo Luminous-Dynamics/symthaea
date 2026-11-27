@@ -390,7 +390,7 @@ fn summarize(
         config,
     );
     let mut reason_counts = BTreeMap::<String, usize>::new();
-    for record in &eligible {
+    for record in records {
         if record.model_abstained {
             let reason = record
                 .abstention_reason
@@ -790,11 +790,15 @@ mod tests {
         abstained.abstention_reason = Some("insufficient_evidence".to_string());
         let mut unspecified = record("b", 0.3, true, Some(false));
         unspecified.model_abstained = true;
-        let report = evaluate_risk_coverage(&[abstained, unspecified], &config()).unwrap();
+        let mut pending = record("pending", 0.2, true, None);
+        pending.model_abstained = true;
+        pending.abstention_reason = Some("awaiting_adjudication".to_string());
+        let report =
+            evaluate_risk_coverage(&[abstained, unspecified, pending], &config()).unwrap();
         let observed = report.report.observed_model_policy.as_ref().unwrap();
         assert_eq!(observed.policy.accepted_count, 0);
         assert_eq!(observed.policy.abstained_count, 2);
-        assert_eq!(observed.abstention_reasons.len(), 2);
+        assert_eq!(observed.abstention_reasons.len(), 3);
         assert!(observed.policy.risk.is_none());
     }
 
