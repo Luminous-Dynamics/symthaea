@@ -385,6 +385,46 @@ fn audit(fixture: &Value) -> Result<(), String> {
         }
     }
 
+    let scalar_search = field(response_qualification, "scalar_separation_oracle")?;
+    require_string(scalar_search, "status", "design_only_not_executed")?;
+    require_string(
+        scalar_search,
+        "method",
+        "branch_conditioned_lipschitz_branch_and_bound_1d",
+    )?;
+    if !boolean(scalar_search, "interior_search_required")?
+        || boolean(scalar_search, "boundary_only_search_sufficient")?
+        || !boolean(scalar_search, "full_order_confirmation_required")?
+    {
+        return Err("adversarial pulse search must include interior points and full-order confirmation".to_owned());
+    }
+    require_string(
+        scalar_search,
+        "lipschitz_certificate_status",
+        "not_issued_synthetic",
+    )?;
+    require_string(
+        scalar_search,
+        "branch_stability_evidence_status",
+        "not_issued_synthetic",
+    )?;
+    require_string(
+        scalar_search,
+        "budget_exhaustion_disposition",
+        "unqualified",
+    )?;
+    require_string(
+        scalar_search,
+        "global_bound_claim_status",
+        "conditional_on_valid_lipschitz_and_branch_evidence",
+    )?;
+    let parameter_axes = string_array(scalar_search, "continuous_parameter_axes")?;
+    for axis in ["pulse_phase", "kick_amplitude", "pulse_separation"] {
+        if !parameter_axes.iter().any(|value| value == axis) {
+            return Err(format!("continuous adversarial search axis {axis} is missing"));
+        }
+    }
+
     let resources = field(fixture, "resource_budget")?;
     for comparison in [
         "equal_rank",
