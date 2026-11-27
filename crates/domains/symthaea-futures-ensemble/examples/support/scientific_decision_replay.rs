@@ -115,6 +115,14 @@ impl DecisionObjectiveReference {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PermittedActionOfferRef {
+    /// Upstream AgentView offer ID from #11015; this contract does not mint offers.
+    pub offer_id: String,
+    /// Exact payload digest on the upstream offer.
+    pub action_payload_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CandidateDecisionContext {
     pub schema_version: u16,
     pub episode_id: String,
@@ -135,7 +143,8 @@ pub struct CandidateDecisionContext {
     pub context_digest: String,
     /// Decision-local references only; artifact/evidence custody stays with its upstream owner.
     pub evidence_available_at_decision: Vec<EvidenceReference>,
-    pub permitted_action_ids: Vec<String>,
+    /// Exact upstream offer IDs and their payload digests, projected from #11015 AgentView.
+    pub permitted_action_offers: Vec<PermittedActionOfferRef>,
     pub estimated_budget: ResourceVector,
 }
 impl CandidateDecisionContext {
@@ -153,10 +162,16 @@ impl CandidateDecisionContext {
         if self.schema_version != SCHEMA_VERSION {
             return Err("unsupported schema version".into());
         }
-        if self.permitted_action_ids.is_empty() {
-            return Err("permitted action set is empty".into());
+        if self.permitted_action_offers.is_empty() {
+            return Err("permitted action offer set is empty".into());
         }
-        ensure_unique("permitted_action_ids", &self.permitted_action_ids)?;
+        let mut offer_ids = Vec::with_capacity(self.permitted_action_offers.len());
+        for offer in &self.permitted_action_offers {
+            require_nonempty("upstream offer_id", &offer.offer_id)?;
+            validate_sha256("upstream offer payload digest", &offer.action_payload_sha256)?;
+            offer_ids.push(offer.offer_id.clone());
+        }
+        ensure_unique("permitted_action_offer_ids", &offer_ids)?;
         if self.deadline_ms.is_some_and(|d| d < self.decision_time_ms) {
             return Err("deadline precedes decision time".into());
         }
@@ -172,8 +187,15 @@ impl CandidateDecisionContext {
         }
         Ok(())
     }
-    pub fn permits(&self, action: &str) -> bool {
-        self.permitted_action_ids.iter().any(|id| id == action)
+    pub fn offered_payload_digest(&self, offer_id: &str) -> Option<&str> {
+        self.permitted_action_offers
+            .iter()
+            .find(|offer| offer.offer_id == offer_id)
+            .map(|offer| offer.action_payload_sha256.as_str())
+    }
+
+    pub fn permits(&self, offer_id: &str) -> bool {
+        self.offered_payload_digest(offer_id).is_some()
     }
 }
 
@@ -247,8 +269,11 @@ impl DecisionProposal {
         if self.episode_id != c.episode_id {
             return Err("proposal episode mismatch".into());
         }
-        if !c.permits(&self.selected_action_id) {
-            return Err("selected action outside permitted set".into());
+        let offered_payload = c
+            .offered_payload_digest(&self.selected_action_id)
+            .ok_or_else(|| "selected action outside permitted offer set".to_string())?;
+        if offered_payload != self.selected_action_payload_digest {
+            return Err("selected action payload differs from upstream permitted offer".into());
         }
         if self.predicted_outcomes.is_empty() {
             return Err("predicted outcome distribution is empty".into());
@@ -273,9 +298,9 @@ impl DecisionProposal {
                 protocol_ref,
             } => {
                 require_nonempty("randomization protocol reference", protocol_ref)?;
-                if action_probabilities.len() != c.permitted_action_ids.len() {
+                if action_probabilities.len() != c.permitted_action_offers.len() {
                     return Err(
-                        "randomized policy must log probabilities for every permitted action"
+                        "randomized policy must log probabilities for every permitted action offer"
                             .into(),
                     );
                 }
@@ -288,8 +313,16 @@ impl DecisionProposal {
                         "randomized action_payload_digest",
                         &entry.action_payload_digest,
                     )?;
-                    if !c.permits(&entry.action_id) {
-                        return Err("randomization distribution contains an action outside the permitted set".into());
+                    let offered_payload = c
+                        .offered_payload_digest(&entry.action_id)
+                        .ok_or_else(|| {
+                            "randomization distribution contains an action outside the permitted offers"
+                                .to_string()
+                        })?;
+                    if offered_payload != entry.action_payload_digest {
+                        return Err(
+                            "randomization payload differs from upstream permitted offer".into(),
+                        );
                     }
                     if entry.probability_micros > PROBABILITY_SCALE {
                         return Err("action propensity exceeds probability scale".into());
@@ -627,7 +660,18 @@ mod tests {
                 observed_at_ms: 80,
                 available_at_ms: 90,
             }],
-            permitted_action_ids: vec!["a".into(), "b".into()],
+            permitted_action_offers: vec![
+                PermittedActionOfferRef {
+                    offer_id: "a".into(),
+                    action_payload_sha256:
+                        "6666666666666666666666666666666666666666666666666666666666666666".into(),
+                },
+                PermittedActionOfferRef {
+                    offer_id: "b".into(),
+                    action_payload_sha256:
+                        "7777777777777777777777777777777777777777777777777777777777777777".into(),
+                },
+            ],
             estimated_budget: ResourceVector::default(),
         }
     }
@@ -785,7 +829,7 @@ mod tests {
         assert!(
             p.validate_against(&c)
                 .unwrap_err()
-                .contains("every permitted action")
+                .contains("every permitted action offer")
         );
 
         p.assignment_mechanism = AssignmentMechanism::Randomized {
@@ -811,6 +855,19 @@ mod tests {
                 .contains("selected action must have nonzero")
         );
     }
+    #[test]
+    fn rejects_selected_payload_not_present_on_upstream_offer() {
+        let c = context();
+        let mut p = proposal(&c);
+        p.selected_action_payload_digest =
+            "9999999999999999999999999999999999999999999999999999999999999999".into();
+        assert!(
+            p.validate_against(&c)
+                .unwrap_err()
+                .contains("differs from upstream permitted offer")
+        );
+    }
+
     #[test]
     fn rejects_unauthorized_action() {
         let c = context();
