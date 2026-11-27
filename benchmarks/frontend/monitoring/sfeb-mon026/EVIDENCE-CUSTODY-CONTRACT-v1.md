@@ -38,7 +38,7 @@ The root is SHA-256 over a domain-separated, length-prefixed binary encoding:
 
 JSON serialization bytes are not signed directly. This means whitespace, property ordering and equivalent JSON formatting do not affect the semantic root. Artifact path, size, digest, role, producer, timestamp and clock metadata all affect the root.
 
-The Ed25519 message is domain-separated from other protocols and contains the root digest. The signature is not included in the root calculation, avoiding a cycle.
+The Ed25519 message is domain-separated from other protocols and contains the root digest. The signature is not included in the root calculation, avoiding a cycle. The signature message additionally binds the algorithm and signer key ID, so swapping key identity metadata invalidates the signature.
 
 ## 4. Trust model
 
@@ -53,7 +53,7 @@ The v1 verifier does not decide how keys are provisioned, rotated, revoked or pr
 
 ## 5. Chain semantics
 
-A first bundle uses sequence 1 and has no previous root. Later bundles must:
+A verifier must supply the exact expected run ID and sequence out of band. A first bundle uses sequence 1 and has no previous root. Later bundles must:
 - increment the sequence by exactly one;
 - include the prior manifest root;
 - be checked against the verifier's separately supplied expected previous root.
@@ -66,7 +66,7 @@ Paths use normalized forward-slash relative form. Absolute paths, empty paths, `
 
 The verifier requires the bundle directory to contain exactly the declared regular files (no unlisted files or symlinks), then checks observed size and SHA-256 against the signed manifest. Missing files, size mismatch or digest mismatch block the bundle. File bytes remain outside the manifest, so copying the bundle preserves the raw artifacts and permits independent re-hashing.
 
-The current reference rejects symlinks and validates all path components before opening. It assumes the bundle is quiescent during verification; a hostile concurrent filesystem mutation could require stronger platform-specific no-follow APIs or immutable storage.
+The current reference requires an exact directory inventory: every regular file below the artifact root must be listed in the signed manifest, and symlink/non-regular entries are rejected. Keep the manifest/signature envelope outside the artifact root. It rejects symlinks and validates all path components before opening. It assumes the bundle is quiescent during verification; a hostile concurrent filesystem mutation could require stronger platform-specific no-follow APIs or immutable storage.
 
 ## 7. Clock and freshness semantics
 
