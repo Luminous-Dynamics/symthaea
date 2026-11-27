@@ -37,17 +37,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert!(pulse_check.parameter_jacobian_max_abs_error < 1.0e-8);
     assert!(pulse_check.symplectic_defect < 1.0e-14);
 
+    let mapped_point = pulse.apply(0.23, -0.4)?;
     let event_time = pulse.application_time_sensitivity(
         0.23,
         -0.4,
-        0.0,
-        0.0,
+        PhaseSpaceTangent {
+            dx_dt: -0.4,
+            dv_dt: 0.0,
+        },
+        PhaseSpaceTangent {
+            dx_dt: mapped_point.v,
+            dv_dt: 0.0,
+        },
         PhaseSpaceTangent {
             dx_dt: 0.0,
             dv_dt: 0.0,
         },
     )?;
-    assert!(event_time.x.is_finite() && event_time.v.is_finite());
+    assert!(event_time.dx_dt.is_finite() && event_time.dv_dt.is_finite());
 
     let velocity_edges = (0..=16)
         .map(|index| -4.0 + 0.5 * index as f64)
