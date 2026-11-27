@@ -89,6 +89,6 @@ jobs:
           name: scientific-decision-replay-cargo-lock
           path: tools/sym-rsi-decision-replay-contract/Cargo.lock
       - name: Run isolated decision and custody contract tests
-        run: cargo test --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml
+        run: cargo test --locked --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml
       - name: Strict Clippy for isolated contract harness
-        run: cargo clippy --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml --all-targets -- -D warnings
