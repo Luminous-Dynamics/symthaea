@@ -30,6 +30,8 @@ type FaultScenario struct {
 	Class string `json:"class"`
 	Name string `json:"name"`
 	ExpectedOutcome string `json:"expected_outcome"`
+	Injection string `json:"injection"`
+	Notes string `json:"notes"`
 }
 
 type OracleDocument struct {
@@ -102,8 +104,9 @@ func BuildSuiteFromMON025(
 	seen:=make(map[string]struct{},len(matrix.Scenarios))
 	cases:=make([]CaseSpec,0,len(matrix.Scenarios))
 	for _,scenario:=range matrix.Scenarios {
-		if scenario.ID=="" {
-			return Suite{},fmt.Errorf("%w: matrix case ID missing",ErrInvalidSuite)
+		if scenario.ID=="" || scenario.Name=="" ||
+			(scenario.Class!="positive_control" && scenario.Class!="negative_control" && scenario.Class!="indeterminate_control") {
+			return Suite{},fmt.Errorf("%w: matrix case identity/class invalid",ErrInvalidSuite)
 		}
 		if _,exists:=seen[scenario.ID]; exists {
 			return Suite{},fmt.Errorf("%w: duplicate matrix case %q",ErrOracleMismatch,scenario.ID)
@@ -154,13 +157,13 @@ func decodeStrictJSON(raw []byte,destination any) error {
 }
 
 func readProfileID(raw []byte) (string,error) {
-	var profile struct {
-		Profile string `json:"profile"`
-		Version string `json:"version"`
-	}
-	if err:=decodeStrictJSON(raw,&profile); err!=nil { return "",err }
-	if profile.Profile=="" || profile.Version=="" { return "",ErrInvalidSuite }
-	return profile.Profile,nil
+	var fields map[string]json.RawMessage
+	if err:=decodeStrictJSON(raw,&fields); err!=nil { return "",err }
+	var profile,version string
+	if err:=json.Unmarshal(fields["profile"],&profile); err!=nil { return "",err }
+	if err:=json.Unmarshal(fields["version"],&version); err!=nil { return "",err }
+	if profile=="" || version=="" { return "",ErrInvalidSuite }
+	return profile,nil
 }
 
 func sha256Hex(raw []byte) string {
