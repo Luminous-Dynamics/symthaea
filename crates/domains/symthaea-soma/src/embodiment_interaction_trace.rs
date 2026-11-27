@@ -83,7 +83,6 @@ struct AuthorizationRecord {
     clock_domain_id: String,
     expires_at_monotonic_ns: u64,
     action_scope: HashSet<String>,
-    policy_version: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -332,7 +331,6 @@ impl InteractionTraceVerifier {
                             clock_domain_id: clock_domain_id.clone(),
                             expires_at_monotonic_ns: expires,
                             action_scope,
-                            policy_version,
                         };
                         authorization_by_sequence.insert(sequence, record);
                         authorization_by_key.entry(key).or_default().push(sequence);
@@ -983,6 +981,66 @@ mod tests {
         assert_eq!(
             InteractionTraceVerifier::verify_value(&trace),
             Err(InteractionTraceError::PolicyVersionRegression { index: 2 })
+        );
+    }
+
+    #[test]
+    fn authorization_privacy_must_match_the_semantic_cue() {
+        let mut trace = valid_trace();
+        trace["events"][2]["privacy_class"] = json!("restricted");
+        assert_eq!(
+            InteractionTraceVerifier::verify_value(&trace),
+            Err(InteractionTraceError::PrivacyMismatch { index: 2 })
+        );
+    }
+
+    fn append_scoped_actuator_authorization(trace: &mut Value, action_scope: &[&str]) {
+        append_event(
+            trace,
+            json!({
+                "sequence":8,"at_monotonic_ns":160,"clock_domain_id":"clock:synthetic-1",
+                "event_type":"authorization","decision":"authorized","grant_id":"grant:2",
+                "permit_digest":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "canonical_cue_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "channel":"actuator","destination":"local_private","expires_at_monotonic_ns":900,
+                "policy_version":4,"semantic_event_id":"event:1","form":"living_constellation",
+                "privacy_class":"public","action_scope":action_scope
+            }),
+        );
+    }
+
+    #[test]
+    fn explicitly_scoped_actuator_action_is_accepted() {
+        let mut trace = valid_trace();
+        append_scoped_actuator_authorization(&mut trace, &["robot.move"]);
+        append_event(
+            &mut trace,
+            json!({
+                "sequence":9,"at_monotonic_ns":165,"clock_domain_id":"clock:synthetic-1",
+                "event_type":"action","action_id":"action:move-1","action_kind":"robot.move",
+                "authorization_sequence":8,"state":"completed","side_effect":true,
+                "outcome_digest":null
+            }),
+        );
+        assert!(InteractionTraceVerifier::verify_value(&trace).is_ok());
+    }
+
+    #[test]
+    fn actuator_action_outside_the_permit_scope_is_rejected() {
+        let mut trace = valid_trace();
+        append_scoped_actuator_authorization(&mut trace, &["robot.move"]);
+        append_event(
+            &mut trace,
+            json!({
+                "sequence":9,"at_monotonic_ns":165,"clock_domain_id":"clock:synthetic-1",
+                "event_type":"action","action_id":"action:open-1","action_kind":"robot.open",
+                "authorization_sequence":8,"state":"completed","side_effect":true,
+                "outcome_digest":null
+            }),
+        );
+        assert_eq!(
+            InteractionTraceVerifier::verify_value(&trace),
+            Err(InteractionTraceError::ActionAuthorizationMissing { index: 9 })
         );
     }
 }
