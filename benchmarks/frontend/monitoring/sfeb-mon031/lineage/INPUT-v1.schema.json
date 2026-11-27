@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon031-backup-lineage-input-v1.schema.json",
+  "title": "MON-031 PostgreSQL Backup Lineage Qualification Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "version", "policy", "backups"],
+  "properties": {
+    "profile": {"const": "mon031-backup-lineage-input-v1"},
+    "version": {"const": "1.0.0"},
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_id", "current_server_version", "expected_system_identifier"],
+      "properties": {
+        "candidate_id": {"type": "string", "minLength": 1},
+        "current_server_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"},
+        "expected_system_identifier": {"type": "string", "minLength": 1},
+        "minimum_full_backup_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"}
+      }
+    },
+    "backups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "server_version", "system_identifier", "created_at", "integrity_status", "wal_archive_status"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "type": {"enum": ["full", "incremental"]},
+          "server_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"},
+          "system_identifier": {"type": "string", "minLength": 1},
+          "created_at": {"type": "string", "format": "date-time"},
+          "parent_id": {"type": "string"},
+          "integrity_status": {"enum": ["verified", "failed", "unknown"]},
+          "wal_archive_status": {"enum": ["verified", "failed", "unknown"]}
+        }
+      }
+    }
+  }
+}

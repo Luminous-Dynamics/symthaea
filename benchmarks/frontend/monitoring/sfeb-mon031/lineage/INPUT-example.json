@@ -1,0 +1,41 @@
+{
+  "profile": "mon031-backup-lineage-input-v1",
+  "version": "1.0.0",
+  "policy": {
+    "candidate_id": "pg18-incremental-002",
+    "current_server_version": "18.7",
+    "expected_system_identifier": "7438291029384756102",
+    "minimum_full_backup_version": "18.7"
+  },
+  "backups": [
+    {
+      "id": "pg18-full-after-18-7",
+      "type": "full",
+      "server_version": "18.7",
+      "system_identifier": "7438291029384756102",
+      "created_at": "2026-11-20T10:00:00Z",
+      "integrity_status": "verified",
+      "wal_archive_status": "verified"
+    },
+    {
+      "id": "pg18-incremental-001",
+      "type": "incremental",
+      "server_version": "18.7",
+      "system_identifier": "7438291029384756102",
+      "created_at": "2026-11-20T11:00:00Z",
+      "parent_id": "pg18-full-after-18-7",
+      "integrity_status": "verified",
+      "wal_archive_status": "verified"
+    },
+    {
+      "id": "pg18-incremental-002",
+      "type": "incremental",
+      "server_version": "18.7",
+      "system_identifier": "7438291029384756102",
+      "created_at": "2026-11-20T12:00:00Z",
+      "parent_id": "pg18-incremental-001",
+      "integrity_status": "verified",
+      "wal_archive_status": "verified"
+    }
+  ]
+}
