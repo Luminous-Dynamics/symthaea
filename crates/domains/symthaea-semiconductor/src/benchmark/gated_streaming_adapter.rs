@@ -87,10 +87,37 @@ pub struct StreamingAdapterPolicyV1 {
     pub minimum_context_support: u64,
     pub temporal_ema_alpha: f64,
     pub temporal_activation_threshold: f64,
+    pub temporal_threshold_calibration: Option<TemporalThresholdCalibrationReceiptV1>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TemporalThresholdCalibrationReceiptV1 {
+    pub schema: String,
+    pub training_manifest_sha256: String,
+    pub residual_count: usize,
+    pub quantile: f64,
+    pub threshold: f64,
+    pub receipt_sha256: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StreamingContextLevelV1 {
+    Equipment,
+    Chamber,
+    EquipmentChamber,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct StreamingContextIdentityV1 {
+    pub equipment_id: Option<String>,
+    pub chamber_id: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StreamingContextStateV1 {
+    pub level: StreamingContextLevelV1,
+    pub context_id: String,
     pub residual_ema: f64,
     pub support_count: u64,
 }
@@ -99,6 +126,7 @@ pub struct StreamingContextStateV1 {
 pub struct StreamingAdapterStateV1 {
     pub feature_weights: Vec<f64>,
     pub global_context_residual_ema: f64,
+    pub global_context_support_count: u64,
     pub global_temporal_residual_ema: f64,
     pub contexts: BTreeMap<String, StreamingContextStateV1>,
     pub accepted_update_count: u64,
@@ -136,7 +164,7 @@ pub struct StreamingPredictionInputV1 {
     pub selected_feature_indices: Vec<usize>,
     /// Prediction from the immutable/global VM model.
     pub global_baseline_prediction: f64,
-    pub context_key: Option<String>,
+    pub context_identity: Option<StreamingContextIdentityV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -152,7 +180,7 @@ pub struct StreamingPredictionReceiptV1 {
     pub global_model_artifact_sha256: String,
     pub feature_schema_sha256: String,
     pub policy_sha256: String,
-    pub context_key: Option<String>,
+    pub context_identity: Option<StreamingContextIdentityV1>,
     pub feature_vector_sha256: String,
     pub selected_feature_indices: Vec<usize>,
     /// The selected feature values are frozen at prediction time for delayed updates.
@@ -299,6 +327,28 @@ fn validate_policy(policy: &StreamingAdapterPolicyV1) -> Result<(), GatedStreami
             "streaming adapter policy contains invalid numeric parameters".into(),
         ));
     }
+    if let Some(receipt) = &policy.temporal_threshold_calibration {
+        if receipt.schema != "luminous.semi-bench.temporal-threshold-calibration.v1"
+            || !valid_sha256(&receipt.training_manifest_sha256)
+            || receipt.residual_count == 0
+            || !receipt.quantile.is_finite()
+            || !(0.0..=1.0).contains(&receipt.quantile)
+            || !receipt.threshold.is_finite()
+            || receipt.threshold < 0.0
+            || receipt.threshold != policy.temporal_activation_threshold
+        {
+            return Err(GatedStreamingAdapterErrorV1(
+                "temporal threshold calibration receipt is invalid or inconsistent".into(),
+            ));
+        }
+        let mut canonical = receipt.clone();
+        canonical.receipt_sha256.clear();
+        if json_sha256(&canonical)? != receipt.receipt_sha256 {
+            return Err(GatedStreamingAdapterErrorV1(
+                "temporal threshold calibration receipt digest mismatch".into(),
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -337,11 +387,11 @@ fn validate_engine(
             .adapter_state
             .global_temporal_residual_ema
             .is_finite()
-        || engine
-            .adapter_state
-            .contexts
-            .values()
-            .any(|context| !context.residual_ema.is_finite())
+        || engine.adapter_state.contexts.iter().any(|(key, context)| {
+            !context.residual_ema.is_finite()
+                || context.support_count == 0
+                || context_id_key(context.level, &context.context_id) != *key
+        })
     {
         return Err(GatedStreamingAdapterErrorV1(
             "streaming adapter state contains an invalid numeric value".into(),
@@ -389,6 +439,7 @@ pub fn create_gated_streaming_adapter_engine_v1(
         adapter_state: StreamingAdapterStateV1 {
             feature_weights: initial_feature_weights,
             global_context_residual_ema: 0.0,
+            global_context_support_count: 0,
             global_temporal_residual_ema: 0.0,
             contexts: BTreeMap::new(),
             accepted_update_count: 0,
@@ -400,22 +451,168 @@ pub fn create_gated_streaming_adapter_engine_v1(
     })
 }
 
-fn context_correction(engine: &GatedStreamingAdapterEngineV1, context_key: Option<&str>) -> f64 {
-    let Some(key) = context_key else {
-        return engine.adapter_state.global_context_residual_ema;
+fn context_id_key(level: StreamingContextLevelV1, context_id: &str) -> String {
+    let level_name = match level {
+        StreamingContextLevelV1::Equipment => "equipment",
+        StreamingContextLevelV1::Chamber => "chamber",
+        StreamingContextLevelV1::EquipmentChamber => "equipment_chamber",
     };
-    let Some(local) = engine.adapter_state.contexts.get(key) else {
-        return engine.adapter_state.global_context_residual_ema;
-    };
-    let minimum = engine.policy.minimum_context_support as f64;
-    let support = local.support_count as f64;
-    let local_weight = if minimum <= 0.0 {
+    format!("{level_name}:{}:{context_id}", context_id.len())
+}
+
+fn context_entries(
+    identity: &StreamingContextIdentityV1,
+) -> Vec<(StreamingContextLevelV1, String)> {
+    let mut entries = Vec::new();
+    if let Some(equipment_id) = &identity.equipment_id {
+        entries.push((StreamingContextLevelV1::Equipment, equipment_id.clone()));
+    }
+    if let Some(chamber_id) = &identity.chamber_id {
+        entries.push((StreamingContextLevelV1::Chamber, chamber_id.clone()));
+    }
+    if let (Some(equipment_id), Some(chamber_id)) =
+        (&identity.equipment_id, &identity.chamber_id)
+    {
+        let pair_id = format!(
+            "{}:{}|{}:{}",
+            equipment_id.len(),
+            equipment_id,
+            chamber_id.len(),
+            chamber_id
+        );
+        entries.push((StreamingContextLevelV1::EquipmentChamber, pair_id));
+    }
+    entries
+}
+
+fn reliability_weight(support_count: u64, minimum_support: u64) -> f64 {
+    if minimum_support == 0 {
         1.0
     } else {
-        support / (support + minimum)
+        let support = support_count as f64;
+        support / (support + minimum_support as f64)
+    }
+}
+
+fn context_correction(
+    engine: &GatedStreamingAdapterEngineV1,
+    identity: Option<&StreamingContextIdentityV1>,
+) -> f64 {
+    let mut weighted_sum = 0.0;
+    let mut weight_sum = 0.0;
+    let global_weight = reliability_weight(
+        engine.adapter_state.global_context_support_count,
+        engine.policy.minimum_context_support,
+    );
+    weighted_sum += global_weight * engine.adapter_state.global_context_residual_ema;
+    weight_sum += global_weight;
+
+    if let Some(identity) = identity {
+        for (level, context_id) in context_entries(identity) {
+            let key = context_id_key(level, &context_id);
+            if let Some(context) = engine.adapter_state.contexts.get(&key) {
+                let weight = reliability_weight(
+                    context.support_count,
+                    engine.policy.minimum_context_support,
+                );
+                weighted_sum += weight * context.residual_ema;
+                weight_sum += weight;
+            }
+        }
+    }
+    if weight_sum <= f64::EPSILON {
+        0.0
+    } else {
+        weighted_sum / weight_sum
+    }
+}
+
+fn update_context_hierarchy(
+    state: &mut StreamingAdapterStateV1,
+    policy: &StreamingAdapterPolicyV1,
+    identity: Option<&StreamingContextIdentityV1>,
+    residual: f64,
+) -> Result<(), GatedStreamingAdapterErrorV1> {
+    let next_global_support = state
+        .global_context_support_count
+        .checked_add(1)
+        .ok_or_else(|| GatedStreamingAdapterErrorV1("global context support overflow".into()))?;
+    let global_alpha = policy.global_context_ema_alpha;
+    state.global_context_residual_ema =
+        (1.0 - global_alpha) * state.global_context_residual_ema + global_alpha * residual;
+    state.global_context_support_count = next_global_support;
+
+    if let Some(identity) = identity {
+        for (level, context_id) in context_entries(identity) {
+            let key = context_id_key(level, &context_id);
+            let entry = state.contexts.entry(key).or_insert(StreamingContextStateV1 {
+                level,
+                context_id,
+                residual_ema: residual,
+                support_count: 0,
+            });
+            let next_support = entry
+                .support_count
+                .checked_add(1)
+                .ok_or_else(|| GatedStreamingAdapterErrorV1("context support count overflow".into()))?;
+            if entry.support_count > 0 {
+                let alpha = policy.local_context_ema_alpha;
+                entry.residual_ema = (1.0 - alpha) * entry.residual_ema + alpha * residual;
+            }
+            entry.support_count = next_support;
+            if !entry.residual_ema.is_finite() {
+                return Err(GatedStreamingAdapterErrorV1(
+                    "local context candidate state is non-finite".into(),
+                ));
+            }
+        }
+    }
+    if !state.global_context_residual_ema.is_finite() {
+        return Err(GatedStreamingAdapterErrorV1(
+            "global context candidate state is non-finite".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Calibrates the fast temporal activation threshold using only a frozen
+/// training-residual sample; the receipt is then sealed into the policy.
+pub fn calibrate_streaming_temporal_threshold_v1(
+    mut policy: StreamingAdapterPolicyV1,
+    training_manifest_sha256: &str,
+    training_residuals: &[f64],
+    quantile: f64,
+) -> Result<StreamingAdapterPolicyV1, GatedStreamingAdapterErrorV1> {
+    if !valid_sha256(training_manifest_sha256)
+        || training_residuals.is_empty()
+        || !quantile.is_finite()
+        || !(0.0..=1.0).contains(&quantile)
+        || training_residuals.iter().any(|value| !value.is_finite())
+    {
+        return Err(GatedStreamingAdapterErrorV1(
+            "temporal threshold calibration inputs are invalid".into(),
+        ));
+    }
+    let mut absolute: Vec<f64> = training_residuals.iter().map(|value| value.abs()).collect();
+    absolute.sort_by(f64::total_cmp);
+    let rank = quantile * absolute.len().saturating_sub(1) as f64;
+    let lower = rank.floor() as usize;
+    let upper = rank.ceil() as usize;
+    let fraction = rank - lower as f64;
+    let threshold =
+        (absolute[lower] * (1.0 - fraction) + absolute[upper] * fraction).max(1.0e-6);
+    let mut receipt = TemporalThresholdCalibrationReceiptV1 {
+        schema: "luminous.semi-bench.temporal-threshold-calibration.v1".into(),
+        training_manifest_sha256: training_manifest_sha256.into(),
+        residual_count: training_residuals.len(),
+        quantile,
+        threshold,
+        receipt_sha256: String::new(),
     };
-    (1.0 - local_weight) * engine.adapter_state.global_context_residual_ema
-        + local_weight * local.residual_ema
+    receipt.receipt_sha256 = json_sha256(&receipt.clone()).unwrap_or_default();
+    policy.temporal_activation_threshold = threshold;
+    policy.temporal_threshold_calibration = Some(receipt);
+    Ok(policy)
 }
 
 /// Creates an immutable prediction receipt and registers it for a future label.
@@ -467,13 +664,13 @@ pub fn predict_and_register_stream_sample_v1(
             "prediction contains a non-finite or out-of-policy feature/baseline value".into(),
         ));
     }
-    if input
-        .context_key
-        .as_deref()
-        .is_some_and(|key| key.trim().is_empty())
-    {
+    if input.context_identity.as_ref().is_some_and(|identity| {
+        identity.equipment_id.as_deref().is_some_and(|value| value.trim().is_empty())
+            || identity.chamber_id.as_deref().is_some_and(|value| value.trim().is_empty())
+            || (identity.equipment_id.is_none() && identity.chamber_id.is_none())
+    }) {
         return Err(GatedStreamingAdapterErrorV1(
-            "context_key cannot be empty when supplied".into(),
+            "context identity must contain at least one non-empty equipment/chamber ID".into(),
         ));
     }
     if input.selected_feature_indices.is_empty()
@@ -511,7 +708,7 @@ pub fn predict_and_register_stream_sample_v1(
         .zip(&selected_feature_vector)
         .map(|(weight, feature)| weight * feature)
         .sum::<f64>();
-    let context = context_correction(engine, input.context_key.as_deref());
+    let context = context_correction(engine, input.context_identity.as_ref());
     let base_prediction = input.global_baseline_prediction + feature_adapter_prediction + context;
     let temporal = if engine.adapter_state.global_temporal_residual_ema.abs()
         >= engine.policy.temporal_activation_threshold
@@ -543,7 +740,7 @@ pub fn predict_and_register_stream_sample_v1(
         global_model_artifact_sha256: input.global_model_artifact_sha256.clone(),
         feature_schema_sha256: input.feature_schema_sha256.clone(),
         policy_sha256: engine.policy_sha256.clone(),
-        context_key: input.context_key.clone(),
+        context_identity: input.context_identity.clone(),
         feature_vector_sha256,
         selected_feature_indices: input.selected_feature_indices.clone(),
         selected_feature_vector,
@@ -780,7 +977,8 @@ pub fn deliver_qualified_stream_label_v1(
     // All candidate mutations happen on a private clone. Any invalid delta,
     // overflow, non-finite result or receipt-serialization error leaves the
     // live model state and pending prediction unchanged.
-    let error = delivery.label_value - prediction_receipt.prediction_value;
+    // Feature and temporal adapters learn from the pre-temporal base residual.
+    let error = delivery.label_value - prediction_receipt.base_prediction;
     if !error.is_finite() || error.abs() > engine.policy.maximum_abs_prediction_error {
         return update_receipt(
             engine,
@@ -846,42 +1044,21 @@ pub fn deliver_qualified_stream_label_v1(
         ));
     }
 
-    // Residual left after the feature adapter is updated, preserving the
-    // prediction-time context/temporal corrections as the local target.
+    // Context learns the residual after global + updated feature adapter;
+    // the previous context and temporal corrections are not subtracted.
     let context_residual = delivery.label_value
-        - (prediction_receipt.global_baseline_prediction
-            + updated_feature_correction
-            + prediction_receipt.temporal_correction);
+        - (prediction_receipt.global_baseline_prediction + updated_feature_correction);
     if !context_residual.is_finite() {
         return Err(GatedStreamingAdapterErrorV1(
             "context residual is non-finite".into(),
         ));
     }
-    next_state.global_context_residual_ema = (1.0 - engine.policy.global_context_ema_alpha)
-        * next_state.global_context_residual_ema
-        + engine.policy.global_context_ema_alpha * context_residual;
-
-    if let Some(context_key) = prediction_receipt.context_key.clone() {
-        let entry = next_state
-            .contexts
-            .entry(context_key)
-            .or_insert(StreamingContextStateV1 {
-                residual_ema: next_state.global_context_residual_ema,
-                support_count: 0,
-            });
-        let next_support = entry
-            .support_count
-            .checked_add(1)
-            .ok_or_else(|| GatedStreamingAdapterErrorV1("context support count overflow".into()))?;
-        entry.residual_ema = (1.0 - engine.policy.local_context_ema_alpha) * entry.residual_ema
-            + engine.policy.local_context_ema_alpha * context_residual;
-        entry.support_count = next_support;
-        if !entry.residual_ema.is_finite() {
-            return Err(GatedStreamingAdapterErrorV1(
-                "local context candidate state is non-finite".into(),
-            ));
-        }
-    }
+    update_context_hierarchy(
+        &mut next_state,
+        &engine.policy,
+        prediction_receipt.context_identity.as_ref(),
+        context_residual,
+    )?;
 
     next_state.accepted_update_count = next_state
         .accepted_update_count
