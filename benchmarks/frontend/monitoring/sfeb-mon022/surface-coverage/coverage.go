@@ -51,11 +51,15 @@ type Attestation struct {
 	ObserverIdentityDigest string
 	ObserverControlRootDigest string
 	ObserverVerified bool
+	InventoryDigest string
 	ScopeDigest string
 	SourceStateDigest string
 	TargetStateDigest string
+	StateDigestProfile string
 	MethodProfileDigest string
 	EvidenceDigest string
+	EvidenceSubjectID string
+	EvidenceProfile string
 	ExclusionReason string
 	ApplicabilityProofDigest string
 	Verified bool
@@ -154,8 +158,8 @@ func Evaluate(req Request) Result {
 		if d!=Qualified { return finish(d,"surface "+spec.ID+": "+why,r) }
 		switch a.Mode {
 		case NativeReplication,IndependentComparison,RecomputedComparison:
-			if !nonempty(a.SourceStateDigest,a.TargetStateDigest,a.MethodProfileDigest) {
-				return finish(Indeterminate,"state/method digest missing for covered surface: "+spec.ID,r)
+			if !nonempty(a.SourceStateDigest,a.TargetStateDigest,a.StateDigestProfile,a.MethodProfileDigest) {
+				return finish(Indeterminate,"state/method digest profile missing for covered surface: "+spec.ID,r)
 			}
 			if a.SourceStateDigest!=a.TargetStateDigest {
 				return finish(Divergent,"source/target canonical state digest mismatch: "+spec.ID,r)
@@ -195,7 +199,9 @@ func Evaluate(req Request) Result {
 }
 
 func validateCommon(req Request,s SurfaceSpec,a Attestation)(Decision,string) {
+	if a.InventoryDigest!=req.InventoryDigest { return Indeterminate,"attestation inventory digest does not match declared inventory" }
 	if a.ScopeDigest!=s.ScopeDigest { return Indeterminate,"surface scope digest mismatch" }
+	if a.EvidenceSubjectID!=a.ID||a.EvidenceProfile!="mon022-surface-coverage-attestation-v1" { return Indeterminate,"attestation digest subject/profile binding is missing or unsupported" }
 	if a.SourceSystem!=req.SourceSystem||a.TargetSystem!=req.TargetSystem { return Denied,"source/target system identity mismatch" }
 	if a.SourceControlRoot!=req.SourceControlRoot||a.TargetControlRoot!=req.TargetControlRoot { return Denied,"source/target control-root mismatch" }
 	if !a.Verified { return Indeterminate,"attestation is not verifier-qualified" }
