@@ -61,3 +61,10 @@ cargo clippy --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml 
 ```
 
 The library uses synthetic fixtures only. It has not been run against a live provider, an official benchmark, or a sealed independent evaluator.
+
+Standalone evaluator commands:
+
+```bash
+cargo test --manifest-path research/mace-evidence-span-ablation-v0-1/Cargo.toml
+cargo clippy --manifest-path research/mace-evidence-span-ablation-v0-1/Cargo.toml --all-targets -- -D warnings
+```
