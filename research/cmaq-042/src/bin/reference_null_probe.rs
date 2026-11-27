@@ -108,14 +108,14 @@ fn run_replication(
     let replication_seed = config
         .seed
         .wrapping_add((replication as u64).wrapping_mul(0x9E37_79B9));
-    let mut rng = SplitMix64::new(replication_seed);
 
     let mut references = Vec::with_capacity(REFERENCE_COUNT);
     for index in 0..REFERENCE_COUNT {
-        let log_maximum = path_log_maximum(&mut rng, config.horizon);
-        let reference_key = replication_seed
-            .wrapping_mul(0xD6E8_FEB8_6659_FD93)
-            .wrapping_add(index as u64 + 1);
+        // Disjoint deterministic seeds make the simulated reference paths
+        // separate pseudo-random streams; the test path uses another seed.
+        let reference_key = replication_seed.wrapping_add(index as u64 + 1);
+        let mut reference_rng = SplitMix64::new(reference_key);
+        let log_maximum = path_log_maximum(&mut reference_rng, config.horizon);
         references.push(ReferencePathMaximum {
             trajectory_id: format!("null-{replication}-{index}"),
             trace_sha256: digest_for(reference_key),
@@ -123,8 +123,9 @@ fn run_replication(
         });
     }
 
-    let test_log_maximum = path_log_maximum(&mut rng, config.horizon);
-    let test_key = replication_seed ^ 0xA5A5_A5A5_5A5A_5A5A;
+    let test_key = replication_seed.wrapping_add(1_000);
+    let mut test_rng = SplitMix64::new(test_key);
+    let test_log_maximum = path_log_maximum(&mut test_rng, config.horizon);
     let bank = ReferenceNullBank {
         bank_id: format!("mission-bank-{replication}"),
         horizon: config.horizon,
@@ -153,13 +154,14 @@ fn run_replication(
         .evaluate_once(&test)
         .map_err(|error| format!("test path rejected: {error:?}"))?;
     let reference_reject = matches!(decision, ThresholdDecision::Reject { .. });
+    let log_threshold = gate.log_threshold().unwrap_or(f64::INFINITY);
     let ville_reject = test_log_maximum >= (f64::from(ALPHA_DENOMINATOR)
         / f64::from(ALPHA_NUMERATOR))
         .ln();
 
     writeln!(
         output,
-        "{replication},{test_log_maximum:.12},{reference_reject},{ville_reject}"
+        "{replication},{test_log_maximum:.12},{log_threshold:.12},{reference_reject},{ville_reject}"
     )
     .map_err(|error| error.to_string())?;
     Ok((reference_reject, ville_reject))
@@ -167,8 +169,9 @@ fn run_replication(
 
 fn main() -> Result<(), String> {
     let config = parse_config()?;
-    let mut output =
-        String::from("replication,test_log_maximum,reference_null_reject,ville_reject\n");
+    let mut output = String::from(
+        "replication,test_log_maximum,reference_log_threshold,reference_null_reject,ville_reject\n",
+    );
     let mut reference_rejects = 0usize;
     let mut ville_rejects = 0usize;
 
