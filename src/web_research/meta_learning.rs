@@ -217,6 +217,7 @@ impl EpistemicLearner {
             source_credibility: HashMap::new(),
             strategies: Vec::new(),
             outcomes: VecDeque::new(),
+            adjudicated_since_meta_update: 0,
             meta_phi: MetaPhi::default(),
             domain_expertise: HashMap::new(),
         }
