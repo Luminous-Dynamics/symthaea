@@ -301,8 +301,8 @@ pub fn parse_delimited(raw: &[u8], receipt: &RawReceipt, config: ParseConfig) ->
         );
     }
 
-    let parsed = match parse_records(raw, &config, started) {
-        Ok(records) => records,
+    let observations = match parse_observations(raw, &config, started) {
+        Ok(observations) => observations,
         Err(CsvError::Malformed(message)) => {
             return result_with_failure(
                 Disposition::Malformed,
@@ -343,107 +343,6 @@ pub fn parse_delimited(raw: &[u8], receipt: &RawReceipt, config: ParseConfig) ->
         );
     }
 
-    let mut records = parsed.into_iter();
-    let Some(header) = records.next() else {
-        return result_with_failure(
-            Disposition::Malformed,
-            &config,
-            Some(raw_hash),
-            byte_length,
-            elapsed_ms,
-            "MISSING_HEADER",
-            "Delimited-text artifact is empty and has no header record.".to_string(),
-        );
-    };
-
-    if header.is_empty() || header.iter().any(|field| field.decoded_value.trim().is_empty()) {
-        return result_with_failure(
-            Disposition::Malformed,
-            &config,
-            Some(raw_hash),
-            byte_length,
-            elapsed_ms,
-            "INVALID_HEADER",
-            "Header names must be non-empty.".to_string(),
-        );
-    }
-
-    let mut seen_headers = std::collections::BTreeSet::new();
-    for field in &header {
-        if !seen_headers.insert(field.decoded_value.clone()) {
-            return result_with_failure(
-                Disposition::Malformed,
-                &config,
-                Some(raw_hash),
-                byte_length,
-                elapsed_ms,
-                "DUPLICATE_HEADER",
-                format!("Duplicate header name {:?}.", field.decoded_value),
-            );
-        }
-    }
-
-    let mut observations = Vec::new();
-    for (record_index, fields) in records.enumerate() {
-        if started.elapsed().as_millis() as u64 > config.limits.max_elapsed_ms {
-            return result_with_failure(
-                Disposition::LimitExceeded,
-                &config,
-                Some(raw_hash),
-                byte_length,
-                started.elapsed().as_millis() as u64,
-                "ELAPSED_TIME_LIMIT",
-                "Elapsed-time limit reached while building cell observations.".to_string(),
-            );
-        }
-        if fields.len() != header.len() {
-            return result_with_failure(
-                Disposition::Malformed,
-                &config,
-                Some(raw_hash),
-                byte_length,
-                started.elapsed().as_millis() as u64,
-                "ROW_WIDTH_MISMATCH",
-                format!(
-                    "Data record {record_index} has {} fields; header has {}.",
-                    fields.len(),
-                    header.len()
-                ),
-            );
-        }
-        for (column_index, field) in fields.iter().enumerate() {
-            if observations.len() as u64 >= config.limits.max_observations {
-                return result_with_failure(
-                    Disposition::LimitExceeded,
-                    &config,
-                    Some(raw_hash),
-                    byte_length,
-                    started.elapsed().as_millis() as u64,
-                    "OBSERVATION_LIMIT",
-                    format!(
-                        "Observation limit {} reached.",
-                        config.limits.max_observations
-                    ),
-                );
-            }
-            let column_name = header[column_index].decoded_value.clone();
-            observations.push(Observation {
-                observation_id: format!("csv-r{record_index}-c{column_index}"),
-                locator: CsvCellLocator {
-                    record_index: record_index as u64,
-                    column_index: column_index as u64,
-                    column_name,
-                    byte_start: field.byte_start as u64,
-                    byte_end: field.byte_end as u64,
-                },
-                raw_lexeme: field.raw_lexeme.clone(),
-                decoded_value: field.decoded_value.clone(),
-                value_kind: classify_value(&field.decoded_value),
-                unit_lexeme: None,
-            });
-        }
-    }
-
     let payload_sha256 = derived_payload_sha256(&observations);
     ParseResult {
         disposition: Disposition::Parsed,
@@ -461,32 +360,91 @@ pub fn parse_delimited(raw: &[u8], receipt: &RawReceipt, config: ParseConfig) ->
     }
 }
 
-fn parse_records(raw: &[u8], config: &ParseConfig, started: Instant) -> Result<Vec<Vec<Field>>, CsvError> {
-    let mut records = Vec::new();
-    let mut cursor = 0usize;
+fn parse_observations(
+    raw: &[u8],
+    config: &ParseConfig,
+    started: Instant,
+) -> Result<Vec<Observation>, CsvError> {
+    let delimiter = config.delimiter.byte();
+    let header_limit = usize::try_from(config.limits.max_observations.max(1)).unwrap_or(usize::MAX);
+    let Some((header, mut cursor)) = parse_one_record(raw, 0, delimiter, header_limit)? else {
+        return Err(CsvError::Malformed(
+            "Delimited-text artifact is empty and has no header record.".to_string(),
+        ));
+    };
+
+    if header.is_empty() || header.iter().any(|field| field.decoded_value.trim().is_empty()) {
+        return Err(CsvError::Malformed("Header names must be non-empty.".to_string()));
+    }
+
+    let mut seen_headers = std::collections::BTreeSet::new();
+    for field in &header {
+        if !seen_headers.insert(field.decoded_value.clone()) {
+            return Err(CsvError::Malformed(format!(
+                "Duplicate header name {:?}.",
+                field.decoded_value
+            )));
+        }
+    }
+
+    let mut observations = Vec::new();
+    let mut record_index = 0u64;
     while cursor < raw.len() {
         if started.elapsed().as_millis() as u64 > config.limits.max_elapsed_ms {
-            return Err(CsvError::LimitExceeded("Elapsed-time limit reached while scanning records.".to_string()));
+            return Err(CsvError::LimitExceeded(
+                "Elapsed-time limit reached while building cell observations.".to_string(),
+            ));
         }
-        if records.len() as u64 > config.limits.max_observations {
-            return Err(CsvError::LimitExceeded("Record scan exceeded the bounded observation envelope.".to_string()));
-        }
-        let Some((fields, next_cursor)) = parse_one_record(raw, cursor, config.delimiter.byte())? else {
+
+        let remaining = config
+            .limits
+            .max_observations
+            .saturating_sub(observations.len() as u64);
+        let field_limit = usize::try_from(remaining).unwrap_or(usize::MAX);
+        let Some((fields, next_cursor)) = parse_one_record(raw, cursor, delimiter, field_limit)? else {
             break;
         };
         if next_cursor <= cursor {
             return Err(CsvError::Malformed("Parser made no forward progress.".to_string()));
         }
-        records.push(fields);
+        if fields.len() != header.len() {
+            return Err(CsvError::Malformed(format!(
+                "Data record {record_index} has {} fields; header has {}.",
+                fields.len(),
+                header.len()
+            )));
+        }
+
+        for (column_index, field) in fields.iter().enumerate() {
+            let column_name = header[column_index].decoded_value.clone();
+            observations.push(Observation {
+                observation_id: format!("csv-r{record_index}-c{column_index}"),
+                locator: CsvCellLocator {
+                    record_index,
+                    column_index: column_index as u64,
+                    column_name,
+                    byte_start: field.byte_start as u64,
+                    byte_end: field.byte_end as u64,
+                },
+                raw_lexeme: field.raw_lexeme.clone(),
+                decoded_value: field.decoded_value.clone(),
+                value_kind: classify_value(&field.decoded_value),
+                unit_lexeme: None,
+            });
+        }
+
         cursor = next_cursor;
+        record_index += 1;
     }
-    Ok(records)
+
+    Ok(observations)
 }
 
 fn parse_one_record(
     raw: &[u8],
     start_cursor: usize,
     delimiter: u8,
+    max_fields: usize,
 ) -> Result<Option<(Vec<Field>, usize)>, CsvError> {
     if start_cursor >= raw.len() {
         return Ok(None);
@@ -543,14 +501,14 @@ fn parse_one_record(
                 ));
             }
             value if value == delimiter => {
-                fields.push(build_field(raw, field_start, index, quoted_field)?);
+                push_field(&mut fields, raw, field_start, index, quoted_field, max_fields)?;
                 index += 1;
                 field_start = index;
                 quoted_field = false;
                 quote_closed = false;
             }
             b'\n' => {
-                fields.push(build_field(raw, field_start, index, quoted_field)?);
+                push_field(&mut fields, raw, field_start, index, quoted_field, max_fields)?;
                 return Ok(Some((fields, index + 1)));
             }
             b'\r' => {
@@ -570,8 +528,25 @@ fn parse_one_record(
         return Err(CsvError::Malformed("Unterminated quoted field.".to_string()));
     }
 
-    fields.push(build_field(raw, field_start, raw.len(), quoted_field)?);
+    push_field(&mut fields, raw, field_start, raw.len(), quoted_field, max_fields)?;
     Ok(Some((fields, raw.len())))
+}
+
+fn push_field(
+    fields: &mut Vec<Field>,
+    raw: &[u8],
+    start: usize,
+    end: usize,
+    quoted: bool,
+    max_fields: usize,
+) -> Result<(), CsvError> {
+    if fields.len() >= max_fields {
+        return Err(CsvError::LimitExceeded(
+            "Maximum cell-observation count would be exceeded.".to_string(),
+        ));
+    }
+    fields.push(build_field(raw, start, end, quoted)?);
+    Ok(())
 }
 
 fn build_field(
