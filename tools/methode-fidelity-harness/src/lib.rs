@@ -83,6 +83,7 @@ pub struct PreprocessingContract {
 pub struct ComponentContract {
     pub role: String,
     pub implementation_sha256: String,
+    pub configuration_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -110,7 +111,11 @@ pub struct BudgetContract {
 pub struct MethodContract {
     pub contract_id: String,
     pub contract_sha256: String,
+    pub reference_claim_id: String,
     pub reference_claim_sha256: String,
+    pub reference_source_id: String,
+    pub reference_artifact_sha256: String,
+    pub reference_passage_sha256: String,
     pub review: ProtocolReview,
     pub dataset: DatasetContract,
     pub preprocessing: PreprocessingContract,
@@ -125,6 +130,7 @@ pub struct MethodContract {
 pub struct ComponentUse {
     pub role: String,
     pub implementation_sha256: String,
+    pub configuration_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -151,6 +157,8 @@ pub struct ReplayReceipt {
     pub verifier_id: String,
     pub verifier_sha256: String,
     pub replayed_contract_sha256: String,
+    /// The independently replayed output artifacts must match the execution record.
+    pub replayed_outputs: Vec<OutputArtifact>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -278,7 +286,11 @@ fn unique_deviations(receipt: &ExecutionReceipt) -> (BTreeMap<String, String>, b
 fn valid_contract(contract: &MethodContract) -> bool {
     !contract.contract_id.trim().is_empty()
         && is_sha256(&contract.contract_sha256)
+        && !contract.reference_claim_id.trim().is_empty()
         && is_sha256(&contract.reference_claim_sha256)
+        && !contract.reference_source_id.trim().is_empty()
+        && is_sha256(&contract.reference_artifact_sha256)
+        && is_sha256(&contract.reference_passage_sha256)
         && contract.review.approved
         && !contract.review.reviewer_id.trim().is_empty()
         && is_sha256(&contract.review.review_sha256)
@@ -289,7 +301,11 @@ fn valid_contract(contract: &MethodContract) -> bool {
         && is_sha256(&contract.preprocessing.pipeline_sha256)
         && is_sha256(&contract.preprocessing.fitted_on_split_manifest_sha256)
         && !contract.required_components.is_empty()
-        && contract.required_components.iter().all(|c| !c.role.trim().is_empty() && is_sha256(&c.implementation_sha256))
+        && contract.required_components.iter().all(|c| {
+            !c.role.trim().is_empty()
+                && is_sha256(&c.implementation_sha256)
+                && is_sha256(&c.configuration_sha256)
+        })
         && contract.required_baselines.iter().all(|b| !b.baseline_id.trim().is_empty() && is_sha256(&b.configuration_sha256))
         && contract.required_metrics.iter().all(|m| !m.metric_id.trim().is_empty() && is_sha256(&m.definition_sha256))
         && is_sha256(&contract.budget.policy_sha256)
@@ -321,7 +337,9 @@ fn contains_required_components(contract: &MethodContract, receipt: &ExecutionRe
         && required_roles == actual_roles
         && contract.required_components.iter().all(|required| {
             receipt.components.iter().any(|actual| {
-                actual.role == required.role && actual.implementation_sha256 == required.implementation_sha256
+                actual.role == required.role
+                    && actual.implementation_sha256 == required.implementation_sha256
+                    && actual.configuration_sha256 == required.configuration_sha256
             })
         })
 }
@@ -509,7 +527,8 @@ pub fn audit_method(contract: &MethodContract, receipt: &ExecutionReceipt) -> Au
         receipt.replay.outcome == ReplayOutcome::Passed
             && !receipt.replay.verifier_id.trim().is_empty()
             && is_sha256(&receipt.replay.verifier_sha256)
-            && receipt.replay.replayed_contract_sha256 == contract.contract_sha256,
+            && receipt.replay.replayed_contract_sha256 == contract.contract_sha256
+            && receipt.replay.replayed_outputs == receipt.outputs,
         true, &deviations, "Independent replay is missing, failed, or not bound to the reviewed method contract.",
     );
 
@@ -564,7 +583,11 @@ mod tests {
         MethodContract {
             contract_id: "study-2026-001".into(),
             contract_sha256: h('a'),
+            reference_claim_id: "claim-method-effect-size".into(),
             reference_claim_sha256: h('c'),
+            reference_source_id: "paper-2026-001".into(),
+            reference_artifact_sha256: h('b'),
+            reference_passage_sha256: h('c'),
             review: ProtocolReview {
                 approved: true,
                 reviewer_id: "independent-protocol-reviewer".into(),
@@ -586,8 +609,16 @@ mod tests {
                 fitted_record_count: 1_000,
             },
             required_components: vec![
-                ComponentContract { role: "model".into(), implementation_sha256: h('1') },
-                ComponentContract { role: "optimizer".into(), implementation_sha256: h('2') },
+                ComponentContract {
+                    role: "model".into(),
+                    implementation_sha256: h('1'),
+                    configuration_sha256: h('9'),
+                },
+                ComponentContract {
+                    role: "optimizer".into(),
+                    implementation_sha256: h('2'),
+                    configuration_sha256: h('8'),
+                },
             ],
             required_baselines: vec![
                 BaselineContract { baseline_id: "linear-reference".into(), configuration_sha256: h('3') },
@@ -607,6 +638,10 @@ mod tests {
     }
 
     fn receipt(contract: &MethodContract) -> ExecutionReceipt {
+        let outputs = vec![
+            OutputArtifact { artifact_id: "predictions.csv".into(), artifact_sha256: h('6') },
+            OutputArtifact { artifact_id: "metrics.json".into(), artifact_sha256: h('7') },
+        ];
         ExecutionReceipt {
             execution_id: "run-001".into(),
             method_contract_sha256: contract.contract_sha256.clone(),
@@ -625,8 +660,16 @@ mod tests {
             preprocessing_fit_split_manifest_sha256: contract.preprocessing.fitted_on_split_manifest_sha256.clone(),
             preprocessing_fitted_record_count: 1_000,
             components: vec![
-                ComponentUse { role: "model".into(), implementation_sha256: h('1') },
-                ComponentUse { role: "optimizer".into(), implementation_sha256: h('2') },
+                ComponentUse {
+                    role: "model".into(),
+                    implementation_sha256: h('1'),
+                    configuration_sha256: h('9'),
+                },
+                ComponentUse {
+                    role: "optimizer".into(),
+                    implementation_sha256: h('2'),
+                    configuration_sha256: h('8'),
+                },
             ],
             baselines: vec![
                 BaselineUse { baseline_id: "linear-reference".into(), configuration_sha256: h('3') },
@@ -639,15 +682,13 @@ mod tests {
             training_records_used: 1_000,
             wall_time_ms: 420_000,
             peak_memory_bytes: 4_000_000_000,
-            outputs: vec![
-                OutputArtifact { artifact_id: "predictions.csv".into(), artifact_sha256: h('6') },
-                OutputArtifact { artifact_id: "metrics.json".into(), artifact_sha256: h('7') },
-            ],
+            outputs: outputs.clone(),
             replay: ReplayReceipt {
                 outcome: ReplayOutcome::Passed,
                 verifier_id: "independent-replay-v1".into(),
                 verifier_sha256: h('8'),
                 replayed_contract_sha256: contract.contract_sha256.clone(),
+                replayed_outputs: outputs,
             },
             scientific_result: ScientificResult::Supported,
             declared_deviations: Vec::new(),
@@ -864,6 +905,30 @@ mod tests {
         assert_eq!(report.disposition, Disposition::ReferenceProtocolReproduced);
         assert!(report.permissions.may_claim_reference_protocol_reproduced);
         assert!(!report.permissions.may_claim_scientific_result_supported);
+    }
+
+    #[test]
+    fn component_configuration_hash_is_part_of_method_fidelity() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.components[0].configuration_sha256 = h('a');
+        assert_eq!(disposition(&c, &r), Disposition::Unresolved);
+    }
+
+    #[test]
+    fn independent_replay_must_reproduce_exact_outputs() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.replay.replayed_outputs[0].artifact_sha256 = h('a');
+        assert_eq!(disposition(&c, &r), Disposition::Unresolved);
+    }
+
+    #[test]
+    fn method_contract_requires_source_claim_and_passage_anchors() {
+        let mut c = contract();
+        c.reference_source_id.clear();
+        let r = receipt(&c);
+        assert_eq!(disposition(&c, &r), Disposition::Unresolved);
     }
 
     #[test]
