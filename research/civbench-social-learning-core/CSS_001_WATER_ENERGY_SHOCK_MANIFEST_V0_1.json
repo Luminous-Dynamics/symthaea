@@ -1,0 +1,256 @@
+{
+  "schema_version": "0.1.0",
+  "scenario_id": "CSS-001",
+  "title": "Synthetic two-region water-energy-food shock and essential-service allocation",
+  "scenario_kind": "synthetic_benchmark",
+  "epistemic_class": "scenario_assumption",
+  "synthetic_only": true,
+  "geography": {
+    "representation": "abstract_two_region_system",
+    "region_ids": [
+      "synthetic_north",
+      "synthetic_south"
+    ],
+    "real_world_place": null,
+    "spatial_evidence_status": "not_applicable"
+  },
+  "temporal_scope": {
+    "tick_unit": "day",
+    "tick_count": 4,
+    "shock_starts_at_tick": 2,
+    "observation_boundary": "At the start of each tick, the policy observes opening stocks, per-capita essential demand and the exogenous production input for that tick."
+  },
+  "units": {
+    "water": "m3",
+    "energy": "kWh",
+    "food": "kg",
+    "population": "persons",
+    "service_coverage": "served_essential_demand / essential_demand"
+  },
+  "regions": [
+    {
+      "region_id": "synthetic_north",
+      "population": 1000,
+      "opening_stock": {
+        "water_m3": 1000,
+        "energy_kwh": 5000,
+        "food_kg": 4000
+      },
+      "essential_demand_per_capita_per_tick": {
+        "water_m3": 0.1,
+        "energy_kwh": 1,
+        "food_kg": 0.5
+      }
+    },
+    {
+      "region_id": "synthetic_south",
+      "population": 800,
+      "opening_stock": {
+        "water_m3": 200,
+        "energy_kwh": 3000,
+        "food_kg": 1500
+      },
+      "essential_demand_per_capita_per_tick": {
+        "water_m3": 0.12,
+        "energy_kwh": 1.25,
+        "food_kg": 0.6
+      }
+    }
+  ],
+  "exogenous_production_by_tick": [
+    {
+      "tick": 0,
+      "north": {
+        "water_m3": 40,
+        "energy_kwh": 200,
+        "food_kg": 100
+      },
+      "south": {
+        "water_m3": 10,
+        "energy_kwh": 80,
+        "food_kg": 40
+      },
+      "shock_state": "baseline"
+    },
+    {
+      "tick": 1,
+      "north": {
+        "water_m3": 40,
+        "energy_kwh": 200,
+        "food_kg": 100
+      },
+      "south": {
+        "water_m3": 10,
+        "energy_kwh": 80,
+        "food_kg": 40
+      },
+      "shock_state": "baseline"
+    },
+    {
+      "tick": 2,
+      "north": {
+        "water_m3": 10,
+        "energy_kwh": 100,
+        "food_kg": 70
+      },
+      "south": {
+        "water_m3": 5,
+        "energy_kwh": 40,
+        "food_kg": 25
+      },
+      "shock_state": "water_yield_and_energy_supply_shock"
+    },
+    {
+      "tick": 3,
+      "north": {
+        "water_m3": 10,
+        "energy_kwh": 100,
+        "food_kg": 70
+      },
+      "south": {
+        "water_m3": 5,
+        "energy_kwh": 40,
+        "food_kg": 25
+      },
+      "shock_state": "water_yield_and_energy_supply_shock"
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "P0_NO_TRANSFER",
+      "name": "No transfer",
+      "controller": "empty transfer list",
+      "ledger_transfer_policy": "unrestricted",
+      "description": "No inter-region resources are transferred."
+    },
+    {
+      "policy_id": "P1_FIXED_SOLIDARITY",
+      "name": "Fixed solidarity transfer",
+      "controller": "request north-to-south transfer each tick",
+      "request_per_tick": {
+        "water_m3": 60,
+        "energy_kwh": 250,
+        "food_kg": 80
+      },
+      "ledger_transfer_policy": "unrestricted",
+      "description": "A predeclared constant transfer is made every tick, regardless of observed deficits."
+    },
+    {
+      "policy_id": "P2_ADAPTIVE_SERVICE_DEFICIT",
+      "name": "Adaptive essential-service deficit",
+      "controller": "current-tick-deficit-with-donor-buffer",
+      "donor_region": "synthetic_north",
+      "receiver_region": "synthetic_south",
+      "donor_buffer_ticks": 0.5,
+      "formula": {
+        "receiver_deficit": "max(0, receiver_essential_demand - receiver_opening_stock - receiver_production)",
+        "donor_surplus": "max(0, donor_opening_stock + donor_production - donor_essential_demand * (1 + donor_buffer_ticks))",
+        "transfer": "componentwise_min(receiver_deficit, donor_surplus)"
+      },
+      "ledger_transfer_policy": "unrestricted",
+      "description": "Transfer only the receiver's current-tick essential-service deficit, bounded by donor stock after its own demand and a half-tick reserve buffer."
+    }
+  ],
+  "evaluation": {
+    "essential_service_floor": 0.9,
+    "track_coverage_separately_by": [
+      "region",
+      "resource",
+      "tick"
+    ],
+    "report": [
+      "per-region resource coverage",
+      "unmet essential demand in native units",
+      "opening/production/import/export/served/closing stock ledger",
+      "requested versus delivered transfer per resource",
+      "conservation residual per region/resource",
+      "count of region-resource-ticks below the service floor",
+      "lowest-region coverage and population-weighted coverage, separately per resource"
+    ],
+    "prohibition": "Do not sum m3, kWh and kg into one transfer-volume or efficiency score. Any economic weighting requires an explicit, independently justified conversion model."
+  },
+  "analytical_reference_expectations": {
+    "status": "hand-derived fixture expectations; must be checked against the Rust runner before qualification",
+    "no_transfer": {
+      "floor_violations": 4,
+      "south_minimum_coverage": {
+        "water": 0.0520833333,
+        "energy": 0.24,
+        "food": 0.3958333333
+      },
+      "final_stocks": {
+        "synthetic_north": {
+          "water_m3": 700,
+          "energy_kwh": 1600,
+          "food_kg": 2340
+        },
+        "synthetic_south": {
+          "water_m3": 0,
+          "energy_kwh": 0,
+          "food_kg": 0
+        }
+      }
+    },
+    "fixed_solidarity": {
+      "floor_violations": 0,
+      "delivered_transfer_total": {
+        "water_m3": 240,
+        "energy_kwh": 1000,
+        "food_kg": 320
+      },
+      "final_stocks": {
+        "synthetic_north": {
+          "water_m3": 460,
+          "energy_kwh": 600,
+          "food_kg": 2020
+        },
+        "synthetic_south": {
+          "water_m3": 86,
+          "energy_kwh": 240,
+          "food_kg": 30
+        }
+      }
+    },
+    "adaptive_service_deficit": {
+      "floor_violations": 0,
+      "delivered_transfer_total": {
+        "water_m3": 154,
+        "energy_kwh": 760,
+        "food_kg": 290
+      },
+      "final_stocks": {
+        "synthetic_north": {
+          "water_m3": 546,
+          "energy_kwh": 840,
+          "food_kg": 2050
+        },
+        "synthetic_south": {
+          "water_m3": 0,
+          "energy_kwh": 0,
+          "food_kg": 0
+        }
+      }
+    }
+  },
+  "limitations": [
+    "All populations, stocks, demands, production and policy requests are invented synthetic inputs.",
+    "This is a four-tick scenario, not a hindcast, forecast or claim about a real city, basin, grid or population.",
+    "No transport losses, pipeline/grid capacity, pumping energy, monetary cost, prices, rationing behavior or strategic demand response are represented.",
+    "The donor buffer is an operational stock buffer, not an environmental-flow requirement or proof of ecological sustainability.",
+    "No ecosystem, groundwater recharge, river flow, biodiversity, institutional response or infrastructure degradation feedback is represented.",
+    "The model has only two abstract regions and one directed transfer corridor.",
+    "A full service-floor pass is conditional on this scenario and these assumptions; it does not imply policy superiority in other scenarios."
+  ],
+  "rights_and_access": {
+    "external_sources_used": false,
+    "synthetic_data_owner": "Luminous Dynamics research fixture",
+    "reuse": "repository licence applies",
+    "participant_or_personal_data": false
+  },
+  "cross_project_roles": {
+    "symthaea": "CivBench task protocol, policy-learning contenders and independent evaluation",
+    "symtropy": "stock-flow accounting and transfer-policy simulation",
+    "mycelix": "rights-aware claims, provenance, dispute and revocation records",
+    "sol_atlas": "epistemic/spatiotemporal layer rendering; no geographic map until real geometry is sourced"
+  }
+}

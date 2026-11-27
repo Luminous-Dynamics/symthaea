@@ -1,0 +1,114 @@
+name: Reward Network III public task-asset audit
+
+on:
+  pull_request:
+    paths:
+      - "research/civbench-social-learning-core/scripts/hydrate_reward_network_task_assets.py"
+      - "research/civbench-social-learning-core/scripts/inspect_reward_network_source_layout.py"
+      - ".github/workflows/reward-network-iii-task-assets.yml"
+  push:
+    paths:
+      - "research/civbench-social-learning-core/scripts/hydrate_reward_network_task_assets.py"
+      - "research/civbench-social-learning-core/scripts/inspect_reward_network_source_layout.py"
+      - ".github/workflows/reward-network-iii-task-assets.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hydrate-audit:
+    name: Hydrate task networks and verify split invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out audit source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax-check source and LFS audit helpers
+        run: |
+          python -m py_compile research/civbench-social-learning-core/scripts/inspect_reward_network_source_layout.py
+          python -m py_compile research/civbench-social-learning-core/scripts/hydrate_reward_network_task_assets.py
+
+      - name: Download and verify Zenodo v2.0 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rn3
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 \
+            "https://zenodo.org/records/18547122/files/center-for-humans-and-machines/reward-network-iii-v2.0.zip?download=1" \
+            --output /tmp/rn3/reward-network-iii-v2.0.zip
+          echo "archive_size=$(stat -c%s /tmp/rn3/reward-network-iii-v2.0.zip)"
+          echo "archive_md5=$(md5sum /tmp/rn3/reward-network-iii-v2.0.zip | cut -d' ' -f1)"
+          echo "archive_sha256=$(sha256sum /tmp/rn3/reward-network-iii-v2.0.zip | cut -d' ' -f1)"
+          unzip -t /tmp/rn3/reward-network-iii-v2.0.zip
+
+      - name: Inspect allowlisted source layout and LFS configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rn3/source-layout
+          python research/civbench-social-learning-core/scripts/inspect_reward_network_source_layout.py \
+            --archive /tmp/rn3/reward-network-iii-v2.0.zip \
+            --output-json /tmp/rn3/source-layout/source-layout.json \
+            --output-markdown /tmp/rn3/source-layout/source-layout.md
+          cat /tmp/rn3/source-layout/source-layout.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Hydrate selected LFS task assets and audit
+        shell: bash
+        env:
+          # This optional token must be authorized for the external upstream
+          # repository. Do not pass this repository's GITHUB_TOKEN across owners.
+          CIVBENCH_REWARD_NETWORK_LFS_TOKEN: ${{ secrets.REWARD_NETWORK_III_LFS_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          python research/civbench-social-learning-core/scripts/hydrate_reward_network_task_assets.py \
+            --archive /tmp/rn3/reward-network-iii-v2.0.zip \
+            --output-json /tmp/rn3/network-task-asset-audit.json
+          cat /tmp/rn3/network-task-asset-audit.json
+
+      - name: Upload source-layout inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reward-network-iii-source-layout
+          path: /tmp/rn3/source-layout/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Add aggregate audit to job summary
+        shell: bash
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          p = "/tmp/rn3/network-task-asset-audit.json"
+          report = json.load(open(p, encoding="utf-8"))
+          print("# Reward Network III task-asset audit")
+          print()
+          print(f"- Archive SHA-256: `{report['source']['archive_sha256']}`")
+          print(f"- Hydrated generated-task assets: {len(report['assets'])}")
+          print(f"- Cross-split duplicate network IDs: {report['split_audit']['cross_split_duplicate_id_count']}")
+          print("- Participant/session/move-history data hydrated: **no**")
+          print()
+          print("## Network splits")
+          print()
+          for split, summary in report["network_splits"].items():
+              print(f"### {split}")
+              print(f"- Networks: {summary['network_count']}")
+              print(f"- Node counts: {summary['node_count_distribution']}")
+              print(f"- Edge counts: {summary['edge_count_distribution']}")
+              print(f"- Rewards: {summary['edge_reward_distribution']}")
+          PY
+
+      - name: Upload aggregate-only task asset audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: reward-network-iii-task-asset-audit
+          path: /tmp/rn3/network-task-asset-audit.json
+          if-no-files-found: error
+          retention-days: 30

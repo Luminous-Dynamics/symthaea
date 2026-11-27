@@ -1,0 +1,914 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.luminousdynamics.org/civilizational-systems-science/claim/0.1",
+  "title": "Civilizational Systems Science Claim v0.1",
+  "description": "Shared evidence envelope for observed, historical, inferred and scenario claims. It is not a civilizational ranking or authority score.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "claim_id",
+    "subject_ref",
+    "predicate",
+    "object_or_value",
+    "epistemic_class",
+    "valid_time",
+    "observation_time",
+    "publication_time",
+    "spatial_scope",
+    "sources",
+    "derivation",
+    "alternative_interpretations",
+    "limitations",
+    "rights_and_access",
+    "missingness_status",
+    "claim_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "subject_ref": {
+      "$ref": "#/$defs/entityRef"
+    },
+    "predicate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "object_or_value": {
+      "$ref": "#/$defs/claimValue"
+    },
+    "epistemic_class": {
+      "enum": [
+        "observed_measurement",
+        "archaeological_evidence",
+        "primary_historical_source",
+        "oral_or_community_history",
+        "compiled_secondary_source",
+        "model_inference",
+        "scenario_assumption",
+        "speculative_hypothesis",
+        "confirmed_detection"
+      ]
+    },
+    "valid_time": {
+      "$ref": "#/$defs/temporalExtent"
+    },
+    "observation_time": {
+      "$ref": "#/$defs/temporalExtent"
+    },
+    "publication_time": {
+      "$ref": "#/$defs/temporalExtent"
+    },
+    "spatial_scope": {
+      "$ref": "#/$defs/spatialScope"
+    },
+    "measurement": {
+      "$ref": "#/$defs/measurement"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sourceRef"
+      }
+    },
+    "derivation": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transformationRef"
+      }
+    },
+    "model_ref": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/modelRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "alternative_interpretations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/claimRef"
+      }
+    },
+    "confidence_or_probability": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/uncertainty"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rights_and_access": {
+      "$ref": "#/$defs/rightsAndAccess"
+    },
+    "missingness_status": {
+      "enum": [
+        "observed_value",
+        "measured_zero",
+        "not_observed",
+        "unknown",
+        "not_applicable",
+        "withheld_by_custodian",
+        "unavailable_from_source",
+        "invalid_or_rejected"
+      ]
+    },
+    "claim_status": {
+      "enum": [
+        "active",
+        "disputed",
+        "superseded",
+        "retracted",
+        "under_review"
+      ]
+    },
+    "supersedes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/claimRef"
+      }
+    },
+    "dispute_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "epistemic_class": {
+            "const": "confirmed_detection"
+          }
+        },
+        "required": [
+          "epistemic_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "sources": {
+            "minItems": 1
+          },
+          "derivation": {
+            "minItems": 1
+          },
+          "limitations": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "epistemic_class": {
+            "const": "model_inference"
+          }
+        },
+        "required": [
+          "epistemic_class"
+        ]
+      },
+      "then": {
+        "required": [
+          "model_ref",
+          "derivation"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "epistemic_class": {
+            "const": "scenario_assumption"
+          }
+        },
+        "required": [
+          "epistemic_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "limitations": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "entityRef": {
+      "type": "object",
+      "required": [
+        "entity_id",
+        "entity_kind"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entity_kind": {
+          "enum": [
+            "person",
+            "population",
+            "community",
+            "organization",
+            "institution",
+            "polity",
+            "settlement",
+            "city",
+            "region",
+            "ecosystem",
+            "species",
+            "technology",
+            "infrastructure_asset",
+            "resource",
+            "planetary_body",
+            "habitat",
+            "astronomical_source",
+            "hypothetical_society",
+            "other"
+          ]
+        },
+        "display_label": {
+          "type": "string"
+        },
+        "custodian_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "claimValue": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "value_kind",
+            "entity_ref"
+          ],
+          "properties": {
+            "value_kind": {
+              "const": "entity_ref"
+            },
+            "entity_ref": {
+              "$ref": "#/$defs/entityRef"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "value_kind",
+            "value"
+          ],
+          "properties": {
+            "value_kind": {
+              "enum": [
+                "text",
+                "boolean",
+                "integer",
+                "number",
+                "enum",
+                "structured"
+              ]
+            },
+            "value": {},
+            "unit": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "value_kind",
+            "quantity",
+            "value",
+            "unit",
+            "measure_kind"
+          ],
+          "properties": {
+            "value_kind": {
+              "const": "quantity"
+            },
+            "quantity": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "measure_kind": {
+              "enum": [
+                "stock",
+                "flow",
+                "rate",
+                "capacity",
+                "cumulative",
+                "intensity",
+                "ratio",
+                "index",
+                "other"
+              ]
+            },
+            "uncertainty": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/uncertainty"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "temporalExtent": {
+      "type": "object",
+      "required": [
+        "status",
+        "kind"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "instant",
+            "interval",
+            "distribution",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "start": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "end": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "precision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timezone_or_calendar": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "distribution_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "instant"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "interval"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "unknown",
+                  "not_applicable"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "start": {
+                "type": "null"
+              },
+              "end": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "spatialScope": {
+      "type": "object",
+      "required": [
+        "scope_kind",
+        "status"
+      ],
+      "properties": {
+        "scope_kind": {
+          "enum": [
+            "point",
+            "site",
+            "catchment",
+            "network",
+            "region",
+            "planet",
+            "orbital_frame",
+            "global",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "geometry_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geometry_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+        },
+        "coordinate_reference_system": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "spatial_resolution": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "boundary_source_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "measurement": {
+      "type": "object",
+      "required": [
+        "quantity",
+        "value",
+        "unit",
+        "measure_kind",
+        "method_ref",
+        "uncertainty"
+      ],
+      "properties": {
+        "quantity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measure_kind": {
+          "enum": [
+            "stock",
+            "flow",
+            "rate",
+            "capacity",
+            "cumulative",
+            "intensity",
+            "ratio",
+            "index",
+            "other"
+          ]
+        },
+        "method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty": {
+          "$ref": "#/$defs/uncertainty"
+        },
+        "instrument_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "calibration_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "uncertainty": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "standard_deviation",
+            "standard_error",
+            "confidence_interval",
+            "credible_interval",
+            "distribution",
+            "range",
+            "qualitative",
+            "unknown"
+          ]
+        },
+        "lower": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "upper": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "level": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "distribution_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "sourceRef": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "source_kind",
+        "locator",
+        "digest",
+        "rights_ref"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_kind": {
+          "enum": [
+            "instrument",
+            "archaeological_record",
+            "primary_source",
+            "oral_history",
+            "community_record",
+            "secondary_publication",
+            "dataset",
+            "database",
+            "model_output",
+            "archive",
+            "other"
+          ]
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+        },
+        "retrieved_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "rights_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "custodian_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "transformationRef": {
+      "type": "object",
+      "required": [
+        "transformation_id",
+        "operation",
+        "actor_ref",
+        "input_digests",
+        "output_digest",
+        "code_ref"
+      ],
+      "properties": {
+        "transformation_id": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "actor_ref": {
+          "type": "string"
+        },
+        "input_digests": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+          }
+        },
+        "output_digest": {
+          "type": "string",
+          "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+        },
+        "code_ref": {
+          "type": "string"
+        },
+        "executed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "config_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "modelRef": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "version",
+        "source_digest"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "source_digest": {
+          "type": "string",
+          "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+        },
+        "run_receipt_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "claimRef": {
+      "type": "object",
+      "required": [
+        "claim_id",
+        "relation"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string"
+        },
+        "relation": {
+          "enum": [
+            "supports",
+            "contradicts",
+            "qualifies",
+            "supersedes",
+            "derived_from",
+            "alternative"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "rightsAndAccess": {
+      "type": "object",
+      "required": [
+        "license_or_basis",
+        "access_class",
+        "consent_status",
+        "reuse_conditions"
+      ],
+      "properties": {
+        "license_or_basis": {
+          "type": "string"
+        },
+        "access_class": {
+          "enum": [
+            "public",
+            "open_with_conditions",
+            "restricted",
+            "community_controlled",
+            "private",
+            "unknown"
+          ]
+        },
+        "consent_status": {
+          "enum": [
+            "explicit_consent",
+            "community_authorized",
+            "public_record_basis",
+            "not_required_by_source_terms",
+            "withheld",
+            "unknown"
+          ]
+        },
+        "reuse_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "retention_policy_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "redaction_notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
