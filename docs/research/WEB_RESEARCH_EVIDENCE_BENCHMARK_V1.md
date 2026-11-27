@@ -108,6 +108,10 @@ Measure:
 
 Use AutoSciBench-style task recipes to generate *new sealed variants* from vetted scientific concepts and data-generating procedures. An external evaluator may use observed failure modes to harden the next benchmark version, but candidate agents must never see the generator's hidden parameters, judge rubric, or per-task gold. Keep a frozen public anchor set for comparability and a rotating sealed challenge set for saturation resistance. Human experts audit generated task validity and distribution drift before promotion. Report anchor and challenge scores separately; never merge them into a single untraceable composite.
 
+## Artifact-native research follow-up
+
+The WebResearcher content extractor remains HTML-oriented; its numeric-series helper is line-based and explicitly does not parse units. The acquisition receipt is an integrity record for captured content, not a typed scientific-artifact parser or a stable table/cell/page locator. [Issue #undefined](https://github.com/Luminous-Dynamics/symthaea/issues/undefined) now owns the staged artifact-intake contract: immutable raw bytes, parser/configuration receipts, typed source locations, and explicit unsupported/malformed outcomes. It composes with #13854 acquisition, #12471 method execution and #13796 claim/source relation adjudication; it does not introduce a second planner or evidence ledger.
+
 ## 3. Benchmark architecture
 
 Each evaluated run freezes:
