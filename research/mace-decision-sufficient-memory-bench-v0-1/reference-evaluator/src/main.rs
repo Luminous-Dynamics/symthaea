@@ -698,11 +698,15 @@ mod tests {
         let c=Candidate{query_time_ms:2,query:"q".into(),source_events:vec![e.clone()],allowed_actions:vec!["a".into()],evidence_budget:1,observation_budget:0,observation_cost_units:0.0,scope:"s".into()};
         assert!(!admissible(&e,&c,&BTreeSet::new()));
     }
-    #[test] fn cyclic_source_dependency_is_rejected(){
-        let mut e=generated_episode(0,77);
-        e.candidate.source_events[0].parent_event_ids=vec![e.candidate.source_events[1].event_id.clone()];
-        e.candidate.source_events[1].parent_event_ids=vec![e.candidate.source_events[0].event_id.clone()];
-        assert!(validate_episode(&e).is_err());
+    #[test] fn cyclic_and_duplicate_source_dependencies_are_rejected(){
+        let mut cyclic=generated_episode(0,77);
+        cyclic.candidate.source_events[0].parent_event_ids=vec![cyclic.candidate.source_events[1].event_id.clone()];
+        cyclic.candidate.source_events[1].parent_event_ids=vec![cyclic.candidate.source_events[0].event_id.clone()];
+        assert!(validate_episode(&cyclic).is_err());
+        let mut duplicate=generated_episode(0,77);
+        let parent=duplicate.candidate.source_events[0].event_id.clone();
+        duplicate.candidate.source_events[1].parent_event_ids=vec![parent.clone(),parent];
+        assert!(validate_episode(&duplicate).is_err());
     }
     #[test] fn generator_is_deterministic_and_covers_four_confirmatory_families(){
         let a:Vec<_>=(0..40).map(|i|generated_episode(i,77)).collect();
