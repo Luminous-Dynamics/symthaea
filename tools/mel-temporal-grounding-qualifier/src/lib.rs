@@ -15,3 +15,5 @@ pub mod temporal_consensus;
 pub mod temporal_reliability;
 
 pub mod music_listen_bench;
+
+pub mod performance_invariance;
