@@ -185,6 +185,7 @@ services:
       - pg19_backups:/backups:ro
       - pg19_restore_data:/var/lib/postgresql
       - ./restore/restore-entrypoint.sh:/lab/restore-entrypoint.sh:ro
+      - ./postgres:/lab/postgres:ro
     depends_on:
       postgres19:
         condition: service_healthy
