@@ -45,6 +45,8 @@ The evaluator rejects incompatible property/factor combinations rather than forc
 Each triad contains:
 
 1. **CLEAN:** a reference comparison. Expected relation is Same.
+
+All three arms must use the exact same question bytes. The controlled variable is the audio/performance realization and its target-property relation—not prompt wording. The evaluator recomputes each question digest and rejects within-triad prompt drift, including drift paired with a freshly recomputed digest.
 2. **Performance-STAY:** a different performance realization that preserves the named property. Expected relation is Same.
 3. **Musical-FLIP:** a matched change to the named property. Expected relation is Different.
 
