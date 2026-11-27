@@ -486,8 +486,8 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
         threshold_count:config.thresholds.len(),group_count:groups.len(),
         calibration_method:"hierarchical_group_conditional_exact_cluster_risk".into(),
         risk_target_alpha:config.risk_target_alpha,familywise_delta:config.familywise_delta,
-        multiplicity_method:"bonferroni_over_group_threshold_hypotheses".into(),
-        resampling_unit:"independent_declared_cluster".into(),
+        multiplicity_method:"bonferroni".into(),
+        resampling_unit:"independent_task_cluster".into(),
         exchangeability_status:if config.exchangeability_justified_by_design{"justified_by_sampling_design"}else{"not_established"}.into(),
         threshold_selection:"calibration_split_only".into(),
         unacceptable_loss_threshold:config.unacceptable_loss_threshold,
@@ -624,7 +624,7 @@ pub fn assess_decision_v1(input:&DecisionInputV1,certificate:&GroupCertificateV1
         policy_sha256:input.policy_sha256.clone(),group_id:input.group_id.clone(),action,status,
         hard_gates_pass:input.hard_gates_pass,sufficiency_score:input.sufficiency_score,
         threshold:certificate.threshold,risk_target_alpha:certificate.risk_target_alpha,
-        risk_upper_bound:certificate.risk_upper_bound,
+        risk_upper_bound:if input.hard_gates_pass && !input.distribution_shift_detected && !certificate.distribution_shift_detected { certificate.risk_upper_bound } else { None },
         distribution_shift_detected:input.distribution_shift_detected||certificate.distribution_shift_detected,
         reason:reason.into()
     };
