@@ -304,3 +304,17 @@ func TestExpectedSequenceMismatchBlocks(t *testing.T) {
 		t.Fatalf("expected stale sequence to block, got %+v", r)
 	}
 }
+
+func TestSignatureBindsKeyIdentity(t *testing.T) {
+	root, m, _, _, policy := testFixture(t)
+	otherPublic, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy.TrustedKeys["custody-key-2"] = otherPublic
+	m.Signature.KeyID = "custody-key-2"
+	r := VerifyBundle(root, m, policy)
+	if r.Verdict != VerdictBlocked || !hasReason(r, "signature_invalid") {
+		t.Fatalf("changing signer identity must invalidate signature: %+v", r)
+	}
+}
