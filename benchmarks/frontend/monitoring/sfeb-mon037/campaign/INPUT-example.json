@@ -183,5 +183,7 @@
   "observed_capture_complete": true,
   "observed_capture_manifest_sha256": "5bc9c15baf7d2b5704d17ac3ee2ba15f4a64805b581ca0ac45bca888ba60e49e",
   "transaction_report_complete": true,
-  "transaction_report_sha256": "013f2547dc5b7fc69f763ee1fad4ba38c541e3510acf2c95533034bdcd65ca48"
+  "transaction_report_sha256": "013f2547dc5b7fc69f763ee1fad4ba38c541e3510acf2c95533034bdcd65ca48",
+  "surface_inventory_complete": true,
+  "surface_inventory_sha256": "2c5d58ea9e058f1475e796fc0654dc51a2080f73565b9f2b95868b95c745199b"
 }
