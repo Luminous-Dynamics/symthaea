@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json",
+  "title": "MACE use-time evidence receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "payload_sha256",
+    "canonical_event_hash",
+    "prior_raw_event_receipt_digest",
+    "current_raw_event_receipt_digest",
+    "current_authority_receipt_digest",
+    "prior_lineage_receipt_digest",
+    "current_lineage_receipt_digest",
+    "prior_snapshot_sha256",
+    "current_snapshot_sha256",
+    "event_time",
+    "verification_time",
+    "action",
+    "scope",
+    "source",
+    "lifecycle",
+    "dependency_lineage",
+    "assessment",
+    "use",
+    "canonical_sha256",
+    "verification_custody"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_evidence_use_receipt_v1"
+    },
+    "event_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "payload_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "canonical_event_hash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "prior_raw_event_receipt_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "current_raw_event_receipt_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "current_authority_receipt_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "prior_lineage_receipt_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "current_lineage_receipt_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "prior_snapshot_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "current_snapshot_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "event_time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "occurred_at_ms",
+        "valid_from_ms",
+        "valid_until_ms"
+      ],
+      "properties": {
+        "occurred_at_ms": {
+          "type": "integer"
+        },
+        "valid_from_ms": {
+          "type": "integer"
+        },
+        "valid_until_ms": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    },
+    "verification_time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_received_at_ms",
+        "prior_valid_at_ms",
+        "prior_known_at_ms",
+        "valid_at_ms",
+        "known_at_ms"
+      ],
+      "properties": {
+        "authority_received_at_ms": {
+          "type": "integer"
+        },
+        "prior_valid_at_ms": {
+          "type": "integer"
+        },
+        "prior_known_at_ms": {
+          "type": "integer"
+        },
+        "valid_at_ms": {
+          "type": "integer"
+        },
+        "known_at_ms": {
+          "type": "integer"
+        }
+      }
+    },
+    "action": {
+      "enum": [
+        "A",
+        "B"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "regime",
+        "objective"
+      ],
+      "properties": {
+        "regime": {
+          "enum": [
+            "baseline",
+            "shifted"
+          ]
+        },
+        "objective": {
+          "enum": [
+            "quality",
+            "cost",
+            "speed"
+          ]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_family",
+        "source_root_digest",
+        "upstream_source_id",
+        "source_artifact_digest",
+        "transformation_digest",
+        "issuer_id",
+        "trust_status",
+        "trust_policy_sha256"
+      ],
+      "properties": {
+        "source_family": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "source_root_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "upstream_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_artifact_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "transformation_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "issuer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_status": {
+          "enum": [
+            "trusted_for_scope",
+            "untrusted",
+            "unknown"
+          ]
+        },
+        "trust_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "lifecycle": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "active"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "retracted"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "successor_event_id"
+          ],
+          "properties": {
+            "status": {
+              "const": "superseded"
+            },
+            "successor_event_id": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      ]
+    },
+    "dependency_lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "manifest_sha256",
+        "derived_from_event_ids"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "unknown"
+          ]
+        },
+        "manifest_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "derived_from_event_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "calibration_sha256",
+        "measurement_unit",
+        "measurement_error_bound",
+        "causal_assessment_sha256",
+        "semantic_estimand_sha256",
+        "outcome_sha256"
+      ],
+      "properties": {
+        "calibration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "measurement_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_error_bound": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "causal_assessment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "semantic_estimand_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "outcome_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "use": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose_code",
+        "consumer_policy_sha256"
+      ],
+      "properties": {
+        "purpose_code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "consumer_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "canonical_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "verification_custody": {
+      "const": "originating_process_only"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
