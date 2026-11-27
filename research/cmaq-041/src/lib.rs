@@ -416,32 +416,26 @@ fn union_exposure_us(intervals: &mut [ExposureInterval]) -> Result<u64, Evaluati
     let mut total = 0u64;
     let mut current: Option<(String, u64, u64)> = None;
     for interval in intervals {
-        match current.as_mut() {
-            Some((domain, _, end))
-                if *domain == interval.domain_id && interval.start_us <= *end =>
-            {
+        let overlaps = current.as_ref().is_some_and(|(domain, _, end)| {
+            domain == &interval.domain_id && interval.start_us <= *end
+        });
+        if overlaps {
+            if let Some((_, _, end)) = current.as_mut() {
                 *end = (*end).max(interval.end_us);
             }
-            Some(_) => {
-                let (_, start, end) =
-                    current.take().ok_or(EvaluationError::ArithmeticOverflow)?;
-                total = total
-                    .checked_add(end - start)
-                    .ok_or(EvaluationError::ArithmeticOverflow)?;
-                current = Some((
-                    interval.domain_id.clone(),
-                    interval.start_us,
-                    interval.end_us,
-                ));
-            }
-            None => {
-                current = Some((
-                    interval.domain_id.clone(),
-                    interval.start_us,
-                    interval.end_us,
-                ));
-            }
+            continue;
         }
+
+        if let Some((_, start, end)) = current.take() {
+            total = total
+                .checked_add(end - start)
+                .ok_or(EvaluationError::ArithmeticOverflow)?;
+        }
+        current = Some((
+            interval.domain_id.clone(),
+            interval.start_us,
+            interval.end_us,
+        ));
     }
     if let Some((_, start, end)) = current {
         total = total
