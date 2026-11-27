@@ -19,7 +19,7 @@ PARSED means the pinned parser completed under declared limits and emitted a dig
 
 PARTIAL is diagnostic only. UNSUPPORTED, MALFORMED, LIMIT_EXCEEDED and INTEGRITY_FAILED carry no derived-payload digest or observations. No failure state may be turned into a successful empty artifact.
 
-The v0 locators are intentionally narrow: CSV cell and JSON Pointer. PDF, XLSX, Parquet, FASTA/GenBank and PDB/mmCIF need separately reviewed parser adapters and locator contracts. The fixtures do not imply that those adapters exist.
+The v0 locators are intentionally narrow: CSV cell and JSON Pointer. PDF, XLSX, Parquet, FASTA/GenBank and PDB/mmCIF need separately reviewed parser adapters and locator contracts. The fixtures include literal UTF-8 artifact bytes and their actual SHA-256 values. The fixture contract also checks byte lengths, receipt-to-raw digest equality, derived-payload digests, and exact CSV byte spans. One deliberate mismatch is retained as a negative control. These fixtures do not imply that the adapters exist.
 
 ## Conformance rules beyond JSON Schema
 
