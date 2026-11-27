@@ -14,6 +14,7 @@
     "recovery_boundary_sha256",
     "code_revision",
     "fault_ids",
+    "fault_ids",
     "fault_set_sha256",
     "target_failure_signature_sha256",
     "required_runs",
