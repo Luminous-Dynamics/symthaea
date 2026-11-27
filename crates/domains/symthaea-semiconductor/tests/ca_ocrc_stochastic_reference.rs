@@ -63,6 +63,56 @@ fn round(index: u64, threshold: f64, proxy_draw: f64) -> CaoOcrcRoundInputV1 {
     }
 }
 
+fn independent_stochastic_bound(
+    policy: &CaoOcrcPolicyV1,
+    horizon: u64,
+    proxy_survival: &[f64],
+    proxy_max: usize,
+) -> f64 {
+    let g = policy.feedback_delay_survival.as_ref().unwrap();
+    let q = 1.0 - g[proxy_max + 1];
+    let mut ell = 0.0;
+    let mut mean_delay = 0.0;
+    let mut q_fg = 0.0;
+    for age in 0..=proxy_max {
+        let mass = g[age] - g[age + 1];
+        mean_delay += age as f64 * mass / q;
+        q_fg += mass / (q * q * proxy_survival[age]);
+        if age > 0 {
+            ell += proxy_survival[age] * g[age];
+        }
+    }
+    let k = policy.tracking_capacity as f64;
+    let alpha_bar = policy.target_risk.max(1.0 - policy.target_risk);
+    let r_fg = alpha_bar
+        * (mean_delay + 2.0
+            + k * alpha_bar.powi(2) / (2.0 * (1.0 - alpha_bar)) * q_fg);
+    let capacity_term = if proxy_max >= policy.tracking_capacity {
+        let x = ell / k;
+        let h = x - 1.0 - x.ln();
+        (-k * h).exp()
+    } else {
+        0.0
+    };
+    policy.score_upper_bound / (policy.learning_rate * horizon as f64)
+        + r_fg / horizon as f64
+        + capacity_term
+}
+
+fn independent_kappa(g: &[f64], proxy_max: usize, age: usize) -> f64 {
+    let mut min_over_start = f64::INFINITY;
+    for start in 1..=age {
+        let mut max_over_end: f64 = 0.0;
+        for end in age..=proxy_max {
+            let numerator = g[start] - g[end + 1];
+            let denominator: f64 = (start..=end).map(|i| g[i]).sum();
+            max_over_end = max_over_end.max(numerator / denominator);
+        }
+        min_over_start = min_over_start.min(max_over_end);
+    }
+    min_over_start
+}
+
 fn feedback(origin: u64, delivery: u64, value: f64, label_id: &str) -> CaoOcrcFeedbackInputV1 {
     let payload = digest('d');
     let event_id = format!("event-{origin}");
@@ -195,6 +245,11 @@ fn stochastic_theorem_bound_matches_independent_scalar_formula() {
     assert!((bound.range_term_r_fg - range).abs() < 1.0e-12);
     assert_eq!(bound.capacity_saturation_term, 0.0); // dbar_max < K
     assert!((bound.bound - expected_bound).abs() < 1.0e-10);
+    assert_eq!(
+        bound.theorem_assumption_status,
+        CaoOcrcStochasticAssumptionStatusV1::DeclaredByCallerNotIndependentlyVerified
+    );
+    assert_eq!(bound.feedback_delay_law_manifest_sha256, digest('9'));
 }
 
 #[test]
@@ -217,6 +272,55 @@ fn iid_delay_profile_requires_a_content_addressed_delay_law_manifest() {
     assert!(
         create_ca_ocrc_engine_v1("missing-g-manifest", "fab-clock", policy).is_err()
     );
+}
+
+#[test]
+fn stochastic_optimizer_is_no_worse_than_independent_dense_theta_grid() {
+    let base = policy(1, 2, vec![1.0, 1.0, 1.0], vec![1.0, 0.8, 0.3, 0.0]);
+    let optimized = optimize_ca_ocrc_stochastic_proxy_v1(&base, 100).unwrap();
+    let g = base.feedback_delay_survival.as_ref().unwrap();
+    let mut grid_best = f64::INFINITY;
+
+    for proxy_max in 0..=base.maximum_feedback_delay_rounds as usize {
+        if g[proxy_max] - g[proxy_max + 1] <= 0.0 {
+            continue;
+        }
+        if proxy_max < base.tracking_capacity {
+            let candidate = vec![1.0; proxy_max + 1];
+            grid_best = grid_best.min(independent_stochastic_bound(
+                &base,
+                100,
+                &candidate,
+                proxy_max,
+            ));
+            continue;
+        }
+
+        let kappa: Vec<f64> = (0..=proxy_max)
+            .map(|age| {
+                if age == 0 {
+                    0.0
+                } else {
+                    independent_kappa(g, proxy_max, age)
+                }
+            })
+            .collect();
+        let theta_max = (1..=proxy_max)
+            .map(|age| 1.0 / kappa[age].sqrt())
+            .fold(0.0_f64, f64::max);
+        for step in 1..=20_000 {
+            let theta = theta_max * step as f64 / 20_000.0;
+            let mut candidate = vec![1.0];
+            candidate.extend((1..=proxy_max).map(|age| (theta * kappa[age].sqrt()).min(1.0)));
+            if candidate.iter().any(|value| *value <= 0.0) {
+                continue;
+            }
+            let bound = independent_stochastic_bound(&base, 100, &candidate, proxy_max);
+            grid_best = grid_best.min(bound);
+        }
+    }
+
+    assert!(optimized.risk_bound <= grid_best + 2.0e-3);
 }
 
 #[test]
