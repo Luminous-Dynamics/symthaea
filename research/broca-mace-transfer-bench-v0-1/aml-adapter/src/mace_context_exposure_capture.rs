@@ -607,6 +607,14 @@ mod tests {
             clock_profile_sha256: D8, observer_profile_sha256: D9,
             storage_profile_sha256: D1, encryption_profile_sha256: D2,
             access_policy_sha256: D3, retention_policy_sha256: D4,
+            use_valid_at_ms: 100, use_known_at_ms: 200,
+            use_purpose_code: "mace.context.exposure",
+            use_consumer_policy_sha256: D5,
+            use_scope: broca_mace_policy::Scope {
+                regime: broca_mace_policy::Regime::Baseline,
+                objective: broca_mace_policy::Objective::Quality,
+            },
+            require_complete_dependency_lineage: true,
         }
     }
     fn metadata(id: &str) -> MaceExposureSourceMetadataV1 {
@@ -696,6 +704,7 @@ mod tests {
                 candidate_decision_trace_sha256: D8, admission_denials: vec![],
                 model_declared_support_event_ids: vec!["e1".to_owned()],
             },
+            &AcceptEvidence,
             &TestArtifactStore, &TestTransport, &signer,
         ).unwrap();
         assert_eq!(response.received_request_body_sha256, receipt.capture.provider_request_body_sha256);
@@ -827,4 +836,66 @@ mod tests {
             MaceExposureCaptureRejectV1::ArtifactBindingMismatch
         );
     }
+
+    #[test]
+    fn rejects_unrevalidated_memory_before_artifact_storage_or_transport() {
+        struct RejectEvidence;
+        impl MaceExposureAdmissionVerifierV1 for RejectEvidence {
+            fn verify_admitted_exposure(
+                &self,
+                _: &MaceMemoryExposureSpanV1,
+                _: &MaceExpectedExposureBindingV1<'_>,
+            ) -> Result<(), MaceContextExposureRejectV1> {
+                Err(MaceContextExposureRejectV1::EvidenceAdmissionRejected)
+            }
+        }
+        struct PanicArtifactStore;
+        impl MaceRequestBodyArtifactWriterV1 for PanicArtifactStore {
+            fn store_immutable_encrypted(
+                &self,
+                _: &[u8],
+                _: &MaceExpectedExposureBindingV1<'_>,
+            ) -> Result<MaceRequestBodyArtifactV1, MaceExposureCaptureRejectV1> {
+                panic!("artifact storage must not run before use-time admission");
+            }
+        }
+        struct PanicTransport;
+        impl MaceProviderTransportV1 for PanicTransport {
+            fn send_exact(
+                &self,
+                _: &[u8],
+            ) -> Result<MaceProviderResponseV1, MaceExposureCaptureRejectV1> {
+                panic!("provider transport must not run before use-time admission");
+            }
+        }
+
+        let request = MaceProviderNeutralRequestV1 {
+            model: "model-v1".to_owned(),
+            request_parameters: BTreeMap::new(),
+            messages: vec![MaceRequestMessageV1 {
+                role: MaceContextRoleV1::User,
+                segments: vec![MaceRequestSegmentV1 {
+                    text: "memory-derived source".to_owned(),
+                    origin: MaceRequestSegmentOriginV1::Memory(metadata("e1")),
+                }],
+            }],
+        };
+        let result = capture_send_and_sign_mace_invocation_v1(
+            &request,
+            &expected(),
+            MaceExposureCaptureContextV1 {
+                receipt_id: "receipt-1",
+                captured_at_monotonic_ns: 42,
+                candidate_decision_trace_sha256: D8,
+                admission_denials: vec![],
+                model_declared_support_event_ids: vec!["e1".to_owned()],
+            },
+            &RejectEvidence,
+            &PanicArtifactStore,
+            &PanicTransport,
+            &signer(),
+        );
+        assert_eq!(result, Err(MaceExposureCaptureRejectV1::EvidenceAdmissionRejected));
+    }
+
 }
