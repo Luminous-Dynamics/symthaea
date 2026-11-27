@@ -51,6 +51,8 @@ dz_i(t)=\frac{c_i^T x(t-\delta_i)-z_i(t)}{\tau_i}\,dt
 
 and the measured value is then the declared acquisition operator applied to z_i(t). The corresponding causal impulse response is h_i(s)=exp(-s/tau_i)/tau_i for s>=0.
 
+**Delay implementation boundary:** a fixed transport delay is not generally equivalent to increasing the sensor time constant. For a general continuous-time state-space process, evaluating x(t-delta) may require a declared history representation, method-of-steps construction, or an independently verified delayed-state covariance calculation. M0 must only claim exactness for the specific process/delay class covered by its fixtures. Do not quietly fold transport delay into tau_i or use a finite-dimensional Markov augmentation unless equivalence is proved for that case.
+
 Verify augmented-state covariance and endpoint/observation cross-covariance against an independent convolution calculation. #13940's rectangular accumulator remains an explicit reduction/special case.
 
 Do not claim arbitrary nonlinear hysteresis in M0. Hysteresis must be represented by a declared path-dependent state model or rejected as unsupported.
