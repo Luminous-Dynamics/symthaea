@@ -56,7 +56,7 @@ A TaskRecord is constructed by the benchmark harness and independent evaluator, 
 - submitted_decision is the agent's final label. InsufficientEvidence is the abstention action.
 - confidence_correct means the agent's stated probability that its submitted decision is correct.
 - Citation eligibility and support of the expected decision are evaluator-adjudicated against the exact claim. A source may be relevant but contradict the expected conclusion; it does not count as a correct supporting citation.
-- origin_id groups mirrored URLs or re-hosted copies under one underlying origin. Distinct URLs do not imply independent evidence.
+- origin_id groups mirrored URLs or re-hosted copies under one underlying origin. Distinct URLs do not imply independent evidence. Origin identities are whitespace-trimmed before deduplication; the independent evaluator remains responsible for assigning a canonical provenance identity.
 - Every intervention carries an explicit post-intervention oracle. Counterfactual and source-removal outputs are scored against that oracle, not merely rewarded for changing. Placebo oracles must preserve the pre-intervention decision.
 - A required replay passes only when an independent replay succeeds and both the contract digest and output manifest match exactly.
 - Resource limits are explicit. Missing limits are not silently interpreted as unlimited budget observations.
