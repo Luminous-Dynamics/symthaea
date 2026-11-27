@@ -93,7 +93,11 @@ These are proposed gates, not achieved results. The 30-work floor in #14019 must
 
 ## Reproduction
 
-Install the pinned research dependency from requirements.txt, then run:
+Install the pinned research dependency from the repository root, then run:
+
+    python -m pip install -r research/mel-hear-005/requirements.txt
+
+Then execute:
 
     python research/mel-hear-005/simulate_crossed_bootstrap.py
 
