@@ -560,8 +560,8 @@ mod tests {
     fn cheap_nonseparating_probe_is_charged_and_has_negative_value() {
         let c = contract(vec![ProbeSpec { probe_id: "cheap".into(), cost_loss_units: 1 }]);
         let worlds = vec![
-            world("w1", "f1", "c1", [("hold", 0, true), ("open", 0, true), ("close", 5, true)], &[("cheap", "same")]),
-            world("w2", "f2", "c2", [("hold", 0, true), ("open", 5, true), ("close", 0, true)], &[("cheap", "same")]),
+            world("w1", "f1", "c1", [("hold", 3, true), ("open", 0, true), ("close", 5, true)], &[("cheap", "same")]),
+            world("w2", "f2", "c2", [("hold", 3, true), ("open", 5, true), ("close", 0, true)], &[("cheap", "same")]),
         ];
         let score = score_decision_value(
             &c,
@@ -581,9 +581,9 @@ mod tests {
             ProbeSpec { probe_id: "expensive".into(), cost_loss_units: 5 },
         ]);
         let worlds = vec![
-            world("w1", "f1", "c1", [("hold", 0, true), ("open", 0, true), ("close", 8, true)], &[("cheap", "a"), ("expensive", "1")]),
-            world("w2", "f2", "c2", [("hold", 0, true), ("open", 0, true), ("close", 7, true)], &[("cheap", "a"), ("expensive", "2")]),
-            world("w3", "f3", "c3", [("hold", 0, true), ("open", 6, true), ("close", 0, true)], &[("cheap", "b"), ("expensive", "3")]),
+            world("w1", "f1", "c1", [("hold", 6, true), ("open", 0, true), ("close", 8, true)], &[("cheap", "a"), ("expensive", "1")]),
+            world("w2", "f2", "c2", [("hold", 7, true), ("open", 0, true), ("close", 8, true)], &[("cheap", "a"), ("expensive", "2")]),
+            world("w3", "f3", "c3", [("hold", 6, true), ("open", 8, true), ("close", 0, true)], &[("cheap", "b"), ("expensive", "3")]),
         ];
         let cheap = score_decision_value(
             &c,
