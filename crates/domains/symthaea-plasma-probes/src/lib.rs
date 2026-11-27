@@ -11,6 +11,7 @@
 
 use std::collections::BTreeSet;
 
+pub mod challenge_search;
 pub mod rbkr;
 pub mod validity_horizon;
 
