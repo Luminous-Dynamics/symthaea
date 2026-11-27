@@ -14,7 +14,7 @@ Split combined episode records into candidate-visible and evaluator-private JSON
 
     cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- prepare /tmp/dsm-episodes.jsonl /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl
 
-A candidate adapter consumes only the candidate stream, conforming to schemas/candidate-input-v0.1.schema.json, and emits one response per episode and arm, conforming to schemas/response-v0.1.schema.json. The response echoes the candidate row's candidate_sha256, carries an arm_binding_sha256 derived from that digest and the declared arm ID, and contains a selected action, separate retrieved_evidence_ids and selected_evidence_ids (the latter must be a subset of the former), observation-request count and candidate-reported resource counters. The scorer verifies both bindings against the candidate row, evaluator-private commitment and preregistered arm ID.
+A candidate adapter consumes only the candidate stream, conforming to schemas/candidate-input-v0.1.schema.json, and emits one response per episode and arm, conforming to schemas/response-v0.1.schema.json. The response echoes the candidate row's candidate_sha256, carries an arm_binding_sha256 derived from that digest and the declared arm ID, and contains a selected action, separate retrieved_evidence_ids and selected_evidence_ids (the latter must be a subset of the former), observation-request count and candidate-reported resource counters. Detailed phase-attributed cost receipts preserve nanoseconds and measured-versus-estimated storage labels; unavailable top-level counters are nullable rather than silently set to zero. The scorer verifies both bindings against the candidate row, evaluator-private commitment and preregistered arm ID.
 
 Run the Rust unit tests when a Rust 2024 toolchain is available:
 
@@ -73,17 +73,15 @@ Cost fields are candidate-reported receipts. Unknown operation counts, bytes or 
 
 ## Tests
 
-Authored unit tests cover:
-- half-open valid-time boundaries and observed-at knowledge-time boundaries;
-- untrusted lifecycle events cannot revoke trusted evidence;
-- response-to-candidate and response-to-arm binding mismatch rejection;
-- retrieved evidence is distinct from decision-support evidence and selection must be a retrieved subset;
-- the distinction between contradiction and supersession/retraction;
-- rejection of cyclic/duplicate evidence ancestry;
-- co-retrieved conflicts cannot silently pass decision sufficiency;
-- fail-closed handling of untrusted evidence and untrusted lifecycle events;
-- seeded deterministic generation and first-four-family coverage;
-- separation of regret from memory-induced harm.
+Eight authored unit tests cover:
+- half-open valid-time windows and future-observation exclusion;
+- observed supersession/retraction and rejection of untrusted lifecycle events;
+- untrusted source evidence rejection;
+- cyclic and duplicate source ancestry rejection;
+- deterministic generation across the four confirmatory families;
+- contradiction in retrieved context cannot silently pass decision sufficiency;
+- stale retrieval separated from selected decision support, including selected-subset enforcement;
+- candidate/arm digest mismatch rejection and the distinction between regret and a task-authored reference-action comparison.
 
 No Rust compilation, Cargo test, rustfmt, Clippy, CI pass or benchmark result is claimed until those checks have executed on the exact commit head.
 
