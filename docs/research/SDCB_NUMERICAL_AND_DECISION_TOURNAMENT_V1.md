@@ -168,12 +168,14 @@ Do not claim adaptivity from a known-covariance, fixed linear-Gaussian, variance
 Purpose: evaluate the full Symthaea proposal → experiment → observation → verification → scientific claim cycle.
 
 Use external benchmarks as complementary evidence, not substitutes for the SDCB physical-measurement benchmark:
-- FrontierPhysics (56 tasks from 42 physicists across nine physics domains) tests literature review, planning, experiments and structured research outputs; its 2026 evaluation reports that no configuration passed more than 46 of 168 rollouts.
-- AstaBench covers thousands of scientific tasks across literature, coding, data analysis and end-to-end discovery. Its 2026 update reports about 53% overall for its top agent, while the best E2E-Bench-Hard result completed only 3% of tasks perfectly end-to-end.
-- ScienceAgentBench provides 102 data-driven discovery tasks validated by subject-matter experts.
-- DiscoverPhysics uses 22 procedurally generated worlds with deliberately nonstandard physical laws and requires iterative experimental discovery.
-- Autonomous Science Bench 0.1 is a six-task pilot with a public leaderboard; interpret its resolution rates as pilot evidence, not broad field rankings.
-- SciAgentArena offers approximately 200 interactive scientific research tasks with stepwise verification.
+- **Terminal-Bench-Science 0.1** has 70 expert-curated tasks across life, physical, earth, mathematical and engineering sciences. Its task families explicitly include sensor calibration, model fitting, inverse problems, signal processing, statistical inference and simulation. The initial August 2026 release reported 30% resolution for its best evaluated system after three trials per task; the benchmark is designed to evolve through new releases. Freeze the release, harness and leaderboard snapshot when comparing. This is the closest public workflow bridge for an SDCB calibration task.
+- **ASI-Bench** is a 60-task, 11-domain project-level benchmark with a B1–B4 guidance gradient. Its public catalog includes LiDAR/IMU time-offset and extrinsic calibration, transmission-line dispersion inferred from calibration data, correlated range-noise mapping, and stochastic dynamics. These tasks are especially relevant to SDCB's calibration, temporal-model and causal-dependence tracks. Record the exact task set and benchmark revision.
+- **FrontierPhysics** tests literature review, planning, experiments and structured research outputs over 56 tasks contributed by 42 physicists across nine physics domains. Its initial 2026 paper reports that no evaluated configuration passed more than 46 of 168 rollouts.
+- **AstaBench** covers more than 2,400 scientific problems across literature, coding/execution, data analysis and end-to-end discovery. Its April 2026 update reports about 53% overall for Asta v0, while the best E2E-Bench-Hard agent completed only 3% of tasks perfectly end-to-end.
+- **ScienceAgentBench** provides 102 expert-validated data-driven discovery tasks from peer-reviewed scientific work.
+- **DiscoverPhysics** uses 22 procedurally generated worlds with deliberately nonstandard physical laws and requires iterative experimental discovery.
+- **Autonomous Science Bench 0.1** is a six-task pilot with a public leaderboard; interpret its resolution rates as pilot evidence, not a broad field ranking.
+- **SciAgentArena** offers approximately 200 interactive scientific research tasks with stepwise verification.
 
 Map each SDCB task onto the benchmark capabilities it genuinely tests. A paper-generation score is not a metrology score; a solver score is not evidence of discovery; a synthetic win is not physical validation.
 
@@ -224,11 +226,13 @@ Publish Pareto frontiers. Do not collapse probability error, decision loss, safe
 5. **Calibration as a lifecycle with a validity domain.** Track label maturity, time alignment, calibration epoch, model digest, drift mode and fresh-fold custody. Use a dependence-aware method or make no exchangeability claim.
 6. **Decision value, not information volume.** Optimize terminal scientific loss and value of sample information under full resource budgets. High entropy reduction is not inherently useful.
 7. **Evidence-carrying adaptation.** Symthaea may propose the next experiment; the policy oracle evaluates it; authorization and physical execution remain separate; observations update beliefs only through independently verified receipts and replay.
+8. **Decision-aware numerical refinement.** Do not compute every rectangle probability to an arbitrary uniform tolerance. Carry an integration estimate and its uncertainty diagnostics into the policy evaluator; allocate more points/refinement only where action-value intervals overlap or a decision boundary may change. Stop early when the preferred action is separated by a valid bound, and abstain/escalate when it is not. Randomized-QMC replicate spread and Simpson refinement deltas are diagnostics unless a separate calibration/proof justifies a bound; never describe them as certified intervals by default.
 
 ## 6. Implementation sequence
 
 1. Finish M0 bivariate reference and exact rank-one/rank-zero fixtures (#13951).
 2. Add independent trivariate known-answer integration and randomized-QMC comparison.
+3. Add a decision-aware refinement controller that trades numerical effort against policy action-margin, and evaluates compute regret and wrong-action frequency on exact small worlds.
 3. Implement a Genz-style SPD path with randomized replicates, reproducible streams, variable reordering and reported error diagnostics.
 4. Add general PSD support reduction only with rank-revealing factorization and exact support tests; never jitter.
 5. Bind joint likelihood tables to #13940 interval-observation state predictions, conditional on each model/common/device state.
