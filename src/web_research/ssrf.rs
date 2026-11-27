@@ -132,6 +132,19 @@ impl fmt::Display for UrlPolicyRejection {
 impl Error for UrlPolicyRejection {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedirectPolicyRejection {
+    pub status: u16,
+}
+
+impl fmt::Display for RedirectPolicyRejection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "REDIRECT_REJECTED: HTTP {} redirect was not followed", self.status)
+    }
+}
+
+impl Error for RedirectPolicyRejection {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DnsPolicyRejection {
     LocalOnlyHostname(String),
     EmptyAnswerSet(String),
@@ -348,6 +361,24 @@ pub fn is_dns_policy_rejection_anyhow(error: &anyhow::Error) -> bool {
     error.chain().any(|cause| cause.downcast_ref::<DnsPolicyRejection>().is_some())
 }
 
+/// Refuse every 3xx response consistently. The client is configured with
+/// redirect Policy::none(), so the response is the terminal result and no
+/// Location target has been contacted.
+pub fn reject_redirect_response(response: reqwest::Response) -> anyhow::Result<reqwest::Response> {
+    let status = response.status();
+    if status.is_redirection() {
+        return Err(anyhow::Error::new(RedirectPolicyRejection {
+            status: status.as_u16(),
+        }));
+    }
+    Ok(response)
+}
+
+/// Classify typed redirect rejections carried through anyhow context.
+pub fn is_redirect_policy_rejection_anyhow(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| cause.downcast_ref::<RedirectPolicyRejection>().is_some())
+}
+
 /// Used to classify policy failures in the acquisition receipt without turning
 /// ordinary DNS timeouts or resolver failures into policy rejections.
 pub fn is_dns_policy_rejection(error: &reqwest::Error) -> bool {
@@ -461,6 +492,22 @@ mod tests {
         let resolver = GuardedDnsResolver::with_lookup(StubLookup::with_answers(answers));
         assert_eq!(resolve(&resolver, "rebind.example").await.unwrap(), vec![socket("8.8.8.8")]);
         assert!(resolve(&resolver, "rebind.example").await.unwrap_err().contains("DNS_POLICY_REJECTED"));
+    }
+
+    #[test]
+    fn all_http_redirect_statuses_are_typed_rejections() {
+        for status in [
+            reqwest::StatusCode::MOVED_PERMANENTLY,
+            reqwest::StatusCode::FOUND,
+            reqwest::StatusCode::SEE_OTHER,
+            reqwest::StatusCode::TEMPORARY_REDIRECT,
+            reqwest::StatusCode::PERMANENT_REDIRECT,
+        ] {
+            let error = anyhow::Error::new(RedirectPolicyRejection {
+                status: status.as_u16(),
+            });
+            assert!(is_redirect_policy_rejection_anyhow(&error));
+        }
     }
 
     #[test]
