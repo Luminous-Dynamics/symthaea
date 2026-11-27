@@ -362,6 +362,12 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 func verifyArtifact(rootDir string, a Artifact) (string, string) {
 	fullPath, err := safeArtifactPath(rootDir, a.Path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "blocked", "artifact_missing"
+		}
+		if errors.Is(err, ErrArtifactNotFile) {
+			return "blocked", "artifact_not_regular_file"
+		}
 		return "blocked", "artifact_path_unsafe"
 	}
 	f, err := os.Open(fullPath)
