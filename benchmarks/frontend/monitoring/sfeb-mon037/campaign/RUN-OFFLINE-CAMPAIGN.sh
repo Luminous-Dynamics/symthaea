@@ -7,15 +7,15 @@ HEAD_SHA="$(git -C "$REPO" rev-parse HEAD)"
 for cmd in go jq sha256sum; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "$cmd required" >&2; exit 69; }
 done
-RUN_ID="$MON037_RUN_ID"
+RUN_ID="$(printenv MON037_RUN_ID || true)"
 if [ -z "$RUN_ID" ]; then RUN_ID="offline-$(date -u +%Y%m%dT%H%M%SZ)"; fi
 case "$RUN_ID" in *[!A-Za-z0-9_-]*|'') echo "invalid run ID" >&2; exit 64 ;; esac
-OUT_ROOT="$MON037_OUT_DIR"
+OUT_ROOT="$(printenv MON037_OUT_DIR || true)"
 if [ -z "$OUT_ROOT" ]; then OUT_ROOT="$HERE/out"; fi
 mkdir -p "$OUT_ROOT"
 OUT="$OUT_ROOT/$RUN_ID"
 mkdir "$OUT"
-trap 'echo "Campaign logs: '"$OUT"'"' EXIT
+trap 'printf "Campaign logs: %s\\n" "$OUT"' EXIT
 : > "$OUT/steps.jsonl"
 
 step() {
