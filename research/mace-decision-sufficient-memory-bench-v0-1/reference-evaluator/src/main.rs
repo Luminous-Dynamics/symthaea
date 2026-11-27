@@ -125,7 +125,7 @@ struct Cost {
 }
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ArmManifest { schema_version: String, expected_arm_ids: Vec<String> }
+struct ArmManifest { schema_version: String, expected_arm_ids: Vec<String>, no_memory_arm_id: Option<String> }
 
 #[derive(Clone, Debug, Serialize)]
 struct ScoreRow {
@@ -411,6 +411,9 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
     }
     let expected_arms: BTreeSet<String> = arm_manifest.expected_arm_ids.iter().cloned().collect();
     if expected_arms.len() != arm_manifest.expected_arm_ids.len() { return Err("duplicate arm in manifest".into()); }
+    if arm_manifest.no_memory_arm_id.as_ref().is_some_and(|id| !expected_arms.contains(id)) {
+        return Err("declared no-memory arm is absent from expected_arm_ids".into());
+    }
     let mut cm = BTreeMap::new();
     let mut pm = BTreeMap::new();
     for c in &candidates {
@@ -449,6 +452,34 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
     }
     let per_arm: Vec<_> = arm_groups.iter().map(|(k,v)| aggregate(k,v)).collect();
     let per_family_arm: Vec<_> = family_groups.iter().map(|((f,a),v)| aggregate(&format!("{f}/{a}"),v)).collect();
+    let paired_vs_executed_no_memory = if let Some(baseline_id) = arm_manifest.no_memory_arm_id.as_ref() {
+        let baseline_by_episode: BTreeMap<&str, f64> = scored.iter()
+            .filter(|row| row.arm_id == *baseline_id)
+            .map(|row| (row.episode_id.as_str(), row.loss)).collect();
+        let paired: Vec<_> = expected_arms.iter()
+            .filter(|arm| *arm != baseline_id)
+            .map(|arm| {
+                let pairs: Vec<(&ScoreRow, f64)> = scored.iter()
+                    .filter(|row| row.arm_id == *arm)
+                    .map(|row| (row, *baseline_by_episode.get(row.episode_id.as_str()).expect("balanced matrix includes baseline")))
+                    .collect();
+                let gains: Vec<f64> = pairs.iter().map(|(row, baseline_loss)| baseline_loss - row.loss).collect();
+                let harm_count = gains.iter().filter(|gain| **gain < -1e-9).count();
+                let improved_count = gains.iter().filter(|gain| **gain > 1e-9).count();
+                json!({
+                    "arm_id": arm,
+                    "episodes": pairs.len(),
+                    "mean_gain_vs_executed_no_memory": average(gains.iter().copied()),
+                    "worse_than_executed_no_memory_rate": if pairs.is_empty() { None } else { Some(harm_count as f64 / pairs.len() as f64) },
+                    "harm_count": harm_count,
+                    "improved_count": improved_count,
+                    "tie_count": pairs.len() - harm_count - improved_count
+                })
+            }).collect::<Vec<_>>();
+        json!({"status":"measured_from_declared_no_memory_arm","baseline_arm_id":baseline_id,"comparisons":paired})
+    } else {
+        json!({"status":"not_measured","reason":"Arm manifest does not declare an independently executed no-memory arm."})
+    };
     let report = json!({
         "schema_version": REPORT_SCHEMA,
         "qualification_status": "reference_evaluation_generated_not_independently_qualified",
@@ -458,6 +489,8 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
         "episode_count": candidates.len(), "arm_ids": expected_arms,
         "arm_manifest_sha256": digest(&arm_bytes),
         "paired_response_count": scored.len(),
+        "no_memory_arm_id": arm_manifest.no_memory_arm_id,
+        "paired_vs_executed_no_memory": paired_vs_executed_no_memory,
         "per_arm": per_arm, "per_family_arm": per_family_arm, "per_episode": scored,
         "interpretation": {
             "regret": "Candidate action loss minus minimum evaluator-private action loss.",
