@@ -55,3 +55,7 @@ The performance target is measured separately from the target system's recovery 
 The aggregate and per-family false-qualified rates use the completed unsafe-case denominator. Planned unsafe observations are always reported separately. Incomplete campaigns cannot pass the safety gate. The one-sided Wilson 95% upper bound is an approximate screening interval; common-host, common-reset and common-injector clustering requires cluster-aware confirmatory analysis.
 
 A score file is a derived artifact. Preserve the signed suite, raw SUT outputs, per-case evidence artifacts and score report together under MON-026/027 custody.
+
+## Suite identity
+
+`ComputeSuiteDigest` uses a MON-028 domain separator and a length-prefixed binary encoding with fixed field order. The case list is sorted by CaseID before hashing. The encoding is independent of JSON key order, whitespace and serializer-specific escaping. The suite still needs an external MON-026/027 custody signature to establish provenance.
