@@ -88,7 +88,7 @@ The request carries the complete inventory and the claim scope. The evaluator mu
 8. reject exclusions for required full-database-state surfaces;
 9. report excluded surfaces in a scoped row-stream result.
 
-A row-stream claim is qualified only for its explicitly listed row-stream-required surfaces. It reports every other surface as excluded/not covered, and is not a full-state claim.
+A row-stream claim is qualified only for its explicitly listed row-stream-required surfaces. It reports every other surface as excluded/not covered, and is not a full-state claim. The output separately counts covered surfaces, not-applicable surfaces, and excluded surfaces; not-applicable is never presented as an observed/copy-verified surface.
 
 A full recoverable-database-state claim is qualified only when every full-state-required surface has valid coverage evidence or a valid not-applicable proof. No scalar confidence score can compensate for a missing surface.
 
