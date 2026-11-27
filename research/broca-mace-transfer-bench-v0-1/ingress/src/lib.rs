@@ -10,6 +10,14 @@
 pub mod claims;
 pub mod providers;
 mod evidence_use;
+mod evidence_set;
+pub use evidence_set::{
+    select_evidence_set_v1, CandidateExclusionReasonV1, EvidencePairConstraintV1,
+    EvidencePairReasonV1, EvidencePairRelationV1, EvidenceSetCandidateV1,
+    EvidenceSetConstraintVerifierV1, EvidenceSetContextV1,
+    EvidenceSetObstructionCertificateV1, EvidenceSetObstructionReasonV1,
+    EvidenceSetSelectionReceiptV1,
+};
 pub use evidence_use::{
     link_verified_evidence_to_decision_v1, revalidate_for_use_v1,
     ContextEvidenceSpanV1, DecisionEvidenceUseContextV1, DecisionEvidenceUseLinkV1,
