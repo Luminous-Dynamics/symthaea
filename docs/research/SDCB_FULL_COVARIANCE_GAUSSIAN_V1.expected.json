@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "sdcb-full-covariance-shared-bias-budget-two-v1",
+  "execution_kind": "independent_full_covariance_matrix_enumeration",
+  "rust_compiled_or_executed": false,
+  "expected_report": {
+    "selected_action_ids": ["reference", "science-a"],
+    "selected_cost_units": 2,
+    "budget_units": 2,
+    "prior_science_variance": 1.0,
+    "posterior_science_variance": 0.013759519417707996,
+    "science_variance_reduction_fraction": 0.986240480582292,
+    "prior_marginal_variances": [1.0, 1.0],
+    "posterior_marginal_variances": [0.013759519417707996, 0.00985361652431278],
+    "joint_information_gain_nats": 4.664228220651893,
+    "subsets_evaluated": 8
+  },
+  "additional_correlated_duplicate_control": {
+    "prior_variance": 1.0,
+    "residual_covariance": [[0.01, 0.0099], [0.0099, 0.01]],
+    "selected_actions": ["replicate-a", "replicate-b"],
+    "posterior_variance": 0.009852216748768473,
+    "independent_residual_comparator_variance": 0.004975124378109453,
+    "formula": "1 / (1 + 2 / 0.0199)"
+  },
+  "claim_boundary": "Analytical Gaussian fixture only; not compiled Rust output or physical sensor validation."
+}
