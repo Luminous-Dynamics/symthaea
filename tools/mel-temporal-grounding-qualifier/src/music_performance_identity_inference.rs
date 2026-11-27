@@ -77,6 +77,21 @@ pub struct PairedMetricInferenceV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PairedMusicalIdentityStratumV1 {
+    pub target_property: crate::music_performance_identity::MusicalIdentityPropertyV1,
+    pub performance_stay_factor: Option<
+        crate::music_performance_identity::PerformanceStayFactorV1,
+    >,
+    pub musical_flip_factor: Option<crate::music_performance_identity::MusicalFlipFactorV1>,
+    pub item_count: usize,
+    pub source_work_clusters: usize,
+    pub status: PairedInferenceStatusV1,
+    pub performance_stay_false_difference: PairedMetricInferenceV1,
+    pub musical_flip_miss: PairedMetricInferenceV1,
+    pub joint_exact: PairedMetricInferenceV1,
+}
+
 pub struct PairedMusicalIdentityComparisonReportV1 {
     pub schema: &'static str,
     pub bootstrap_method: &'static str,
@@ -98,6 +113,10 @@ pub struct PairedMusicalIdentityComparisonReportV1 {
     pub performance_stay_false_difference: PairedMetricInferenceV1,
     pub musical_flip_miss: PairedMetricInferenceV1,
     pub joint_exact: PairedMetricInferenceV1,
+    /// Separate strata; no pooled score can hide property/factor failures.
+    pub by_target_property: Vec<PairedMusicalIdentityStratumV1>,
+    pub by_performance_stay_factor: Vec<PairedMusicalIdentityStratumV1>,
+    pub by_musical_flip_factor: Vec<PairedMusicalIdentityStratumV1>,
     pub source_work_lineage_authenticated: bool,
     pub target_property_annotations_authenticated: bool,
     pub audio_bytes_recomputed: bool,
@@ -170,7 +189,7 @@ pub fn audit_paired_musical_identity_comparison(
         PairedInferenceStatusV1::InsufficientSourceWorkClusters
     };
 
-    let intervals = if status == PairedInferenceStatusV1::ConfirmatoryEligible {
+    let intervals = if status == PairedInferenceStatusV1::SourceWorkClusterFloorMet {
         Some(bootstrap_intervals(&clusters, &case.inference_policy)?)
     } else {
         None
@@ -201,6 +220,60 @@ pub fn audit_paired_musical_identity_comparison(
         candidate_improvement_interval: intervals.as_ref().map(|v| v.2.clone()),
     };
 
+    let by_target_property = case
+        .baseline
+        .triads
+        .iter()
+        .map(|triad| triad.target_property)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|property| {
+            build_stratum(
+                StratumSelection::Property(property),
+                &baseline_results,
+                &candidate_results,
+                &case.baseline,
+                &case.inference_policy,
+            )
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    let by_performance_stay_factor = case
+        .baseline
+        .triads
+        .iter()
+        .map(|triad| (triad.target_property, triad.performance_stay_factor))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|(property, factor)| {
+            build_stratum(
+                StratumSelection::PerformanceStay(property, factor),
+                &baseline_results,
+                &candidate_results,
+                &case.baseline,
+                &case.inference_policy,
+            )
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    let by_musical_flip_factor = case
+        .baseline
+        .triads
+        .iter()
+        .map(|triad| (triad.target_property, triad.musical_flip_factor))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|(property, factor)| {
+            build_stratum(
+                StratumSelection::MusicalFlip(property, factor),
+                &baseline_results,
+                &candidate_results,
+                &case.baseline,
+                &case.inference_policy,
+            )
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
     Ok(PairedMusicalIdentityComparisonReportV1 {
         schema: REPORT_SCHEMA_V1,
         bootstrap_method: BOOTSTRAP_METHOD_V1,
@@ -220,6 +293,9 @@ pub fn audit_paired_musical_identity_comparison(
         performance_stay_false_difference: stay,
         musical_flip_miss: flip,
         joint_exact: joint,
+        by_target_property,
+        by_performance_stay_factor,
+        by_musical_flip_factor,
         source_work_lineage_authenticated: false,
         target_property_annotations_authenticated: false,
         audio_bytes_recomputed: false,
@@ -344,6 +420,148 @@ fn index_results<'a>(
         }
     }
     Ok(output)
+}
+
+#[derive(Debug, Clone, Copy)]
+enum StratumSelection {
+    Property(crate::music_performance_identity::MusicalIdentityPropertyV1),
+    PerformanceStay(
+        crate::music_performance_identity::MusicalIdentityPropertyV1,
+        crate::music_performance_identity::PerformanceStayFactorV1,
+    ),
+    MusicalFlip(
+        crate::music_performance_identity::MusicalIdentityPropertyV1,
+        crate::music_performance_identity::MusicalFlipFactorV1,
+    ),
+}
+
+impl StratumSelection {
+    fn includes(
+        self,
+        triad: &crate::music_performance_identity::MusicalPerformanceIdentityTriadV1,
+    ) -> bool {
+        match self {
+            Self::Property(property) => triad.target_property == property,
+            Self::PerformanceStay(property, factor) => {
+                triad.target_property == property && triad.performance_stay_factor == factor
+            }
+            Self::MusicalFlip(property, factor) => {
+                triad.target_property == property && triad.musical_flip_factor == factor
+            }
+        }
+    }
+
+    fn fields(
+        self,
+    ) -> (
+        crate::music_performance_identity::MusicalIdentityPropertyV1,
+        Option<crate::music_performance_identity::PerformanceStayFactorV1>,
+        Option<crate::music_performance_identity::MusicalFlipFactorV1>,
+    ) {
+        match self {
+            Self::Property(property) => (property, None, None),
+            Self::PerformanceStay(property, factor) => (property, Some(factor), None),
+            Self::MusicalFlip(property, factor) => (property, None, Some(factor)),
+        }
+    }
+}
+
+fn build_stratum(
+    selection: StratumSelection,
+    baseline_results: &BTreeMap<&str, &MusicalIdentityTriadResultV1>,
+    candidate_results: &BTreeMap<&str, &MusicalIdentityTriadResultV1>,
+    baseline_case: &MusicalPerformanceIdentityCaseV1,
+    policy: &PairedInferencePolicyV1,
+) -> Result<PairedMusicalIdentityStratumV1, String> {
+    let selected_case = MusicalPerformanceIdentityCaseV1 {
+        schema: baseline_case.schema.clone(),
+        benchmark_id: baseline_case.benchmark_id.clone(),
+        benchmark_version: baseline_case.benchmark_version.clone(),
+        dataset_revision_sha256: baseline_case.dataset_revision_sha256.clone(),
+        evaluator_protocol_sha256: baseline_case.evaluator_protocol_sha256.clone(),
+        triads: baseline_case
+            .triads
+            .iter()
+            .filter(|triad| selection.includes(triad))
+            .cloned()
+            .collect(),
+    };
+    let selected_ids: BTreeSet<&str> = selected_case
+        .triads
+        .iter()
+        .map(|triad| triad.item_id.as_str())
+        .collect();
+    if selected_ids.is_empty() {
+        return Err("stratum unexpectedly contains no items".into());
+    }
+    let baseline_subset: BTreeMap<&str, &MusicalIdentityTriadResultV1> = baseline_results
+        .iter()
+        .filter(|(item_id, _)| selected_ids.contains(**item_id))
+        .map(|(item_id, result)| (*item_id, *result))
+        .collect();
+    let candidate_subset: BTreeMap<&str, &MusicalIdentityTriadResultV1> = candidate_results
+        .iter()
+        .filter(|(item_id, _)| selected_ids.contains(**item_id))
+        .map(|(item_id, result)| (*item_id, *result))
+        .collect();
+    let clusters = paired_cluster_outcomes(
+        &baseline_subset,
+        &candidate_subset,
+        &selected_case,
+    )?;
+    let cluster_count = clusters.len();
+    if cluster_count == 0 {
+        return Err("stratum has no source-work clusters".into());
+    }
+    let observed = summarize_cluster_means(&clusters);
+    let status = if cluster_count >= policy.minimum_source_work_clusters {
+        PairedInferenceStatusV1::SourceWorkClusterFloorMet
+    } else {
+        PairedInferenceStatusV1::InsufficientSourceWorkClusters
+    };
+    let intervals = if status == PairedInferenceStatusV1::SourceWorkClusterFloorMet {
+        Some(bootstrap_intervals(&clusters, policy)?)
+    } else {
+        None
+    };
+    let metrics = (
+        PairedMetricInferenceV1 {
+            estimate: PairedMetricEstimateV1 {
+                baseline: observed.baseline_stay_error,
+                candidate: observed.candidate_stay_error,
+                candidate_improvement: observed.stay_improvement,
+            },
+            candidate_improvement_interval: intervals.as_ref().map(|value| value.0.clone()),
+        },
+        PairedMetricInferenceV1 {
+            estimate: PairedMetricEstimateV1 {
+                baseline: observed.baseline_flip_error,
+                candidate: observed.candidate_flip_error,
+                candidate_improvement: observed.flip_improvement,
+            },
+            candidate_improvement_interval: intervals.as_ref().map(|value| value.1.clone()),
+        },
+        PairedMetricInferenceV1 {
+            estimate: PairedMetricEstimateV1 {
+                baseline: observed.baseline_joint_exact,
+                candidate: observed.candidate_joint_exact,
+                candidate_improvement: observed.joint_improvement,
+            },
+            candidate_improvement_interval: intervals.as_ref().map(|value| value.2.clone()),
+        },
+    );
+    let (target_property, performance_stay_factor, musical_flip_factor) = selection.fields();
+    Ok(PairedMusicalIdentityStratumV1 {
+        target_property,
+        performance_stay_factor,
+        musical_flip_factor,
+        item_count: selected_ids.len(),
+        source_work_clusters: cluster_count,
+        status,
+        performance_stay_false_difference: metrics.0,
+        musical_flip_miss: metrics.1,
+        joint_exact: metrics.2,
+    })
 }
 
 fn paired_cluster_outcomes(
