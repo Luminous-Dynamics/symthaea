@@ -582,6 +582,22 @@ mod tests {
     }
 
     #[test]
+    fn tied_scores_use_independent_tie_key_for_total_order() {
+        let mut reference = reference();
+        reference.scores[4].score_units = 4;
+        reference.scores[5].score_units = 4;
+        let mut monitor =
+            AnytimeCalibrationMonitor::new(reference, 1, 20).unwrap();
+        let result = monitor.observe(event(0, 4, 99)).unwrap();
+        match result {
+            MonitorUpdate::Accepted {
+                rank_one_based, ..
+            } => assert_eq!(rank_one_based, 5),
+            other => panic!("expected accepted rank observation, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn high_rank_stream_grows_upper_order_component() {
         let mut monitor = monitor(1, 20);
         for i in 0..12 {
