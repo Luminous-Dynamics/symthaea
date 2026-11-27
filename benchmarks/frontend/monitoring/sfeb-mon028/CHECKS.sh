@@ -26,6 +26,14 @@ jq -e '.profile == "mon028-workload-profile-v1"' "$ROOT/WORKLOAD-example.json" >
 jq -e '.profile == "mon028-environment-profile-v1"' "$ROOT/ENVIRONMENT-example.json" >/dev/null
 jq -e '.profile == "mon028-resource-budget-profile-v1"' "$ROOT/RESOURCE-BUDGET-example.json" >/dev/null
 jq -e '.properties.profile.const == "mon028-independent-ground-truth-oracle-v1"' "$ROOT/ORACLE-v1.schema.json" >/dev/null
+jq -e '.profile == "mon028-independent-ground-truth-oracle-v1" and (.entries | length == 41) and ([.entries[].case_id] | unique | length == 41)' "$ROOT/ORACLE-v1.json" >/dev/null
+jq -e '.properties.profile.const == "mon028-workload-profile-v1"' "$ROOT/WORKLOAD-v1.schema.json" >/dev/null
+jq -e '.properties.profile.const == "mon028-environment-profile-v1"' "$ROOT/ENVIRONMENT-v1.schema.json" >/dev/null
+jq -e '.properties.profile.const == "mon028-resource-budget-profile-v1"' "$ROOT/RESOURCE-BUDGET-v1.schema.json" >/dev/null
+jq -e '.profile == "mon028-workload-profile-v1"' "$ROOT/WORKLOAD-example.json" >/dev/null
+jq -e '.profile == "mon028-environment-profile-v1"' "$ROOT/ENVIRONMENT-example.json" >/dev/null
+jq -e '.profile == "mon028-resource-budget-profile-v1"' "$ROOT/RESOURCE-BUDGET-example.json" >/dev/null
+jq -e '.profile == "mon025-live-recovery-challenge-v1" and (.scenarios | length == 41)' "$ROOT/../sfeb-mon025/FAULT-MATRIX-v1.json" >/dev/null
 jq -e '.profile == "mon028-falsification-first-suite-v1" and ([.cases[] | select(.expected == "qualified")] | length > 0) and ([.cases[] | select(.expected != "qualified")] | length > 0)' "$ROOT/SUITE-example.json" >/dev/null
 
 cd "$MODULE"
