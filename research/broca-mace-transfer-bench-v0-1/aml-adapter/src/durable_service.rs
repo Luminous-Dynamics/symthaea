@@ -127,6 +127,13 @@ pub trait DurableAmlStoreV1 {
         memory_ids: &[String],
     ) -> Result<Vec<DurableMemoryRecordV1>, DurableStoreErrorV1>;
 
+    /// Atomically release an uncommitted reservation after reconcile_add has
+    /// returned NotCommitted. Must reject if a write/receipt appeared meanwhile.
+    fn release_uncommitted_add(
+        &mut self,
+        key: &DurableAddKeyV1,
+    ) -> Result<(), DurableStoreErrorV1>;
+
     fn finalize_add(
         &mut self,
         key: &DurableAddKeyV1,
@@ -200,6 +207,7 @@ where
                         match self.store.reconcile_add(&key).map_err(map_store_error)? {
                             DurableAddReconciliationV1::Committed(receipt) => receipt,
                             DurableAddReconciliationV1::NotCommitted => {
+                                self.store.release_uncommitted_add(&key).map_err(map_store_error)?;
                                 return Err(map_store_error(write_error));
                             }
                             DurableAddReconciliationV1::Unknown => {
@@ -213,6 +221,7 @@ where
                 match self.store.reconcile_add(&key).map_err(map_store_error)? {
                     DurableAddReconciliationV1::Committed(receipt) => receipt,
                     DurableAddReconciliationV1::NotCommitted => {
+                        self.store.release_uncommitted_add(&key).map_err(map_store_error)?;
                         return Err(DurableAmlServiceErrorV1::AddStillInFlight);
                     }
                     DurableAddReconciliationV1::Unknown => {
@@ -429,6 +438,7 @@ mod tests {
         unknown_reconcile: bool,
         hide_visibility: bool,
         inject_cross_user_search_result: bool,
+        fail_write_before_commit: bool,
     }
 
     impl FakeDurableStore {
@@ -520,6 +530,12 @@ mod tests {
             if entry.digest != key.idempotency_digest {
                 return Err(DurableStoreErrorV1::RequestIdPayloadConflict);
             }
+            if self.fail_write_before_commit {
+                self.fail_write_before_commit = false;
+                return Err(DurableStoreErrorV1::Backend(
+                    "simulated failure before commit".into(),
+                ));
+            }
             let (receipt, records) = Self::visibility_receipt(key, request);
             entry.receipt = Some(receipt.clone());
             self.visible.extend(records);
@@ -566,6 +582,25 @@ mod tests {
                 .filter(|record| record.user_id == user_id && wanted.contains(record.id.as_str()))
                 .cloned()
                 .collect())
+        }
+
+        fn release_uncommitted_add(
+            &mut self,
+            key: &DurableAddKeyV1,
+        ) -> Result<(), DurableStoreErrorV1> {
+            let entry_key = Self::entry_key(key);
+            let Some(entry) = self.entries.get(&entry_key) else {
+                return Err(DurableStoreErrorV1::Backend(
+                    "release without reservation".into(),
+                ));
+            };
+            if entry.digest != key.idempotency_digest || entry.receipt.is_some() {
+                return Err(DurableStoreErrorV1::Backend(
+                    "refusing to release a committed or rebound reservation".into(),
+                ));
+            }
+            self.entries.remove(&entry_key);
+            Ok(())
         }
 
         fn finalize_add(
@@ -688,6 +723,22 @@ mod tests {
         let response = service.add(Track::Textual, &request).unwrap();
         assert!(response.success);
         assert_eq!(service.store.visible.len(), 1);
+    }
+
+    #[test]
+    fn reconciled_not_committed_write_can_be_retried_without_stuck_reservation() {
+        let mut store = FakeDurableStore::default();
+        store.fail_write_before_commit = true;
+        let mut service = service(store);
+        let request = add_request("durable-retry", "user-a", "retry after proven rollback");
+        assert!(matches!(
+            service.add(Track::Textual, &request),
+            Err(DurableAmlServiceErrorV1::Store(DurableStoreErrorV1::Backend(_)))
+        ));
+        let response = service.add(Track::Textual, &request).unwrap();
+        assert!(response.success);
+        assert_eq!(service.store.visible.len(), 1);
+        assert!(service.store.entries.values().all(|entry| entry.finalized));
     }
 
     #[test]
