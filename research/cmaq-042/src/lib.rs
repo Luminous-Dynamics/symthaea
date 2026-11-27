@@ -559,12 +559,14 @@ mod tests {
 
     #[test]
     fn exchangeable_rank_positions_respect_the_alpha_bound() {
-        for (reference_count, alpha_numerator, alpha_denominator) in
-            [(19usize, 1u32, 20u32), (39, 1, 20), (99, 1, 20), (99, 1, 10)]
-        {
+        for (reference_count, alpha_numerator, alpha_denominator) in [
+            (19usize, 1u32, 20u32),
+            (39, 1, 20),
+            (99, 1, 20),
+            (99, 1, 10),
+        ] {
             let threshold_rank =
-                calibrated_order_rank(reference_count, alpha_numerator, alpha_denominator)
-                    .unwrap();
+                calibrated_order_rank(reference_count, alpha_numerator, alpha_denominator).unwrap();
             let mut rejected_positions = 0usize;
             for test_rank in 1..=reference_count + 1 {
                 let mut input = bank(reference_count);
