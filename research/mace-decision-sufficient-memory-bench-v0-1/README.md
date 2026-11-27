@@ -240,6 +240,8 @@ Measure and report separately:
 
 Never label an estimate as measured cost. Cost-per-decision-gain and cost-per-valid-evidence result may be reported as derived metrics, with their components and assumptions visible.
 
+The Rust evaluator retains the existing `CostReceiptV1` contract for compatibility and adds `CostReceiptV2`, in which retained/index/network byte quantities carry an explicit `Measured`, `Estimated`, `Unknown` or `NotApplicable` state. A measured zero is `Some(0) + Measured`; unreported cost is `None + Unknown`, never numeric zero. Phase timings must still reconcile to wall time.
+
 ## Research hypotheses
 
 - **H1 — qualification reduces stale-action harm:** adding provenance, validity and revocation gates to lexical retrieval reduces stale-evidence decisions under a matched retrieval budget.
@@ -250,7 +252,7 @@ Never label an estimate as measured cost. Cost-per-decision-gain and cost-per-va
 - **H6 — governance is part of capability:** poisoning resistance, deletion and isolation should predict downstream decision safety, not be treated as unrelated operational checkboxes.
 - **H7 — evidence has measurable causal influence:** leave-one-out interventions on returned evidence identify items whose presence improves or worsens the frozen downstream decision. The signal should remain reproducible under fixed reader, seed and evidence-resolution rules.
 
-These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator now contains 28 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
+These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator now contains 29 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
 
 ## Baselines and industry comparison
 
