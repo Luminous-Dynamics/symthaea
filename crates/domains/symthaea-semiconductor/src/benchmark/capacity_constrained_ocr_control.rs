@@ -636,7 +636,7 @@ pub fn advance_capacity_ocrc_round_v1(
     let expired: Vec<u64> = candidate
         .tracked_rounds
         .iter()
-        .filter(|(round, tracked)| tracked.proxy_deadline_round < prediction.round)
+        .filter(|(_, tracked)| tracked.proxy_deadline_round < prediction.round)
         .map(|(round, _)| *round)
         .collect();
     for round in expired {
