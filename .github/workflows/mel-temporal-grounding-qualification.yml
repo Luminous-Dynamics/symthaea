@@ -272,7 +272,7 @@ jobs:
             and .overall.conditional_musical_flip_miss_rate < 0.15
             and .overall.joint_clean_performance_stay_musical_flip_exact_rate == 0.625
             and (.by_property | length) == 6
-            and (.by_performance_stay_factor | length) == 6
+            and (.by_performance_stay_factor | length) == 8
             and (.by_musical_flip_factor | length) == 6
             and (.by_performance_stay_performer | length) == 2
             and (.by_performance_stay_take | length) == 2
@@ -389,6 +389,16 @@ jobs:
             cp docs/research/MEL-HEAR-001-MUSICLISTENBENCH-ADAPTER-V1.md "$evidence/"
             if [[ -f "$RUNNER_TEMP/music-listen-bench-report.json" ]]; then
               cp "$RUNNER_TEMP/music-listen-bench-report.json" "$evidence/"
+            fi
+          fi
+          if [[ -f tools/mel-temporal-grounding-qualifier/src/music_performance_identity.rs ]]; then
+            cp tools/mel-temporal-grounding-qualifier/src/music_performance_identity.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/src/bin/mel-music-performance-identity-audit.rs "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-music-performance-identity.synthetic.json "$evidence/"
+            cp tools/mel-temporal-grounding-qualifier/schemas/mel-music-performance-identity-case-v1.schema.json "$evidence/"
+            cp docs/research/MEL-HEAR-002-PROPERTY-RELATIVE-MUSIC-PERFORMANCE-IDENTITY-V1.md "$evidence/"
+            if [[ -f "$RUNNER_TEMP/music-performance-identity-report.json" ]]; then
+              cp "$RUNNER_TEMP/music-performance-identity-report.json" "$evidence/"
             fi
           fi
           if [[ -f tools/mel-temporal-grounding-qualifier/src/temporal_unitizing.rs ]]; then
