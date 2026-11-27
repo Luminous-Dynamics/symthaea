@@ -12,15 +12,17 @@ cargo test --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/e
 cargo clippy --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/evaluator/Cargo.toml --locked --all-targets -- -D warnings
 ~~~
 
-The crate has no external dependencies. Its public API currently provides:
+The crate has no external dependencies. The LAFS helper is in src/longmemeval_v2.rs and uses the official published Small/Medium operating points; re-check the official benchmark page before each evaluation. Its public API currently provides:
 
 - Validation of evaluator cases and candidate outputs.
 - Exact integer action-loss and regret scoring.
-- Paired memory versus no-memory comparison on the same episode, enforcing an identical downstream-policy digest and decision seed.
+- Paired memory versus no-memory comparison on the same episode, enforcing and preserving an identical downstream-policy SHA-256 digest and decision seed.
 - Memory-induced harm and helpful/harmful action-change indicators.
 - Admissible-evidence precision and necessary-evidence recall as integer ratios.
 - Leave-one-out evidence interventions. The runner must invoke the same frozen, deterministic downstream policy digest and decision seed for each intervention, withholding exactly one returned evidence ID. Positive item contribution means retaining the item lowered decision loss; negative contribution means it increased loss.
 - Cost receipt reconciliation across non-overlapping phases (their sum, including residual, must equal wall time), retained/index/network bytes, and separately marked measured versus estimated cost.
+- Deterministic whole-world cluster bootstrap with 95% percentile intervals for mean paired memory gain and memory-induced harm rate; within-world episodes are resampled together.
+- Exact LongMemEval-V2 LAFS integration over the official 1–200 second log-latency budget, including Small and Medium reference frontiers, and delta-LAFS helpers.
 
 ## Critical evaluator isolation
 
@@ -35,6 +37,7 @@ Do not pipe this crate's evaluator structures into candidate prompts, HTTP reque
 This is a scoring core, not yet a complete benchmark runner:
 
 - It does not parse JSONL or generate random worlds.
+- The LAFS helper computes the metric but does not invoke the official LongMemEval-V2 data preparation, reader, scoring package, or submission validator.
 - It does not invoke candidate systems or implement AML Add/Search.
 - It does not implement process isolation, sandboxing, cryptographic provenance or a private key service.
 - The current leave-one-out method does not estimate higher-order evidence interactions or Shapley values.
