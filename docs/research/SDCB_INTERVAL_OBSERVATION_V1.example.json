@@ -1,0 +1,58 @@
+{
+  "schema_version": "sdcb_interval_observation.v1",
+  "process": {
+    "generator": [
+      [
+        -1
+      ]
+    ],
+    "diffusion_covariance": [
+      [
+        2
+      ]
+    ],
+    "initial_mean": [
+      0
+    ],
+    "initial_covariance": [
+      [
+        1
+      ]
+    ]
+  },
+  "windows": [
+    {
+      "id": "slow-reference",
+      "start_seconds": 0,
+      "end_seconds": 2,
+      "loadings": [
+        1
+      ]
+    },
+    {
+      "id": "fast-mobile",
+      "start_seconds": 1,
+      "end_seconds": 2,
+      "loadings": [
+        1
+      ]
+    }
+  ],
+  "acquisition_noise_covariance": [
+    [
+      0.01,
+      0
+    ],
+    [
+      0,
+      0.01
+    ]
+  ],
+  "observations": [
+    1,
+    0.7
+  ],
+  "notes": [
+    "Synthetic stationary OU cross-check; process scale chosen for unit stationary variance."
+  ]
+}
