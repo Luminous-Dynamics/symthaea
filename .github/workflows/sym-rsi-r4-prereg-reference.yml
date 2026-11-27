@@ -1,0 +1,47 @@
+name: Sym-RSI R4 Preregistration Validator
+
+on:
+  push:
+    branches:
+      - research/sym-rsi-r4-prereg-v0
+    paths:
+      - "tools/sym-rsi-r4-prereg-reference/**"
+      - "docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json"
+      - ".github/workflows/sym-rsi-r4-prereg-reference.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/sym-rsi-r4-prereg-reference/**"
+      - "docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json"
+      - ".github/workflows/sym-rsi-r4-prereg-reference.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validator:
+    name: Rust 1.96 R4 preregistration contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
+      - name: Run semantic validator tests
+        run: cargo test --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml
+      - name: Run strict Clippy
+        run: cargo clippy --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml --all-targets -- -D warnings
+      - name: Prove the template is rejected as unfrozen
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json > "$RUNNER_TEMP/template-report.json"
+          status=$?
+          set -e
+          test "$status" -eq 2
+          jq -e '.ready_for_independent_review == false' "$RUNNER_TEMP/template-report.json"
+          jq -e 'any(.issues[]; startswith("DOCUMENT_NOT_FROZEN"))' "$RUNNER_TEMP/template-report.json"
