@@ -721,17 +721,24 @@ mod tests {
                     channel_id: "mobile-channel".to_string(),
                     device_id: "mobile-1".to_string(),
                     device_evidence_version: 4,
+                    observation_window_id: "mobile-window-1".to_string(),
+                    capture_start_ms: 1_000,
+                    capture_end_ms: 2_000,
+                    calibration_context_id: "mobile-calibration-epoch-12".to_string(),
+                    calibration_epoch: 12,
                 },
                 ChannelEvidenceBinding {
                     channel_id: "reference-channel".to_string(),
                     device_id: "reference-1".to_string(),
                     device_evidence_version: 7,
+                    observation_window_id: "reference-window-4".to_string(),
+                    capture_start_ms: 1_500,
+                    capture_end_ms: 4_000,
+                    calibration_context_id: "reference-calibration-epoch-9".to_string(),
+                    calibration_epoch: 9,
                 },
             ],
             measurement_action_id: "collocation-run-5".to_string(),
-            observation_window_id: "window-mobile-1-reference-4".to_string(),
-            calibration_context_id: "calibration-epoch-12".to_string(),
-            calibration_epoch: 12,
         }
     }
 
