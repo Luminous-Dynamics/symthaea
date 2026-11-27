@@ -1,0 +1,10 @@
+[package]
+name = "mace-dsm-evaluator"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Dependency-free paired counterfactual scoring core for MACE Decision-Sufficient Memory"
+
+[lib]
+path = "src/lib.rs"
