@@ -172,41 +172,38 @@ impl SinusoidalVelocityKick {
         &self,
         position: f64,
         velocity: f64,
-        pre_kick_acceleration: f64,
-        post_kick_acceleration: f64,
-        explicit_reset_time_derivative: PhasePoint,
-    ) -> Result<PhasePoint, PulseMapError> {
-        if !velocity.is_finite()
-            || !pre_kick_acceleration.is_finite()
-            || !post_kick_acceleration.is_finite()
-            || !explicit_reset_time_derivative.x.is_finite()
-            || !explicit_reset_time_derivative.v.is_finite()
-        {
+        pre_event_flow: PhaseSpaceTangent,
+        post_event_flow: PhaseSpaceTangent,
+        explicit_reset_time_derivative: PhaseSpaceTangent,
+    ) -> Result<PhaseSpaceTangent, PulseMapError> {
+        let supplied_vectors = [
+            pre_event_flow.dx_dt,
+            pre_event_flow.dv_dt,
+            post_event_flow.dx_dt,
+            post_event_flow.dv_dt,
+            explicit_reset_time_derivative.dx_dt,
+            explicit_reset_time_derivative.dv_dt,
+        ];
+        if supplied_vectors.iter().any(|value| !value.is_finite()) {
             return Err(PulseMapError::InvalidParticleState);
         }
-        let mapped = self.apply(position, velocity)?;
         let reset = self.state_jacobian(position)?;
-        let pre_flow = PhasePoint {
-            x: velocity,
-            v: pre_kick_acceleration,
+        let sensitivity = PhaseSpaceTangent {
+            dx_dt: reset.m11 * pre_event_flow.dx_dt
+                + reset.m12 * pre_event_flow.dv_dt
+                + explicit_reset_time_derivative.dx_dt
+                - post_event_flow.dx_dt,
+            dv_dt: reset.m21 * pre_event_flow.dx_dt
+                + reset.m22 * pre_event_flow.dv_dt
+                + explicit_reset_time_derivative.dv_dt
+                - post_event_flow.dv_dt,
         };
-        let post_flow = PhasePoint {
-            x: mapped.v,
-            v: post_kick_acceleration,
-        };
-        let sensitivity = PhasePoint {
-            x: reset.m11 * pre_flow.x
-                + reset.m12 * pre_flow.v
-                + explicit_reset_time_derivative.x
-                - post_flow.x,
-            v: reset.m21 * pre_flow.x
-                + reset.m22 * pre_flow.v
-                + explicit_reset_time_derivative.v
-                - post_flow.v,
-        };
-        if !sensitivity.x.is_finite() || !sensitivity.v.is_finite() {
+        if !sensitivity.dx_dt.is_finite() || !sensitivity.dv_dt.is_finite() {
             return Err(PulseMapError::NonFiniteDerivative);
         }
+        // Validate that the supplied position/velocity is a valid point on
+        // the same pulse branch, even though only the reset Jacobian is used.
+        self.apply(position, velocity)?;
         Ok(sensitivity)
     }
 
@@ -234,6 +231,13 @@ impl SinusoidalVelocityKick {
 pub struct PhasePoint {
     pub x: f64,
     pub v: f64,
+}
+
+/// Phase-space vector field or derivative with respect to an external parameter.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PhaseSpaceTangent {
+    pub dx_dt: f64,
+    pub dv_dt: f64,
 }
 
 /// Row-major 2x2 state Jacobian.
@@ -440,19 +444,50 @@ mod tests {
         let kick = manufactured_kick();
         let x = 0.23;
         let v = -0.4;
+        let mapped = kick.apply(x, v).unwrap();
         let timing = kick
-            .application_time_sensitivity(x, v, 0.0, 0.0, PhasePoint { x: 0.0, v: 0.0 })
+            .application_time_sensitivity(
+                x,
+                v,
+                PhaseSpaceTangent {
+                    dx_dt: v,
+                    dv_dt: 0.0,
+                },
+                PhaseSpaceTangent {
+                    dx_dt: mapped.v,
+                    dv_dt: 0.0,
+                },
+                PhaseSpaceTangent {
+                    dx_dt: 0.0,
+                    dv_dt: 0.0,
+                },
+            )
             .unwrap();
         let delta = kick.delta_v(x).unwrap();
         let shear = kick.state_jacobian(x).unwrap().m21;
-        assert!((timing.x + delta).abs() < 1.0e-14);
-        assert!((timing.v - shear * v).abs() < 1.0e-14);
+        assert!((timing.dx_dt + delta).abs() < 1.0e-14);
+        assert!((timing.dv_dt - shear * v).abs() < 1.0e-14);
 
         let explicit = kick
-            .application_time_sensitivity(x, v, 0.3, -0.2, PhasePoint { x: 0.1, v: 0.05 })
+            .application_time_sensitivity(
+                x,
+                v,
+                PhaseSpaceTangent {
+                    dx_dt: v,
+                    dv_dt: 0.3,
+                },
+                PhaseSpaceTangent {
+                    dx_dt: mapped.v,
+                    dv_dt: -0.2,
+                },
+                PhaseSpaceTangent {
+                    dx_dt: 0.1,
+                    dv_dt: 0.05,
+                },
+            )
             .unwrap();
-        assert!((explicit.x - (timing.x + 0.1)).abs() < 1.0e-14);
-        assert!((explicit.v - (timing.v + 0.3 + 0.05 - (-0.2))).abs() < 1.0e-14);
+        assert!((explicit.dx_dt - (timing.dx_dt + 0.1)).abs() < 1.0e-14);
+        assert!((explicit.dv_dt - (timing.dv_dt + 0.3 + 0.05 - (-0.2))).abs() < 1.0e-14);
     }
 
     #[test]
@@ -465,18 +500,28 @@ mod tests {
         let event_time = 0.5;
         let observation_time = 1.4;
         let step = 1.0e-5;
-        let explicit_reset_time_derivative = PhasePoint { x: 0.03, v: -0.02 };
+        let explicit_reset_time_derivative = PhaseSpaceTangent { dx_dt: 0.03, dv_dt: -0.02 };
 
         let pre_x = x0 + v0 * event_time + 0.5 * a_minus * event_time * event_time;
         let pre_v = v0 + a_minus * event_time;
         let post_event_duration = observation_time - event_time;
+        let mapped_at_nominal = kick.apply(pre_x, pre_v).unwrap();
         let local_sensitivity = kick
             .application_time_sensitivity(
                 pre_x,
                 pre_v,
-                a_minus,
-                a_plus,
-                explicit_reset_time_derivative,
+                PhaseSpaceTangent {
+                    dx_dt: pre_v,
+                    dv_dt: a_minus,
+                },
+                PhaseSpaceTangent {
+                    dx_dt: mapped_at_nominal.v,
+                    dv_dt: a_plus,
+                },
+                PhaseSpaceTangent {
+                    dx_dt: explicit_reset_time_derivative.x,
+                    dv_dt: explicit_reset_time_derivative.v,
+                },
             )
             .unwrap();
 
@@ -505,8 +550,8 @@ mod tests {
         // Propagate the event-time sensitivity to the fixed observation time
         // through the post-event tangent [[1, dt], [0, 1]].
         let predicted_x =
-            local_sensitivity.x + post_event_duration * local_sensitivity.v;
-        let predicted_v = local_sensitivity.v;
+            local_sensitivity.dx_dt + post_event_duration * local_sensitivity.dv_dt;
+        let predicted_v = local_sensitivity.dv_dt;
         assert!((fd_x - predicted_x).abs() < 1.0e-7);
         assert!((fd_v - predicted_v).abs() < 1.0e-7);
     }
