@@ -1,0 +1,69 @@
+name: SDCB Student-t5 Common-Scale Dependence Stress
+
+on:
+  push:
+    branches:
+      - research/sdcb-student-t5-common-scale-stress-2026-11-27
+    paths:
+      - "scripts/research/sdcb_student_t5_common_scale_stress.rs"
+      - ".github/workflows/sdcb-student-t5-common-scale-stress.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/research/sdcb_student_t5_common_scale_stress.rs"
+      - ".github/workflows/sdcb-student-t5-common-scale-stress.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  heavy-tail-dependence-stress:
+    name: Rust 1.96 Gaussian and t5 common-scale regime shifts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Generate rustfmt preview
+        run: rustfmt --edition 2024 scripts/research/sdcb_student_t5_common_scale_stress.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-t5-common-scale-rustfmt-preview
+          path: scripts/research/sdcb_student_t5_common_scale_stress.rs
+      - name: Restore exact committed source
+        run: git checkout -- scripts/research/sdcb_student_t5_common_scale_stress.rs
+      - name: Check formatting on exact committed source
+        run: rustfmt --edition 2024 --check scripts/research/sdcb_student_t5_common_scale_stress.rs
+      - name: Compile and run exact-source unit controls
+        run: |
+          rustc --edition=2024 --test scripts/research/sdcb_student_t5_common_scale_stress.rs -o /tmp/sdcb-t5-common-scale-tests
+          /tmp/sdcb-t5-common-scale-tests
+      - name: Run full deterministic Gaussian and t5 grid
+        run: |
+          rustc --edition=2024 scripts/research/sdcb_student_t5_common_scale_stress.rs -o /tmp/sdcb-t5-common-scale
+          mkdir -p "$RUNNER_TEMP/sdcb-t5-common-scale"
+          /tmp/sdcb-t5-common-scale > "$RUNNER_TEMP/sdcb-t5-common-scale/regime_shift.csv"
+          {
+            echo "source_commit=$(git rev-parse HEAD)"
+            rustc --version
+            echo "experiment=Gaussian AR(1) and standardized Student-t(5) common-scale mixtures; unit variance; each marginal family invariant under rho switches"
+            echo "calibration_rho={0.05,0.95}; test_rho={0.05,0.95}; calibration_blocks=39; alpha=0.10; trials=2500 per condition"
+            echo "grid=marginal:{gaussian,student_t5_common_scale}; block_len:{1,8,32}; independent blocks; serial_path embargo_gap:{0,64}; 72 total conditions"
+          } > "$RUNNER_TEMP/sdcb-t5-common-scale/manifest.txt"
+      - name: Upload reproducible regime-shift report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-student-t5-common-scale-report
+          path: ${{ runner.temp }}/sdcb-t5-common-scale/
+          if-no-files-found: error
+          retention-days: 30
