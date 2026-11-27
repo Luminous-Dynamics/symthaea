@@ -1,0 +1,119 @@
+{
+  "profile": "mon040-replay-reproducibility-scenarios-v1",
+  "version": "1.0.0",
+  "classification": "public_synthetic_development_corpus",
+  "scenarios": [
+    {
+      "id": "MON040-P001",
+      "classification": "positive_control",
+      "name": "29_of_29_exact_matches",
+      "expected_outcome": "qualified",
+      "mutation": "29/29 exact blocked-signature outcomes; lower one-sided 95% bound exceeds 0.90"
+    },
+    {
+      "id": "MON040-P002",
+      "classification": "positive_control",
+      "name": "same_fault_same_boundary",
+      "expected_outcome": "qualified",
+      "mutation": "All observations share trial, fault set, scenario, boundary and code revision"
+    },
+    {
+      "id": "MON040-N001",
+      "classification": "negative_control",
+      "name": "28_of_29_exact_matches",
+      "expected_outcome": "blocked",
+      "mutation": "Exact lower confidence bound is below 0.90"
+    },
+    {
+      "id": "MON040-N002",
+      "classification": "negative_control",
+      "name": "missing_replay",
+      "expected_outcome": "indeterminate",
+      "mutation": "A replay is absent from preregistered denominator"
+    },
+    {
+      "id": "MON040-N003",
+      "classification": "negative_control",
+      "name": "incomplete_replay",
+      "expected_outcome": "indeterminate",
+      "mutation": "One replay receipt is marked incomplete"
+    },
+    {
+      "id": "MON040-N004",
+      "classification": "negative_control",
+      "name": "indeterminate_oracle_outcome",
+      "expected_outcome": "indeterminate",
+      "mutation": "One completed run cannot adjudicate the target signature"
+    },
+    {
+      "id": "MON040-N005",
+      "classification": "negative_control",
+      "name": "different_blocked_signature",
+      "expected_outcome": "blocked",
+      "mutation": "Blocked result has a different failure signature"
+    },
+    {
+      "id": "MON040-N006",
+      "classification": "negative_control",
+      "name": "duplicate_replay_id",
+      "expected_outcome": "blocked",
+      "mutation": "Two observations reuse one replay ID"
+    },
+    {
+      "id": "MON040-N007",
+      "classification": "negative_control",
+      "name": "duplicate_seed",
+      "expected_outcome": "blocked",
+      "mutation": "Two observations reuse one random seed"
+    },
+    {
+      "id": "MON040-N008",
+      "classification": "negative_control",
+      "name": "cross_boundary_replay",
+      "expected_outcome": "blocked",
+      "mutation": "One replay belongs to another recovery boundary"
+    },
+    {
+      "id": "MON040-N009",
+      "classification": "negative_control",
+      "name": "altered_receipt_payload",
+      "expected_outcome": "blocked",
+      "mutation": "Observation field changes without recomputed outcome receipt"
+    },
+    {
+      "id": "MON040-N010",
+      "classification": "negative_control",
+      "name": "future_timestamp",
+      "expected_outcome": "blocked",
+      "mutation": "Replay observation occurs after evaluation time"
+    },
+    {
+      "id": "MON040-N011",
+      "classification": "negative_control",
+      "name": "unpreregistered_extra_run",
+      "expected_outcome": "blocked",
+      "mutation": "More replays supplied than the fixed run count"
+    },
+    {
+      "id": "MON040-N012",
+      "classification": "negative_control",
+      "name": "wrong_fault_set_digest",
+      "expected_outcome": "blocked",
+      "mutation": "Fault IDs and canonical digest disagree"
+    },
+    {
+      "id": "MON040-N013",
+      "classification": "negative_control",
+      "name": "invalid_confidence",
+      "expected_outcome": "blocked",
+      "mutation": "Confidence parameter outside (0,1)"
+    },
+    {
+      "id": "MON040-N014",
+      "classification": "negative_control",
+      "name": "runtime_custody_missing",
+      "expected_outcome": "indeterminate",
+      "mutation": "Internally consistent runtime candidate lacks authenticated scheduler/custody adapter"
+    }
+  ]
+}
