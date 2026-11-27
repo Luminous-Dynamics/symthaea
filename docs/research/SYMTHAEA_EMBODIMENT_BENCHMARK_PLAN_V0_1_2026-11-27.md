@@ -91,7 +91,7 @@ cessation are distinct events.
 
 Run the receipt ledger against the positive/negative lifecycle fixtures and
 fault-injection traces. Enforce the permitted transition graph, single terminal
-outcome, attempt identity, exact grant identity, event/grant/effective expiry,
+outcome, attempt identity, exact grant identity, complete canonical-cue digest, event/grant/effective expiry,
 observer-channel compatibility, and per-clock monotonicity. Verify every
 ledger digest and previous-digest link.
 
@@ -108,7 +108,7 @@ Targets (not results):
 - p95 submission-to-observation latency below 100 ms for the local visual renderer;
 - cancellation-to-observed-stop p95 below one render update;
 - zero raw-media data in receipt records;
-- 100% records carry policy/adapter/build identity and both event and grant expiry.
+- 100% records carry policy/adapter/build identity, the canonical cue digest, and event/grant/effective expiry.
 
 Report observer type, adapter build, clock domains, unknown outcomes, dropped
 observations, terminal failure types, and resource cost. An adapter callback
