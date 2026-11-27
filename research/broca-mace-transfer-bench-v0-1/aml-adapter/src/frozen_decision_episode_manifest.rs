@@ -465,7 +465,7 @@ mod tests {
             frozen_decision_episode_manifest_sha256_v1(&reparsed).unwrap(),
             frozen_decision_episode_manifest_sha256_v1(&a).unwrap()
         );
-        let repeated = verify_frozen_decision_episode_set_v1(&[a, b]).unwrap();
+        let repeated = verify_frozen_decision_episode_set_v1(&[a.clone(), b.clone()]).unwrap();
         assert_eq!(set.root_sha256(), repeated.root_sha256());
         assert_eq!(
             frozen_decision_episode_manifest_sha256_v1(&a).unwrap(),
