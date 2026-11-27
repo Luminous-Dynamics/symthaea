@@ -918,10 +918,10 @@ mod tests {
         let config = BoxChallengeSearchConfig::new(
             BoxSearchDomain {
                 axis_ids: vec![
-                "second_pulse_phase".to_owned(),
-                "second_pulse_amplitude".to_owned(),
-                "pulse_separation".to_owned(),
-            ],
+                    "second_pulse_phase".to_owned(),
+                    "second_pulse_amplitude".to_owned(),
+                    "pulse_separation".to_owned(),
+                ],
                 lower_bounds: vec![0.0, 0.0, 0.0],
                 upper_bounds: vec![1.0, 1.0, 1.0],
                 lipschitz_constants: vec![1.0, 2.0, 0.5],
