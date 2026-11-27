@@ -8,7 +8,7 @@
 //! reference-comparison and evidence-ingestion boundary. It does not authenticate
 //! score receipts, tie-break randomness or cluster independence.
 
-use cmaq_031_anytime_calibration_monitor::{centered_rank_payoff, MonitorError, RankFeature};
+use cmaq_031_anytime_calibration_monitor::{MonitorError, RankFeature, centered_rank_payoff};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct AdaptiveComponent {
@@ -78,20 +78,13 @@ impl OnsPredictiveRankMonitor {
         if calibration_count == 0 {
             return Err(OnsError::InvalidCalibrationCount);
         }
-        if alpha_numerator == 0
-            || alpha_denominator == 0
-            || alpha_numerator >= alpha_denominator
-        {
+        if alpha_numerator == 0 || alpha_denominator == 0 || alpha_numerator >= alpha_denominator {
             return Err(OnsError::InvalidMiscoverage);
         }
 
         let rank_counts = vec![0; calibration_count + 1];
-        let order_bound = projection_bound(
-            calibration_count,
-            &rank_counts,
-            1,
-            RankFeature::UpperOrder,
-        )?;
+        let order_bound =
+            projection_bound(calibration_count, &rank_counts, 1, RankFeature::UpperOrder)?;
         let dispersion_bound = projection_bound(
             calibration_count,
             &rank_counts,
@@ -312,11 +305,7 @@ fn projection_bound(
             .checked_mul(total)
             .and_then(|value| value.checked_sub(weighted_sum))
             .ok_or(OnsError::ArithmeticOverflow)?;
-        maximum = maximum.max(
-            centered
-                .checked_abs()
-                .ok_or(OnsError::ArithmeticOverflow)?,
-        );
+        maximum = maximum.max(centered.checked_abs().ok_or(OnsError::ArithmeticOverflow)?);
     }
     let maximum = maximum as f64;
     if !denominator.is_finite() || denominator <= 0.0 || !maximum.is_finite() {
@@ -446,8 +435,9 @@ mod tests {
         assert_eq!(monitor.components()[0].lambda, 0.0);
         let first = monitor.observe_rank(18).unwrap();
         let components = match first {
-            OnsUpdate::Accepted { components, .. }
-            | OnsUpdate::Quarantined { components, .. } => components,
+            OnsUpdate::Accepted { components, .. } | OnsUpdate::Quarantined { components, .. } => {
+                components
+            }
         };
         assert!(components[0].lambda > 0.0);
         assert!(components[1].lambda > 0.0);
@@ -455,8 +445,9 @@ mod tests {
         let mut lower_shift = OnsPredictiveRankMonitor::new(17, 1, 20).unwrap();
         let lower = lower_shift.observe_rank(1).unwrap();
         let lower_components = match lower {
-            OnsUpdate::Accepted { components, .. }
-            | OnsUpdate::Quarantined { components, .. } => components,
+            OnsUpdate::Accepted { components, .. } | OnsUpdate::Quarantined { components, .. } => {
+                components
+            }
         };
         assert!(lower_components[0].lambda < 0.0);
     }
@@ -479,14 +470,9 @@ mod tests {
         for rank in [8, 9, 10, 11, 12] {
             let tail =
                 centered_rank_payoff(n, &counts, t, rank, RankFeature::TailDispersion).unwrap();
-            let center = centered_rank_payoff(
-                n,
-                &counts,
-                t,
-                rank,
-                RankFeature::CenterConcentration,
-            )
-            .unwrap();
+            let center =
+                centered_rank_payoff(n, &counts, t, rank, RankFeature::CenterConcentration)
+                    .unwrap();
             assert!((tail + center).abs() < 1e-12);
         }
     }
@@ -506,10 +492,7 @@ mod tests {
         }
         assert!(alarmed);
         assert!(monitor.is_quarantined());
-        assert_eq!(
-            monitor.observe_rank(29),
-            Err(OnsError::AlreadyQuarantined)
-        );
+        assert_eq!(monitor.observe_rank(29), Err(OnsError::AlreadyQuarantined));
     }
 
     #[test]
