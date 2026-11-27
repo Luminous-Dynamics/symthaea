@@ -20,7 +20,7 @@ Arguments are replications, horizon and seed. Defaults are 10,000, 500 and 20,26
 
 ## Output and interpretation
 
-For each scenario and method: empirical probability of quarantine by the horizon, 95% Wilson interval, median / 90th / 95th percentile detection delay conditional on detection. Paired win/loss/tie counts compare detection delay on common random-number streams for alternative shifts only. Null false alarms are reported solely as rates and confidence intervals; paired timing wins are not defined for the null.
+For each scenario and method: empirical probability of quarantine by the horizon, 95% Wilson interval, median / 90th / 95th percentile detection delay conditional on detection. Paired win/loss/tie counts compare ONS against both fixed-bet controls on common random-number streams for alternative shifts only. Null false alarms are reported solely as rates and confidence intervals; paired timing wins are not defined for the null.
 
 Null false-alarm probability must be checked before interpreting alternative power. No alarm is not assigned a fabricated delay. This simulation does not establish safety or guarantee detection.
 
