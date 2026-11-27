@@ -1,7 +1,7 @@
 # MACE Decision-Sufficient Memory Benchmark
 
 **Version:** 0.1.0  
-**Status:** research protocol and candidate-only fixtures authored; dependency-free Rust paired evaluator core and LongMemEval-V2 LAFS helper implemented (execution/CI validation still pending)  
+**Status:** research protocol and candidate-only fixtures authored; dependency-free Rust paired evaluator core and LongMemEval-V2 LAFS helper pass exact-head Rust 1.96 validation (45 tests); benchmark execution and external result reproduction remain pending  
 **Tracking:** [issue #13893](https://github.com/Luminous-Dynamics/symthaea/issues/13893)
 
 ## Thesis
