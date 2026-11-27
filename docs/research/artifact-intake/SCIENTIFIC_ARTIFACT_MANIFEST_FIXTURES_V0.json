@@ -180,7 +180,7 @@
             "max_observations": 64
           },
           "usage": {
-            "bytes_read": 2048,
+            "bytes_read": 48,
             "elapsed_ms": 1,
             "observations_emitted": 0
           }
@@ -236,7 +236,7 @@
             "max_observations": 64
           },
           "usage": {
-            "bytes_read": 2048,
+            "bytes_read": 3,
             "elapsed_ms": 1,
             "observations_emitted": 0
           }
