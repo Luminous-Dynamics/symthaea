@@ -103,7 +103,15 @@ pub struct CandidateDecisionContext {
     pub deadline_ms: Option<u64>,
     pub phase: DecisionPhase,
     pub decision_objective: DecisionObjectiveReference,
+    /// Exact serialized ResearchState digest from #13665; reference only, not a second state store.
+    pub research_state_sha256: String,
+    /// Exact visible evidence-prefix digest from #13665/#11015.
+    pub evidence_prefix_sha256: String,
+    /// Exact upstream AgentView permitted-action-offer-list digest from #11015.
+    pub permitted_action_offer_list_sha256: String,
+    /// Digest of this episode envelope, including the upstream identities above.
     pub context_digest: String,
+    /// Decision-local references only; artifact/evidence custody stays with its upstream owner.
     pub evidence_available_at_decision: Vec<EvidenceReference>,
     pub permitted_action_ids: Vec<String>,
     pub estimated_budget: ResourceVector,
@@ -113,6 +121,9 @@ impl CandidateDecisionContext {
         require_nonempty("episode_id", &self.episode_id)?;
         require_nonempty("task_family_id", &self.task_family_id)?;
         require_nonempty("context_digest", &self.context_digest)?;
+        validate_sha256("research_state_sha256", &self.research_state_sha256)?;
+        validate_sha256("evidence_prefix_sha256", &self.evidence_prefix_sha256)?;
+        validate_sha256("permitted_action_offer_list_sha256", &self.permitted_action_offer_list_sha256)?;
         self.decision_objective.validate()?;
         if self.schema_version != SCHEMA_VERSION { return Err("unsupported schema version".into()); }
         if self.permitted_action_ids.is_empty() { return Err("permitted action set is empty".into()); }
@@ -376,6 +387,15 @@ impl EvaluatorResolution {
     }
 }
 
+fn validate_sha256(field: &str, value: &str) -> Result<(), String> {
+    if value.len() != 64
+        || !value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err(format!("{field} must be lowercase SHA-256 hex"));
+    }
+    Ok(())
+}
+
 fn require_nonempty(field: &str, value: &str) -> Result<(), String> {
     if value.trim().is_empty() { Err(format!("{field} must not be empty")) } else { Ok(()) }
 }
@@ -404,7 +424,10 @@ mod tests {
                 utility_unit: Some("normalized_loss_units".into()),
                 loss_table_digest: Some("sha256:loss-table".into()),
             },
-            context_digest: "sha256:ctx".into(),
+            research_state_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            evidence_prefix_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+            permitted_action_offer_list_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
+            context_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into(),
             evidence_available_at_decision: vec![EvidenceReference {
                 evidence_id: "obs".into(), content_digest: "sha256:obs".into(),
                 observed_at_ms: 80, available_at_ms: 90,
@@ -454,6 +477,19 @@ mod tests {
             cost_completeness: CostCompleteness::Complete,
             independent_adjudication_ref: Some("independent-review".into()),
         }
+    }
+
+    #[test]
+    fn requires_exact_upstream_research_state_and_offer_bindings() {
+        let mut c = context();
+        c.research_state_sha256 = "not-a-digest".into();
+        assert!(c.validate().unwrap_err().contains("research_state_sha256"));
+        c = context();
+        c.evidence_prefix_sha256 = "A".repeat(64);
+        assert!(c.validate().unwrap_err().contains("evidence_prefix_sha256"));
+        c = context();
+        c.permitted_action_offer_list_sha256 = "c".repeat(63);
+        assert!(c.validate().unwrap_err().contains("permitted_action_offer_list_sha256"));
     }
 
     #[test]
