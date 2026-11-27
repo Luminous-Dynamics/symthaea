@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-eqc-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Standalone reference-contract evaluator for the Evidence-Qualified Capability seed"
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+
+# This nested workspace keeps the EQC reference tool independent from the
+# Symthaea monorepo workspace and its unrelated dependency graph.
+[workspace]
