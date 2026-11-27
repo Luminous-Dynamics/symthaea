@@ -67,3 +67,17 @@ A frozen cohort row wraps its prediction, any adjudicator/panel assignment made 
 This is an exploratory population estimator, not the finite-sample martingale risk-control procedure in the recent SOWRC literature. It does not inherit SOWRC's guarantees. Its role is to expose selection bias and support failures before making population-level selective-risk claims.
 
 The standalone Rust 1.96 harness imports the production source by path. Exact-head formatting, tests and strict Clippy are required before qualification.
+
+
+## Custodian-randomized stratified audit design
+
+The production module `src/web_research/stratified_audit.rs` turns an externally randomized, complete pre-label cohort into a fixed-size stratified simple-random-sampling-without-replacement (SRSWOR) audit plan.
+
+- A separate custodian supplies independent, uniformly generated 128-bit random priorities and a frozen randomization-manifest reference. This module does not generate entropy, assign reviewers, authenticate the manifest, or expose evaluator outcomes.
+- The builder selects the lowest-priority units in each pre-label stratum according to an explicit quota. Priority collisions are rejected rather than broken by record ID.
+- Every record in the complete cohort is returned with a positive first-order inclusion probability `pi_i = n_h / N_h`. Every nonempty stratum must receive a positive quota; zero-support strata fail closed.
+- Within-stratum second-order probabilities are `pi_ij = n_h(n_h-1)/(N_h(N_h-1))` for distinct records. Cross-stratum probabilities are the product of first-order probabilities, conditional on independent randomization across strata.
+- The plan reports whether every stratum supports a within-stratum sample variance: a non-census stratum needs at least two sampled records. This is a design diagnostic, not a claim that a variance estimator has already been implemented.
+- The output composes with `SelectiveObservationRecord.adjudication_inclusion_probability`; selected records receive their label through the independent adjudicator, while nonselected records remain pending in the complete cohort.
+
+The random priorities, pre-label strata, quotas and selected IDs must be preserved in an independently controlled manifest. The selection guarantee is conditional on the custodian's randomization and the stated SRSWOR design.
