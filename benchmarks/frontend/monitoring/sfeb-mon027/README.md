@@ -29,7 +29,40 @@ MON-027 attach + verify
 signed manifest + MON-026 offline verification
 ```
 
-The assembler never receives a private key. The external signer signs the exact domain-separated message for the manifest root and key identity. The attach step checks key ID, algorithm, signature and all artifact bytes against an out-of-band expected run ID, sequence, predecessor root and trusted public key.
+The assembler never receives a private key. It produces a deterministic request ID and the exact domain-separated message for the manifest root and key identity. The external signer signs only those supplied bytes and returns an envelope bound to that request ID. The attach step checks key ID, algorithm, signature and all artifact bytes against an out-of-band expected run ID, sequence, predecessor root and trusted public key.
+
+## Operator workflow
+
+From the `packager/` module directory, prepare an input index like [INPUT-example.json](./INPUT-example.json) outside the raw artifact root. The `artifacts` list must enumerate every file under that root and no other path.
+
+```sh
+go run ./cmd/assemble \
+  --index /runs/run-001/input-index.json \
+  --artifact-root /runs/run-001/artifacts \
+  --manifest-out /runs/run-001/manifest.unsigned.json \
+  --signing-request-out /runs/run-001/signing-request.json
+```
+
+Send `signing-request.json` to an independently administered signer. The signer validates authorization and key status, signs the exact `message_base64` bytes with the requested Ed25519 key, and returns a detached envelope conforming to `SIGNATURE-ENVELOPE-v1.schema.json`. The request ID is a deterministic idempotency key; the signer should persist its decision for that ID.
+
+Attach and verify the signer response using independently provisioned trust:
+
+```sh
+go run ./cmd/attach-signature \
+  --artifact-root /runs/run-001/artifacts \
+  --manifest /runs/run-001/manifest.unsigned.json \
+  --signature /runs/run-001/signature-envelope.json \
+  --key-id luminous-custody-ed25519-2026-01 \
+  --public-key-hex "$TRUSTED_ED25519_PUBLIC_KEY_HEX" \
+  --expected-run-id mon025-run-2026-11-27-001 \
+  --expected-sequence 1 \
+  --clock-domain lab-clock \
+  --max-age 24h \
+  --max-clock-uncertainty 100ms \
+  --signed-manifest-out /runs/run-001/manifest.signed.json
+```
+
+For later sequences, also pass `--expected-previous-root SHA256`. The attach command writes a signed manifest only after independent MON-026 verification qualifies. It never reads a private signing key.
 
 ## Contents
 
