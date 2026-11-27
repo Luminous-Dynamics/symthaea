@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/broca-mace-transfer-bench-v0-1/schemas/evidence-set-selection-v1.schema.json",
+  "title": "MACE evidence set selection or obstruction v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/selection"
+    },
+    {
+      "$ref": "#/$defs/obstruction"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "idArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/id"
+      },
+      "uniqueItems": true
+    },
+    "digestArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "exclusionReason": {
+      "enum": [
+        "not_selected_by_optimizer",
+        "missing_verified_ingress_capability",
+        "receipt_integrity_failure",
+        "bitemporal_snapshot_mismatch",
+        "scope_mismatch",
+        "purpose_mismatch",
+        "consumer_policy_mismatch",
+        "source_not_trusted",
+        "source_not_active",
+        "dependency_lineage_incomplete",
+        "outside_validity_interval"
+      ]
+    },
+    "obstructionReason": {
+      "enum": [
+        "invalid_context",
+        "too_many_candidates",
+        "invalid_candidate_id",
+        "invalid_candidate_digest",
+        "duplicate_evidence_id",
+        "duplicate_event_id",
+        "invalid_constraint",
+        "constraint_verification_failed",
+        "unknown_constraint_endpoint",
+        "duplicate_constraint_id",
+        "must_link_cannot_link_conflict",
+        "required_constraint_conflict",
+        "required_set_exceeds_budget",
+        "no_feasible_selection"
+      ]
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "context_sha256",
+        "candidate_set_sha256",
+        "constraint_set_sha256",
+        "constraint_policy_sha256",
+        "selected_evidence_ids",
+        "selected_representation_sha256",
+        "selected_use_receipt_sha256",
+        "excluded",
+        "total_token_cost",
+        "total_relevance_score_micros",
+        "max_token_cost",
+        "canonical_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_evidence_set_selection_v1"
+        },
+        "context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "constraint_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "constraint_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "selected_evidence_ids": {
+          "$ref": "#/$defs/idArray"
+        },
+        "selected_representation_sha256": {
+          "$ref": "#/$defs/digestArray"
+        },
+        "selected_use_receipt_sha256": {
+          "$ref": "#/$defs/digestArray"
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "evidence_id",
+              "reason"
+            ],
+            "properties": {
+              "evidence_id": {
+                "$ref": "#/$defs/id"
+              },
+              "reason": {
+                "$ref": "#/$defs/exclusionReason"
+              }
+            }
+          }
+        },
+        "total_token_cost": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_relevance_score_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_token_cost": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "obstruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "reason",
+        "context_sha256",
+        "candidate_set_sha256",
+        "constraint_set_sha256",
+        "blocking_evidence_ids",
+        "blocking_constraint_ids",
+        "canonical_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_evidence_set_obstruction_v1"
+        },
+        "reason": {
+          "$ref": "#/$defs/obstructionReason"
+        },
+        "context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "constraint_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "blocking_evidence_ids": {
+          "$ref": "#/$defs/idArray"
+        },
+        "blocking_constraint_ids": {
+          "$ref": "#/$defs/idArray"
+        },
+        "canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
