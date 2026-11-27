@@ -387,7 +387,7 @@ mod tests {
         let model = FirstOrderResponseOu::new(lambda, 1.0, tau).unwrap();
         let actual = model.transition_matrix(5.169304199174938e249).unwrap()[1][0];
         assert!(actual > 0.0);
-        close(actual, 1.5902379318026358e-258, 2.0e-270);
+        close(actual, 1.5902379318025706e-258, 2.0e-270);
     }
 
     #[test]
@@ -398,6 +398,16 @@ mod tests {
         let expected = t * (-t).exp();
         assert!(transition[1][0] > 0.0);
         close(transition[1][0], expected, 1.0e-323);
+    }
+
+    #[test]
+    fn compensated_rate_time_product_matches_high_precision_transition() {
+        let lambda = 7.646017666493531e-32;
+        let tau = 1.0 / 7.64601766649353e-32;
+        let elapsed = 7.847222255702168e33;
+        let model = FirstOrderResponseOu::new(lambda, 1.0, tau).unwrap();
+        let actual = model.transition_matrix(elapsed).unwrap()[1][0];
+        close(actual, 1.5902379318027118e-258, 1.0e-272);
     }
 
     #[test]
