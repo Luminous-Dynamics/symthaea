@@ -109,6 +109,34 @@ pub struct PairedScoreV1 {
     pub changed_action_harmed: bool,
 }
 
+/// One completed paired episode, assigned to its independent world cluster.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClusteredPairedScoreV1 {
+    pub cluster_id: String,
+    pub score: PairedScoreV1,
+}
+
+/// Percentile interval for a cluster-bootstrap statistic.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ConfidenceIntervalV1 {
+    pub lower: f64,
+    pub upper: f64,
+}
+
+/// Episode-weighted point estimates with cluster-resampled uncertainty.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClusteredSummaryV1 {
+    pub episode_count: u64,
+    pub cluster_count: u64,
+    pub mean_memory_gain_micros: f64,
+    pub memory_induced_harm_rate: CountRatioV1,
+    pub memory_improvement_rate: CountRatioV1,
+    pub mean_gain_confidence_95: ConfidenceIntervalV1,
+    pub harm_rate_confidence_95: ConfidenceIntervalV1,
+    pub bootstrap_replicates: u64,
+    pub bootstrap_seed: u64,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PhaseTimingsV1 {
     pub add_ingest_ns: u64,
@@ -192,6 +220,12 @@ pub enum EvaluationErrorV1 {
     AblationSetIncomplete,
     AblationEvidenceSetMismatch,
     AblationSystemMismatch,
+    NoClusteredEpisodes,
+    EmptyClusterId,
+    DuplicateEpisodeId,
+    InsufficientIndependentClusters,
+    InvalidBootstrapReplicates,
+    AggregateOverflow,
     MissingActionLoss,
 }
 
@@ -476,6 +510,176 @@ pub fn score_leave_one_out(
     Ok(results)
 }
 
+const MIN_BOOTSTRAP_REPLICATES: usize = 100;
+
+/// Small deterministic SplitMix64 generator; used only to make cluster
+/// bootstrap resampling exactly reproducible from the run manifest seed.
+struct SplitMix64V1 {
+    state: u64,
+}
+
+impl SplitMix64V1 {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        value ^ (value >> 31)
+    }
+
+    fn index(&mut self, upper: usize) -> usize {
+        let bound = u64::try_from(upper).unwrap_or(u64::MAX);
+        let zone = u64::MAX - (u64::MAX % bound);
+        loop {
+            let value = self.next_u64();
+            if value < zone {
+                return usize::try_from(value % bound).unwrap_or(0);
+            }
+        }
+    }
+}
+
+fn nearest_rank(sorted: &[f64], probability: f64) -> f64 {
+    let rank = (probability * sorted.len() as f64).ceil() as usize;
+    let index = rank.clamp(1, sorted.len()) - 1;
+    sorted[index]
+}
+
+/// Summarize paired memory effects using a cluster bootstrap.
+///
+/// Each bootstrap draw samples independent world clusters with replacement;
+/// all episodes from each selected cluster move together. The point estimate
+/// is episode-weighted. The bootstrap interval therefore preserves within-world
+/// dependence instead of falsely treating related questions as independent.
+///
+/// The returned intervals are percentile 95% intervals, not posterior
+/// probabilities. They describe the sampled benchmark worlds and do not
+/// establish generalization beyond the frozen scenario distribution.
+pub fn summarize_clustered_pairs(
+    rows: &[ClusteredPairedScoreV1],
+    bootstrap_replicates: usize,
+    bootstrap_seed: u64,
+) -> Result<ClusteredSummaryV1, EvaluationErrorV1> {
+    if rows.is_empty() {
+        return Err(EvaluationErrorV1::NoClusteredEpisodes);
+    }
+    if bootstrap_replicates < MIN_BOOTSTRAP_REPLICATES {
+        return Err(EvaluationErrorV1::InvalidBootstrapReplicates);
+    }
+
+    let mut seen_episodes = BTreeSet::new();
+    let mut clusters = std::collections::BTreeMap::<String, Vec<i128>>::new();
+    let mut total_gain = 0_i128;
+    let mut harm_count = 0_u64;
+    let mut improvement_count = 0_u64;
+
+    for row in rows {
+        if row.cluster_id.trim().is_empty() {
+            return Err(EvaluationErrorV1::EmptyClusterId);
+        }
+        if !seen_episodes.insert(row.score.episode_id.as_str()) {
+            return Err(EvaluationErrorV1::DuplicateEpisodeId);
+        }
+        total_gain = total_gain
+            .checked_add(row.score.memory_gain_micros)
+            .ok_or(EvaluationErrorV1::AggregateOverflow)?;
+        if row.score.memory_induced_harm != (row.score.memory_gain_micros < 0) {
+            return Err(EvaluationErrorV1::AggregateOverflow);
+        }
+        if row.score.memory_gain_micros < 0 {
+            harm_count = harm_count
+                .checked_add(1)
+                .ok_or(EvaluationErrorV1::AggregateOverflow)?;
+        }
+        if row.score.memory_gain_micros > 0 {
+            improvement_count = improvement_count
+                .checked_add(1)
+                .ok_or(EvaluationErrorV1::AggregateOverflow)?;
+        }
+        clusters
+            .entry(row.cluster_id.clone())
+            .or_default()
+            .push(row.score.memory_gain_micros);
+    }
+
+    if clusters.len() < 2 {
+        return Err(EvaluationErrorV1::InsufficientIndependentClusters);
+    }
+
+    let episode_count =
+        u64::try_from(rows.len()).map_err(|_| EvaluationErrorV1::AggregateOverflow)?;
+    let cluster_count =
+        u64::try_from(clusters.len()).map_err(|_| EvaluationErrorV1::AggregateOverflow)?;
+    let mean_memory_gain_micros = total_gain as f64 / episode_count as f64;
+
+    let cluster_values: Vec<&Vec<i128>> = clusters.values().collect();
+    let mut rng = SplitMix64V1::new(bootstrap_seed);
+    let mut gain_samples = Vec::with_capacity(bootstrap_replicates);
+    let mut harm_samples = Vec::with_capacity(bootstrap_replicates);
+
+    for _ in 0..bootstrap_replicates {
+        let mut sample_gain = 0_i128;
+        let mut sample_harms = 0_u64;
+        let mut sample_episodes = 0_u64;
+
+        // Draw K independent clusters, where K is the observed cluster count.
+        for _ in 0..cluster_values.len() {
+            let selected = cluster_values[rng.index(cluster_values.len())];
+            for gain in selected {
+                sample_gain = sample_gain
+                    .checked_add(*gain)
+                    .ok_or(EvaluationErrorV1::AggregateOverflow)?;
+                sample_episodes = sample_episodes
+                    .checked_add(1)
+                    .ok_or(EvaluationErrorV1::AggregateOverflow)?;
+                if *gain < 0 {
+                    sample_harms = sample_harms
+                        .checked_add(1)
+                        .ok_or(EvaluationErrorV1::AggregateOverflow)?;
+                }
+            }
+        }
+
+        if sample_episodes == 0 {
+            return Err(EvaluationErrorV1::NoClusteredEpisodes);
+        }
+        gain_samples.push(sample_gain as f64 / sample_episodes as f64);
+        harm_samples.push(sample_harms as f64 / sample_episodes as f64);
+    }
+
+    gain_samples.sort_by(f64::total_cmp);
+    harm_samples.sort_by(f64::total_cmp);
+
+    Ok(ClusteredSummaryV1 {
+        episode_count,
+        cluster_count,
+        mean_memory_gain_micros,
+        memory_induced_harm_rate: CountRatioV1 {
+            numerator: harm_count,
+            denominator: episode_count,
+        },
+        memory_improvement_rate: CountRatioV1 {
+            numerator: improvement_count,
+            denominator: episode_count,
+        },
+        mean_gain_confidence_95: ConfidenceIntervalV1 {
+            lower: nearest_rank(&gain_samples, 0.025),
+            upper: nearest_rank(&gain_samples, 0.975),
+        },
+        harm_rate_confidence_95: ConfidenceIntervalV1 {
+            lower: nearest_rank(&harm_samples, 0.025),
+            upper: nearest_rank(&harm_samples, 0.975),
+        },
+        bootstrap_replicates: u64::try_from(bootstrap_replicates)
+            .map_err(|_| EvaluationErrorV1::AggregateOverflow)?,
+        bootstrap_seed,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -673,6 +877,107 @@ mod tests {
                 }],
             ),
             Err(EvaluationErrorV1::DownstreamPolicyMismatch)
+        );
+    }
+
+    fn clustered_row(episode: &str, cluster: &str, gain: i8) -> ClusteredPairedScoreV1 {
+        let mut evaluator_case = case();
+        evaluator_case.episode_id = episode.to_owned();
+        let (memory_action, memory_evidence) = if gain < 0 {
+            ("approve", vec!["expired-account"])
+        } else {
+            ("hold", vec!["signed-current"])
+        };
+        let memory = CandidateRunV1 {
+            episode_id: episode.to_owned(),
+            system_id: "mace".to_owned(),
+            downstream_policy_digest: "frozen-reader-sha256:aggregate-v1".to_owned(),
+            decision_seed: 77,
+            chosen_action: memory_action.to_owned(),
+            retrieved_evidence_ids: memory_evidence.into_iter().map(str::to_owned).collect(),
+        };
+        let baseline = CandidateRunV1 {
+            episode_id: episode.to_owned(),
+            system_id: "no-memory".to_owned(),
+            downstream_policy_digest: "frozen-reader-sha256:aggregate-v1".to_owned(),
+            decision_seed: 77,
+            chosen_action: "abstain".to_owned(),
+            retrieved_evidence_ids: vec![],
+        };
+        // The candidate evidence may intentionally be inadmissible; the
+        // aggregate function scores the paired result, not its correctness.
+        let score = score_paired(&evaluator_case, &memory, &baseline)
+            .expect("valid paired known-answer case");
+        ClusteredPairedScoreV1 {
+            cluster_id: cluster.to_owned(),
+            score,
+        }
+    }
+
+    #[test]
+    fn cluster_bootstrap_resamples_whole_world_clusters_deterministically() {
+        let rows = vec![
+            clustered_row("episode-a1", "world-a", 1),
+            clustered_row("episode-a2", "world-a", 1),
+            clustered_row("episode-b1", "world-b", -1),
+        ];
+        let first = summarize_clustered_pairs(&rows, 1_000, 0xD5_01)
+            .expect("valid cluster bootstrap");
+        let second = summarize_clustered_pairs(&rows, 1_000, 0xD5_01)
+            .expect("same-seed bootstrap replay");
+
+        assert_eq!(first, second);
+        assert_eq!(first.episode_count, 3);
+        assert_eq!(first.cluster_count, 2);
+        assert_eq!(
+            first.memory_induced_harm_rate,
+            CountRatioV1 {
+                numerator: 1,
+                denominator: 3,
+            }
+        );
+        assert_eq!(
+            first.memory_improvement_rate,
+            CountRatioV1 {
+                numerator: 2,
+                denominator: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn cluster_bootstrap_rejects_pseudoreplication_from_one_world() {
+        let rows = vec![
+            clustered_row("episode-a1", "world-a", 1),
+            clustered_row("episode-a2", "world-a", 1),
+        ];
+        assert_eq!(
+            summarize_clustered_pairs(&rows, 1_000, 1),
+            Err(EvaluationErrorV1::InsufficientIndependentClusters)
+        );
+    }
+
+    #[test]
+    fn cluster_bootstrap_rejects_duplicate_episode_identity() {
+        let rows = vec![
+            clustered_row("episode-a1", "world-a", 1),
+            clustered_row("episode-a1", "world-b", -1),
+        ];
+        assert_eq!(
+            summarize_clustered_pairs(&rows, 1_000, 1),
+            Err(EvaluationErrorV1::DuplicateEpisodeId)
+        );
+    }
+
+    #[test]
+    fn cluster_bootstrap_rejects_too_few_replicates() {
+        let rows = vec![
+            clustered_row("episode-a1", "world-a", 1),
+            clustered_row("episode-b1", "world-b", -1),
+        ];
+        assert_eq!(
+            summarize_clustered_pairs(&rows, 99, 1),
+            Err(EvaluationErrorV1::InvalidBootstrapReplicates)
         );
     }
 
