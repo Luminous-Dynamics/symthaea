@@ -1,0 +1,12 @@
+[package]
+name = "cmaq-033-prm-ons-monitor"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Online Newton Step adaptive predictive-rank betting for calibration drift monitoring"
+
+[dependencies]
+cmaq-031-anytime-calibration-monitor = { path = "../cmaq-031" }
+
+[workspace]
