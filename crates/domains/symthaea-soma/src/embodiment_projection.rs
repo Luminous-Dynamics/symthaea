@@ -267,6 +267,7 @@ pub fn project_for_form(cue: &CanonicalCue, form: EmbodimentForm) -> FormCue {
 pub struct ReplayStep {
     pub event: EmbodimentEvent,
     pub now_monotonic_ns: String,
+    pub now_clock_domain_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -288,7 +289,11 @@ pub fn replay_trace(
 
     for (step_index, step) in steps.iter().enumerate() {
         validator
-            .accept(&step.event, &step.now_monotonic_ns)
+            .accept(
+                &step.event,
+                &step.now_monotonic_ns,
+                &step.now_clock_domain_id,
+            )
             .map_err(|cause| ReplayError { step_index, cause })?;
         let cue = CanonicalCue::from_event(&step.event)
             .map_err(|cause| ReplayError { step_index, cause })?;
@@ -334,10 +339,12 @@ mod tests {
             ReplayStep {
                 event: event(0, "event-0"),
                 now_monotonic_ns: "200".to_owned(),
+                now_clock_domain_id: "clock:dialogue-epoch-1".to_owned(),
             },
             ReplayStep {
                 event: event(1, "event-1"),
                 now_monotonic_ns: "300".to_owned(),
+                now_clock_domain_id: "clock:dialogue-epoch-1".to_owned(),
             },
         ]
     }
@@ -349,6 +356,15 @@ mod tests {
             replay_trace("session-1", &trace).unwrap(),
             replay_trace("session-1", &trace).unwrap()
         );
+    }
+
+    #[test]
+    fn replay_rejects_a_clock_reading_from_another_domain() {
+        let mut trace = steps();
+        trace[0].now_clock_domain_id = "clock:other-process-epoch".to_owned();
+        let error = replay_trace("session-1", &trace).unwrap_err();
+        assert_eq!(error.step_index, 0);
+        assert_eq!(error.cause, EventValidationError::ClockDomainMismatch);
     }
 
     #[test]
