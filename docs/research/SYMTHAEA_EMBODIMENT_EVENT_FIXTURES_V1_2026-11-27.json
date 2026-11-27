@@ -18,7 +18,8 @@
         "instance_id": "dialogue-01"
       },
       "epistemic_status": "measured",
-      "privacy_class": "public"
+      "privacy_class": "public",
+      "clock_domain_id": "clock:demo-process-epoch-1"
     },
     {
       "schema": "symthaea.embodiment-event.v1",
@@ -39,7 +40,8 @@
       },
       "epistemic_status": "inferred",
       "confidence": 0.73,
-      "privacy_class": "local_sensitive"
+      "privacy_class": "local_sensitive",
+      "clock_domain_id": "clock:demo-process-epoch-1"
     },
     {
       "schema": "symthaea.embodiment-event.v1",
@@ -62,7 +64,8 @@
       "evidence_refs": [
         "sha256:0123456789abcdef"
       ],
-      "privacy_class": "public"
+      "privacy_class": "public",
+      "clock_domain_id": "clock:demo-process-epoch-1"
     }
   ],
   "schema_rejection_examples": [
@@ -86,7 +89,8 @@
           "instance_id": "reasoner-01"
         },
         "epistemic_status": "inferred",
-        "privacy_class": "local_sensitive"
+        "privacy_class": "local_sensitive",
+        "clock_domain_id": "clock:demo-process-epoch-1"
       }
     },
     {
@@ -108,7 +112,8 @@
           "instance_id": "dialogue-01"
         },
         "epistemic_status": "measured",
-        "privacy_class": "public"
+        "privacy_class": "public",
+        "clock_domain_id": "clock:demo-process-epoch-1"
       }
     },
     {
@@ -129,6 +134,29 @@
         "source": {
           "component": "symthaea-evidence-gate",
           "instance_id": "evidence-01"
+        },
+        "epistemic_status": "measured",
+        "privacy_class": "public",
+        "clock_domain_id": "clock:demo-process-epoch-1"
+      }
+    },
+    {
+      "case": "missing_clock_domain_id",
+      "expected": "schema_reject",
+      "event": {
+        "schema": "symthaea.embodiment-event.v1",
+        "session_id": "demo-session-001",
+        "event_id": "invalid-clock-001",
+        "sequence": 5,
+        "observed_at_monotonic_ns": "1500000",
+        "expires_at_monotonic_ns": "3500000",
+        "event_kind": "conversation.listening",
+        "payload": {
+          "active": true
+        },
+        "source": {
+          "component": "symthaea-dialogue",
+          "instance_id": "dialogue-01"
         },
         "epistemic_status": "measured",
         "privacy_class": "public"
@@ -170,6 +198,14 @@
       "case": "cancel_not_applied",
       "cancel_to_render_updates": 2,
       "expected": "reject"
+    },
+    {
+      "case": "clock_domain_changes_within_session",
+      "clock_domain_ids": [
+        "clock:process-epoch-1",
+        "clock:other-process-epoch"
+      ],
+      "expected": "reject_second_event"
     }
   ]
 }
