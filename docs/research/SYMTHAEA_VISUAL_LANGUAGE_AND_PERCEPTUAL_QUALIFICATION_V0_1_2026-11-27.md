@@ -352,3 +352,17 @@ Do not use a mean to conceal a failing form, accessibility cohort, or high-conse
 ## 11. Qualification status
 
 This document is a design and evaluation specification. The current renderer source has not been modified by this document. No geometry, visual-quality, accessibility, user-study, compositor-observation, StreamEval, VideoFDB, or hardware result is claimed. The seven-form visual grammar is a target for the next renderer implementation, not a claim that seven polished forms already exist.
+
+
+## 12. Source implementation increment (2026-11-27)
+
+A first renderer implementation now accompanies this specification:
+
+- `renderers/symthaea-soma-bevy/src/visual_grammar.rs` provides a pure deterministic, role-aware placement function for all seven `EmbodimentForm` variants.
+- `renderers/symthaea-soma-bevy/src/lib.rs` now uses that layout instead of the generic index-only ring.
+- The glyph-to-mesh mapping now assigns distinct silhouettes to the current glyph variants rather than collapsing most nodes to circles and most connections to bars.
+- Five authored tests cover the stable core anchor, distinct connection anchors across the seven forms, deterministic replay/order, alternative separation, and finite placements.
+
+Important limit: the current `SceneElement` contract carries role, glyph, weight and motion, but not explicit relationship endpoints. The new layout is therefore form- and role-aware composition; it does not invent or claim graph-edge connectivity. Explicit semantic edges require a versioned scene-contract extension and their own migration/fixture coverage.
+
+These tests are authored, not compiled or executed. No Bevy runtime, image capture, visual regression, human-legibility study, accessibility audit or hardware performance result is claimed.
