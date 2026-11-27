@@ -1,0 +1,15 @@
+[package]
+name = "sym-rsi-decision-replay-contract"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Standalone tests for Symthaea scientific decision/replay custody contracts"
+
+# Deliberately standalone: root workspace enumerates a missing crates/core/symthaea member.
+[workspace]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+blake3 = "1.5"
