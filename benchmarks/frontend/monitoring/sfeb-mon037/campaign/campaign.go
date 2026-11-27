@@ -3,6 +3,7 @@
 package campaign
 
 import (
+ "crypto/sha256"
  "encoding/hex"
  "encoding/json"
  "sort"
@@ -98,12 +99,16 @@ type Input struct {
  RequiredSurfaceIDs []string `json:"required_surface_ids"`
  SurfaceInventoryComplete bool `json:"surface_inventory_complete"`
  SurfaceInventorySHA256 string `json:"surface_inventory_sha256"`
+ RequiredSurfaceIDsSHA256 string `json:"required_surface_ids_sha256"`
  SourceTruthComplete bool `json:"source_truth_complete"`
  SourceTruthManifestSHA256 string `json:"source_truth_manifest_sha256"`
+ SourceEventsSHA256 string `json:"source_events_sha256"`
  ObservedCaptureComplete bool `json:"observed_capture_complete"`
  ObservedCaptureManifestSHA256 string `json:"observed_capture_manifest_sha256"`
+ ObservedEventsSHA256 string `json:"observed_events_sha256"`
  TransactionReportComplete bool `json:"transaction_report_complete"`
  TransactionReportSHA256 string `json:"transaction_report_sha256"`
+ TransactionProofsSHA256 string `json:"transaction_proofs_sha256"`
  SourceEvents []Event `json:"source_events"`
  ObservedEvents []Event `json:"observed_events"`
  TopicPartitions []TopicPartition `json:"topic_partitions"`
@@ -158,6 +163,54 @@ func merge(dst,src *flags,prefix string){dst.blocked=dst.blocked||src.blocked;ds
 func validID(s string)bool{return s!=""&&len(s)<=256&&!strings.ContainsAny(s," \t\r\n")}
 func validDigest(s string)bool{if len(s)!=64{return false};_,err:=hex.DecodeString(s);return err==nil&&s==strings.ToLower(s)}
 func contains(v []string,w string)bool{for _,s:=range v{if s==w{return true}};return false}
+func canonicalDigest(value any) string {
+ raw,err:=json.Marshal(value)
+ if err!=nil{return ""}
+ sum:=sha256.Sum256(raw)
+ return hex.EncodeToString(sum[:])
+}
+func sourceEventsDigest(events []Event) string {
+ copyEvents:=append([]Event(nil),events...)
+ sort.Slice(copyEvents,func(i,j int)bool{
+  a,b:=copyEvents[i],copyEvents[j]
+  if a.EventID!=b.EventID{return a.EventID<b.EventID}
+  if a.TransactionID!=b.TransactionID{return a.TransactionID<b.TransactionID}
+  if a.Topic!=b.Topic{return a.Topic<b.Topic}
+  if a.TotalOrder!=b.TotalOrder{return a.TotalOrder<b.TotalOrder}
+  return a.PayloadSHA256<b.PayloadSHA256
+ })
+ return canonicalDigest(copyEvents)
+}
+func observedEventsDigest(events []Event) string {
+ copyEvents:=append([]Event(nil),events...)
+ sort.Slice(copyEvents,func(i,j int)bool{
+  a,b:=copyEvents[i],copyEvents[j]
+  if a.Topic!=b.Topic{return a.Topic<b.Topic}
+  if a.Partition!=b.Partition{return a.Partition<b.Partition}
+  if a.Offset!=b.Offset{return a.Offset<b.Offset}
+  return a.EventID<b.EventID
+ })
+ return canonicalDigest(copyEvents)
+}
+func transactionProofsDigest(proofs []TransactionProof) string {
+ copyProofs:=append([]TransactionProof(nil),proofs...)
+ sort.Slice(copyProofs,func(i,j int)bool{return copyProofs[i].TransactionID<copyProofs[j].TransactionID})
+ return canonicalDigest(copyProofs)
+}
+func surfaceIDsDigest(ids []string) string {
+ copyIDs:=append([]string(nil),ids...)
+ sort.Strings(copyIDs)
+ return canonicalDigest(copyIDs)
+}
+func checkRecordManifest(label string,complete bool,artifactSHA,recordsSHA,expectedSHA string,f *flags) {
+ if !complete||!validDigest(artifactSHA)||!validDigest(recordsSHA) {
+  f.hold(label+"_manifest_missing_or_incomplete")
+  return
+ }
+ if recordsSHA!=expectedSHA {
+  f.block(label+"_record_set_digest_mismatch")
+ }
+}
 func sameEvent(a,b Event)bool{return a.EventID==b.EventID&&a.TransactionID==b.TransactionID&&a.Topic==b.Topic&&a.DataCollection==b.DataCollection&&a.Operation==b.Operation&&a.PayloadSHA256==b.PayloadSHA256&&a.TotalOrder==b.TotalOrder&&a.CollectionOrder==b.CollectionOrder}
 func decode(raw json.RawMessage,dst any,name string,f *flags){if len(raw)==0{f.hold(name+"_missing");return};if err:=json.Unmarshal(raw,dst);err!=nil{f.block(name+"_invalid_json")}}
 func status(name string,f *flags)ComponentStatus{return ComponentStatus{Name:name,Verdict:f.verdict(),ReasonCodes:f.codes()}}
@@ -242,7 +295,7 @@ func checkContinuity(in Input,f *flags){
  for _,id:=range required{ds:=claims[id];if len(ds)!=1{f.hold("claim_missing_or_ambiguous:"+id);continue};switch ds[0]{case "retain":case "revalidate":f.hold("claim_revalidation_required:"+id);case "invalidate":f.block("claim_invalidated:"+id);case "unresolved":f.hold("claim_unresolved:"+id);default:f.hold("claim_disposition_invalid:"+id)}}
 }
 func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
- r.ExpectedEvents=len(in.SourceEvents);r.ObservedEvents=len(in.ObservedEvents);if len(in.SourceEvents)==0{cdc.hold("source_truth_missing")};if !in.SourceTruthComplete||!validDigest(in.SourceTruthManifestSHA256){cdc.hold("source_truth_manifest_incomplete_or_unbound")};if !in.ObservedCaptureComplete||!validDigest(in.ObservedCaptureManifestSHA256){cdc.hold("observed_capture_manifest_incomplete_or_unbound")};if !in.TransactionReportComplete||!validDigest(in.TransactionReportSHA256){txn.hold("transaction_report_incomplete_or_unbound")}
+ r.ExpectedEvents=len(in.SourceEvents);r.ObservedEvents=len(in.ObservedEvents);if len(in.SourceEvents)==0{cdc.hold("source_truth_missing")};checkRecordManifest("source_truth",in.SourceTruthComplete,in.SourceTruthManifestSHA256,in.SourceEventsSHA256,sourceEventsDigest(in.SourceEvents),cdc);checkRecordManifest("observed_capture",in.ObservedCaptureComplete,in.ObservedCaptureManifestSHA256,in.ObservedEventsSHA256,observedEventsDigest(in.ObservedEvents),cdc);checkRecordManifest("transaction_report",in.TransactionReportComplete,in.TransactionReportSHA256,in.TransactionProofsSHA256,transactionProofsDigest(in.Transactions),txn)
  want:=map[string]Event{};for _,e:=range in.SourceEvents{if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validID(e.DataCollection)||!validDigest(e.PayloadSHA256)||e.TotalOrder<1||e.CollectionOrder<1{cdc.block("source_event_malformed");continue};if _,ok:=want[e.EventID];ok{cdc.block("duplicate_source_event_id:"+e.EventID)};want[e.EventID]=e}
  got:=map[string][]Event{};unique:=map[string]Event{};for _,e:=range in.ObservedEvents{if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validID(e.DataCollection)||!validDigest(e.PayloadSHA256)||e.TotalOrder<1||e.CollectionOrder<1||e.Partition<0||e.Offset<0{cdc.block("observed_event_malformed");continue};got[e.EventID]=append(got[e.EventID],e);if _,ok:=unique[e.EventID];!ok{unique[e.EventID]=e}}
  r.UniqueObservedEvents=len(unique)
@@ -264,7 +317,7 @@ func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
  for id:=range byTx{if _,ok:=txProofs[id];!ok{r.TransactionViolations=append(r.TransactionViolations,id+":proof_missing")}};if len(r.TransactionViolations)>0{sort.Strings(r.TransactionViolations);txn.block("transaction_not_closed")}
 }
 func checkSurfaces(in Input,r *Reconciliation,f *flags){
- if in.SurfaceScope!="full_state"&&in.SurfaceScope!="row_stream"{f.hold("surface_scope_invalid")};if len(in.Surfaces)==0{f.hold("surface_inventory_missing")};if len(in.RequiredSurfaceIDs)==0{f.hold("required_surface_inventory_missing")};if !in.SurfaceInventoryComplete||!validDigest(in.SurfaceInventorySHA256){f.hold("surface_inventory_manifest_incomplete_or_unbound")}
+ if in.SurfaceScope!="full_state"&&in.SurfaceScope!="row_stream"{f.hold("surface_scope_invalid")};if len(in.Surfaces)==0{f.hold("surface_inventory_missing")};if len(in.RequiredSurfaceIDs)==0{f.hold("required_surface_inventory_missing")};checkRecordManifest("surface_inventory",in.SurfaceInventoryComplete,in.SurfaceInventorySHA256,in.RequiredSurfaceIDsSHA256,surfaceIDsDigest(in.RequiredSurfaceIDs),f)
  required:=map[string]struct{}{};for _,id:=range in.RequiredSurfaceIDs{if !validID(id){f.block("required_surface_id_invalid");continue};if _,ok:=required[id];ok{f.block("duplicate_required_surface_id:"+id)};required[id]=struct{}{}}
  seen:=map[string]struct{}{};for _,s:=range in.Surfaces{if !validID(s.ID){f.block("surface_id_invalid");continue};if _,ok:=seen[s.ID];ok{f.block("duplicate_surface:"+s.ID);continue};seen[s.ID]=struct{}{};if _,ok:=required[s.ID];!ok{f.block("surface_not_in_required_inventory:"+s.ID)};r.SurfaceCounts[s.Disposition]++
  switch s.Disposition{case "covered":if !validDigest(s.SourceSHA256)||!validDigest(s.RestoredSHA256){f.hold("surface_digest_missing:"+s.ID)}else if s.SourceSHA256!=s.RestoredSHA256{f.block("surface_digest_mismatch:"+s.ID)}
