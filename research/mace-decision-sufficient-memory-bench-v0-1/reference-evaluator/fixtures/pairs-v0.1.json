@@ -1,0 +1,52 @@
+{
+  "schema_version": "mace_dsm_pair_manifest_v0_1",
+  "run_id": "mace-dsm-six-episode-fixture-v0-1",
+  "source_revision": "6bfb693dec6dd6d5694b3a90f07924d6d18b9a76",
+  "generator_sha256": "50a470f15b6393191661296a6becd8b0a079e93336f522b0de169fbe20753f8f",
+  "scenario_sha256": "9a5d74ac0822d213ca7dc98875bf508b23bbab89eda2fa16aec3a5ecfbef8cb2",
+  "arm_manifest_sha256": "9f49875e7cf1a9c2ae280a07ed4e0f7a2b8eeaf8fd797f127e0d932cc1713ec8",
+  "episodes": [
+    {
+      "episode_id": "temporal-drift/0001",
+      "pair_block_id": "pair-temporal-0001",
+      "world_cluster_id": "world-temporal-0001",
+      "query_id": "query-temporal-0001",
+      "candidate_sha256": "6fc25a0187df2ff4e3e2a699c9e86cd418195ad0feb286da2e25a15f27aae2f6"
+    },
+    {
+      "episode_id": "contradiction/0001",
+      "pair_block_id": "pair-conflict-0001",
+      "world_cluster_id": "world-conflict-0001",
+      "query_id": "query-conflict-0001",
+      "candidate_sha256": "ee39f155b2b30b11411215c07a63fb8728cdce91770703cfa60b5a795ec8e7a4"
+    },
+    {
+      "episode_id": "revocation/0001",
+      "pair_block_id": "pair-revocation-0001",
+      "world_cluster_id": "world-revocation-0001",
+      "query_id": "query-revocation-0001",
+      "candidate_sha256": "a97df1fb65e613265a345b8605766a1269f8b5e25188b28305941da326887158"
+    },
+    {
+      "episode_id": "insufficient-evidence/0001",
+      "pair_block_id": "pair-observation-0001",
+      "world_cluster_id": "world-observation-0001",
+      "query_id": "query-observation-0001",
+      "candidate_sha256": "d3abb5636d6439d3dbba15de260e32a9d1096aa107fdebcea4f9398661ffed78"
+    },
+    {
+      "episode_id": "poisoning/0001",
+      "pair_block_id": "pair-poisoning-0001",
+      "world_cluster_id": "world-poisoning-0001",
+      "query_id": "query-poisoning-0001",
+      "candidate_sha256": "0fe0544f3d726170bff16178c9ea75ca2e71d6f7fcbc51d578946e527f930d56"
+    },
+    {
+      "episode_id": "decision-sufficient-compression/0001",
+      "pair_block_id": "pair-compression-0001",
+      "world_cluster_id": "world-compression-0001",
+      "query_id": "query-compression-0001",
+      "candidate_sha256": "53199a91b909be94cb1301eac78064772bc52fdea2474db9f04830a1cf52430f"
+    }
+  ]
+}
