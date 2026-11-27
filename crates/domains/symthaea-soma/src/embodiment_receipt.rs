@@ -198,6 +198,15 @@ impl PresentationReceipt {
     pub fn event_id(&self) -> &str { &self.event_id }
     pub fn canonical_cue_digest(&self) -> &str { &self.canonical_cue_digest }
     pub fn grant_id(&self) -> &str { &self.grant_id }
+    pub fn event_sequence(&self) -> u64 { self.event_sequence }
+    pub fn event_kind(&self) -> EventKind { self.event_kind }
+    pub fn form(&self) -> EmbodimentForm { self.form }
+    pub fn channel(&self) -> OutputChannel { self.channel }
+    pub fn destination(&self) -> OutputDestination { self.destination }
+    pub fn motion_mode(&self) -> MotionMode { self.motion_mode }
+    pub fn privacy_class(&self) -> PrivacyClass { self.privacy_class }
+    pub fn effective_intensity(&self) -> f32 { self.effective_intensity }
+    pub fn semantic_key(&self) -> &str { &self.semantic_key }
     pub fn event_expires_at_monotonic_ns(&self) -> &str { &self.event_expires_at_monotonic_ns }
     pub fn grant_expires_at_monotonic_ns(&self) -> &str { &self.grant_expires_at_monotonic_ns }
     pub fn effective_permit_expires_at_monotonic_ns(&self) -> &str { &self.effective_permit_expires_at_monotonic_ns }
