@@ -360,7 +360,11 @@
       "branch_stability_evidence_status": "not_issued_synthetic",
       "budget_exhaustion_disposition": "unqualified",
       "global_bound_claim_status": "conditional_on_valid_lipschitz_and_branch_evidence",
-      "full_order_confirmation_required": true
+      "full_order_confirmation_required": true,
+      "objective_sample_error_interval_required": true,
+      "sample_interval_semantics": "max_zero_value_minus_abs_error_to_value_plus_abs_error",
+      "physical_sample_error_bound_status": "not_issued_synthetic",
+      "convergence_flag_alone_means_zero_error": false
     },
     "joint_box_oracle": {
       "status": "design_only_not_executed",
@@ -380,7 +384,11 @@
       "global_bound_claim_status": "conditional_on_valid_box_lipschitz_and_branch_evidence",
       "full_order_confirmation_required": true,
       "objective_normalization": "declared_qoi_scale_and_fixed_positive_floor",
-      "reference_response_denominator_lower_bound_required": true
+      "reference_response_denominator_lower_bound_required": true,
+      "objective_sample_error_interval_required": true,
+      "sample_interval_semantics": "max_zero_value_minus_abs_error_to_value_plus_abs_error",
+      "physical_sample_error_bound_status": "not_issued_synthetic",
+      "convergence_flag_alone_means_zero_error": false
     }
   },
   "methodological_prior_art": [
