@@ -54,6 +54,7 @@ pub use symthaea_spore::persistence;
 pub mod embodiment_event;
 pub mod embodiment_interaction_trace;
 pub mod embodiment_policy;
+pub mod embodiment_presentation_feedback;
 pub mod embodiment_projection;
 pub mod embodiment_receipt;
 pub mod embodiment_scene;
