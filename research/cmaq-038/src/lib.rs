@@ -568,7 +568,10 @@ mod tests {
             let monitor = RankSpectrumMonitor::new(calibration_count, 1, 20).unwrap();
             assert!((monitor.mixture_weight_sum() - 1.0).abs() < 1e-12);
             assert_eq!(
-                monitor.contrast_counts_by_resolution().iter().sum::<usize>(),
+                monitor
+                    .contrast_counts_by_resolution()
+                    .iter()
+                    .sum::<usize>(),
                 calibration_count
             );
             assert!(monitor.log_mixture_wealth().unwrap().abs() < 1e-10);
@@ -612,15 +615,12 @@ mod tests {
                 .rank_counts
                 .iter()
                 .enumerate()
-                .map(|(bucket, count)| {
-                    (i128::from(*count) + 1) * contrast.code_for_bucket(bucket)
-                })
+                .map(|(bucket, count)| (i128::from(*count) + 1) * contrast.code_for_bucket(bucket))
                 .sum();
 
             for rank in 1..=monitor.calibration_count() + 1 {
                 let observed_term = contrast.code_for_rank(rank) * total;
-                let expected = (observed_term - weighted_code_sum) as f64
-                    / (2.0 * total as f64);
+                let expected = (observed_term - weighted_code_sum) as f64 / (2.0 * total as f64);
                 let actual = monitor.test_payoff(contrast, rank, next_t).unwrap();
                 assert!(
                     (actual - expected).abs() < 1e-12,
@@ -636,10 +636,7 @@ mod tests {
         monitor.rank_counts[0] = u64::MAX;
         let before = monitor.clone();
 
-        assert_eq!(
-            monitor.observe_rank(1),
-            Err(SpectrumError::CounterOverflow)
-        );
+        assert_eq!(monitor.observe_rank(1), Err(SpectrumError::CounterOverflow));
         assert_eq!(monitor, before);
     }
 
