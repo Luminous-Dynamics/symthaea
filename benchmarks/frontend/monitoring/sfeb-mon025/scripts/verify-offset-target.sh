@@ -7,10 +7,10 @@ PROOF_FILE="$3"
 case "$TARGET" in lsn_events_processed_1|transactional_message) ;; *) echo "invalid target" >&2; exit 64 ;; esac
 [ ! -e "$PROOF_FILE" ] || { echo "proof output already exists" >&2; exit 73; }
 jq -e --arg target "$TARGET" '
+  (.offsets[0].offset) as $o |
   (.offsets | type == "array" and length == 1) and
   (.offsets[0].partition | type == "object") and
-  (.offsets[0].offset | type == "object") and
-  (.offsets[0].offset) as $o |
+  ($o | type == "object") and
   ($o.lsn != null and $o.lsn_proc != null and $o.lsn_commit != null) and
   (if $target == "lsn_events_processed_1" then
      ((try ($o.lsn_events_processed | tonumber) catch -1) == 1) and
