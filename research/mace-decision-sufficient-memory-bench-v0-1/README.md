@@ -106,7 +106,7 @@ Each source event should retain, where available:
 - tenant, evaluation-run and purpose scope;
 - source revocation, deletion and retention state.
 
-The candidate must never receive evaluator-private fields. The public candidate JSONL schema and seed fixture contain only candidate-visible observations, query, action set and resource budgets. Evaluator loss tables, oracle actions, admissible/required evidence labels and held-out world state are not stored in the candidate fixture. The scorer's known-answer unit tests are public development checks, not hidden evaluation data. Confirmatory labels and held-out seeds must live in a separate evaluator service or private artifact store, isolated from candidate processes, prompts, requests, telemetry and logs.
+The candidate must never receive evaluator-private fields. The public candidate JSONL fixture contains only candidate-visible observations, query, action set and resource budgets; generator seeds and task-family labels are held evaluator-side. The public fixtures are at [candidate-episodes-v0.1.jsonl](fixtures/candidate-episodes-v0.1.jsonl). Evaluator loss tables, oracle actions, admissible/required evidence labels and held-out world state are not stored in the candidate fixture. The scorer's known-answer unit tests are public development checks, not hidden evaluation data. Confirmatory labels and held-out seeds must live in a separate evaluator service or private artifact store, isolated from candidate processes, prompts, requests, telemetry and logs.
 
 The v0.1 seed fixtures and JSON Schema are synthetic protocol examples, not a validated benchmark set, representative production data, or leaderboard results. The scorer API is not a sandbox; the caller must enforce process/OS/container separation.
 
@@ -176,7 +176,7 @@ The academic hybrid arm must use the AML-designated embedding model when it is i
 - Use the same corpus, query, allowed evidence count or token budget and downstream policy for every paired arm.
 - Do not provide candidate systems with hidden target utilities, optimal actions, future facts, evaluator labels or latent state.
 - Keep answer-generation and judge configurations fixed when an external benchmark requires them.
-- Freeze commit SHAs, model identifiers, prompts, index parameters, retrieval limits, corpus generator, seeds, machine configuration and evaluator version in the run manifest. Enforce an identical downstream-policy digest and decision seed across no-memory, memory and leave-one-out interventions. The versioned [run-manifest schema](schemas/run-manifest-v0.1.schema.json) binds these configurations and applies the AML Academic model restrictions and top_k=100 ceiling.
+- Freeze commit SHAs, model identifiers, prompts, index parameters, retrieval limits, corpus generator, seeds, machine configuration and evaluator version in the run manifest. Enforce an identical downstream-policy digest and decision seed across no-memory, memory and leave-one-out interventions. The versioned [run-manifest schema](schemas/run-manifest-v0.1.schema.json) binds these configurations and applies the AML Academic model restrictions and top_k=100 ceiling. It also records the DSM bootstrap seed/replicate count and the LongMemEval-V2 Small/Medium tier.
 - Use separate development and held-out generator seeds. No tuning on held-out results.
 - Cluster-bootstrap at the independent world/episode-cluster level. Do not treat correlated questions from one world as independent samples. The dependency-free Rust scorer now implements deterministic whole-cluster resampling and reports 95% percentile intervals for paired mean memory gain and memory-induced harm rate; all episodes from a sampled world move together.
 - Publish per-family results and uncertainty intervals. A single composite score is optional only as a secondary, explicitly defined view.
@@ -245,7 +245,7 @@ Never label an estimate as measured cost. Cost-per-decision-gain and cost-per-va
 - **H6 — governance is part of capability:** poisoning resistance, deletion and isolation should predict downstream decision safety, not be treated as unrelated operational checkboxes.
 - **H7 — evidence has measurable causal influence:** leave-one-out interventions on returned evidence identify items whose presence improves or worsens the frozen downstream decision. The signal should remain reproducible under fixed reader, seed and evidence-resolution rules.
 
-These are falsifiable hypotheses, not findings.
+These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator contains 20 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
 
 ## Baselines and industry comparison
 
@@ -290,6 +290,8 @@ The official page describes the fixed reference frontier and a 1–200 second lo
 | OPS-Agentic-Memory-v1 | +0.322 | 81.4% | 153.6 s |
 
 The published baseline AgentRunbook-C reference is 74.9% Small Overall at 108.3 seconds and 70.1% Medium Overall at 139.9 seconds. The top LAFS gain is not the same as the top raw accuracy: OPS has 81.4% at 153.6 seconds but only +0.322 LAFS. The operating point matters. Source: https://xiaowu0162.github.io/longmemeval-v2/
+
+The Rust evaluator now includes a standalone implementation of the official LAFS integral in `evaluator/src/longmemeval_v2.rs`, with both published Small and Medium reference frontiers and delta-LAFS helpers. The known-answer reference frontier scores computed by the helper are 55.7648469364 (Small) and 51.0740894823 (Medium). These values validate the formula implementation against the published operating points; they are not MACE benchmark results. Nine LAFS unit tests are authored, including these reference scores. The helper does not replace the official dataset, reader, evaluation or submission harness.
 
 MACE target sequence:
 - **First qualification:** reproduce the official harness and frozen reader, and report Small/Medium accuracy, all five ability families, query latency, memory/query budget and exact hardware.
