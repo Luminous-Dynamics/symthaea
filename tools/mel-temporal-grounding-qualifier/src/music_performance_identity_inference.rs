@@ -116,7 +116,13 @@ struct ClusterOutcomes {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct BootstrapDeltas {
+struct PointEstimates {
+    baseline_stay_error: f64,
+    candidate_stay_error: f64,
+    baseline_flip_error: f64,
+    candidate_flip_error: f64,
+    baseline_joint_exact: f64,
+    candidate_joint_exact: f64,
     stay_improvement: f64,
     flip_improvement: f64,
     joint_improvement: f64,
@@ -363,12 +369,12 @@ fn paired_cluster_outcomes(
             .entry(triad.source_work_lineage_sha256.as_str())
             .or_default()
             .push(ClusterOutcomes {
-                baseline_stay_error: f64::from(!baseline_result.performance_stay_correct),
-                candidate_stay_error: f64::from(!candidate_result.performance_stay_correct),
-                baseline_flip_error: f64::from(!baseline_result.musical_flip_correct),
-                candidate_flip_error: f64::from(!candidate_result.musical_flip_correct),
-                baseline_joint_exact: f64::from(baseline_result.joint_exact),
-                candidate_joint_exact: f64::from(candidate_result.joint_exact),
+                baseline_stay_error: if baseline_result.performance_stay_correct { 0.0 } else { 1.0 },
+                candidate_stay_error: if candidate_result.performance_stay_correct { 0.0 } else { 1.0 },
+                baseline_flip_error: if baseline_result.musical_flip_correct { 0.0 } else { 1.0 },
+                candidate_flip_error: if candidate_result.musical_flip_correct { 0.0 } else { 1.0 },
+                baseline_joint_exact: if baseline_result.joint_exact { 1.0 } else { 0.0 },
+                candidate_joint_exact: if candidate_result.joint_exact { 1.0 } else { 0.0 },
             });
     }
 
@@ -390,25 +396,31 @@ fn paired_cluster_outcomes(
     Ok(output)
 }
 
-fn summarize_cluster_means(clusters: &[ClusterOutcomes]) -> BootstrapDeltas {
+fn summarize_cluster_means(clusters: &[ClusterOutcomes]) -> PointEstimates {
     let count = clusters.len() as f64;
-    BootstrapDeltas {
-        stay_improvement: clusters.iter().map(|v| v.baseline_stay_error - v.candidate_stay_error).sum::<f64>() / count,
-        flip_improvement: clusters.iter().map(|v| v.baseline_flip_error - v.candidate_flip_error).sum::<f64>() / count,
-        joint_improvement: clusters.iter().map(|v| v.candidate_joint_exact - v.baseline_joint_exact).sum::<f64>() / count,
+    let baseline_stay_error =
+        clusters.iter().map(|v| v.baseline_stay_error).sum::<f64>() / count;
+    let candidate_stay_error =
+        clusters.iter().map(|v| v.candidate_stay_error).sum::<f64>() / count;
+    let baseline_flip_error =
+        clusters.iter().map(|v| v.baseline_flip_error).sum::<f64>() / count;
+    let candidate_flip_error =
+        clusters.iter().map(|v| v.candidate_flip_error).sum::<f64>() / count;
+    let baseline_joint_exact =
+        clusters.iter().map(|v| v.baseline_joint_exact).sum::<f64>() / count;
+    let candidate_joint_exact =
+        clusters.iter().map(|v| v.candidate_joint_exact).sum::<f64>() / count;
+    PointEstimates {
+        baseline_stay_error,
+        candidate_stay_error,
+        baseline_flip_error,
+        candidate_flip_error,
+        baseline_joint_exact,
+        candidate_joint_exact,
+        stay_improvement: baseline_stay_error - candidate_stay_error,
+        flip_improvement: baseline_flip_error - candidate_flip_error,
+        joint_improvement: candidate_joint_exact - baseline_joint_exact,
     }
-}
-
-fn cluster_metric_means(clusters: &[ClusterOutcomes]) -> (f64, f64, f64, f64, f64, f64) {
-    let count = clusters.len() as f64;
-    (
-        clusters.iter().map(|v| v.baseline_stay_error).sum::<f64>() / count,
-        clusters.iter().map(|v| v.candidate_stay_error).sum::<f64>() / count,
-        clusters.iter().map(|v| v.baseline_flip_error).sum::<f64>() / count,
-        clusters.iter().map(|v| v.candidate_flip_error).sum::<f64>() / count,
-        clusters.iter().map(|v| v.baseline_joint_exact).sum::<f64>() / count,
-        clusters.iter().map(|v| v.candidate_joint_exact).sum::<f64>() / count,
-    )
 }
 
 fn bootstrap_intervals(
