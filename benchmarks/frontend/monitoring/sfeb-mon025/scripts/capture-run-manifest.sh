@@ -33,14 +33,23 @@ images_json="$OUT/images.json"
 for service in "postgres$MAJOR" kafka connect; do
   container_id="$("${DC[@]}" ps -q "$service")"
   [ -n "$container_id" ] || { echo "service is not running: $service" >&2; exit 69; }
-  docker inspect "$container_id" | jq -r '.[0] | {
-    service: .Config.Hostname,
-    configured_image: .Config.Image,
-    image_id: .Image,
-    repo_digests: (.RepoDigests // [])
-  }' >>"$images_json"
+  container_json="$(docker inspect "$container_id")"
+  image_ref="$(printf '%s' "$container_json" | jq -r '.[0].Config.Image')"
+  hostname="$(printf '%s' "$container_json" | jq -r '.[0].Config.Hostname')"
+  docker image inspect "$image_ref" | jq --arg service "$service" --arg hostname "$hostname" '
+    .[0] | {
+      service: $service,
+      hostname: $hostname,
+      configured_image: .RepoTags[0],
+      image_id: .Id,
+      repo_digests: (.RepoDigests // [])
+    }' >>"$images_json"
 done
 jq -s '.' "$images_json" >"$OUT/images.normalized.json"
+jq -e 'all(.[]; (.image_id | startswith("sha256:")) and (.repo_digests | length > 0))' "$OUT/images.normalized.json" >/dev/null || {
+  echo "one or more images lack a repository digest; record immutable digests before confirmatory runs" >&2
+  exit 65
+}
 mv "$OUT/images.normalized.json" "$images_json"
 
 cat >"$OUT/run-manifest.json" <<EOF
