@@ -227,6 +227,31 @@ fn render_amplitude(scene_weight: Option<f32>, authorized_intensity: f32) -> f32
         .clamp(0.0, authorized_intensity)
 }
 
+fn clamp_scale_to_authorized(scale: Vec3, authorized_intensity: f32) -> Vec3 {
+    let cap = authorized_intensity.clamp(0.0, 1.0);
+    Vec3::new(
+        scale.x.clamp(0.0, cap),
+        scale.y.clamp(0.0, cap),
+        scale.z.clamp(0.0, cap),
+    )
+}
+
+fn flow_offset(phase: f32, base_translation: Vec3, authorized_intensity: f32) -> Vec3 {
+    let amplitude = authorized_intensity.clamp(0.0, 1.0);
+    Vec3::new((phase + base_translation.y).sin() * 6.0 * amplitude, 0.0, 0.0)
+}
+
+fn pulse_scale(base_scale: Vec3, phase: f32, authorized_intensity: f32) -> Vec3 {
+    clamp_scale_to_authorized(base_scale * (1.0 + 0.06 * phase.sin()), authorized_intensity)
+}
+
+fn radiate_scale(base_scale: Vec3, phase: f32, authorized_intensity: f32) -> Vec3 {
+    clamp_scale_to_authorized(
+        base_scale * (1.0 + 0.08 * (phase.sin() * 0.5 + 0.5)),
+        authorized_intensity,
+    )
+}
+
 #[derive(Resource, Default)]
 pub struct SceneSubmissionQueue {
     pending: Option<AuthorizedSceneSubmission>,
@@ -318,6 +343,7 @@ pub struct SceneElementPresentation {
     glyph: SceneGlyph,
     motion: SceneMotion,
     weight: Option<f32>,
+    authorized_intensity: f32,
     base_scale: Vec3,
     base_translation: Vec3,
 }
@@ -454,6 +480,7 @@ fn render_pending_scene(
                 glyph: element.glyph,
                 motion: element.motion,
                 weight: element.weight,
+                authorized_intensity: frame.effective_intensity(),
                 base_scale,
                 base_translation,
             },
@@ -529,22 +556,34 @@ fn animate_scene_elements(
         let phase = seconds * 2.6;
         match element.motion {
             SceneMotion::Static => {
-                transform.scale = element.base_scale;
+                transform.scale = clamp_scale_to_authorized(
+                    element.base_scale,
+                    element.authorized_intensity,
+                );
                 transform.translation = element.base_translation;
             }
             SceneMotion::Pulse => {
-                let scale = 1.0 + 0.06 * phase.sin();
-                transform.scale = element.base_scale * scale;
+                transform.scale = pulse_scale(
+                    element.base_scale,
+                    phase,
+                    element.authorized_intensity,
+                );
                 transform.translation = element.base_translation;
             }
             SceneMotion::Flow => {
-                transform.scale = element.base_scale;
+                transform.scale = clamp_scale_to_authorized(
+                    element.base_scale,
+                    element.authorized_intensity,
+                );
                 transform.translation = element.base_translation
-                    + Vec3::new((phase + element.base_translation.y).sin() * 6.0, 0.0, 0.0);
+                    + flow_offset(phase, element.base_translation, element.authorized_intensity);
             }
             SceneMotion::Radiate => {
-                let scale = 1.0 + 0.08 * (phase.sin() * 0.5 + 0.5);
-                transform.scale = element.base_scale * scale;
+                transform.scale = radiate_scale(
+                    element.base_scale,
+                    phase,
+                    element.authorized_intensity,
+                );
                 transform.translation = element.base_translation;
             }
         }
@@ -621,6 +660,33 @@ mod tests {
         assert!((render_amplitude(None, 0.2) - 0.2).abs() < f32::EPSILON);
         assert!((render_amplitude(None, 0.0) - 0.0).abs() < f32::EPSILON);
         assert!((render_amplitude(None, 1.0) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn animation_never_amplifies_above_authorized_intensity() {
+        let cap = 0.25;
+        let base = Vec3::splat(0.24);
+        for phase in [-100.0, -3.14, -1.2, 0.0, 1.2, 3.14, 100.0] {
+            for scale in [
+                pulse_scale(base, phase, cap),
+                radiate_scale(base, phase, cap),
+                clamp_scale_to_authorized(base, cap),
+            ] {
+                assert!(scale.x <= cap && scale.y <= cap && scale.z <= cap);
+                assert!(scale.x >= 0.0 && scale.y >= 0.0 && scale.z >= 0.0);
+            }
+            let offset = flow_offset(phase, Vec3::ZERO, cap);
+            assert!(offset.length() <= 6.0 * cap + f32::EPSILON);
+        }
+    }
+
+    #[test]
+    fn zero_authorized_intensity_freezes_all_animated_output_at_zero() {
+        let base = Vec3::splat(0.4);
+        assert_eq!(pulse_scale(base, 1.5, 0.0), Vec3::ZERO);
+        assert_eq!(radiate_scale(base, 1.5, 0.0), Vec3::ZERO);
+        assert_eq!(clamp_scale_to_authorized(base, 0.0), Vec3::ZERO);
+        assert_eq!(flow_offset(1.5, Vec3::ZERO, 0.0), Vec3::ZERO);
     }
 
     #[test]
