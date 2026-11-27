@@ -263,38 +263,38 @@ fn run_suite(trials: u64) -> Vec<RegimeReport> {
         MarginalFamily::Gaussian,
         MarginalFamily::StandardizedStudentT5CommonScale,
     ] {
-      for calibration_rho in CALIBRATION_RHO_GRID {
-        for test_rho in TEST_RHO_GRID {
-            for block_len in BLOCK_LENGTH_GRID {
-                let base_seed = 0x5344_4352_0000_0000
-                    ^ calibration_rho.to_bits().rotate_left(11)
-                    ^ test_rho.to_bits().rotate_left(29)
-                    ^ ((block_len as u64) << 32);
-                reports.push(run_regime_experiment(
-                    SamplingDesign::IndependentBlocks,
-                    marginal,
-                    calibration_rho,
-                    test_rho,
-                    block_len,
-                    0,
-                    trials,
-                    base_seed ^ 0x0101,
-                ));
-                for gap in SERIAL_EMBARGO_GRID {
+        for calibration_rho in CALIBRATION_RHO_GRID {
+            for test_rho in TEST_RHO_GRID {
+                for block_len in BLOCK_LENGTH_GRID {
+                    let base_seed = 0x5344_4352_0000_0000
+                        ^ calibration_rho.to_bits().rotate_left(11)
+                        ^ test_rho.to_bits().rotate_left(29)
+                        ^ ((block_len as u64) << 32);
                     reports.push(run_regime_experiment(
-                        SamplingDesign::OneSerialPath,
+                        SamplingDesign::IndependentBlocks,
                         marginal,
                         calibration_rho,
                         test_rho,
                         block_len,
-                        gap,
+                        0,
                         trials,
-                        base_seed ^ 0x1000 ^ gap as u64,
+                        base_seed ^ 0x0101,
                     ));
+                    for gap in SERIAL_EMBARGO_GRID {
+                        reports.push(run_regime_experiment(
+                            SamplingDesign::OneSerialPath,
+                            marginal,
+                            calibration_rho,
+                            test_rho,
+                            block_len,
+                            gap,
+                            trials,
+                            base_seed ^ 0x1000 ^ gap as u64,
+                        ));
+                    }
                 }
             }
         }
-      }
     }
     reports
 }
@@ -378,7 +378,6 @@ mod tests {
             reverse.empirical_alarm_rate
         );
     }
-
 
     #[test]
     fn standardized_student_t5_preserves_unit_variance_and_regime_shift() {
@@ -470,8 +469,7 @@ mod tests {
         let reports = run_suite(20);
         assert_eq!(
             reports.len(),
-            2
-                * CALIBRATION_RHO_GRID.len()
+            2 * CALIBRATION_RHO_GRID.len()
                 * TEST_RHO_GRID.len()
                 * BLOCK_LENGTH_GRID.len()
                 * (1 + SERIAL_EMBARGO_GRID.len())
