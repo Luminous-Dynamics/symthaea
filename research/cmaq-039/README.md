@@ -19,7 +19,9 @@ Raw episode count is diagnostic only. It never becomes the sample size.
 - Verifies every score attestation binds the same closure digest and score definition.
 - Requires block-manifest, aggregate-score and tie-break receipt digests.
 - Rejects duplicate tie keys, missing or extra attestations, non-calibration attestations, noncanonical inventories and count tampering.
-- Produces the existing CMAQ-031 CalibrationRankReference without changing its monitor API.
+- Produces a ClosureQualifiedRankReference with a private underlying reference; callers cannot move the raw CMAQ-031 reference out of the wrapper.
+- Converts that qualified reference into a ClosureQualifiedMonitor, which retains the closure digest and effective-block diagnostics while delegating online observations, quarantine state and wealth reporting to CMAQ-031.
+- Preserves closure provenance during the normal calibration-to-monitor handoff rather than dropping it immediately after monitor construction.
 
 The result has two calibration scores for the four-episode adversarial fixture: the three linked episodes contribute one maximum score of 90; the unlinked fourth episode contributes one score of 20.
 
