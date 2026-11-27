@@ -287,3 +287,12 @@ A new cross-track protocol is now documented in docs/research/SDCB_NUMERICAL_AND
 ## Bivariate oracle evaluation-budget correction — 27 November 2026
 
 The bivariate reference now checks a hard one-million-call budget before every initial three-call batch and every recursive two-call batch, preventing batch overrun. The reported counter is explicitly named outer-integrand evaluations; it does not count the fixed 64-point scalar inner quadrature nodes and must not be described as total floating-point operations. Eighteen Rust tests are authored but remain uncompiled/unexecuted.
+
+
+## State-bound joint likelihood adapter — 27 November 2026
+
+The bivariate likelihood reference now exposes a bound-result entry point. It preserves the exact caller-supplied prediction/model/conditioning-state IDs and versions, common-cause evidence version, both channel and device IDs/evidence versions, separate acquisition-window IDs/start/end timestamps and per-channel calibration contexts/epochs, plus measurement-action identity. The returned object also includes the conditional mean/covariance, per-channel threshold arrays and numerical method settings.
+
+The bound wrapper validates nonempty identities, distinct channel IDs, nonempty capture windows and consistent device evidence versions when both channels belong to the same device. It is an identity propagation envelope only: caller-supplied identifiers are not cryptographically authenticated and no source custody or receipt validity is proved. The adapter does not mutate #13805, authorize an experiment, or choose a policy. Call it separately for each explicit model/common/device conditioning assignment; state-marginalization belongs to the defined Bayesian/robust estimand downstream.
+
+The scalar Gaussian interval routine now caches the 64-point Gauss–Legendre rule with thread-safe OnceLock; the bivariate inner loop reuses it. The branch now has 25 authored bivariate tests and 9 scalar-adapter tests, all uncompiled/unexecuted. Two new negative controls require exact duplicate-channel bins to occupy only diagonal cells and perfect anti-correlation bins only off-diagonal cells.
