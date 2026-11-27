@@ -1,0 +1,449 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_class": "synthetic_contract_with_real_fixture_bytes",
+  "claim_boundary": "These fixtures test the manifest contract only. They are not parser executions, benchmark observations, or scientific evidence.",
+  "cases": [
+    {
+      "case_id": "csv_cell_exact_decimal",
+      "expected_disposition": "PARSED",
+      "expected_acceptance": "schema_valid_and_cross_field_invariants_valid",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:79ee82ea9b736a6472be8430330b08de3937c59d961efe56af24ef60b31f4aee",
+        "acquisition": {
+          "receipt_id": "acq-receipt-csv-001",
+          "receipt_content_sha256": "79ee82ea9b736a6472be8430330b08de3937c59d961efe56af24ef60b31f4aee",
+          "requested_uri": "https://data.example.test/study.csv",
+          "final_uri": "https://data.example.test/study.csv",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "text/csv",
+          "detected_content_type": "text/csv",
+          "filename": "study.csv",
+          "encoding": "utf-8"
+        },
+        "raw": {
+          "sha256": "79ee82ea9b736a6472be8430330b08de3937c59d961efe56af24ef60b31f4aee",
+          "byte_length": 35,
+          "capture_ref": "cas://sha256/79ee82ea9b736a6472be8430330b08de3937c59d961efe56af24ef60b31f4aee"
+        },
+        "parser": {
+          "parser_id": "symthaea.delimited-text",
+          "parser_version": "0.1.0",
+          "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "PARSED",
+          "derived_payload_sha256": "fe18f50ea0248b6884dbe8ca669e47791bb1382ad100fb9d6e58c6dfbcb68edd",
+          "observations": [
+            {
+              "observation_id": "study-row-0-temperature",
+              "locator": {
+                "kind": "CSV_CELL",
+                "record_index": 0,
+                "column_index": 1,
+                "column_name": "temperature_C",
+                "byte_start": 29,
+                "byte_end": 34
+              },
+              "raw_lexeme": "21.50",
+              "value_kind": "DECIMAL",
+              "unit_lexeme": "degC"
+            }
+          ],
+          "issues": [],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 35,
+            "elapsed_ms": 4,
+            "observations_emitted": 1
+          }
+        }
+      },
+      "fixture_artifact_bytes_utf8": "sample_id,temperature_C\nS001,21.50\n",
+      "fixture_derived_payload_utf8": "observation_id=study-row-0-temperature\nlocator=CSV_CELL|record=0|column=1|name=temperature_C|start=29|end=34\nraw_lexeme=21.50\nvalue_kind=DECIMAL\nunit=degC\n",
+      "policy_usable": true
+    },
+    {
+      "case_id": "json_pointer_numeric",
+      "expected_disposition": "PARSED",
+      "expected_acceptance": "schema_valid_and_cross_field_invariants_valid",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:1dada1a2c1a40a36a4fa6d88197d9c31190b5ab4c3525012d1f498806cf6cc38",
+        "acquisition": {
+          "receipt_id": "acq-receipt-json-001",
+          "receipt_content_sha256": "1dada1a2c1a40a36a4fa6d88197d9c31190b5ab4c3525012d1f498806cf6cc38",
+          "requested_uri": "https://data.example.test/results.json",
+          "final_uri": "https://data.example.test/results.json",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "application/json",
+          "detected_content_type": "application/json",
+          "filename": "results.json",
+          "encoding": "utf-8"
+        },
+        "raw": {
+          "sha256": "1dada1a2c1a40a36a4fa6d88197d9c31190b5ab4c3525012d1f498806cf6cc38",
+          "byte_length": 40,
+          "capture_ref": "cas://sha256/1dada1a2c1a40a36a4fa6d88197d9c31190b5ab4c3525012d1f498806cf6cc38"
+        },
+        "parser": {
+          "parser_id": "symthaea.json",
+          "parser_version": "0.1.0",
+          "config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "PARSED",
+          "derived_payload_sha256": "29b1d195356a1dce2f7ba1498ffd0d3588b4f1631cc144f4884eca38acd5f68f",
+          "observations": [
+            {
+              "observation_id": "results-effect-estimate",
+              "locator": {
+                "kind": "JSON_POINTER",
+                "pointer": "/results/0/effect_estimate"
+              },
+              "raw_lexeme": "0.032",
+              "value_kind": "DECIMAL",
+              "unit_lexeme": null
+            }
+          ],
+          "issues": [],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 40,
+            "elapsed_ms": 2,
+            "observations_emitted": 1
+          }
+        }
+      },
+      "fixture_artifact_bytes_utf8": "{\"results\":[{\"effect_estimate\":0.032}]}\n",
+      "fixture_derived_payload_utf8": "observation_id=results-effect-estimate\nlocator=JSON_POINTER|/results/0/effect_estimate\nraw_lexeme=0.032\nvalue_kind=DECIMAL\nunit=NULL\n",
+      "policy_usable": true
+    },
+    {
+      "case_id": "unsupported_pdf",
+      "expected_disposition": "UNSUPPORTED",
+      "expected_acceptance": "schema_valid_but_not_policy_usable",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:90fdc3feb228128e26b970b7a4e9d731b705dadc0aba2b3b5b1c2228baecc684",
+        "acquisition": {
+          "receipt_id": "acq-receipt-pdf-001",
+          "receipt_content_sha256": "90fdc3feb228128e26b970b7a4e9d731b705dadc0aba2b3b5b1c2228baecc684",
+          "requested_uri": "https://data.example.test/figure.pdf",
+          "final_uri": "https://data.example.test/figure.pdf",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "application/pdf",
+          "detected_content_type": "application/pdf",
+          "filename": "figure.pdf",
+          "encoding": null
+        },
+        "raw": {
+          "sha256": "90fdc3feb228128e26b970b7a4e9d731b705dadc0aba2b3b5b1c2228baecc684",
+          "byte_length": 48,
+          "capture_ref": "cas://sha256/90fdc3feb228128e26b970b7a4e9d731b705dadc0aba2b3b5b1c2228baecc684"
+        },
+        "parser": {
+          "parser_id": "symthaea.artifact-intake",
+          "parser_version": "0.1.0",
+          "config_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "UNSUPPORTED",
+          "derived_payload_sha256": null,
+          "observations": [],
+          "issues": [
+            {
+              "reason_code": "PARSER_NOT_ADMITTED",
+              "message": "PDF parser has not been qualified for this intake profile."
+            }
+          ],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 48,
+            "elapsed_ms": 1,
+            "observations_emitted": 0
+          }
+        }
+      },
+      "fixture_artifact_bytes_utf8": "%PDF-1.7\n% synthetic unsupported parser fixture\n",
+      "policy_usable": false
+    },
+    {
+      "case_id": "receipt_digest_mismatch",
+      "expected_disposition": "INTEGRITY_FAILED",
+      "expected_acceptance": "schema_valid_but_cross_field_integrity_rejected",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+        "acquisition": {
+          "receipt_id": "acq-receipt-integrity-mismatch",
+          "receipt_content_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "requested_uri": "https://data.example.test/receipt-mismatch.json",
+          "final_uri": "https://data.example.test/receipt-mismatch.json",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "application/pdf",
+          "detected_content_type": "application/pdf",
+          "filename": "figure.pdf",
+          "encoding": null
+        },
+        "raw": {
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+          "byte_length": 3,
+          "capture_ref": "cas://sha256/ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        "parser": {
+          "parser_id": "symthaea.artifact-intake",
+          "parser_version": "0.1.0",
+          "config_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "INTEGRITY_FAILED",
+          "derived_payload_sha256": null,
+          "observations": [],
+          "issues": [
+            {
+              "reason_code": "ACQUISITION_DIGEST_MISMATCH",
+              "message": "The acquisition receipt digest does not match the bytes bound by this manifest."
+            }
+          ],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 3,
+            "elapsed_ms": 1,
+            "observations_emitted": 0
+          }
+        }
+      },
+      "fixture_artifact_bytes_utf8": "{}\n",
+      "policy_usable": false
+    },
+    {
+      "case_id": "malformed_csv_row_width",
+      "expected_disposition": "MALFORMED",
+      "expected_acceptance": "schema_valid_fail_closed_no_observations",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:bdd02e073d54b9b21e1b7e77262cc24be5759448ac6668c73e769c31d7230868",
+        "acquisition": {
+          "receipt_id": "acq-receipt-malformed-csv",
+          "receipt_content_sha256": "bdd02e073d54b9b21e1b7e77262cc24be5759448ac6668c73e769c31d7230868",
+          "requested_uri": "https://data.example.test/malformed.csv",
+          "final_uri": "https://data.example.test/malformed.csv",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "text/csv",
+          "detected_content_type": "text/csv",
+          "filename": "malformed.csv",
+          "encoding": "utf-8"
+        },
+        "raw": {
+          "sha256": "bdd02e073d54b9b21e1b7e77262cc24be5759448ac6668c73e769c31d7230868",
+          "byte_length": 22,
+          "capture_ref": "cas://sha256/bdd02e073d54b9b21e1b7e77262cc24be5759448ac6668c73e769c31d7230868"
+        },
+        "parser": {
+          "parser_id": "symthaea.delimited-text",
+          "parser_version": "0.1.0",
+          "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "MALFORMED",
+          "derived_payload_sha256": null,
+          "observations": [],
+          "issues": [
+            {
+              "reason_code": "CSV_RECORD_WIDTH_MISMATCH",
+              "message": "A data record has a different number of fields from the declared header."
+            }
+          ],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 22,
+            "elapsed_ms": 1,
+            "observations_emitted": 0
+          }
+        }
+      },
+      "fixture_artifact_bytes_utf8": "id,value\nA001,1,extra\n",
+      "policy_usable": false
+    },
+    {
+      "case_id": "input_byte_limit",
+      "expected_disposition": "LIMIT_EXCEEDED",
+      "expected_acceptance": "schema_valid_fail_closed_no_observations",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:8bb9d4b0419ddfff205348150355a44ba17b072718b441a44ddaf504e76f128e",
+        "acquisition": {
+          "receipt_id": "acq-receipt-input-limit",
+          "receipt_content_sha256": "8bb9d4b0419ddfff205348150355a44ba17b072718b441a44ddaf504e76f128e",
+          "requested_uri": "https://data.example.test/large.csv",
+          "final_uri": "https://data.example.test/large.csv",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "text/csv",
+          "detected_content_type": "text/csv",
+          "filename": "large.csv",
+          "encoding": "utf-8"
+        },
+        "raw": {
+          "sha256": "8bb9d4b0419ddfff205348150355a44ba17b072718b441a44ddaf504e76f128e",
+          "byte_length": 149,
+          "capture_ref": "cas://sha256/8bb9d4b0419ddfff205348150355a44ba17b072718b441a44ddaf504e76f128e"
+        },
+        "parser": {
+          "parser_id": "symthaea.delimited-text",
+          "parser_version": "0.1.0",
+          "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "LIMIT_EXCEEDED",
+          "derived_payload_sha256": null,
+          "observations": [],
+          "issues": [
+            {
+              "reason_code": "MAX_INPUT_BYTES_EXCEEDED",
+              "message": "The parser stopped at the configured input-byte ceiling."
+            }
+          ],
+          "limits": {
+            "max_input_bytes": 64,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 64,
+            "elapsed_ms": 1,
+            "observations_emitted": 0
+          }
+        }
+      },
+      "fixture_artifact_bytes_utf8": "id,value\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\nA001,1\n",
+      "policy_usable": false
+    },
+    {
+      "case_id": "partial_csv_diagnostic_only",
+      "expected_disposition": "PARTIAL",
+      "expected_acceptance": "diagnostic_only_not_policy_usable",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:992752f65913a10925d10f9edf32befdf29da44a2d793bd9c6bebb5e306aa4a9",
+        "acquisition": {
+          "receipt_id": "acq-receipt-partial-csv",
+          "receipt_content_sha256": "992752f65913a10925d10f9edf32befdf29da44a2d793bd9c6bebb5e306aa4a9",
+          "requested_uri": "https://data.example.test/partial.csv",
+          "final_uri": "https://data.example.test/partial.csv",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "text/csv",
+          "detected_content_type": "text/csv",
+          "filename": "study.csv",
+          "encoding": "utf-8"
+        },
+        "raw": {
+          "sha256": "992752f65913a10925d10f9edf32befdf29da44a2d793bd9c6bebb5e306aa4a9",
+          "byte_length": 29,
+          "capture_ref": "cas://sha256/992752f65913a10925d10f9edf32befdf29da44a2d793bd9c6bebb5e306aa4a9"
+        },
+        "parser": {
+          "parser_id": "symthaea.delimited-text",
+          "parser_version": "0.1.0",
+          "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "PARTIAL",
+          "derived_payload_sha256": "593fedce11f183c859f8ed45c2bae3707059723e2db29df0fd5260d7c0ddac2c",
+          "observations": [
+            {
+              "observation_id": "partial-row-0-value",
+              "locator": {
+                "kind": "CSV_CELL",
+                "record_index": 0,
+                "column_index": 1,
+                "column_name": "value",
+                "byte_start": 14,
+                "byte_end": 15
+              },
+              "raw_lexeme": "1",
+              "value_kind": "INTEGER",
+              "unit_lexeme": null
+            }
+          ],
+          "issues": [
+            {
+              "reason_code": "CSV_ROW_PARTIAL_FAILURE",
+              "message": "One record was rejected; retained observations are diagnostic only."
+            }
+          ],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 29,
+            "elapsed_ms": 4,
+            "observations_emitted": 1
+          }
+        }
+      },
+      "fixture_artifact_bytes_utf8": "id,value\nA001,1\nA002,2,EXTRA\n",
+      "fixture_derived_payload_utf8": "observation_id=partial-row-0-value\nlocator=CSV_CELL|record=0|column=1|name=value|start=14|end=15\nraw_lexeme=1\nvalue_kind=INTEGER\nunit=NULL\n",
+      "policy_usable": false
+    }
+  ],
+  "cross_field_invariants": [
+    "artifact_id must equal 'sha256:' + raw.sha256",
+    "acquisition.receipt_content_sha256 must equal raw.sha256",
+    "parse.usage.bytes_read must not exceed parse.limits.max_input_bytes",
+    "parse.usage.elapsed_ms must not exceed parse.limits.max_elapsed_ms",
+    "parse.usage.observations_emitted must equal parse.observations.length and not exceed parse.limits.max_observations",
+    "For CSV_CELL, byte_start must be strictly less than byte_end and the span must resolve inside raw.byte_length",
+    "A non-PARSED disposition is never sufficient for downstream claim support or decision use",
+    "PARTIAL observations and derived payloads are diagnostic only and cannot be promoted into claim support or decision inputs.",
+    "SHA-256(UTF-8(fixture_artifact_bytes_utf8)) must equal manifest.raw.sha256",
+    "manifest.raw.byte_length must equal the UTF-8 byte length of fixture_artifact_bytes_utf8",
+    "For PARSED and PARTIAL cases, SHA-256(UTF-8(fixture_derived_payload_utf8)) must equal parse.derived_payload_sha256",
+    "Every CSV_CELL byte span must select exactly the declared raw_lexeme bytes from fixture_artifact_bytes_utf8",
+    "The receipt_digest_mismatch case is intentionally the sole fixture where acquisition.receipt_content_sha256 differs from raw.sha256"
+  ],
+  "hash_contract": "fixture_artifact_bytes_utf8 and fixture_derived_payload_utf8 are UTF-8 byte strings; their SHA-256 digests must equal raw.sha256 and parse.derived_payload_sha256 respectively, except for the intentional receipt digest mismatch case."
+}
