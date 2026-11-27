@@ -584,6 +584,18 @@ fn validate_tracking(
         )));
     }
 
+    if input.controller == ObservationRiskControllerV1::CapacityAwareOcrcBounded {
+        let physically_measured = row.acquisition.state == PhysicalAcquisitionStateV1::Measured;
+        if physically_measured
+            == (tracking.state == FeedbackTrackingStateV1::NotApplicable)
+        {
+            return Err(ObservationProcessErrorV1(format!(
+                "round {} CA-OCRC tracking is NOT_APPLICABLE exactly when no physical measurement exists",
+                row.round_id
+            )));
+        }
+    }
+
     match input.controller {
         ObservationRiskControllerV1::None => {
             if tracking.state != FeedbackTrackingStateV1::NotApplicable
@@ -655,6 +667,10 @@ fn validate_tracking(
         ObservationRiskControllerV1::CapacityAwareOcrcBounded => {
             let maximum_delay = input.maximum_feedback_delay_rounds.expect("policy validated");
             match tracking.state {
+                FeedbackTrackingStateV1::NotApplicable => {
+                    // No physical measurement exists for this population round;
+                    // there is no feedback outcome to place in the controller tracker.
+                }
                 FeedbackTrackingStateV1::ProxyNotTracked => {
                     if tracking.proxy_delay_rounds != Some(-1)
                         || tracking.action_receipt_sha256.is_none()
@@ -1468,6 +1484,26 @@ mod tests {
         assert_eq!(report.funnel.k1_blocked, 1);
         assert_eq!(report.population_risk.partial_identification_lower, 0.0);
         assert_eq!(report.population_risk.partial_identification_upper, 0.75);
+    }
+
+    #[test]
+    fn unmeasured_population_round_has_no_ca_ocrc_feedback_outcome() {
+        let data = input(
+            ObservationRiskControllerV1::CapacityAwareOcrcBounded,
+            vec![row(
+                1,
+                PhysicalAcquisitionStateV1::NotSelected,
+                K1QualificationStateV1::NotApplicable,
+                FeedbackTrackingStateV1::NotApplicable,
+            )],
+        );
+        let report = evaluate_observation_process_v1(&data).unwrap();
+        assert_eq!(report.funnel.not_selected, 1);
+        assert_eq!(report.funnel.feedback_not_applicable, 1);
+        assert_eq!(report.funnel.proxy_not_tracked, 0);
+        assert_eq!(report.funnel.capacity_denied, 0);
+        assert_eq!(report.controller_assumption_state, ControllerAssumptionStateV1::InvalidatedByMissingOrUnqualifiedOutcome);
+        assert_eq!(report.population_risk.missing_count, 1);
     }
 
     #[test]
