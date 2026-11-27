@@ -544,12 +544,13 @@ fn validate_annotation_intervals(
                 "item {item_id} annotation {annotation_index} interval {interval_index} is invalid or outside the continuum"
             ));
         }
-        if require_nonempty && interval_index > 0 {
-            if interval.start_frame < intervals[interval_index - 1].end_frame {
-                return Err(format!(
-                    "item {item_id} annotator {annotation_index} has overlapping or unsorted unit intervals"
-                ));
-            }
+        if require_nonempty
+            && interval_index > 0
+            && interval.start_frame < intervals[interval_index - 1].end_frame
+        {
+            return Err(format!(
+                "item {item_id} annotator {annotation_index} has overlapping or unsorted unit intervals"
+            ));
         }
     }
     Ok(())
@@ -1005,7 +1006,7 @@ fn median(values: &[f64]) -> Option<f64> {
     let mut sorted = values.to_vec();
     sorted.sort_by(f64::total_cmp);
     let middle = sorted.len() / 2;
-    Some(if sorted.len() % 2 == 0 {
+    Some(if sorted.len().is_multiple_of(2) {
         (sorted[middle - 1] + sorted[middle]) / 2.0
     } else {
         sorted[middle]
@@ -1236,7 +1237,7 @@ mod tests {
                     '1',
                     'a',
                     GroundTruthStateV1::Present,
-                    vec![event.clone()],
+                    vec![event],
                     None,
                 ),
                 test_annotation('2', 'b', GroundTruthStateV1::Absent, Vec::new(), None),
@@ -1244,7 +1245,7 @@ mod tests {
                     '3',
                     'c',
                     GroundTruthStateV1::Ambiguous,
-                    vec![ambiguous_interval.clone()],
+                    vec![ambiguous_interval],
                     Some("gradual onset has no stable event boundary"),
                 ),
                 test_annotation(
