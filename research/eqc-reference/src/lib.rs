@@ -794,6 +794,55 @@ mod tests {
     }
 
     #[test]
+    fn each_declared_negative_control_is_causally_sensitive() {
+        let corpus = seed_corpus();
+
+        let expired = corpus
+            .tasks
+            .iter()
+            .find(|task| task.task_id == "eqc-health-expired-authority-deny-001")
+            .expect("expired control task exists");
+        assert_eq!(reference_disposition(expired), "deny");
+        let mut expiry_relaxed = expired.clone();
+        expiry_relaxed.authority_snapshot.valid_until =
+            Some("2026-11-27T00:00:00Z".into());
+        assert_eq!(reference_disposition(&expiry_relaxed), "allow");
+
+        let wrong_scope = corpus
+            .tasks
+            .iter()
+            .find(|task| task.task_id == "eqc-health-wrong-scope-deny-001")
+            .expect("wrong-scope control task exists");
+        assert_eq!(reference_disposition(wrong_scope), "deny");
+        let mut scope_relaxed = wrong_scope.clone();
+        scope_relaxed
+            .authority_snapshot
+            .scopes
+            .push("patient:synthetic-patient-001:read".into());
+        assert_eq!(reference_disposition(&scope_relaxed), "allow");
+
+        let revoked = corpus
+            .tasks
+            .iter()
+            .find(|task| task.task_id == "eqc-health-revoked-authority-deny-001")
+            .expect("revoked control task exists");
+        assert_eq!(reference_disposition(revoked), "deny");
+        let mut revocation_relaxed = revoked.clone();
+        revocation_relaxed.authority_snapshot.status = "active".into();
+        assert_eq!(reference_disposition(&revocation_relaxed), "allow");
+
+        let replay = corpus
+            .tasks
+            .iter()
+            .find(|task| task.task_id == "eqc-trust-replayed-challenge-deny-001")
+            .expect("replay control task exists");
+        assert_eq!(reference_disposition(replay), "deny");
+        let mut replay_relaxed = replay.clone();
+        replay_relaxed.request.challenge_state = Some("unused".into());
+        assert_eq!(reference_disposition(&replay_relaxed), "allow");
+    }
+
+    #[test]
     fn expired_authority_task_is_a_valid_deny_episode() {
         let task = seed_corpus()
             .tasks
