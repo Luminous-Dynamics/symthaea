@@ -428,7 +428,7 @@ mod tests {
     #[test]
     fn conflicting_reference_outcomes_inside_one_cluster_are_rejected() {
         let records = vec![
-            record('d', "fa', "ca", 10, CandidateOutput::Point(10)),
+            record('d', "fa", "ca", 10, CandidateOutput::Point(10)),
             record('d', "fa", "ca", 20, CandidateOutput::Point(10)),
         ];
         assert_eq!(
