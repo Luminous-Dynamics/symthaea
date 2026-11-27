@@ -254,7 +254,7 @@ impl EventPayload {
             Self::EvidenceStatus(value) => {
                 validate_identifier("evidence subject", &value.subject_id)?;
                 if value.status == EvidenceState::Supported {
-                    if value.verifier_receipt_ref.as_deref().is_none_or(str::is_empty)
+                    if value.verifier_receipt_ref.as_deref().map_or(true, str::is_empty)
                         || evidence_refs.is_empty()
                     {
                         return Err(EventValidationError::MissingEvidenceReceipt);
@@ -431,6 +431,16 @@ impl EmbodimentStreamValidator {
         if self.seen_event_ids.contains(&event.event_id) {
             return Err(EventValidationError::DuplicateEventId);
         }
+        if let EventPayload::UserControl(UserControlPayload {
+            action: UserControlAction::Cancel,
+            target_event_id: Some(target_event_id),
+            ..
+        }) = &event.payload
+        {
+            if !self.seen_event_ids.contains(target_event_id) {
+                return Err(EventValidationError::UnknownCancelTarget);
+            }
+        }
 
         match self.last_sequence {
             None if event.sequence != 0 => {
@@ -480,6 +490,7 @@ pub enum EventValidationError {
     MissingEvidenceReceipt,
     TooManyEvidenceReferences,
     MissingCancelTarget,
+    UnknownCancelTarget,
     MissingFormId,
     MissingReducedMotionValue,
     MissingIntensity,
@@ -669,6 +680,26 @@ mod tests {
             intensity: None,
         });
         assert_eq!(event.validate(), Err(EventValidationError::MissingCancelTarget));
+    }
+
+    #[test]
+    fn cancel_control_must_reference_an_event_in_the_same_stream() {
+        let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        let mut cancel = listening_event(1, "event-1");
+        cancel.event_kind = EventKind::UserControl;
+        cancel.payload = EventPayload::UserControl(UserControlPayload {
+            action: UserControlAction::Cancel,
+            form_id: None,
+            target_event_id: Some("missing-event".to_owned()),
+            enabled: None,
+            intensity: None,
+        });
+        assert_eq!(
+            validator.accept(&cancel, "300"),
+            Err(EventValidationError::UnknownCancelTarget)
+        );
+        assert_eq!(validator.last_sequence(), Some(0));
     }
 
     #[test]
