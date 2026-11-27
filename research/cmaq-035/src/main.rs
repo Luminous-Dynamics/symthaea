@@ -417,6 +417,49 @@ pub fn run_benchmark(config: BenchmarkConfig) -> Result<Vec<ScenarioSummary>, St
         .collect()
 }
 
+/// Positional CLI: cmaq-035-prm-paired-benchmark [replications] [horizon] [seed].
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let replications = args.first().map_or(Ok(10_000), |value| value.parse())?;
+    let horizon = args.get(1).map_or(Ok(500), |value| value.parse())?;
+    let seed = args
+        .get(2)
+        .map_or(Ok(20_261_127_u64), |value| value.parse())?;
+    let config = BenchmarkConfig {
+        replications,
+        horizon,
+        seed,
+    };
+    let results = run_benchmark(config).map_err(std::io::Error::other)?;
+
+    println!(
+        "scenario,method,replications,horizon,detection_rate,wilson95_low,wilson95_high,median_delay,p90_delay,p95_delay"
+    );
+    for result in &results {
+        for row in result.csv_rows() {
+            println!("{row}");
+        }
+        println!(
+            "#paired,{},ons_wins={},fixed_wins={},ties={}",
+            result.scenario.as_str(),
+            result.ons_wins,
+            result.fixed_bet_wins,
+            result.paired_ties
+        );
+    }
+    eprintln!(
+        "SIMULATION ONLY: replications={} horizon={} seed={} calibration_n={} alpha={}/{} rng=SplitMix64(non-cryptographic)",
+        config.replications,
+        config.horizon,
+        config.seed,
+        CALIBRATION_COUNT,
+        ALPHA_NUMERATOR,
+        ALPHA_DENOMINATOR
+    );
+    Ok(())
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -520,46 +563,4 @@ mod tests {
             run_scenario(config, Scenario::OrthogonalTrimodal).unwrap()
         );
     }
-}
-
-/// Positional CLI: cmaq-035-prm-paired-benchmark [replications] [horizon] [seed].
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let replications = args.first().map_or(Ok(10_000), |value| value.parse())?;
-    let horizon = args.get(1).map_or(Ok(500), |value| value.parse())?;
-    let seed = args
-        .get(2)
-        .map_or(Ok(20_261_127_u64), |value| value.parse())?;
-    let config = BenchmarkConfig {
-        replications,
-        horizon,
-        seed,
-    };
-    let results = run_benchmark(config).map_err(std::io::Error::other)?;
-
-    println!(
-        "scenario,method,replications,horizon,detection_rate,wilson95_low,wilson95_high,median_delay,p90_delay,p95_delay"
-    );
-    for result in &results {
-        for row in result.csv_rows() {
-            println!("{row}");
-        }
-        println!(
-            "#paired,{},ons_wins={},fixed_wins={},ties={}",
-            result.scenario.as_str(),
-            result.ons_wins,
-            result.fixed_bet_wins,
-            result.paired_ties
-        );
-    }
-    eprintln!(
-        "SIMULATION ONLY: replications={} horizon={} seed={} calibration_n={} alpha={}/{} rng=SplitMix64(non-cryptographic)",
-        config.replications,
-        config.horizon,
-        config.seed,
-        CALIBRATION_COUNT,
-        ALPHA_NUMERATOR,
-        ALPHA_DENOMINATOR
-    );
-    Ok(())
 }
