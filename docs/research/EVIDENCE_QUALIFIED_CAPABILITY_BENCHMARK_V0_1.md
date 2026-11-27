@@ -86,7 +86,11 @@ cargo run --locked --manifest-path research/eqc-rust/Cargo.toml -- \
   --out /tmp/eqc-reference-report.json
 ```
 
-The seed corpus is explicitly marked `synthetic_public_seed_unqualified`. It has no live health records and does not claim a clinical, EHR, Holochain, or cryptographic integration. The Rust evaluator validates the reference contract; it does not yet exercise an external system under test. Exact-head CI must run before any implementation claim is made.
+The seed corpus is explicitly marked `synthetic_public_seed_unqualified`. It has no live health records and does not claim a clinical, EHR, Holochain, or cryptographic integration. The Rust evaluator validates the reference contract; it does not yet exercise an external system under test.
+
+The standalone suite also validates both published schemas against the Draft 2020-12 meta-schema using a pinned, network-disabled Rust validator; validates all four public tasks against the task schema; and exercises positive/negative receipt cases, including the non-compensatory rule that a `qualified=true` receipt requires every dimension to pass, independent verification, and successful replay. Date-time formats are explicitly enabled rather than treated as annotations. The committed receipt example remains synthetic and unqualified.
+
+Exact-head CI must run before any implementation claim is made.
 
 ## 3. Six independent dimensions
 
