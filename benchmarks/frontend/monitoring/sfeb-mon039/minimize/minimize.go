@@ -102,7 +102,7 @@ func validVerdict(v Verdict)bool{return v==Qualified||v==Blocked||v==Indetermina
 func validRevision(s string)bool{if len(s)!=40&&len(s)!=64{return false};_,err:=hex.DecodeString(s);return err==nil}
 func digestJSON(v any)string{b,e:=json.Marshal(v);if e!=nil{return ""};d:=sha256.Sum256(b);return hex.EncodeToString(d[:])}
 func canonicalFaults(ids []string)([]string,bool){
-	out:=append([]string(nil),ids...)
+	out:=make([]string,len(ids));copy(out,ids)
 	for _,id:=range out{if !validID(id){return nil,false}}
 	sort.Strings(out)
 	for i:=1;i<len(out);i++{if out[i]==out[i-1]{return nil,false}}
