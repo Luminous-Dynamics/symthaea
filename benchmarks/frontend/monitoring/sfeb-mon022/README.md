@@ -26,4 +26,4 @@ PostgreSQL 19 adds sequence synchronization, but cached sequence values mean a s
 
 ## Claim ceiling
 
-The Go evaluator checks normalized coverage attestations. It does not collect PostgreSQL catalogs, sequence state, large-object contents or generated-column values; it does not authenticate attestations or prove the underlying state truthful. The runtime must supply pinned, independently verified evidence. No PostgreSQL integration or production qualification is claimed.
+The Go evaluator checks normalized coverage attestations, exact inventory/surface scope, a pinned attestation profile, freshness, state digests and independently evidenced observer identity/control-root membership. It does not collect PostgreSQL catalogs, sequence state, large-object contents or generated-column values; it does not authenticate attestations or prove the underlying state truthful. The runtime must supply pinned, independently verified evidence. No exact-head test or PostgreSQL integration/production qualification is claimed.
