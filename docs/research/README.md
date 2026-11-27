@@ -34,6 +34,7 @@ event contract.
 - [Dynamic temporal attention](SYMTHAEA_DYNAMIC_TEMPORAL_ATTENTION_V0_1_2026-11-27.md)
 - [Event schema](SYMTHAEA_EMBODIMENT_EVENT_SCHEMA_V1_2026-11-27.json)
 - [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
+- [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
 
 The Rust event and projection modules live in
 `crates/domains/symthaea-soma/src/embodiment_event.rs` and
