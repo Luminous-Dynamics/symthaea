@@ -106,6 +106,7 @@ pub struct K1QualificationRecordV1 {
     pub label_revision: Option<u64>,
     pub label_payload_sha256: Option<String>,
     pub measurement_event_id: Option<String>,
+    pub label_available_at_unix_seconds: Option<i64>,
     pub report_sha256: Option<String>,
     pub report_available_at_unix_seconds: Option<i64>,
     /// Loss against the immutable prediction/interval. It is recorded for
@@ -123,6 +124,8 @@ pub struct FeedbackTrackingRecordV1 {
     /// Actual physical feedback delay, including rounds not retained by the
     /// controller, when the outcome is later known to the offline evaluator.
     pub actual_feedback_delay_rounds: Option<u64>,
+    /// When the controller actually received a tracked physical/K1 outcome.
+    pub controller_feedback_received_at_unix_seconds: Option<i64>,
     /// CA-OCRC survival probability for the relevant observed delay.
     pub proxy_survival_probability: Option<f64>,
     pub tracking_slot_id: Option<u64>,
@@ -417,6 +420,7 @@ fn validate_qualification(
                 || qualification.label_revision.is_some()
                 || qualification.label_payload_sha256.is_some()
                 || qualification.measurement_event_id.is_some()
+                || qualification.label_available_at_unix_seconds.is_some()
                 || qualification.report_sha256.is_some()
                 || qualification.report_available_at_unix_seconds.is_some()
                 || qualification.qualified_loss.is_some()
@@ -435,7 +439,9 @@ fn validate_qualification(
             )?;
             if qualification.label_revision.is_none()
                 || qualification.label_payload_sha256.is_none()
+                || qualification.label_available_at_unix_seconds.is_none()
                 || qualification.report_sha256.is_some()
+                || qualification.report_available_at_unix_seconds.is_some()
                 || qualification.qualified_loss.is_some()
             {
                 return Err(ObservationProcessErrorV1(format!(
@@ -453,6 +459,7 @@ fn validate_qualification(
                 || qualification.label_payload_sha256.is_none()
                 || qualification.measurement_event_id.as_deref()
                     != Some(row.measurement_event_id.as_str())
+                || qualification.label_available_at_unix_seconds.is_none()
                 || qualification.report_sha256.is_none()
                 || qualification.report_available_at_unix_seconds.is_none()
                 || !qualification
@@ -475,6 +482,7 @@ fn validate_qualification(
                 || qualification.label_payload_sha256.is_none()
                 || qualification.measurement_event_id.as_deref()
                     != Some(row.measurement_event_id.as_str())
+                || qualification.label_available_at_unix_seconds.is_none()
                 || qualification.report_sha256.is_none()
                 || qualification.report_available_at_unix_seconds.is_none()
                 || qualification.qualified_loss.is_some()
@@ -488,16 +496,26 @@ fn validate_qualification(
         }
     }
 
-    if qualification
-        .report_available_at_unix_seconds
-        .is_some_and(|available| {
-            row.acquisition
-                .measured_at_unix_seconds
-                .is_some_and(|measured| available < measured)
-        })
-    {
+    if let Some(label_available) = qualification.label_available_at_unix_seconds {
+        if row
+            .acquisition
+            .measured_at_unix_seconds
+            .is_some_and(|measured| label_available < measured)
+            || label_available < row.event_time_unix_seconds
+        {
+            return Err(ObservationProcessErrorV1(format!(
+                "round {} label availability predates the measurement or physical event",
+                row.round_id
+            )));
+        }
+    }
+    if qualification.report_available_at_unix_seconds.is_some_and(|report_available| {
+        qualification
+            .label_available_at_unix_seconds
+            .is_some_and(|label_available| report_available < label_available)
+    }) {
         return Err(ObservationProcessErrorV1(format!(
-            "round {} K1 report predates its measurement",
+            "round {} K1 report predates physical label availability",
             row.round_id
         )));
     }
@@ -520,6 +538,35 @@ fn validate_tracking(
             "round {} has invalid proxy survival probability",
             row.round_id
         )));
+    }
+
+    let requires_controller_receipt = matches!(
+        tracking.state,
+        FeedbackTrackingStateV1::UnlimitedReceived | FeedbackTrackingStateV1::TrackedReceived
+    );
+    if requires_controller_receipt != tracking.controller_feedback_received_at_unix_seconds.is_some()
+    {
+        return Err(ObservationProcessErrorV1(format!(
+            "round {} controller receipt timestamp does not match its feedback tracking state",
+            row.round_id
+        )));
+    }
+    if let Some(received_at) = tracking.controller_feedback_received_at_unix_seconds {
+        if received_at < row.prediction_time_unix_seconds
+            || row
+                .qualification
+                .label_available_at_unix_seconds
+                .is_some_and(|available| received_at < available)
+            || row
+                .qualification
+                .report_available_at_unix_seconds
+                .is_some_and(|available| received_at < available)
+        {
+            return Err(ObservationProcessErrorV1(format!(
+                "round {} controller received feedback before the prediction, physical label or K1 report was available",
+                row.round_id
+            )));
+        }
     }
 
     if tracking.controller_update_applied
@@ -1295,6 +1342,7 @@ mod tests {
                 label_revision: has_label.then_some(1),
                 label_payload_sha256: has_label.then(|| digest('d')),
                 measurement_event_id: has_label.then(|| format!("event-{round_id}")),
+                label_available_at_unix_seconds: has_label.then_some(106 + round_id as i64 * 10),
                 report_sha256: matches!(
                     qualification,
                     K1QualificationStateV1::Eligible
@@ -1308,7 +1356,7 @@ mod tests {
                         | K1QualificationStateV1::Unknown
                         | K1QualificationStateV1::Blocked
                 )
-                .then_some(106 + round_id as i64 * 10),
+                .then_some(107 + round_id as i64 * 10),
                 qualified_loss: eligible.then_some(if round_id % 2 == 0 { 0.0 } else { 1.0 }),
                 qualified_loss_evidence_sha256: eligible.then(|| digest('f')),
             },
@@ -1316,6 +1364,7 @@ mod tests {
                 state: tracking,
                 proxy_delay_rounds: None,
                 actual_feedback_delay_rounds: None,
+                controller_feedback_received_at_unix_seconds: None,
                 proxy_survival_probability: None,
                 tracking_slot_id: None,
                 tracking_end_round: None,
@@ -1330,6 +1379,11 @@ mod tests {
                     | FeedbackTrackingStateV1::TrackedReceived
             )
             .then(|| digest('1')),
+                controller_feedback_received_at_unix_seconds: matches!(
+                    tracking,
+                    FeedbackTrackingStateV1::UnlimitedReceived | FeedbackTrackingStateV1::TrackedReceived
+                )
+                .then_some(108 + round_id as i64 * 10),
                 controller_update_applied: tracking == FeedbackTrackingStateV1::UnlimitedReceived
                     && eligible,
             },
@@ -1501,6 +1555,7 @@ mod tests {
         received.tracking.proxy_survival_probability = Some(0.5);
         received.tracking.tracking_slot_id = Some(101);
         received.tracking.tracking_end_round = Some(2);
+        received.tracking.controller_feedback_received_at_unix_seconds = Some(119);
         received.tracking.controller_update_applied = true;
         let data = input(
             ObservationRiskControllerV1::CapacityAwareOcrcBounded,
