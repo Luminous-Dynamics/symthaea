@@ -1098,7 +1098,10 @@ mod tests {
             vm_residual_observation(1, "vm-1", "tool-a/ch-1", 10, 5.0, "label-1");
         observation.measurement_event_id = Some("different-event".into());
         let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
-        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert_eq!(
+            assessment.diagnostic_state,
+            ShiftDiagnosticStateV1::InsufficientEvidence
+        );
         assert!(
             assessment
                 .reason_codes
@@ -1348,8 +1351,15 @@ mod tests {
 
         let vm = vm_residual_observation(2, "vm-1", "tool-a/ch-1", 19, 0.0, "label-1");
         let assessment = observe_evidence_shift_v1(&mut engine, &vm).unwrap();
-        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
-        assert!(assessment.reason_codes.contains(&ShiftReasonCodeV1::EventTimeRegression));
+        assert_eq!(
+            assessment.diagnostic_state,
+            ShiftDiagnosticStateV1::InsufficientEvidence
+        );
+        assert!(
+            assessment
+                .reason_codes
+                .contains(&ShiftReasonCodeV1::EventTimeRegression)
+        );
         assert_eq!(engine.last_stream_sequence, 1);
     }
 
@@ -1364,7 +1374,11 @@ mod tests {
             ShiftSignalChannelV1::ProcessEventMarker,
         );
         let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
-        assert!(assessment.reason_codes.contains(&ShiftReasonCodeV1::ProcessEventEvidenceMissing));
+        assert!(
+            assessment
+                .reason_codes
+                .contains(&ShiftReasonCodeV1::ProcessEventEvidenceMissing)
+        );
         assert!(!engine.process_markers.contains_key("tool-a/ch-1"));
     }
 
@@ -1374,13 +1388,25 @@ mod tests {
         let mut bad = vm_residual_observation(1, "bad", "tool-a/ch-1", 1, 5.0, "label-1");
         bad.nominal_baseline_manifest_sha256 = digest('f');
         let report = observe_evidence_shift_v1(&mut engine, &bad).unwrap();
-        assert_eq!(report.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
-        assert!(report.reason_codes.contains(&ShiftReasonCodeV1::BaselineDigestMismatch));
+        assert_eq!(
+            report.diagnostic_state,
+            ShiftDiagnosticStateV1::InsufficientEvidence
+        );
+        assert!(
+            report
+                .reason_codes
+                .contains(&ShiftReasonCodeV1::BaselineDigestMismatch)
+        );
 
-        let mut bad_clock = vm_residual_observation(1, "bad-clock", "tool-a/ch-1", 1, 5.0, "label-1");
+        let mut bad_clock =
+            vm_residual_observation(1, "bad-clock", "tool-a/ch-1", 1, 5.0, "label-1");
         bad_clock.clock_domain_id = "other-clock".into();
         let report = observe_evidence_shift_v1(&mut engine, &bad_clock).unwrap();
-        assert!(report.reason_codes.contains(&ShiftReasonCodeV1::ClockDomainMismatch));
+        assert!(
+            report
+                .reason_codes
+                .contains(&ShiftReasonCodeV1::ClockDomainMismatch)
+        );
     }
 
     #[test]
@@ -1390,7 +1416,11 @@ mod tests {
         let first = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
         let before = engine.channel_states.clone();
         let duplicate = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
-        assert!(duplicate.reason_codes.contains(&ShiftReasonCodeV1::DuplicateObservation));
+        assert!(
+            duplicate
+                .reason_codes
+                .contains(&ShiftReasonCodeV1::DuplicateObservation)
+        );
         assert_eq!(engine.channel_states, before);
         assert_ne!(first.assessment_sha256, duplicate.assessment_sha256);
     }
