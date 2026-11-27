@@ -69,6 +69,8 @@ pub struct ReferenceMarginBlock {
     pub independent_cluster_id: String,
     pub environment_family_id: String,
     pub block_manifest_sha256: String,
+    /// Digest of the exact candidate margin block used to compute the reference residual.
+    pub candidate_margin_block_sha256: String,
     pub reference_margin_receipt_sha256: String,
     pub spec: RecoveryMarginBlockSpec,
     pub cells: Vec<ReferenceMarginCell>,
@@ -268,6 +270,18 @@ pub fn calibrate_recoverability_margin(
         if !is_sha256_hex(&reference.block_manifest_sha256) {
             return Err(MarginCalibrationError::InvalidSha256(
                 "block_manifest_sha256",
+            ));
+        }
+        if !is_sha256_hex(&reference.candidate_margin_block_sha256) {
+            return Err(MarginCalibrationError::InvalidSha256(
+                "candidate_margin_block_sha256",
+            ));
+        }
+        if reference.candidate_margin_block_sha256
+            != unit.candidate.predicted_margin_block_sha256
+        {
+            return Err(MarginCalibrationError::RuntimeScopeMismatch(
+                "candidate_margin_block_sha256",
             ));
         }
         if !is_sha256_hex(&reference.reference_margin_receipt_sha256) {
@@ -714,6 +728,7 @@ mod tests {
             independent_cluster_id: format!("calibration-{cluster}"),
             environment_family_id: format!("family-{}", cluster % 3),
             block_manifest_sha256: digest('8'),
+            candidate_margin_block_sha256: digest('7'),
             reference_margin_receipt_sha256: digest('9'),
             spec: s,
             cells: vec![
@@ -823,6 +838,18 @@ mod tests {
                 required_rank: 19,
                 available_clusters: 18,
             })
+        );
+    }
+
+    #[test]
+    fn reference_must_be_bound_to_exact_candidate_margin_block() {
+        let mut p = pair(0, 2);
+        p.reference.candidate_margin_block_sha256 = digest('0');
+        assert_eq!(
+            score_calibration_unit(&p.candidate, &p.reference, &spec()),
+            Err(MarginCalibrationError::RuntimeScopeMismatch(
+                "candidate_margin_block_sha256"
+            ))
         );
     }
 
