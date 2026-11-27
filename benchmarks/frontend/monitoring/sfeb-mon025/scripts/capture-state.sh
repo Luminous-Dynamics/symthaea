@@ -37,7 +37,7 @@ capture="$("${DC[@]}" exec -T \
       'captured_at', transaction_timestamp()::text,
       'capture_lsn', boundary.capture_lsn::text,
       'system_identifier', (SELECT system_identifier::text FROM pg_control_system()),
-      'timeline_id', (('x' || substring(pg_walfile_name(boundary.capture_lsn) from 1 for 8))::bit(32)::bigint)::text,
+      'timeline_id', (SELECT timeline_id::text FROM pg_split_walfile_name(pg_walfile_name(boundary.capture_lsn))),
       'is_in_recovery', boundary.is_in_recovery
     )::text FROM boundary" \
   -f /lab/postgres/state-manifest.sql \
