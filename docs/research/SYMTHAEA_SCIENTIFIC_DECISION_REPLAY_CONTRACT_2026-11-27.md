@@ -323,11 +323,12 @@ Not implemented or not yet verified:
 - integration with existing ledger/archive/receipts/attestation;
 - executable replay policy, live-fidelity audit, external benchmark runner or R4.
 
-Verification boundary (exact tested code head `85588f935435d051353fbe2c4f409400a03f4c5f`):
+Verification boundary (exact tested code head `bddab8d62ebd9afb1df4a8863371385d60b9a386`):
 - Focused Rust 1.96 PR and push workflow runs both succeeded after the standalone dependency lockfile was committed.
 - `rustfmt --check` passed for all included production support modules and the standalone harness.
-- Standalone harness ran with `--locked`, compiled the production support-module source against shape-matched domain shims, and passed **31/31 tests**: 15 decision-contract, 9 custody/prefix and 7 AS-Bench payload/offer-binding tests.
+- Standalone harness ran with `--locked`, compiled the production support-module source against shape-matched domain shims, and passed **33/33 tests**: 17 decision-contract, 9 custody/prefix and 7 AS-Bench payload/offer-binding tests.
 - Strict Clippy with `--locked` for all standalone harness targets passed.
+- The canonical v1 permitted-offer-list digest was recomputed from the exact ordered offer ID/payload pairs; substitution and order-change negative controls passed.
 - The lockfile is committed at `tools/sym-rsi-decision-replay-contract/Cargo.lock` (30 registry/workspace package entries); both Cargo test and Clippy ran with `--locked`.
 - This is isolated schema/custody/adapter-contract qualification only. It does not establish integration with the real `symthaea-futures-symtropy` crate, a full workspace build, or compilation of the capsule-materializer example; its two output-root tests remain outside the standalone harness.
 - The ten-world materializer has not been run. No OS/service-level access controls, separate evaluator process, live AS-Bench campaign, external benchmark reproduction, scientific-quality result, SOTA result or R4 qualification is claimed.
