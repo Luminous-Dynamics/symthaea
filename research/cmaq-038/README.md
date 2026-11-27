@@ -65,6 +65,23 @@ This alternative is a constructed rank-space challenge. It is not the raw-score 
 
 Metrics are detection/alarm rate with Wilson intervals and conditional median / p90 / p95 delay. A delay is blank when a method does not alarm. Under the null, alarm rate—not paired timing wins—is the relevant measure. The simulation PRNG is deterministic and non-cryptographic.
 
+## First exact-head smoke result
+
+Exact-head GitHub Actions run 20 passed formatting, all 10 deterministic tests, strict Clippy, the paired smoke benchmark and artifact preservation at commit `5cf164d7f209b7d9dc21b59f6119a4271608393f`.
+
+The preserved 64-replication, horizon-200 smoke artifact reported:
+
+| Scenario | CMAQ-031 fixed-four | CMAQ-038 spectrum |
+|---|---:|---:|
+| Predictive-rank null alarms | 0/64 | 0/64 |
+| Trimodal rank-grid alarms | 0/64 | 64/64 |
+| Trimodal median delay | — | 91 |
+| Trimodal p90 / p95 delay | — | 97 / 97 |
+
+Both null arms' 95% Wilson intervals were 0–5.66%; 64 replications are not enough to establish compliance with a 5% anytime alarm budget. The trimodal result is a small deterministic smoke probe, not an estimate of general power or evidence of superiority. The longer registered experiment remains 10,000 replications per scenario, followed by the full CMAQ-037 matrix.
+
+Artifact: `cmaq-038-rank-spectrum-smoke`, GitHub Actions run `46004264438`, artifact digest `sha256:790392f6c191a50aeed9bd8b1644cc125dfa5d409acf0f599e532fb455e647a0`.
+
 ## Deterministic tests
 
 The library tests cover:
