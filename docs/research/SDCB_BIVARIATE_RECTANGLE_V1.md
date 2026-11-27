@@ -36,15 +36,17 @@ This is a low-dimensional reference method. The reported outer refinement differ
 
 ## 3. Covariance and tail policy
 
-- Requires a finite, symmetric, strictly positive-definite 2×2 covariance matrix.
-- No diagonal jitter, eigenvalue flooring, or silent covariance repair.
-- Exact rank deficiency / duplicate channels return SingularCovarianceUnsupported.
-- Correlation condition estimates above \(10^8\) return IllConditionedCovarianceUnsupported.
-- Standardized Cholesky coordinates are truncated to \([-12,12]\). The result carries an explicit union-bound allowance of \(7.1\times10^{-33}\).
-- A requested rectangle whose probability is unresolved above that truncation allowance is rejected as ProbabilityBelowResolution.
+- Requires a finite, symmetric, positive-semidefinite 2×2 covariance matrix.
+- Full-rank SPD inputs use conditional integration and are rejected when the correlation condition estimate exceeds (10^8).
+- Rank-one PSD inputs are integrated on their exact one-dimensional support by intersecting the two affine channel constraints. This includes exact duplicate channels, perfect negative correlation, and one deterministic channel.
+- Rank-zero covariance is handled as a deterministic rectangle-membership test.
+- A zero-variance coordinate with a nonzero cross-covariance is rejected as non-PSD. Correlation magnitude beyond the explicit 64-ulp roundoff allowance is rejected; no eigenvalue flooring, diagonal jitter, or silent covariance repair is used.
+- The result reports covariance support rank. Correlation condition is absent for rank-deficient inputs because it is not a finite SPD condition measure.
+- Standardized normal coordinates are truncated to ([-12,12]); the full-rank result carries an explicit union-bound allowance of (7.1\times10^{-33}). The rank-zero case is deterministic and has no truncation allowance.
+- A rectangle with positive support only beyond the numerical truncation window is rejected as ProbabilityBelowResolution.
 - Zero-width rectangles return zero; invalid or reversed bounds are rejected.
 
-This is deliberate fail-closed behavior, not a claim that all near-singular Gaussian problems are solved. A rank-revealing support reduction is a separate research increment.
+This is a bounded bivariate support-aware method, not a general singular MVN algorithm. Higher-dimensional rank-revealing transformations remain future work.
 
 ## 4. Joint categorical adapter
 
@@ -68,6 +70,10 @@ Independent calculations used:
 | Positive orthant, rho = -0.75 | 0.11502672808130796 |
 | Shifted/scaled asymmetric rectangle | 0.35895496926483000 |
 | Correlated tail (8,9] × (8,9], rho = 0.5 | \(1.7805614713759896\times10^{-21}\) |
+| Exact duplicate channels, common interval (0,1] | 0.3413447460685429 |
+| Perfect anti-correlation, support intersection (0,1) | 0.3413447460685429 |
+| One deterministic channel; other in (-0.5,0.5] | 0.3829249225480262 |
+| Rank-zero deterministic point inside rectangle | 1.0 |
 
 These are mathematical numerical fixtures, not measured sensor probabilities. Orthant fixtures have analytic cross-checks; asymmetric and rare-tail fixtures were independently integrated with SciPy adaptive quadrature.
 
