@@ -408,6 +408,12 @@ The implication is sharper than ordinary marginal drift: **an unchanged pointwis
 
 This is specific to two stationary Gaussian AR(1) regimes, block-max scores, 39 calibration blocks, alpha=.10, the tested grid and 2,500 trials per condition. The 36-condition report is an initial diagnostic, not a universal guarantee, production detector or physical calibration. Confirmatory work must add independent seeds, more trials, negative rho, heavy tails, latent common causes, drift and held-out regimes.
 
+### 9.9 SDCB score-aware reduction of redundant dependence experiments
+
+A metamorphic control in #14045 encodes the alternating-sign transform for stationary AR(1): `Y_t=(-1)^t X_t` maps `rho` to `-rho` while preserving `|X_t|` at every tick. For symmetric Gaussian innovations, and for the positive path-level Student-t(5) common scale, the distribution of the max-absolute-residual block score is therefore identical under `rho` and `-rho`.
+
+The exact-source test checks equality of each absolute residual and block maximum for both marginals and `|rho|={0.05,0.50,0.95}`. The workflow is pending. If qualified, the practical result is methodological: do not spend simulation budget on negative-rho duplicates for this stationary AR(1) + absolute-score model. Spend it on genuinely distinguishable regimes—non-AR lag structures, multivariate covariance rotations, asymmetric innovations, signed scores, common-cause shocks and drift. This identity does not transfer to asymmetric innovations or directional score functions.
+
 ### 9.8 MACE pairwise evidence interaction (implementation pending exact-head qualification)
 
 The MACE evaluator already supports paired memory/no-memory decision loss, frozen-policy leave-one-out interventions, cost receipts and world-cluster bootstrap. A new research increment adds second-order pairwise interventions to expose non-additive evidence effects that leave-one-out cannot identify.
