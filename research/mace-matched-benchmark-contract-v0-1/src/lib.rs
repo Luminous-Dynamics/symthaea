@@ -175,7 +175,7 @@ fn digest_serialized<T: Serialize>(value: &T) -> Result<String, BenchmarkContrac
 
 fn metric_definition_set_sha256(metrics: &[MetricObservationV1]) -> Result<String, BenchmarkContractRejectV1> {
     let mut definitions: Vec<(&str, &str, MetricDirectionV1, &str)> = metrics.iter()
-        .map(|metric| (metric.metric_id.as_str(), metric.unit.as_str(), metric.direction, metric.definition_sha256.as_str()))
+        .map(|metric| (metric.metric_id.as_str(), metric.unit.as_str(), metric.direction, metric.definition_sha256.as_str(), metric.denominator))
         .collect();
     definitions.sort_unstable();
     digest_serialized(&definitions)
@@ -610,6 +610,19 @@ mod tests {
         assert_eq!(
             validate_matched_comparison_v1(&[first, candidate]),
             Err(BenchmarkContractRejectV1::MixedDependenceUnit)
+        );
+    }
+
+
+    #[test]
+    fn metric_denominators_are_part_of_the_matched_definition() {
+        let first = manifest("bm25", "bm25");
+        let mut candidate = manifest("mace", "mace");
+        candidate.metrics[0].denominator = Some(99);
+        candidate.matched_controls_sha256 = Some(compute_matched_controls_sha256_v1(&candidate).unwrap());
+        assert_eq!(
+            validate_matched_comparison_v1(&[first, candidate]),
+            Err(BenchmarkContractRejectV1::MixedMetricDefinitions)
         );
     }
 
