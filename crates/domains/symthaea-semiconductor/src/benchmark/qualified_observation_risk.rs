@@ -508,7 +508,7 @@ pub fn compute_qualified_observation_risk_v1(
         identification,
         mnar_warning,
         mut reason_codes,
-    ) = if observed_count == input.population_round_count {
+    ) = if observed_count as u64 == input.population_round_count {
         (
             Some(observed_loss_sum / population),
             None,
