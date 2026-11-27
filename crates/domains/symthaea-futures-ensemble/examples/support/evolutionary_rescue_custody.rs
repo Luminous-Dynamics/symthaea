@@ -193,13 +193,25 @@ pub fn verify_encoded_capsules(
         .map_err(|e| format!("decode candidate receipt: {e}"))?;
     let manifest: WorldCustodyManifest = serde_json::from_slice(&set.evaluator_manifest_json)
         .map_err(|e| format!("decode evaluator manifest: {e}"))?;
+    let candidate: CandidateObservationCapsule = serde_json::from_slice(&set.candidate_capsule_json)
+        .map_err(|e| format!("decode candidate capsule: {e}"))?;
+    let evaluator: EvaluatorOutcomeCapsule = serde_json::from_slice(&set.evaluator_capsule_json)
+        .map_err(|e| format!("decode evaluator capsule: {e}"))?;
     if receipt.schema_version != CAPSULE_SCHEMA_VERSION
         || manifest.schema_version != CAPSULE_SCHEMA_VERSION
+        || candidate.schema_version != CAPSULE_SCHEMA_VERSION
+        || evaluator.schema_version != CAPSULE_SCHEMA_VERSION
         || receipt.candidate_capsule_blake3 != candidate_actual
         || manifest.candidate_capsule_blake3 != candidate_actual
         || manifest.evaluator_capsule_blake3 != evaluator_actual
         || receipt.world_id != manifest.world_id
+        || candidate.world_id != manifest.world_id
+        || evaluator.world_id != manifest.world_id
+        || candidate.world_format_version != manifest.world_format_version
+        || evaluator.world_format_version != manifest.world_format_version
         || receipt.observation_policy_id != manifest.observation_policy_id
+        || candidate.observation_policy_id != manifest.observation_policy_id
+        || evaluator.seed != manifest.seed
     {
         return Err("capsule receipt/manifest linkage mismatch".into());
     }
@@ -381,6 +393,21 @@ mod tests {
             &w, "opaque", WorldSplit::Training, ObservationView::Census,
             "0123456789abcdef0123456789abcdef01234567",
         ).unwrap_err().contains("unexpectedly contains trait data"));
+    }
+
+    #[test]
+    fn rejects_receipt_or_manifest_relinking() {
+        let mut encoded = encode_world(
+            &world(), "opaque", WorldSplit::Training, ObservationView::Census,
+            "0123456789abcdef0123456789abcdef01234567",
+        ).unwrap();
+        let mut manifest: WorldCustodyManifest =
+            serde_json::from_slice(&encoded.evaluator_manifest_json).unwrap();
+        manifest.world_id = "different-world".into();
+        encoded.evaluator_manifest_json = serde_json::to_vec(&manifest).unwrap();
+        assert!(verify_encoded_capsules(
+            &encoded, &encoded.candidate_digest, &encoded.evaluator_digest,
+        ).unwrap_err().contains("linkage mismatch"));
     }
 
     #[test]
