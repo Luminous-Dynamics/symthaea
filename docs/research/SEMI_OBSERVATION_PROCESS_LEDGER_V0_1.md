@@ -166,7 +166,7 @@ It extends the public research direction toward NIST's TIDAL manufacturing archi
 
 ## Authored tests
 
-Nineteen unit tests exercise the four funnel stages, capacity denial, proxy nontracking, ACI/CA-OCRC separation, fixed-delay missingness, exact tracked receipt and occupancy, capacity overrun, delay-contract violation, K1 timing, audit-method independence, loss withholding and canonical replay. The exact-head formatter, Clippy, crate tests and SEMI-BENCH-001 reference oracle are still required.
+Twenty unit tests exercise the four funnel stages, capacity denial, proxy nontracking, ACI/CA-OCRC separation, fixed-delay missingness, exact tracked receipt and occupancy, capacity overrun, delay-contract violation, K1 timing, audit-method independence, loss withholding and canonical replay. Two independent integration-oracle tests recompute worst-case population bounds and check input-order-invariant report receipts. Unmeasured rounds use NOT_APPLICABLE tracking, not proxy-not-tracked/capacity-denied. The exact-head formatter, Clippy, crate tests and SEMI-BENCH-001 reference oracle are still required.
 
 ## Claim ceiling
 
