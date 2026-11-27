@@ -405,11 +405,6 @@ fn ensure_unique(field: &str, values: &[String]) -> Result<(), String> {
     }
     Ok(())
 }
-fn ensure_nonempty_items(field: &str, values: &[String]) -> Result<(), String> {
-    for value in values { require_nonempty(field, value)?; }
-    Ok(())
-}
-
 fn ensure_sha256_items(field: &str, values: &[String]) -> Result<(), String> {
     for value in values { validate_sha256(field, value)?; }
     Ok(())
