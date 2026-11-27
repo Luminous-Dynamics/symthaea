@@ -81,6 +81,8 @@ services:
       - pg18_source_data:/var/lib/postgresql/data
       - pg18_backups:/backups
       - ./postgres:/lab/postgres:ro
+      - ./postgres/source-entrypoint.sh:/lab/source-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/lab/source-entrypoint.sh"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${MON025_DB_USER:-mon025} -d ${MON025_DB_NAME:-mon025}"]
       interval: 5s
@@ -129,7 +131,7 @@ services:
     restart: unless-stopped
 
   restore18:
-    profiles: ["pg18", "restore18"]
+    profiles: ["restore18"]
     image: postgres:18.7-bookworm
     hostname: restore18
     entrypoint: ["/lab/restore-entrypoint.sh"]
@@ -147,13 +149,14 @@ services:
       - pg18_backups:/backups:ro
       - pg18_restore_data:/var/lib/postgresql/data
       - ./restore/restore-entrypoint.sh:/lab/restore-entrypoint.sh:ro
+      - ./postgres:/lab/postgres:ro
     depends_on:
       postgres18:
         condition: service_healthy
     restart: "no"
 
   restore19:
-    profiles: ["pg19", "restore19"]
+    profiles: ["restore19"]
     image: postgres:19.0-bookworm
     hostname: restore19
     entrypoint: ["/lab/restore-entrypoint.sh"]
