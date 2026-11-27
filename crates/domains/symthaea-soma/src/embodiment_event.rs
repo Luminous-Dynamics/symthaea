@@ -263,6 +263,9 @@ impl EventPayload {
             }
             Self::EvidenceStatus(value) => {
                 validate_identifier_max("evidence subject", &value.subject_id, 256)?;
+                if let Some(receipt_ref) = value.verifier_receipt_ref.as_deref() {
+                    validate_identifier_max("verifier_receipt_ref", receipt_ref, 256)?;
+                }
                 if value.status == EvidenceState::Supported {
                     if value.verifier_receipt_ref.as_deref().map_or(true, str::is_empty)
                         || evidence_refs.is_empty()
@@ -718,6 +721,32 @@ mod tests {
             Err(EventValidationError::UnknownCancelTarget)
         );
         assert_eq!(validator.last_sequence(), Some(0));
+    }
+
+    #[test]
+    fn supported_evidence_receipt_must_be_a_valid_reference() {
+        let mut event = listening_event(0, "event-0");
+        event.event_kind = EventKind::EvidenceStatus;
+        event.payload = EventPayload::EvidenceStatus(EvidenceStatusPayload {
+            subject_id: "claim-1".to_owned(),
+            status: EvidenceState::Supported,
+            verifier_receipt_ref: Some("invalid receipt".to_owned()),
+        });
+        event.evidence_refs = vec!["sha256:abc123".to_owned()];
+        assert_eq!(
+            event.validate(),
+            Err(EventValidationError::InvalidIdentifier("verifier_receipt_ref"))
+        );
+    }
+
+    #[test]
+    fn event_json_roundtrips_with_versioned_wire_names() {
+        let event = listening_event(0, "event-0");
+        let encoded = serde_json::to_string(&event).unwrap();
+        assert!(encoded.contains("\"conversation.listening\""));
+        assert!(encoded.contains("\"observed_at_monotonic_ns\":\"100\""));
+        let decoded: EmbodimentEvent = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, event);
     }
 
     #[test]
