@@ -38,6 +38,10 @@ fn engine(capacity: usize) -> CaoOcrcEngineV1 {
     .unwrap()
 }
 
+fn standalone_policy(capacity: usize) -> CaoOcrcPolicyV1 {
+    policy(capacity)
+}
+
 fn round(round_index: u64, draw: f64, threshold: f64) -> CaoOcrcRoundInputV1 {
     let centre = 10.0;
     CaoOcrcRoundInputV1 {
@@ -161,9 +165,10 @@ fn two_feedback_arrivals_match_independent_proxy_and_ipw_oracle() {
     let expected_delays = draws.map(oracle_proxy_delay);
     assert_eq!(expected_delays, [2, 2, 0]);
 
+    let first_threshold = controller.threshold;
     let r1 = advance_ca_ocrc_round_v1(
         &mut controller,
-        &round(1, draws[0], controller.threshold),
+        &round(1, draws[0], first_threshold),
         &[],
     )
     .unwrap();
@@ -183,9 +188,10 @@ fn two_feedback_arrivals_match_independent_proxy_and_ipw_oracle() {
     // Round 3 attempts admission before it consumes both feedback events.
     // Capacity is full, so the current round is denied; then rounds 1 and 2
     // arrive at actual delays 2 and 1, respectively.
+    let threshold_r3 = controller.threshold;
     let r3 = advance_ca_ocrc_round_v1(
         &mut controller,
-        &round(3, draws[2], controller.threshold),
+        &round(3, draws[2], threshold_r3),
         &[
             feedback(1, 3, 11.0, "label-1"),
             feedback(2, 3, 10.0, "label-2"),
@@ -250,13 +256,12 @@ fn proxy_deadline_inclusive_eviction_order_matches_independent_queue_oracle() {
         third.received_feedback_receipts[0].disposition,
         symthaea_semiconductor::benchmark::CaoOcrcFeedbackDispositionV1::ReceivedAndApplied
     );
-    assert!(controller.tracked_rounds.contains_key(&3));
-    assert!(!controller.tracked_rounds.contains_key(&1));
+    assert!(controller.tracked_rounds.is_empty());
 }
 
 #[test]
 fn risk_bound_oracle_does_not_confuse_spare_capacity_with_full_tracking() {
-    let mut policy = policy(4);
+    let mut policy = standalone_policy(4);
     policy.proxy_survival = vec![1.0, 1.0, 0.8];
     assert!(symthaea_semiconductor::benchmark::compute_ca_ocrc_risk_bound_v1(&policy, 100).is_err());
 
@@ -272,9 +277,10 @@ fn risk_bound_oracle_does_not_confuse_spare_capacity_with_full_tracking() {
 #[test]
 fn evidence_filtering_marks_the_run_as_not_inheriting_the_paper_guarantee() {
     let mut controller = engine(1);
+    let first_threshold = controller.threshold;
     advance_ca_ocrc_round_v1(
         &mut controller,
-        &round(1, 0.80, controller.threshold),
+        &round(1, 0.80, first_threshold),
         &[],
     )
     .unwrap();
@@ -287,9 +293,10 @@ fn evidence_filtering_marks_the_run_as_not_inheriting_the_paper_guarantee() {
     blocked.eligibility_report.report_sha256 =
         format!("{:x}", sha2::Sha256::digest(serde_json::to_vec(&canonical).unwrap()));
 
+    let second_threshold = controller.threshold;
     let receipt = advance_ca_ocrc_round_v1(
         &mut controller,
-        &round(2, 0.80, controller.threshold),
+        &round(2, 0.80, second_threshold),
         &[blocked],
     )
     .unwrap();
