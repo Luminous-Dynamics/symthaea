@@ -217,7 +217,7 @@ pub fn bivariate_gaussian_rectangle(
     if v1 == 0.0 || v2 == 0.0 {
         if c12 != 0.0 { return Err(RectangleError::CovarianceNotPositiveSemidefinite); }
         let loading = if v1 == 0.0 { [0.0, v2.sqrt()] } else { [v1.sqrt(), 0.0] };
-        return rank_one_rectangle(mean, loading, lower, upper, Some(0.0));
+        return rank_one_rectangle(mean, loading, lower, upper, None);
     }
 
     let s1 = v1.sqrt();
@@ -482,6 +482,7 @@ mod tests {
         ).unwrap();
         close(r.probability, 0.3829249225480262, 2.0e-13);
         assert_eq!(r.covariance_rank, 1);
+        assert_eq!(r.correlation, None);
         let excluded = bivariate_gaussian_rectangle(
             [2.0001, 0.0], [[0.0, 0.0], [0.0, 1.0]],
             [1.0, -0.5], [2.0, 0.5],
