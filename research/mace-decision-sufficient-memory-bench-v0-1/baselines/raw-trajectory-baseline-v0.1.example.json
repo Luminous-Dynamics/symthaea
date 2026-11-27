@@ -1,0 +1,65 @@
+{
+  "schema_version": "mace_raw_trajectory_candidate_v0_1",
+  "documents": [
+    {
+      "document_id": "workorder-031",
+      "scope_id": "lab-a",
+      "observed_at_ms": 100,
+      "valid_from_ms": 90,
+      "valid_until_ms": 300,
+      "text": "Pump P-17 pressure inspection completed. Calibration certificate CAL-41 was current during the inspection."
+    },
+    {
+      "document_id": "workorder-032",
+      "scope_id": "lab-a",
+      "observed_at_ms": 120,
+      "valid_from_ms": 110,
+      "valid_until_ms": null,
+      "text": "Pump P-18 vibration inspection completed. Pressure remained within the approved operating band."
+    },
+    {
+      "document_id": "certificate-041",
+      "scope_id": "lab-a",
+      "observed_at_ms": 80,
+      "valid_from_ms": 80,
+      "valid_until_ms": 220,
+      "text": "Calibration certificate CAL-41 authorizes reference use for pressure channel P-17."
+    },
+    {
+      "document_id": "late-correction-041",
+      "scope_id": "lab-a",
+      "observed_at_ms": 400,
+      "valid_from_ms": 150,
+      "valid_until_ms": null,
+      "text": "Correction: certificate CAL-41 was invalid from 150 milliseconds."
+    },
+    {
+      "document_id": "other-tenant-001",
+      "scope_id": "lab-b",
+      "observed_at_ms": 90,
+      "valid_from_ms": 90,
+      "valid_until_ms": null,
+      "text": "Pump P-17 pressure inspection and calibration history for a separate laboratory."
+    }
+  ],
+  "query": {
+    "query_text": "pump pressure inspection calibration",
+    "scope_id": "lab-a",
+    "as_of_ms": 200,
+    "top_k": 10
+  },
+  "ranked_channels": [
+    {
+      "channel_id": "entity",
+      "weight": 1.0,
+      "document_ids": ["workorder-031", "certificate-041", "workorder-032"]
+    },
+    {
+      "channel_id": "date",
+      "weight": 0.5,
+      "document_ids": ["certificate-041", "workorder-031"]
+    }
+  ],
+  "rrf_k": 60,
+  "top_k": 10
+}
