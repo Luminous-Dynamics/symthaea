@@ -7,10 +7,10 @@ It is deliberately outside the production Cargo workspace. It consumes only a JS
 ## Run
 
 ```sh
-cargo fmt --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
-cargo clippy --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml
-cargo run --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json
+cargo fmt --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
+cargo clippy --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml
+cargo run --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json
 ```
 
 The checked-in document is intentionally `TEMPLATE_NOT_PREREGISTERED`, so the CLI must reject it with a non-zero readiness result. Unit tests construct a synthetic, fully populated specimen in memory and mutate it to exercise negative controls; no synthetic specimen is represented as an actual experiment.
@@ -26,6 +26,21 @@ The checked-in document is intentionally `TEMPLATE_NOT_PREREGISTERED`, so the CL
 - Per-round development/audit fields, the full null-control set, statistical analysis fields, reporting fields and authority guardrails are required.
 - Claim dependencies prevent recursive-progress and ignition labels from being selected without their required lower-level evidence profiles.
 - Research-state continuity binds record classes, cold-restart restore, successor migration, independent recovery audit, and full/no-state/untyped/shuffled/accepted-only plus fixed/adaptive/shuffled/oracle scope-routing ablations. It measures recovery quality, false sharing/fragmentation and downstream research utility rather than memory volume.
+
+## Canonical inclusive-budget commitment (v1)
+
+The semantic checker recomputes `budget.shared_envelope_digest`; it does not merely compare two copied strings. The lowercase SHA-256 is over compact serde JSON for the fixed-order v1 struct:
+
+- domain: `symthaea.r4.inclusive-budget-envelope`
+- schema version: `1`
+- accounting boundary, total budget and currency/price basis
+- all twelve per-arm caps in the schema's fixed field order
+- failure-accounting policy
+- the four inclusive/same-envelope booleans
+
+The two arm bindings must each equal this recomputed digest. The canonical struct is intentionally fixed-field rather than a free-form JSON map, so field ordering is stable. Changing any budget or cap value without recomputing the commitment is rejected. A valid digest still authenticates neither its source nor the actual realized costs; canonical receipts and independent accounting remain authoritative.
+
+All Rust commands use the committed `Cargo.lock` and `--locked`. The dedicated Rust 1.96 workflow is a focused validator gate, not a full workspace or R4 experiment result.
 
 ## Important limits
 
