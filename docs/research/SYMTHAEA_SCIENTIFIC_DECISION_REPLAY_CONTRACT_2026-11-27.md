@@ -242,6 +242,7 @@ This is a shared decision-episode contract, not a new scientific scheduler or de
 - #9817/#9821: active sensing and decision-focused evidence acquisition.
 - #5476/#5477/#5478: prospective value-of-computation calibration, realized-utility receipts and causal metareasoning ablations.
 - #11012: evidence-contingent adaptive research orchestration; this contract can supply its evidence-prefix-bound decision episode.
+- #11171: open-world research-policy adapter and production callable; this remains the owner of the missing state-contingent researcher.
 - #8721: prospective scientific tool/computation allocation; do not recreate its action/tool scheduler.
 - #10877: research direction/approach/experiment/interpretation taste.
 - #10756: evaluator research and independent target judgments.
@@ -255,6 +256,14 @@ This is a shared decision-episode contract, not a new scientific scheduler or de
 - #10314/#10370/#10167: benchmark receipts, accounting, attestation and regrade.
 - #10064/#10369: execution isolation and trust roots.
 - #10630: evidence lifecycle and selective revalidation.
+
+### Production policy and deterministic baseline boundary
+
+The production researcher is not yet the adaptive policy being proposed here. A source audit of `src/web_research/researcher.rs` shows heuristic query expansion, fixed fetch/extract/verify sequencing and static domain-targeting rules. `EpistemicConsciousness::research` still has a confidence-derived correctness shortcut; draft #13612 removes that feedback path. The researcher also seeds source support as a placeholder before verification; draft #13634 separates topical relevance from claim support and must not be bypassed by restoring automatic `supports=true`.
+
+A deterministic public-state comparator already exists on branch `research/stateguard-b0-policy-stacked-v1` (StateGuard B0, 21 authored synthetic tests). It consumes typed ResearchState, upstream offers and componentwise budgets, and can only SELECT/ABSTAIN/STOP. It does not execute an action or adjudicate truth. Its first dedicated Rust 1.96 workflow failed at the formatting step; tests, synthetic replay and Clippy were skipped. Therefore B0 is an implemented comparator candidate, not yet a qualified baseline.
+
+The next policy experiment belongs in #11171/#11015: freeze B0 as the rule-based comparator, then compare matched fixed, random, static-threshold, EVSI/robust-minimax and state-contingent policies. Use identical ResearchState bytes, upstream offer list, executor, model/tool availability, and inclusive budgets. The exact sequential oracle stays evaluator-only. Do not put another scheduler or research policy inside this episode-contract PR.
 
 The current futures ledger records forecast provenance and scored continuations. This contract is a decision-episode interface, not a competing ledger or ResearchState authority. #13665 owns the typed public ResearchState projection and its exact serialized SHA-256; #11015 owns prospective policy traces and binds the ResearchState digest, evidence-prefix digest and upstream permitted-action-offer-list digest. #13933 must consume those three upstream identities unchanged and add only scientific episode semantics: decision phase, selected action plus exact payload digest, prospective outcome, assignment mechanism, causal-design declaration and evaluator resolution. It must not reconstruct the evidence graph, re-hash a second state, mint new action offers or replace the canonical action trace. Persistent writing should reference existing evidence/receipt identities and be assigned to an existing owner. Adapt this contract to #13663/#13665/#11015, the decision objective and event semantics in #12546/#12407 rather than duplicating their state, calculations or observation model.
 
