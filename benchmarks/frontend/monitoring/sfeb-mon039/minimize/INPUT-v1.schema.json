@@ -80,6 +80,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "trial_id",
         "fault_ids",
         "fault_set_sha256",
         "scenario_sha256",
@@ -132,6 +133,9 @@
         },
         "complete": {
           "type": "boolean"
+        },
+        "trial_id": {
+          "$ref": "#/$defs/id"
         }
       }
     }
