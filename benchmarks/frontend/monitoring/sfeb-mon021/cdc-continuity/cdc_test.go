@@ -98,3 +98,21 @@ func TestUnsupportedPostgreSQLMajorIndeterminate(t *testing.T){
 	p.ServerMajor=17
 	want(t,ValidateCapture(p,s,m),Indeterminate)
 }
+
+func TestDifferentXIDsCannotClaimSameCommitRecordDivergent(t *testing.T){
+	p,s,m:=base()
+	m.Events[1].CommitLSN=m.Events[0].CommitLSN
+	m.Transactions[1].BeginLSN=0x108
+	m.Transactions[1].CommitLSN=m.Transactions[0].CommitLSN
+	m.Transactions[1].EndLSN=0x118
+	want(t,ValidateCapture(p,s,m),Divergent)
+}
+func TestReplayPreparedTransactionRemainsIndeterminate(t *testing.T){
+	_,_,m:=base()
+	n:=m
+	n.Transactions=append([]Transaction(nil),m.Transactions...)
+	n.Transactions[0].State="prepared"
+	n.TerminalLSN=0x160
+	n.EvidenceThroughLSN=0x160
+	want(t,ValidateReplay(m,n),Indeterminate)
+}
