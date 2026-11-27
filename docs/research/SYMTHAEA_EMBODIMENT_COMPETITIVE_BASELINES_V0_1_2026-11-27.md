@@ -38,19 +38,41 @@ The primary comparison for Symthaea's full-duplex ambition is the full-duplex bu
 
 Source: https://research.nvidia.com/labs/amri/projects/video-fdb/leaderboard.html
 
+### MetaHuman 5.8 — capture, animation and scale
+
+Epic's current MetaHuman 5.8 release notes expand the comparison surface:
+- real-time facial animation can consume RTSP video streams through Live Link;
+- experimental MetaHuman Crowd tooling scales from tens to thousands of characters;
+- single-camera body capture is an offline solve, marked experimental/editor-facing, and is not a runtime/player-facing body-animation feature;
+- realtime facial animation remains available through audio or compatible mono-camera/mobile sources.
+
+This is a strong animation, capture and content-production baseline. It still does not establish a permissioned semantic event contract, full-duplex conversational reasoning, or cross-form semantic invariance. The strategic choice is therefore not to race MetaHuman on face fidelity first; it is to make the source event, policy decision and presented meaning independently inspectable.
+
+Sources:
+- https://dev.epicgames.com/documentation/en-us/metahuman/metahuman-5-8-release-notes-in-unreal-engine
+- https://dev.epicgames.com/documentation/en-us/metahuman/realtime-animation
+
 ### Commercial avatar delivery
 
 Epic documents real-time MetaHuman animation from a mono camera, supported mobile device, or audio source, requiring Unreal Engine 5.6+ and the MetaHuman Live Link plugin. This is a strong character-animation and capture baseline. It is not the same task as full-duplex conversational reasoning or event-authorized output.
 
 Source: https://dev.epicgames.com/documentation/en-us/metahuman/realtime-animation
 
-Tavus advertises an integrated conversational-video system combining LLM, TTS, STT/ASR, WebRTC and perception, plus conversation memory, knowledge retrieval and function calling. That breadth is the product baseline Symthaea must respect: a renderer-only demo will not compete with an integrated service.
+Tavus advertises an integrated conversational-video system combining LLM, TTS, STT/ASR, WebRTC and perception, plus conversation memory, knowledge retrieval and function calling. Its product page also describes 1080p video, 24 kHz audio, audio-only and video modes, dynamic memory, guardrails and tool calling. That breadth is the product baseline Symthaea must respect: a renderer-only demo will not compete with an integrated service. These are vendor product claims, not independent benchmark results.
 
 Source: https://www.tavus.io/pricing
 
 Anam's vendor-published October 16, 2026 latency study reports a full-pipeline response latency of 1.24 s median and 1.84 s P95 for Cara-4.1 Express, from 1,173 measured turns in that provider row; the wider study included 4,703 turns, 926 connections and 60 participants. Its time-to-first-frame was 1.42 s median and 2.97 s P95. A separate shared LiveKit pipeline table reports different response latencies (2.12 s median and 3.64 s P95 for Anam); do not mix that setup with the provider-default full-pipeline comparison. These are vendor-published operational references, not independent academic results.
 
 Source: https://anam.ai/tools/latency-benchmark
+
+### Full-Duplex-Bench v3 — tool-using conversation
+
+Full-Duplex-Bench v3 adds a task-completion lane that complements InteractionBench's timing, spoken control and groundedness probes. The published aggregator snapshot describes 100 examples across 79 scenarios, 12 speakers and four domains. Its available table reports GPT Realtime 1.5 at 60% strict pass@1, 6.36 s first response and 6.89 s task completion; Gemini Live 3.1 at 54%, 3.95 s and 4.25 s. A cascaded Whisper/GPT-4o/TTS baseline reaches 45% and takes 10.12 s to complete the task.
+
+The table is a fixed snapshot transcribed from the benchmark paper, not a continuously updated universal ranking. Use it as a separate task-capability lane; do not combine its scores with VideoFDB or InteractionBench.
+
+Source: https://benchlm.ai/voice-benchmarks/full-duplex-bench-v3
 
 ### InteractionBench — important voice-only complement
 
