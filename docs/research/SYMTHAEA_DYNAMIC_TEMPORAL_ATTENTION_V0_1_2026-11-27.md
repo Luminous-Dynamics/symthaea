@@ -162,3 +162,26 @@ Do not claim a novel field-wide technique solely from implementing an adaptive s
 - Trigger implementation: not implemented.
 - Dataset evaluation: not run.
 - Symthaea superiority: not established.
+
+
+## Related work: event cameras are not adaptive frame sampling
+
+A second, more radical path is a **neuromorphic event-sensor adapter**.
+
+Conventional adaptive sampling chooses when to request the next full RGB frame. Event cameras instead emit asynchronous per-pixel brightness-change events. Recent reviews describe their high temporal resolution, sparse representation, and potential low-latency/low-power benefits, while also identifying limitations: event streams lack absolute intensity, are noise-sensitive, and require distinct processing algorithms and representations.
+
+References:
+- Cimarelli et al., *Hardware, Algorithms, and Applications of the Neuromorphic Vision Sensor: A Review* (Sensors, 2025): https://doi.org/10.3390/s25196208
+- Cazzato and Bono, *An Application-Driven Survey on Event-Based Neuromorphic Computer Vision* (2024): https://doi.org/10.3390/info15080472
+- *Neuromorphic computing for robotic vision: algorithms to hardware advances* (Communications Engineering, 2025): https://www.nature.com/articles/s44172-025-00492-5
+
+### Proposed two-sensor architecture
+
+- **Event stream:** detect motion/change boundaries at high temporal resolution.
+- **RGB frame stream:** provide semantic context only at explicit, bounded sampling points.
+- **Temporal integrator:** aggregate irregular event bursts and RGB observations into typed event candidates.
+- **Policy gate:** require permission and adequate evidence before issuing any outward cue.
+
+The event sensor is a trigger and temporal signal, not a substitute for semantic interpretation. No user emotion, intent, identity, or consent should be inferred from pixel changes.
+
+This is a future hardware track, not a dependency for the first implementation. A normal RGB camera with bounded event-triggered frames remains the near-term experiment. A DVS adapter should be tested separately against both frame-based and hybrid sensor baselines; the device's power and resolution claims must be measured on the actual selected hardware.
