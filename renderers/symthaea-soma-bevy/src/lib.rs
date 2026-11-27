@@ -351,12 +351,6 @@ struct SceneMaterialFade {
 }
 
 #[derive(Component, Clone)]
-struct SceneFrameGuard {
-    clock_domain_id: String,
-    effective_expires_at_monotonic_ns: String,
-}
-
-#[derive(Component, Clone)]
 pub struct SceneFrameMetadata {
     event_id: String,
     semantic_key: String,
@@ -467,7 +461,7 @@ fn render_pending_scene(
     // Superseding an in-flight transition uses a hard cut. We deliberately
     // avoid a three-scene overlap with ambiguous authority and blend weights.
     let mut source_submission = active.submission.clone();
-    let mut source_group_id = active.group_id;
+    let source_group_id = active.group_id;
     if transition.plan.is_some() {
         for (entity, _) in &existing { commands.entity(entity).despawn(); }
         source_submission = None;
@@ -509,11 +503,11 @@ fn render_pending_scene(
                 return;
             }
         };
-        let Some(clock_id) = clock.clock_domain_id() else {
-            latest_ack.latest = Some(rejected_ack(submission, AdapterError::ClockUnavailable));
-            return;
-        };
-        let Some(now) = clock.now_monotonic_ns() else {
+        let (Some(clock_id), Some(now)) = (clock.clock_domain_id(), clock.now_monotonic_ns()) else {
+            for (entity, _) in &existing { commands.entity(entity).despawn(); }
+            active.submission = None;
+            transition.source_submission = None;
+            transition.plan = None;
             latest_ack.latest = Some(rejected_ack(submission, AdapterError::ClockUnavailable));
             return;
         };
@@ -561,10 +555,6 @@ fn render_pending_scene(
     commands.spawn((
         RenderedSceneEntity,
         SceneGroupId(target_group_id),
-        SceneFrameGuard {
-            clock_domain_id: clock_domain_id.clone(),
-            effective_expires_at_monotonic_ns: expires.clone(),
-        },
         SceneFrameMetadata {
             event_id: frame.event_id().to_owned(),
             semantic_key: frame.semantic_key().to_owned(),
@@ -595,10 +585,6 @@ fn render_pending_scene(
             if amplitude > 0.0 { Visibility::Visible } else { Visibility::Hidden },
             RenderedSceneEntity,
             SceneGroupId(target_group_id),
-            SceneFrameGuard {
-                clock_domain_id: clock_domain_id.clone(),
-                effective_expires_at_monotonic_ns: expires.clone(),
-            },
             SceneMaterialFade {
                 group_id: target_group_id,
                 material,
@@ -716,17 +702,10 @@ fn enforce_active_scene(
             transition.plan = None;
             set_group_opacity(target_group_id, 1.0, &mut materials, &fades);
         }
-        (true, false, true) => {
-            for (entity, group) in &rendered {
-                if group.0 == target_group_id { commands.entity(entity).despawn(); }
-            }
-            active.submission = source;
-            active.group_id = source_group_id;
-            transition.source_submission = None;
-            transition.plan = None;
-            set_group_opacity(source_group_id, 1.0, &mut materials, &fades);
-        }
-        (true, false, false) => {
+        (true, false, _) => {
+            // A denied/expired target never rolls back to prior content.
+            // Both groups are removed; new output requires a fresh authorized
+            // submission rather than resurrecting a stale scene.
             for (entity, group) in &rendered {
                 if group.0 == source_group_id || group.0 == target_group_id {
                     commands.entity(entity).despawn();

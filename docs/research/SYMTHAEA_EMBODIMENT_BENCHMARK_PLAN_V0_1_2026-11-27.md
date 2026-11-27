@@ -572,3 +572,24 @@ Source:
 - https://arxiv.org/abs/2610.28402
 - https://streameval.ai/
 
+
+
+## 15. Implementation update — permission-checked cross-form transitions (2026-11-27)
+
+The isolated Bevy adapter now calls the renderer-neutral `plan_transition` API. It tags source and target scene groups separately, uses Bevy's explicit 2D alpha-blend mode for fades, and obtains transition weights from the host-supplied monotonic scene clock. During a transition, the adapter rechecks both opaque permits against the live presentation policy on every update.
+
+Safety behavior:
+- If the source permit becomes invalid but the target remains valid, the source is removed and the target continues by hard cut.
+- If the target becomes invalid, both source and target are removed; prior content is not resurrected.
+- If both become invalid, both are removed.
+- If a new submission supersedes an unfinished transition, the adapter hard-cuts rather than producing a three-group overlap.
+- The planner's descriptor is descriptive only. It cannot authorize output; each source and target permit is independently rechecked.
+
+The material fade changes presentation opacity only; it does not change scene semantics, semantic confidence or policy-authorized intensity. The adapter's ECS acknowledgement is not a compositor observation.
+
+**Evidence status:** source implementation committed; 118 Rust tests authored (109 core and 9 adapter), none compiled or executed; no Bevy runtime/display, compositor observer or device qualification. Bevy dependency resolution and lockfile are still pending. The adapter README records the current limitations.
+
+See:
+- `SYMTHAEA_CROSS_FORM_CONTINUITY_V0_1_2026-11-27.md`
+- `SYMTHAEA_INTERACTION_BENCH_INTEGRATION_V0_1_2026-11-27.md`
+- `../../renderers/symthaea-soma-bevy/README.md`

@@ -170,3 +170,22 @@ Never combine these into one headline score. Report per-track scores, confidence
 8. Add camera/event-sensor adapters only after their permissions, retention and energy costs are separately tested.
 
 The near-term win is not "more realistic". It is *more faithful, more interruptible, more private, more accessible, and measurably lower-latency* without changing what the system actually knows.
+
+
+## 15. Integrated interaction benchmark — InteractionBench (2026-11-02)
+
+InteractionBench measures four dimensions on the same recorded user audio and evaluated systems: conversational timing, spoken-task accuracy, whisper/volume control, and groundedness over conversations of more than twenty turns. Its published snapshot reports 221 items per system, 13 scenarios, seven systems and 1,519 graded runs.
+
+Reported findings include the turn-based cascade scoring 38/50 on spoken tasks but having the second-lowest timing score; hosted systems passing 67–88% of groundedness probes versus 14–35% for open full-duplex models in this evaluation; only Gemini Live whispering on most whisper requests (8/10); and no tested system correcting the user's grammar within the required window.
+
+Interpret these findings with the paper's caveats. Client-heard timing includes network delay; the paper describes a roughly 1.5-second server/client clock difference for GPT-Live that materially changed its reported timing result. Some instructions differ by system. The dataset contains 13 scenarios and is not a universal ranking across every use case.
+
+Symthaea should adopt the four separate scorecards and add two orthogonal lanes: cross-form semantic invariance and executable presentation authority. The trace schema, metric list, experimental controls and proposed targets are in
+`SYMTHAEA_INTERACTION_BENCH_INTEGRATION_V0_1_2026-11-27.md`.
+
+Do not produce one weighted interaction score yet. Strong visual quality or A/V synchronization must never compensate for unauthorized presentation, failed cancellation, unsupported factual output or a false turn-yield.
+
+References:
+- https://arxiv.org/abs/2611.02430
+- https://avera-labs.github.io/InteractionBench/
+- https://github.com/avera-labs/InteractionBench

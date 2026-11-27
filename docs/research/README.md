@@ -43,6 +43,7 @@ event contract.
 - [Presentation grant schema](SYMTHAEA_PRESENTATION_CONSENT_GRANT_SCHEMA_V1_2026-11-27.json)
 - [Presentation grant fixtures](SYMTHAEA_PRESENTATION_CONSENT_GRANT_FIXTURES_V1_2026-11-27.json)
 - [Competitive baselines and differentiation](SYMTHAEA_EMBODIMENT_COMPETITIVE_BASELINES_V0_1_2026-11-27.md)
+- [Integrated interaction benchmark protocol](SYMTHAEA_INTERACTION_BENCH_INTEGRATION_V0_1_2026-11-27.md)
 - [Turn-control benchmark protocol](SYMTHAEA_TURN_CONTROL_BENCHMARK_V0_1_2026-11-27.md)
 - [Cross-form semantic continuity](SYMTHAEA_CROSS_FORM_CONTINUITY_V0_1_2026-11-27.md)
 - [Scene continuity descriptor schema](SYMTHAEA_SCENE_CONTINUITY_SCHEMA_V1_2026-11-27.json)
@@ -55,9 +56,9 @@ event contract.
 - [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
 
 The renderer-independent event, projection, policy, receipt, scene, turn-control and continuity modules live under
-`crates/domains/symthaea-soma/src/`. A standalone Bevy 0.20.1 adapter has source code under
+`crates/domains/symthaea-soma/src/`. A standalone Bevy 0.20.1 adapter has transition-aware source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
-All current regression tests are authored but unexecuted, and no VideoFDB evaluation result is claimed.
+All 118 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
 
 ## Theoretical Foundations
 

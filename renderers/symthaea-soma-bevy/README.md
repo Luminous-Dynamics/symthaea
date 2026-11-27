@@ -1,6 +1,6 @@
 # Symthaea Soma Bevy renderer adapter
 
-**Status:** source implementation added; exact Bevy build and runtime qualification pending  
+**Status:** transition-aware source/target implementation added; exact Bevy build and runtime qualification pending  
 **Bevy:** pinned to `=0.20.1`  
 **Scope:** isolated 2D renderer for immutable Symthaea Soma scene frames
 
@@ -27,8 +27,11 @@ The host should serialize policy recheck/authorization, queue submission and rec
 
 - Requires a fresh host clock update in the current app update; missing/stale clock hides output.
 - Rejects wrong clock domains and clock regression.
-- Rechecks the opaque permit against the live policy before creating scene entities.
+- Rechecks the opaque permit against the live policy before creating scene entities and rechecks both source and target permits on every update during a handoff.
 - A changed policy result (including reduced-motion or intensity changes) invalidates the authorized frame; the host must reauthorize and compile a new frame.
+- Same-form updates and cross-form transitions use separate scene groups, host-clock transition weights, and Bevy's explicit alpha-blend material mode.
+- If the source loses authority but the target remains valid, the source is removed and the target continues by hard cut. If the target loses authority, both groups are removed; previous output is never restored.
+- Superseding an unfinished transition uses a hard cut instead of an ambiguous three-scene overlap.
 - Every rendered entity is removed when policy recheck fails or the effective-permit expiry is reached.
 - Reduced-motion scenes contain only static elements.
 - No camera/microphone access, network transmission, audio output, haptics or physical actuators are implemented.
@@ -47,4 +50,4 @@ Generate and review the package lockfile first, then use the exact committed loc
 
 ## Current tests
 
-Seven Rust tests are authored for monotonic clock regression, exact expiry, cross-domain rejection, authorized-intensity clamping, zero-intensity output, and animated amplitude/offset caps. They have not been compiled or executed. The main Soma event, projection, policy, receipt, scene, turn-control and transition modules have 109 authored Rust tests, also not compiled or executed. GitHub Actions runs associated with the current draft PR have been skipped rather than passed.
+Nine Rust adapter tests are authored, including monotonic clock regression, exact expiry, cross-domain rejection, authorized-intensity clamping, zero-intensity output, animation caps, and transition alpha bounds. The main Soma event, projection, policy, receipt, scene, turn-control and transition modules contain 109 authored tests, for 118 authored Rust tests total. None has been compiled or executed. Current draft-PR GitHub Actions results must be read from the exact head and are not inferred from this document.
