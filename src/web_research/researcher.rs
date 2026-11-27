@@ -76,9 +76,15 @@ impl WebResearcher {
 
     /// Create a new web researcher with custom configuration
     pub fn with_config(config: WebResearchConfig) -> Result<Self> {
+        // Untrusted search results must not expand network authority through
+        // automatic redirects or ambient proxy configuration. Redirects are
+        // returned as explicit acquisition dispositions; a later guarded
+        // fetch layer may follow them only after per-hop destination checks.
         let client = reqwest::Client::builder()
             .timeout(Duration::from_millis(config.request_timeout_ms))
             .user_agent(&config.user_agent)
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
             .build()
             .context("Failed to create HTTP client")?;
 
@@ -1168,27 +1174,46 @@ impl WebResearcher {
             .map(str::to_string);
 
         if !status.is_success() {
+            let redirect_target = response
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string);
+            let (outcome, reason_code, reason) = if status.is_redirection() {
+                (
+                    AcquisitionOutcome::RedirectRejected,
+                    "REDIRECT_REJECTED",
+                    redirect_target.map_or_else(
+                        || format!("automatic redirects are disabled; HTTP {status} has no valid Location header"),
+                        |location| format!("automatic redirects are disabled; refused next hop {location}"),
+                    ),
+                )
+            } else if status.as_u16() == 429 {
+                (
+                    AcquisitionOutcome::RateLimited,
+                    "PAGE_RATE_LIMITED",
+                    format!("page fetch returned HTTP {status}"),
+                )
+            } else {
+                (
+                    AcquisitionOutcome::HttpError,
+                    "PAGE_HTTP_ERROR",
+                    format!("page fetch returned HTTP {status}"),
+                )
+            };
             let mut receipt = make_receipt(
                 candidate.query_rank,
                 Some(candidate.source_rank),
                 AcquisitionStage::PageFetch,
                 &candidate.query,
-                if status.as_u16() == 429 {
-                    AcquisitionOutcome::RateLimited
-                } else {
-                    AcquisitionOutcome::HttpError
-                },
+                outcome,
             );
             receipt.requested_url = Some(candidate.url.clone());
             receipt.final_url = Some(final_url);
             receipt.http_status = Some(status.as_u16());
             receipt.content_type = content_type;
-            receipt.reason_code = Some(if status.as_u16() == 429 {
-                "PAGE_RATE_LIMITED".to_string()
-            } else {
-                "PAGE_HTTP_ERROR".to_string()
-            });
-            receipt.reason = Some(format!("page fetch returned HTTP {status}"));
+            receipt.reason_code = Some(reason_code.to_string());
+            receipt.reason = Some(reason);
             receipt.elapsed_ms = elapsed_ms(started);
             return PageAcquisition {
                 candidate,
@@ -1886,6 +1911,67 @@ mod tests {
         assert!(AcquisitionOutcome::HttpError.is_incomplete());
         assert!(AcquisitionOutcome::FetchedTruncated.is_incomplete());
         assert!(AcquisitionOutcome::BudgetExceeded.is_incomplete());
+    }
+
+    #[tokio::test]
+    async fn page_fetch_rejects_redirect_without_contacting_the_next_hop() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+        use tokio::time::timeout;
+
+        let next_hop = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let next_hop_addr = next_hop.local_addr().unwrap();
+        let first_hop = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let first_hop_addr = first_hop.local_addr().unwrap();
+
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = first_hop.accept().await.unwrap();
+            let mut request = [0u8; 2048];
+            let _ = stream.read(&mut request).await.unwrap();
+            let response = format!(
+                "HTTP/1.1 302 Found\\r\\nLocation: http://{next_hop_addr}/internal\\r\\nContent-Length: 0\\r\\nConnection: close\\r\\n\\r\\n"
+            );
+            stream.write_all(response.as_bytes()).await.unwrap();
+        });
+
+        let researcher = WebResearcher::new().unwrap();
+        let acquisition = researcher
+            .fetch_and_extract_with_receipt(PageCandidate {
+                query_rank: 0,
+                source_rank: 0,
+                query: "redirect negative control".to_string(),
+                url: format!("http://{first_hop_addr}/start"),
+            })
+            .await;
+        server.await.unwrap();
+
+        assert_eq!(acquisition.receipt.http_status, Some(302));
+        assert_eq!(
+            acquisition.receipt.outcome,
+            AcquisitionOutcome::RedirectRejected
+        );
+        assert_eq!(
+            acquisition.receipt.reason_code.as_deref(),
+            Some("REDIRECT_REJECTED")
+        );
+        assert!(acquisition.extraction.is_none());
+        assert!(
+            timeout(Duration::from_millis(150), next_hop.accept())
+                .await
+                .is_err(),
+            "automatic redirect unexpectedly contacted the second hop"
+        );
+    }
+
+    #[test]
+    fn redirect_and_http_statuses_have_distinct_acquisition_outcomes() {
+        let researcher = WebResearcher::new().unwrap();
+        let redirect = reqwest::StatusCode::FOUND;
+        let forbidden = reqwest::StatusCode::FORBIDDEN;
+        assert!(redirect.is_redirection());
+        assert!(!forbidden.is_redirection());
+        assert!(AcquisitionOutcome::RedirectRejected.is_incomplete());
+        assert!(AcquisitionOutcome::HttpError.is_incomplete());
     }
 
     #[test]
