@@ -22,6 +22,13 @@ const EVALUATOR_VERSION_V1: &str = "mel-performance-invariance-evaluator-v1";
 const CONFIRMATORY_LINEAGE_FLOOR: usize = 30;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum PerformanceInvarianceSplitV1 {
+    SyntheticRendered,
+    PublicRealRecordingEvaluationOnly,
+    MusicianRecordedConfirmatory,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum MusicalTargetPropertyV1 {
     ChordQuality,
     RootPitchClass,
@@ -91,8 +98,11 @@ pub struct PerformanceInvarianceCaseV1 {
     pub schema: String,
     pub benchmark_id: String,
     pub benchmark_version: String,
+    pub split: PerformanceInvarianceSplitV1,
     pub dataset_revision_sha256: String,
     pub annotation_policy_sha256: String,
+    /// Digest of the rights/eligibility snapshot consumed from the owning registry.
+    pub source_permissions_manifest_sha256: String,
     pub triads: Vec<PerformanceTriadV1>,
 }
 
@@ -165,8 +175,10 @@ pub struct PerformanceInvarianceReportV1 {
     pub evaluator_version: &'static str,
     pub benchmark_id: String,
     pub benchmark_version: String,
+    pub split: PerformanceInvarianceSplitV1,
     pub dataset_revision_sha256: String,
     pub annotation_policy_sha256: String,
+    pub source_permissions_manifest_sha256: String,
     pub overall: TargetPropertyMetricsV1,
     pub by_target_property: Vec<TargetPropertyMetricsV1>,
     pub by_performance_factor: Vec<PerformanceFactorMetricsV1>,
@@ -179,6 +191,8 @@ pub struct PerformanceInvarianceReportV1 {
     pub audio_bytes_recomputed: bool,
     /// Performance/take and annotation references are metadata, not authenticated receipts.
     pub performance_and_annotation_receipts_authenticated: bool,
+    /// The rights/eligibility manifest is a digest reference, not an authenticated receipt here.
+    pub source_permission_receipts_authenticated: bool,
     /// No model is invoked by this deterministic answer-scoring adapter.
     pub model_invoked_by_evaluator: bool,
 }
@@ -229,6 +243,10 @@ pub fn audit_performance_invariance_case(
     }
     validate_digest(&case.dataset_revision_sha256, "dataset_revision_sha256")?;
     validate_digest(&case.annotation_policy_sha256, "annotation_policy_sha256")?;
+    validate_digest(
+        &case.source_permissions_manifest_sha256,
+        "source_permissions_manifest_sha256",
+    )?;
     if case.triads.is_empty() {
         return Err("performance-invariance case must contain at least one complete triad".into());
     }
@@ -402,8 +420,10 @@ pub fn audit_performance_invariance_case(
         evaluator_version: EVALUATOR_VERSION_V1,
         benchmark_id: case.benchmark_id.clone(),
         benchmark_version: case.benchmark_version.clone(),
+        split: case.split,
         dataset_revision_sha256: case.dataset_revision_sha256.clone(),
         annotation_policy_sha256: case.annotation_policy_sha256.clone(),
+        source_permissions_manifest_sha256: case.source_permissions_manifest_sha256.clone(),
         overall,
         by_target_property,
         by_performance_factor,
@@ -414,6 +434,7 @@ pub fn audit_performance_invariance_case(
         confirmatory_lineage_floor_met: source_lineages.len() >= CONFIRMATORY_LINEAGE_FLOOR,
         audio_bytes_recomputed: false,
         performance_and_annotation_receipts_authenticated: false,
+        source_permission_receipts_authenticated: false,
         model_invoked_by_evaluator: false,
     })
 }
@@ -943,8 +964,10 @@ mod tests {
             schema: CASE_SCHEMA_V1.into(),
             benchmark_id: "Melothaea-Performance-Identity".into(),
             benchmark_version: "1.0".into(),
+            split: PerformanceInvarianceSplitV1::SyntheticRendered,
             dataset_revision_sha256: digest('3'),
             annotation_policy_sha256: digest('4'),
+            source_permissions_manifest_sha256: digest('5'),
             triads,
         }
     }
