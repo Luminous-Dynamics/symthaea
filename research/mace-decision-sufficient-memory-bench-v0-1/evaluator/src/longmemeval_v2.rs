@@ -215,6 +215,14 @@ mod tests {
     }
 
     #[test]
+    fn official_small_and_medium_reference_frontiers_match_known_values() {
+        let small = lafs_score(&SMALL_REFERENCE_V1).expect("small reference");
+        let medium = lafs_score(&MEDIUM_REFERENCE_V1).expect("medium reference");
+        assert!((small - 55.764_846_936_380_05).abs() < 1.0e-9);
+        assert!((medium - 51.074_089_482_305_1).abs() < 1.0e-9);
+    }
+
+    #[test]
     fn negative_latency_is_rejected() {
         assert_eq!(
             lafs_score(&[point(50.0, -0.1)]),
