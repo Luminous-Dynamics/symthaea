@@ -83,3 +83,27 @@ Run the synthetic six-target audit:
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-performance-invariance-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-performance-invariance.synthetic.json
 
 This evaluator scores supplied answers only. Performance-condition, source-work, composition and annotation digests remain self-reported metadata until verified by the owning evidence/rights systems. The six-case fixture is a plumbing test, not a model result, musician study or confirmatory statistic. Acoustic-only nuisance transforms (room, EQ, hiss) remain in the official MusicListenBench/generic acoustic-invariance programme; they are not reclassified as performance variation here.
+
+
+## Performance-invariant musical identity (MEL-HEAR-002)
+
+The `performance_invariance` module is a separate extension to the official MusicListenBench v1.0 evaluator. It preserves the official CLEAN/FLIP/STAY contract and adds its own CLEAN / Performance-STAY / Musical-FLIP triad. Each triad names exactly one target property:
+
+- chord quality;
+- root pitch class;
+- chord voicing;
+- relative interval sequence;
+- melodic contour;
+- rhythmic ratio pattern;
+- pulse rate;
+- instrument family.
+
+The target property determines which variations are valid STAY factors. Examples: global transposition is a STAY for relative interval sequence and chord quality, but not root pitch class; inversion may preserve chord quality/root but not exact voicing; uniform tempo scaling may preserve rhythmic ratios but not pulse rate. Acoustic-only Room/EQ/Hiss factors are deliberately excluded from this performance-variation module and remain in the existing MusicListenBench/acoustic-invariance path.
+
+CLEAN and Musical-FLIP share one performance-condition digest; Performance-STAY must bind a different condition. All three audio hashes must differ. The question text and its recomputed SHA-256 are identical across the matched triad. Semantic A/B normalization is reused from `music_listen_bench::predicted_relation_for_variant`, so letter reversal does not change the musical answer.
+
+Run the synthetic six-target fixture:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-performance-invariance-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-performance-invariance.synthetic.json
+
+The fixture is an evaluator plumbing control, not evidence about model capability. Performance-condition, source-work, composition and annotation references are supplied metadata; this evaluator does not authenticate them, read audio bytes, or invoke a model. Real-data analysis must be performer-, composition- and source-work-disjoint and rights-approved.
