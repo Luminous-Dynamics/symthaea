@@ -39,7 +39,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+/// Textual and Multimodal formal retrieval limits.
 pub const FORMAL_TOP_K: usize = 100;
+/// Coding Memory permits up to 1,000 returned candidates per Search call.
+pub const CODING_MAX_TOP_K: usize = 1_000;
 pub const TEXTUAL_MAX_MESSAGES: usize = 20;
 pub const TEXTUAL_MAX_WORDS: usize = 2_000;
 pub const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024;
@@ -369,7 +372,14 @@ pub fn validate_search_request_for_track(
     track: Track,
     request: &SearchRequest,
 ) -> Result<(), AmlReject> {
-    validate_search_request(request)?;
+    validate_search_request_common(request)?;
+    let max_top_k = match track {
+        Track::Coding => CODING_MAX_TOP_K,
+        Track::Textual | Track::Multimodal => FORMAL_TOP_K,
+    };
+    if request.top_k > max_top_k {
+        return Err(AmlReject::InvalidTopK);
+    }
     if track != Track::Multimodal
         && !matches!(&request.query, MessageContent::Text(_))
     {
@@ -781,11 +791,11 @@ impl AddIdempotencyLedger {
     }
 }
 
-pub fn validate_search_request(request: &SearchRequest) -> Result<(), AmlReject> {
+fn validate_search_request_common(request: &SearchRequest) -> Result<(), AmlReject> {
     if request.user_id.trim().is_empty() {
         return Err(AmlReject::EmptySearchUserId);
     }
-    if request.top_k == 0 || request.top_k > FORMAL_TOP_K {
+    if request.top_k == 0 {
         return Err(AmlReject::InvalidTopK);
     }
     match &request.query {
@@ -804,6 +814,16 @@ pub fn validate_search_request(request: &SearchRequest) -> Result<(), AmlReject>
         if options.iter().any(|option| option.trim().is_empty()) {
             return Err(AmlReject::EmptyOption);
         }
+    }
+    Ok(())
+}
+
+/// Legacy/default Search validation uses the Textual/Multimodal ceiling.
+/// Call validate_search_request_for_track for a track-aware contract.
+pub fn validate_search_request(request: &SearchRequest) -> Result<(), AmlReject> {
+    validate_search_request_common(request)?;
+    if request.top_k > FORMAL_TOP_K {
+        return Err(AmlReject::InvalidTopK);
     }
     Ok(())
 }
@@ -1543,6 +1563,32 @@ mod tests {
         );
         response.data.truncate(1);
         assert_eq!(validate_search_response(&request, &response), Ok(()));
+    }
+
+    #[test]
+    fn coding_search_allows_one_thousand_results_but_textual_and_multimodal_stop_at_one_hundred() {
+        let coding = SearchRequest {
+            query: MessageContent::Text("query".into()),
+            options: None,
+            user_id: "user".into(),
+            top_k: CODING_MAX_TOP_K,
+        };
+        assert_eq!(validate_search_request_for_track(Track::Coding, &coding), Ok(()));
+        assert_eq!(
+            validate_search_request_for_track(Track::Textual, &coding),
+            Err(AmlReject::InvalidTopK)
+        );
+        assert_eq!(
+            validate_search_request_for_track(Track::Multimodal, &coding),
+            Err(AmlReject::InvalidTopK)
+        );
+
+        let mut over_limit = coding;
+        over_limit.top_k = CODING_MAX_TOP_K + 1;
+        assert_eq!(
+            validate_search_request_for_track(Track::Coding, &over_limit),
+            Err(AmlReject::InvalidTopK)
+        );
     }
 
     #[test]
