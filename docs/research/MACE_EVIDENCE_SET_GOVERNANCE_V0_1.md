@@ -11,12 +11,13 @@ This increment consumes the #13967/#13973 evidence-use path. It does not replace
 ## Contract
 
 - Every candidate must carry a current in-process verified `EvidenceUseReceiptV1` with exact valid-at/known-at snapshot, scope, purpose, consumer policy, active lifecycle and trusted source status.
-- The context may require complete dependency lineage.
+- The context may require complete dependency lineage and binds a frozen selection-policy digest that defines how relevance scores are produced and how ties are resolved.
+- Every representation digest is paired with a transformation digest that must match the transformation digest in its verified use receipt. This binds lineage identity, but does not by itself prove the bytes are the output of that transformation; a production transformation attestation remains required.
 - Pairwise constraints are explicit must-link or cannot-link records with reason, issuer, authority-receipt digest and constraint-policy digest. Each is passed to an injected authority verifier.
 - Must-link components are all-or-none. Cannot-link pairs may never appear together. A cannot-link inside a must-link component returns an obstruction.
 - A required candidate brings its complete must-link closure. If it is inadmissible, conflicted or over budget, the selector returns an obstruction rather than silently dropping required evidence.
 - Up to 20 candidates are solved exactly by enumeration. The objective maximizes integer relevance score, then minimizes token cost, then uses lexicographic IDs for deterministic tie-breaking.
-- Selection receipts bind context, candidate set, constraints, selected evidence IDs, representation digests and use-receipt digests. Excluded candidates carry a reason.
+- Selection receipts bind context, candidate set, constraints, scoring/selection policy, selected evidence IDs, representation and transformation digests, and use-receipt digests. Excluded candidates carry a reason.
 
 ## Complexity boundary
 
