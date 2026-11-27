@@ -773,7 +773,9 @@ mod tests {
         second.baseline.false_quarantines = 1;
         second.candidate.false_quarantines = 2;
         second.baseline.safe_exposure[0].start_us = 1_800_000_000;
+        second.baseline.safe_exposure[0].end_us = 5_400_000_000;
         second.candidate.safe_exposure[0].start_us = 1_800_000_000;
+        second.candidate.safe_exposure[0].end_us = 5_400_000_000;
         let report = evaluate_paired(&[first, second], 100, 100, 9).unwrap();
         assert_eq!(report.baseline.safe_exposure_us, 5_400_000_000);
         assert_eq!(report.candidate.safe_exposure_us, 5_400_000_000);
