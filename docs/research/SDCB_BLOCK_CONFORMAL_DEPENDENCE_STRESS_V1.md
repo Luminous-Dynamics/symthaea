@@ -91,3 +91,33 @@ Before using block conformal as an engineering adequacy gate:
 6. The production SDCB helper must consume calibration and test units once and retain the complete cross-stage ledger, as implemented in #13946.
 
 This experiment is a step toward falsifiable coverage evidence; it is not a conformal-validity proof, a physical calibration campaign or an external benchmark result.
+
+
+## First exact-head execution — 27 November 2026
+
+The focused workflow passed on source commit `30a508248f31d595d930224c852925e4762fc3d9`:
+- Rust 1.96 formatting check passed;
+- 3/3 unit controls passed;
+- the full 12-condition, 5,000-trials-per-condition grid completed;
+- report artifact: [coverage CSV and manifest](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45987147070/artifacts/15192042421).
+
+Observed nominal 10% alarm rates:
+
+| Design | Block length | Embargo | Alarms / 5,000 | Alarm rate | Wilson 95% interval |
+|---|---:|---:|---:|---:|---:|
+| Independent blocks | 1 | 0 | 528 | 10.56% | 9.74–11.44% |
+| One serial path | 1 | 0 | 677 | **13.54%** | **12.62–14.52%** |
+| One serial path | 1 | 16 | 506 | 10.12% | 9.31–10.99% |
+| One serial path | 1 | 64 | 514 | 10.28% | 9.47–11.15% |
+| Independent blocks | 8 | 0 | 476 | 9.52% | 8.74–10.36% |
+| One serial path | 8 | 0 | 502 | 10.04% | 9.24–10.90% |
+| One serial path | 8 | 16 | 487 | 9.74% | 8.95–10.59% |
+| One serial path | 8 | 64 | 514 | 10.28% | 9.47–11.15% |
+| Independent blocks | 32 | 0 | 504 | 10.08% | 9.28–10.94% |
+| One serial path | 32 | 0 | 512 | 10.24% | 9.43–11.11% |
+| One serial path | 32 | 16 | 509 | 10.18% | 9.37–11.05% |
+| One serial path | 32 | 64 | 501 | 10.02% | 9.22–10.88% |
+
+The clearest failure in this small initial grid is consecutive unit-length blocks from one serial path: its 95% interval lies above the nominal 10% alarm rate. An embargo of 16 or 64 AR(1) steps moves the observed unit-block rate back near nominal in this setting. For block lengths 8 and 32, every tested serial-path interval contains 10%.
+
+This does **not** establish that 16 is a safe embargo, that length 8 makes blocks exchangeable, or that all dependent time series behave like Gaussian AR(1). The result is specific to `rho=0.95`, Gaussian stationary innovations, maximum-absolute-residual block scores, 39 calibration blocks and the tested seed/trial count. It motivates a broader preregistered grid over correlation strength, heavy tails, common causes, drift, score definitions and held-out regimes. The independent-block arm is a simulation control, not a physical-data calibration.
