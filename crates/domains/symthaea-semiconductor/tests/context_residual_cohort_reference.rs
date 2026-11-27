@@ -4,11 +4,10 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use symthaea_semiconductor::benchmark::{
     CONTEXT_RESIDUAL_COHORT_SCHEMA_V1, CONTEXT_RESIDUAL_OBSERVATION_SCHEMA_V1,
-    ContextResidualCohortInputV1, ContextResidualCohortStatusV1,
-    ContextResidualObservationV1, LabelConsumptionEligibilityReportV1,
-    LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1, StreamingPredictionReceiptV1,
-    evaluate_context_residual_cohort_v1, seal_context_residual_cohort_v1,
-    seal_context_residual_observation_v1,
+    ContextResidualCohortInputV1, ContextResidualCohortStatusV1, ContextResidualObservationV1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
+    StreamingPredictionReceiptV1, evaluate_context_residual_cohort_v1,
+    seal_context_residual_cohort_v1, seal_context_residual_observation_v1,
 };
 
 fn digest(ch: char) -> String {
@@ -109,8 +108,7 @@ fn make_observation(
         eligibility_report: eligibility,
         observation_sha256: String::new(),
     };
-    observation.observation_sha256 =
-        seal_context_residual_observation_v1(&observation).unwrap();
+    observation.observation_sha256 = seal_context_residual_observation_v1(&observation).unwrap();
     observation
 }
 
