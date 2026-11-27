@@ -1,0 +1,239 @@
+{
+  "corpus_id": "MON-020-EVENT-ORDER",
+  "corpus_version": "1.0.0",
+  "status": "research_seed",
+  "purpose": "Synthetic event-order assurance scenarios. Descriptive seed cases, not field observations or statistical security estimates.",
+  "scenario_semantics": "same-source ordering is established by authenticated monotonic sequence; cross-source ordering requires independently witnessed exact-event handoff.",
+  "scenarios": [
+    {
+      "id": "ORDER-001",
+      "family": "same_source",
+      "description": "Entity generation at sequence 10 and use at sequence 11 in the same verified source domain.",
+      "expected_decision": "qualified",
+      "reason_code": "generation_precedes_use",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "ORDER-002",
+      "family": "same_source",
+      "description": "Entity use at sequence 10 and generation at sequence 11 in the same source domain.",
+      "expected_decision": "denied",
+      "reason_code": "use_before_generation",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-003",
+      "family": "cross_source",
+      "description": "Generation and use occur in different source domains with a valid independent signed handoff witness.",
+      "expected_decision": "qualified",
+      "reason_code": "cross_source_handoff_verified",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "ORDER-004",
+      "family": "cross_source",
+      "description": "Generation and use occur in different source domains with no handoff witness.",
+      "expected_decision": "indeterminate",
+      "reason_code": "cross_source_order_unknown",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-005",
+      "family": "cross_source",
+      "description": "A cross-source order witness shares a control root with the source of one endpoint event.",
+      "expected_decision": "indeterminate",
+      "reason_code": "witness_not_independent",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-006",
+      "family": "same_source",
+      "description": "Two event IDs claim the same source-local sequence number.",
+      "expected_decision": "divergent",
+      "reason_code": "source_sequence_equivocation",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-007",
+      "family": "graph",
+      "description": "Two independently verified order witnesses create a directed cycle.",
+      "expected_decision": "divergent",
+      "reason_code": "event_order_cycle",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-008",
+      "family": "invalidation",
+      "description": "Entity use occurs after the entity invalidation event in the same source sequence.",
+      "expected_decision": "denied",
+      "reason_code": "use_after_invalidation",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-009",
+      "family": "invalidation",
+      "description": "Entity invalidation occurs after generation and all use events.",
+      "expected_decision": "qualified",
+      "reason_code": "invalidation_order_valid",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "ORDER-010",
+      "family": "activity",
+      "description": "Activity end sequence precedes a generated entity event attributed to the activity.",
+      "expected_decision": "denied",
+      "reason_code": "event_after_activity_end",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-011",
+      "family": "activity",
+      "description": "Activity start precedes all its internal events and end follows them.",
+      "expected_decision": "qualified",
+      "reason_code": "activity_boundary_order_valid",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "ORDER-012",
+      "family": "activity",
+      "description": "Activity has an internal use event but no authenticated start or end event.",
+      "expected_decision": "indeterminate",
+      "reason_code": "activity_boundary_missing",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-013",
+      "family": "evidence",
+      "description": "Event source signature report is missing or unverified.",
+      "expected_decision": "indeterminate",
+      "reason_code": "event_authenticity_unverified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-014",
+      "family": "evidence",
+      "description": "Event source signature report is invalid.",
+      "expected_decision": "denied",
+      "reason_code": "event_signature_invalid",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-015",
+      "family": "evidence",
+      "description": "Event sequence is authenticated by a pinned verifier and source identity is current.",
+      "expected_decision": "qualified",
+      "reason_code": "event_evidence_verified",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "ORDER-016",
+      "family": "cross_source",
+      "description": "A timestamp claims generation precedes use, but no sequence or witness evidence exists.",
+      "expected_decision": "indeterminate",
+      "reason_code": "timestamp_alone_not_order_proof",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-017",
+      "family": "same_source",
+      "description": "Same-source sequence is valid but source-local records are not completely captured through the declared boundary.",
+      "expected_decision": "indeterminate",
+      "reason_code": "source_sequence_completeness_missing",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-018",
+      "family": "cross_source",
+      "description": "Cross-source handoff is authenticated, exact-event-bound and independently witnessed.",
+      "expected_decision": "qualified",
+      "reason_code": "exact_handoff_binding",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "ORDER-019",
+      "family": "invalidation",
+      "description": "Invalidation precedes generation in a same-source sequence domain.",
+      "expected_decision": "denied",
+      "reason_code": "invalidation_before_generation",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-020",
+      "family": "graph",
+      "description": "An event-order witness refers to a nonexistent event or mismatched digest.",
+      "expected_decision": "indeterminate",
+      "reason_code": "order_witness_reference_invalid",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-021",
+      "family": "evidence",
+      "description": "An entity use event is present but the bounded event set contains no authenticated generation event for that entity.",
+      "expected_decision": "indeterminate",
+      "reason_code": "entity_generation_missing",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-022",
+      "family": "evidence",
+      "description": "A source identity is verified but its administrative control-root membership evidence is missing or unverified.",
+      "expected_decision": "indeterminate",
+      "reason_code": "control_root_membership_unverified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "ORDER-023",
+      "family": "same_source",
+      "description": "A source service restarts and its monotonic sequence resets, but the new sequence incarnation is presented under the old source-domain ID.",
+      "expected_decision": "divergent",
+      "reason_code": "sequence_domain_reuse_after_reset",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    }
+  ]
+}
