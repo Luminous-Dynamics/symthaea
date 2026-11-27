@@ -619,7 +619,7 @@ mod tests {
         let first = manifest("bm25", "bm25");
         let mut candidate = manifest("mace", "mace");
         candidate.metrics[0].denominator = Some(99);
-        candidate.matched_controls_sha256 = Some(compute_matched_controls_sha256_v1(&candidate).unwrap());
+        candidate.matched_controls_sha256 = first.matched_controls_sha256.clone();
         assert_eq!(
             validate_matched_comparison_v1(&[first, candidate]),
             Err(BenchmarkContractRejectV1::MixedMetricDefinitions)
