@@ -64,7 +64,9 @@
         "must_link_cannot_link_conflict",
         "required_constraint_conflict",
         "required_set_exceeds_budget",
-        "no_feasible_selection"
+        "no_feasible_selection",
+        "constraint_not_known_at_snapshot",
+        "constraint_outside_validity_interval"
       ]
     },
     "selection": {
