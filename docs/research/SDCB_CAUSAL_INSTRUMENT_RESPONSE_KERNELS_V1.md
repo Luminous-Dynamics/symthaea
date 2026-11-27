@@ -1,6 +1,6 @@
 # SDCB causal instrument-response kernels v1
 
-**Status:** Research specification. No response-kernel implementation, high-rate experiment, physical qualification, or SOTA result is claimed.
+**Status:** The standalone scalar OU + first-order response analytic reference is authored in `scripts/research/sdcb_exponential_response.rs` with nine Rust tests. The tests are not compiled or executed in this environment. No integration into the existing interval-observation module, high-rate experiment, physical qualification, or SOTA result is claimed.
 
 ## 1. Motivation
 
@@ -56,6 +56,16 @@ and the measured value is then the declared acquisition operator applied to z_i(
 Verify augmented-state covariance and endpoint/observation cross-covariance against an independent convolution calculation. #13940's rectangular accumulator remains an explicit reduction/special case.
 
 Do not claim arbitrary nonlinear hysteresis in M0. Hysteresis must be represented by a declared path-dependent state model or rejected as unsupported.
+
+
+### Authored M0 reference
+
+`scripts/research/sdcb_exponential_response.rs` now provides a standalone two-state analytic reference for
+`dx = -lambda x dt + sqrt(2 lambda variance) dW` and
+`dz = (x-z)/tau_s dt`.
+It computes the stationary covariance, exact 2x2 transition matrix, future/past cross-covariance, filtered-sensor autocovariance, normalized step response, and first-order frequency response. It includes the repeated-root case (equal latent and sensor rates) and uses exp_m1-based rate-gap formulas near that case.
+
+Nine Rust tests are authored for stationary covariance, equal-rate and distinct-rate fixtures, zero lag, near-equal-rate continuity, step response, -3 dB / phase behavior, invalid inputs and negative elapsed time. An independent authoring-runtime check using SciPy matrix exponential and continuous Lyapunov solution reproduced the distinct-rate transition/cross-covariance fixture to below 2e-15 absolute difference. This is an independent numerical calculation, not Rust execution, crate compilation, CI, or physical sensor validation.
 
 ## 4. Required fixtures and invariants
 
