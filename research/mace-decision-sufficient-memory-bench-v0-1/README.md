@@ -332,3 +332,11 @@ These are authored engineering changes and proposed research work. No DSM evalua
 7. MemoryLACE, 2026 preprint: https://arxiv.org/abs/2609.03201
 8. Dual-Layer Agentic Memory, 2026 preprint: https://arxiv.org/abs/2608.22215
 9. Luminous Dynamics, Decision-Relevant Predictability Benchmark: https://github.com/Luminous-Dynamics/symthaea/tree/main/research/decision-predictability-benchmark
+
+## Executable Rust reference evaluator
+
+A standalone Rust reference implementation now exists under [reference-evaluator/](reference-evaluator/README.md). It adds deterministic first-four-family episode generation, a candidate/evaluator-private preparation split, a strict response schema, balanced-arm scoring, regret versus the complete-information optimum, memory gain/harm versus the no-memory baseline, evidence lifecycle checks and cost-field reporting. Its six-response positive-control JSONL is a synthetic conformance fixture, not a benchmark run.
+
+The implementation does not create a process sandbox, sign candidate data, or independently measure resource counters. Candidate/evaluator isolation and sealed-label custody remain deployment requirements. Exact-head compilation, tests, formatting and Clippy are pending; no CI pass or MACE score is claimed.
+
+See [MACE DSM benchmark frontier, 27 November 2026](../../../../docs/research/MACE_DSM_BENCHMARK_FRONTIER_2026-11-27.md) for the current external comparison and preregisterable target ladder.
