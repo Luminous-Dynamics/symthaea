@@ -393,7 +393,28 @@ fn validate_trace(
             }
             require_order(events, ("correction", None), ("projection_invalidation", None), &trace_id)?;
             require_order(events, ("projection_invalidation", None), ("projection_rebuild", None), &trace_id)?;
-            require_order(events, ("projection_rebuild", None), ("residual_influence_check", Some("residual_influence_absent")), &trace_id)?;
+            let rebuild_index = event_index(events, "projection_rebuild", None)
+                .ok_or_else(|| format!("{trace_id}: missing projection_rebuild"))?;
+            let post_repair_replay_index = events
+                .iter()
+                .rposition(|event| {
+                    event.get("stage").and_then(Value::as_str) == Some("counterfactual_replay")
+                        && event.get("outcome").and_then(Value::as_str) == Some("effect_absent")
+                })
+                .ok_or_else(|| format!("{trace_id}: missing post-repair no-effect replay"))?;
+            let residual_index = event_index(
+                events,
+                "residual_influence_check",
+                Some("residual_influence_absent"),
+            )
+            .ok_or_else(|| format!("{trace_id}: missing residual-influence absence check"))?;
+            if rebuild_index >= post_repair_replay_index
+                || post_repair_replay_index >= residual_index
+            {
+                return Err(format!(
+                    "{trace_id}: post-repair replay and residual-influence check must follow projection rebuild"
+                ));
+            }
         }
         _ => {}
     }
@@ -479,8 +500,8 @@ mod tests {
     fn duplicate_event_ids_are_rejected_across_the_corpus() {
         let mut lines = fixture_lines();
         let mut first: Value = serde_json::from_str(&lines[0]).expect("JSON");
-        let second: Value = serde_json::from_str(&lines[1]).expect("JSON");
-        first["events"][0]["event_id"] = second["events"][0]["event_id"].clone();
+        let _second: Value = serde_json::from_str(&lines[1]).expect("JSON");
+        first["events"][1]["event_id"] = first["events"][0]["event_id"].clone();
         lines[0] = first.to_string();
         assert!(validate_corpus(&lines).is_err());
     }
@@ -517,6 +538,15 @@ mod tests {
         let mut lines = fixture_lines();
         let mut trace: Value = serde_json::from_str(&lines[7]).expect("JSON");
         trace["events"][0]["record_ids"] = json!(["only-one-record"]);
+        lines[7] = trace.to_string();
+        assert!(validate_corpus(&lines).is_err());
+    }
+
+    #[test]
+    fn post_repair_counterfactual_must_follow_projection_rebuild() {
+        let mut lines = fixture_lines();
+        let mut trace: Value = serde_json::from_str(&lines[7]).expect("JSON");
+        trace["events"][11]["stage"] = json!("retrieval_exposure");
         lines[7] = trace.to_string();
         assert!(validate_corpus(&lines).is_err());
     }
