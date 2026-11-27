@@ -93,14 +93,21 @@ impl FirstOrderResponseOu {
     /// For the declared OU + first-order filter:
     /// cov(x,z) = var(z) = mu * var(x) / (lambda + mu).
     pub fn stationary_covariance(&self) -> [[f64; 2]; 2] {
-        // Compute mu/(lambda+mu) without overflowing the sum.
-        let response_fraction = if self.mu >= self.lambda {
-            1.0 / (1.0 + self.lambda / self.mu)
+        // Compute mu*variance/(lambda+mu) without overflowing the sum or
+        // underflowing mu/lambda before a large variance can restore scale.
+        let cross = if self.mu >= self.lambda {
+            let ratio = self.lambda / self.mu;
+            self.process_variance / (1.0 + ratio)
         } else {
             let ratio = self.mu / self.lambda;
-            ratio / (1.0 + ratio)
+            if ratio == 0.0 {
+                // If mu/lambda underflows, lambda is necessarily large enough
+                // that variance*mu is safe for finite variance <= f64::MAX.
+                (self.process_variance * self.mu) / self.lambda
+            } else {
+                (self.process_variance * ratio) / (1.0 + ratio)
+            }
         };
-        let cross = response_fraction * self.process_variance;
         [
             [self.process_variance, cross],
             [cross, cross],
@@ -266,6 +273,20 @@ mod tests {
         assert!(
             (actual - expected).abs() <= tolerance,
             "actual={actual:.17e}, expected={expected:.17e}, tolerance={tolerance:.3e}"
+        );
+    }
+
+    #[test]
+    fn stationary_covariance_preserves_scale_when_rate_ratio_underflows() {
+        let lambda = 3.2990604078250345e62;
+        let mu = 1.2242014100976064e-274;
+        let tau = 1.0 / mu;
+        let process_variance = 4.672577555410409e143;
+        let model = FirstOrderResponseOu::new(lambda, process_variance, tau).unwrap();
+        close(
+            model.stationary_covariance()[1][1],
+            1.7338803553145542e-193,
+            2.0e-207,
         );
     }
 
