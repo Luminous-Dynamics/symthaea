@@ -988,6 +988,17 @@ mod tests {
         ledger
     }
 
+    /// Construct an empty projection index and replay every source-ledger
+    /// receipt so the index sequence is actually synchronized with the ledger.
+    fn synced_index(ledger: &StreamingSessionLedgerV1) -> DerivedProjectionIndexV1 {
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let receipts = ledger.mutation_receipts().cloned().collect::<Vec<_>>();
+        for receipt in receipts {
+            index.apply_transition(ledger, &receipt).unwrap();
+        }
+        index
+    }
+
     fn spec(
         id: &str,
         seq: u64,
@@ -1020,7 +1031,7 @@ mod tests {
     #[test]
     fn metamemory_summary_is_value_free_and_matches_exact_store_counts() {
         let ledger = ledger();
-        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let index = synced_index(&ledger);
         let summary = index.metamemory_summary(&ledger).unwrap();
         assert_eq!(summary.schema_version, 1);
         assert_eq!(summary.active_source_event_count, 1);
@@ -1060,7 +1071,7 @@ mod tests {
     #[test]
     fn metamemory_summary_rejects_reordered_and_overflowing_status_counts() {
         let ledger = ledger();
-        let index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let index = synced_index(&ledger);
         let summary = index.metamemory_summary(&ledger).unwrap();
 
         let mut reordered = summary.clone();
@@ -1076,7 +1087,7 @@ mod tests {
     #[test]
     fn metamemory_verifier_accepts_exact_current_snapshot() {
         let ledger = ledger();
-        let index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let index = synced_index(&ledger);
         let summary = index.metamemory_summary(&ledger).unwrap();
         assert_eq!(index.verify_metamemory_summary(&ledger, &summary), Ok(()));
     }
@@ -1084,7 +1095,7 @@ mod tests {
     #[test]
     fn metamemory_verifier_rejects_internally_valid_but_stale_snapshot() {
         let mut ledger = ledger();
-        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let index = synced_index(&ledger);
         let stale = index.metamemory_summary(&ledger).unwrap();
         assert!(stale.verify_integrity());
 
@@ -1100,7 +1111,7 @@ mod tests {
     #[test]
     fn metamemory_verifier_rejects_tampering_even_after_the_caller_reseals_a_digest() {
         let ledger = ledger();
-        let index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let index = synced_index(&ledger);
         let mut forged = index.metamemory_summary(&ledger).unwrap();
         forged.active_source_event_count += 1;
         forged.summary_sha256 = metamemory_summary_digest(&forged);
@@ -1126,7 +1137,7 @@ mod tests {
     #[test]
     fn metamemory_summary_rejects_wrong_scope_and_tampered_counts() {
         let ledger = ledger();
-        let index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let index = synced_index(&ledger);
         let summary = index.metamemory_summary(&ledger).unwrap();
         let mut altered = summary.clone();
         altered.active_source_event_count += 1;
