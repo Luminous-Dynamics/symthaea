@@ -103,6 +103,9 @@ pub mod selective_prediction;
 // Population-risk evaluation under declared selective-adjudication designs
 pub mod selective_observation;
 
+// Custodian-randomized stratified audit sampling and inclusion probabilities
+pub mod stratified_audit;
+
 // Re-exports for ergonomic access
 pub use conjecture_feed::{
     ConjectureFeedError, ConjectureFeeder, ProvenancedConjecture, ResearchNumericDataset,
@@ -129,6 +132,10 @@ pub use selective_observation::{
     evaluate_selective_observation, AdjudicationSamplingDesign,
     AdjudicationSamplingMechanism, PropensitySupportDiagnostics,
     PropensityWeightedReport, SelectiveObservationEvaluation, SelectiveObservationRecord,
+};
+pub use stratified_audit::{
+    build_stratified_random_audit_plan, AuditCandidate, AuditSelection,
+    AuditStratumPlan, AuditStratumQuota, StratifiedAuditError, StratifiedAuditPlan,
 };
 pub use types::*;
 pub use verifier::{
