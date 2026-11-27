@@ -219,3 +219,27 @@ func TestPerFamilyFalseQualificationBreakdown(t *testing.T) {
 		t.Fatalf("per-family unsafe acceptance not reported: %+v",score.FamilyBreakdown)
 	}
 }
+
+func TestSuiteDigestBindsExpectedVerdictAndReplicateCount(t *testing.T) {
+	s:=testSuite()
+	first,err:=ComputeSuiteDigest(s)
+	if err!=nil { t.Fatal(err) }
+	s.Cases[0].Expected=Blocked
+	second,err:=ComputeSuiteDigest(s)
+	if err!=nil { t.Fatal(err) }
+	if first==second { t.Fatal("changing independent expected verdict must change suite root") }
+	s=testSuite()
+	s.Cases[0].Replicates++
+	third,err:=ComputeSuiteDigest(s)
+	if err!=nil { t.Fatal(err) }
+	if first==third { t.Fatal("changing required replicate count must change suite root") }
+}
+
+func TestSuiteObservationLimitRejectsExcessiveReplicates(t *testing.T) {
+	s:=testSuite()
+	s.Cases[0].Replicates=uint32(MaxPlannedObservations)
+	s.Cases[1].Replicates=1
+	if err:=ValidateSuite(s); !errors.Is(err,ErrInvalidSuite) {
+		t.Fatalf("suite above planned observation limit must be rejected, got %v",err)
+	}
+}
