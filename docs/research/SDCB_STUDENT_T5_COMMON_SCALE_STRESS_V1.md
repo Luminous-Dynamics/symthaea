@@ -1,6 +1,6 @@
 # SDCB Gaussian and standardized Student-t(5) common-scale dependence stress v1
 
-**Status:** standalone Rust 1.96 executable authored; exact-head formatting, unit controls, full-grid execution and artifact inspection are the qualification gate. No empirical result is claimed until the exact source revision passes and its report is inspected.
+**Status:** exact-head Rust 1.96 workflow passed on source `394919be85c65b04510a8ca33b490116a56dcff2`: rustfmt, **7/7 unit controls**, full 72-condition × 2,500-trial grid (180,000 simulations), and report artifact inspection. See [workflow run #?](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46003315297) and [CSV + manifest artifact 15199048151](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46003315297/artifacts/15199048151). Results remain diagnostic, not a general coverage guarantee.
 
 ## Research question
 
@@ -33,11 +33,32 @@ The grid contains:
 
 This creates 72 conditions × 2,500 trials = 180,000 Monte Carlo trials. Both shift directions and no-change controls are included. The independent-block arm draws an independent path-level scale for every block, including the test block; the serial arm shares one scale across its complete calibration/embargo/test path.
 
+## Exact-head results — 27 November 2026
+
+The exact executable source head `394919be85c65b04510a8ca33b490116a56dcff2` passed Rust 1.96 formatting and **7/7 tests**, including the 50,000-sample standardized t5 variance control, t5 one-point rank-invariance control, both regime-shift directions and deterministic replay. The full 72-condition grid completed at 2,500 trials per condition (180,000 total). The manifest binds source commit and Rust 1.96.0. See [workflow run](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46003315297) and [CSV + manifest artifact](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46003315297/artifacts/15199048151).
+
+Selected independent-block results for the standardized Student-t(5) common-scale marginal (nominal alarm rate = 10%):
+
+| Calibration rho → test rho | Block length | Alarm rate | Wilson 95% interval |
+|---|---:|---:|---:|
+| 0.05 → 0.95 | 1 | 10.60% | 9.453–11.868% |
+| 0.05 → 0.95 | 8 | **4.56%** | 3.810–5.450% |
+| 0.05 → 0.95 | 32 | **3.92%** | 3.227–4.754% |
+| 0.95 → 0.05 | 1 | 9.64% | 8.544–10.860% |
+| 0.95 → 0.05 | 8 | **23.20%** | 21.587–24.895% |
+| 0.95 → 0.05 | 32 | **22.60%** | 21.003–24.281% |
+
+At block length 1, the independent-block rates remain close to the nominal 10% in both dependence-shift directions, consistent with the same one-point marginal distribution. At lengths 8 and 32, the block-max score distribution changes sharply: low-to-high dependence becomes over-conservative, while high-to-low dependence produces substantial undercoverage. This repeats the directional pattern observed under Gaussian marginals, although the magnitudes differ under the heavier-tailed, path-level scale mixture.
+
+The serial-path arms retain the additional cross-block dependence failure seen in #13959 and #13986. For example, high-to-low rho at block length 1 yields 18.68% alarms with no gap and 10.00% with gap 64; at block length 32, the serial-path rates are 32.12% with no gap and 33.72% with gap 64. The shared t5 scale cancels when comparing ranks within a single path, so those serial-path rates coincide with the Gaussian path's rank outcomes for the same seeds. The independent-block arm is therefore the clearest view of how the heavy-tail marginal interacts with a within-block dependence shift.
+
+**Interpretation:** the same calibration principle is fragile under both a Gaussian marginal and this standardized Student-t(5) common-scale marginal. The result is not an artifact of a mean/variance shift: each pointwise marginal remains fixed and unit variance. The scale-mixture model adds one shared latent factor per path, but does not model every common-cause or multivariate failure mode. These 2,500-trial results are exploratory; confirmatory replication should use more independent seeds and at least 50,000–100,000 trials per condition.
+
 ## Why Student-t(5) and the common scale matter
 
 A single marginal family can hide substantial dependence differences. The t5 mixture has heavier tails than a Gaussian while retaining finite variance. Sharing the latent scale across a path introduces tail co-movement, so extreme residuals can cluster. A robust calibration protocol should not assume that a Gaussian AR(1) diagnostic transfers to heavy-tailed, common-cause observations.
 
-The path-level scale model is a narrow, interpretable common-cause stressor. It is not a universal model of sensor faults, cross-channel dependence or arbitrary non-Gaussian time series.
+The path-level scale model is a narrow, interpretable common-cause stressor. It is not a universal model of sensor faults, cross-channel dependence or arbitrary non-Gaussian time series. In the current implementation, the t5 scale is shared across an independent AR path; this makes blocks within a serial path share the same latent scale, while each independent-block arm gets a separately drawn scale.
 
 ## Statistic and decision rule
 
