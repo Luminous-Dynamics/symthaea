@@ -255,7 +255,10 @@ pub fn evaluate_selective_observation(
             (
                 None,
                 Some(
-                    "pending labels have inclusion probability 1.0 under a design defined at this evaluation cutoff"
+                    concat!(
+                        "pending labels have inclusion probability 1.0 under a design ",
+                        "defined at this evaluation cutoff"
+                    )
                         .to_owned(),
                 ),
             )
@@ -543,17 +546,26 @@ fn compute_population_report(
         observed_model_policy,
         uncertainty_limitation: UNCERTAINTY_LIMITATION.to_owned(),
         assumptions: vec![
-            "The target population is the complete frozen prediction cohort; all candidate              predictions are available for every record."
-                .to_owned(),
+            concat!(
+                "The target population is the complete frozen prediction cohort; ",
+                "all candidate predictions are available for every record."
+            )
+            .to_owned(),
             "Every record has a known, strictly positive adjudication inclusion probability."
                 .to_owned(),
             "The inclusion probability is assigned using only pre-label information.".to_owned(),
-            "Conditional ignorability and the declared sampling design are external assumptions;              this evaluator cannot verify them."
-                .to_owned(),
+            concat!(
+                "Conditional ignorability and the declared sampling design are external ",
+                "assumptions; this evaluator cannot verify them."
+            )
+            .to_owned(),
             "Horvitz-Thompson estimates are not clipped and may leave [0, 1] in finite samples."
                 .to_owned(),
-            "Wilson intervals from the adjudicated-only lane are not valid for these weighted              estimates."
-                .to_owned(),
+            concat!(
+                "Wilson intervals from the adjudicated-only lane are not valid for ",
+                "these weighted estimates."
+            )
+            .to_owned(),
         ],
     }
 }
