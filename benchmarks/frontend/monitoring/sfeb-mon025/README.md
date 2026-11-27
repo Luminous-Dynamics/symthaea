@@ -23,16 +23,18 @@ Copy `.env.example` to `.env` and set a unique local-only password before runnin
 ```sh
 cp .env.example .env
 # Edit .env: set MON025_DB_PASSWORD and confirm the local-only settings.
-./scripts/labctl.sh preflight
-./scripts/labctl.sh up 18
-./scripts/capture-run-manifest.sh 18 mon025-run-001
-./scripts/capture-source-boundary.sh 18
-./scripts/register-connector.sh 18
-./scripts/seed-batch.sh 18 mon025-run-001 100
-./scripts/verify-cdc-events.sh 18 mon025-run-001 100
+bash scripts/labctl.sh preflight
+bash scripts/labctl.sh up 18
+bash scripts/capture-run-manifest.sh 18 mon025-run-001
+bash scripts/capture-source-boundary.sh 18
+bash scripts/register-connector.sh 18
+bash scripts/seed-batch.sh 18 mon025-run-001 100
+bash scripts/verify-cdc-events.sh 18 mon025-run-001 100
 ```
 
 To run the PostgreSQL 19 lane, use `./scripts/labctl.sh up 19` and register the connector against that service. Do not run the two source majors under the same connector identity/slot simultaneously.
+
+The database fixture is initialized on first start from `compose/initdb/001-mon025-schema.sql`. The scripts are invoked with `bash` because repository file mode may not yet mark them executable.
 
 The lab binds exposed ports to loopback only. It is single-node and non-HA. Kafka replication factors are 1. It is not a production deployment template.
 
@@ -58,4 +60,4 @@ The Compose restore service starts with traffic inaccessible on loopback-only po
 
 ## Execution status
 
-No Docker/Podman runtime is available in the authoring environment. Therefore no image pull, Compose startup, live connector registration, PostgreSQL transaction, Kafka event capture, pgBackRest invocation, physical backup or restore was performed here. Static JSON/schema validation, shell syntax checks and source-level checks are performed separately and reported accurately.
+No Docker/Podman runtime is available in the authoring environment. Therefore no image pull, Compose startup, live connector registration, PostgreSQL transaction, Kafka event capture, pgBackRest invocation, physical backup or restore was performed here. Static JSON and schema structure are intended to be checked before use. Exact-head shell syntax and Compose parsing have not yet been run; live integration remains pending.
