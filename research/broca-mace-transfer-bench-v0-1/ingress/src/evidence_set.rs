@@ -32,6 +32,9 @@ pub struct EvidencePairConstraintV1 {
     pub issuer_id: String,
     pub authority_receipt_sha256: String,
     pub constraint_policy_sha256: String,
+    pub valid_from_ms: i64,
+    pub valid_until_ms: Option<i64>,
+    pub known_at_ms: i64,
     pub canonical_sha256: String,
 }
 
@@ -44,6 +47,9 @@ impl EvidencePairConstraintV1 {
             self.right_evidence_id.as_str(), self.issuer_id.as_str(),
             self.authority_receipt_sha256.as_str(), self.constraint_policy_sha256.as_str(),
         ] { put_text(&mut h, value); }
+        h.update(self.valid_from_ms.to_be_bytes());
+        match self.valid_until_ms { Some(value) => { h.update([1]); h.update(value.to_be_bytes()); }, None => h.update([0]) }
+        h.update(self.known_at_ms.to_be_bytes());
         h.update([
             match self.relation { EvidencePairRelationV1::MustLink => 1, EvidencePairRelationV1::CannotLink => 2 },
             match self.reason {
@@ -168,6 +174,7 @@ pub enum EvidenceSetObstructionReasonV1 {
     InvalidContext, TooManyCandidates, InvalidCandidateId, InvalidCandidateDigest,
     DuplicateEvidenceId, DuplicateEventId, InvalidConstraint,
     ConstraintVerificationFailed, UnknownConstraintEndpoint, DuplicateConstraintId,
+    ConstraintNotKnownAtSnapshot, ConstraintOutsideValidityInterval,
     MustLinkCannotLinkConflict, RequiredConstraintConflict, RequiredSetExceedsBudget,
     NoFeasibleSelection,
 }
@@ -282,6 +289,8 @@ fn obstruction_code(v: EvidenceSetObstructionReasonV1) -> u8 {
         EvidenceSetObstructionReasonV1::RequiredConstraintConflict=>12,
         EvidenceSetObstructionReasonV1::RequiredSetExceedsBudget=>13,
         EvidenceSetObstructionReasonV1::NoFeasibleSelection=>14,
+        EvidenceSetObstructionReasonV1::ConstraintNotKnownAtSnapshot=>15,
+        EvidenceSetObstructionReasonV1::ConstraintOutsideValidityInterval=>16,
     }
 }
 fn obstruction(
@@ -355,6 +364,12 @@ pub fn select_evidence_set_v1(
         }
         if !seen_constraints.insert(c.constraint_id.as_str()){
             return Err(fail(EvidenceSetObstructionReasonV1::DuplicateConstraintId,vec![],vec![c.constraint_id.clone()]));
+        }
+        if c.known_at_ms > context.known_at_ms {
+            return Err(fail(EvidenceSetObstructionReasonV1::ConstraintNotKnownAtSnapshot,vec![c.left_evidence_id.clone(),c.right_evidence_id.clone()],vec![c.constraint_id.clone()]));
+        }
+        if context.valid_at_ms < c.valid_from_ms || c.valid_until_ms.is_some_and(|until|context.valid_at_ms>=until) {
+            return Err(fail(EvidenceSetObstructionReasonV1::ConstraintOutsideValidityInterval,vec![c.left_evidence_id.clone(),c.right_evidence_id.clone()],vec![c.constraint_id.clone()]));
         }
         if !verifier.verify_constraint(c,&context.constraint_policy_sha256){
             return Err(fail(EvidenceSetObstructionReasonV1::ConstraintVerificationFailed,vec![c.left_evidence_id.clone(),c.right_evidence_id.clone()],vec![c.constraint_id.clone()]));
@@ -564,6 +579,9 @@ mod tests {
             issuer_id: "did:key:constraint-authority".into(),
             authority_receipt_sha256: digest("constraint-receipt"),
             constraint_policy_sha256: digest("constraint-policy"),
+            valid_from_ms: 100,
+            valid_until_ms: Some(300),
+            known_at_ms: 200,
             canonical_sha256: String::new(),
         };
         value.seal_integrity();
@@ -738,6 +756,25 @@ mod tests {
         let obstruction = select_evidence_set_v1(&context(), &[candidate], &[], &TestConstraintVerifier).unwrap_err();
         assert_eq!(obstruction.reason, EvidenceSetObstructionReasonV1::InvalidCandidateDigest);
         assert!(obstruction.verify_integrity());
+    }
+
+
+    #[test]
+    fn pairwise_constraints_are_checked_at_the_context_bitemporal_snapshot() {
+        let receipts=[receipt(1),receipt(2)];
+        let candidates=[candidate("a",&receipts[0],10,5,false),candidate("b",&receipts[1],10,4,false)];
+        let mut future=constraint("future","a","b",EvidencePairRelationV1::CannotLink,EvidencePairReasonV1::PrivacyConflict);
+        future.known_at_ms=221;
+        future.seal_integrity();
+        let error=select_evidence_set_v1(&context(),&candidates,&[future],&TestConstraintVerifier).unwrap_err();
+        assert_eq!(error.reason,EvidenceSetObstructionReasonV1::ConstraintNotKnownAtSnapshot);
+
+        let mut expired=constraint("expired","a","b",EvidencePairRelationV1::CannotLink,EvidencePairReasonV1::PrivacyConflict);
+        expired.valid_until_ms=Some(180);
+        expired.seal_integrity();
+        let error=select_evidence_set_v1(&context(),&candidates,&[expired],&TestConstraintVerifier).unwrap_err();
+        assert_eq!(error.reason,EvidenceSetObstructionReasonV1::ConstraintOutsideValidityInterval);
+        assert!(error.verify_integrity());
     }
 
 }
