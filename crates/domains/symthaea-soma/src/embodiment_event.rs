@@ -267,7 +267,7 @@ impl EventPayload {
                     validate_identifier_max("verifier_receipt_ref", receipt_ref, 256)?;
                 }
                 if value.status == EvidenceState::Supported {
-                    if value.verifier_receipt_ref.as_deref().map_or(true, str::is_empty)
+                    if value.verifier_receipt_ref.as_deref().is_none_or(str::is_empty)
                         || evidence_refs.is_empty()
                     {
                         return Err(EventValidationError::MissingEvidenceReceipt);
