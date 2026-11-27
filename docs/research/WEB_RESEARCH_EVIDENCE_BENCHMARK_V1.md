@@ -281,6 +281,40 @@ LifeSciBench's reported artifact-heavy pass rate is 28.1% for GPT-Rosalind, vers
 
 Do not introduce a new web-research planner to solve an evidence-model defect. Reuse the existing retrieval subsystem and plug in the typed relation/adjudication process, preserving its candidate/evaluator boundary.
 
+## 7A. Outbound acquisition security is part of evidence integrity
+
+A source receipt is not trustworthy if the mechanism that acquired it can be redirected into an internal network. The bounded acquisition path in [PR #13854](https://github.com/Luminous-Dynamics/symthaea/pull/13854) currently uses a default reqwest client for search-result URLs. The branch audit found no visible destination-IP policy in the page-fetch path; reqwest follows redirects by default and honors system proxy settings unless configured otherwise. This is a security follow-on, not evidence that the bounded-acquisition work is invalid.
+
+[Issue #13870](https://github.com/Luminous-Dynamics/symthaea/issues/13870) owns the implementation. The required invariant is:
+
+> Every outbound research connection must be pinned to an address that was validated for that exact request. Redirects, retries and alternate addresses must repeat the same checks. A source-controlled URL or HTTP response must never increase the researcher's network authority.
+
+Required controls:
+- Parse and constrain the URL scheme, authority, user-info and destination port.
+- Resolve once, reject the whole A/AAAA set when any address is non-public or special-use, and pin the validated addresses into the connection resolver. Hostname-only checks are not sufficient because they leave a DNS rebinding / time-of-check-to-time-of-use gap.
+- Disable automatic redirects, or follow each hop manually with complete URL and address revalidation and a strict hop cap.
+- Disable implicit environment/system proxies unless an explicit trusted proxy mode has its own enforced destination policy.
+- Apply the same policy to provider adapters, retries and all fallback connections.
+- Retain structured URL/DNS/redirect/proxy rejection receipts; rejected destinations must not enter the successful captured-source inventory.
+- Require deployment-level egress controls as a separate defense-in-depth boundary.
+
+Security conformance metrics (separate from scientific accuracy):
+- **Forbidden-destination connection count:** target 0 across the full hostile matrix.
+- **Pinned-address agreement:** 100% of successful connections terminate at an address in the exact validated resolver result.
+- **Redirect revalidation:** 100% of redirect hops are either rejected or independently validated; no auto-follow bypass.
+- **Rejection accounting:** 100% of denied attempts have a typed receipt and remain excluded from the source inventory.
+- **Safe-path preservation:** controlled public-destination fixtures remain fetchable under the same resolver and policy.
+- **Proxy isolation:** no implicit proxy is used when proxy mode is disabled.
+
+The deterministic test matrix must include IPv4/IPv6 loopback, private/ULA, link-local, unspecified, multicast, broadcast, CGNAT, mapped IPv6, reserved/special-purpose ranges, mixed public+private DNS answers, DNS rebinding, internal-target redirects, redirect loops, scheme changes, malformed URLs, user-info, encoded IP forms, disallowed ports and environment proxy variables. Use an injected resolver and local controlled endpoints; tests must not contact live internal infrastructure.
+
+This is a binary security gate, not a weighted score that can be offset by better retrieval or report quality. Passing application tests does not prove deployment egress isolation, and no production security claim is allowed until both layers are independently inspected.
+
+Primary references:
+- OWASP SSRF Prevention Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
+- reqwest 0.13.5 redirect behavior and policy: https://docs.rs/reqwest/0.13.5/reqwest/redirect/
+- reqwest 0.13.5 DNS resolver override and address pinning API: https://docs.rs/reqwest/0.13.5/reqwest/struct.ClientBuilder.html
+
 ## 8. Claim boundary
 
 This is a benchmark protocol and code-audit map. The existing WebResearcher has not been evaluated on these external benchmarks, no current SOTA score is claimed, and the implementation PRs remain draft pending exact-head Rust qualification. The intended contribution is a measurable reduction in false support and unverifiable research claims, not a claim that fluent reports are equivalent to reliable scientific knowledge.
