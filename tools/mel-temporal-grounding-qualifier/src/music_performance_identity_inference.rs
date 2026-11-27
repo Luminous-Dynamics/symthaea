@@ -799,6 +799,16 @@ mod tests {
         );
         assert_eq!(report.item_count, 30);
         assert_eq!(report.source_work_clusters, 30);
+        assert_eq!(report.by_target_property.len(), 1);
+        assert_eq!(report.by_performance_stay_factor.len(), 1);
+        assert_eq!(report.by_musical_flip_factor.len(), 1);
+        assert_eq!(report.by_target_property[0].source_work_clusters, 30);
+        assert_eq!(report.by_performance_stay_factor[0].source_work_clusters, 30);
+        assert_eq!(report.by_musical_flip_factor[0].source_work_clusters, 30);
+        assert_eq!(
+            report.by_target_property[0].status,
+            PairedInferenceStatusV1::SourceWorkClusterFloorMet
+        );
         assert!(
             report
                 .performance_stay_false_difference
@@ -945,6 +955,79 @@ mod tests {
             original.musical_flip_miss.estimate
         );
         assert_eq!(report.joint_exact.estimate, original.joint_exact.estimate);
+    }
+
+    #[test]
+    fn sparse_property_stratum_is_not_estimable_even_when_overall_floor_is_met() {
+        let mut input = fixture();
+        let property_question = "Is the root pitch class the same?".to_string();
+        let property_question_sha256 = crate::music_listen_bench::sha256_hex(
+            property_question.as_bytes(),
+        );
+        for case in [&mut input.baseline, &mut input.candidate] {
+            let triad = case.triads.last_mut().unwrap();
+            triad.target_property =
+                crate::music_performance_identity::MusicalIdentityPropertyV1::RootPitchClass;
+            triad.musical_flip_factor =
+                crate::music_performance_identity::MusicalFlipFactorV1::RootPitchClassChange;
+            triad.target_property_reference_sha256 = "1".repeat(64);
+            triad.pairing_manifest_sha256 = "2".repeat(64);
+            for variant in [
+                &mut triad.clean,
+                &mut triad.performance_stay,
+                &mut triad.musical_flip,
+            ] {
+                variant.response.question = property_question.clone();
+                variant.response.question_sha256 = property_question_sha256.clone();
+            }
+        }
+
+        let report = audit_paired_musical_identity_comparison(&input).unwrap();
+        assert_eq!(report.source_work_clusters, 30);
+        let root = report
+            .by_target_property
+            .iter()
+            .find(|stratum| {
+                stratum.target_property
+                    == crate::music_performance_identity::MusicalIdentityPropertyV1::RootPitchClass
+            })
+            .unwrap();
+        assert_eq!(root.source_work_clusters, 1);
+        assert_eq!(root.status, PairedInferenceStatusV1::InsufficientSourceWorkClusters);
+        assert!(
+            root.performance_stay_false_difference
+                .candidate_improvement_interval
+                .is_none()
+        );
+        assert!(root.musical_flip_miss.candidate_improvement_interval.is_none());
+        assert!(root.joint_exact.candidate_improvement_interval.is_none());
+    }
+
+    #[test]
+    fn stay_improvement_does_not_hide_a_flip_regression() {
+        let mut input = fixture();
+        for triad in &mut input.candidate.triads {
+            triad.performance_stay.response.model_answer =
+                crate::music_performance_identity::MusicListenAnswerV1::ChoiceA;
+            triad.musical_flip.response.model_answer =
+                crate::music_performance_identity::MusicListenAnswerV1::ChoiceA;
+        }
+        let report = audit_paired_musical_identity_comparison(&input).unwrap();
+        assert!(
+            report
+                .performance_stay_false_difference
+                .estimate
+                .candidate_improvement
+                > 0.0
+        );
+        assert!(
+            report.musical_flip_miss.estimate.candidate_improvement
+                < 0.0
+        );
+        assert_ne!(
+            report.performance_stay_false_difference.estimate.candidate_improvement,
+            report.musical_flip_miss.estimate.candidate_improvement
+        );
     }
 
     #[test]
