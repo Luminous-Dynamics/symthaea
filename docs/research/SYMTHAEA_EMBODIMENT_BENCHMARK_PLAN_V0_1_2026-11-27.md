@@ -90,14 +90,14 @@ Use VideoFDB's published protocol and dataset if its terms permit. Do not claim 
 
 Report separate perception and generation scores. Preserve the four communication channels and the event families: dialogue/turn-taking, gaze/attention, face/expression, and body/gesture.
 
-Project target:
-- target >= 4.0/5 on matched full-duplex perception and >= 4.5/5 on matched full-duplex AV2AV generation as stretch goals;
-- target >= 90% TOR alignment with <= 500 ms median TOR latency on perception;
-- separately target >= 80% TOR alignment with <= 920 ms median TOR latency on generation;
+Project targets (not results):
+- matched full-duplex perception: >= 4.0/5, >= 92% TOR alignment, and <= 150 ms median TOR latency;
+- matched full-duplex AV2AV generation: >= 4.35/5, >= 60% TOR alignment, and <= 900 ms median TOR latency;
+- cross-architecture stretch (not an architecture-matched claim): >= 4.50/5 generation, >= 82% TOR alignment, and <= 800 ms, exceeding the current cascaded generation reference;
 - compare to the best matching full-duplex architecture/modality, not merely the highest overall row;
 - report every rubric axis, sample count, architecture, modality, weight availability and model/provider status.
 
-These are ambitious stretch targets, not current Symthaea results. They are deliberately stricter than the leading full-duplex reference in some dimensions and must be revised only through preregistered feasibility work, not after looking at held-out results. The highest aggregate perception and generation entries in VideoFDB v1.4 are cascaded; the leading full-duplex perception reference is Tavus Griffin Lite at 3.85/5 and 90.63% TOR alignment / 200 ms median latency. The leading full-duplex generation reference listed is Tavus Griffin Lite at 4.20/5 and 48.78% / 1,200 ms. Use official splits, preserve per-sample outputs, and do not tune on the evaluation set.
+The current VideoFDB v1.4 snapshot is dated 2026-11-25 and lists 13 full-duplex and 3 cascaded entries. Tavus Griffin Lite leads the full-duplex perception bucket at 3.85/5 and 90.63% TOR alignment / 200 ms median latency; it leads full-duplex generation at 4.20/5 and 48.78% / 1,200 ms. Anam Cara-5 Preview leads overall perception at 3.87/5 and generation at 4.44/5, but is cascaded (perception 87.88% / 920 ms; generation 80.00% / 920 ms). The targets above are intentionally above the matched full-duplex reference; the separate cross-architecture stretch is explicitly labelled as such. Use official splits, preserve per-sample outputs, and do not tune on the evaluation set.
 
 ### E2 — Turn-taking and response timing
 
@@ -122,6 +122,41 @@ Metrics:
 - calibration and confidence intervals clustered by conversation/session.
 
 Target: >= 90% turn-onset alignment on the frozen project test set after human annotation validation. A universal millisecond success window must not be invented; calibrate the permitted windows to each annotated conversational event.
+
+### E2.5 — Voice-only interaction quality and client timing
+
+Use InteractionBench as a complementary voice-only track, not a substitute for
+VideoFDB's audio-visual perception/generation protocol. It measures timing,
+spoken-task accuracy, whisper/volume control, and groundedness across 13
+scenarios (221 items per system in the published study).
+
+The November 2, 2026 preprint reports best tested dimension scores of 72% for
+spoken tasks, 86% for timing, 75% for whisper/volume, and 88% for groundedness;
+the best groundedness coherence score is 86/100. These results are specific to
+the dataset and sample; do not generalize them to all production interactions.
+
+Symthaea stretch targets on the same frozen protocol:
+- >= 80% spoken-task accuracy;
+- >= 90% conversational timing;
+- >= 85% whisper/volume control;
+- >= 92% groundedness probes;
+- response latency measured at the client output device, with p50 <= 1.0 s and
+  p95 <= 1.5 s on a named network/hardware profile.
+
+As an additional operational reference, Anam's vendor-published 2026-10-16
+full-pipeline study reports 1.24 s median / 1.84 s P95 response latency across
+4,703 measured turns and 60 participants. It is a vendor-published comparison,
+not an independent academic benchmark. Match provider pipeline, network,
+turn-boundary rules, and client measurement before asserting a win.
+
+Record source-media, model, client-output, and network clocks separately.
+Report early starts, wait-through-pause rate, interruption yield, backchannel
+robustness, p50/p95/p99 latency, and groundedness. Server-only timestamps cannot
+replace user-heard timing.
+
+References:
+- https://arxiv.org/abs/2611.02430
+- https://anam.ai/tools/latency-benchmark
 
 ### E3 — Cross-embodiment semantic consistency
 
