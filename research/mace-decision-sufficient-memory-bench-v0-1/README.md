@@ -250,7 +250,7 @@ Never label an estimate as measured cost. Cost-per-decision-gain and cost-per-va
 - **H6 — governance is part of capability:** poisoning resistance, deletion and isolation should predict downstream decision safety, not be treated as unrelated operational checkboxes.
 - **H7 — evidence has measurable causal influence:** leave-one-out interventions on returned evidence identify items whose presence improves or worsens the frozen downstream decision. The signal should remain reproducible under fixed reader, seed and evidence-resolution rules.
 
-These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator contains 20 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
+These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator now contains 25 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
 
 ## Baselines and industry comparison
 
@@ -279,6 +279,22 @@ The official Cycle 2 score breakdown suggests that the three tracks need differe
 The proposed advantage is not that HDC automatically solves these gaps. It is that typed temporal evidence, incremental update paths and explicit lineage give us testable hypotheses for addressing them. We should compare each intervention to a strong non-HDC baseline under the same model, evidence budget and query policy.
 
 The +3-point open-source goals are first external targets. The later stretch objective is to close the gap to the commercial leader without violating the academic model rules or sacrificing evidence governance.
+
+### Other external memory benchmark lanes
+
+These suites probe different capabilities and must be reported separately from AML and native DSM decision-regret values.
+
+| Benchmark | Published scope / reference | What MACE should test next | Proposed target (not a result) |
+|---|---|---|---|
+| AMA-Bench (ICML 2026) | Long-horizon agent trajectories; AMA-Agent reports 57.22% accuracy and +11.16 percentage points over its strongest matched baseline | Reproduce the official trajectory split and probe causal/objective transfer under held-out regimes | First exact replication; then +3 pp over the matched strongest baseline without additional hidden-state access |
+| MemoryArena (ICML 2026) | Multi-session Memory-Agent-Environment loops; its central claim is that memory retrieval and future task execution must be evaluated together | Compare end-task progress, constraint adherence and interaction cost across repeated sessions | +3 pp task success/progress at equal model, environment and interaction budget |
+| TimlMemBench (Findings EMNLP 2026) | 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases; canonical-pool and raw-native tracks | Preserve raw-native Add/ingest behaviour and split failure counts by revocation, scope, provenance, activation and restraint | ≥50% relative reduction in stale/revoked/scope-ineligible activation against the strongest matched baseline, with ≤1 pp answer-quality regression |
+| COLLABMEM (EMNLP 2026) | 58 scenarios/1,118 core probes; scaled split 174 scenarios/3,359 probes; TMS-GRAPH++ reports 69.6% non-Oracle average | Test role-filtered views, cross-role isolation, provenance routing and conflict updates under the official matched harness | +5 pp over the matched 69.6% reference and zero unauthorized cross-role disclosure in hard isolation cases |
+| Memora / FAMA (Findings ACL 2026) | Weeks-to-months personalized conversations; FAMA penalizes obsolete or invalidated memory reuse | Report official FAMA separately from decision regret; stress corrections, expiry and supersession | ≥50% relative reduction in invalid-memory reuse while preserving current-memory recall |
+| MEMORA-Bench (Findings EMNLP 2026) | 45-hour egocentric-video benchmark with retrospective memory faithfulness and prospective memory-grounded planning | Add an embodied lane with matched perception, typed spatial/object/action lineage and delayed planning goals | Reproduce the four-answer-model comparison, then target +3 pp prospective planning with non-inferior retrospective faithfulness |
+
+AMA-Bench's 57.22% result is from its own task mix and reader; COLLABMEM's 69.6% is its own non-Oracle multi-agent score. Neither number is directly comparable to AML's 0–100 track scores or MACE's integer decision-loss scale. For MemoryArena and MEMORA-Bench, report the official metrics and task conditions; the targets above are proposed experiments, not conversions into a shared score.
+
 
 The industry comparison must include both framework families and fixed baselines: lexical/vector hybrids, temporal or knowledge-graph memory, tiered episodic/semantic memory, reflection/consolidation systems and lifecycle-aware evidence models. Compare exact versions, models, prompts, budgets and evaluation procedures. A vendor feature list is not performance evidence.
 
@@ -379,6 +395,7 @@ For AML, keep the independent target of +3 absolute points over the published op
 - [Issue #13874](https://github.com/Luminous-Dynamics/symthaea/issues/13874) tracks encryption, retention and verifiable erasure.
 - [Issue #13875](https://github.com/Luminous-Dynamics/symthaea/issues/13875) tracks the official frozen Textual word counter.
 - [Issue #13893](https://github.com/Luminous-Dynamics/symthaea/issues/13893) tracks this research programme.
+- [PR #13935](https://github.com/Luminous-Dynamics/symthaea/pull/13935) adds retrieval-versus-decision-support scoring, source-family/root diversity and retrieved-conflict gates to the paired evaluator.
 
 These are authored engineering changes and proposed research work. No DSM evaluator, benchmark score, AML Smoke pass, leaderboard improvement, production deployment or SOTA result is claimed by this protocol document.
 
@@ -388,6 +405,11 @@ These are authored engineering changes and proposed research work. No DSM evalua
 2. Agent Memory Leaderboard, Add/Search API guide: https://agentmemoryleaderboard.ai/api-guide
 3. Wu et al., LongMemEval-V2, 2026: https://xiaowu0162.github.io/longmemeval-v2/
 4. Zhou et al., TimlMemBench, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.507/
+5. Zhao et al., AMA-Bench, ICML 2026: https://proceedings.mlr.press/v306/zhao26bs.html
+6. He et al., MemoryArena, ICML 2026: https://proceedings.mlr.press/v306/he26am.html
+7. Wu et al., COLLABMEM, EMNLP 2026: https://aclanthology.org/2026.emnlp-main.1194/
+8. Uddin et al., Memora / FAMA, Findings ACL 2026: https://aclanthology.org/2026.findings-acl.1337/
+9. Yu et al., MEMORA-Bench, Findings EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1211/
 5. Wu et al., LongMemEval, ICLR 2025: https://github.com/xiaowu0162/LongMemEval
 6. Tan et al., MemBench, Findings of ACL 2025: https://aclanthology.org/2025.findings-acl.989/
 7. Chen et al., MemSecBench, 2026 preprint: https://arxiv.org/abs/2607.27080
