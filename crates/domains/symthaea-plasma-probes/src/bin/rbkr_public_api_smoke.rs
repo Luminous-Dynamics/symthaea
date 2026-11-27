@@ -9,6 +9,7 @@
 //! integration boundary rather than only testing module-internal functions.
 
 use symthaea_plasma_probes::{
+    velocity_kick_remap::remap_distribution_after_velocity_kick,
     pulse_map::{PhasePoint, SinusoidalVelocityKick, check_pulse_jacobians_central_difference},
     EmpiricalGramian,
     rbkr::{
@@ -41,6 +42,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         PhasePoint { x: 0.0, v: 0.0 },
     )?;
     assert!(event_time.x.is_finite() && event_time.v.is_finite());
+
+    let velocity_edges = (0..=16)
+        .map(|index| -4.0 + 0.5 * index as f64)
+        .collect::<Vec<_>>();
+    let cell_averages = vec![vec![
+        0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0,
+    ]];
+    let remap = remap_distribution_after_velocity_kick(
+        &pulse,
+        &[std::f64::consts::PI / 2.0],
+        &velocity_edges,
+        &cell_averages,
+    )?;
+    assert!(remap.distribution[0].iter().all(|value| *value >= 0.0));
+    assert!(remap.total_boundary_outflow < 1.0e-12);
+    assert!(remap.total_mass_balance_residual.abs() < 1.0e-12);
 
     let identity = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
     let input = vec![vec![1.0], vec![0.0]];
