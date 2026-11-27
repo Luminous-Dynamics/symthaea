@@ -468,7 +468,7 @@ mod tests {
                 evidence_manifest: Some(&yoked_manifest),
                 source_audio_bytes: Some(&yoked_source),
                 decoded_pcm_bytes: Some(&yoked_pcm),
-                request_body_bytes: Some(YOKED_REQUEST_BODY),
+                request_body_bytes: Some(&yoked_request),
             },
         )
         .unwrap();
@@ -528,7 +528,7 @@ mod tests {
                     evidence_manifest: Some(&yoked_manifest),
                     source_audio_bytes: Some(&yoked_source),
                     decoded_pcm_bytes: Some(&yoked_pcm),
-                    request_body_bytes: Some(YOKED_REQUEST_BODY),
+                    request_body_bytes: Some(&yoked_request),
                 },
             )
             .is_err()
@@ -567,7 +567,7 @@ mod tests {
                     evidence_manifest: Some(&yoked_manifest),
                     source_audio_bytes: Some(&yoked_source),
                     decoded_pcm_bytes: Some(&yoked_pcm),
-                    request_body_bytes: Some(YOKED_REQUEST_BODY),
+                    request_body_bytes: Some(&yoked_request),
                 },
             )
             .is_err()
