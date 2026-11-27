@@ -135,8 +135,9 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
     selected = next((fact for fact in facts if fact.get("intervene", True)), facts[0])
     counter_values[selected["id"]] = distinct_value(seed, template_id, selected, baseline_values[selected["id"]])
     fact_kinds = {fact["id"]: fact["kind"] for fact in facts}
-    placebo_base = derive_value(seed, template_id, template["placebo"], "placebo-baseline")
-    placebo_counterfactual = distinct_value(seed, template_id, template["placebo"], placebo_base)
+    placebo_fact = dict(template["placebo"], id=template["placebo"].get("id", "P"))
+    placebo_base = derive_value(seed, template_id, placebo_fact, "placebo-baseline")
+    placebo_counterfactual = distinct_value(seed, template_id, placebo_fact, placebo_base)
 
     candidate_rows: list[dict[str, Any]] = []
     audit_rows: list[dict[str, Any]] = []
@@ -145,7 +146,8 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
         placebo_value = placebo_counterfactual if condition == "placebo" else placebo_base
         expanded = replace_markers(copy.deepcopy(template["source"]), values, fact_kinds)
         for pointer in template["placebo"]["paths"]:
-            set_pointer(expanded, pointer, placebo_value)
+            prefix = template["placebo"].get("prefix", "")
+            set_pointer(expanded, pointer, f"{prefix}{placebo_value}")
         sources = expanded["sources"]
         removed_source = None
         if condition == "source_removed":
@@ -173,6 +175,8 @@ def expand(seed: bytes, template: dict[str, Any]) -> tuple[list[dict[str, Any]],
             "task_id": opaque_id,
             "template_id": template_id,
             "condition": condition,
+            "baseline_values": baseline_values,
+            "counterfactual_values": counter_values,
             "expanded_values": values,
             "placebo_baseline": placebo_base,
             "placebo_variant": placebo_value,
