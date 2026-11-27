@@ -1162,7 +1162,10 @@ mod tests {
         report.downstream_consumption_allowed = false;
         report.report_sha256 = report_digest(report).unwrap();
         let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
-        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert_eq!(
+            assessment.diagnostic_state,
+            ShiftDiagnosticStateV1::InsufficientEvidence
+        );
         assert!(assessment.reason_codes.contains(&ShiftReasonCodeV1::LabelNotEligible));
         assert!(!engine.channel_states.contains_key(&("tool-a/ch-1".into(), ShiftSignalChannelV1::VmResidual)));
     }
@@ -1325,7 +1328,10 @@ mod tests {
             let assessment = observe_evidence_shift_v1(&mut engine, &sensor).unwrap();
             seq += 1;
             if i == 2 {
-                assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::SensorObservabilityShift);
+                assert_eq!(
+                    assessment.diagnostic_state,
+                    ShiftDiagnosticStateV1::SensorObservabilityShift
+                );
             }
         }
     }
@@ -1334,13 +1340,28 @@ mod tests {
     fn tool_scopes_do_not_share_detector_state() {
         let mut engine = engine();
         for i in 0..4 {
-            let observation = vm_residual_observation(i + 1, &format!("a-{i}"), "tool-a/ch-1", i as i64 + 1, 5.0, &format!("label-a-{i}"));
+            let observation = vm_residual_observation(
+                i + 1,
+                &format!("a-{i}"),
+                "tool-a/ch-1",
+                i as i64 + 1,
+                5.0,
+                &format!("label-a-{i}"),
+            );
             observe_evidence_shift_v1(&mut engine, &observation).unwrap();
         }
         let tool_b = vm_residual_observation(5, "b-1", "tool-b/ch-9", 5, 0.0, "label-b-1");
         let report = observe_evidence_shift_v1(&mut engine, &tool_b).unwrap();
-        assert_eq!(report.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
-        assert!(!report.channel_assessments.iter().any(|c| c.channel == ShiftSignalChannelV1::VmResidual && c.alert));
+        assert_eq!(
+            report.diagnostic_state,
+            ShiftDiagnosticStateV1::InsufficientEvidence
+        );
+        assert!(
+            !report
+                .channel_assessments
+                .iter()
+                .any(|c| c.channel == ShiftSignalChannelV1::VmResidual && c.alert)
+        );
     }
 
     #[test]
