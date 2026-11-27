@@ -87,6 +87,8 @@ pub struct PresentationPermit {
     event_id: String,
     grant_id: String,
     issued_at_monotonic_ns: String,
+    event_expires_at_monotonic_ns: String,
+    grant_expires_at_monotonic_ns: String,
     /// Minimum of event expiry and the exact grant expiry at decision time.
     expires_at_monotonic_ns: String,
     requested_intensity: f32,
@@ -109,6 +111,8 @@ impl PresentationPermit {
     pub fn event_id(&self) -> &str { &self.event_id }
     pub fn grant_id(&self) -> &str { &self.grant_id }
     pub fn issued_at_monotonic_ns(&self) -> &str { &self.issued_at_monotonic_ns }
+    pub fn event_expires_at_monotonic_ns(&self) -> &str { &self.event_expires_at_monotonic_ns }
+    pub fn grant_expires_at_monotonic_ns(&self) -> &str { &self.grant_expires_at_monotonic_ns }
     pub fn expires_at_monotonic_ns(&self) -> &str { &self.expires_at_monotonic_ns }
     pub fn sequence(&self) -> u64 { self.sequence }
     pub fn event_kind(&self) -> EventKind { self.event_kind }
@@ -357,6 +361,8 @@ impl PresentationPolicy {
             event_id: cue.event_id.clone(),
             grant_id: grant.grant_id.clone(),
             issued_at_monotonic_ns: now_monotonic_ns.to_owned(),
+            event_expires_at_monotonic_ns: event.expires_at_monotonic_ns.clone(),
+            grant_expires_at_monotonic_ns: grant.expires_at_monotonic_ns.clone(),
             expires_at_monotonic_ns: event_expires.min(grant_expires).to_string(),
             requested_intensity: request.requested_intensity,
             sequence: cue.sequence,
@@ -410,12 +416,16 @@ impl PresentationPolicy {
             .map_err(|_| DenialReason::InvalidTimestamp)?;
         let issued = parse_monotonic_ns(&permit.issued_at_monotonic_ns)
             .map_err(|_| DenialReason::InvalidTimestamp)?;
+        let event_expires = parse_monotonic_ns(&permit.event_expires_at_monotonic_ns)
+            .map_err(|_| DenialReason::InvalidTimestamp)?;
+        let prior_grant_expires = parse_monotonic_ns(&permit.grant_expires_at_monotonic_ns)
+            .map_err(|_| DenialReason::InvalidTimestamp)?;
         let permit_expires = parse_monotonic_ns(&permit.expires_at_monotonic_ns)
             .map_err(|_| DenialReason::InvalidTimestamp)?;
         if issued > now {
             return Err(DenialReason::EventObservedInFuture);
         }
-        if permit_expires <= now {
+        if event_expires <= now || prior_grant_expires <= now || permit_expires <= now {
             return Err(DenialReason::PermitExpired);
         }
         if !permit.requested_intensity.is_finite()
@@ -452,7 +462,8 @@ impl PresentationPolicy {
         }
 
         let mut refreshed = permit.clone();
-        refreshed.expires_at_monotonic_ns = permit_expires.min(grant_expires).to_string();
+        refreshed.grant_expires_at_monotonic_ns = grant.expires_at_monotonic_ns.clone();
+        refreshed.expires_at_monotonic_ns = event_expires.min(grant_expires).to_string();
         refreshed.effective_intensity =
             permit.requested_intensity.min(grant.max_intensity);
         refreshed.motion_mode =
