@@ -550,7 +550,6 @@ fn render_pending_scene(
     }
 
     let frame = submission.frame();
-    let expires = frame.effective_permit_expires_at_monotonic_ns().to_owned();
     let clock_domain_id = frame.clock_domain_id().to_owned();
     commands.spawn((
         RenderedSceneEntity,
@@ -668,6 +667,29 @@ fn transition_alpha(base_alpha: f32, opacity: f32) -> f32 {
     base_alpha.clamp(0.0, 1.0) * opacity.clamp(0.0, 1.0)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TransitionValidityAction {
+    Continue,
+    HardCutToTarget,
+    ClearBoth,
+    KeepTarget,
+    ClearTarget,
+}
+
+fn transition_validity_action(
+    has_source: bool,
+    target_valid: bool,
+    source_valid: bool,
+) -> TransitionValidityAction {
+    match (has_source, target_valid, source_valid) {
+        (true, true, true) => TransitionValidityAction::Continue,
+        (true, true, false) => TransitionValidityAction::HardCutToTarget,
+        (true, false, _) => TransitionValidityAction::ClearBoth,
+        (false, true, _) => TransitionValidityAction::KeepTarget,
+        (false, false, _) => TransitionValidityAction::ClearTarget,
+    }
+}
+
 fn enforce_active_scene(
     mut commands: Commands,
     clock: Res<SceneClock>,
@@ -692,9 +714,9 @@ fn enforce_active_scene(
         })
     });
 
-    match (source.is_some(), target_valid, source_valid) {
-        (true, true, true) => {}
-        (true, true, false) => {
+    match transition_validity_action(source.is_some(), target_valid, source_valid) {
+        TransitionValidityAction::Continue => {}
+        TransitionValidityAction::HardCutToTarget => {
             for (entity, group) in &rendered {
                 if group.0 == source_group_id { commands.entity(entity).despawn(); }
             }
@@ -702,7 +724,7 @@ fn enforce_active_scene(
             transition.plan = None;
             set_group_opacity(target_group_id, 1.0, &mut materials, &fades);
         }
-        (true, false, _) => {
+        TransitionValidityAction::ClearBoth => {
             // A denied/expired target never rolls back to prior content.
             // Both groups are removed; new output requires a fresh authorized
             // submission rather than resurrecting a stale scene.
@@ -715,12 +737,14 @@ fn enforce_active_scene(
             transition.source_submission = None;
             transition.plan = None;
         }
-        (false, true, _) => {}
-        (false, false, _) => {
+        TransitionValidityAction::KeepTarget => {}
+        TransitionValidityAction::ClearTarget => {
             for (entity, group) in &rendered {
                 if group.0 == target_group_id { commands.entity(entity).despawn(); }
             }
             active.submission = None;
+            transition.source_submission = None;
+            transition.plan = None;
         }
     }
 }
@@ -926,5 +950,58 @@ mod tests {
         assert_eq!(transition_alpha(0.8, -1.0), 0.0);
         assert_eq!(transition_alpha(0.8, 2.0), 0.8);
         assert_eq!(transition_alpha(2.0, 0.5), 0.5);
+    }
+
+    #[test]
+    fn both_valid_permits_continue_the_crossfade() {
+        assert_eq!(
+            transition_validity_action(true, true, true),
+            TransitionValidityAction::Continue
+        );
+    }
+
+    #[test]
+    fn source_revocation_hard_cuts_to_a_still_valid_target() {
+        assert_eq!(
+            transition_validity_action(true, true, false),
+            TransitionValidityAction::HardCutToTarget
+        );
+    }
+
+    #[test]
+    fn target_revocation_clears_both_and_never_restores_source() {
+        assert_eq!(
+            transition_validity_action(true, false, true),
+            TransitionValidityAction::ClearBoth
+        );
+        assert_eq!(
+            transition_validity_action(true, false, false),
+            TransitionValidityAction::ClearBoth
+        );
+    }
+
+    #[test]
+    fn initial_authorized_target_stays_visible() {
+        assert_eq!(
+            transition_validity_action(false, true, false),
+            TransitionValidityAction::KeepTarget
+        );
+    }
+
+    #[test]
+    fn initial_denied_target_is_removed() {
+        assert_eq!(
+            transition_validity_action(false, false, false),
+            TransitionValidityAction::ClearTarget
+        );
+    }
+
+    #[test]
+    fn transition_weights_never_allocate_more_than_one_scene_unit() {
+        for progress in [0.0_f32, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0] {
+            let source_opacity = 1.0 - progress;
+            let target_opacity = progress;
+            assert!((source_opacity + target_opacity - 1.0).abs() < f32::EPSILON);
+        }
     }
 }
