@@ -1,6 +1,6 @@
 # SDCB decision-certified numerical computation v1
 
-**Status:** Research specification and implementation handoff. No certified probability enclosure or decision-certificate implementation is claimed by this document.
+**Status:** Research specification plus an authored finite outcome action-value enclosure reference (`scripts/research/sdcb_decision_value_bounds.rs`, eight Rust tests). No certified Gaussian probability enclosure implementation is claimed; the action-value reference consumes already supplied probability intervals. Rust tests remain uncompiled/unexecuted.
 
 ## 1. Motivation
 
@@ -100,7 +100,24 @@ Otherwise:
 
 This is numerical refinement, not a new experiment planner. #13567 remains the owner of policy-tree optimization, non-anticipativity, and resource budgets. #13739 remains the owner of selector benchmarking.
 
-## 5. Invariants and negative controls
+
+## 5.1 Authored finite action-value enclosure reference
+
+`scripts/research/sdcb_decision_value_bounds.rs` implements the finite box-plus-normalization subproblem: given cell probability intervals `[l_i,u_i]`, and finite per-cell utilities `v_i`, bound
+
+`min/max sum_i p_i v_i` subject to `l_i <= p_i <= u_i` and `sum_i p_i = 1`.
+
+It uses the LP dual identity
+
+`E[v] = lambda + sum_i (v_i-lambda) p_i`
+
+and evaluates utility breakpoints as dual multipliers. Each multiplication/addition is expanded outward by one binary64 representable step. An exact binary64 probability-sum accumulator (integer units of 2^-1074) checks feasibility of the interval box plus exact unit-sum constraint without a rounded sum comparison. It selects a unique best action only when that action's lower value bound strictly exceeds every competing upper bound.
+
+Eight Rust tests are authored for exact unit sums, decimal-float overage, a 3-cell utility fixture, exact probabilities, negative utilities, infeasible boxes, unique action separation, unresolved overlap and malformed inputs. A separate Python oracle using exact `Fraction.from_float` summation and `nextafter` outward arithmetic passed the fixed fixtures and 2,000 randomized box-plus-normalization LP-extrema checks. This is independent authoring-runtime verification, not Rust execution or a formally verified compiler/arithmetic proof.
+
+Current scope is deliberately limited to interval boxes plus one normalization equality. Extra pairwise marginal or cross-moment constraints are not handled by this module; they require a richer constrained LP. This is an evaluator only: it does not construct experiments, mutate #13805, authorize actions or validate the supplied probability enclosures themselves.
+
+## 6. Invariants and negative controls
 
 - Every certified interval contains every frozen analytical/high-precision known answer.
 - Joint cells remain nonnegative and jointly normalized within the sum of their enclosure widths; marginal constraints are preserved.
@@ -112,7 +129,7 @@ This is numerical refinement, not a new experiment planner. #13567 remains the o
 - Budget exhaustion never returns a point result labelled certified.
 - Numerical uncertainty alone never changes #13805 evidence state or authorizes a physical action.
 
-## 6. Benchmark protocol
+## 7. Benchmark protocol
 
 Compare on identical inputs, hardware, precision, and resource budgets:
 
@@ -152,7 +169,7 @@ Our reproduction matrix should therefore separate (a) exact paper replication on
 
 Publish all failed, unsupported, and unresolved cases. Do not collapse correctness, enclosure tightness, and throughput into one score.
 
-## 7. Acceptance gates (targets, not achieved results)
+## 8. Acceptance gates (targets, not achieved results)
 
 - 100% containment of all frozen analytical and independently validated references.
 - Zero results labelled certified when any error component is unbounded or heuristic.
@@ -163,7 +180,7 @@ Publish all failed, unsupported, and unresolved cases. Do not collapse correctne
 - Decision refinement reduces median computation on clear-margin cases relative to a fixed stringent tolerance, without worsening false-ranking or containment gates.
 - Unresolved cases remain abstentions, not forced rankings.
 
-## 8. Implementation sequence
+## 9. Implementation sequence
 
 1. Audit all current numerical error sources in #13944/#13951 and write an explicit error ledger.
 2. Implement certified normal interval/tail enclosures and validate them independently.
@@ -174,7 +191,7 @@ Publish all failed, unsupported, and unresolved cases. Do not collapse correctne
 7. Benchmark against the matched numerical comparators and publish enclosure-width/latency Pareto results.
 8. Only after the low-dimensional path is independently qualified, investigate validated higher-dimensional QMC/importance-sampling enclosures.
 
-## 9. References
+## 10. References
 
 - Peterlin, J. (2026), “Doubly blocked variant of Genz's method for multivariate normal integration,” Computational Statistics 41(6), DOI: https://doi.org/10.1007/s00180-026-01794-8.
 - Genz and Bretz, Computation of Multivariate Normal and t Probabilities, Springer, and the R package mvtnorm: https://cran.r-project.org/package=mvtnorm.
