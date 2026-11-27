@@ -331,7 +331,7 @@ impl RestartedRankSpectrumMonitor {
         for (component, next_active) in self
             .components
             .iter_mut()
-            .zip(next_active_wealths.into_iter())
+            .zip(next_active_wealths)
         {
             component.log_active_wealth = next_active;
         }
