@@ -166,23 +166,51 @@
   "negative": [
     {
       "name": "audio-bytes-differ-across-counterfactual-pair",
+      "base_positive": "turn-yield-counterfactual-pair",
       "expected_rejection": "audio_digest_mismatch",
-      "mutation": "Change av-counterfactual audio_digest to a new valid 64-character digest."
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/conditions/1/audio_digest",
+          "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
     },
     {
       "name": "video-timing-profile-mismatch",
+      "base_positive": "turn-yield-counterfactual-pair",
       "expected_rejection": "video_timing_profile_mismatch",
-      "mutation": "Change the av-counterfactual frame_count to 149 while retaining the same pair_id."
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/conditions/1/timing_profile/frame_count",
+          "value": 149
+        }
+      ]
     },
     {
       "name": "cue-interval-exceeds-video-duration",
+      "base_positive": "turn-yield-counterfactual-pair",
       "expected_rejection": "cue_interval_out_of_bounds",
-      "mutation": "Set av-positive cue end_ms to 6000 when duration_ms is 5000."
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/conditions/0/annotated_visual_cue/end_ms",
+          "value": 6000
+        }
+      ]
     },
     {
       "name": "task-requires-visual-evidence-but-no-positive-cue",
+      "base_positive": "turn-yield-counterfactual-pair",
       "expected_rejection": "missing_decision_relevant_visual_cue",
-      "mutation": "Set task_requires_visual_evidence=true but remove the positive visual cue annotation."
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/conditions/0/annotated_visual_cue",
+          "value": null
+        }
+      ]
     }
   ]
 }
