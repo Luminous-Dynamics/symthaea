@@ -567,7 +567,11 @@
         "pulse_map_parameter_jacobian_required",
         "split_solver_composition_order_required",
         "independent_finite_difference_cross_check_required",
-        "branch_change_disposition"
+        "branch_change_disposition",
+        "pulse_application_time_jacobian_required",
+        "pulse_time_finite_difference_cross_check_required",
+        "pulse_time_sensitivity_convention",
+        "pulse_time_sensitivity_status"
       ],
       "properties": {
         "status": {
@@ -593,6 +597,18 @@
         },
         "branch_change_disposition": {
           "const": "UNKNOWN_OR_HANDOFF"
+        },
+        "pulse_application_time_jacobian_required": {
+          "const": true
+        },
+        "pulse_time_finite_difference_cross_check_required": {
+          "const": true
+        },
+        "pulse_time_sensitivity_convention": {
+          "const": "scheduled_reset_D_R_f_minus_plus_R_t_minus_f_plus"
+        },
+        "pulse_time_sensitivity_status": {
+          "const": "synthetic_not_computed"
         }
       }
     },
