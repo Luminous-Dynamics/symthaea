@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "research/broca-mace-transfer-bench-v0-1/ingress/**"
+      - "research/broca-mace-transfer-bench-v0-1/policy/**"
       - "research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json"
       - "docs/research/MACE_USE_TIME_REVALIDATION_V0_1.md"
       - ".github/workflows/mace-use-time-revalidation.yml"
@@ -13,6 +14,7 @@ on:
       - research/mace-use-time-revalidation-v0-1
     paths:
       - "research/broca-mace-transfer-bench-v0-1/ingress/**"
+      - "research/broca-mace-transfer-bench-v0-1/policy/**"
       - "research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json"
       - "docs/research/MACE_USE_TIME_REVALIDATION_V0_1.md"
       - ".github/workflows/mace-use-time-revalidation.yml"
