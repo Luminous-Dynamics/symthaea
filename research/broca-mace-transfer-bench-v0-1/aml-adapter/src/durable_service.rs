@@ -459,6 +459,7 @@ mod tests {
         unknown_reconcile: bool,
         hide_visibility: bool,
         inject_cross_user_search_result: bool,
+        tamper_source_metadata: bool,
         fail_write_before_commit: bool,
     }
 
@@ -600,12 +601,18 @@ mod tests {
                 return Ok(Vec::new());
             }
             let wanted: BTreeSet<&str> = memory_ids.iter().map(String::as_str).collect();
-            Ok(self
+            let mut records: Vec<DurableMemoryRecordV1> = self
                 .visible
                 .iter()
                 .filter(|record| record.user_id == user_id && wanted.contains(record.id.as_str()))
                 .cloned()
-                .collect())
+                .collect();
+            if self.tamper_source_metadata {
+                if let Some(record) = records.first_mut() {
+                    record.timestamp_ms = Some(record.timestamp_ms.unwrap_or_default().saturating_add(1));
+                }
+            }
+            Ok(records)
         }
 
         fn release_uncommitted_add(
@@ -776,6 +783,19 @@ mod tests {
             service.add(Track::Textual, &request),
             Err(DurableAmlServiceErrorV1::CommitOutcomeUnknown)
         );
+    }
+
+    #[test]
+    fn changed_source_timestamp_blocks_success_acknowledgement() {
+        let mut store = FakeDurableStore::default();
+        store.tamper_source_metadata = true;
+        let mut service = service(store);
+        let request = add_request("durable-source-metadata", "user-a", "source timestamp matters");
+        assert_eq!(
+            service.add(Track::Textual, &request),
+            Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch)
+        );
+        assert!(service.store.entries.values().all(|entry| !entry.finalized));
     }
 
     #[test]
