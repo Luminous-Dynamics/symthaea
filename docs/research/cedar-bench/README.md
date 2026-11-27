@@ -17,7 +17,7 @@ The benchmark is motivated by Abbas, Zia and Windridge, “Cited but Unused: Par
 
 ## Split isolation
 
-Templates are assigned by task family to disjoint train (10), development (5) and sealed-test (5) groups. The generator defaults to `sealed_test`; pass `train`, `development` or `sealed_test` as the third argument to select a split. `all` exists only for the non-scoring CI smoke test. The candidate output does not disclose split labels; the auditor stream records them. Do not expose the sealed-test family templates or seed during candidate development.
+Templates are assigned by task family to disjoint train (10), development (5) and sealed-test (5) groups. The generator defaults to `sealed_test`; pass `train`, `development` or `sealed_test` as the third argument to select a split. `all` exists only for the non-scoring CI smoke test. The candidate output does not disclose split labels; the auditor stream records them. The current v0 templates and family assignments are public in this PR, so this is a structural held-out split, not a truly secret benchmark. The HMAC-generated fact values remain hidden without the run seed. Before confirmatory scoring, move sealed-test templates to an independent private evaluator (or regenerate held-out families from private seeds) and freeze candidate/model versions first.
 
 ## Separation of duties
 
@@ -26,7 +26,7 @@ The generator uses CEDAR_BENCH_SEED (at least 32 bytes; operators must supply 25
 - candidate JSONL: one randomized trial per condition, with only prompt, source bundle and opaque task ID;
 - auditor JSONL: condition labels, generated values, source digests and expected behavior.
 
-Store auditor output separately from the candidate environment. Do not upload generated auditor keys to public CI artifacts. The static CI test verifies template structure only; do not use a public fixed seed for a scored evaluation.
+Store auditor output separately from the candidate environment. Do not upload generated auditor keys to public CI artifacts. The CI stream check uses a public deterministic smoke seed and is explicitly non-scoring. Never use that seed for evaluation. Current template structures are public; only generated values are hidden by the per-run seed.
 
 ## Conditions
 
