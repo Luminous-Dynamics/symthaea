@@ -34,6 +34,7 @@ const (
 )
 type Observation struct {
 	FaultIDs []string `json:"fault_ids"`
+	TrialID string `json:"trial_id"`
 	FaultSetSHA256 string `json:"fault_set_sha256"`
 	ScenarioSHA256 string `json:"scenario_sha256"`
 	RecoveryBoundarySHA256 string `json:"recovery_boundary_sha256"`
@@ -136,7 +137,7 @@ func validateInput(in Input,f *flags)map[string]Observation{
 		if !valid{f.block("observation_fault_ids_invalid");continue}
 		digest:=digestJSON(ids)
 		if !validDigest(o.FaultSetSHA256)||o.FaultSetSHA256!=digest{f.block("observation_fault_set_digest_mismatch");continue}
-		if o.ScenarioSHA256!=in.ScenarioSHA256||o.RecoveryBoundarySHA256!=in.RecoveryBoundarySHA256||o.CodeRevision!=in.CodeRevision{
+		if o.TrialID!=in.TrialID||o.ScenarioSHA256!=in.ScenarioSHA256||o.RecoveryBoundarySHA256!=in.RecoveryBoundarySHA256||o.CodeRevision!=in.CodeRevision{
 			f.block("observation_scope_mismatch");continue
 		}
 		if o.ObservedAt.IsZero()||(!in.EvaluatedAt.IsZero()&&o.ObservedAt.After(in.EvaluatedAt)){f.block("observation_time_invalid");continue}
