@@ -29,6 +29,7 @@ use crate::mace_context_exposure_receipt::{
     MaceMemoryExposureSpanV1,
     MaceRequestBodyArtifactV1,
     MaceExposureReceiptSignerV1,
+    MaceExposureAdmissionVerifierV1,
     MACE_CONTEXT_EXPOSURE_MAX_BODY_BYTES_V1,
     MACE_CONTEXT_EXPOSURE_MAX_SPANS_V1,
 };
@@ -114,6 +115,7 @@ pub enum MaceExposureCaptureRejectV1 {
     InvalidResponseBinding,
     ReceiptSigningFailed,
     InvalidCaptureContext,
+    EvidenceAdmissionRejected,
 }
 
 pub struct MaceExposureCaptureContextV1<'a> {
@@ -276,6 +278,7 @@ pub fn capture_send_and_sign_mace_invocation_v1(
     request: &MaceProviderNeutralRequestV1,
     expected: &MaceExpectedExposureBindingV1<'_>,
     context: MaceExposureCaptureContextV1<'_>,
+    admission_verifier: &impl MaceExposureAdmissionVerifierV1,
     artifact_writer: &impl MaceRequestBodyArtifactWriterV1,
     transport: &impl MaceProviderTransportV1,
     signer: &impl MaceExposureReceiptSignerV1,
@@ -292,6 +295,16 @@ pub fn capture_send_and_sign_mace_invocation_v1(
     validate_digest(expected.observer_profile_sha256)?;
 
     let serialized = serialize_mace_provider_request_with_exposure_map_v1(request, expected.arm)?;
+
+    // Admission occurs before immutable storage or provider transport. Every
+    // typed memory segment must carry a fresh, use-bound ingress receipt and
+    // a current purpose/rights decision.
+    for exposure in serialized.exposures() {
+        admission_verifier
+            .verify_admitted_exposure(exposure, expected)
+            .map_err(|_| MaceExposureCaptureRejectV1::EvidenceAdmissionRejected)?;
+    }
+
     let body_sha256 = serialized.body_sha256();
     let artifact = artifact_writer
         .store_immutable_encrypted(serialized.body(), expected)
@@ -752,6 +765,7 @@ mod tests {
                     candidate_decision_trace_sha256: D8, admission_denials: vec![],
                     model_declared_support_event_ids: vec![],
                 },
+                &AcceptEvidence,
                 &TestArtifactStore, &TestTransport, &signer(),
             ).unwrap_err(),
             MaceExposureCaptureRejectV1::EmptyModel
@@ -807,6 +821,7 @@ mod tests {
                     candidate_decision_trace_sha256: D8, admission_denials: vec![],
                     model_declared_support_event_ids: vec![],
                 },
+                &AcceptEvidence,
                 &WrongArtifactStore, &TestTransport, &signer()
             ).unwrap_err(),
             MaceExposureCaptureRejectV1::ArtifactBindingMismatch
