@@ -166,6 +166,7 @@ fn assumptions(model: &str) -> GaussianLinearLongMemoryEvidenceV1 {
         absolute_error_score_definition_sha256: score_definition_sha(),
         assumption_evidence_sha256: digest('b'),
         gaussian_iid_innovations_declared: true,
+        zero_mean_residuals_declared: true,
         regularly_varying_coefficients_declared: true,
         fixed_predictor_independent_of_calibration_and_test_declared: true,
         leading_coefficient_abs_lower_bound: 0.1,
