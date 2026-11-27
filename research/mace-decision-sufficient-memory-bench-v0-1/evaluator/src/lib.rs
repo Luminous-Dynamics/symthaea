@@ -79,6 +79,45 @@ pub struct CandidateRunV1 {
     pub decision_support_evidence_ids: Vec<String>,
 }
 
+/// Candidate run v2 binds the unchanged v1 decision/evidence record to a
+/// measurement-aware cost receipt. Unknown values must not be represented as zero.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CandidateRunV2 {
+    pub run: CandidateRunV1,
+    pub cost: CostReceiptV2,
+}
+
+/// Paired score v2 keeps decision scoring and both arms' cost evidence together.
+/// It does not collapse distinct cost dimensions into a weighted scalar.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PairedScoreV2 {
+    pub paired: PairedScoreV1,
+    pub memory_cost: CostReceiptV2,
+    pub no_memory_cost: CostReceiptV2,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PairedEvaluationErrorV2 {
+    Decision(EvaluationErrorV1),
+    Cost(CostReceiptErrorV2),
+}
+
+pub fn score_paired_v2(
+    case: &EvaluatorCaseV1,
+    memory: &CandidateRunV2,
+    no_memory: &CandidateRunV2,
+) -> Result<PairedScoreV2, PairedEvaluationErrorV2> {
+    memory.cost.validate().map_err(PairedEvaluationErrorV2::Cost)?;
+    no_memory.cost.validate().map_err(PairedEvaluationErrorV2::Cost)?;
+    let paired = score_paired(case, &memory.run, &no_memory.run)
+        .map_err(PairedEvaluationErrorV2::Decision)?;
+    Ok(PairedScoreV2 {
+        paired,
+        memory_cost: memory.cost,
+        no_memory_cost: no_memory.cost,
+    })
+}
+
 /// Exact integer ratio. A missing ratio is used when its denominator is zero.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CountRatioV1 {
@@ -1725,6 +1764,86 @@ mod tests {
         assert_eq!(
             forged_zero.validate(),
             Err(CostReceiptErrorV2::ResourceStatusValueMismatch)
+        );
+    }
+
+    fn cost_v2(
+        retained: ResourceQuantityV2,
+        index: ResourceQuantityV2,
+        network: ResourceQuantityV2,
+    ) -> CostReceiptV2 {
+        CostReceiptV2 {
+            phases: PhaseTimingsV1 {
+                add_ingest_ns: 1,
+                index_update_ns: 2,
+                retrieval_ns: 3,
+                evidence_verification_ns: 4,
+                policy_application_ns: 5,
+                maintenance_ns: 6,
+                unattributed_ns: 7,
+                wall_ns: 28,
+            },
+            measured_cost_microunits: None,
+            estimated_cost_microunits: None,
+            retained_bytes: retained,
+            index_bytes: index,
+            network_bytes: network,
+        }
+    }
+
+    fn measured_bytes(value: u64) -> ResourceQuantityV2 {
+        ResourceQuantityV2 {
+            value: Some(value),
+            status: ResourceMeasurementStatusV2::Measured,
+        }
+    }
+
+    fn unknown_bytes() -> ResourceQuantityV2 {
+        ResourceQuantityV2 {
+            value: None,
+            status: ResourceMeasurementStatusV2::Unknown,
+        }
+    }
+
+    #[test]
+    fn paired_v2_binds_cost_receipts_without_changing_v1_decision_score() {
+        let memory = CandidateRunV2 {
+            run: run("mace", "hold", &["signed-current"]),
+            cost: cost_v2(measured_bytes(128), measured_bytes(64), unknown_bytes()),
+        };
+        let no_memory = CandidateRunV2 {
+            run: run("no-memory", "abstain", &[]),
+            cost: cost_v2(measured_bytes(0), measured_bytes(0), unknown_bytes()),
+        };
+        let result = score_paired_v2(&case(), &memory, &no_memory).expect("valid cost receipts");
+        assert_eq!(result.paired.memory_gain_micros, 2_000_000);
+        assert_eq!(result.memory_cost.retained_bytes, measured_bytes(128));
+        assert_eq!(result.no_memory_cost.retained_bytes, measured_bytes(0));
+        assert_eq!(result.memory_cost.network_bytes, unknown_bytes());
+    }
+
+    #[test]
+    fn paired_v2_rejects_cost_report_that_turns_unknown_into_zero() {
+        let memory = CandidateRunV2 {
+            run: run("mace", "hold", &["signed-current"]),
+            cost: cost_v2(
+                measured_bytes(128),
+                measured_bytes(64),
+                ResourceQuantityV2 {
+                    value: Some(0),
+                    status: ResourceMeasurementStatusV2::Unknown,
+                },
+            ),
+        };
+        let no_memory = CandidateRunV2 {
+            run: run("no-memory", "abstain", &[]),
+            cost: cost_v2(measured_bytes(0), measured_bytes(0), unknown_bytes()),
+        };
+        assert_eq!(
+            score_paired_v2(&case(), &memory, &no_memory),
+            Err(PairedEvaluationErrorV2::Cost(
+                CostReceiptErrorV2::ResourceStatusValueMismatch
+            ))
         );
     }
 
