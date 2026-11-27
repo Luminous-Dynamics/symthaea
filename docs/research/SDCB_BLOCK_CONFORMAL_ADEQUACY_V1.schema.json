@@ -33,11 +33,15 @@
         },
         "model_set_digest": {
           "type": "string",
-          "minLength": 1
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
         },
         "scoring_protocol_digest": {
           "type": "string",
-          "minLength": 1
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
         },
         "exchangeability_unit": {
           "enum": [
@@ -84,11 +88,15 @@
         },
         "model_set_digest": {
           "type": "string",
-          "minLength": 1
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
         },
         "scoring_protocol_digest": {
           "type": "string",
-          "minLength": 1
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
         },
         "nonconformity_scores": {
           "type": "array",
