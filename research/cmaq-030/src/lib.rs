@@ -889,7 +889,9 @@ mod tests {
     #[test]
     fn reference_must_be_bound_to_exact_candidate_margin_block() {
         let mut m = manifest(19);
-        m.calibration_units[0].reference.candidate_margin_block_sha256 = digest('0');
+        m.calibration_units[0]
+            .reference
+            .candidate_margin_block_sha256 = digest('0');
         assert_eq!(
             calibrate_recoverability_margin(contract(), &m),
             Err(MarginCalibrationError::RuntimeScopeMismatch(
