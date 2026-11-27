@@ -892,14 +892,14 @@ pub fn validate_preregistration(root: &Value) -> ValidationReport {
         "experiment_id",
         "protocol_version",
         "preregistered_at_utc",
-        "preregistration_commit",
+        "protocol_contract_commit",
     ] {
         require_string(&mut report, root, &["experiment", field]);
     }
-    if !string_at(root, &["experiment", "preregistration_commit"])
+    if !string_at(root, &["experiment", "protocol_contract_commit"])
         .is_some_and(|value| is_lower_hex(value, 40))
     {
-        report.issue("PREREGISTRATION_COMMIT_INVALID", "expected a frozen 40-character lowercase commit SHA");
+        report.issue("PROTOCOL_CONTRACT_COMMIT_INVALID", "expected a frozen 40-character lowercase commit SHA");
     }
     if !string_at(root, &["experiment", "preregistered_at_utc"])
         .is_some_and(|value| value.ends_with('Z'))
@@ -929,7 +929,7 @@ mod tests {
             Value::String(raw) if PLACEHOLDERS.iter().any(|marker| raw.contains(marker)) => {
                 let replacement = if key == "preregistered_at_utc" {
                     "2026-11-06T00:00:00Z".to_owned()
-                } else if key == "preregistration_commit" || key == "analysis_code_commit" {
+                } else if key == "protocol_contract_commit" || key == "analysis_code_commit" {
                     "b".repeat(40)
                 } else if key == "confirmatory_seed_count" {
                     "10".to_owned()
