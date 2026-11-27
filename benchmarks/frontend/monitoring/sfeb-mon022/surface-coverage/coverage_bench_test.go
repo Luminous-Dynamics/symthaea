@@ -10,7 +10,7 @@ func fixture(n int) Request {
 		id:=fmt.Sprintf("surface-%08d",i)
 		scope:=fmt.Sprintf("scope-%08d",i)
 		r.Surfaces=append(r.Surfaces,SurfaceSpec{ID:id,Class:"table_or_state_object",ScopeDigest:scope,RequiredForRowStream:true,RequiredForFullState:true})
-		r.Attestations=append(r.Attestations,Attestation{ID:"att-"+id,SurfaceID:id,Mode:NativeReplication,SourceSystem:"src",TargetSystem:"dst",SourceControlRoot:"src-root",TargetControlRoot:"dst-root",ScopeDigest:scope,SourceStateDigest:"state",TargetStateDigest:"state",MethodProfileDigest:"method",EvidenceDigest:"evidence",Verified:true,Complete:true,ObservedAt:10,FreshUntil:1000})
+		r.Attestations=append(r.Attestations,Attestation{ID:"att-"+id,SurfaceID:id,Mode:NativeReplication,SourceSystem:"src",TargetSystem:"dst",SourceControlRoot:"src-root",TargetControlRoot:"dst-root",InventoryDigest:"inventory",ScopeDigest:scope,SourceStateDigest:"state",TargetStateDigest:"state",StateDigestProfile:"state-v1",MethodProfileDigest:"method",EvidenceDigest:"evidence",EvidenceSubjectID:"att-"+id,EvidenceProfile:"mon022-surface-coverage-attestation-v1",Verified:true,Complete:true,ObservedAt:10,FreshUntil:1000})
 	}
 	return r
 }
