@@ -2225,7 +2225,7 @@ mod tests {
         wrong_unit.utility_unit = "dollars".into();
         assert!(matches!(
             ingest_as_known(&wrong_unit, query(180, 250), &TestVerifier::default()),
-            Err(IngestReject::InvalidMeasurementBound)
+            Err(IngestReject::OutcomeUnitMismatch)
         ));
         let mut after_validity = raw();
         after_validity.outcome_observed_at_ms = 350;
@@ -2356,7 +2356,11 @@ mod tests {
             .map(ConsolidationEvidenceRefV1::experience)
             .collect();
         let query_b = Query { scope: scope() };
+        for item in &memory_b {
+            println!("decision-chain candidate: {item:?}; qualified={}", is_qualified(item, query_b));
+        }
         let decision_b = decide(Policy::CausalQualified, &memory_b, query_b);
+        println!("decision-chain result: {decision_b:?}");
         assert_eq!(decision_b.action, Some(Action::A));
 
         let session_c_verifier = TestVerifier {
@@ -3050,6 +3054,7 @@ mod tests {
     fn unknown_or_unverified_lineage_is_rejected() {
         let unknown = TestVerifier {
             root_id: 0,
+            unknown_root_digest: true,
             ..TestVerifier::default()
         };
         assert!(matches!(
@@ -3225,8 +3230,12 @@ mod tests {
             Err(EvidenceUseRejectV1::DependencyLineageIncomplete)
         );
         let permissive = EvidenceUseContextV1 { require_complete_dependency_lineage: false, ..strict };
+        let future_receipt = TestVerifier {
+            raw_event_received_at_ms: 280,
+            ..TestVerifier::default()
+        };
         assert_eq!(
-            revalidate_for_use_v1(&raw(), &prior, query(180, 210), &permissive, &TestVerifier::default()),
+            revalidate_for_use_v1(&raw(), &prior, query(180, 270), &permissive, &future_receipt),
             Err(EvidenceUseRejectV1::RevalidationRejected(IngestReject::RecordedAfterKnownAt))
         );
     }
