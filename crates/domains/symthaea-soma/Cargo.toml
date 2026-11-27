@@ -67,3 +67,6 @@ required-features = ["broca-full"]
 [[test]]
 name = "proptest_soma"
 required-features = ["prop-tests"]
+[[bin]]
+name = "verify_interaction_trace"
+path = "src/bin/verify_interaction_trace.rs"
