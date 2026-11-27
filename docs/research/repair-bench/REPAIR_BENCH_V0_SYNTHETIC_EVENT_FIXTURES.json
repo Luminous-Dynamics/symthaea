@@ -43,8 +43,8 @@
           "kind": "CSV_CELL",
           "record_index": 0,
           "column_name": "temperature_C",
-          "byte_start": 38,
-          "byte_end": 42
+          "byte_start": 36,
+          "byte_end": 40
         },
         "raw_lexeme": "21.5",
         "parsed_value": 21,
@@ -57,8 +57,8 @@
           "kind": "CSV_CELL",
           "record_index": 1,
           "column_name": "temperature_C",
-          "byte_start": 48,
-          "byte_end": 52
+          "byte_start": 47,
+          "byte_end": 51
         },
         "raw_lexeme": "19.0",
         "parsed_value": 19,
@@ -71,8 +71,8 @@
           "kind": "CSV_CELL",
           "record_index": 0,
           "column_name": "control",
-          "byte_start": 43,
-          "byte_end": 44
+          "byte_start": 41,
+          "byte_end": 42
         },
         "raw_lexeme": "0",
         "parsed_value": 0
@@ -84,8 +84,8 @@
           "kind": "CSV_CELL",
           "record_index": 1,
           "column_name": "control",
-          "byte_start": 53,
-          "byte_end": 54
+          "byte_start": 52,
+          "byte_end": 53
         },
         "raw_lexeme": "0",
         "parsed_value": 0
@@ -348,7 +348,9 @@
         "reassessed_changed": [
           "claim_mean_temperature",
           "claim_above_threshold",
-          "claim_controls_zero"
+          "claim_controls_zero",
+          "analysis_mean_temperature",
+          "analysis_control_check"
         ],
         "reassessed_unchanged": [
           "claim_protocol_version"
@@ -474,16 +476,18 @@
       },
       "expected": {
         "reassessed_changed": [
+          "obs_temp_s01",
           "analysis_mean_temperature",
-          "claim_mean_temperature",
-          "claim_above_threshold",
-          "decision_temperature_alert"
+          "claim_mean_temperature"
         ],
         "reassessed_unchanged": [
+          "obs_temp_s02",
+          "obs_threshold",
+          "claim_above_threshold",
+          "decision_temperature_alert",
           "analysis_control_check",
           "claim_controls_zero",
           "decision_control_accept",
-          "obs_threshold",
           "claim_protocol_version"
         ],
         "blocked": [],
@@ -598,7 +602,13 @@
           "claim_above_threshold",
           "claim_controls_zero",
           "decision_temperature_alert",
-          "decision_control_accept"
+          "decision_control_accept",
+          "obs_temp_s01",
+          "obs_temp_s02",
+          "obs_control_s01",
+          "obs_control_s02",
+          "analysis_mean_temperature",
+          "analysis_control_check"
         ],
         "unresolved": [],
         "not_dependent": [
