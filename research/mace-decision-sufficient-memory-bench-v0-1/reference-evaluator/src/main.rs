@@ -110,6 +110,7 @@ struct Response {
     candidate_sha256: String,
     arm_binding_sha256: String,
     action: String,
+    retrieved_evidence_ids: Vec<String>,
     selected_evidence_ids: Vec<String>,
     observation_requests: usize,
     cost: Cost,
@@ -117,12 +118,40 @@ struct Response {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Cost {
-    ingest_operations: u64,
-    query_operations: u64,
-    maintenance_operations: u64,
-    retained_bytes: u64,
-    returned_bytes: u64,
+    ingest_operations: Option<u64>,
+    query_operations: Option<u64>,
+    maintenance_operations: Option<u64>,
+    retained_bytes: Option<u64>,
+    returned_bytes: Option<u64>,
     latency_us: Option<u64>,
+    detailed_receipt: Option<DetailedCostReceipt>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct PhaseTimingsNs {
+    memory_selection_ns: u64,
+    index_build_ns: u64,
+    retrieval_ns: u64,
+    evidence_resolution_verification_ns: u64,
+    policy_application_ns: u64,
+    unattributed_coordinator_ns: u64,
+    total_wall_ns: u64,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct DetailedCostReceipt {
+    schema_version: String,
+    latency_ns: Option<u64>,
+    phase_timings_ns: Option<PhaseTimingsNs>,
+    input_tokens: Option<u64>,
+    model_calls: Option<u64>,
+    tool_calls: Option<u64>,
+    external_tool_calls: Option<u64>,
+    index_bytes: Option<u64>,
+    index_bytes_kind: Option<String>,
+    evidence_sidecar_bytes: Option<u64>,
+    evidence_sidecar_bytes_kind: Option<String>,
+    unmeasured_cost_stages: Vec<String>,
 }
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -144,6 +173,13 @@ struct ScoreRow {
     gain_vs_declared_no_memory_reference: f64,
     worse_than_declared_no_memory_reference: bool,
     changed_action_vs_declared_no_memory_reference: bool,
+    retrieved_evidence_count: usize,
+    admissible_retrieved_evidence_count: usize,
+    invalid_retrieved_evidence_count: usize,
+    stale_or_superseded_retrieved_count: usize,
+    untrusted_retrieved_count: usize,
+    forbidden_retrieved_count: usize,
+    retrieved_evidence_precision: Option<f64>,
     selected_evidence_count: usize,
     admissible_evidence_count: usize,
     invalid_evidence_count: usize,
@@ -335,18 +371,29 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
     if r.arm_id.trim().is_empty() || !c.candidate.allowed_actions.contains(&r.action) {
         return Err(format!("{id}: empty arm or disallowed action"));
     }
-    if r.selected_evidence_ids.len() > c.candidate.evidence_budget ||
+    if r.retrieved_evidence_ids.len() > c.candidate.evidence_budget ||
         r.observation_requests > c.candidate.observation_budget {
-        return Err(format!("{id}: evidence/observation budget exceeded"));
+        return Err(format!("{id}: retrieved-evidence/observation budget exceeded"));
     }
     let event_map: BTreeMap<&str, &SourceEvent> = c.candidate.source_events.iter()
         .map(|e| (e.event_id.as_str(), e)).collect();
     let forbidden: BTreeSet<String> = p.evaluator_private.forbidden_evidence_ids.iter().cloned().collect();
     let required: BTreeSet<String> = p.evaluator_private.required_evidence_ids.iter().cloned().collect();
+    let mut retrieved: BTreeSet<String> = BTreeSet::new();
+    let (mut admissible_retrieved_n, mut stale_retrieved_n, mut untrusted_retrieved_n, mut forbidden_retrieved_n) = (0usize, 0usize, 0usize, 0usize);
+    for event_id in &r.retrieved_evidence_ids {
+        if !retrieved.insert(event_id.clone()) { return Err(format!("{id}: duplicate retrieved evidence {event_id}")); }
+        let event = event_map.get(event_id.as_str()).ok_or_else(|| format!("{id}: unknown retrieved evidence {event_id}"))?;
+        if !current_at(event, c.candidate.query_time_ms) || invalidated(event_id, &c.candidate.source_events, c.candidate.query_time_ms) { stale_retrieved_n += 1; }
+        if event.authority_tier == AuthorityTier::Untrusted { untrusted_retrieved_n += 1; }
+        if forbidden.contains(event_id) { forbidden_retrieved_n += 1; }
+        if admissible(event, &c.candidate, &forbidden) { admissible_retrieved_n += 1; }
+    }
     let mut selected: BTreeSet<String> = BTreeSet::new();
     let (mut admissible_n, mut stale_n, mut untrusted_n, mut forbidden_n) = (0usize, 0usize, 0usize, 0usize);
     for event_id in &r.selected_evidence_ids {
         if !selected.insert(event_id.clone()) { return Err(format!("{id}: duplicate selected evidence {event_id}")); }
+        if !retrieved.contains(event_id) { return Err(format!("{id}: selected evidence was not in retrieved evidence set: {event_id}")); }
         let event = event_map.get(event_id.as_str()).ok_or_else(|| format!("{id}: unknown selected evidence {event_id}"))?;
         if !current_at(event, c.candidate.query_time_ms) || invalidated(event_id, &c.candidate.source_events, c.candidate.query_time_ms) { stale_n += 1; }
         if event.authority_tier == AuthorityTier::Untrusted { untrusted_n += 1; }
@@ -378,6 +425,15 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
         gain_vs_declared_no_memory_reference: declared_no_memory_reference_loss - loss,
         worse_than_declared_no_memory_reference: loss > declared_no_memory_reference_loss + 1e-9,
         changed_action_vs_declared_no_memory_reference: r.action != p.evaluator_private.no_memory_action,
+        retrieved_evidence_count: r.retrieved_evidence_ids.len(),
+        admissible_retrieved_evidence_count: admissible_retrieved_n,
+        invalid_retrieved_evidence_count: r.retrieved_evidence_ids.len().saturating_sub(admissible_retrieved_n),
+        stale_or_superseded_retrieved_count: stale_retrieved_n,
+        untrusted_retrieved_count: untrusted_retrieved_n,
+        forbidden_retrieved_count: forbidden_retrieved_n,
+        retrieved_evidence_precision: if r.retrieved_evidence_ids.is_empty() { None } else {
+            Some(admissible_retrieved_n as f64 / r.retrieved_evidence_ids.len() as f64)
+        },
         selected_evidence_count: r.selected_evidence_ids.len(),
         admissible_evidence_count: admissible_n, invalid_evidence_count: invalid_n,
         stale_or_superseded_evidence_count: stale_n, untrusted_evidence_count: untrusted_n,
@@ -386,7 +442,9 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
             Some(admissible_n as f64 / r.selected_evidence_ids.len() as f64)
         },
         required_evidence_recall: recall,
-        decision_sufficient: (loss - oracle_loss).abs() <= 1e-9 && required_found == required.len() && invalid_n == 0 && contradiction_pairs == 0,
+        decision_sufficient: (loss - oracle_loss).abs() <= 1e-9 && required_found == required.len() &&
+            invalid_n == 0 && r.retrieved_evidence_ids.len().saturating_sub(admissible_retrieved_n) == 0 &&
+            contradiction_pairs == 0,
         attack_case: p.evaluator_private.attack_case,
         observation_requests: r.observation_requests,
         observation_cost_units: c.candidate.observation_cost_units,
