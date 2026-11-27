@@ -202,5 +202,10 @@ These are research gates. No QUANT benchmark result, dataset acquisition, physic
 - ISO/IEC Guide 98-3:2008 / JCGM 100, Guide to the Expression of Uncertainty in Measurement (GUM).
 - ISO/IEC Guide 98-3 Supplement 1 / JCGM 101, Propagation of distributions using a Monte Carlo method.
 - Kok, G. and Tabandeh, S. (2026), *Uncertainty Evaluation for Testing and Calibrating Mobile Sensors Only Using Short Collocation Periods*, Quality and Reliability Engineering International 42(7), 4298–4309. DOI: https://doi.org/10.1002/qre.70319
+- NBN catalogue entry for CEN/TS 17660-1:2021 (gaseous pollutants): https://app.nbn.be/data/r/platform/frontend/detail?p40_id=199863&p_lang=en
+- NBN catalogue entry for CEN/TS 17660-2:2024 (particulate matter): https://app.nbn.be/data/r/platform/frontend/detail?lang=en&p40_id=2670286&p40_language_code=en
+- ISO/JCGM introduction to the Guide to the Expression of Uncertainty in Measurement (GUM): https://www.iso.org/sites/JCGM/GUM-introduction.htm
+- ISO/IEC Guide 98-3:2008 status and catalogue record: https://www.iso.org/standard/50461.html
+- BIPM/OIML/ILAC/ISO joint declaration on metrological traceability: https://www.bipm.org/documents/20126/42177518/BIPM-OIML-ILAC-ISO_joint_declaration_2011.pdf
 - Terminal-Bench-Science live task set and contribution process: https://github.com/harbor-framework/terminal-bench-science/ and https://www.terminal-bench-science.ai/contribute
 - ASI-Bench task catalog: https://asibench.apexin.ai/tasks/catalog/
