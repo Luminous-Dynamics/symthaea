@@ -282,6 +282,7 @@ fn current_at(e: &SourceEvent, at: i64) -> bool {
 fn invalidated(id: &str, events: &[SourceEvent], at: i64) -> bool {
     events.iter().any(|event|
         event.observed_at_ms <= at && event.valid_from_ms <= at &&
+        event.authority_tier != AuthorityTier::Untrusted &&
         matches!(event.relation_to_parent, Some(Relation::Supersedes | Relation::Retracts)) &&
         event.parent_event_ids.iter().any(|parent| parent == id))
 }
@@ -554,6 +555,8 @@ mod tests {
         let sup=event("s".into(),"s1".into(),2,0,None,AuthorityTier::Verified,0,"s",Relation::Supersedes,vec!["p".into()]);
         assert!(!invalidated("p",&[sup.clone()],1));
         assert!(invalidated("p",&[sup],2));
+        let untrusted_revoke=event("u".into(),"attacker".into(),2,0,None,AuthorityTier::Untrusted,0,"fake revoke",Relation::Retracts,vec!["p".into()]);
+        assert!(!invalidated("p",&[untrusted_revoke],2));
     }
     #[test] fn untrusted_evidence_is_never_admissible(){
         let e=event("e".into(),"s".into(),1,0,None,AuthorityTier::Untrusted,0,"x",Relation::Asserts,vec![]);
