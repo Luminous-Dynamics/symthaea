@@ -54,6 +54,36 @@ Fixtures cover:
 
 **Hard gate:** 100% expected outcomes on deterministic positive and negative controls; zero accepted stale, replayed, cross-session, mixed-clock, over-budget, or causally backdated events. Invalid traces are excluded from quality averages and reported separately.
 
+### E0.5 — Consent and presentation authorization
+
+**Purpose:** Prove that semantic events cannot directly authorize an output.
+
+The renderer boundary must apply the default-deny policy in the
+embodiment_policy.rs module. A permit is a scoped decision, not proof of renderer
+execution, consent authenticity, or physical safety.
+
+Deterministic positive controls cover an explicitly granted form/channel/
+destination with a live session and clock. Negative controls cover missing or
+expired grants, mismatched session/clock, ungranted forms/channels/destinations,
+LocalSensitive output to shared/remote sinks, Restricted data, cancellation,
+pause, channel revocation, and invalid intensity.
+
+**Hard gate:** zero unauthorized permits across the complete deterministic
+negative-control corpus; 100% expected allow/deny outcomes; no semantic or
+provenance change from motion reduction or intensity clamping. A renderer must
+re-check revocation/cancellation immediately before output.
+
+Targets (not results):
+- local pause/revocation effective before the next renderer update;
+- p99 policy decision latency below 1 ms at 10,000 decisions/s on named hardware;
+- zero sensor activations caused by a presentation grant;
+- 100% traceability from source cue to policy decision and observed renderer outcome.
+
+Consent authentication, sensor capture permission, remote data export, and
+physical actuator safety are separate contracts and must not be inferred from
+this module. See
+[Embodiment Consent and Presentation Policy](SYMTHAEA_EMBODIMENT_CONSENT_POLICY_V0_1_2026-11-27.md).
+
 ### E1 — Full-duplex conversational behavior
 
 Use VideoFDB's published protocol and dataset if its terms permit. Do not claim a VideoFDB leaderboard result unless the official evaluation path and artifact requirements are followed.
