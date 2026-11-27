@@ -125,17 +125,18 @@ The v0.1 seed fixtures and JSON Schema are synthetic protocol examples, not a va
 | Cross-scope isolation | Similar IDs or content exist in different users or evaluation runs | Never expose another user's or run's evidence, before ranking or content resolution |
 | Cross-lingual provenance | A memory is written in one language and queried in another, including code-switching | Preserve semantic qualifiers, entities, uncertainty and source-language traceability; do not fabricate a translation |
 | Representation migration | An embedding, HDC codebook, graph schema or index version changes | Preserve canonical evidence and lineage; verify migration equivalence and support atomic rollback |
+| Verified procedural memory | Ordered successful tool traces are compiled into a reusable skill/procedure | Require source-event citations, independently checked outcome, preconditions, permissions, environment applicability, version admission and revocation propagation |
 
 ### First confirmatory slice
 
-The first implementation should not attempt all nine families. Begin with four deterministic families:
+The first implementation should not attempt all listed families. Begin with four deterministic families:
 
 1. Temporal drift and supersession.
 2. Contradiction and source authority.
 3. Source revocation.
 4. Insufficient evidence and selective abstention.
 
-Add poisoning, compression, streaming and erasure only after the reference evaluator and negative controls are stable. Coordinate security cases with MemSecBench rather than claiming to replace it. Treat cross-lingual provenance and representation migration as follow-on families after the four-family baseline; add source/query language pairs and version-upgrade/rollback controls with independent annotations.
+Add poisoning, compression, streaming and erasure only after the reference evaluator and negative controls are stable. Coordinate security cases with MemSecBench rather than claiming to replace it. Treat cross-lingual provenance and representation migration as follow-on families after the four-family baseline; add source/query language pairs and version-upgrade/rollback controls with independent annotations. Treat verified procedural memory as a separate follow-on workstream tracked in [issue #13922](https://github.com/Luminous-Dynamics/symthaea/issues/13922); compare against Zep Agent Skills and other trace-to-skill systems rather than claiming procedural memory as novel.
 
 ## Experimental design
 
@@ -299,6 +300,16 @@ MACE target sequence:
 - **Frontier target:** exceed the current +2.823 LAFS leader while preserving evidence traceability and governance controls.
 - **Raw-accuracy stretch:** challenge the 81.4% OPS result, but do not claim superiority unless the latency/accuracy frontier also improves.
 - **Do not compare AML scores, DSM decision-regret values and LongMemEval-V2 accuracy/LAFS as a shared scale.**
+
+A new adjacent capability is now production-relevant: Zep Agent Skills compiles independently verified task traces into immutable, versioned source-cited procedures, gates admission and reuses verified outcomes to adjust retrieval rank. Its November 2026 paper reports 4.5–18.8 percentage-point transfer gains on selected task suites. This is prior art, not a MACE result. The separate MACE research issue #13922 investigates whether stronger evidence qualification, applicability checks, independent replay and counterfactual procedure evaluation can improve on or complement this design.
+
+References:
+- https://arxiv.org/abs/2611.01386
+- https://help.getzep.com/v4/agent-skills
+- https://docs.letta.com/configuration/memory
+- https://github.com/mem0ai/memory-benchmarks
+
+Vendor-reported Zep Graphiti LongMemEval (90.2%, 162ms) and Mem0 LongMemEval V1 (94.4% Top-200) are not LongMemEval-V2 results and must not be compared directly with the V2 accuracy/LAFS frontier. Re-run each system under the same official harness before drawing performance conclusions.
 
 ## Initial gates and target setting
 
