@@ -71,7 +71,6 @@ jobs:
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/challenge_search.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/response_balanced_contract_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/vpl_echo_contract_audit.rs
-          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/vpl_echo_contract_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/rbkr_public_api_smoke.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/pulse_map.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs
@@ -114,7 +113,6 @@ jobs:
           cp crates/domains/symthaea-plasma-probes/src/bin/positive_mass_projection_audit.rs "${crate_dir}/src/bin/positive_mass_projection_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/small_positive_response_qp_audit.rs "${crate_dir}/src/bin/small_positive_response_qp_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/response_balanced_contract_audit.rs "${crate_dir}/src/bin/response_balanced_contract_audit.rs"
-          cp crates/domains/symthaea-plasma-probes/src/bin/vpl_echo_contract_audit.rs "${crate_dir}/src/bin/vpl_echo_contract_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/vpl_echo_contract_audit.rs "${crate_dir}/src/bin/vpl_echo_contract_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/rbkr_public_api_smoke.rs "${crate_dir}/src/bin/rbkr_public_api_smoke.rs"
           cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
@@ -1044,7 +1042,7 @@ jobs:
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
-          root = Path("\${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb")
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb")
           schema = json.loads((root / "kresp-cl-vpl-contract-v0.1.schema.json").read_text())
           fixture = json.loads((root / "fixtures/synthetic-vpl-echo-growth-v0.1.json").read_text())
           Draft202012Validator.check_schema(schema)
@@ -1091,8 +1089,8 @@ jobs:
 
       - name: Run Rust K-RESP-CL semantic contract auditor
         run: |
-          cargo run --locked --manifest-path "\${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin vpl_echo_contract_audit -- \
-            "\${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
+          cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin vpl_echo_contract_audit -- \
+            "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
 
       - name: Challenge Rust K-RESP-CL auditor with negative controls
         run: |
@@ -1103,7 +1101,7 @@ jobs:
           import tempfile
           from pathlib import Path
 
-          root = Path("\${{ runner.temp }}/plasma-probe-validation")
+          root = Path("${{ runner.temp }}/plasma-probe-validation")
           fixture_path = root / "benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
           fixture = json.loads(fixture_path.read_text())
           binaries = list(root.glob("**/debug/vpl_echo_contract_audit"))
@@ -1136,7 +1134,7 @@ jobs:
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
-          root = Path("\${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb")
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb")
           schema = json.loads((root / "kresp-cl-vpl-contract-v0.1.schema.json").read_text())
           fixture = json.loads((root / "fixtures/synthetic-vpl-echo-growth-v0.1.json").read_text())
           Draft202012Validator.check_schema(schema)
@@ -1183,8 +1181,8 @@ jobs:
 
       - name: Run Rust K-RESP-CL semantic contract auditor
         run: |
-          cargo run --locked --manifest-path "\${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin vpl_echo_contract_audit -- \
-            "\${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
+          cargo run --locked --manifest-path "${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin vpl_echo_contract_audit -- \
+            "${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
 
       - name: Challenge Rust K-RESP-CL auditor with negative controls
         run: |
@@ -1195,7 +1193,7 @@ jobs:
           import tempfile
           from pathlib import Path
 
-          root = Path("\${{ runner.temp }}/plasma-probe-validation")
+          root = Path("${{ runner.temp }}/plasma-probe-validation")
           fixture_path = root / "benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
           fixture = json.loads(fixture_path.read_text())
           binaries = list(root.glob("**/debug/vpl_echo_contract_audit"))
