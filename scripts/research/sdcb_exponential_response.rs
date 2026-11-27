@@ -44,10 +44,14 @@ impl FirstOrderResponseOu {
         if !response_time_constant.is_finite() || response_time_constant <= 0.0 {
             return Err(ResponseModelError::InvalidResponseTimeConstant);
         }
+        let mu = 1.0 / response_time_constant;
+        if !mu.is_finite() || mu <= 0.0 {
+            return Err(ResponseModelError::InvalidResponseTimeConstant);
+        }
         Ok(Self {
             lambda,
             process_variance,
-            mu: 1.0 / response_time_constant,
+            mu,
         })
     }
 
@@ -67,7 +71,14 @@ impl FirstOrderResponseOu {
     /// For the declared OU + first-order filter:
     /// cov(x,z) = var(z) = mu * var(x) / (lambda + mu).
     pub fn stationary_covariance(&self) -> [[f64; 2]; 2] {
-        let cross = self.mu * self.process_variance / (self.lambda + self.mu);
+        // Compute mu/(lambda+mu) without overflowing the sum.
+        let response_fraction = if self.mu >= self.lambda {
+            1.0 / (1.0 + self.lambda / self.mu)
+        } else {
+            let ratio = self.mu / self.lambda;
+            ratio / (1.0 + ratio)
+        };
+        let cross = response_fraction * self.process_variance;
         [
             [self.process_variance, cross],
             [cross, cross],
@@ -211,6 +222,14 @@ mod tests {
     }
 
     #[test]
+    fn near_equal_rates_remain_continuous() {
+        let model = FirstOrderResponseOu::new(1.0, 1.0, 1.0 / (1.0 + 1.0e-12)).unwrap();
+        let actual = model.sensor_autocovariance(1.0).unwrap();
+        let repeated_root_limit = (-1.0_f64).exp();
+        close(actual, repeated_root_limit, 2.0e-12);
+    }
+
+    #[test]
     fn zero_lag_cross_covariance_is_the_stationary_covariance() {
         let model = FirstOrderResponseOu::new(0.7, 2.3, 1.4).unwrap();
         let p = model.stationary_covariance();
@@ -260,6 +279,10 @@ mod tests {
         );
         assert_eq!(
             FirstOrderResponseOu::new(1.0, 1.0, 0.0).unwrap_err(),
+            ResponseModelError::InvalidResponseTimeConstant
+        );
+        assert_eq!(
+            FirstOrderResponseOu::new(1.0, 1.0, f64::from_bits(1)).unwrap_err(),
             ResponseModelError::InvalidResponseTimeConstant
         );
         let model = FirstOrderResponseOu::new(1.0, 1.0, 1.0).unwrap();
