@@ -53,6 +53,7 @@ pub enum CalibrationError {
     EmptyReferenceBank,
     InvalidAlpha,
     DuplicateReferenceTrajectory,
+    DuplicateReferenceTrace,
     InvalidEvidenceDigest(&'static str),
     NonFiniteLogMaximum,
     LogMaximumBelowInitialWealth,
@@ -63,6 +64,7 @@ pub enum CalibrationError {
     ScoreDefinitionMismatch,
     RankReferenceMismatch,
     TestTrajectoryAppearsInReferenceBank,
+    TestTraceAppearsInReferenceBank,
     CalibrationAlreadyConsumed,
 }
 
@@ -101,6 +103,8 @@ pub struct FiniteHorizonGate {
     score_definition_sha256: String,
     rank_reference_sha256: String,
     reference_ids: HashSet<String>,
+    reference_trace_hashes: HashSet<String>,
+    null_simulator_sha256: String,
     reference_count: usize,
     threshold_rank_one_based: usize,
     log_threshold: Option<f64>,
@@ -134,6 +138,7 @@ impl FiniteHorizonGate {
         validate_digest(&bank.null_simulator_sha256, "null_simulator_sha256")?;
 
         let mut reference_ids = HashSet::with_capacity(bank.references.len());
+        let mut reference_trace_hashes = HashSet::with_capacity(bank.references.len());
         let mut sorted_maxima = Vec::with_capacity(bank.references.len());
         for reference in &bank.references {
             if reference.trajectory_id.trim().is_empty() {
@@ -143,6 +148,9 @@ impl FiniteHorizonGate {
                 return Err(CalibrationError::DuplicateReferenceTrajectory);
             }
             validate_digest(&reference.trace_sha256, "reference_trace_sha256")?;
+            if !reference_trace_hashes.insert(reference.trace_sha256.clone()) {
+                return Err(CalibrationError::DuplicateReferenceTrace);
+            }
             validate_log_maximum(reference.log_max_e_value)?;
             sorted_maxima.push(reference.log_max_e_value);
         }
@@ -171,6 +179,8 @@ impl FiniteHorizonGate {
             score_definition_sha256: bank.score_definition_sha256,
             rank_reference_sha256: bank.rank_reference_sha256,
             reference_ids,
+            reference_trace_hashes,
+            null_simulator_sha256: bank.null_simulator_sha256,
             reference_count,
             threshold_rank_one_based,
             log_threshold,
@@ -194,6 +204,9 @@ impl FiniteHorizonGate {
 
         if self.reference_ids.contains(&test.trajectory_id) {
             return Err(CalibrationError::TestTrajectoryAppearsInReferenceBank);
+        }
+        if self.reference_trace_hashes.contains(&test.trace_sha256) {
+            return Err(CalibrationError::TestTraceAppearsInReferenceBank);
         }
         if test.horizon != self.horizon {
             return Err(CalibrationError::HorizonMismatch);
@@ -258,6 +271,10 @@ impl FiniteHorizonGate {
 
     pub fn is_disabled(&self) -> bool {
         self.log_threshold.is_none()
+    }
+
+    pub fn null_simulator_sha256(&self) -> &str {
+        &self.null_simulator_sha256
     }
 
     pub fn is_consumed(&self) -> bool {
@@ -470,6 +487,16 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_reference_trace_digests_are_rejected() {
+        let mut input = bank(19);
+        input.references[1].trace_sha256 = input.references[0].trace_sha256.clone();
+        assert_eq!(
+            FiniteHorizonGate::calibrate(input).err(),
+            Some(CalibrationError::DuplicateReferenceTrace)
+        );
+    }
+
+    #[test]
     fn malformed_digests_and_non_finite_statistics_are_rejected() {
         let mut input = bank(19);
         input.references[0].trace_sha256 = "bad".into();
@@ -504,6 +531,13 @@ mod tests {
             gate.evaluate_once(&test),
             Err(CalibrationError::TestTrajectoryAppearsInReferenceBank)
         );
+
+        test = test_path(20.0);
+        test.trace_sha256 = SHA_A.into();
+        assert_eq!(
+            gate.evaluate_once(&test),
+            Err(CalibrationError::TestTraceAppearsInReferenceBank)
+        );
     }
 
     #[test]
@@ -521,6 +555,36 @@ mod tests {
         assert_eq!(calibrated_order_rank(19, 1, 20), Ok(19));
         assert_eq!(calibrated_order_rank(18, 1, 20), Ok(19));
         assert_eq!(calibrated_order_rank(99, 1, 20), Ok(95));
+    }
+
+    #[test]
+    fn exchangeable_rank_positions_respect_the_alpha_bound() {
+        for (reference_count, alpha_numerator, alpha_denominator) in
+            [(19usize, 1u32, 20u32), (39, 1, 20), (99, 1, 20), (99, 1, 10)]
+        {
+            let threshold_rank =
+                calibrated_order_rank(reference_count, alpha_numerator, alpha_denominator)
+                    .unwrap();
+            let mut rejected_positions = 0usize;
+            for test_rank in 1..=reference_count + 1 {
+                let mut input = bank(reference_count);
+                for (index, reference) in input.references.iter_mut().enumerate() {
+                    reference.trace_sha256 = format!("{:064x}", index + 1);
+                    reference.log_max_e_value = index as f64 + 0.5;
+                }
+                let mut gate = FiniteHorizonGate::calibrate(input).unwrap();
+                let test_log_max = test_rank as f64 - 1.0;
+                let decision = gate.evaluate_once(&test_path(test_log_max)).unwrap();
+                if matches!(decision, ThresholdDecision::Reject { .. }) {
+                    rejected_positions += 1;
+                }
+            }
+            let observed = rejected_positions as f64 / (reference_count + 1) as f64;
+            assert!(
+                observed <= f64::from(alpha_numerator) / f64::from(alpha_denominator),
+                "rank rejection fraction {observed} exceeded alpha"
+            );
+        }
     }
 
     #[test]
