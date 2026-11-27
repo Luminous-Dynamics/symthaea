@@ -34,14 +34,15 @@ This is not a user/tenant RBAC decision, a signed cross-service authorization to
 
 ## Validation authored
 
-Seven deterministic tests cover:
+Eight deterministic tests cover:
 1. success with an exact prior/current bitemporal pair and scope/policy binding;
 2. rejection when a previously admitted source is retracted before use;
 3. rejection for changed source identity and loss of trusted-for-scope status;
 4. strict veto of unknown ancestry and rejection of evidence recorded after the requested known-at time;
 5. malformed purpose and downstream-policy digest rejection;
 6. rejection of known-at time regression relative to the prior admitted snapshot;
-7. rejection when the verified measurement-error bound changes, even if a faulty verifier reuses the old calibration digest.
+7. rejection when the verified measurement-error bound changes, even if a faulty verifier reuses the old calibration digest;
+8. rejection at the half-open valid-until boundary.
 
 The strict JSON Schema is at [evidence-use-receipt-v1.schema.json](../../schemas/evidence-use-receipt-v1.schema.json). Its role is structural validation only; it does not authenticate issuers or recreate in-process verifier custody.
 
