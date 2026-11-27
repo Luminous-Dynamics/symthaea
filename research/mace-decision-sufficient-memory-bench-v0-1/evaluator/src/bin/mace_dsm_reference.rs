@@ -46,7 +46,8 @@ struct SourceEvent {
     authority_tier: AuthorityTier,
     uncertainty_ppm: u32,
     claim: String,
-    relation_to_parent: Relation,
+    #[serde(default)]
+    relation_to_parent: Option<Relation>,
     parent_event_ids: Vec<String>,
 }
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -305,7 +306,7 @@ fn current_at(event: &SourceEvent, query_time_ms: i64) -> bool {
 fn invalidated(id: &str, events: &[SourceEvent], at: i64) -> bool {
     events.iter().any(|event| event.authority_tier != AuthorityTier::Untrusted
         && event.observed_at_ms <= at && event.valid_from_ms <= at
-        && matches!(event.relation_to_parent, Relation::Supersedes | Relation::Retracts)
+        && matches!(event.relation_to_parent, Some(Relation::Supersedes | Relation::Retracts))
         && event.parent_event_ids.iter().any(|parent| parent == id))
 }
 fn derived_admissible(episode: &CandidateEpisode) -> BTreeSet<String> {
@@ -317,7 +318,7 @@ fn derived_admissible(episode: &CandidateEpisode) -> BTreeSet<String> {
 fn contradiction_pairs(retrieved: &[String], episode: &CandidateEpisode) -> usize {
     let returned: BTreeSet<&str> = retrieved.iter().map(String::as_str).collect();
     episode.source_events.iter()
-        .filter(|event| event.relation_to_parent == Relation::Contradicts
+        .filter(|event| event.relation_to_parent == Some(Relation::Contradicts)
             && event.authority_tier != AuthorityTier::Untrusted
             && current_at(event, episode.query_time_ms)
             && returned.contains(event.event_id.as_str()))
@@ -592,7 +593,7 @@ mod tests{
     use super::*;
     fn event(id:&str,observed:i64,from:i64,until:Option<i64>,authority:AuthorityTier,relation:Relation,parents:&[&str])->SourceEvent{
         SourceEvent{event_id:id.into(),source_id:"source".into(),observed_at_ms:observed,valid_from_ms:from,valid_until_ms:until,
-            authority_tier:authority,uncertainty_ppm:0,claim:"claim".into(),relation_to_parent:relation,
+            authority_tier:authority,uncertainty_ppm:0,claim:"claim".into(),relation_to_parent:Some(relation),
             parent_event_ids:parents.iter().map(|x|(*x).into()).collect()}
     }
     #[test] fn candidate_digest_binds_exact_record_bytes(){
