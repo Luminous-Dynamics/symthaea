@@ -79,3 +79,18 @@ Run the synthetic eight-triad extension panel with:
 The report keeps CLEAN accuracy, performance-STAY false-difference rate and musical-FLIP miss rate separate, with conditional-on-CLEAN-correct rates and property/performance-factor/performer/take/renderer slices. It does not emit a composite music identity score.
 
 The dataset, target-property references and pairing manifests are digest-shaped metadata only. The evaluator does not rehash audio bytes or authenticate musician annotations, performance identities or rights/consent. The synthetic panel is a deterministic evaluator control, not evidence of real-performance invariance or SOTA.
+
+
+## Paired source-work-clustered performance identity comparison
+
+The `music_performance_identity_inference` module composes the authoritative #13947 reducer for baseline and candidate runs. It requires exact item/pair/source-work/target-property/factor/audio/question/option-map/performer/take/performance/instrument/renderer alignment; only model/prompt/runtime/decoding identity and answers may differ.
+
+The primary estimand is an equal-source-work mean: each source work contributes one within-cluster mean regardless of its number of triads. A fixed-seed paired cluster bootstrap resamples source works and uses the same sampled clusters for both runs. It reports candidate improvement separately for performance-STAY false-difference, musical-FLIP miss and joint-exact rates. It does not resample individual triads.
+
+Run the synthetic 30-source-work comparison with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-performance-identity-compare -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-performance-identity-comparison.synthetic.json
+
+The fixture uses the canonical ChordQuality question required by #13947. The 30-cluster floor is a minimum reporting gate, not a power calculation or scientific confirmation. Synthetic values validate plumbing only; they are not real model results. The report leaves lineage and annotation authentication, audio-byte recomputation, model invocation and population generalization explicitly false.
+
+Protocol: `docs/research/MEL-HEAR-004-PAIRED-SOURCE-WORK-INFERENCE-V1.md`.
