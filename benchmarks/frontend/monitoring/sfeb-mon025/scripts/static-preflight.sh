@@ -18,6 +18,7 @@ sh -n "$ROOT/compose/postgres/source-entrypoint.sh"
 sh -n "$ROOT/compose/restore/restore-entrypoint.sh"
 
 bash "$ROOT/scripts/test-transaction-metadata-order.sh"
+bash "$ROOT/scripts/test-offset-target.sh"
 
 echo "MON-025 JSON structure and shell syntax checks passed."
 
