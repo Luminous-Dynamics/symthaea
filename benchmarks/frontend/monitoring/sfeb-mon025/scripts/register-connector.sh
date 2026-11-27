@@ -44,7 +44,7 @@ config="$(jq -n \
     "tombstones.on.delete":"false",
     "provide.transaction.metadata":"true",
     "heartbeat.interval.ms":"1000",
-    "decimal.handling.mode":"precise",
+    "decimal.handling.mode":"string",
     "include.schema.changes":"true"
   }')"
 
