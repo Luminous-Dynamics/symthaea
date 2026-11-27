@@ -157,6 +157,59 @@ impl SinusoidalVelocityKick {
         Ok(derivative)
     }
 
+    /// Timing sensitivity of a scheduled kick at fixed future observation time.
+    ///
+    /// For a smooth pre-event vector field f_minus, post-event vector field
+    /// f_plus, reset map R, and explicit reset-time derivative R_t, the local
+    /// event-time sensitivity immediately after the event is
+    ///
+    ///     D_x R * f_minus + R_t - f_plus.
+    ///
+    /// This is distinct from D_x R and from the kick amplitude/phase Jacobian.
+    /// The caller must supply the vector fields from the actual split solver
+    /// on either side of the event.
+    pub fn application_time_sensitivity(
+        &self,
+        position: f64,
+        velocity: f64,
+        pre_kick_acceleration: f64,
+        post_kick_acceleration: f64,
+        explicit_reset_time_derivative: PhasePoint,
+    ) -> Result<PhasePoint, PulseMapError> {
+        if !velocity.is_finite()
+            || !pre_kick_acceleration.is_finite()
+            || !post_kick_acceleration.is_finite()
+            || !explicit_reset_time_derivative.x.is_finite()
+            || !explicit_reset_time_derivative.v.is_finite()
+        {
+            return Err(PulseMapError::InvalidParticleState);
+        }
+        let mapped = self.apply(position, velocity)?;
+        let reset = self.state_jacobian(position)?;
+        let pre_flow = PhasePoint {
+            x: velocity,
+            v: pre_kick_acceleration,
+        };
+        let post_flow = PhasePoint {
+            x: mapped.v,
+            v: post_kick_acceleration,
+        };
+        let sensitivity = PhasePoint {
+            x: reset.m11 * pre_flow.x
+                + reset.m12 * pre_flow.v
+                + explicit_reset_time_derivative.x
+                - post_flow.x,
+            v: reset.m21 * pre_flow.x
+                + reset.m22 * pre_flow.v
+                + explicit_reset_time_derivative.v
+                - post_flow.v,
+        };
+        if !sensitivity.x.is_finite() || !sensitivity.v.is_finite() {
+            return Err(PulseMapError::NonFiniteDerivative);
+        }
+        Ok(sensitivity)
+    }
+
     /// Signed kinetic-energy change per unit particle mass across the kick.
     ///
     /// This is an external intervention. Kinetic energy and momentum are not
@@ -380,6 +433,26 @@ mod tests {
         let first = kick.state_jacobian(-0.2).unwrap();
         let second = kick.state_jacobian(-0.2 + kick.domain_length).unwrap();
         assert!((first.m21 - second.m21).abs() < 1.0e-13);
+    }
+
+    #[test]
+    fn application_time_sensitivity_is_distinct_from_state_and_control_jacobians() {
+        let kick = manufactured_kick();
+        let x = 0.23;
+        let v = -0.4;
+        let timing = kick
+            .application_time_sensitivity(x, v, 0.0, 0.0, PhasePoint { x: 0.0, v: 0.0 })
+            .unwrap();
+        let delta = kick.delta_v(x).unwrap();
+        let shear = kick.state_jacobian(x).unwrap().m21;
+        assert!((timing.x + delta).abs() < 1.0e-14);
+        assert!((timing.v - shear * v).abs() < 1.0e-14);
+
+        let explicit = kick
+            .application_time_sensitivity(x, v, 0.3, -0.2, PhasePoint { x: 0.1, v: 0.05 })
+            .unwrap();
+        assert!((explicit.x - (timing.x + 0.1)).abs() < 1.0e-14);
+        assert!((explicit.v - (timing.v + 0.3 + 0.05 - (-0.2))).abs() < 1.0e-14);
     }
 
     #[test]
