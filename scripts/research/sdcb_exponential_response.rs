@@ -94,18 +94,26 @@ impl FirstOrderResponseOu {
     /// cov(x,z) = var(z) = mu * var(x) / (lambda + mu).
     pub fn stationary_covariance(&self) -> [[f64; 2]; 2] {
         // Compute mu*variance/(lambda+mu) without overflowing the sum or
-        // underflowing mu/lambda before a large variance can restore scale.
+        // losing a subnormal mu/lambda ratio before the variance restores scale.
         let cross = if self.mu >= self.lambda {
             let ratio = self.lambda / self.mu;
             self.process_variance / (1.0 + ratio)
         } else {
             let ratio = self.mu / self.lambda;
-            if ratio == 0.0 {
-                // If mu/lambda underflows, lambda is necessarily large enough
-                // that variance*mu is safe for finite variance <= f64::MAX.
-                (self.process_variance * self.mu) / self.lambda
-            } else {
+            if ratio >= f64::MIN_POSITIVE {
                 (self.process_variance * ratio) / (1.0 + ratio)
+            } else {
+                // Prefer (variance/lambda)*mu when that quotient is normal;
+                // otherwise (variance*mu)/lambda has bounded intermediates
+                // in the remaining subnormal-ratio regime.
+                let variance_over_lambda = self.process_variance / self.lambda;
+                if variance_over_lambda >= f64::MIN_POSITIVE
+                    && variance_over_lambda.is_finite()
+                {
+                    variance_over_lambda * self.mu
+                } else {
+                    (self.process_variance * self.mu) / self.lambda
+                }
             }
         };
         [
@@ -287,6 +295,20 @@ mod tests {
             model.stationary_covariance()[1][1],
             1.7338803553145542e-193,
             2.0e-207,
+        );
+    }
+
+    #[test]
+    fn stationary_covariance_preserves_subnormal_rate_ratio() {
+        let lambda = 7.071003610674585e260;
+        let mu = 5.036876054794767e-63;
+        let tau = 1.0 / mu;
+        let variance = 2.545515374320597e50;
+        let model = FirstOrderResponseOu::new(lambda, variance, tau).unwrap();
+        close(
+            model.stationary_covariance()[1][1],
+            1.8132426656764452e-273,
+            2.0e-287,
         );
     }
 
