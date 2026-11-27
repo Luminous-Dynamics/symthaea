@@ -110,6 +110,29 @@
         "epistemic_status": "measured",
         "privacy_class": "public"
       }
+    },
+    {
+      "case": "supported_evidence_without_receipt_or_evidence_reference",
+      "expected": "schema_reject",
+      "event": {
+        "schema": "symthaea.embodiment-event.v1",
+        "session_id": "demo-session-001",
+        "event_id": "invalid-evidence-001",
+        "sequence": 3,
+        "observed_at_monotonic_ns": "1300000",
+        "expires_at_monotonic_ns": "3300000",
+        "event_kind": "evidence.status",
+        "payload": {
+          "subject_id": "claim:example-18",
+          "status": "supported"
+        },
+        "source": {
+          "component": "symthaea-evidence-gate",
+          "instance_id": "evidence-01"
+        },
+        "epistemic_status": "measured",
+        "privacy_class": "public"
+      }
     }
   ],
   "semantic_validator_rejection_examples": [
