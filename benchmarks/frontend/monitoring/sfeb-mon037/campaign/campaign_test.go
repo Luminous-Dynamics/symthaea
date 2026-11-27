@@ -74,7 +74,7 @@ func TestConflictingDuplicateIdentityBlocks(t *testing.T){in:=fixture();e:=in.Ob
 func TestExactReplayRequiresDeduplicationProof(t *testing.T){
  in:=fixture();e:=in.ObservedEvents[0];e.Offset=11;in.ObservedEvents=append(in.ObservedEvents,e);refreshRecordDigests(&in)
  expect(t,in,Indeterminate)
- in.ExactReplayDeduplicationProven=true;in.DeduplicationProofSHA256=fixtureDigest("MON037 synthetic replay-deduplication proof v1\n");expect(t,in,Qualified)
+ in.ExactReplayDeduplicationProven=true;in.DeduplicationProofSHA256=fixtureDigest("MON037 synthetic replay-deduplication proof v1\n");in.DeduplicationCoverageSHA256=canonicalDigest([]string{"row-1"});expect(t,in,Qualified)
  got:=Evaluate(in);if got.Reconciliation.DuplicateReplays!=1{t.Fatalf("duplicate replay count lost: %+v",got.Reconciliation)}
 }
 func TestPayloadMismatchBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].PayloadSHA256=dc;refreshRecordDigests(&in);expect(t,in,Blocked)}
@@ -117,7 +117,7 @@ func TestOffsetPredicateMismatchBlocks(t *testing.T){
 }
 func TestSurfaceDigestMismatchBlocks(t *testing.T){in:=fixture();in.Surfaces[0].RestoredSHA256=dc;refreshRecordDigests(&in);expect(t,in,Blocked)}
 func TestFullStateExclusionBlocks(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");refreshRecordDigests(&in);expect(t,in,Blocked)}
-func TestRowStreamAllowsExplicitExclusion(t *testing.T){in:=fixture();in.SurfaceScope="row_stream";in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded",ExclusionManifestSHA256:fixtureDigest("MON037 synthetic generated-surface exclusion manifest v1\n")});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");expect(t,in,Qualified)}
+func TestRowStreamAllowsExplicitExclusion(t *testing.T){in:=fixture();in.SurfaceScope="row_stream";in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded",ExclusionManifestSHA256:fixtureDigest("MON037 synthetic generated-surface exclusion manifest v1\n")});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");refreshRecordDigests(&in);expect(t,in,Qualified)}
 func TestUnknownSurfaceIsIndeterminate(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"unknown",Disposition:"unknown"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"unknown");refreshRecordDigests(&in);expect(t,in,Indeterminate)}
 func TestOldPrimaryUnfencedBlocks(t *testing.T){in:=fixture();in.RestoreChecks["old_primary_fenced"]="failed";expect(t,in,Blocked)}
 func TestMissingRestoreCheckIsIndeterminate(t *testing.T){in:=fixture();delete(in.RestoreChecks,"application_write_readback");expect(t,in,Indeterminate)}
