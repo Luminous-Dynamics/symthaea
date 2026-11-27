@@ -11,9 +11,12 @@
 //! separate process or restricted custody domain.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub const SCHEMA_VERSION: u16 = 1;
 pub const PROBABILITY_SCALE: u32 = 1_000_000;
+/// Canonical ordered AgentView offer-list encoding proposed for shared use with #11015.
+pub const PERMITTED_OFFER_LIST_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -115,11 +118,18 @@ impl DecisionObjectiveReference {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PermittedActionOfferRef {
     /// Upstream AgentView offer ID from #11015; this contract does not mint offers.
     pub offer_id: String,
     /// Exact payload digest on the upstream offer.
     pub action_payload_sha256: String,
+}
+
+#[derive(Serialize)]
+struct CanonicalPermittedOfferListV1<'a> {
+    schema_version: u16,
+    offers: &'a [PermittedActionOfferRef],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -158,6 +168,13 @@ impl CandidateDecisionContext {
             "permitted_action_offer_list_sha256",
             &self.permitted_action_offer_list_sha256,
         )?;
+        let computed_offer_list_digest = self.canonical_permitted_offer_list_sha256()?;
+        if computed_offer_list_digest != self.permitted_action_offer_list_sha256 {
+            return Err(
+                "permitted_action_offer_list_sha256 does not match the canonical ordered offer list"
+                    .into(),
+            );
+        }
         self.decision_objective.validate()?;
         if self.schema_version != SCHEMA_VERSION {
             return Err("unsupported schema version".into());
@@ -190,6 +207,20 @@ impl CandidateDecisionContext {
         }
         Ok(())
     }
+    /// Canonical ordered-list digest proposed for adoption by the upstream #11015 AgentView.
+    ///
+    /// The list order is preserved, and each offer binds its ID to the exact payload SHA-256.
+    /// The bytes are compact serde JSON for {schema_version, offers}; changes require a version bump.
+    pub fn canonical_permitted_offer_list_sha256(&self) -> Result<String, String> {
+        let canonical = CanonicalPermittedOfferListV1 {
+            schema_version: PERMITTED_OFFER_LIST_SCHEMA_VERSION,
+            offers: &self.permitted_action_offers,
+        };
+        let bytes = serde_json::to_vec(&canonical)
+            .map_err(|error| format!("serialize canonical permitted-offer list: {error}"))?;
+        Ok(encode_sha256(&Sha256::digest(bytes)))
+    }
+
     pub fn offered_payload_digest(&self, offer_id: &str) -> Option<&str> {
         self.permitted_action_offers
             .iter()
@@ -592,6 +623,16 @@ impl EvaluatorResolution {
     }
 }
 
+fn encode_sha256(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
+}
+
 fn validate_sha256(field: &str, value: &str) -> Result<(), String> {
     if value.len() != 64
         || !value
@@ -629,7 +670,7 @@ fn ensure_sha256_items(field: &str, values: &[String]) -> Result<(), String> {
 mod tests {
     use super::*;
     fn context() -> CandidateDecisionContext {
-        CandidateDecisionContext {
+        let mut context = CandidateDecisionContext {
             schema_version: SCHEMA_VERSION,
             episode_id: "e1".into(),
             parent_episode_id: None,
@@ -651,8 +692,7 @@ mod tests {
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             evidence_prefix_sha256:
                 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
-            permitted_action_offer_list_sha256:
-                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
+            permitted_action_offer_list_sha256: String::new(),
             context_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
                 .into(),
             evidence_available_at_decision: vec![EvidenceReference {
@@ -675,7 +715,11 @@ mod tests {
                 },
             ],
             estimated_budget: ResourceVector::default(),
-        }
+        };
+        context.permitted_action_offer_list_sha256 = context
+            .canonical_permitted_offer_list_sha256()
+            .expect("test offer list serializes");
+        context
     }
     fn proposal(c: &CandidateDecisionContext) -> DecisionProposal {
         DecisionProposal {
@@ -757,6 +801,29 @@ mod tests {
             cost_completeness: CostCompleteness::Complete,
             independent_adjudication_ref: Some("independent-review".into()),
         }
+    }
+
+    #[test]
+    fn rejects_offer_list_digest_substitution() {
+        let mut c = context();
+        c.permitted_action_offers[0].action_payload_sha256 =
+            "9999999999999999999999999999999999999999999999999999999999999999".into();
+        assert!(
+            c.validate()
+                .unwrap_err()
+                .contains("does not match the canonical ordered offer list")
+        );
+    }
+
+    #[test]
+    fn canonical_offer_list_digest_preserves_upstream_offer_order() {
+        let c = context();
+        let mut reversed = c.clone();
+        reversed.permitted_action_offers.reverse();
+        assert_ne!(
+            c.canonical_permitted_offer_list_sha256().unwrap(),
+            reversed.canonical_permitted_offer_list_sha256().unwrap()
+        );
     }
 
     #[test]
