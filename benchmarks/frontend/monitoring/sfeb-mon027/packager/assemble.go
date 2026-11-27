@@ -184,8 +184,8 @@ func AttachSignature(rootDir string, manifest custody.Manifest, envelope Signatu
 
 
 func signingRequestID(runID string, sequence uint64, root, keyID string) string {
-	message := "MON027-SIGNING-REQUEST-V1\\x00" + runID + "\\x00" +
-		strconv.FormatUint(sequence, 10) + "\\x00" + strings.ToLower(root) + "\\x00" + keyID
+	message := "MON027-SIGNING-REQUEST-V1\x00" + runID + "\x00" +
+		strconv.FormatUint(sequence, 10) + "\x00" + strings.ToLower(root) + "\x00" + keyID
 	sum := sha256.Sum256([]byte(message))
 	return hex.EncodeToString(sum[:])
 }
