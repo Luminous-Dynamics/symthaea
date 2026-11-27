@@ -55,7 +55,9 @@ pub struct RetrievalHitV1 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RetrievalWorkV1 {
     pub eligible_document_count: u64,
-    /// Eligible posting rows used for scoring; excludes other scopes and future records.
+    /// Posting rows visited inside the requested scope and knowledge-time cut.
+    pub scope_knowledge_postings_visited: u64,
+    /// Posting rows that also pass valid-time filtering and contribute to scores.
     pub eligible_postings_scored: u64,
     pub scored_document_count: u64,
 }
@@ -93,7 +95,10 @@ struct PreparedDocument {
 pub struct Bm25IndexV1 {
     documents: Vec<PreparedDocument>,
     by_id: BTreeMap<String, usize>,
-    postings: BTreeMap<String, Vec<(usize, u32)>>,
+    /// Document indexes partitioned by scope and sorted by knowledge time.
+    scope_documents: BTreeMap<String, Vec<usize>>,
+    /// Term postings are partitioned by scope and sorted by knowledge time.
+    postings: BTreeMap<(String, String), Vec<(usize, u32)>>,
     config: Bm25ConfigV1,
 }
 
@@ -145,7 +150,8 @@ impl Bm25IndexV1 {
 
         let mut prepared = Vec::with_capacity(documents.len());
         let mut by_id = BTreeMap::new();
-        let mut postings = BTreeMap::<String, Vec<(usize, u32)>>::new();
+        let mut scope_documents = BTreeMap::<String, Vec<usize>>::new();
+        let mut postings = BTreeMap::<(String, String), Vec<(usize, u32)>>::new();
 
         for document in documents {
             if document.document_id.trim().is_empty() {
@@ -175,9 +181,13 @@ impl Bm25IndexV1 {
                 .sum();
             let index = prepared.len();
             by_id.insert(document.document_id.clone(), index);
+            scope_documents
+                .entry(document.scope_id.clone())
+                .or_default()
+                .push(index);
             for (term, frequency) in &term_frequencies {
                 postings
-                    .entry(term.clone())
+                    .entry((document.scope_id.clone(), term.clone()))
                     .or_default()
                     .push((index, *frequency));
             }
@@ -187,9 +197,17 @@ impl Bm25IndexV1 {
             });
         }
 
+        for indexes in scope_documents.values_mut() {
+            indexes.sort_by_key(|index| prepared[*index].document.observed_at_ms);
+        }
+        for rows in postings.values_mut() {
+            rows.sort_by_key(|(index, _)| prepared[*index].document.observed_at_ms);
+        }
+
         Ok(Self {
             documents: prepared,
             by_id,
+            scope_documents,
             postings,
             config,
         })
@@ -222,71 +240,74 @@ impl Bm25IndexV1 {
             let count = query_terms.entry(token).or_default();
             *count = count.saturating_add(1);
         }
-        if query_terms.is_empty() || query.top_k == 0 {
-            return Ok(Bm25ResultV1 {
-                hits: Vec::new(),
-                work: RetrievalWorkV1 {
-                    eligible_document_count: self
-                        .documents
-                        .iter()
-                        .filter(|prepared| {
-                            let d = &prepared.document;
-                            d.scope_id == query.scope_id
-                                && d.observed_at_ms <= query.as_of_ms
-                                && d.valid_from_ms <= query.as_of_ms
-                                && d.valid_until_ms.is_none_or(|end| query.as_of_ms < end)
-                        })
-                        .count() as u64,
-                    eligible_postings_scored: 0,
-                    scored_document_count: 0,
-                },
-            });
-        }
 
-        let eligible: Vec<bool> = self
-            .documents
-            .iter()
-            .map(|prepared| {
-                let document = &prepared.document;
-                document.scope_id == query.scope_id
-                    && document.observed_at_ms <= query.as_of_ms
-                    && document.valid_from_ms <= query.as_of_ms
-                    && document
-                        .valid_until_ms
-                        .is_none_or(|end| query.as_of_ms < end)
-            })
-            .collect();
-        let eligible_count = eligible.iter().filter(|value| **value).count();
-        if eligible_count == 0 {
+        // Scope partitioning happens before corpus statistics, document vectors,
+        // term postings or scoring are traversed. Knowledge-time ordering lets us
+        // cut future-observed records from the candidate workset with one binary search.
+        let Some(scope_indexes) = self.scope_documents.get(&query.scope_id) else {
             return Ok(Bm25ResultV1 {
                 hits: Vec::new(),
                 work: RetrievalWorkV1 {
                     eligible_document_count: 0,
+                    scope_knowledge_postings_visited: 0,
+                    eligible_postings_scored: 0,
+                    scored_document_count: 0,
+                },
+            });
+        };
+        let knowledge_visible_count = scope_indexes.partition_point(|index| {
+            self.documents[*index].document.observed_at_ms <= query.as_of_ms
+        });
+        let knowledge_visible_indexes = &scope_indexes[..knowledge_visible_count];
+        let eligible_indexes: Vec<usize> = knowledge_visible_indexes
+            .iter()
+            .copied()
+            .filter(|index| {
+                let document = &self.documents[*index].document;
+                document.valid_from_ms <= query.as_of_ms
+                    && document.valid_until_ms.is_none_or(|end| query.as_of_ms < end)
+            })
+            .collect();
+        let eligible_count = eligible_indexes.len();
+
+        if query_terms.is_empty() || query.top_k == 0 || eligible_count == 0 {
+            return Ok(Bm25ResultV1 {
+                hits: Vec::new(),
+                work: RetrievalWorkV1 {
+                    eligible_document_count: eligible_count as u64,
+                    scope_knowledge_postings_visited: 0,
                     eligible_postings_scored: 0,
                     scored_document_count: 0,
                 },
             });
         }
 
-        let total_tokens: u128 = self
-            .documents
+        let eligible_set: std::collections::BTreeSet<usize> =
+            eligible_indexes.iter().copied().collect();
+        let total_tokens: u128 = eligible_indexes
             .iter()
-            .zip(&eligible)
-            .filter(|(_, is_eligible)| **is_eligible)
-            .map(|(prepared, _)| u128::from(prepared.token_count))
+            .map(|index| u128::from(self.documents[*index].token_count))
             .sum();
         let average_length = total_tokens as f64 / eligible_count as f64;
-        let mut scores = vec![0.0_f64; self.documents.len()];
+        let mut scores = BTreeMap::<usize, f64>::new();
+        let mut scope_knowledge_postings_visited = 0_u64;
         let mut eligible_postings_scored = 0_u64;
 
         if average_length > 0.0 {
             for (term, query_frequency) in query_terms {
-                let Some(postings) = self.postings.get(&term) else {
+                let key = (query.scope_id.clone(), term);
+                let Some(postings) = self.postings.get(&key) else {
                     continue;
                 };
-                let document_frequency = postings
+                let knowledge_cutoff = postings.partition_point(|(index, _)| {
+                    self.documents[*index].document.observed_at_ms <= query.as_of_ms
+                });
+                let visible_postings = &postings[..knowledge_cutoff];
+                scope_knowledge_postings_visited = scope_knowledge_postings_visited
+                    .saturating_add(visible_postings.len() as u64);
+                let document_frequency = visible_postings
                     .iter()
-                    .filter(|(index, _)| eligible[*index])
+                    .filter(|(index, _)| eligible_set.contains(index))
                     .count();
                 if document_frequency == 0 {
                     continue;
@@ -294,8 +315,8 @@ impl Bm25IndexV1 {
                 let n = eligible_count as f64;
                 let df = document_frequency as f64;
                 let inverse_document_frequency = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
-                for (index, frequency) in postings {
-                    if !eligible[*index] {
+                for (index, frequency) in visible_postings {
+                    if !eligible_set.contains(index) {
                         continue;
                     }
                     eligible_postings_scored = eligible_postings_scored.saturating_add(1);
@@ -307,20 +328,18 @@ impl Bm25IndexV1 {
                     let term_score = inverse_document_frequency
                         * (tf * (self.config.k1 + 1.0) / normalization)
                         * f64::from(query_frequency);
-                    scores[*index] += term_score;
+                    *scores.entry(*index).or_default() += term_score;
                 }
             }
         }
 
-        let mut ranked: Vec<(String, f64)> = self
-            .documents
+        let mut ranked: Vec<(String, f64)> = scores
             .iter()
-            .enumerate()
-            .filter(|(index, _)| eligible[*index] && scores[*index] > 0.0)
-            .map(|(_, prepared)| {
+            .filter(|(_, score)| **score > 0.0)
+            .map(|(index, score)| {
                 (
-                    prepared.document.document_id.clone(),
-                    scores[self.by_id[&prepared.document.document_id]],
+                    self.documents[*index].document.document_id.clone(),
+                    *score,
                 )
             })
             .collect();
@@ -346,6 +365,7 @@ impl Bm25IndexV1 {
             hits,
             work: RetrievalWorkV1 {
                 eligible_document_count: eligible_count as u64,
+                scope_knowledge_postings_visited,
                 eligible_postings_scored,
                 scored_document_count,
             },
@@ -546,6 +566,41 @@ mod tests {
         assert_eq!(
             base.search(&q).unwrap(),
             with_other_scope.search(&q).unwrap()
+        );
+    }
+
+    #[test]
+    fn other_scopes_and_future_knowledge_do_not_enter_the_query_workset() {
+        let base = index(vec![
+            document("known", "tenant-a", "pump pressure inspection", 1, 1, None),
+        ]);
+        let mut extended_documents = vec![
+            document("known", "tenant-a", "pump pressure inspection", 1, 1, None),
+        ];
+        for i in 0..256 {
+            extended_documents.push(document(
+                &format!("other-{i:03}"),
+                "tenant-b",
+                "pump pressure pump pressure pump pressure",
+                1,
+                1,
+                None,
+            ));
+            extended_documents.push(document(
+                &format!("future-{i:03}"),
+                "tenant-a",
+                "pump pressure pump pressure pump pressure",
+                100,
+                1,
+                None,
+            ));
+        }
+        let extended = index(extended_documents);
+        let q = query("pump pressure inspection", "tenant-a", 10, 10);
+        assert_eq!(base.search(&q).unwrap(), extended.search(&q).unwrap());
+        assert_eq!(
+            extended.search(&q).unwrap().work.scope_knowledge_postings_visited,
+            base.search(&q).unwrap().work.scope_knowledge_postings_visited
         );
     }
 
