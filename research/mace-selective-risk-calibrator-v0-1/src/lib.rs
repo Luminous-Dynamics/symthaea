@@ -145,6 +145,17 @@ pub struct CalibrationManifestV1 {
     pub manifest_sha256: String,
 }
 
+impl CalibrationManifestV1 {
+    /// Verify the manifest integrity commitment; this does not authenticate its issuer.
+    pub fn verify_integrity(&self) -> bool {
+        let mut unsigned = self.clone();
+        unsigned.manifest_sha256.clear();
+        digest_serialized(&unsigned)
+            .map(|digest| digest == self.manifest_sha256)
+            .unwrap_or(false)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct CalibrationResultV1 {
     pub manifest: CalibrationManifestV1,
@@ -486,8 +497,8 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
         threshold_count:config.thresholds.len(),group_count:groups.len(),
         calibration_method:"hierarchical_group_conditional_exact_cluster_risk".into(),
         risk_target_alpha:config.risk_target_alpha,familywise_delta:config.familywise_delta,
-        multiplicity_method:"bonferroni".into(),
-        resampling_unit:"independent_task_cluster".into(),
+        multiplicity_method:"bonferroni_over_group_threshold_hypotheses".into(),
+        resampling_unit:"independent_declared_cluster".into(),
         exchangeability_status:if config.exchangeability_justified_by_design{"justified_by_sampling_design"}else{"not_established"}.into(),
         threshold_selection:"calibration_split_only".into(),
         unacceptable_loss_threshold:config.unacceptable_loss_threshold,
@@ -682,6 +693,7 @@ mod tests{
         for row in rows.iter_mut().take(20){row.sufficiency_score=0.2;row.decision_loss=1.0;}
         let cfg=config(&groups,&rows,vec![0.0,0.5,0.8],30);
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        assert!(result.manifest.verify_integrity());
         let cert=&result.certificates[0];
         assert_eq!(cert.status,RiskStatusV1::Certified);
         assert!(cert.threshold.is_some_and(|value|value>=0.5));
