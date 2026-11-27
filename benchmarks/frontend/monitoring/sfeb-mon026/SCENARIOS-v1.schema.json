@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon026-scenarios-v1.schema.json",
+  "title": "MON-026 Evidence Custody Scenario Seeds",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "classification",
+    "scenarios"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon026-evidence-custody-v1"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "classification": {
+      "const": "synthetic-descriptive-seeds"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "name",
+          "expected_outcome",
+          "mutation",
+          "notes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^MON026-[PN][0-9]{3}$"
+          },
+          "class": {
+            "enum": [
+              "positive_control",
+              "negative_control",
+              "indeterminate_control"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_outcome": {
+            "enum": [
+              "qualified",
+              "blocked",
+              "indeterminate"
+            ]
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
