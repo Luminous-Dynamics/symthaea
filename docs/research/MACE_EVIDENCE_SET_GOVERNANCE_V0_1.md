@@ -29,7 +29,7 @@ The exact solver is capped at 20 candidates (at most 1,048,576 subsets). Larger 
 
 ## Tests and qualification
 
-Nine deterministic tests cover budget optimality, must-link closure, cannot-link exclusion, contradictory constraints and obstruction, required-bundle budget failure, invalid receipt exclusion, strict dependency lineage, bitemporal mismatch, constraint authority and unknown endpoints, and candidate-order determinism.
+Ten deterministic tests cover budget optimality, must-link closure, cannot-link exclusion, contradictory constraints and obstruction, required-bundle budget failure, invalid receipt exclusion, strict dependency lineage, bitemporal mismatch, constraint authority and unknown endpoints, and candidate-order determinism.
 
 ## Run
 
