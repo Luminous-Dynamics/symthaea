@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/mace-decision-sufficient-memory-bench-v0-1/baselines/raw-trajectory-candidate-v0.1.schema.json",
+  "title": "MACE candidate-visible raw trajectory lexical baseline input v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "documents", "query"],
+  "properties": {
+    "schema_version": { "const": "mace_raw_trajectory_candidate_v0_1" },
+    "documents": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sourceDocument" }
+    },
+    "query": { "$ref": "#/$defs/query" },
+    "ranked_channels": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rankedChannel" }
+    },
+    "rrf_k": { "type": "integer", "minimum": 1 },
+    "top_k": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "sourceDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_id", "scope_id", "observed_at_ms", "valid_from_ms", "valid_until_ms", "text"],
+      "properties": {
+        "document_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "scope_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "observed_at_ms": { "type": "integer", "minimum": 0 },
+        "valid_from_ms": { "type": "integer", "minimum": 0 },
+        "valid_until_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "text": { "type": "string", "maxLength": 200000 }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query_text", "scope_id", "as_of_ms", "top_k"],
+      "properties": {
+        "query_text": { "type": "string", "maxLength": 20000 },
+        "scope_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "as_of_ms": { "type": "integer", "minimum": 0 },
+        "top_k": { "type": "integer", "minimum": 0, "maximum": 1000 }
+      }
+    },
+    "rankedChannel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel_id", "weight", "document_ids"],
+      "properties": {
+        "channel_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "weight": { "type": "number", "exclusiveMinimum": 0 },
+        "document_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        }
+      }
+    }
+  }
+}
