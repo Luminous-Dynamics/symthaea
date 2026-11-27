@@ -182,18 +182,17 @@ impl EpistemicConsciousness {
         // Update last Phi
         self.last_phi = integration.phi_after;
 
-        // Record outcomes for meta-learning
+        // Record the prediction, but do not turn the verifier's confidence
+        // into a correctness label. Correctness remains unadjudicated until
+        // an independent ground-truth outcome is supplied.
         for claim in &result.claims {
-            // For now, assume high-confidence claims are correct
-            // In a real system, this would be based on user feedback
-            let outcome = VerificationOutcome {
-                claim: claim.text.clone(),
-                source_domain: self.extract_domain(&result.url),
-                source_type: result.source_type,
-                was_correct: claim.confidence > 0.7,
-                predicted_confidence: claim.confidence,
-                domain: self.detect_domain(query),
-            };
+            let outcome = VerificationOutcome::unadjudicated(
+                claim.text.clone(),
+                self.extract_domain(&result.url),
+                result.source_type,
+            )
+            .with_confidence(claim.confidence)
+            .with_domain(self.detect_domain(query));
             self.learner.record_outcome(outcome)?;
         }
 
@@ -211,6 +210,8 @@ impl EpistemicConsciousness {
             total_phi_gain: integrator_stats.total_phi_gain,
             meta_phi: learner_stats.meta_phi,
             accuracy: learner_stats.accuracy,
+            adjudicated_claims: learner_stats.adjudicated_outcomes,
+            unadjudicated_claims: learner_stats.unadjudicated_outcomes,
             is_ready: self.learner.is_ready(),
         }
     }
@@ -271,8 +272,12 @@ pub struct EpistemicStats {
     pub total_phi_gain: f64,
     /// Meta-Phi (epistemic self-awareness)
     pub meta_phi: f64,
-    /// Verification accuracy
+    /// Accuracy over independently adjudicated outcomes only
     pub accuracy: f32,
+    /// Claims with independent correctness labels
+    pub adjudicated_claims: usize,
+    /// Claims still lacking independent correctness labels
+    pub unadjudicated_claims: usize,
     /// Whether the system is ready for recommendations
     pub is_ready: bool,
 }
