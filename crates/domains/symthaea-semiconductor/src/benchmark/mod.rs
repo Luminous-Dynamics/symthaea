@@ -11,6 +11,7 @@ pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
+pub mod fdm_coverage_inference;
 pub mod realized_coverage_backtest;
 pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
@@ -158,4 +159,12 @@ pub use realized_coverage_backtest::{
     CoverageEstimandV1, CoverageExclusionReasonV1, CoverageInferenceMethodV1,
     RealizedCoverageBacktestErrorV1, RealizedCoverageObservationV1, RealizedCoveragePolicyV1,
     RealizedCoverageReportV1, evaluate_realized_coverage_backtest_v1,
+};
+
+pub use fdm_coverage_inference::{
+    FDM_COVERAGE_ASSUMPTION_SCHEMA_V1, FDM_COVERAGE_POLICY_SCHEMA_V1, FDM_COVERAGE_REPORT_SCHEMA_V1,
+    FDM_COVERAGE_SCHEMA_V1, FDM_COVERAGE_SCORE_SCHEMA_V1, FdmAssumptionStateV1,
+    FdmCoverageAssumptionEvidenceV1, FdmCoverageErrorV1, FdmCoverageInferenceMethodV1,
+    FdmCoverageInputV1, FdmCoveragePolicyV1, FdmCoverageReportV1, FdmCoverageStatusV1,
+    FdmQualifiedScoreObservationV1, evaluate_fdm_coverage_inference_v1,
 };
