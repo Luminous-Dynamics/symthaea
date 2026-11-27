@@ -62,7 +62,7 @@ This prototype does not replace the existing evidence ledger, candidate archive,
 
 A historical trajectory gives outcomes for actions actually taken. It does not reveal outcomes for every action that could have been taken.
 
-For each decision, record exact candidate-visible context and evidence availability times, admissible action set, selected action and behavior-policy identity, assignment mechanism and propensity when randomized, outcome/evidence for the action actually executed, cost, feedback delay, adjudication, task family, evaluator epoch and lineage.
+For each decision, record exact candidate-visible context and evidence availability times, admissible action set, selected action and behavior-policy identity, assignment mechanism and the full probability distribution over every permitted action when randomized (including zero-probability actions), outcome/evidence for the action actually executed, cost, feedback delay, adjudication, task family, evaluator epoch and lineage.
 
 Rules:
 1. Score a replayed action only when a valid outcome for that exact action at that decision state exists.
