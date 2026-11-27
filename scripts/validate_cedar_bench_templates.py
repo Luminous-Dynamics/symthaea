@@ -116,6 +116,9 @@ def validate() -> None:
         require(referenced_sources <= set(source_ids), f"{tid}: answer oracle references unknown sources")
         if kind == "fact" and answer_spec.get("source_mode", "all") not in {"all", "any"}:
             raise ValueError(f"{tid}: invalid source_mode")
+        for source in sources:
+            require(isinstance(source.get("origin_id"), str) and bool(source["origin_id"].strip()),
+                    f"{tid}: every source needs a non-empty origin_id")
         citation = template["citation_contract"]
         support_ids = set(citation["support_source_ids"])
         decoy_ids = set(citation["decoy_source_ids"])
@@ -124,6 +127,9 @@ def validate() -> None:
         require(decoy_ids <= set(source_ids), f"{tid}: citation decoy source missing")
         require(not (support_ids & decoy_ids), f"{tid}: a source cannot be both support and decoy")
         require(citation.get("must_not_cite_decoy") is True, f"{tid}: decoy-citation prohibition missing")
+        require(isinstance(citation.get("minimum_independent_origins"), int)
+                and citation["minimum_independent_origins"] >= 1,
+                f"{tid}: minimum independent-origin count must be a positive integer")
         placebo = template["placebo"]
         require(placebo.get("id") == "P", f"{tid}: placebo fact ID must be P")
         require(bool(placebo.get("paths")), f"{tid}: placebo paths missing")
@@ -134,7 +140,9 @@ def validate() -> None:
             require(len(parts) >= 3 and parts[0] == "sources", f"{tid}: placebo path must be under a source")
             require(parts[1].isdigit() and int(parts[1]) < len(sources), f"{tid}: placebo source index missing")
         if "source_removal" in template:
-            require(template["source_removal"]["remove_source_id"] in source_ids,
+            removal = template["source_removal"]
+            removal_ids = removal.get("remove_source_ids", [removal.get("remove_source_id")])
+            require(bool(removal_ids) and set(removal_ids) <= set(source_ids),
                     f"{tid}: source-removal target missing")
         if "citation_swap" in template:
             require(template["citation_swap"]["decoy_source_id"] in source_ids,
