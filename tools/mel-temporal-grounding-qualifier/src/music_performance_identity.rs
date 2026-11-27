@@ -954,30 +954,35 @@ mod tests {
         }
     }
 
-    fn variant(
-        id: &str,
+    #[derive(Clone, Copy)]
+    struct VariantSeed {
         audio: char,
         take: char,
         performance: char,
         performer: char,
         instrument: char,
         renderer: char,
+    }
+
+    fn variant(
+        id: &str,
+        seed: VariantSeed,
         expected: MusicalRelationV1,
         answer: MusicListenAnswerV1,
     ) -> MusicalIdentityVariantV1 {
         MusicalIdentityVariantV1 {
             response: response(
                 id,
-                &digest(audio),
+                &digest(seed.audio),
                 "Is the target musical property the same?",
                 expected,
                 answer,
             ),
-            take_identity_sha256: digest(take),
-            performance_identity_sha256: digest(performance),
-            performer_identity_sha256: digest(performer),
-            instrument_family_sha256: digest(instrument),
-            renderer_identity_sha256: digest(renderer),
+            take_identity_sha256: digest(seed.take),
+            performance_identity_sha256: digest(seed.performance),
+            performer_identity_sha256: digest(seed.performer),
+            instrument_family_sha256: digest(seed.instrument),
+            renderer_identity_sha256: digest(seed.renderer),
         }
     }
 
@@ -988,12 +993,14 @@ mod tests {
     ) -> MusicalPerformanceIdentityTriadV1 {
         let clean = variant(
             "clean",
-            '1',
-            '2',
-            '3',
-            '4',
-            '5',
-            '6',
+            VariantSeed {
+                audio: '1',
+                take: '2',
+                performance: '3',
+                performer: '4',
+                instrument: '5',
+                renderer: '6',
+            },
             MusicalRelationV1::Same,
             MusicListenAnswerV1::ChoiceA,
         );
@@ -1004,12 +1011,14 @@ mod tests {
         };
         let performance_stay = variant(
             "performance-stay",
-            'b',
-            stay_take,
-            stay_performance,
-            stay_performer,
-            '5',
-            stay_renderer,
+            VariantSeed {
+                audio: 'b',
+                take: stay_take,
+                performance: stay_performance,
+                performer: stay_performer,
+                instrument: '5',
+                renderer: stay_renderer,
+            },
             MusicalRelationV1::Same,
             MusicListenAnswerV1::ChoiceA,
         );
@@ -1020,12 +1029,14 @@ mod tests {
         };
         let musical_flip = variant(
             "musical-flip",
-            'd',
-            '2',
-            '3',
-            '4',
-            flip_instrument,
-            '6',
+            VariantSeed {
+                audio: 'd',
+                take: '2',
+                performance: '3',
+                performer: '4',
+                instrument: flip_instrument,
+                renderer: '6',
+            },
             MusicalRelationV1::Different,
             MusicListenAnswerV1::ChoiceB,
         );
