@@ -181,21 +181,30 @@ def answer_oracle(spec: dict[str, Any], values: dict[str, str], active_sources: 
 def source_citation_contract(template: dict[str, Any], active_sources: list[dict[str, Any]]) -> dict[str, Any]:
     citation = template["citation_contract"]
     active_ids = {source["source_id"] for source in active_sources}
+    allowed_ids = sorted(set(citation["support_source_ids"]) & active_ids)
     origin_groups: dict[str, list[str]] = {}
+    support_origin_groups: dict[str, list[str]] = {}
     for source in active_sources:
         origin_id = str(source.get("origin_id", "")).strip()
         require(bool(origin_id), "every source must carry a non-empty origin_id")
         origin_groups.setdefault(origin_id, []).append(source["source_id"])
+        if source["source_id"] in allowed_ids:
+            support_origin_groups.setdefault(origin_id, []).append(source["source_id"])
     normalized_groups = {
         origin_id: sorted(source_ids)
         for origin_id, source_ids in sorted(origin_groups.items())
     }
-    independent_count = len(normalized_groups)
+    normalized_support_groups = {
+        origin_id: sorted(source_ids)
+        for origin_id, source_ids in sorted(support_origin_groups.items())
+    }
+    independent_count = len(normalized_support_groups)
     minimum_origins = int(citation["minimum_independent_origins"])
     return {
-        "allowed_citation_source_ids": sorted(set(citation["support_source_ids"]) & active_ids),
+        "allowed_citation_source_ids": allowed_ids,
         "forbidden_decoy_source_ids": sorted(set(citation["decoy_source_ids"]) & active_ids),
         "origin_groups": normalized_groups,
+        "support_origin_groups": normalized_support_groups,
         "independent_origin_count": independent_count,
         "minimum_independent_origins": minimum_origins,
         "corroboration_available": independent_count >= minimum_origins,
