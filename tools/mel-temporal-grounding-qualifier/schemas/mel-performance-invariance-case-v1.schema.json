@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-performance-invariance-case-v1.schema.json",
+  "title": "Melothaea performance-invariance case v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmark_id",
+    "benchmark_version",
+    "dataset_revision_sha256",
+    "annotation_policy_sha256",
+    "triads"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-performance-invariance-case-v1"
+    },
+    "benchmark_id": {
+      "const": "Melothaea-Performance-Identity"
+    },
+    "benchmark_version": {
+      "const": "1.0"
+    },
+    "dataset_revision_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "annotation_policy_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "triads": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/triad"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "target": {
+      "enum": [
+        "ChordQuality",
+        "RootPitchClass",
+        "ChordVoicing",
+        "RelativeIntervalSequence",
+        "MelodicContour",
+        "RhythmicRatioPattern",
+        "PulseRate",
+        "InstrumentFamily"
+      ]
+    },
+    "performanceFactor": {
+      "enum": [
+        "DifferentPerformer",
+        "DifferentTake",
+        "StrumOrArticulation",
+        "VelocityOrDynamics",
+        "ExpressiveRubato",
+        "GlobalTransposition",
+        "ChordInversion",
+        "ChordVoicing",
+        "UniformTempoScale",
+        "CrossRenderer"
+      ]
+    },
+    "flipFactor": {
+      "enum": [
+        "ChordQuality",
+        "RootPitchClass",
+        "ChordVoicing",
+        "MelodicInterval",
+        "MelodicContour",
+        "RhythmicRatio",
+        "PulseRate",
+        "InstrumentFamily"
+      ]
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variant_id",
+        "audio_sha256",
+        "question",
+        "question_sha256",
+        "option_a_relation",
+        "option_b_relation",
+        "expected_relation",
+        "model_answer"
+      ],
+      "properties": {
+        "variant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "question_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "option_a_relation": {
+          "enum": [
+            "Same",
+            "Different"
+          ]
+        },
+        "option_b_relation": {
+          "enum": [
+            "Same",
+            "Different"
+          ]
+        },
+        "expected_relation": {
+          "enum": [
+            "Same",
+            "Different"
+          ]
+        },
+        "model_answer": {
+          "enum": [
+            "ChoiceA",
+            "ChoiceB",
+            "Unparseable",
+            "Abstain"
+          ]
+        }
+      }
+    },
+    "performanceVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "performance_condition_sha256",
+        "answer"
+      ],
+      "properties": {
+        "performance_condition_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "answer": {
+          "$ref": "#/$defs/variant"
+        }
+      }
+    },
+    "triad": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "pair_id",
+        "source_lineage_sha256",
+        "composition_sha256",
+        "target_property",
+        "performance_stay_factor",
+        "musical_flip_factor",
+        "model_identity_sha256",
+        "system_prompt_sha256",
+        "runtime_identity_sha256",
+        "decoding_config_sha256",
+        "clean",
+        "performance_stay",
+        "musical_flip"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_lineage_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "composition_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "target_property": {
+          "$ref": "#/$defs/target"
+        },
+        "performance_stay_factor": {
+          "$ref": "#/$defs/performanceFactor"
+        },
+        "musical_flip_factor": {
+          "$ref": "#/$defs/flipFactor"
+        },
+        "model_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "system_prompt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "runtime_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "decoding_config_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "clean": {
+          "$ref": "#/$defs/performanceVariant"
+        },
+        "performance_stay": {
+          "$ref": "#/$defs/performanceVariant"
+        },
+        "musical_flip": {
+          "$ref": "#/$defs/performanceVariant"
+        }
+      }
+    }
+  }
+}
