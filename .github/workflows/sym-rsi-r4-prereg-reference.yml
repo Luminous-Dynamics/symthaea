@@ -52,8 +52,7 @@ jobs:
           git checkout -- \
             tools/sym-rsi-r4-prereg-reference/src/lib.rs \
             tools/sym-rsi-r4-prereg-reference/src/main.rs
-      - name: Check committed formatting (advisory until preview is applied)
-        continue-on-error: true
+      - name: Check committed formatting
         run: cargo fmt --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
       - name: Run semantic validator tests
         run: cargo test --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml
