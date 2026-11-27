@@ -370,7 +370,7 @@ fn assumptions_supported(
     Ok(None)
 }
 
-fn validate_score_observation(
+pub(crate) fn validate_score_observation(
     row: &FdmQualifiedScoreObservationV1,
     cutoff: i64,
 ) -> Result<f64, FdmCoverageErrorV1> {
