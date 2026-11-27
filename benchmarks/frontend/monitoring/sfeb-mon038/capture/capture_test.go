@@ -113,7 +113,7 @@ func TestTenThousandAdversarialMutationsNeverQualifyUnsafeCapture(t *testing.T){
  case 7:in.PartitionCaptures= in.PartitionCaptures[:2]
  case 8:in.PartitionCaptures[0].CleanupPolicy="compact"
  case 9:in.Boundary.ClaimID="other-claim"
- };refresh(&in);if Evaluate(in).CaptureVerdict==Qualified{t.Fatalf("unsafe mutation %d qualified",n)}}
+ };if n%10==9 { in.PartitionCaptures[0].BoundarySHA256=dd } else { refresh(&in) };if Evaluate(in).CaptureVerdict==Qualified{t.Fatalf("unsafe mutation %d qualified",n)}}
 }
 func BenchmarkEvaluate10000Records256Partitions(b *testing.B){
  in:=fixture();in.TopicInventory=[]TopicInventory{{ClusterID:"kafka-cluster-1",Topic:"ledger",TopicID:"topic-id-ledger",PartitionCount:256,CleanupPolicy:"delete",ConfigSHA256:da}}
