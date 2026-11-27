@@ -1652,18 +1652,18 @@ mod tests {
     }
 
     fn test_semantic_estimand() -> SemanticEstimandV1 {
-        SemanticEstimandV1::new(
-            1,
-            test_evidence_digest(20),
-            test_evidence_digest(21),
-            test_evidence_digest(22),
-            test_evidence_digest(23),
-            test_evidence_digest(24),
-            30_000,
-            test_evidence_digest(25),
-            test_evidence_digest(26),
-            test_evidence_digest(27),
-        )
+        SemanticEstimandV1::new(broca_mace_policy::SemanticEstimandFieldsV1 {
+            schema_version: 1,
+            population_spec_digest: test_evidence_digest(20),
+            treatment_version_digest: test_evidence_digest(21),
+            comparator_version_digest: test_evidence_digest(22),
+            outcome_definition_digest: test_evidence_digest(23),
+            outcome_unit_digest: test_evidence_digest(24),
+            follow_up_horizon_ms: 30_000,
+            censoring_strategy_digest: test_evidence_digest(25),
+            intercurrent_event_strategy_digest: test_evidence_digest(26),
+            target_weighting_digest: test_evidence_digest(27),
+        })
     }
 
     fn test_causal_identification() -> CausalIdentificationV1 {
