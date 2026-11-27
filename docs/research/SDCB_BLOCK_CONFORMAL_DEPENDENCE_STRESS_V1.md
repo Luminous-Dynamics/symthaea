@@ -1,6 +1,6 @@
 # SDCB Block-Conformal Dependence Stress Experiment v1
 
-**Status:** deterministic AR(1) stress-test executable authored; exact-head Rust 1.96 workflow is the execution gate. No empirical coverage result is claimed until the workflow report artifact is generated and inspected.
+**Status:** expanded deterministic AR(1) experiment executed on exact source head `419dda0bba8d6f664b78a201172942c078e2c3cd`; Rust 1.96 formatting and 4/4 harness tests passed, and the 72-condition × 5,000-trial report was generated, downloaded and inspected. The observed results below remain diagnostic and do not establish a general coverage guarantee.
 
 ## Question
 
@@ -45,6 +45,25 @@ The workflow records the exact source commit and Rust version in `manifest.txt` 
 - `manifest.txt`, binding source revision, toolchain, sample count and grid.
 
 The seed used for every output row is included in the CSV. This experiment is deterministic for the same source, seed, toolchain and math runtime; cross-platform floating-point library differences may produce small differences.
+
+## Expanded six-correlation results — 27 November 2026
+
+The table below isolates the block-length-1 cases to show how the serial-path alarm rate changes with dependence strength. Rates are empirical across 5,000 trials per condition; the complete CSV artifact contains all 72 rows and Wilson 95% intervals.
+
+| AR(1) rho | Independent blocks | Serial path, no gap | Serial path, gap 16 | Serial path, gap 64 |
+|---:|---:|---:|---:|---:|
+| 0.00 | 9.96% | 9.92% | 8.94% | 9.16% |
+| 0.50 | 10.04% | 9.88% | 10.20% | 9.90% |
+| 0.80 | 10.32% | 10.30% | 9.84% | 10.00% |
+| 0.90 | 9.92% | **12.16%** | 10.42% | 10.34% |
+| 0.95 | 10.56% | **13.54%** | 10.12% | 10.28% |
+| 0.99 | 10.18% | **17.62%** | **12.64%** | 10.40% |
+
+The nominal alarm rate is 10%. In the block-length-1 serial/no-gap conditions, the Wilson 95% interval is entirely above nominal at rho 0.90 (12.16%, interval 11.283–13.095%), rho 0.95 (13.54%, 12.620–14.516%) and rho 0.99 (17.62%, 16.589–18.701%). At rho 0.99, an embargo of 16 still leaves a statistically elevated rate of 12.64% (11.748–13.590%); an embargo of 64 reduces it to 10.40% (9.584–11.277%), whose interval includes 10%.
+
+The 72-row scan also shows that block length alone is not a general cure: at rho 0.99, block length 8 has a 12.12% serial/no-gap rate (11.244–13.054%), and block length 32 has a 10.94% rate (10.105–11.835%). A 16-step embargo at block length 8 remains above nominal (11.56%, 10.703–12.476%). Other conditions' intervals include nominal or do not show the same clear excess.
+
+**Interpretation:** stronger serial dependence can produce substantial undercoverage for this particular block-max rank test when consecutive blocks are treated as exchangeable. Embargo reduced the measured excess in some settings, but the results do not identify a universally safe gap. The rate changes must be validated over independent seeds, additional block scores, negative autocorrelation, non-Gaussian/heavy-tailed innovations, nonstationary drift and common-cause factors before any operational threshold is promoted. These are simulation results only—not real sensor calibration and not a theorem.
 
 ## Interpretation boundaries
 
@@ -101,7 +120,7 @@ The initial focused workflow passed on source commit `30a508248f31d595d930224c85
 - the rho=0.95 slice of the original 12-condition grid completed at 5,000 trials per condition;
 - report artifact: [coverage CSV and manifest](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45987147070/artifacts/15192042421).
 
-An expanded six-rho, 72-condition workflow is now being executed. It preserves the exact rho=0.95 seeds from the first run. Its output is not yet available and must not be conflated with the 12-row initial report.
+The expanded six-rho, 72-condition workflow completed on exact source head `419dda0bba8d6f664b78a201172942c078e2c3cd`, preserving the exact rho=0.95 seeds from the first run. Rust 1.96 formatting and all 4/4 harness tests passed; the 72-row CSV and manifest were uploaded as [artifact 15197286811](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45998581987/artifacts/15197286811). Each row uses 5,000 trials, so the expanded experiment contains 360,000 Monte Carlo trials. The exact source/toolchain/grid are recorded in that manifest.
 
 Observed nominal 10% alarm rates:
 
