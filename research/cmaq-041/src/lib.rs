@@ -12,6 +12,15 @@ use std::collections::{BTreeMap, HashSet};
 const PROGRESS_SCALE_PPM: u32 = 1_000_000;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExposureInterval {
+    /// Asset or simulator timeline whose operating exposure is measured.
+    pub domain_id: String,
+    /// Absolute monotonic interval within that domain.
+    pub start_us: u64,
+    pub end_us: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EvidenceBindings {
     pub source_trace_sha256: String,
     pub scenario_manifest_sha256: String,
@@ -50,6 +59,8 @@ pub struct EpisodeTrace {
     pub task_completed: bool,
     /// Useful progress in parts per million, in [0, 1_000_000].
     pub useful_progress_ppm: u32,
+    /// Required for safe episodes; hazard episodes add no safe exposure.
+    pub safe_exposure_interval: Option<ExposureInterval>,
     pub evidence: EvidenceBindings,
 }
 
@@ -68,6 +79,9 @@ pub enum EvaluationError {
     FallbackCompletedWithoutStart,
     EventOrderViolation,
     ProgressOutOfRange,
+    MissingSafeExposureInterval,
+    UnexpectedSafeExposureInterval,
+    InvalidSafeExposureInterval,
     ArithmeticOverflow,
     EmptyEvaluation,
 }
@@ -130,6 +144,7 @@ pub struct Scorecard {
 struct Accumulator {
     metrics: Metrics,
     effective_block_ids: HashSet<String>,
+    safe_exposure_intervals: Vec<ExposureInterval>,
     warning_leads_us: Vec<u64>,
     quarantine_leads_us: Vec<u64>,
     fallback_leads_us: Vec<u64>,
@@ -174,11 +189,11 @@ impl Accumulator {
                 _ => bump(&mut self.metrics.late_or_missing_fallback_completions)?,
             }
         } else {
-            self.metrics.safe_operating_time_us = self
-                .metrics
-                .safe_operating_time_us
-                .checked_add(episode.duration_us)
-                .ok_or(EvaluationError::ArithmeticOverflow)?;
+            let exposure = episode
+                .safe_exposure_interval
+                .as_ref()
+                .ok_or(EvaluationError::MissingSafeExposureInterval)?;
+            self.safe_exposure_intervals.push(exposure.clone());
             bump(&mut self.metrics.safe_progress_observations)?;
             self.metrics.safe_useful_progress_ppm_sum = self
                 .metrics
@@ -202,8 +217,10 @@ impl Accumulator {
         Ok(())
     }
 
-    fn finish(mut self) -> Metrics {
+    fn finish(mut self) -> Result<Metrics, EvaluationError> {
         self.metrics.effective_block_count = self.effective_block_ids.len();
+        self.metrics.safe_operating_time_us =
+            union_exposure_us(&mut self.safe_exposure_intervals)?;
         self.warning_leads_us.sort_unstable();
         self.quarantine_leads_us.sort_unstable();
         self.fallback_leads_us.sort_unstable();
@@ -217,7 +234,7 @@ impl Accumulator {
             nearest_rank(&self.fallback_leads_us, 50, 100);
         self.metrics.fallback_completion_lead_p90_us =
             nearest_rank(&self.fallback_leads_us, 90, 100);
-        self.metrics
+        Ok(self.metrics)
     }
 }
 
@@ -258,16 +275,20 @@ pub fn evaluate(episodes: &[EpisodeTrace]) -> Result<Scorecard, EvaluationError>
             .add_episode(episode)?;
     }
 
+    let overall = overall.finish()?;
+    let by_family = by_family
+        .into_iter()
+        .map(|(family, accumulator)| Ok((family, accumulator.finish()?)))
+        .collect::<Result<BTreeMap<_, _>, EvaluationError>>()?;
+    let by_effective_block = by_effective_block
+        .into_iter()
+        .map(|(block_id, accumulator)| Ok((block_id, accumulator.finish()?)))
+        .collect::<Result<BTreeMap<_, _>, EvaluationError>>()?;
+
     Ok(Scorecard {
-        overall: overall.finish(),
-        by_family: by_family
-            .into_iter()
-            .map(|(family, accumulator)| (family, accumulator.finish()))
-            .collect(),
-        by_effective_block: by_effective_block
-            .into_iter()
-            .map(|(block_id, accumulator)| (block_id, accumulator.finish()))
-            .collect(),
+        overall,
+        by_family,
+        by_effective_block,
     })
 }
 
@@ -319,6 +340,23 @@ fn validate_episode(episode: &EpisodeTrace) -> Result<(), EvaluationError> {
         _ => {}
     }
 
+    match (
+        episode.intervention_required,
+        episode.safe_exposure_interval.as_ref(),
+    ) {
+        (true, Some(_)) => return Err(EvaluationError::UnexpectedSafeExposureInterval),
+        (false, None) => return Err(EvaluationError::MissingSafeExposureInterval),
+        (false, Some(interval)) => {
+            if interval.domain_id.trim().is_empty()
+                || interval.end_us <= interval.start_us
+                || interval.end_us - interval.start_us != episode.duration_us
+            {
+                return Err(EvaluationError::InvalidSafeExposureInterval);
+            }
+        }
+        (true, None) => {}
+    }
+
     for (timestamp, label) in [
         (episode.first_warning_us, "first_warning_us"),
         (episode.quarantined_us, "quarantined_us"),
@@ -365,6 +403,52 @@ fn is_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn union_exposure_us(intervals: &mut [ExposureInterval]) -> Result<u64, EvaluationError> {
+    intervals.sort_by(|left, right| {
+        left.domain_id
+            .cmp(&right.domain_id)
+            .then_with(|| left.start_us.cmp(&right.start_us))
+            .then_with(|| left.end_us.cmp(&right.end_us))
+    });
+
+    let mut total = 0u64;
+    let mut current: Option<(String, u64, u64)> = None;
+    for interval in intervals {
+        match current.as_mut() {
+            Some((domain, _, end))
+                if *domain == interval.domain_id && interval.start_us <= *end =>
+            {
+                *end = (*end).max(interval.end_us);
+            }
+            Some(_) => {
+                let (_, start, end) =
+                    current.take().ok_or(EvaluationError::ArithmeticOverflow)?;
+                total = total
+                    .checked_add(end - start)
+                    .ok_or(EvaluationError::ArithmeticOverflow)?;
+                current = Some((
+                    interval.domain_id.clone(),
+                    interval.start_us,
+                    interval.end_us,
+                ));
+            }
+            None => {
+                current = Some((
+                    interval.domain_id.clone(),
+                    interval.start_us,
+                    interval.end_us,
+                ));
+            }
+        }
+    }
+    if let Some((_, start, end)) = current {
+        total = total
+            .checked_add(end - start)
+            .ok_or(EvaluationError::ArithmeticOverflow)?;
+    }
+    Ok(total)
 }
 
 fn bump(value: &mut usize) -> Result<(), EvaluationError> {
@@ -432,6 +516,7 @@ mod tests {
             safety_violation: false,
             task_completed: false,
             useful_progress_ppm: 120_000,
+            safe_exposure_interval: None,
             evidence: evidence_for(id),
         }
     }
@@ -456,6 +541,11 @@ mod tests {
             safety_violation: false,
             task_completed: true,
             useful_progress_ppm: 875_000,
+            safe_exposure_interval: Some(ExposureInterval {
+                domain_id: "vehicle-1".into(),
+                start_us: 0,
+                end_us: 2_000_000,
+            }),
             evidence: evidence_for(id),
         }
     }
@@ -493,8 +583,56 @@ mod tests {
         assert_eq!(score.overall.false_quarantines, 1);
         assert_eq!(score.overall.unnecessary_fallbacks, 1);
         assert_eq!(score.overall.safe_task_completed, 3);
-        assert_eq!(score.overall.safe_operating_time_us, 6_000_000);
+        // Three overlapping clips from one vehicle count as one interval.
+        assert_eq!(score.overall.safe_operating_time_us, 2_000_000);
         assert_eq!(score.overall.mean_safe_useful_progress_ppm(), Some(875_000));
+    }
+
+    #[test]
+    fn overlapping_and_adjacent_safe_windows_are_unioned_per_domain() {
+        let first = safe("s1", "urban", None, None, None);
+        let mut second = safe("s2", "urban", None, None, None);
+        let mut third = safe("s3", "urban", None, None, None);
+        second.safe_exposure_interval = Some(ExposureInterval {
+            domain_id: "vehicle-1".into(),
+            start_us: 1_000_000,
+            end_us: 3_000_000,
+        });
+        third.safe_exposure_interval = Some(ExposureInterval {
+            domain_id: "vehicle-1".into(),
+            start_us: 3_000_000,
+            end_us: 5_000_000,
+        });
+        let score = evaluate(&[first, second, third]).unwrap();
+        assert_eq!(score.overall.safe_operating_time_us, 5_000_000);
+    }
+
+    #[test]
+    fn safe_exposure_interval_is_required_and_validated() {
+        let mut episode = safe("s1", "urban", None, None, None);
+        episode.safe_exposure_interval = None;
+        assert_eq!(
+            evaluate(&[episode]),
+            Err(EvaluationError::MissingSafeExposureInterval)
+        );
+
+        let mut episode = safe("s2", "urban", None, None, None);
+        episode.safe_exposure_interval.as_mut().unwrap().end_us = 1_000_000;
+        assert_eq!(
+            evaluate(&[episode]),
+            Err(EvaluationError::InvalidSafeExposureInterval)
+        );
+
+        let mut episode = hazard("h1", "merge", None, None, None);
+        episode.safe_exposure_interval = Some(ExposureInterval {
+            domain_id: "vehicle-1".into(),
+            start_us: 0,
+            end_us: 1_000,
+        });
+        assert_eq!(
+            evaluate(&[episode]),
+            Err(EvaluationError::UnexpectedSafeExposureInterval)
+        );
     }
 
     #[test]
