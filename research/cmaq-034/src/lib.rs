@@ -9,7 +9,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use cmaq_028_recovery_option_portfolio::{
+use cmaq_028_recovery_portfolio::{
     PortfolioAssessment, PortfolioDisposition, PortfolioError, PortfolioRequest,
     PreviousOutcome as PortfolioPreviousOutcome, RecoveryOption, SelectedRecoveryOption,
     assess_recovery_portfolio,
@@ -296,7 +296,7 @@ fn is_sha256_hex(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cmaq_028_recovery_option_portfolio::PortfolioPrefix;
+    use cmaq_028_recovery_portfolio::PortfolioPrefix;
 
     fn digest(ch: char) -> String {
         std::iter::repeat_n(ch, 64).collect()
