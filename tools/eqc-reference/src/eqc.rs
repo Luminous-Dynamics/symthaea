@@ -184,8 +184,13 @@ fn load_schema(path: &Path) -> anyhow::Result<Value> {
     let bytes = fs::read(path).with_context(|| format!("read JSON Schema {}", path.display()))?;
     let schema: Value = serde_json::from_slice(&bytes)
         .with_context(|| format!("parse JSON Schema {}", path.display()))?;
-    jsonschema::meta::validate(&schema)
-        .with_context(|| format!("JSON Schema meta-validation failed for {}", path.display()))?;
+    jsonschema::meta::validate(&schema).map_err(|error| {
+        anyhow::anyhow!(
+            "JSON Schema meta-validation failed for {}: {}",
+            path.display(),
+            error
+        )
+    })?;
     Ok(schema)
 }
 
