@@ -722,6 +722,19 @@ mod tests {
         assert_eq!(scored.unresolved_contradiction_pairs,1);
         assert!(!scored.decision_sufficient);
     }
+    #[test] fn stale_retrieval_is_distinct_from_selected_decision_support(){
+        let e=generated_episode(0,77);
+        let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id,e.seed,&e.family,&e.candidate).unwrap(),candidate:e.candidate.clone()};
+        let p=PrivateRow{schema_version:PRIVATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:c.candidate_sha256.clone(),evaluator_private:e.evaluator_private.clone()};
+        let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"retrieval-audit".into(),candidate_sha256:c.candidate_sha256.clone(),arm_binding_sha256:arm_binding_digest(&c.candidate_sha256,"retrieval-audit"),action:"use_current_account".into(),retrieved_evidence_ids:vec!["event-000000-old".into()],selected_evidence_ids:vec![],observation_requests:0,cost:Cost{ingest_operations:None,query_operations:None,maintenance_operations:None,retained_bytes:None,returned_bytes:None,latency_us:None,detailed_receipt:None}};
+        let scored=score_one(&c,&p,&r).unwrap();
+        assert_eq!(scored.retrieved_evidence_count,1);
+        assert_eq!(scored.selected_evidence_count,0);
+        assert_eq!(scored.invalid_retrieved_evidence_count,1);
+        assert!(!scored.decision_sufficient);
+        let mut invalid_selection=r.clone(); invalid_selection.selected_evidence_ids=vec!["event-000000-old".into()];
+        assert!(score_one(&c,&p,&invalid_selection).is_err());
+    }
     #[test] fn bad_memory_is_measured_against_no_memory_separately_from_regret(){
         let e=generated_episode(0,77);
         let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.episode_id, e.seed, &e.family, &e.candidate).unwrap(),candidate:e.candidate.clone()};
