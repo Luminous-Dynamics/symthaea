@@ -109,10 +109,7 @@ impl BoxTarget {
     ///
     /// At a zero coordinate any point in [lower, upper] is valid; clamping zero
     /// into that interval is deterministic and keeps the selection bounded.
-    pub fn support_subgradient(
-        &self,
-        normal: &[f64],
-    ) -> Result<Vec<f64>, ApproachabilityError> {
+    pub fn support_subgradient(&self, normal: &[f64]) -> Result<Vec<f64>, ApproachabilityError> {
         self.validate_vector(normal)?;
         Ok(normal
             .iter()
@@ -207,10 +204,7 @@ impl ConvexTargetApproachabilityMonitor {
         if !observation_norm_bound.is_finite() || observation_norm_bound <= 0.0 {
             return Err(ApproachabilityError::InvalidObservationNormBound);
         }
-        if alpha_numerator == 0
-            || alpha_denominator == 0
-            || alpha_numerator >= alpha_denominator
-        {
+        if alpha_numerator == 0 || alpha_denominator == 0 || alpha_numerator >= alpha_denominator {
             return Err(ApproachabilityError::InvalidAlpha);
         }
         let residual_bound = observation_norm_bound + target.maximum_corner_norm();
@@ -319,10 +313,8 @@ impl ConvexTargetApproachabilityMonitor {
         let subgradient = self.target.support_subgradient(&normal_used)?;
         let gradient_step = 1.0 / (self.residual_bound * (next_seen as f64).sqrt());
         let mut next_normal = Vec::with_capacity(normal_used.len());
-        for ((weight, observation_value), support_gradient) in normal_used
-            .iter()
-            .zip(observation)
-            .zip(subgradient.iter())
+        for ((weight, observation_value), support_gradient) in
+            normal_used.iter().zip(observation).zip(subgradient.iter())
         {
             next_normal.push(weight + gradient_step * (observation_value - support_gradient));
         }
@@ -505,13 +497,7 @@ mod tests {
     fn conditional_mean_in_target_has_nonpositive_expected_support_residual() {
         let target = target();
         let mean = [0.04, -0.1];
-        let directions = [
-            [1.0, 0.0],
-            [0.0, 1.0],
-            [0.6, 0.8],
-            [-0.8, 0.6],
-            [-1.0, 0.0],
-        ];
+        let directions = [[1.0, 0.0], [0.0, 1.0], [0.6, 0.8], [-0.8, 0.6], [-1.0, 0.0]];
         for direction in directions {
             let residual = dot(&direction, &mean).unwrap() - target.support(&direction).unwrap();
             assert!(residual <= 1e-12);
@@ -588,8 +574,7 @@ mod tests {
     #[test]
     fn separated_mean_sequence_accumulates_evidence_and_quarantines() {
         let box_target = BoxTarget::new(vec![-0.05, -0.05], vec![0.05, 0.05]).unwrap();
-        let mut monitor =
-            ConvexTargetApproachabilityMonitor::new(box_target, 1.0, 1, 20).unwrap();
+        let mut monitor = ConvexTargetApproachabilityMonitor::new(box_target, 1.0, 1, 20).unwrap();
         let mut quarantined_at = None;
         for index in 0..400 {
             let noise = if index % 2 == 0 { 0.1 } else { -0.1 };
