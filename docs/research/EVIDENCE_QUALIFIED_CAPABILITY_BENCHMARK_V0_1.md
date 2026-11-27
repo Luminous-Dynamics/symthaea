@@ -150,16 +150,31 @@ For mutation-capable tasks, verify the state before and after every negative-con
 
 ## 5. Domain tracks and industry comparisons
 
+### Current external benchmark snapshot — 2026-11-27
+
+These references are domain-specific baselines, not interchangeable scores:
+
+| Domain | Current public reference | Current result / protocol signal | EQC opportunity |
+|---|---|---|---|
+| Repository software engineering | [SWE-Bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2) | The public split has 642 tasks across 11 repositories; the current leaderboard displays 98.0 for Claude Opus 5 / Claude Code xhigh. Release protocol removed 89 invalid tasks, uses reference-pass/empty-patch-fail task admission, disables web tools during agent execution, and re-grades on pristine images. | Compete on unseen tasks and qualified-success rate, adding authority, supply-chain integrity, provenance and independent replay without losing raw issue-resolution capability. |
+| Tool-mediated terminal work | [Terminal-Bench 2.1](https://www.tbench.ai/news/terminal-bench-2-1) | Version 2.1 repaired 28 of 89 tasks. A representative GPT-5.3-Codex / Codex CLI result is 79.1%, versus 73.3% on v2.0; Opus 4.6 / Claude Code is 70.1%, versus 58.0%. The revision documents dependency drift, resource-budget mismatch and instruction/test misspecification. | Treat task validity, environment drift and resource sufficiency as part of benchmark qualification, then measure agent capability on stable, versioned tasks. |
+| Healthcare agents | [HealthAgentBench V2](https://microsoft.github.io/HealthAgentBench/v2/results/) | 75 tasks across nine categories; the top listed agent is 57.3% at an estimated $4.7/task and 14.7 minutes/task. The published run uses one attempt per task, xhigh reasoning, model API access and no web tools. | Retain task success as a comparator, but add wrong-patient, tenant crossover, revoked consent, unauthorized mutation, FHIR/server conformance and state-before/after verification. |
+| Inference systems | [MLPerf Inference v6.1](https://mlcommons.org/2026/09/chairs-mlperf-inference-v6-1/) | A record 30 submitters and 120 systems; v6.1 adds end-to-end RAG and agentic edge inference benchmarks. Its Closed division holds the model mathematically equivalent to the reference; Open permits innovation. | Borrow Closed/Open separation: a matched reproducibility track plus an innovation track. EQC is a workflow/system qualification protocol, not an inference-throughput replacement. |
+| Computational physics | [ASME V&V 20](https://www.asme.org/codes-standards/find-codes-standards/standard-for-verification-and-validation-in-computational-fluid-dynamics-and-heat-transfer) and [ASME VVUQ 20.1-2024](https://www.asme.org/codes-standards/find-codes-standards/vvuq201-vvuq-20-1-multivariate-metric-for-validation) | VVUQ 20.1-2024 extends pointwise validation with a multivariate metric for global discrepancies across variables, locations and times while accounting for shared/independent uncertainty. | Combine analytical references, numerical convergence, multivariate validation errors and uncertainty intervals, not only one scalar benchmark error. |
+
+The 98.0, 79.1% and 57.3% values are snapshots from different task sets and protocols. They must not be averaged or presented as directly comparable. Leaderboard movement, model settings, budget caps and harness changes must be frozen in each comparison report.
+
 ### 5.1 Software engineering agents — Symthaea
 
 **Industry comparators**
 
 - SWE-Bench Pro V2 for challenging repository-level issue resolution.
 - SWE Atlas for codebase comprehension, test writing, and refactoring.
-- Terminal-Bench for tool-mediated terminal work.
+- Terminal-Bench 2.1 for tool-mediated terminal work, not the repaired 2.0 dataset.
+- MLPerf Inference Closed/Open methodology for matched systems and declared innovation.
 - MLPerf-style closed/open comparison discipline for matched systems and declared innovation.
 
-SWE-Bench Pro V2's September 2026 public release describes 642 tasks across 11 repositories, web tools disabled during the agent phase, pristine-image re-grading, and both reference and empty-patch checks. The current Scale Labs leaderboard displays a 99.40 ± 0.40 public V2 result. Treat that as a benchmark-specific frontier observation, not proof of general software engineering competence.
+The current public V2 leaderboard snapshot displays 98.0 for Claude Opus 5 / Claude Code xhigh. The 642-task release also demonstrates why task admission belongs inside the benchmark: 89 tasks were removed as invalid, instructions were corrected when they contradicted tests, the agent phase disables web tools, every diff is re-graded in a pristine image, and each task must pass with a reference patch and fail with an empty patch. These controls are stronger than a headline resolve rate, but the publisher still notes residual risks such as verifier execution of patch-controlled code. Treat the score as a benchmark-specific observation, not a general software-engineering capability claim.
 
 **EQC extension**
 
@@ -181,7 +196,7 @@ A near-ceiling public score is not a reason to claim victory. The differentiator
 
 **Industry comparator**
 
-HealthAgentBench V2 reports 75 tasks across nine categories and nine environments. Its current results page shows 57.3% for the leading evaluated agent, with one scored attempt per task, model API access only, and web tools disabled. This is a useful frontier reference, but it is not a clinical safety certification or a directly comparable score for every EHR integration.
+HealthAgentBench V2 reports 75 tasks across nine categories; its results page currently lists a leading success rate of 57.3%, with estimated cost of $4.7/task and time of 14.7 minutes/task. The published protocol uses one attempt per task, xhigh reasoning, model API access only and disabled web tools. This is a useful task-capability reference, not a clinical safety certification or a directly comparable score for every EHR integration.
 
 **FHIR comparator**
 
@@ -215,7 +230,7 @@ These are engineering targets for synthetic qualification; they do not establish
 - NASA's published CFD verification approach, including iterative convergence, consistency/conservation, spatial and temporal convergence, and comparison with highly accurate solutions.
 - Domain-specific experimental benchmark datasets and analytical reference cases.
 
-ASME V&V 20 frames validation as quantifying simulation accuracy at specified variables and validation points while accounting for uncertainty in both computed solutions and experimental data. It is not a blanket certification for an entire model or all operating conditions.
+ASME V&V 20 frames validation as quantifying simulation accuracy at specified variables and validation points while accounting for uncertainty in both computed solutions and experimental data. ASME VVUQ 20.1-2024 adds a multivariate metric for global discrepancy across multiple variables, locations and times, including shared or independent uncertainty. Neither is a blanket certification for an entire model or all operating conditions.
 
 **EQC extension**
 
@@ -360,26 +375,39 @@ The field should move from **answer benchmarking** to **evidence-carrying capabi
 
 This is a research direction. It should be considered successful only after the protocol, independent verifiers, public seed corpus and exact-head receipts have been implemented and externally challenged.
 
-## 12. Implemented v0.1 seed and exact-head evidence
+## 11. Implemented v0.1 seed and exact-head evidence
 
-The first standalone reference evaluator is implemented in `research/eqc-rust/`, outside the main Symthaea Cargo workspace. Its locked dependencies, task/receipt schemas, synthetic inputs and runner are independently reproducible. This PR is stacked on workspace-manifest repair PR [#13080](https://github.com/Luminous-Dynamics/symthaea/pull/13080), which excludes the examples-only `crates/core/symthaea` path from the root workspace glob and restores the repository-wide manifest checks; the evaluator itself remains a separately locked nested Cargo workspace.
+The standalone reference evaluator is implemented in `research/eqc-rust/`, outside the main Symthaea Cargo workspace, with its own locked dependencies, task/receipt schemas, synthetic inputs and runner.
 
-Exact-head run on 2026-11-27:
+A prior source-branch exact-head run on 2026-11-27 completed successfully:
 - Source head: `39f0a9e2f43ba4f289d756dd3b5a40de94c0ad6a`.
 - Toolchain: Rust 1.96.0.
 - Workflow: [EQC Standalone Reference Qualification, run #14](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45946327074).
-- Result: **success**; 25 Rust tests passed, 0 failed; four seed tasks passed the reference contract; report and source evidence artifact uploaded.
+- Result: 25 Rust tests passed; four seed tasks passed the reference contract; report and source evidence artifact uploaded.
 - Schema validator: pinned `jsonschema 0.63.2`, Draft 2020-12 meta-schema checks for both contracts, all four tasks schema-valid, receipt conditional qualification tests and explicit `date-time` format validation.
 
-The run qualifies the evaluator, task/receipt schemas and synthetic reference corpus only. It does not demonstrate that a real agent can safely execute a clinical workflow. A separate Mycelix Health system-under-test adapter is tracked in [Mycelix Health issue #359](https://github.com/Luminous-Dynamics/mycelix-health/issues/359), which requires synthetic Tryorama conductor episodes, independent source-chain before/after observation and zero-mutation denial controls.
+**Current review branch status:** this separate main-based PR [#13929](https://github.com/Luminous-Dynamics/symthaea/pull/13929) has a distinct exact-head run #22 pending on head `0e4111d6169db9c818130200d5b5cf8d0283d1fd`. The earlier run is evidence for the source-branch commit only; it is not a pass for the current PR head.
 
-## 11. References
+These tests qualify the reference evaluator, task/receipt schemas and synthetic corpus only. They do not demonstrate that a real agent can safely execute a clinical workflow. The Mycelix Health production adapter is tracked in [issue #360](https://github.com/Luminous-Dynamics/mycelix-health/issues/360), requiring synthetic Holochain conductor episodes, independent source-chain before/after observation and zero-mutation denial controls.
 
-- Scale Labs, [SWE-Bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2) and [V2 methodology](https://labs.scale.com/blog/swe-bench-pro-v2) (September 22, 2026).
-- Microsoft, [HealthAgentBench V2 results](https://microsoft.github.io/HealthAgentBench/v2/results/) and [benchmark repository](https://github.com/microsoft/HealthAgentBench) (V2 release announced October 25, 2026).
+
 - HL7 community, [FHIR conformance testing registry](https://www.fhir.org/conformance-testing/).
 - ASME, [V&V 20: Standard for Verification and Validation in CFD and Heat Transfer](https://www.asme.org/codes-standards/find-codes-standards/standard-for-verification-and-validation-in-computational-fluid-dynamics-and-heat-transfer) (2009, reaffirmed 2021).
 - ASME, [Verification, Validation and Uncertainty Quantification resources](https://www.asme.org/codes-standards/publications-information/verification-validation-uncertainty).
 - NASA, [CFD verification assessment](https://www.grc.nasa.gov/www/wind/valid/tutorial/verassess.html).
 - NIST, [AI Risk Management Framework: Generative AI Profile](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence) (NIST AI 600-1; a risk-management reference, not a task leaderboard).
 - MLCommons, [MLPerf Inference submission guide](https://docs.mlcommons.org/inference/submission/).
+
+## 12. References
+
+- Scale Labs, [SWE-Bench Pro V2 leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2) and [V2 methodology](https://labs.scale.com/blog/swe-bench-pro-v2) (updated September 22, 2026).
+- Terminal-Bench, [Terminal-Bench 2.1 release and task corrections](https://www.tbench.ai/news/terminal-bench-2-1).
+- Microsoft, [HealthAgentBench V2 results](https://microsoft.github.io/HealthAgentBench/v2/results/) and [benchmark repository](https://github.com/microsoft/HealthAgentBench).
+- MLCommons, [MLPerf Inference v6.1 industry results and agentic/end-to-end benchmark update](https://mlcommons.org/2026/09/chairs-mlperf-inference-v6-1/) and [submission guide](https://docs.mlcommons.org/inference/submission/).
+- HL7 community, [FHIR conformance testing registry](https://www.fhir.org/conformance-testing/).
+- ASME, [V&V 20: Standard for Verification and Validation in CFD and Heat Transfer](https://www.asme.org/codes-standards/find-codes-standards/standard-for-verification-and-validation-in-computational-fluid-dynamics-and-heat-transfer).
+- ASME, [VVUQ 20.1-2024: Multivariate Metric for Validation](https://www.asme.org/codes-standards/find-codes-standards/vvuq201-vvuq-20-1-multivariate-metric-for-validation) and [VVUQ standards portfolio](https://www.asme.org/codes-standards/publications-information/verification-validation-uncertainty).
+- NASA, [CFD verification assessment](https://www.grc.nasa.gov/www/wind/valid/tutorial/verassess.html).
+- NIST, [AI Risk Management Framework: Generative AI Profile](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-artificial-intelligence-risk-management-framework-generative-artificial-intelligence).
+- Rapier, [Godot 4.7 same-machine physics benchmark](https://godot.rapier.rs/docs/documentation/performance/).
+- Jolt Physics, [v5.5 architecture and determinism notes](https://jrouwe.github.io/JoltPhysicsDocs/5.5.0/).
