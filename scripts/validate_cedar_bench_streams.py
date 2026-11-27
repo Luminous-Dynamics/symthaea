@@ -42,7 +42,7 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
     forbidden_candidate_keys = {
         "condition", "expected_behavior", "expanded_values",
         "baseline_values", "counterfactual_values", "seed_commitment",
-        "selected_intervention_fact",
+        "selected_intervention_fact", "split",
     }
     for task_id, candidate in candidate_by_id.items():
         audit = audit_by_id[task_id]
