@@ -1,0 +1,96 @@
+{
+  "schema_version": "symthaea.presentation-receipt-fixtures.v1",
+  "purpose": "Lifecycle sequence fixtures. Schema validation covers record shapes; phase ordering, exactly-one terminal outcome, per-clock monotonicity and digest verification are semantic ledger checks.",
+  "positive": [
+    {
+      "id": "observed_then_stopped",
+      "phases": [
+        "permitted",
+        "submitted",
+        "observed",
+        "stopped"
+      ],
+      "expected_terminal": "stopped"
+    },
+    {
+      "id": "unknown_then_observed_then_stopped",
+      "phases": [
+        "permitted",
+        "submitted",
+        "outcome_unknown",
+        "observed",
+        "stopped"
+      ],
+      "expected_terminal": "stopped"
+    },
+    {
+      "id": "unknown_then_failed",
+      "phases": [
+        "permitted",
+        "submitted",
+        "outcome_unknown",
+        "failed"
+      ],
+      "expected_terminal": "failed"
+    },
+    {
+      "id": "policy_denied_before_submission",
+      "phases": [
+        "permitted",
+        "not_submitted"
+      ],
+      "expected_terminal": "not_submitted"
+    }
+  ],
+  "negative": [
+    {
+      "id": "observed_without_submission",
+      "phases": [
+        "permitted",
+        "observed"
+      ],
+      "expected_rejection": "invalid_transition"
+    },
+    {
+      "id": "stopped_without_observation",
+      "phases": [
+        "permitted",
+        "submitted",
+        "stopped"
+      ],
+      "expected_rejection": "invalid_transition"
+    },
+    {
+      "id": "duplicate_terminal",
+      "phases": [
+        "permitted",
+        "not_submitted",
+        "failed"
+      ],
+      "expected_rejection": "invalid_transition"
+    },
+    {
+      "id": "output_clock_regression",
+      "stamps": [
+        {
+          "clock_domain_id": "clock:renderer",
+          "monotonic_ns": "100"
+        },
+        {
+          "clock_domain_id": "clock:renderer",
+          "monotonic_ns": "99"
+        }
+      ],
+      "expected_rejection": "clock_regression"
+    },
+    {
+      "id": "unobserved_output_misreported_as_success",
+      "phases": [
+        "permitted",
+        "submitted"
+      ],
+      "reported_terminal": "stopped",
+      "expected_rejection": "missing_stopped_observation"
+    }
+  ]
+}
