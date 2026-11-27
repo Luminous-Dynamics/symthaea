@@ -124,7 +124,7 @@ impl FirstOrderResponseOu {
             // If delta*t underflows to zero while m*t is representable,
             // use the repeated-root limit instead of losing the transition.
             let gap_scaled = delta * t;
-            if gap_scaled == 0.0 && t > 0.0 {
+            if gap_scaled < f64::MIN_POSITIVE && t > 0.0 {
                 let scaled = m * t;
                 if !scaled.is_finite() {
                     return Err(ResponseModelError::NumericalFailure);
@@ -408,6 +408,23 @@ mod tests {
         let expected = t * (-t).exp();
         assert!(transition[1][0] > 0.0);
         close(transition[1][0], expected, 1.0e-323);
+    }
+
+    #[test]
+    fn subnormal_rate_gap_product_uses_repeated_root_limit() {
+        let cases = [
+            (1.0725948952756432e-199, 1.0725948952756434e-199, 1.1348145351131996e-109),
+            (7.277817676318291e-181, 7.27781767631829e-181, 3.0193425571006826e-128),
+        ];
+        for (lambda, target_mu, elapsed) in cases {
+            let tau = 1.0 / target_mu;
+            let model = FirstOrderResponseOu::new(lambda, 1.0, tau).unwrap();
+            let mu = model.response_rate();
+            let actual = model.transition_matrix(elapsed).unwrap()[1][0];
+            let repeated_root = (mu * elapsed) * (-(lambda * elapsed)).exp();
+            assert!(actual > 0.0);
+            close(actual, repeated_root, f64::from_bits(1));
+        }
     }
 
     #[test]
