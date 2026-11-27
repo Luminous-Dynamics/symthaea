@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/frontend/monitoring/sfeb-mon021/SCENARIOS-v1.schema.json",
+  "title": "MON-021 PostgreSQL CDC Continuity Scenario Corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_id",
+    "corpus_version",
+    "status",
+    "purpose",
+    "postgresql_profile",
+    "scenarios"
+  ],
+  "properties": {
+    "corpus_id": {
+      "const": "MON-021-POSTGRES-CDC-CONTINUITY"
+    },
+    "corpus_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "status": {
+      "enum": [
+        "research_seed",
+        "frozen_confirmatory",
+        "retired"
+      ]
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "postgresql_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "family",
+          "description",
+          "expected_decision",
+          "reason_code",
+          "required_control",
+          "severity",
+          "positive_control"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^CDC-[0-9]{3}$"
+          },
+          "family": {
+            "enum": [
+              "identity",
+              "snapshot",
+              "replay",
+              "durability",
+              "retention",
+              "failover",
+              "timeline",
+              "completeness"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_decision": {
+            "enum": [
+              "qualified",
+              "denied",
+              "indeterminate",
+              "divergent"
+            ]
+          },
+          "reason_code": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "required_control": {
+            "enum": [
+              "continue",
+              "deny",
+              "hold",
+              "surface"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "critical",
+              "high",
+              "medium"
+            ]
+          },
+          "positive_control": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
