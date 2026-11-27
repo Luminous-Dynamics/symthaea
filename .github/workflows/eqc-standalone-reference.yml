@@ -5,6 +5,7 @@ on:
     branches: [research/eqc-standalone-reference-2026-11-27]
     paths:
       - "research/eqc-reference/**"
+      - "research/eqc-reference/Cargo.lock"
       - "docs/research/eqc-task-v0.1.schema.json"
       - "docs/research/eqc-run-receipt-v0.1.schema.json"
       - "docs/research/eqc-seed-corpus-v0.1.json"
