@@ -117,10 +117,22 @@ pub struct CalibrationDiagnostics {
     pub held_out_evaluation_cluster_count: usize,
 }
 
+/// One immutable order-statistic input, retained for downstream monitoring.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CalibrationClusterScore {
+    pub independent_cluster_id: String,
+    pub score_units: u64,
+    pub block_manifest_sha256: String,
+    pub candidate_margin_block_sha256: String,
+    pub reference_margin_receipt_sha256: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CalibrationResult {
     pub qualified: QualifiedMarginCalibration,
     pub diagnostics: CalibrationDiagnostics,
+    /// Exact unsorted per-cluster scores used to produce the qualified quantile.
+    pub cluster_scores: Vec<CalibrationClusterScore>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -254,6 +266,7 @@ pub fn calibrate_recoverability_margin(
     let mut cluster_ids = HashSet::new();
     let mut family_ids = HashSet::new();
     let mut scores = Vec::with_capacity(manifest.calibration_units.len());
+    let mut cluster_scores = Vec::with_capacity(manifest.calibration_units.len());
 
     for unit in &manifest.calibration_units {
         let reference = &unit.reference;
@@ -277,9 +290,7 @@ pub fn calibrate_recoverability_margin(
                 "candidate_margin_block_sha256",
             ));
         }
-        if reference.candidate_margin_block_sha256
-            != unit.candidate.predicted_margin_block_sha256
-        {
+        if reference.candidate_margin_block_sha256 != unit.candidate.predicted_margin_block_sha256 {
             return Err(MarginCalibrationError::RuntimeScopeMismatch(
                 "candidate_margin_block_sha256",
             ));
@@ -297,6 +308,13 @@ pub fn calibrate_recoverability_margin(
         }
         let score = score_calibration_unit(&unit.candidate, reference, &contract.spec)?;
         scores.push(score);
+        cluster_scores.push(CalibrationClusterScore {
+            independent_cluster_id: reference.independent_cluster_id.clone(),
+            score_units: score,
+            block_manifest_sha256: reference.block_manifest_sha256.clone(),
+            candidate_margin_block_sha256: reference.candidate_margin_block_sha256.clone(),
+            reference_margin_receipt_sha256: reference.reference_margin_receipt_sha256.clone(),
+        });
         family_ids.insert(reference.environment_family_id.clone());
     }
 
@@ -328,6 +346,7 @@ pub fn calibrate_recoverability_margin(
             validation_cluster_count: manifest.scale_validation_cluster_ids.len(),
             held_out_evaluation_cluster_count: manifest.held_out_evaluation_cluster_ids.len(),
         },
+        cluster_scores,
     })
 }
 
@@ -352,10 +371,9 @@ pub fn apply_recoverability_margin_calibration(
             &cell.option_margins,
             calibration.spec.required_independent_domains,
         )?;
-        let lower = i128::from(predicted_margin)
-            - i128::from(calibration.optimism_radius_units);
-        let lower = i64::try_from(lower)
-            .map_err(|_| MarginCalibrationError::MarginArithmeticOverflow)?;
+        let lower = i128::from(predicted_margin) - i128::from(calibration.optimism_radius_units);
+        let lower =
+            i64::try_from(lower).map_err(|_| MarginCalibrationError::MarginArithmeticOverflow)?;
         lower_bounds.push((cell.identity.clone(), lower));
     }
     let minimum_lower_bound = lower_bounds
@@ -427,10 +445,8 @@ fn score_calibration_unit(
             &candidate_cell.option_margins,
             spec.required_independent_domains,
         )?;
-        let actual = kth_largest_independent_margin(
-            reference_options,
-            spec.required_independent_domains,
-        )?;
+        let actual =
+            kth_largest_independent_margin(reference_options, spec.required_independent_domains)?;
         let optimism = (i128::from(predicted) - i128::from(actual)).max(0);
         let optimism = u64::try_from(optimism)
             .map_err(|_| MarginCalibrationError::MarginArithmeticOverflow)?;
@@ -509,9 +525,7 @@ fn validate_cell_inventory(
     Ok(())
 }
 
-fn expected_cell_count(
-    spec: &RecoveryMarginBlockSpec,
-) -> Result<usize, MarginCalibrationError> {
+fn expected_cell_count(spec: &RecoveryMarginBlockSpec) -> Result<usize, MarginCalibrationError> {
     let count = u128::from(spec.rollouts_per_cluster)
         .checked_mul(u128::from(spec.action_query_cell_count))
         .and_then(|value| value.checked_mul(u128::from(spec.horizon_steps) + 1))
@@ -519,9 +533,7 @@ fn expected_cell_count(
     usize::try_from(count).map_err(|_| MarginCalibrationError::InvalidBlockSpec("cell_count"))
 }
 
-fn validate_contract(
-    contract: &MarginCalibrationContract,
-) -> Result<(), MarginCalibrationError> {
+fn validate_contract(contract: &MarginCalibrationContract) -> Result<(), MarginCalibrationError> {
     validate_spec(&contract.spec)?;
     if contract.alpha_denominator == 0
         || contract.alpha_numerator == 0
@@ -536,7 +548,10 @@ fn validate_spec(spec: &RecoveryMarginBlockSpec) -> Result<(), MarginCalibration
     for (value, name) in [
         (&spec.contract_sha256, "contract_sha256"),
         (&spec.source_manifest_sha256, "source_manifest_sha256"),
-        (&spec.candidate_checkpoint_sha256, "candidate_checkpoint_sha256"),
+        (
+            &spec.candidate_checkpoint_sha256,
+            "candidate_checkpoint_sha256",
+        ),
         (&spec.plant_model_sha256, "plant_model_sha256"),
         (&spec.context_scope_sha256, "context_scope_sha256"),
         (&spec.recovery_portfolio_sha256, "recovery_portfolio_sha256"),
@@ -552,7 +567,9 @@ fn validate_spec(spec: &RecoveryMarginBlockSpec) -> Result<(), MarginCalibration
         }
     }
     if spec.rollouts_per_cluster == 0 {
-        return Err(MarginCalibrationError::InvalidBlockSpec("rollouts_per_cluster"));
+        return Err(MarginCalibrationError::InvalidBlockSpec(
+            "rollouts_per_cluster",
+        ));
     }
     if spec.action_query_cell_count == 0 {
         return Err(MarginCalibrationError::InvalidBlockSpec(
@@ -571,9 +588,7 @@ fn validate_spec(spec: &RecoveryMarginBlockSpec) -> Result<(), MarginCalibration
     Ok(())
 }
 
-fn validate_split_manifest(
-    manifest: &CalibrationManifest,
-) -> Result<(), MarginCalibrationError> {
+fn validate_split_manifest(manifest: &CalibrationManifest) -> Result<(), MarginCalibrationError> {
     if manifest.training_cluster_ids.is_empty() {
         return Err(MarginCalibrationError::EmptySplit("training_cluster_ids"));
     }
@@ -605,10 +620,7 @@ fn validate_split_manifest(
     Ok(())
 }
 
-fn insert_split_id(
-    id: &str,
-    seen: &mut HashSet<String>,
-) -> Result<(), MarginCalibrationError> {
+fn insert_split_id(id: &str, seen: &mut HashSet<String>) -> Result<(), MarginCalibrationError> {
     if id.trim().is_empty() {
         return Err(MarginCalibrationError::EmptyIdentity("split_cluster_id"));
     }
@@ -623,10 +635,7 @@ pub fn finite_sample_quantile_rank(
     alpha_numerator: u32,
     alpha_denominator: u32,
 ) -> Result<usize, MarginCalibrationError> {
-    if alpha_denominator == 0
-        || alpha_numerator == 0
-        || alpha_numerator >= alpha_denominator
-    {
+    if alpha_denominator == 0 || alpha_numerator == 0 || alpha_numerator >= alpha_denominator {
         return Err(MarginCalibrationError::InvalidMiscoverage);
     }
     let n_plus_one = (calibration_clusters as u128)
@@ -721,7 +730,11 @@ mod tests {
         }
     }
 
-    fn reference_block(cluster: usize, predicted_base: i64, overoptimism: i64) -> ReferenceMarginBlock {
+    fn reference_block(
+        cluster: usize,
+        predicted_base: i64,
+        overoptimism: i64,
+    ) -> ReferenceMarginBlock {
         let s = spec();
         let reference_base = predicted_base - overoptimism;
         ReferenceMarginBlock {
@@ -831,6 +844,38 @@ mod tests {
     }
 
     #[test]
+    fn calibration_result_retains_exact_per_cluster_scores() {
+        let m = manifest(19);
+        let result = calibrate_recoverability_margin(contract(), &m).unwrap();
+        assert_eq!(
+            result.cluster_scores.len(),
+            result.qualified.calibration_cluster_count
+        );
+        for (score, unit) in result.cluster_scores.iter().zip(&m.calibration_units) {
+            assert_eq!(
+                score.independent_cluster_id,
+                unit.reference.independent_cluster_id
+            );
+            assert_eq!(
+                score.block_manifest_sha256,
+                unit.reference.block_manifest_sha256
+            );
+            assert_eq!(
+                score.candidate_margin_block_sha256,
+                unit.candidate.predicted_margin_block_sha256
+            );
+            assert_eq!(
+                score.reference_margin_receipt_sha256,
+                unit.reference.reference_margin_receipt_sha256
+            );
+            assert_eq!(
+                score.score_units,
+                score_calibration_unit(&unit.candidate, &unit.reference, &spec()).unwrap()
+            );
+        }
+    }
+
+    #[test]
     fn eighteen_clusters_are_insufficient_at_95_percent() {
         assert_eq!(
             calibrate_recoverability_margin(contract(), &manifest(18)),
@@ -843,10 +888,10 @@ mod tests {
 
     #[test]
     fn reference_must_be_bound_to_exact_candidate_margin_block() {
-        let mut p = pair(0, 2);
-        p.reference.candidate_margin_block_sha256 = digest('0');
+        let mut m = manifest(19);
+        m.calibration_units[0].reference.candidate_margin_block_sha256 = digest('0');
         assert_eq!(
-            score_calibration_unit(&p.candidate, &p.reference, &spec()),
+            calibrate_recoverability_margin(contract(), &m),
             Err(MarginCalibrationError::RuntimeScopeMismatch(
                 "candidate_margin_block_sha256"
             ))
@@ -871,8 +916,7 @@ mod tests {
         c.cells[1].option_margins[2].margin_units += 30;
         r.cells[1].option_margins[0].margin_units += 100;
         r.cells[1].option_margins[1].margin_units += 100;
-        r.cells[1].option_margins[2].margin_units =
-            c.cells[1].option_margins[2].margin_units - 25;
+        r.cells[1].option_margins[2].margin_units = c.cells[1].option_margins[2].margin_units - 25;
         assert_eq!(score_calibration_unit(&c, &r, &spec()).unwrap(), 25);
     }
 
@@ -896,8 +940,7 @@ mod tests {
         // Remove the second independent recovery domain, not a duplicate
         // profile within the first domain.
         forecast.block.cells[1].option_margins[2].margin_units = -100;
-        let assessment =
-            apply_recoverability_margin_calibration(&calibration, &forecast).unwrap();
+        let assessment = apply_recoverability_margin_calibration(&calibration, &forecast).unwrap();
         assert!(matches!(
             assessment.disposition,
             MarginDisposition::DoNotCommit {
@@ -913,8 +956,7 @@ mod tests {
         let calibration = qualified();
         let mut forecast = runtime_forecast();
         forecast.previous_outcome = PreviousOutcome::Unknown;
-        let assessment =
-            apply_recoverability_margin_calibration(&calibration, &forecast).unwrap();
+        let assessment = apply_recoverability_margin_calibration(&calibration, &forecast).unwrap();
         assert_eq!(
             assessment.disposition,
             MarginDisposition::BlockUntilReconciliation
@@ -938,8 +980,10 @@ mod tests {
     #[test]
     fn cluster_split_leakage_is_rejected() {
         let mut m = manifest(19);
-        m.training_cluster_ids[0] =
-            m.calibration_units[0].reference.independent_cluster_id.clone();
+        m.training_cluster_ids[0] = m.calibration_units[0]
+            .reference
+            .independent_cluster_id
+            .clone();
         assert_eq!(
             calibrate_recoverability_margin(contract(), &m),
             Err(MarginCalibrationError::ClusterSplitLeakage)
@@ -949,8 +993,10 @@ mod tests {
     #[test]
     fn duplicate_calibration_cluster_is_rejected() {
         let mut m = manifest(19);
-        m.calibration_units[1].reference.independent_cluster_id =
-            m.calibration_units[0].reference.independent_cluster_id.clone();
+        m.calibration_units[1].reference.independent_cluster_id = m.calibration_units[0]
+            .reference
+            .independent_cluster_id
+            .clone();
         assert_eq!(
             calibrate_recoverability_margin(contract(), &m),
             Err(MarginCalibrationError::DuplicateCalibrationCluster)
