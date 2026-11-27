@@ -16,7 +16,7 @@ const MAX_CONDITION: f64 = 1.0e8;
 const REL_TOL: f64 = 2.0e-10;
 const ABS_TOL: f64 = 1.0e-32;
 const MAX_DEPTH: usize = 24;
-const MAX_EVALS: u64 = 1_000_000;
+const MAX_OUTER_EVALUATIONS: u64 = 1_000_000;
 const MAX_CELLS: usize = 64;
 const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
 
@@ -41,7 +41,7 @@ pub struct BivariateRectangleEstimate {
     pub correlation: Option<f64>,
     pub correlation_condition_estimate: Option<f64>,
     pub covariance_rank: u8,
-    pub function_evaluations: u64,
+    pub outer_integrand_evaluations: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -109,7 +109,7 @@ fn rank_one_rectangle(
             return Ok(BivariateRectangleEstimate {
                 probability: 0.0, outer_quadrature_error_indicator: 0.0,
                 truncation_error_bound: TRUNCATION_BOUND, correlation,
-                correlation_condition_estimate: None, covariance_rank: 1, function_evaluations: 0,
+                correlation_condition_estimate: None, covariance_rank: 1, outer_integrand_evaluations: 0,
             });
         }
     }
@@ -117,7 +117,7 @@ fn rank_one_rectangle(
         return Ok(BivariateRectangleEstimate {
             probability: 0.0, outer_quadrature_error_indicator: 0.0,
             truncation_error_bound: TRUNCATION_BOUND, correlation,
-            correlation_condition_estimate: None, covariance_rank: 1, function_evaluations: 0,
+            correlation_condition_estimate: None, covariance_rank: 1, outer_integrand_evaluations: 0,
         });
     }
     if z_lower >= CUTOFF || z_upper <= -CUTOFF {
@@ -128,8 +128,12 @@ fn rank_one_rectangle(
     Ok(BivariateRectangleEstimate {
         probability, outer_quadrature_error_indicator: 0.0,
         truncation_error_bound: TRUNCATION_BOUND, correlation,
-        correlation_condition_estimate: None, covariance_rank: 1, function_evaluations: 0,
+        correlation_condition_estimate: None, covariance_rank: 1, outer_integrand_evaluations: 0,
     })
+}
+
+fn within_outer_evaluation_budget(current: u64, additional: u64) -> bool {
+    additional <= MAX_OUTER_EVALUATIONS.saturating_sub(current)
 }
 
 fn simpson(a: f64, b: f64, fa: f64, fm: f64, fb: f64) -> f64 {
@@ -141,7 +145,7 @@ fn refine<F>(
     whole: f64, abs_tol: f64, depth: usize, evals: &mut u64,
 ) -> Result<(f64, f64), RectangleError>
 where F: FnMut(f64) -> Result<f64, RectangleError> {
-    if *evals > MAX_EVALS { return Err(RectangleError::EvaluationBudgetExceeded); }
+    if !within_outer_evaluation_budget(*evals, 2) { return Err(RectangleError::EvaluationBudgetExceeded); }
     let m = 0.5 * (a + b);
     let lm = 0.5 * (a + m);
     let rm = 0.5 * (m + b);
@@ -210,7 +214,7 @@ pub fn bivariate_gaussian_rectangle(
         return Ok(BivariateRectangleEstimate {
             probability, outer_quadrature_error_indicator: 0.0, truncation_error_bound: 0.0,
             correlation: None, correlation_condition_estimate: None, covariance_rank: 0,
-            function_evaluations: 0,
+            outer_integrand_evaluations: 0,
         });
     }
 
@@ -243,7 +247,7 @@ pub fn bivariate_gaussian_rectangle(
             probability: 0.0, outer_quadrature_error_indicator: 0.0,
             truncation_error_bound: TRUNCATION_BOUND, correlation: Some(rho),
             correlation_condition_estimate: Some(condition), covariance_rank: 2,
-            function_evaluations: 0,
+            outer_integrand_evaluations: 0,
         });
     }
 
@@ -288,6 +292,9 @@ pub fn bivariate_gaussian_rectangle(
         for i in 0..count {
             let a = start + (end - start) * i as f64 / count as f64;
             let b = start + (end - start) * (i + 1) as f64 / count as f64;
+            if !within_outer_evaluation_budget(evals, 3) {
+                return Err(RectangleError::EvaluationBudgetExceeded);
+            }
             let midpoint = 0.5 * (a + b);
             let fa = integrand(a)?;
             let fm = integrand(midpoint)?;
@@ -325,7 +332,7 @@ pub fn bivariate_gaussian_rectangle(
         correlation: Some(rho),
         correlation_condition_estimate: Some(condition),
         covariance_rank: 2,
-        function_evaluations: evals,
+        outer_integrand_evaluations: evals,
     })
 }
 
@@ -565,11 +572,18 @@ mod tests {
     }
 
     #[test]
+    fn outer_evaluation_budget_rejects_overrun_before_each_batch() {
+        assert!(within_outer_evaluation_budget(MAX_OUTER_EVALUATIONS - 2, 2));
+        assert!(!within_outer_evaluation_budget(MAX_OUTER_EVALUATIONS - 2, 3));
+        assert!(!within_outer_evaluation_budget(MAX_OUTER_EVALUATIONS, 1));
+    }
+
+    #[test]
     fn integration_reports_diagnostics_and_stays_bounded() {
         let r = bivariate_gaussian_rectangle(
             [0.0, 0.0], [[1.0, 0.4], [0.4, 1.0]], [-1.0, -1.0], [1.0, 1.0],
         ).unwrap();
-        assert!(r.function_evaluations <= MAX_EVALS);
+        assert!(r.outer_integrand_evaluations <= MAX_OUTER_EVALUATIONS);
         assert!(r.outer_quadrature_error_indicator.is_finite());
         assert!(r.truncation_error_bound > 0.0);
     }
