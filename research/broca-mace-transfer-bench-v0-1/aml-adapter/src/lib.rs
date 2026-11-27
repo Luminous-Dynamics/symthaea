@@ -1,3 +1,13 @@
+// Copyright (C) 2026 Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Provider-neutral Add/Search protocol core for a future AML adapter.
+//!
+//! This crate validates the public API boundary and deterministic Textual
+//! chunking. It is not an HTTP server, memory database, embedding service or
+//! AML submission. A hosted service must acknowledge Add only after durable
+//! persistence and immediate Search visibility.
+
 pub mod submission;
 pub mod raw_session;
 pub mod longmemeval_v2;
@@ -19,16 +29,7 @@ pub mod mace_evaluation_anchor_payload;
 pub mod mon005_record_adapter;
 pub mod mace_context_exposure_receipt;
 pub mod mace_context_exposure_capture;
-
-// Copyright (C) 2026 Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-
-//! Provider-neutral Add/Search protocol core for a future AML adapter.
-//!
-//! This crate validates the public API boundary and deterministic Textual
-//! chunking. It is not an HTTP server, memory database, embedding service or
-//! AML submission. A hosted service must acknowledge Add only after durable
-//! persistence and immediate Search visibility.
+pub mod mace_ingress_use_admission;
 
 use std::collections::BTreeMap;
 
