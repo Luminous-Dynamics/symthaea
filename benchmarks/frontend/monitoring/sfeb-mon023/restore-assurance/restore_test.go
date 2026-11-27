@@ -34,7 +34,7 @@ func TestFullStateSurfaceMissingIndeterminate(t *testing.T){r:=base();r.Surface.
 func TestFullStateExclusionsDenied(t *testing.T){r:=base();r.Surface.Excluded=[]string{"large-objects"};check(t,Evaluate(r),Denied)}
 func TestDatabaseRecoveredWithoutDependencies(t *testing.T){r:=base();r.Plan.RequestedClaim=DatabaseRecovered;r.Dependencies=nil;check(t,Evaluate(r),Qualified)}
 func TestServiceMissingDependencyIndeterminate(t *testing.T){r:=base();r.Dependencies=r.Dependencies[:1];check(t,Evaluate(r),Indeterminate)}
-func TestRequiredDependencyUnavailableIndeterminate(t *testing.T){r:=base();r.Dependencies[0].Ready=false;check(t,Evaluate(r),Indeterminate)}
+func TestRequiredDependencyUnavailableDenied(t *testing.T){r:=base();r.Dependencies[0].Ready=false;check(t,Evaluate(r),Denied)}
 func TestFailedBusinessInvariantDenied(t *testing.T){r:=base();r.Probes[2].Passed=false;check(t,Evaluate(r),Denied)}
 func TestReadOnlyWithoutSafeWriteIndeterminate(t *testing.T){r:=base();r.Probes=r.Probes[:1];check(t,Evaluate(r),Indeterminate)}
 func TestWriteProbeWithoutRollbackIndeterminate(t *testing.T){r:=base();r.Probes[1].RollbackVerified=false;check(t,Evaluate(r),Indeterminate)}
@@ -94,4 +94,20 @@ func TestServiceReadyMustFollowTrafficEnable(t *testing.T) {
 }
 func TestVerifiedDependencyUnavailableDenied(t *testing.T) {
  r:=base();r.Dependencies[0].Ready=false;check(t,Evaluate(r),Denied)
+}
+
+func TestUnverifiedRequiredDependencyIndeterminate(t *testing.T) {
+ r:=base();r.Dependencies[0].Verified=false;check(t,Evaluate(r),Indeterminate)
+}
+func TestMissingRequiredDependencyIndeterminate(t *testing.T) {
+ r:=base();r.Dependencies=r.Dependencies[:1];check(t,Evaluate(r),Indeterminate)
+}
+func TestRestoreFreshnessStaleIndeterminate(t *testing.T) {
+ r:=base();r.Restore.FreshUntil=r.EvaluatedAt;check(t,Evaluate(r),Indeterminate)
+}
+func TestArtifactFreshnessStaleIndeterminate(t *testing.T) {
+ r:=base();r.Artifact.FreshUntil=r.EvaluatedAt;check(t,Evaluate(r),Indeterminate)
+}
+func TestServiceClaimRequiresTrafficAcceptance(t *testing.T) {
+ r:=base();r.Acceptance.TrafficEnabled=false;check(t,Evaluate(r),Denied)
 }
