@@ -790,7 +790,7 @@ mod tests {
 
         assert_eq!(mgr.pending_count(), 2);
         assert_eq!(mgr.total_dropped_pending, 2);
-        let surprises: BTreeSet<_> = mgr.pending.iter().map(|queued| queued.surprise).collect();
+        let surprises: Vec<_> = mgr.pending.iter().map(|queued| queued.surprise).collect();
         assert!(surprises.contains(&0.7));
         assert!(surprises.contains(&0.99));
         assert!(!surprises.contains(&0.6));
