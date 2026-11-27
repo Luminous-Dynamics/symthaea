@@ -99,6 +99,25 @@ The key methodological finding is that server-reported latency can be misleading
 
 Source: https://arxiv.org/abs/2611.02430
 
+### StreamEval — long-horizon interactive video and instruction following
+
+StreamEval v1 (paper posted October 20, 2026) evaluates 300 scripted sessions lasting 15–300 seconds across five tasks: avatar dialogue, avatar performance, world generation, instruction editing and reference editing. It reports ten task-specific metrics in four dimensions: task execution, state consistency, visual fidelity and audiovisual coordination. Its headline finding is important: high visual quality and identity retention do not imply reliable execution of timed requests or sustained state consistency.
+
+Current public leaderboard snapshot:
+- Avatar dialogue: Vidu S2 Avatar scores 93.98 overall, but that total includes a +5 custom-avatar bonus; content-only quality overall is 88.98. Tavus CVI Full scores 86.65 overall with 94.44 A/V sync, 99.95 stability, 73.91 dialogue and 89.89 identity.
+- Avatar performance: Vidu S2 Avatar scores 81.71 overall including the +5 bonus (76.71 content-only), with 99.60 A/V sync, 97.25 stability, 36.90 Following and 86.12 identity. LiveTalk 1.3B scores 75.85 overall including the bonus (70.85 content-only), with 71.27 quality, 86.44 A/V sync, 96.06 stability, 16.59 Following and 83.89 identity.
+
+Do not compare overall numbers without removing the custom-avatar bonus and preserving task separation. Following scores are still low even where sync and visual stability are high; this is a strong signal that instruction execution is not solved by making an avatar look convincing.
+
+**Symthaea implication:** build a separate polyembodiment task lane. Send timed commands and consent changes during a live stream, then evaluate whether the same semantic state is followed and preserved across all seven forms. Measure command success, time-to-follow, state preservation, semantic-digest invariance, A/V alignment, stale-output duration, privacy/permission compliance and recovery after interruption. Report dialogue and performance separately; never fold them into one score.
+
+StreamEval is a public benchmark and its scores are a current external reference, not a matched Symthaea result. Its scripted request-following task is related to—but not a substitute for—Symthaea's explicit consent and receipt protocol.
+
+Sources:
+- https://arxiv.org/abs/2610.28402
+- https://streameval.ai/
+- https://github.com/StreamEval/StreamEval
+
 ### TurnBench — turn-taking quality, with a scoring warning
 
 TurnBench reports a 30-hour dual-channel held-out corpus with 154 dialogues, 106 actors, six conversation styles and triple annotation (Fleiss' κ = 0.78). The current v1 leaderboard shows high recall but materially different latency/FPR trade-offs: Kuroko is 0.983 / 0.065 / 619 ms; Neosapience Nunchi v2 is 0.959 / 0.064 / 254 ms.
