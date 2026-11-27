@@ -1,0 +1,50 @@
+{
+  "schema_version": "sdcb_bivariate_rectangle.v1",
+  "mean": [
+    0,
+    0
+  ],
+  "covariance": [
+    [
+      1,
+      0.6
+    ],
+    [
+      0.6,
+      1
+    ]
+  ],
+  "lower": [
+    0,
+    0
+  ],
+  "upper": [
+    "Infinity",
+    "Infinity"
+  ],
+  "expected_probability": 0.35241638234956674,
+  "joint_bins": {
+    "thresholds_first": [
+      0
+    ],
+    "thresholds_second": [
+      0
+    ],
+    "probabilities": [
+      [
+        0.35241638234956674,
+        0.14758361765043326
+      ],
+      [
+        0.14758361765043326,
+        0.35241638234956674
+      ]
+    ],
+    "probability_sum": 1
+  },
+  "notes": [
+    "Synthetic standard-normal positive-orthant and two-bin fixture.",
+    "Orthant value is checked against 1/4 + asin(rho)/(2*pi).",
+    "Scalar marginal likelihoods use the #13944 reference."
+  ]
+}
