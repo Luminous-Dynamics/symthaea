@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 const PPM: u32 = 1_000_000;
-const US_PER_HOUR: u128 = 3_600_000_000_000;
+const US_PER_HOUR_PPM: u128 = 3_600_000_000_000_000;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExposureInterval {
@@ -87,8 +87,8 @@ pub struct PairedMetrics {
     /// Candidate minus baseline. Negative favours candidate.
     pub mean_penalized_delay_delta_us: i64,
     /// Percentile cluster-bootstrap interval for the paired mean delta.
-    pub bootstrap_95_low_us: i64,
-    pub bootstrap_95_high_us: i64,
+    pub bootstrap_95_low_us: Option<i64>,
+    pub bootstrap_95_high_us: Option<i64>,
     pub candidate_wins: usize,
     pub ties: usize,
     pub candidate_losses: usize,
@@ -412,7 +412,12 @@ fn paired_metrics(
     }
     let count = i128::try_from(deltas.len()).map_err(|_| BenchmarkError::ArithmeticOverflow)?;
     let mean = round_signed_ratio(sum, count)?;
-    let (low, high) = bootstrap_interval(deltas, bootstrap_replicates, seed)?;
+    let (low, high) = if deltas.len() >= 2 {
+        let (low, high) = bootstrap_interval(deltas, bootstrap_replicates, seed)?;
+        (Some(low), Some(high))
+    } else {
+        (None, None)
+    };
 
     Ok(PairedMetrics {
         blocks: deltas.len(),
@@ -432,14 +437,12 @@ fn bootstrap_interval(
 ) -> Result<(i64, i64), BenchmarkError> {
     let mut rng = SplitMix64::new(seed);
     let count = deltas.len();
-    let count_u128 = u128::try_from(count).map_err(|_| BenchmarkError::ArithmeticOverflow)?;
     let mut means = Vec::with_capacity(replicates);
 
     for _ in 0..replicates {
         let mut sum = 0i128;
         for _ in 0..count {
-            let index = usize::try_from(rng.below(count_u128))
-                .map_err(|_| BenchmarkError::ArithmeticOverflow)?;
+            let index = rng.below(count);
             sum = sum
                 .checked_add(i128::from(deltas[index]))
                 .ok_or(BenchmarkError::ArithmeticOverflow)?;
@@ -570,12 +573,13 @@ impl SplitMix64 {
         value ^ (value >> 31)
     }
 
-    fn below(&mut self, upper_exclusive: u128) -> u128 {
-        let threshold = upper_exclusive.wrapping_neg() % upper_exclusive;
+    fn below(&mut self, upper_exclusive: usize) -> usize {
+        let upper = u64::try_from(upper_exclusive).expect("bootstrap size fits in u64");
+        let threshold = upper.wrapping_neg() % upper;
         loop {
-            let value = u128::from(self.next_u64());
+            let value = self.next_u64();
             if value >= threshold {
-                return value % upper_exclusive;
+                return usize::try_from(value % upper).expect("sample index fits in usize");
             }
         }
     }
@@ -655,7 +659,7 @@ mod tests {
         assert!(report.paired.mean_penalized_delay_delta_us < 0);
         assert_eq!(report.paired.candidate_wins, 3);
         assert_eq!(report.paired.candidate_losses, 0);
-        assert!(report.paired.bootstrap_95_high_us < 0);
+        assert!(report.paired.bootstrap_95_high_us.unwrap() < 0);
     }
 
     #[test]
