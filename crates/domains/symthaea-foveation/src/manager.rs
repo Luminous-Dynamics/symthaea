@@ -16,6 +16,10 @@ use crate::types::{
     FoveationConfig, FoveationRequest, FoveationResult, FoveationTelemetry, FrameBuffer,
 };
 
+const MAX_PENDING_REQUESTS: usize = 4;
+const MAX_FRAME_DIMENSION: u32 = 8_192;
+const MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;
+
 /// Prioritized request wrapper for the BinaryHeap (highest surprise first).
 #[derive(Debug)]
 struct PrioritizedRequest {
@@ -85,8 +89,8 @@ impl FoveationManager {
     pub fn new(config: FoveationConfig, patch_size: usize) -> Self {
         let channel = FoveationChannel::spawn(&config);
         let effective_surprise_threshold = config.min_surprise_threshold;
-        let effective_max_concurrent = config.max_concurrent;
-        let max_pending = config.channel_depth.max(1);
+        let effective_max_concurrent = config.max_concurrent.clamp(1, MAX_PENDING_REQUESTS);
+        let max_pending = config.channel_depth.clamp(1, MAX_PENDING_REQUESTS);
         Self {
             config,
             channel,
@@ -109,9 +113,43 @@ impl FoveationManager {
         }
     }
 
-    /// Store the latest full-resolution frame for future cropping.
-    pub fn on_frame(&mut self, frame: FrameBuffer) {
+    /// Store a validated full-resolution frame for future cropping.
+    pub fn on_frame_checked(&mut self, frame: FrameBuffer) -> Result<(), String> {
+        if frame.width == 0
+            || frame.height == 0
+            || frame.width > MAX_FRAME_DIMENSION
+            || frame.height > MAX_FRAME_DIMENSION
+        {
+            self.frame_buffer = None;
+            return Err("frame dimensions are zero or exceed the observer limit".to_string());
+        }
+        if !(1..=4).contains(&frame.channels) {
+            self.frame_buffer = None;
+            return Err("frame channels must be in 1..=4".to_string());
+        }
+        let expected_len = (frame.width as usize)
+            .checked_mul(frame.height as usize)
+            .and_then(|pixels| pixels.checked_mul(frame.channels))
+            .ok_or_else(|| "frame byte length overflow".to_string())?;
+        if expected_len > MAX_FRAME_BYTES || frame.pixels.len() != expected_len {
+            self.frame_buffer = None;
+            return Err(format!(
+                "frame byte length mismatch or exceeds {} bytes: expected {}, received {}",
+                MAX_FRAME_BYTES,
+                expected_len,
+                frame.pixels.len()
+            ));
+        }
         self.frame_buffer = Some(Arc::new(frame));
+        Ok(())
+    }
+
+    /// Compatibility wrapper. Invalid input clears the current frame; it never
+    /// leaves an older frame available under the assumption that the new one arrived.
+    pub fn on_frame(&mut self, frame: FrameBuffer) {
+        if let Err(error) = self.on_frame_checked(frame) {
+            tracing::warn!("Rejected foveation frame: {error}");
+        }
     }
 
     /// Release the manager's latest-frame reference.
@@ -135,8 +173,22 @@ impl FoveationManager {
             return; // No frame stored yet.
         };
 
+        if self.patch_size == 0 {
+            self.total_invalid_saliency = self
+                .total_invalid_saliency
+                .saturating_add(patches.len() as u64);
+            return;
+        }
+        let patch_rows = (frame.height as usize).div_ceil(self.patch_size);
+        let patch_cols = (frame.width as usize).div_ceil(self.patch_size);
+
         for &(row, col, surprise, velocity) in patches {
-            if !surprise.is_finite() || velocity.iter().any(|value| !value.is_finite()) {
+            if !surprise.is_finite()
+                || !(0.0..=1.0).contains(&surprise)
+                || velocity.iter().any(|value| !value.is_finite())
+                || row >= patch_rows
+                || col >= patch_cols
+            {
                 self.total_invalid_saliency = self.total_invalid_saliency.saturating_add(1);
                 continue;
             }
@@ -795,6 +847,64 @@ mod tests {
         assert!(surprises.contains(&0.99));
         assert!(!surprises.contains(&0.6));
         assert!(!surprises.contains(&0.55));
+    }
+
+    #[test]
+    fn checked_frame_ingestion_rejects_incomplete_or_oversized_frames() {
+        let mut mgr = default_manager();
+        let mut incomplete = make_frame(64, 64, 100);
+        incomplete.pixels.pop();
+
+        assert!(mgr.on_frame_checked(incomplete).is_err());
+        assert!(mgr.frame_buffer.is_none());
+
+        let mut oversized = make_frame(64, 64, 100);
+        oversized.width = MAX_FRAME_DIMENSION + 1;
+        assert!(mgr.on_frame_checked(oversized).is_err());
+        assert!(mgr.frame_buffer.is_none());
+    }
+
+    #[test]
+    fn invalid_new_frame_does_not_leave_an_old_frame_as_current() {
+        let mut mgr = default_manager();
+        mgr.on_frame(make_frame(64, 64, 100));
+        assert!(mgr.frame_buffer.is_some());
+
+        let mut invalid = make_frame(64, 64, 200);
+        invalid.channels = 0;
+        mgr.on_frame(invalid);
+
+        assert!(mgr.frame_buffer.is_none());
+        mgr.on_saliency(&[(0, 0, 0.9, [0.0, 0.0])]);
+        assert_eq!(mgr.pending_count(), 0);
+    }
+
+    #[test]
+    fn pending_and_in_flight_limits_are_hard_capped() {
+        let config = FoveationConfig {
+            channel_depth: usize::MAX,
+            max_concurrent: usize::MAX,
+            ..FoveationConfig::default()
+        };
+        let mgr = FoveationManager::new(config, 8);
+
+        assert_eq!(mgr.max_pending, MAX_PENDING_REQUESTS);
+        assert_eq!(mgr.effective_max_concurrent(), MAX_PENDING_REQUESTS);
+    }
+
+    #[test]
+    fn invalid_patch_coordinates_and_out_of_range_surprise_are_rejected() {
+        let mut mgr = default_manager();
+        mgr.on_frame(make_frame(64, 64, 100));
+        mgr.on_saliency(&[
+            (usize::MAX, 0, 0.9, [0.0, 0.0]),
+            (0, usize::MAX, 0.9, [0.0, 0.0]),
+            (0, 0, 1.1, [0.0, 0.0]),
+            (0, 0, 0.9, [0.0, 0.0]),
+        ]);
+
+        assert_eq!(mgr.pending_count(), 1);
+        assert_eq!(mgr.total_invalid_saliency, 3);
     }
 
     #[test]
