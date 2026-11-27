@@ -108,7 +108,7 @@ func TestNotApplicableRequiresProof(t *testing.T) {
 	r:=base();addFullStateEvidence(&r);r.Attestations[2].Mode=NotApplicable;check(t,Evaluate(r),Indeterminate)
 }
 func TestNotApplicableWithProofQualifies(t *testing.T) {
-	r:=base();addFullStateEvidence(&r);r.Attestations[2].Mode=NotApplicable;r.Attestations[2].ApplicabilityProofDigest="n-a-proof";check(t,Evaluate(r),Qualified)
+	r:=base();addFullStateEvidence(&r);r.Attestations[2].Mode=NotApplicable;r.Attestations[2].ApplicabilityProofDigest="n-a-proof";out:=Evaluate(r);check(t,out,Qualified);if out.NotApplicable!=1||out.Covered!=2 {t.Fatalf("incorrect coverage accounting: %#v",out)}
 }
 func TestExcludedReasonRequired(t *testing.T) {
 	r:=base();r.Scope=RowStream;r.Attestations=append(r.Attestations,ev("rows","rows",NativeReplication,"rows-scope"));s:=ev("x","schema",ExcludedByContract,"schema-scope");r.Attestations=append(r.Attestations,s,ev("seq","sequence",ExcludedByContract,"sequence-scope"));check(t,Evaluate(r),Denied)
