@@ -41,6 +41,16 @@ func readTrustedKey(hexValue string) (ed25519.PublicKey,error) {
 	return ed25519.PublicKey(decoded),nil
 }
 
+func validateTrustSeparation(suiteKeyID string, suiteKey ed25519.PublicKey, resultKeyID string, resultKey ed25519.PublicKey) error {
+	if suiteKeyID == "" || resultKeyID == "" || suiteKeyID == resultKeyID {
+		return errors.New("suite-authority and result-observer key IDs must be distinct trust identities")
+	}
+	if len(suiteKey) != ed25519.PublicKeySize || len(resultKey) != ed25519.PublicKeySize || bytes.Equal(suiteKey, resultKey) {
+		return errors.New("suite-authority and result-observer public keys must be distinct valid keys")
+	}
+	return nil
+}
+
 func verifyCustodyBundle(root,manifestPath,artifactPath,keyID string,pub ed25519.PublicKey,
 	expectedRun string,expectedSequence uint64,expectedPrevious,clockDomain string,
 	maxAge,maxUncertainty time.Duration) (custody.Manifest,custody.Result,error) {
@@ -110,16 +120,12 @@ func run() int {
 		fmt.Fprintln(os.Stderr,"suite and result custody trust flags plus --result-artifact are required; see -h")
 		return 64
 	}
-	if *suiteKeyID==*resultKeyID {
-		fmt.Fprintln(os.Stderr,"suite-authority and result-observer key IDs must be distinct trust identities")
-		return 64
-	}
 	suitePub,err:=readTrustedKey(*suitePublicKeyHex)
 	if err!=nil { fmt.Fprintf(os.Stderr,"suite trust key: %v\n",err); return 64 }
 	resultPub,err:=readTrustedKey(*resultPublicKeyHex)
 	if err!=nil { fmt.Fprintf(os.Stderr,"result trust key: %v\n",err); return 64 }
-	if bytes.Equal(suitePub,resultPub) {
-		fmt.Fprintln(os.Stderr,"suite-authority and result-observer public keys must be distinct")
+	if err:=validateTrustSeparation(*suiteKeyID,suitePub,*resultKeyID,resultPub); err!=nil {
+		fmt.Fprintln(os.Stderr,err)
 		return 64
 	}
 
