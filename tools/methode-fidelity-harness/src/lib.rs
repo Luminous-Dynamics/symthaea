@@ -295,9 +295,16 @@ fn valid_contract(contract: &MethodContract) -> bool {
         && is_sha256(&contract.budget.policy_sha256)
         && !contract.required_outputs.is_empty()
         && contract.required_outputs.iter().all(|id| !id.trim().is_empty())
-        && contract.preprocessing.fit_scope == FitScope::TrainingOnly
+        && contract.preprocessing.fit_scope != FitScope::Unknown
         && contract.preprocessing.fitted_on_split_manifest_sha256 == contract.dataset.split_manifest_sha256
-        && contract.preprocessing.fitted_record_count == contract.dataset.train_records
+        && match contract.preprocessing.fit_scope {
+            FitScope::TrainingOnly => contract.preprocessing.fitted_record_count == contract.dataset.train_records,
+            FitScope::TrainingAndValidation => contract.preprocessing.fitted_record_count
+                == contract.dataset.train_records + contract.dataset.validation_records,
+            FitScope::AllRecords => contract.preprocessing.fitted_record_count
+                == contract.dataset.train_records + contract.dataset.validation_records + contract.dataset.test_records,
+            FitScope::Unknown => false,
+        }
         && contract.dataset.train_records > 0
         && contract.dataset.test_records > 0
         && contract.budget.required_epochs > 0
@@ -530,7 +537,7 @@ mod tests {
     use super::*;
 
     fn h(ch: char) -> String {
-        std::iter::repeat(ch).take(64).collect()
+        ch.to_string().repeat(64)
     }
 
     fn contract() -> MethodContract {
@@ -769,6 +776,19 @@ mod tests {
         assert_eq!(report.disposition, Disposition::NotExecuted);
         assert_eq!(report.scientific_result, ScientificResult::NotEvaluated);
         assert!(!report.permissions.may_claim_scientific_result_supported);
+    }
+
+    #[test]
+    fn independently_reviewed_transductive_fit_scope_can_be_reproduced() {
+        let mut c = contract();
+        c.preprocessing.fit_scope = FitScope::AllRecords;
+        c.preprocessing.fitted_record_count = 1_400;
+        let mut r = receipt(&c);
+        r.preprocessing_fit_scope = FitScope::AllRecords;
+        r.preprocessing_fitted_record_count = 1_400;
+        let report = audit_method(&c, &r);
+        assert_eq!(report.disposition, Disposition::ReferenceProtocolReproduced);
+        assert!(report.permissions.may_claim_reference_protocol_reproduced);
     }
 
     #[test]
