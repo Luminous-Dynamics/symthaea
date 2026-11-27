@@ -22,6 +22,19 @@ PostgreSQL 18 documentation establishes the following relevant semantics:
 
 See official PostgreSQL 18 documentation linked in the README.
 
+
+
+### 2.1 PostgreSQL 19 profile (released 2026-11-19)
+
+MON-021 is now versioned for PostgreSQL 18 and 19 rather than an 18-only deployment. The Go profile pins the server major version and distinguishes configured \`wal_level\` from \`effective_wal_level\`:
+
+- PostgreSQL 18 requires configured/effective \`wal_level=logical\` for this profile.
+- PostgreSQL 19 can automatically raise the effective WAL level to \`logical\` when the first logical slot is created even when configured \`wal_level=replica\`. The adapter must capture \`effective_wal_level\`; a configured value alone is insufficient.
+- PostgreSQL 19 adds \`WAIT FOR LSN\` modes for primary flush and standby write/flush/replay. This is a read-visibility / durability synchronization primitive, not proof of CDC completeness. It compares numeric LSNs and has no timeline identity, so MON must validate the expected timeline independently before interpreting a successful wait as read-your-writes evidence.
+- PostgreSQL 19 improves \`pg_sync_replication_slots()\` so it waits for replication-slot synchronization completion. MON must still inspect the actual slot on the intended standby, including \`synced\`, persistence, invalidation and retained-range state.
+- PostgreSQL 19 adds sequence synchronization through \`FOR ALL SEQUENCES\`, initial subscription copy, \`REFRESH PUBLICATION\` for newly added sequences, and \`REFRESH SEQUENCES\` for known sequences. This is not a per-\`nextval()\` continuously delivered row-change stream. Sequence values can drift as the publisher advances; cached sequence values mean page-LSN comparison alone can miss drift (typically within a cache block of about 32 values). A failover-ready database must separately reconcile \`last_value\`, \`is_called\`, sequence definition and subscription refresh state. Sequence safety is outside MON-021's row-change-stream claim and is elevated to MON-022.
+- PostgreSQL 19 still does not logically replicate schema/DDL changes or large objects. The Debezium PostgreSQL connector documentation also notes that \`pgoutput\` does not capture generated-column values in change events. These exclusions must be represented as explicit unobserved surfaces, not hidden under a generic "CDC complete" claim.
+
 ## 3. Source identity: a CDC stream is not just a slot name
 
 The source profile must bind:
@@ -47,7 +60,7 @@ The initial capture binds an exported snapshot to the slot creation response:
 - exported snapshot name and source snapshot transaction context;
 - `consistent_point` LSN;
 - exact database/source identity and timeline;
-- schema/publication/filter profile;
+- schema/publication/filter profile, with explicit publication/table/row-filter and generated-column scope;
 - snapshot enumeration manifest, terminal marker and digest;
 - the first decoded change-stream boundary.
 
@@ -65,12 +78,14 @@ The source adapter must reject:
 
 LSNs are positions in WAL, not consecutive application event numbers. Valid logical-decoding output may have gaps in LSN values because WAL contains records that the output plugin does not emit as row/change events. MON must not require numeric LSN adjacency.
 
-Each decoded event should carry a stable identity built from the exact source incarnation, database, slot/profile, transaction identity, commit/end LSN and deterministic per-transaction message ordinal, where the output plugin can provide those fields. The exact identity profile must be versioned and must bind the full decoded message digest.
+Each decoded event should carry a stable identity built from the exact source incarnation, database, slot/profile, transaction identity, commit LSN and deterministic per-transaction message ordinal, where the output plugin can provide those fields. Each transaction also needs a separately normalized envelope with XID, begin/commit/end LSN, terminal state and exact member event IDs. The exact identity profile must be versioned and must bind the full decoded message digest.
 
 Requirements:
 - LSNs are parsed and compared only within the same timeline/source lineage.
 - Within one captured stream, decoded event positions must be monotonic under the profile's declared ordering.
-- Multiple messages may share transaction/commit LSNs; message ordinal or another source-defined stable discriminator is required.
+- Multiple row/message records within one transaction share its commit boundary; message ordinal or another source-defined stable discriminator is required.
+- A manifest cannot qualify a row event without a matching complete transaction envelope. The event's XID, commit LSN and ordinal must match the envelope.
+- An aborted, prepared, committed-prepared or rolled-back-prepared transaction is not treated as an ordinary committed row transaction. The current Go reference explicitly returns indeterminate for two-phase slots and prepared transaction states; two-phase decoding needs a separately versioned prepare/resolve profile.
 - Exact duplicate replay of the same event identity and digest is idempotent.
 - Same event identity with different payload digest is divergence.
 - A crash-induced replay may overlap previously captured positions; overlap must reconcile to exact prior event IDs/digests.
@@ -89,7 +104,7 @@ The durable evidence watermark is advanced only after:
 4. replay/reconciliation state is durable enough to safely handle a crash;
 5. the MON evidence store confirms the transaction committed.
 
-Only then may the consumer send a replication feedback/flush acknowledgement that can move `confirmed_flush_lsn` forward.
+Only then may the consumer send a replication feedback/flush acknowledgement that can move `confirmed_flush_lsn` forward. The commit boundary and end-of-transaction LSN must be distinguished: the evidence manifest must include every member event and the complete terminal transaction envelope before acknowledging beyond that transaction's end boundary.
 
 A client receipt, in-memory buffer, local function return or merely decoded maximum LSN is not a durable evidence watermark.
 
@@ -140,7 +155,7 @@ Each bounded manifest contains:
 - timeline ID and timeline-history digest;
 - initial snapshot/consistent-point reference (for initial capture);
 - start and terminal LSN, with exact inclusivity semantics;
-- ordered decoded event identities and payload digests;
+- ordered decoded event identities and payload digests, complete transaction envelopes and per-transaction event membership;
 - replay/duplicate classification and prior manifest reference;
 - slot health/retention observations at start and end;
 - collector identity and independent control root;
@@ -190,8 +205,8 @@ The scenario corpus includes:
 |---|---|---|
 | PostgreSQL logical decoding | WAL-derived ordered logical-change stream | Independent evidence manifests, durable-before-ack and source-scope claims |
 | PostgreSQL replication slots | Retention and consumer progress state | Qualify restart/confirmed-flush, retention and acknowledgement semantics |
-| Debezium | Mature CDC connectors, offsets and schema handling | Independently witnessed source continuity, timeline/slot identity and durable evidence watermark |
-| Kafka Connect | Durable offset-based source/sink integration | Prove offsets are not advanced beyond sealed evidence and preserve exact source range |
+| Debezium 3.7.1.Final | Mature PostgreSQL CDC snapshots, offsets and restart/replay handling; the 2026-11-06 release fixed a PostgreSQL lost-change-on-restart bug involving `lsn_events_processed=1` or transactional logical-message offsets | Independent transaction-envelope evidence, exact replay manifests, timeline/slot identity and durable evidence watermark |
+| Kafka Connect 3.9+ source exactly-once framework | Source EOS exists, but requires a connector that can supply meaningful offsets and resume at the exact external position without dropping/duplicating events; framework configuration alone is insufficient, and source EOS is limited to distributed mode | Prove connector offsets/transactions bind to exact WAL/transaction envelopes and sealed evidence; compare only with EOS explicitly supported and configured |
 | OpenTelemetry | Operational visibility of capture services | Capture-health observability is evidence, not completeness proof |
 | MON-016/017 | Bounded capture and cross-source reconciliation | PostgreSQL-specific snapshot/slot/WAL/timeline profile |
 
@@ -212,6 +227,8 @@ Fair benchmarking must match source database version, data shape, output plugin,
 - initial snapshot sizes: 1 GB, 100 GB, 1 TB (controlled synthetic environments);
 - CDC rates: 100, 1k, 10k, 100k decoded messages/s;
 - transaction sizes: single-row, 100-row, 10k-row, multi-MB payload transactions;
+- transactions spanning multiple output messages, multiple transactions with distinct commit/end LSNs, repeated rows at one transaction boundary, aborted transactions and unresolved PREPARE/COMMIT PREPARED;
+- Debezium 3.7.1 restart regressions: `lsn_events_processed=1`, offset stored at transactional logical message, decoderbufs BEGIN sharing stored LSN;
 - crash/restart point before/after decode, evidence persistence, witness seal, client feedback and checkpoint;
 - failover with synchronized slot, delayed slot sync, catalog xmin gap, missing WAL, unsynced slot, old-primary split-brain;
 - exact replay, partial replay and conflicting message substitution.
@@ -231,14 +248,14 @@ These are research targets, not results. Finite corpus success is not a universa
 
 ## 14. Implementation sequence
 
-1. Implement a Go/Rust semantic reference for LSN parsing, source/slot profile identity, snapshot-to-stream handoff, event ID replay, durable watermark and failover state.
+1. Implement a Go/Rust semantic reference for LSN parsing, source/slot profile identity, snapshot-to-stream handoff, transaction envelopes, event ID replay, durable watermark and failover state.
 2. Define a versioned normalized output-plugin event envelope and per-transaction event ordinal; do not assume a universal row ID.
 3. Add PostgreSQL 18 SQL probes for server/DB/slot state and a reproducible disposable-server integration harness.
 4. Implement snapshot/exported-snapshot acquisition and logical replication protocol capture, binding the slot consistent point to snapshot enumeration.
 5. Persist event manifests before sending flush feedback. Exercise commit-ack loss and restart/replay.
 6. Implement timeline-history / failover slot sync adapter with explicit control-root and old-primary fencing evidence.
 7. Connect manifest output into MON-016/017 bounded capture and cross-source comparison; connect resulting state observation to MON-013/014.
-8. Run PostgreSQL version-pinned integration, failure schedules, independent oracle and matched Debezium/Kafka Connect baselines.
+8. Run PostgreSQL 18 and 19 version-pinned integration, failure schedules, independent oracle and matched Debezium 3.7.1 / Kafka Connect source-EOS baselines.
 
 ## 15. Executable semantic reference
 
@@ -267,4 +284,4 @@ The local source and public GitHub branch were not freshly cloned and replayed a
 
 ## 16. Claim ceiling
 
-This contract and semantic prototype do not prove PostgreSQL SQL/runtime correctness, actual WAL retention, successful logical slot failover, source completeness, plugin semantic completeness, event truth, independent witness operation, database commit effect or physical outcome. A live PostgreSQL 18 integration and independently controlled source/collector/witness qualification remain mandatory.
+This contract and semantic prototype do not prove PostgreSQL SQL/runtime correctness, actual WAL retention, successful logical slot failover, source completeness, plugin semantic completeness, event truth, independent witness operation, database commit effect or physical outcome. Live PostgreSQL 18/19 integration and independently controlled source/collector/witness qualification remain mandatory. Two-phase commit, sequence-state synchronization, DDL/schema changes, generated-column values and large objects remain outside the row-stream completeness claim.
