@@ -154,6 +154,8 @@ pub struct ObservationProcessRoundV1 {
     pub event_time_unix_seconds: i64,
     pub prediction_time_unix_seconds: i64,
     pub clock_domain_id: String,
+    /// Declared observable tool/chamber/recipe/environment stratum when available.
+    pub context_stratum_id: Option<String>,
     pub acquisition: PhysicalAcquisitionRecordV1,
     pub qualification: K1QualificationRecordV1,
     pub tracking: FeedbackTrackingRecordV1,
@@ -1121,6 +1123,9 @@ pub fn evaluate_observation_process_v1(
         require_text(&row.sample_id, "round.sample_id")?;
         require_text(&row.measurement_event_id, "round.measurement_event_id")?;
         require_text(&row.clock_domain_id, "round.clock_domain_id")?;
+        if let Some(stratum) = row.context_stratum_id.as_deref() {
+            require_text(stratum, "round.context_stratum_id")?;
+        }
         for (digest, field) in [
             (&row.prediction_receipt_sha256, "prediction receipt"),
             (&row.interval_receipt_sha256, "interval receipt"),
@@ -1336,6 +1341,7 @@ mod tests {
             event_time_unix_seconds: 100 + round_id as i64 * 10,
             prediction_time_unix_seconds: 101 + round_id as i64 * 10,
             clock_domain_id: "fab-clock".into(),
+            context_stratum_id: Some("synthetic-eqp-1/ch-1".into()),
             acquisition: PhysicalAcquisitionRecordV1 {
                 state: acquisition,
                 selection_design_kind: PhysicalSelectionDesignKindV1::DeterministicOrAdaptive,
