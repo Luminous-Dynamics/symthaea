@@ -122,6 +122,7 @@ pub mod melody;
 #[cfg(feature = "theory")]
 pub mod methodology_plan;
 pub mod midi;
+pub mod musical_forecast;
 pub mod midi_loader;
 #[cfg(feature = "theory")]
 pub mod musical_policy;
