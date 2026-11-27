@@ -294,16 +294,17 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(index, score)| {
-                let letter = char::from(b'g' + index as u8);
+                let aggregate_receipt_digit = char::from(b'a' + index as u8);
+                let tie_receipt_digit = char::from(b'd' + index as u8);
                 ClusterRankAttestation {
                     independent_cluster_id: score.independent_cluster_id.clone(),
                     score_units: score.score_units,
                     block_manifest_sha256: score.block_manifest_sha256.clone(),
                     candidate_margin_block_sha256: score.candidate_margin_block_sha256.clone(),
                     reference_margin_receipt_sha256: score.reference_margin_receipt_sha256.clone(),
-                    aggregate_score_receipt_sha256: digest(letter),
+                    aggregate_score_receipt_sha256: digest(aggregate_receipt_digit),
                     tie_break_key: 100 + index as u64,
-                    tie_break_receipt_sha256: digest(char::from(b'k' + index as u8)),
+                    tie_break_receipt_sha256: digest(tie_receipt_digit),
                 }
             })
             .collect()
@@ -405,7 +406,7 @@ mod tests {
     #[test]
     fn candidate_block_binding_must_match() {
         let mut attestations = attestations();
-        attestations[0].candidate_margin_block_sha256 = digest('z');
+        attestations[0].candidate_margin_block_sha256 = digest('f');
         assert_eq!(
             build_calibration_rank_reference(&calibration(), &binding(), &attestations),
             Err(BridgeError::AttestedScoreMismatch(
@@ -417,7 +418,7 @@ mod tests {
     #[test]
     fn calibration_manifest_digest_must_match() {
         let mut binding = binding();
-        binding.calibration_manifest_sha256 = digest('z');
+        binding.calibration_manifest_sha256 = digest('f');
         assert_eq!(
             build_calibration_rank_reference(&calibration(), &binding, &attestations()),
             Err(BridgeError::CalibrationManifestMismatch)
@@ -427,7 +428,7 @@ mod tests {
     #[test]
     fn scope_specification_must_match() {
         let mut binding = binding();
-        binding.scope_spec.context_scope_sha256 = digest('z');
+        binding.scope_spec.context_scope_sha256 = digest('f');
         assert_eq!(
             build_calibration_rank_reference(&calibration(), &binding, &attestations()),
             Err(BridgeError::ScopeSpecificationMismatch)
