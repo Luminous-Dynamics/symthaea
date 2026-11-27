@@ -367,6 +367,20 @@ Every reported run should emit a machine-readable receipt containing:
 
 A digest establishes byte identity, not authorship, truth, independent execution, or authority. Use a separately trusted signature/attestation or independent channel when those claims matter. Receipts must never include secrets or unnecessary personal/clinical data.
 
+## 8.1 Trusted observation boundary for v0.1
+
+The standalone adapter evaluator deliberately distinguishes **contract consistency** from **independent qualification**.
+
+A system observation can currently be adapter-submitted JSON. Fields such as `verifier.independent`, resource usage, state mutation count, network bytes, and replay digests are therefore claims, not trusted measurements. The evaluator checks that these claims are structurally valid and mutually consistent, but v0.1 has no separately trusted observer, signed meter receipt, or independent state-reconciliation channel.
+
+Accordingly, v0.1 emits:
+
+- `contract_checks_pass`: whether every adapter-reported dimension is internally consistent with the frozen task;
+- `independent_evidence_verified = false`: no trusted observer receipt has been verified;
+- `qualified = false`: self-reported evidence cannot independently qualify itself.
+
+This is intentional fail-closed behavior, not a benchmark failure. A subsequent version must define an independently provisioned trust root, authenticated resource-meter receipts, state-before/state-after evidence, and a replay executor that receives only the frozen task and submitted artifact. The adapter must not be allowed to choose its own trusted key, verifier, or attestation policy.
+
 ## 9. Implementation roadmap
 
 ### Stage 0 — Protocol and task validity
