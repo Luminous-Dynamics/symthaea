@@ -437,12 +437,14 @@ fn bootstrap_interval(
 ) -> Result<(i64, i64), BenchmarkError> {
     let mut rng = SplitMix64::new(seed);
     let count = deltas.len();
+    let count_u64 = u64::try_from(count).map_err(|_| BenchmarkError::ArithmeticOverflow)?;
     let mut means = Vec::with_capacity(replicates);
 
     for _ in 0..replicates {
         let mut sum = 0i128;
         for _ in 0..count {
-            let index = rng.below(count);
+            let index = usize::try_from(rng.below(count_u64))
+                .map_err(|_| BenchmarkError::ArithmeticOverflow)?;
             sum = sum
                 .checked_add(i128::from(deltas[index]))
                 .ok_or(BenchmarkError::ArithmeticOverflow)?;
@@ -573,13 +575,12 @@ impl SplitMix64 {
         value ^ (value >> 31)
     }
 
-    fn below(&mut self, upper_exclusive: usize) -> usize {
-        let upper = u64::try_from(upper_exclusive).expect("bootstrap size fits in u64");
-        let threshold = upper.wrapping_neg() % upper;
+    fn below(&mut self, upper_exclusive: u64) -> u64 {
+        let threshold = upper_exclusive.wrapping_neg() % upper_exclusive;
         loop {
             let value = self.next_u64();
             if value >= threshold {
-                return usize::try_from(value % upper).expect("sample index fits in usize");
+                return value % upper_exclusive;
             }
         }
     }
@@ -688,6 +689,8 @@ mod tests {
         .unwrap();
         assert!(report.by_family["urban"].paired.mean_penalized_delay_delta_us < 0);
         assert!(report.by_family["rural"].paired.mean_penalized_delay_delta_us > 0);
+        assert_eq!(report.by_family["urban"].paired.bootstrap_95_low_us, None);
+        assert_eq!(report.by_family["rural"].paired.bootstrap_95_high_us, None);
     }
 
     #[test]
