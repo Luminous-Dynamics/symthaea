@@ -1327,7 +1327,6 @@ dependencies = [
  "base64 0.22.1",
  "http 1.4.2",
  "log",
- "url",
 ]
 
 [[package]]
@@ -1667,6 +1666,7 @@ dependencies = [
  "ron",
  "serde",
  "stackfuture",
+ "url",
  "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
