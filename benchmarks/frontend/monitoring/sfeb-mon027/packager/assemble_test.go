@@ -143,6 +143,7 @@ func TestAttachExternalSignatureAndVerifyBundle(t *testing.T) {
 	envelope := SignatureEnvelope{
 		Profile: SignatureEnvelopeProfile,
 		Version: "1.0.0",
+		RequestID: built.SigningRequest.RequestID,
 		RunID: built.Manifest.RunID,
 		Sequence: built.Manifest.Sequence,
 		RootSHA256: built.Manifest.RootSHA256,
@@ -185,6 +186,7 @@ func TestAttachBlocksAfterArtifactMutation(t *testing.T) {
 	signature := ed25519.Sign(privateKey, message)
 	envelope := SignatureEnvelope{
 		Profile: SignatureEnvelopeProfile, Version: "1.0.0",
+		RequestID: built.SigningRequest.RequestID,
 		RunID: built.Manifest.RunID, Sequence: built.Manifest.Sequence,
 		RootSHA256: built.Manifest.RootSHA256, Algorithm: "Ed25519",
 		KeyID: built.SigningRequest.KeyID, Value: base64.StdEncoding.EncodeToString(signature),
