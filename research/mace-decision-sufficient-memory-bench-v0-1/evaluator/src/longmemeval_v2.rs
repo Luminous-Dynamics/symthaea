@@ -208,9 +208,9 @@ mod tests {
     #[test]
     fn points_beyond_two_hundred_seconds_cannot_change_lafs() {
         let baseline = lafs_score(&SMALL_REFERENCE_V1).expect("reference");
-        let with_slow_candidate =
-            lafs_score(&[SMALL_REFERENCE_V1.as_slice(), &[point(100.0, 250.0)]].concat())
-                .expect("valid point");
+        let mut points = SMALL_REFERENCE_V1.to_vec();
+        points.push(point(100.0, 250.0));
+        let with_slow_candidate = lafs_score(&points).expect("valid point");
         assert!((baseline - with_slow_candidate).abs() < 1.0e-10);
     }
 
