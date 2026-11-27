@@ -46,5 +46,36 @@
     "Synthetic standard-normal positive-orthant and two-bin fixture.",
     "Orthant value is checked against 1/4 + asin(rho)/(2*pi).",
     "Scalar marginal likelihoods use the #13944 reference."
-  ]
+  ],
+  "rank_deficient_case": {
+    "id": "duplicate-two-channel-measurement",
+    "mean": [
+      0,
+      0
+    ],
+    "covariance": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    "lower": [
+      0,
+      0
+    ],
+    "upper": [
+      1,
+      1
+    ],
+    "expected_probability": 0.3413447460685429,
+    "expected_covariance_rank": 1,
+    "notes": [
+      "Both channels are exact duplicates: the joint event is one scalar event, not the product of two marginal probabilities.",
+      "The rank-one support evaluator integrates on the one-dimensional support; no jitter is applied."
+    ]
+  }
 }
