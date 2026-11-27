@@ -119,6 +119,7 @@ impl PresentationPermit {
     pub fn channel(&self) -> OutputChannel { self.channel }
     pub fn destination(&self) -> OutputDestination { self.destination }
     pub fn motion_mode(&self) -> MotionMode { self.motion_mode }
+    pub fn requested_intensity(&self) -> f32 { self.requested_intensity }
     pub fn effective_intensity(&self) -> f32 { self.effective_intensity }
     pub fn semantic_key(&self) -> &str { &self.semantic_key }
 }
