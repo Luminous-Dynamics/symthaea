@@ -480,10 +480,10 @@
       "$ref": "#/$defs/optionalSha"
     },
     "candidate_saw_evaluator_labels": {
-      "type": "boolean"
+      "const": false
     },
     "evaluator_isolated": {
-      "type": "boolean"
+      "const": true
     },
     "evidence_uri": {
       "$ref": "#/$defs/optionalString"
@@ -576,25 +576,6 @@
           },
           "matched_controls_sha256": {
             "$ref": "#/$defs/sha256"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "candidate_saw_evaluator_labels": {
-            "const": true
-          }
-        },
-        "required": [
-          "candidate_saw_evaluator_labels"
-        ]
-      },
-      "then": {
-        "properties": {
-          "evaluator_isolated": {
-            "const": false
           }
         }
       }
