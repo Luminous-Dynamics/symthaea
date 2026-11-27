@@ -8,8 +8,8 @@ mod bm25;
 
 pub use bm25::{
     AuthorityTierV1, Bm25ConfigV1, Bm25IndexV1, Bm25ResultV1, EventRelationV1, FusedHitV1,
-    RankedChannelV1, RetrievalHitV1, RetrievalQueryV1, RetrievalWorkV1, SourceDocumentV1,
-    weighted_rrf_v1,
+    LineageAuditReportV1, LineageEdgeStatusV1, RankedChannelV1, RetrievalHitV1,
+    RetrievalQueryV1, RetrievalWorkV1, SourceDocumentV1, weighted_rrf_v1,
 };
 
 use serde::{Deserialize, Deserializer};
@@ -149,6 +149,7 @@ pub struct FixtureExecutionV1 {
     pub bm25: Bm25ResultV1,
     pub resolved_hits: Vec<ResolvedEvidenceV1>,
     pub fused_hits: Vec<FusedHitV1>,
+    pub lineage_audit: LineageAuditReportV1,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -281,10 +282,12 @@ pub fn run_candidate_fixture_v1(json: &str) -> Result<FixtureExecutionV1, Adapte
     )
     .map_err(|error| AdapterErrorV1::Fusion(format!("{error:?}")))?;
 
+    let lineage_audit = index.audit_lineage();
     Ok(FixtureExecutionV1 {
         bm25,
         resolved_hits,
         fused_hits,
+        lineage_audit,
     })
 }
 
@@ -387,6 +390,24 @@ mod tests {
             run_candidate_fixture_v1(&oversized_top_k),
             Err(AdapterErrorV1::InvalidCandidateField("top_k".into()))
         );
+    }
+
+    #[test]
+    fn fixture_exposes_lineage_audit_without_inheriting_parent_authority() {
+        let report = run_candidate_fixture_v1(FIXTURE).expect("candidate fixture");
+        assert_eq!(report.lineage_audit.resolved_edge_count, 1);
+        assert_eq!(report.lineage_audit.missing_parent_edge_count, 0);
+        assert_eq!(report.lineage_audit.cross_scope_edge_count, 0);
+        assert!(report.lineage_audit.cycle_components.is_empty());
+
+        let correction = report
+            .lineage_audit
+            .edges
+            .iter()
+            .find(|edge| edge.child_event_id == "late-correction-041")
+            .expect("correction lineage edge");
+        assert_eq!(correction.parent_event_id, "certificate-041");
+        assert_eq!(correction.status, LineageEdgeStatusV1::Resolved);
     }
 
     #[test]
