@@ -24,7 +24,6 @@
           "build_id": "build-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "State reported by the source.",
         "elements": [
           {
@@ -33,7 +32,10 @@
             "weight": null,
             "motion": "static"
           }
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     },
     {
@@ -58,7 +60,6 @@
           "build_id": "build-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "State reported by the source.",
         "elements": [
           {
@@ -67,7 +68,10 @@
             "weight": null,
             "motion": "pulse"
           }
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     },
     {
@@ -92,7 +96,6 @@
           "build_id": "build-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "State reported by the source.",
         "elements": [
           {
@@ -101,7 +104,10 @@
             "weight": null,
             "motion": "static"
           }
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     },
     {
@@ -126,7 +132,6 @@
           "build_id": "build-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "State reported by the source.",
         "elements": [
           {
@@ -135,7 +140,10 @@
             "weight": null,
             "motion": "static"
           }
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     },
     {
@@ -160,7 +168,6 @@
           "build_id": "build-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "State reported by the source.",
         "elements": [
           {
@@ -169,7 +176,10 @@
             "weight": null,
             "motion": "static"
           }
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     },
     {
@@ -194,7 +204,6 @@
           "build_id": "build-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "State reported by the source.",
         "elements": [
           {
@@ -203,7 +212,10 @@
             "weight": null,
             "motion": "static"
           }
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     },
     {
@@ -228,7 +240,6 @@
           "build_id": "build-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "State reported by the source.",
         "elements": [
           {
@@ -237,7 +248,10 @@
             "weight": null,
             "motion": "static"
           }
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     }
   ],
@@ -264,7 +278,6 @@
           "instance_id": "dialogue-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "Listening state reported active.",
         "elements": [
           {
@@ -276,7 +289,10 @@
         ],
         "evidence_refs": [
           "private:raw-ref"
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     },
     {
@@ -300,7 +316,6 @@
           "instance_id": "dialogue-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "Listening state reported active.",
         "elements": [
           {
@@ -309,7 +324,10 @@
             "weight": null,
             "motion": "static"
           }
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     },
     {
@@ -334,7 +352,6 @@
           "instance_id": "dialogue-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "Listening state reported active.",
         "elements": [
           {
@@ -343,7 +360,10 @@
             "weight": null,
             "motion": "static"
           }
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     },
     {
@@ -368,7 +388,6 @@
           "instance_id": "dialogue-1"
         },
         "observed_at_monotonic_ns": "100",
-        "expires_at_monotonic_ns": "900",
         "accessible_description": "Listening state reported active.",
         "elements": [
           {
@@ -377,7 +396,10 @@
             "weight": 1.25,
             "motion": "static"
           }
-        ]
+        ],
+        "event_expires_at_monotonic_ns": "900",
+        "grant_expires_at_monotonic_ns": "800",
+        "effective_permit_expires_at_monotonic_ns": "800"
       }
     }
   ]
