@@ -1175,7 +1175,10 @@ mod tests {
         let mut engine = engine();
         let observation = vm_residual_observation(1, "vm-1", "tool-a/ch-1", 10, 0.0, "label-1");
         let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
-        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert_eq!(
+            assessment.diagnostic_state,
+            ShiftDiagnosticStateV1::InsufficientEvidence
+        );
         assert_eq!(assessment.recommendation, ShiftAdaptationRecommendationV1::Hold);
     }
 
@@ -1301,7 +1304,14 @@ mod tests {
             let sensor = sensor_observation(seq, &format!("sensor-{i}"), "tool-a/ch-1", 10 + i, 0.0);
             observe_evidence_shift_v1(&mut engine, &sensor).unwrap();
             seq += 1;
-            let mut vm = vm_residual_observation(seq, &format!("vm-{i}"), "tool-a/ch-1", 10 + i, 5.0, &format!("label-{i}"));
+            let mut vm = vm_residual_observation(
+                seq,
+                &format!("vm-{i}"),
+                "tool-a/ch-1",
+                10 + i,
+                5.0,
+                &format!("label-{i}"),
+            );
             if i == 0 {
                 vm.process_event_marker = Some(ProcessEventMarkerV1 {
                     event_id: "recipe-change-1".into(),
@@ -1313,8 +1323,14 @@ mod tests {
             let assessment = observe_evidence_shift_v1(&mut engine, &vm).unwrap();
             seq += 1;
             if i == 2 {
-                assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::ProcessShiftSuspected);
-                assert_eq!(assessment.recommendation, ShiftAdaptationRecommendationV1::RequestMetrology);
+                assert_eq!(
+                    assessment.diagnostic_state,
+                    ShiftDiagnosticStateV1::ProcessShiftSuspected
+                );
+                assert_eq!(
+                    assessment.recommendation,
+                    ShiftAdaptationRecommendationV1::RequestMetrology
+                );
             }
         }
     }
@@ -1324,7 +1340,8 @@ mod tests {
         let mut engine = engine();
         let mut seq = 1;
         for i in 0..3 {
-            let sensor = sensor_observation(seq, &format!("sensor-{i}"), "tool-a/ch-1", 10 + i, 5.0);
+            let sensor =
+                sensor_observation(seq, &format!("sensor-{i}"), "tool-a/ch-1", 10 + i, 5.0);
             let assessment = observe_evidence_shift_v1(&mut engine, &sensor).unwrap();
             seq += 1;
             if i == 2 {
