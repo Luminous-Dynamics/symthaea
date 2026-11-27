@@ -9,7 +9,10 @@
 //! integration boundary rather than only testing module-internal functions.
 
 use symthaea_plasma_probes::{
-    velocity_kick_remap::remap_distribution_after_velocity_kick,
+    velocity_kick_remap::{
+        VelocityKickRemapJacobianConfig, linearize_velocity_kick_remap,
+        remap_distribution_after_velocity_kick, remap_distribution_after_velocity_kick_weighted,
+    },
     pulse_map::{PhaseSpaceTangent, SinusoidalVelocityKick, check_pulse_jacobians_central_difference},
     EmpiricalGramian,
     rbkr::{
@@ -62,6 +65,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert!(remap.distribution[0].iter().all(|value| *value >= 0.0));
     assert!(remap.total_boundary_outflow < 1.0e-12);
     assert!(remap.total_mass_balance_residual.abs() < 1.0e-12);
+
+    let spatial_weighted_remap = remap_distribution_after_velocity_kick_weighted(
+        &pulse,
+        &[std::f64::consts::PI / 2.0],
+        &[0.25],
+        &velocity_edges,
+        &cell_averages,
+    )?;
+    assert!((spatial_weighted_remap.total_mass_before - 0.25 * remap.total_mass_before).abs() < 1.0e-12);
+    assert!((spatial_weighted_remap.total_mass_after - 0.25 * remap.total_mass_after).abs() < 1.0e-12);
+    let remap_jacobian = linearize_velocity_kick_remap(
+        &pulse,
+        &[std::f64::consts::PI / 2.0],
+        &[0.25],
+        &velocity_edges,
+        &cell_averages,
+        VelocityKickRemapJacobianConfig::new(1.0e-6, 10_000),
+    )?;
+    assert!(remap_jacobian.minimum_topology_margin > 1.0e-6);
+    assert!(remap_jacobian.rows[0].distribution_wrt_amplitude.iter().all(|v| v.is_finite()));
+    assert!(remap_jacobian.rows[0].boundary_outflow.amplitude.is_finite());
 
     let identity = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
     let input = vec![vec![1.0], vec![0.0]];
