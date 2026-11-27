@@ -9,6 +9,7 @@
 //! allows the old or new frame to outlive its own effective presentation
 //! permission.
 
+use super::embodiment_event::PrivacyClass;
 use super::embodiment_policy::MotionMode;
 use super::embodiment_projection::EmbodimentForm;
 use super::embodiment_scene::EmbodimentSceneFrame;
@@ -42,6 +43,7 @@ pub struct SceneContinuityDescriptor {
     sequence: u64,
     form: EmbodimentForm,
     motion_mode: MotionMode,
+    privacy_class: PrivacyClass,
     effective_intensity: f32,
     observed_at_monotonic_ns: String,
     effective_expires_at_monotonic_ns: String,
@@ -58,6 +60,7 @@ impl SceneContinuityDescriptor {
         sequence: u64,
         form: EmbodimentForm,
         motion_mode: MotionMode,
+        privacy_class: PrivacyClass,
         effective_intensity: f32,
         observed_at_monotonic_ns: impl Into<String>,
         effective_expires_at_monotonic_ns: impl Into<String>,
@@ -95,6 +98,7 @@ impl SceneContinuityDescriptor {
             sequence,
             form,
             motion_mode,
+            privacy_class,
             effective_intensity,
             observed_at_monotonic_ns,
             effective_expires_at_monotonic_ns,
@@ -111,6 +115,7 @@ impl SceneContinuityDescriptor {
             frame.sequence(),
             frame.form(),
             frame.motion_mode(),
+            frame.privacy_class(),
             frame.effective_intensity(),
             frame.observed_at_monotonic_ns(),
             frame.effective_permit_expires_at_monotonic_ns(),
@@ -125,6 +130,7 @@ impl SceneContinuityDescriptor {
     pub fn sequence(&self) -> u64 { self.sequence }
     pub fn form(&self) -> EmbodimentForm { self.form }
     pub fn motion_mode(&self) -> MotionMode { self.motion_mode }
+    pub fn privacy_class(&self) -> PrivacyClass { self.privacy_class }
     pub fn effective_intensity(&self) -> f32 { self.effective_intensity }
     pub fn observed_at_monotonic_ns(&self) -> &str { &self.observed_at_monotonic_ns }
     pub fn effective_expires_at_monotonic_ns(&self) -> &str { &self.effective_expires_at_monotonic_ns }
@@ -327,6 +333,7 @@ pub fn plan_transition(
         || target.effective_intensity < source.effective_intensity
         || source.motion_mode == MotionMode::Static
         || target.motion_mode == MotionMode::Static
+        || source.privacy_class != target.privacy_class
         || source.effective_intensity <= 0.0
         || target.effective_intensity <= 0.0;
 
@@ -413,13 +420,13 @@ mod tests {
         expires: &str,
     ) -> SceneContinuityDescriptor {
         SceneContinuityDescriptor::new(
-            SESSION, CLOCK, id, "grant-v1", digest, sequence, form, motion, intensity, "100", expires,
+            SESSION, CLOCK, id, "grant-v1", digest, sequence, form, motion, PrivacyClass::Public, intensity, "100", expires,
         ).unwrap()
     }
 
     #[test]
     fn initial_frame_appears_without_a_source_fade() {
-        let target = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let target = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
         let plan = plan_transition(None, &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         assert_eq!(plan.kind(), TransitionKind::Initial);
         let weights = plan.weights_at(CLOCK, 200).unwrap();
@@ -429,8 +436,8 @@ mod tests {
 
     #[test]
     fn same_cue_cross_form_transition_preserves_digest() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
-        let target = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
+        let target = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1200");
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         assert_eq!(plan.kind(), TransitionKind::CrossFormSameCue);
         assert_eq!(plan.source_digest(), Some(DIGEST_A));
@@ -439,16 +446,16 @@ mod tests {
 
     #[test]
     fn cross_form_new_cue_is_distinguished_from_same_cue_morph() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
-        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::MycelialBeing, MotionMode::Dynamic, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
+        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::MycelialBeing, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1200");
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         assert_eq!(plan.kind(), TransitionKind::CrossFormNewCue);
     }
 
     #[test]
     fn same_form_semantic_update_uses_shorter_transition() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
-        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
+        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1200");
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         assert_eq!(plan.kind(), TransitionKind::SameFormUpdate);
         assert_eq!(plan.duration_ns(), 90_000_000);
@@ -456,30 +463,30 @@ mod tests {
 
     #[test]
     fn session_and_clock_mismatch_are_rejected() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
         let wrong_session = SceneContinuityDescriptor::new(
-            "other-session", CLOCK, "event-2", "grant-v1", DIGEST_B, 2, EmbodimentForm::Swarm, MotionMode::Dynamic, 0.8, "200", "1200",
+            "other-session", CLOCK, "event-2", "grant-v1", DIGEST_B, 2, EmbodimentForm::Swarm, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "200", "1200",
         ).unwrap();
         assert_eq!(plan_transition(Some(&source), &wrong_session, TransitionPolicy::default(), CLOCK, "250"), Err(TransitionError::WrongSession));
         let wrong_clock = SceneContinuityDescriptor::new(
-            SESSION, "clock:other", "event-2", "grant-v1", DIGEST_B, 2, EmbodimentForm::Swarm, MotionMode::Dynamic, 0.8, "200", "1200",
+            SESSION, "clock:other", "event-2", "grant-v1", DIGEST_B, 2, EmbodimentForm::Swarm, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "200", "1200",
         ).unwrap();
         assert_eq!(plan_transition(Some(&source), &wrong_clock, TransitionPolicy::default(), "clock:other", "250"), Err(TransitionError::WrongClockDomain));
     }
 
     #[test]
     fn same_event_id_cannot_change_content_digest() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
-        let target = descriptor("event-1", 1, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
+        let target = descriptor("event-1", 1, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1200");
         assert_eq!(plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200"), Err(TransitionError::EventContentMismatch));
     }
 
     #[test]
     fn grant_change_forces_a_hard_cut_even_for_the_same_cue() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
         let target = SceneContinuityDescriptor::new(
             SESSION, CLOCK, "event-1", "grant-v2", DIGEST_A, 1,
-            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "200", "1200",
+            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "200", "1200",
         ).unwrap();
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "250").unwrap();
         assert_eq!(plan.kind(), TransitionKind::HardCut);
@@ -488,10 +495,10 @@ mod tests {
 
     #[test]
     fn reduced_intensity_forces_a_hard_cut_so_old_output_cannot_linger() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
         let target = SceneContinuityDescriptor::new(
             SESSION, CLOCK, "event-2", "grant-v1", DIGEST_B, 2,
-            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.2, "200", "1200",
+            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.2, "200", "1200",
         ).unwrap();
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "250").unwrap();
         assert_eq!(plan.kind(), TransitionKind::HardCut);
@@ -499,10 +506,10 @@ mod tests {
 
     #[test]
     fn regressing_target_observation_time_is_rejected() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
         let target = SceneContinuityDescriptor::new(
             SESSION, CLOCK, "event-2", "grant-v1", DIGEST_B, 2,
-            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "90", "1200",
+            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "90", "1200",
         ).unwrap();
         assert_eq!(
             plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "250"),
@@ -512,17 +519,17 @@ mod tests {
 
     #[test]
     fn target_sequence_must_advance_for_a_new_event() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
-        let target = descriptor("event-2", 1, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
+        let target = descriptor("event-2", 1, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1200");
         assert_eq!(plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200"), Err(TransitionError::SequenceRegression));
     }
 
     #[test]
     fn shorter_numeric_expiry_forces_hard_cut_even_when_decimal_is_lexically_larger() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
         let target = SceneContinuityDescriptor::new(
             SESSION, CLOCK, "event-2", "grant-v1", DIGEST_B, 2,
-            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "200", "900",
+            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "200", "900",
         ).unwrap();
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "250").unwrap();
         assert_eq!(plan.kind(), TransitionKind::HardCut);
@@ -531,25 +538,38 @@ mod tests {
 
     #[test]
     fn static_or_zero_intensity_scene_uses_hard_cut() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
-        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Static, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
+        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Static, PrivacyClass::Public, 0.8, "1200");
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         assert_eq!(plan.kind(), TransitionKind::HardCut);
         assert_eq!(plan.duration_ns(), 0);
     }
 
     #[test]
+    fn privacy_class_change_forces_a_hard_cut() {
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let target = SceneContinuityDescriptor::new(
+            SESSION, CLOCK, "event-2", "grant-v1", DIGEST_B, 2,
+            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::LocalSensitive,
+            0.8, "200", "1200",
+        ).unwrap();
+        let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "250").unwrap();
+        assert_eq!(plan.kind(), TransitionKind::HardCut);
+        assert_eq!(plan.duration_ns(), 0);
+    }
+
+    #[test]
     fn transition_duration_is_bounded_by_source_expiry() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "250");
-        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "250");
+        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1200");
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         assert_eq!(plan.duration_ns(), 50);
     }
 
     #[test]
     fn transition_weights_are_linear_and_reach_target_before_expiry() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
-        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
+        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1200");
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         let start = plan.weights_at(CLOCK, 200).unwrap();
         let middle = plan.weights_at(CLOCK, 290_000_200).unwrap();
@@ -564,8 +584,8 @@ mod tests {
 
     #[test]
     fn expired_source_is_never_kept_visible() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "150");
-        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "1200");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "150");
+        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1200");
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         assert_eq!(plan.kind(), TransitionKind::HardCut);
         let weights = plan.weights_at(CLOCK, 200).unwrap();
@@ -575,8 +595,8 @@ mod tests {
 
     #[test]
     fn target_expiry_and_clock_regression_fail_closed() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
-        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "300");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
+        let target = descriptor("event-2", 2, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "300");
         let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200").unwrap();
         assert_eq!(plan.weights_at(CLOCK, 199), Err(TransitionError::ClockRegression));
         assert_eq!(plan.weights_at(CLOCK, 300), Err(TransitionError::TargetExpired));
@@ -584,7 +604,7 @@ mod tests {
 
     #[test]
     fn exact_same_frame_is_a_no_change_not_a_fade() {
-        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, PrivacyClass::Public, 0.8, "1000");
         let plan = plan_transition(Some(&source), &source, TransitionPolicy::default(), CLOCK, "200").unwrap();
         assert_eq!(plan.kind(), TransitionKind::NoChange);
         assert_eq!(plan.duration_ns(), 0);
