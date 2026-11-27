@@ -53,7 +53,7 @@ Stopped, Failed and NotSubmitted are terminal. A second terminal transition is r
 
 Observation sources distinguish adapter callbacks, compositor reports, audio-device loopback, haptic-driver acknowledgement, and external observers. The source is disclosed, not treated as proof of independence. The observer type must match the authorized output channel.
 
-Every receipt preserves session, clock domain, event and grant identity, event sequence, semantic event kind, source/build provenance, epistemic status, privacy class, form, output channel/destination, intensity, motion mode, adapter build and observer metadata. Decision and renderer timestamps retain distinct clock-domain identifiers. No raw audio/video is included.
+Every receipt preserves session, clock domain, event and grant identity, event sequence, semantic event kind, event expiry, grant expiry, effective permit expiry, source/build provenance, epistemic status, privacy class, form, output channel/destination, intensity, motion mode, adapter build and observer metadata. Decision and renderer timestamps retain distinct clock-domain identifiers. No raw audio/video is included.
 
 ## Integrity and trust limits
 
