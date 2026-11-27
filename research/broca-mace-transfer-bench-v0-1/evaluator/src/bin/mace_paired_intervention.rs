@@ -28,7 +28,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-const SCHEMA_VERSION: &str = "mace_memory_decision_intervention_v0_1";
+const SCHEMA_VERSION: &str = "mace_memory_decision_intervention_v0_2";
 const HDC_DIMENSION: usize = 2_048;
 const HDC_CODEBOOK_SEED: u64 = 0x4D41_4345_4844_4301;
 const HDC_NEURON_SEED: u64 = 0x4D41_4345_4C54_4301;
@@ -76,11 +76,22 @@ impl Arm {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct PhaseTimings {
+    memory_selection_ns: u64,
+    index_build_ns: u64,
+    retrieval_ns: u64,
+    evidence_resolution_verification_ns: u64,
+    policy_application_ns: u64,
+    total_ns: u64,
+}
+
 #[derive(Clone, Debug)]
 struct CandidateRun {
     decision: Decision,
     retrieved_ids: Vec<u32>,
     resolved: Vec<Experience>,
+    phase_timings: PhaseTimings,
     latency_ns: u64,
     index_bytes: u64,
     sidecar_bytes: u64,
@@ -120,6 +131,7 @@ struct ScoredArm {
     utility_micros: i64,
     regret_micros: i64,
     task_success: bool,
+    phase_timings: PhaseTimings,
     latency_ns: u64,
     memory_bytes: i64,
     invalid_evidence_use_count: u64,
@@ -285,7 +297,8 @@ fn hdc_hits(
     memory: &[Experience],
     query: Query,
     profile: RepresentationProfile,
-) -> Result<(Vec<CandidateHit>, u64), String> {
+) -> Result<(Vec<CandidateHit>, u64, u64, u64), String> {
+    let build_started = Instant::now();
     let index = CandidateIndex::build(
         memory,
         IndexConfig {
@@ -295,7 +308,9 @@ fn hdc_hits(
         },
     )
     .map_err(|error| error.to_string())?;
+    let index_build_ns = u64::try_from(build_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
 
+    let retrieval_started = Instant::now();
     let mut hits: Vec<CandidateHit> = Vec::new();
     for action in [Action::A, Action::B] {
         let result = index.retrieve(query.scope, action, TOP_K);
@@ -306,22 +321,26 @@ fn hdc_hits(
             .cmp(&right.rank)
             .then_with(|| left.event_id.cmp(&right.event_id))
     });
-    Ok((hits, index.index_payload_bytes()))
+    let retrieval_ns = u64::try_from(retrieval_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+    Ok((hits, index.index_payload_bytes(), index_build_ns, retrieval_ns))
 }
 
 fn typed_content_hits(
     memory: &[Experience],
     decision_need: DecisionNeedV1,
-) -> Result<(Vec<CandidateHit>, u64, String), String> {
+) -> Result<(Vec<CandidateHit>, u64, String, u64, u64), String> {
     let config = TypedContentConfigV1 {
         dimension: HDC_DIMENSION,
         seed: HDC_CODEBOOK_SEED,
         ..TypedContentConfigV1::default()
     };
+    let build_started = Instant::now();
     let index = TypedContentIndexV1::build(memory, config)
         .map_err(|error| error.to_string())?;
+    let index_build_ns = u64::try_from(build_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
     let profile_digest = index.profile_digest().to_string();
 
+    let retrieval_started = Instant::now();
     let mut hits = Vec::new();
     if !decision_need.is_valid() {
         return Err("candidate-visible DecisionNeed failed canonical validation".to_string());
@@ -339,7 +358,14 @@ fn typed_content_hits(
             .cmp(&right.rank)
             .then_with(|| left.event_id.cmp(&right.event_id))
     });
-    Ok((hits, index.index_payload_bytes(), profile_digest))
+    let retrieval_ns = u64::try_from(retrieval_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+    Ok((
+        hits,
+        index.index_payload_bytes(),
+        profile_digest,
+        index_build_ns,
+        retrieval_ns,
+    ))
 }
 
 fn execute_arm(
@@ -348,8 +374,13 @@ fn execute_arm(
     sibling_tasks: &[CandidateTask<'_>],
 ) -> CandidateRun {
     let started = Instant::now();
+    let memory_selection_started = Instant::now();
     let memory = source_memory_for_arm(arm, case, sibling_tasks);
+    let memory_selection_ns =
+        u64::try_from(memory_selection_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
     let mut index_bytes = 0_u64;
+    let mut index_build_ns = 0_u64;
+    let mut retrieval_ns = 0_u64;
     let mut retrieved_ids = Vec::new();
     let mut expected_view_digests = BTreeMap::new();
     let mut retrieval_profile_digest = None;
@@ -357,26 +388,39 @@ fn execute_arm(
 
     let ids_result: Result<Vec<u32>, String> = match arm {
         Arm::NoMemory => Ok(Vec::new()),
-        Arm::ExactScopeScan => Ok(exact_scope_ids(&memory, case.query)),
+        Arm::ExactScopeScan => {
+            let phase_started = Instant::now();
+            let ids = exact_scope_ids(&memory, case.query);
+            retrieval_ns = u64::try_from(phase_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+            Ok(ids)
+        }
         Arm::ConventionalRetrieval => {
             index_bytes = u64::try_from(memory.len())
                 .unwrap_or(u64::MAX)
                 .saturating_mul(size_of::<u32>() as u64);
-            Ok(conventional_ids(&memory, case.query, TOP_K))
+            let phase_started = Instant::now();
+            let ids = conventional_ids(&memory, case.query, TOP_K);
+            retrieval_ns = u64::try_from(phase_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+            Ok(ids)
         }
         Arm::QualifiedSymbolicRetrieval => {
             index_bytes = u64::try_from(memory.len())
                 .unwrap_or(u64::MAX)
                 .saturating_mul(size_of::<u32>() as u64);
-            Ok(qualified_symbolic_ids(&memory, case.query, TOP_K))
+            let phase_started = Instant::now();
+            let ids = qualified_symbolic_ids(&memory, case.query, TOP_K);
+            retrieval_ns = u64::try_from(phase_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+            Ok(ids)
         }
         Arm::StaticHdc => hdc_hits(
             &memory,
             case.query,
             RepresentationProfile::StaticContinuousHv,
         )
-        .map(|(hits, bytes)| {
+        .map(|(hits, bytes, build_ns, retrieve_ns)| {
             index_bytes = bytes;
+            index_build_ns = build_ns;
+            retrieval_ns = retrieve_ns;
             let mut ids = Vec::with_capacity(hits.len());
             for hit in hits {
                 expected_view_digests.insert(hit.event_id, hit.view_digest);
@@ -395,8 +439,10 @@ fn execute_arm(
                 neuron_seed: HDC_NEURON_SEED,
             },
         )
-        .map(|(hits, bytes)| {
+        .map(|(hits, bytes, build_ns, retrieve_ns)| {
             index_bytes = bytes;
+            index_build_ns = build_ns;
+            retrieval_ns = retrieve_ns;
             let mut ids = Vec::with_capacity(hits.len());
             for hit in hits {
                 expected_view_digests.insert(hit.event_id, hit.view_digest);
@@ -405,8 +451,10 @@ fn execute_arm(
             ids
         }),
         Arm::TypedContentHdc => typed_content_hits(&memory, case.decision_need)
-            .map(|(hits, bytes, profile_digest)| {
+            .map(|(hits, bytes, profile_digest, build_ns, retrieve_ns)| {
                 index_bytes = bytes;
+                index_build_ns = build_ns;
+                retrieval_ns = retrieve_ns;
                 retrieval_profile_digest = Some(profile_digest);
                 let mut ids = Vec::with_capacity(hits.len());
                 for hit in hits {
@@ -419,10 +467,14 @@ fn execute_arm(
             index_bytes = u64::try_from(memory.len())
                 .unwrap_or(u64::MAX)
                 .saturating_mul(size_of::<u32>() as u64);
-            Ok(conventional_ids(&memory, case.query, TOP_K))
+            let phase_started = Instant::now();
+            let ids = conventional_ids(&memory, case.query, TOP_K);
+            retrieval_ns = u64::try_from(phase_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+            Ok(ids)
         }
     };
 
+    let evidence_verification_started = Instant::now();
     match ids_result {
         Ok(ids) => retrieved_ids = ids,
         Err(message) => error = Some(message),
@@ -470,6 +522,9 @@ fn execute_arm(
         }
     }
 
+    let evidence_resolution_verification_ns =
+        u64::try_from(evidence_verification_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+    let policy_started = Instant::now();
     let decision = if error.is_some() {
         Decision::abstain()
     } else if arm == Arm::NoMemory {
@@ -477,6 +532,8 @@ fn execute_arm(
     } else {
         decide(Policy::CausalQualified, &resolved, case.query)
     };
+    let policy_application_ns =
+        u64::try_from(policy_started.elapsed().as_nanos()).unwrap_or(u64::MAX);
 
     let sidecar_bytes = if arm == Arm::NoMemory {
         0
@@ -493,13 +550,22 @@ fn execute_arm(
             None
         }
     });
+    let latency_ns = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
     CandidateRun {
         decision,
         retrieved_ids,
         memory_digest: experience_list_digest(&memory),
         retrieval_profile_digest,
         resolved,
-        latency_ns: u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
+        phase_timings: PhaseTimings {
+            memory_selection_ns,
+            index_build_ns,
+            retrieval_ns,
+            evidence_resolution_verification_ns,
+            policy_application_ns,
+            total_ns: latency_ns,
+        },
+        latency_ns,
         index_bytes,
         sidecar_bytes,
         abstention_reason,
