@@ -2,14 +2,44 @@
 
 Go 1.23, standard-library benchmark logic plus the MON-026 verifier as a local module dependency. No network access or third-party package is needed.
 
+
+## 0. Generate the suite from MON-025 and the independent oracle
+
+The MON-025 fault matrix is the scenario schedule, not the sole source of expected answers. MON-028 keeps those answers in the separately maintained `ORACLE-v1.json`. The generator checks exact case coverage and rejects:
+- missing or extra oracle cases;
+- duplicate IDs;
+- outcome disagreement between the matrix and independent oracle;
+- positive controls not marked qualified;
+- an unsafe control marked qualified;
+- workload/environment/resource profiles with the wrong profile identity.
+
+From this module directory:
+
+```sh
+go run ./cmd/suite-from-mon025 \
+  --fault-matrix ../../sfeb-mon025/FAULT-MATRIX-v1.json \
+  --oracle ../ORACLE-v1.json \
+  --workload-profile ../WORKLOAD-example.json \
+  --environment-profile ../ENVIRONMENT-example.json \
+  --resource-budget-profile ../RESOURCE-BUDGET-example.json \
+  --campaign-id recovery-campaign-2026-11-27-001 \
+  --benchmark-id mon-recovery-e2e-v1 \
+  --replicates 30 \
+  --output ../SUITE-generated.json
+```
+
+The example environment profile contains replacement placeholders and the sample budget is illustrative. Replace them with actual pinned versions/image digests, host and enforced cgroup limits before a confirmatory run. The generator hashes exact raw bytes for all five input documents into the resulting suite.
+
+Package `SUITE-generated.json`, `ORACLE-v1.json`, the raw MON-025 fault matrix and the workload/environment/budget profiles through MON-027. The benchmark authority signs that exact allowlist. The scorer verifies the signed bundle before using any expected answers.
+
 ## 1. Prepare and sign the independent suite
 
-The benchmark authority authors a suite JSON conforming to `../SUITE-v1.schema.json`. It fixes case identities, fault families, expected verdicts, replicate counts, fault-matrix/oracle/workload/environment/resource digests.
+The benchmark authority generates a suite JSON conforming to `../SUITE-v1.schema.json` using `cmd/suite-from-mon025`. It fixes all 41 fault case identities, oracle-derived families and outcomes, replicate counts, and the raw fault-matrix/oracle/workload/environment/resource digests.
 
 Compute its canonical digest:
 
 ```sh
-go run ./cmd/suite-digest --suite ../SUITE-example.json
+go run ./cmd/suite-digest --suite ../SUITE-generated.json
 ```
 
 Package the suite as a raw artifact through MON-027, sign it using a dedicated suite-authority key, and retain the signed MON-026 manifest separately from the exact artifact root. Distribute that same custody-verified suite to every operator.
