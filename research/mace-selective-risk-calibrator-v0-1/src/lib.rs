@@ -87,6 +87,7 @@ pub struct GroupCertificateV1 {
     pub record_type: String,
     pub certificate_sha256: String,
     pub calibration_manifest_sha256: String,
+    pub decision_policy_sha256: String,
     pub group_id: String,
     pub group_path: Vec<String>,
     pub parent_group_id: Option<String>,
@@ -455,6 +456,7 @@ fn blank_certificate(config:&CalibrationConfigV1,manifest:&str,group:&GroupSpecV
     GroupCertificateV1{
         schema_version:SCHEMA_VERSION_V1.into(),record_type:"group_certificate".into(),
         certificate_sha256:String::new(),calibration_manifest_sha256:manifest.into(),
+        decision_policy_sha256:config.decision_policy_sha256.clone(),
         group_id:group.group_id.clone(),group_path:path,parent_group_id:group.parent_group_id.clone(),
         status:RiskStatusV1::NotEstimableNoCalibrationClusters,
         calibration_cluster_count:cluster_count,calibration_example_count:example_count,
@@ -605,6 +607,9 @@ pub fn assess_decision_v1(input:&DecisionInputV1,certificate:&GroupCertificateV1
     }else if input.distribution_shift_detected||certificate.status==RiskStatusV1::UnsupportedDistributionShift{
         (if input.evidence_acquisition_available{DecisionActionV1::AcquireEvidence}else{DecisionActionV1::Abstain},
         DecisionAssessmentStatusV1::CertificateSuspendedShift,"distribution shift suspends the group certificate")
+    }else if certificate.decision_policy_sha256!=input.policy_sha256{
+        (DecisionActionV1::Abstain,DecisionAssessmentStatusV1::AbstainedNotEstimable,
+         "decision policy digest does not match the calibrated certificate")
     }else if !certificate.is_usable(){
         match certificate.status{
             RiskStatusV1::RiskExceedsTarget=>(if input.evidence_acquisition_available{DecisionActionV1::AcquireEvidence}else{DecisionActionV1::Abstain},
@@ -805,4 +810,24 @@ mod tests{
         let mut cert=result.certificates[0].clone();cert.threshold=Some(0.99);
         assert!(!cert.verify_integrity());assert!(!cert.is_usable());
     }
+
+    #[test]
+    fn changed_decision_policy_cannot_reuse_a_valid_certificate() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let rows=examples(100,"root",0.9,0.0);
+        let cfg=config(&groups,&rows,vec![0.0,0.5],30);
+        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let cert=&result.certificates[0];
+        let input=DecisionInputV1{
+            group_id:"root".into(),sufficiency_score:0.9,hard_gates_pass:true,
+            distribution_shift_detected:false,evidence_acquisition_available:false,retrieval_available:false,
+            escalate_on_hard_gate:false,decision_need_sha256:digest("need"),
+            evidence_capsule_sha256:digest("capsule"),policy_sha256:digest("different-policy")
+        };
+        let assessment=assess_decision_v1(&input,cert).unwrap();
+        assert_eq!(assessment.action,DecisionActionV1::Abstain);
+        assert_eq!(assessment.status,DecisionAssessmentStatusV1::AbstainedNotEstimable);
+        assert!(assessment.verify_integrity());
+    }
+
 }
