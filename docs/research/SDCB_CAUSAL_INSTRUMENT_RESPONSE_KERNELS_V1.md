@@ -278,3 +278,17 @@ Added `docs/research/SDCB_RESPONSE_IDENTIFIABILITY_CHALLENGE_V1.json`. It freeze
 - Independent reference with known response observing the physical process: distinct autocovariance; identifies the physical pole under the stated reference contract.
 
 The JSON was fetched back from the branch and parsed successfully. This is a synthetic analytic benchmark asset. It does not establish real instrument behaviour or a qualified calibration policy.
+
+## Local runner-independent execution harness
+
+Added `scripts/research/run_sdcb_response_reference_tests.sh`. From the repository root, run:
+
+```bash
+bash scripts/research/run_sdcb_response_reference_tests.sh
+```
+
+The script independently compiles and runs:
+- `sdcb_exponential_response.rs`;
+- `sdcb_response_interval_bridge.rs`, which transitively imports #13940 and #13937.
+
+Each binary is built in a temporary directory, and the directory is removed on exit. The harness is authored but not run here because Rust is unavailable. This is intended to avoid waiting for hosted CI when a local toolchain is available; it does not imply a successful run.
