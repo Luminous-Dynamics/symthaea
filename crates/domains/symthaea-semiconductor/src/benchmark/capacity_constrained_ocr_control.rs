@@ -1236,7 +1236,9 @@ mod tests {
             ),
         )
         .unwrap();
-        assert!(at_deadline.evicted_rounds.is_empty());
+        // Round 2 has proxy delay 0 and is correctly evicted at round 3.
+        // Round 1 has deadline exactly 3 and survives strict Eq. (20) expiry.
+        assert_eq!(at_deadline.evicted_rounds, vec![2]);
         assert_eq!(
             at_deadline.feedback_outcomes[0].disposition,
             OcrcFeedbackDispositionV1::Applied
