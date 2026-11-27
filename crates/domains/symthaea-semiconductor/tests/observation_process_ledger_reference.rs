@@ -4,8 +4,9 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use symthaea_semiconductor::benchmark::{
     FeedbackTrackingRecordV1, FeedbackTrackingStateV1, K1QualificationRecordV1,
-    K1QualificationStateV1, OBSERVATION_PROCESS_SCHEMA_V1, ObservationProcessInputV1,
-    ObservationProcessRoundV1, ObservationRiskControllerV1, PhysicalAcquisitionRecordV1,
+    K1QualificationStateV1, ObservationAssumptionStatusV1, ObservationProcessAssumptionsV1,
+    OBSERVATION_PROCESS_SCHEMA_V1, ObservationProcessInputV1, ObservationProcessRoundV1,
+    ObservationRiskControllerV1, PhysicalAcquisitionRecordV1,
     PhysicalAcquisitionStateV1, PhysicalSelectionDesignKindV1, evaluate_observation_process_v1,
 };
 
@@ -58,6 +59,7 @@ fn row(
                 K1QualificationStateV1::Eligible
                     | K1QualificationStateV1::Unknown
                     | K1QualificationStateV1::Blocked
+                    | K1QualificationStateV1::Revoked
             )
             .then(|| digest('e')),
             report_available_at_unix_seconds: matches!(
@@ -82,6 +84,11 @@ fn row(
             controller_update_applied: false,
         },
         independent_audit: None,
+        physical_delivery_probability_given_selection: None,
+        qualification_probability_given_delivery: None,
+        online_tracking_probability_given_selection: None,
+        frontier_availability_probability_given_qualified: None,
+        update_frontier_at_unix_seconds: None,
     }
 }
 
@@ -101,6 +108,12 @@ fn input(mut rounds: Vec<ObservationProcessRoundV1>) -> ObservationProcessInputV
         tracking_capacity: None,
         closeout_round: 4,
         independent_audit_design: None,
+        qualified_observation_assumptions: ObservationProcessAssumptionsV1 {
+            conditional_probability_factorization: ObservationAssumptionStatusV1::Unknown,
+            conditional_ignorability: ObservationAssumptionStatusV1::Unknown,
+            positivity: ObservationAssumptionStatusV1::Unknown,
+            evidence_receipt_sha256: digest('9'),
+        },
         rounds,
     }
 }
@@ -161,6 +174,51 @@ fn population_bounds_match_independent_manual_partition_oracle() {
             .population_risk
             .population_claim_authorized_by_qualified_subset_alone
     );
+}
+
+#[test]
+fn qualified_observation_risk_is_separate_and_unknown_assumptions_suppress_ipw() {
+    let rows = vec![
+        row(
+            1,
+            PhysicalAcquisitionStateV1::NotSelected,
+            K1QualificationStateV1::NotApplicable,
+            None,
+        ),
+        row(
+            2,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            Some(0.25),
+        ),
+        row(
+            3,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Pending,
+            None,
+        ),
+        row(
+            4,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Revoked,
+            None,
+        ),
+    ];
+    let report = evaluate_observation_process_v1(&input(rows)).unwrap();
+
+    assert_eq!(
+        report.qualified_observation_risk.identification,
+        symthaea_semiconductor::benchmark::PopulationRiskIdentificationV1::WorstCaseBoundsOnly
+    );
+    assert!(report.qualified_observation_risk.physical_observation_ipw.is_none());
+    assert!(report.qualified_observation_risk.online_update_ipw.is_none());
+    assert!(report.qualified_observation_risk.mnar_or_propensity_warning);
+    assert_eq!(report.qualified_observation_risk.pending_qualification_fraction, 0.25);
+    assert_eq!(report.qualified_observation_risk.blocked_or_revoked_fraction, 0.25);
+
+    // The older selection/audit estimator remains a separate report and its
+    // partial-identification interval is not replaced by the staged risk bound.
+    assert!(report.population_risk.identification_interval_width >= 0.0);
 }
 
 #[test]
