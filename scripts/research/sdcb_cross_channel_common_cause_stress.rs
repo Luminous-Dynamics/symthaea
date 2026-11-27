@@ -319,8 +319,8 @@ mod tests {
         let reports = run_suite(10);
         assert_eq!(reports.len(), 2 * GAMMA_GRID.len() * GAMMA_GRID.len() * BLOCK_LENGTH_GRID.len());
         for report in reports {
-            assert_eq!(report.calibration_gamma.abs() < 1.0, true);
-            assert_eq!(report.test_gamma.abs() < 1.0, true);
+            assert!(report.calibration_gamma.abs() < 1.0);
+            assert!(report.test_gamma.abs() < 1.0);
             assert_eq!(report.trials, 10);
             assert!(report.alarm_rate.is_finite());
             assert!((0.0..=1.0).contains(&report.alarm_rate));
