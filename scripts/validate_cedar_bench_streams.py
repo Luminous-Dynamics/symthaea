@@ -114,6 +114,13 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
         require(baseline["citation_contract"] == counterfactual["citation_contract"]
                 == placebo["citation_contract"],
                 f"{template_id}: non-removal intervention changed citation eligibility")
+        if template_id == "CEDAR-15":
+            require(baseline["expected_behavior"] == "SOURCE_CONFLICT_REPRESENTED",
+                    "CEDAR-15 baseline must explicitly represent source conflict")
+            require(counterfactual["expected_behavior"] == "SOURCE_CONFLICT_REPRESENTED_AND_TRACKS_CHANGED_SOURCE",
+                    "CEDAR-15 counterfactual must represent conflict and track the altered source")
+            require(placebo["expected_behavior"] == "SOURCE_CONFLICT_REPRESENTED_AND_PLACEBO_STABLE",
+                    "CEDAR-15 placebo must represent conflict and preserve its answer")
         removed = group["source_removed"]
         require(set(removed["citation_contract"]["allowed_citation_source_ids"])
                 <= set(removed["source_digests"]),
@@ -121,6 +128,11 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
         require(removed["expected_answer"].get("answerable") is False
                 or template_id in {"CEDAR-08", "CEDAR-15"},
                 f"{template_id}: source removal unexpectedly preserves an answer")
+        if template_id == "CEDAR-15":
+            require(removed["expected_behavior"] == "PARTIAL_CONFLICT_REQUIRES_ONE_SOURCE_CAVEAT",
+                    "CEDAR-15 source removal must explicitly caveat the remaining single-source evidence")
+            require(removed["expected_answer"].get("complete") is False,
+                    "CEDAR-15 source removal must mark the conflict record incomplete")
 
     print(f"CEDAR-Bench {expected_split} streams: {expected_count}/{expected_count} candidate and auditor trials align; no condition/gold leakage detected")
 
