@@ -302,13 +302,16 @@ fn validate_observation(
             "coverage outcome/report availability chronology or cutoff is invalid".into(),
         ));
     }
+    let uncertainty_invalid = report
+        .qualified_standard_uncertainty_upper_bound
+        .is_some_and(|value| !value.is_finite() || value < 0.0)
+        || (report.eligibility == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+            && report.qualified_standard_uncertainty_upper_bound.is_none());
     if !report.qualified_corrected_value.is_finite()
         || report.qualified_corrected_value != row.outcome_value
         || report.equipment_control_authority
         || report.training_snapshot_mutated
-        || report
-            .qualified_standard_uncertainty_upper_bound
-            .is_none_or(|value| !value.is_finite() || value < 0.0)
+        || uncertainty_invalid
     {
         return Err(RealizedCoverageBacktestErrorV1(
             "outcome differs from the qualified corrected measurement value".into(),
