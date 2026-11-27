@@ -551,7 +551,6 @@ pub fn sign_mace_context_exposure_receipt_v1(
 ) -> Result<MaceContextExposureReceiptV1, MaceContextExposureRejectV1> {
     validate_identifier(signer.key_id(), 256)
         .map_err(|_| MaceContextExposureRejectV1::InvalidObserverKeyId)?;
-    validate_expected_use_binding(expected)?;
     receipt.signature.algorithm = "Ed25519".to_owned();
     receipt.signature.key_id = signer.key_id().to_owned();
     receipt.signature.signature_base64.clear();
