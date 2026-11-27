@@ -1,0 +1,50 @@
+{
+  "schema_version": "sdcb_open_world_model_adequacy.v1",
+  "observation": [
+    20
+  ],
+  "models": [
+    {
+      "model_id": "narrow-a",
+      "prior_weight": 0.5,
+      "theta_mean": 0,
+      "theta_variance": 1,
+      "predictive_mean": [
+        0
+      ],
+      "innovation_covariance": [
+        [
+          0.1
+        ]
+      ],
+      "theta_observation_covariance": [
+        0
+      ]
+    },
+    {
+      "model_id": "narrow-b",
+      "prior_weight": 0.5,
+      "theta_mean": 0,
+      "theta_variance": 1,
+      "predictive_mean": [
+        0
+      ],
+      "innovation_covariance": [
+        [
+          0.2
+        ]
+      ],
+      "theta_observation_covariance": [
+        0
+      ]
+    }
+  ],
+  "robust_support_ids": [
+    "narrow-a",
+    "narrow-b"
+  ],
+  "minimum_acceptable_best_model_log_density": -20,
+  "notes": [
+    "Synthetic omitted-model challenge; threshold is illustrative only."
+  ]
+}
