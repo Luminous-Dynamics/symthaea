@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod calibration_requalification;
+pub mod capacity_constrained_ocr_control;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
