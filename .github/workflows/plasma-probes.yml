@@ -926,6 +926,23 @@ jobs:
           assert scalar_search["budget_exhaustion_disposition"] == "unqualified"
           assert scalar_search["global_bound_claim_status"] == "conditional_on_valid_lipschitz_and_branch_evidence"
           assert scalar_search["full_order_confirmation_required"] is True
+          joint_search = response_qualification["joint_box_oracle"]
+          assert joint_search["status"] == "design_only_not_executed"
+          assert joint_search["method"] == "anisotropic_lipschitz_branch_and_bound_nd"
+          assert set(joint_search["continuous_parameter_axes"]) == {
+              "pulse_phase", "kick_amplitude", "pulse_separation"
+          }
+          assert joint_search["coordinate_lipschitz_semantics"] == "sum_i_L_i_abs_coordinate_delta_i"
+          assert joint_search["subdivision_policy"] == "largest_Li_times_half_width"
+          assert joint_search["interior_search_required"] is True
+          assert joint_search["boundary_only_search_sufficient"] is False
+          assert joint_search["lipschitz_certificate_status"] == "not_issued_synthetic"
+          assert joint_search["branch_stability_evidence_status"] == "not_issued_synthetic"
+          assert joint_search["budget_exhaustion_disposition"] == "unqualified"
+          assert joint_search["global_bound_claim_status"] == "conditional_on_valid_box_lipschitz_and_branch_evidence"
+          assert joint_search["full_order_confirmation_required"] is True
+          assert joint_search["objective_normalization"] == "declared_qoi_scale_and_fixed_positive_floor"
+          assert joint_search["reference_response_denominator_lower_bound_required"] is True
           assert fixture["claim_boundary"] == {
               "physical_solver_executed": False,
               "physical_response_measured": False,
@@ -1052,6 +1069,14 @@ jobs:
           expect_rejection(
               "future-pulse-response-bypass",
               lambda value: value["response_qualification"].__setitem__("future_pulse_injection_residual_required", False),
+          )
+          expect_rejection(
+              "joint-box-lipschitz-bypass",
+              lambda value: value["response_qualification"]["joint_box_oracle"].__setitem__("reference_response_denominator_lower_bound_required", False),
+          )
+          expect_rejection(
+              "joint-box-axis-omission",
+              lambda value: value["response_qualification"]["joint_box_oracle"].__setitem__("continuous_parameter_axes", ["pulse_phase"]),
           )
           expect_rejection(
               "split-id-duplication",
