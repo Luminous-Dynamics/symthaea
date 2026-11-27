@@ -127,7 +127,8 @@
             "category_conditioned",
             "hierarchical_group_conditional_crc",
             "conformalized_abstention_policy",
-            "fixed_sequence_confidence_bound"
+            "fixed_sequence_confidence_bound",
+            "hierarchical_group_conditional_exact_cluster_risk"
           ]
         },
         "risk_target_alpha": {
@@ -142,7 +143,8 @@
             "bonferroni",
             "holm",
             "hierarchical_fallback",
-            "other_preregistered"
+            "other_preregistered",
+            "bonferroni_over_group_threshold_hypotheses"
           ]
         },
         "resampling_unit": {
@@ -152,7 +154,8 @@
             "independent_source_cluster",
             "independent_user_cluster",
             "independent_task_cluster",
-            "other_preregistered"
+            "other_preregistered",
+            "independent_declared_cluster"
           ]
         },
         "exchangeability_status": {
@@ -466,7 +469,8 @@
                   "not_estimable_no_calibration_clusters",
                   "not_estimable_insufficient_calibration_clusters",
                   "unsupported_distribution_shift",
-                  "rejected_hard_gate"
+                  "rejected_hard_gate",
+                  "not_estimable_exchangeability_not_established"
                 ]
               }
             }
@@ -520,7 +524,9 @@
         "status",
         "risk_target_alpha",
         "risk_upper_bound",
-        "policy_sha256"
+        "policy_sha256",
+        "group_id",
+        "threshold"
       ],
       "properties": {
         "schema_version": {
