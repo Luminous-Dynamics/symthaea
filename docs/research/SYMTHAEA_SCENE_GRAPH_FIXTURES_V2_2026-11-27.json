@@ -1,0 +1,323 @@
+{
+  "schema": "symthaea.scene-graph-fixtures.v2",
+  "version": 2,
+  "positive": [
+    {
+      "name": "public-attention-scene",
+      "expected": "accept",
+      "scene_graph": {
+        "schema": "symthaea.scene-graph.v2",
+        "session_id": "session-graph-001",
+        "clock_domain_id": "clock:dialogue-001",
+        "event_id": "event-attention-001",
+        "event_sequence": 1,
+        "event_kind": "attention.focus",
+        "canonical_cue_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scene_graph_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "form": "living_constellation",
+        "privacy_class": "public",
+        "destination": "local_private",
+        "epistemic_status": "measured",
+        "effective_intensity": 0.6,
+        "effective_permit_expires_at_monotonic_ns": "9000",
+        "nodes": [
+          {
+            "id": 0,
+            "role": "core",
+            "glyph": "star_node",
+            "weight": 0.6,
+            "motion": "static",
+            "layout_anchor": {
+              "kind": "core"
+            }
+          },
+          {
+            "id": 1,
+            "role": "attention",
+            "glyph": "orbit",
+            "weight": null,
+            "motion": "pulse",
+            "layout_anchor": {
+              "kind": "periphery",
+              "slot": 0
+            }
+          },
+          {
+            "id": 2,
+            "role": "evidence",
+            "glyph": "marker",
+            "weight": null,
+            "motion": "static",
+            "layout_anchor": {
+              "kind": "attached_to",
+              "node_id": 0,
+              "slot": 1
+            }
+          }
+        ],
+        "relations": [
+          {
+            "id": 0,
+            "source_node_id": 1,
+            "target_node_id": 2,
+            "kind": "attention_to",
+            "source_field": "attention_focus.target"
+          }
+        ],
+        "layout_attachments": [
+          {
+            "source_node_id": 0,
+            "target_node_id": 1,
+            "slot": 0
+          },
+          {
+            "source_node_id": 0,
+            "target_node_id": 2,
+            "slot": 1
+          }
+        ],
+        "accessible_description": "Attention focus is active. Evidence marker is present."
+      }
+    },
+    {
+      "name": "local-sensitive-private-scene",
+      "expected": "accept",
+      "scene_graph": {
+        "schema": "symthaea.scene-graph.v2",
+        "session_id": "session-graph-002",
+        "clock_domain_id": "clock:dialogue-002",
+        "event_id": "event-turn-002",
+        "event_sequence": 2,
+        "event_kind": "conversation.turn_state",
+        "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "scene_graph_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "form": "mycelial_being",
+        "privacy_class": "local_sensitive",
+        "destination": "local_private",
+        "epistemic_status": "derived",
+        "effective_intensity": 0.35,
+        "effective_permit_expires_at_monotonic_ns": "12000",
+        "nodes": [
+          {
+            "id": 0,
+            "role": "core",
+            "glyph": "hypha_node",
+            "weight": 0.35,
+            "motion": "static",
+            "layout_anchor": {
+              "kind": "core"
+            }
+          },
+          {
+            "id": 1,
+            "role": "turn_state",
+            "glyph": "branch",
+            "weight": 0.2,
+            "motion": "static",
+            "layout_anchor": {
+              "kind": "periphery",
+              "slot": 0
+            }
+          }
+        ],
+        "relations": [
+          {
+            "id": 0,
+            "source_node_id": 0,
+            "target_node_id": 1,
+            "kind": "handoff_to",
+            "source_field": "turn_state.target"
+          }
+        ],
+        "layout_attachments": [
+          {
+            "source_node_id": 0,
+            "target_node_id": 1,
+            "slot": 0
+          }
+        ],
+        "accessible_description": "Sensitive interaction cue; details omitted from generic presentation."
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "duplicate-node-id",
+      "expected_rejection": "duplicate_node_id",
+      "scene_graph": {
+        "schema": "symthaea.scene-graph.v2",
+        "session_id": "session-graph-003",
+        "clock_domain_id": "clock:dialogue-003",
+        "event_id": "event-003",
+        "event_sequence": 3,
+        "event_kind": "attention.focus",
+        "canonical_cue_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "scene_graph_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "form": "swarm",
+        "privacy_class": "public",
+        "destination": "local_private",
+        "epistemic_status": "measured",
+        "effective_intensity": 0.5,
+        "effective_permit_expires_at_monotonic_ns": "12000",
+        "nodes": [
+          {
+            "id": 0,
+            "role": "core",
+            "glyph": "particle",
+            "weight": 0.5,
+            "motion": "static",
+            "layout_anchor": {
+              "kind": "core"
+            }
+          },
+          {
+            "id": 0,
+            "role": "attention",
+            "glyph": "marker",
+            "weight": null,
+            "motion": "static",
+            "layout_anchor": {
+              "kind": "periphery",
+              "slot": 0
+            }
+          }
+        ],
+        "relations": [],
+        "layout_attachments": [],
+        "accessible_description": "Test"
+      }
+    },
+    {
+      "name": "dangling-relation-endpoint",
+      "expected_rejection": "dangling_relation_endpoint",
+      "scene_graph": {
+        "schema": "symthaea.scene-graph.v2",
+        "session_id": "session-graph-004",
+        "clock_domain_id": "clock:dialogue-004",
+        "event_id": "event-004",
+        "event_sequence": 4,
+        "event_kind": "attention.focus",
+        "canonical_cue_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "scene_graph_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "form": "living_constellation",
+        "privacy_class": "public",
+        "destination": "local_private",
+        "epistemic_status": "measured",
+        "effective_intensity": 0.5,
+        "effective_permit_expires_at_monotonic_ns": "12000",
+        "nodes": [
+          {
+            "id": 0,
+            "role": "core",
+            "glyph": "star_node",
+            "weight": 0.5,
+            "motion": "static",
+            "layout_anchor": {
+              "kind": "core"
+            }
+          }
+        ],
+        "relations": [
+          {
+            "id": 0,
+            "source_node_id": 0,
+            "target_node_id": 7,
+            "kind": "attention_to",
+            "source_field": "attention_focus.target"
+          }
+        ],
+        "layout_attachments": [],
+        "accessible_description": "Test"
+      }
+    },
+    {
+      "name": "semantic-edge-forged-from-layout",
+      "expected_rejection": "unsupported_relation_origin",
+      "scene_graph": {
+        "schema": "symthaea.scene-graph.v2",
+        "session_id": "session-graph-005",
+        "clock_domain_id": "clock:dialogue-005",
+        "event_id": "event-005",
+        "event_sequence": 5,
+        "event_kind": "conversation.listening",
+        "canonical_cue_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scene_graph_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+        "form": "cognitive_mandala",
+        "privacy_class": "public",
+        "destination": "local_private",
+        "epistemic_status": "presentation_only",
+        "effective_intensity": 0.5,
+        "effective_permit_expires_at_monotonic_ns": "12000",
+        "nodes": [
+          {
+            "id": 0,
+            "role": "core",
+            "glyph": "mandala_center",
+            "weight": 0.5,
+            "motion": "static",
+            "layout_anchor": {
+              "kind": "core"
+            }
+          },
+          {
+            "id": 1,
+            "role": "connection",
+            "glyph": "radial_line",
+            "weight": null,
+            "motion": "static",
+            "layout_anchor": {
+              "kind": "periphery",
+              "slot": 0
+            }
+          }
+        ],
+        "relations": [
+          {
+            "id": 0,
+            "source_node_id": 0,
+            "target_node_id": 1,
+            "kind": "attention_to",
+            "source_field": "renderer_layout_only"
+          }
+        ],
+        "layout_attachments": [],
+        "accessible_description": "Test"
+      }
+    },
+    {
+      "name": "local-sensitive-to-remote",
+      "expected_rejection": "privacy_destination_mismatch",
+      "scene_graph": {
+        "schema": "symthaea.scene-graph.v2",
+        "session_id": "session-graph-006",
+        "clock_domain_id": "clock:dialogue-006",
+        "event_id": "event-006",
+        "event_sequence": 6,
+        "event_kind": "attention.focus",
+        "canonical_cue_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "scene_graph_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+        "form": "hearth_companion",
+        "privacy_class": "local_sensitive",
+        "destination": "remote",
+        "epistemic_status": "measured",
+        "effective_intensity": 0.4,
+        "effective_permit_expires_at_monotonic_ns": "12000",
+        "nodes": [
+          {
+            "id": 0,
+            "role": "core",
+            "glyph": "ember",
+            "weight": 0.4,
+            "motion": "static",
+            "layout_anchor": {
+              "kind": "core"
+            }
+          }
+        ],
+        "relations": [],
+        "layout_attachments": [],
+        "accessible_description": "Test"
+      }
+    }
+  ]
+}
