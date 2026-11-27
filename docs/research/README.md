@@ -63,12 +63,12 @@ event contract.
 - [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
 - [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
 
-The renderer-independent event, projection, policy, receipt, scene, turn-control, continuity and interaction-trace verification modules live under
+The renderer-independent event, projection, policy, receipt, scene, turn-control, continuity, interaction-trace verification and compositor-feedback modules live under
 `crates/domains/symthaea-soma/src/`. The cross-event trace verifier has a Rust CLI at
 `crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs`; it checks causal relationships but is not a JSON Schema validator.
 A standalone Bevy 0.20.1 adapter has transition-aware source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
-All 144 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
+All 160 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
 
 ## Theoretical Foundations
 
