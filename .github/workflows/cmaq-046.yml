@@ -35,3 +35,11 @@ jobs:
         run: cargo +1.100.0 test --manifest-path research/cmaq-046/Cargo.toml --locked
       - name: Strict Clippy
         run: cargo +1.100.0 clippy --manifest-path research/cmaq-046/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Paired unknown-direction smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-046/Cargo.toml --locked --bin approachability_probe -- 32 500 20261127 250 > cmaq-046-approachability-smoke.csv
+      - name: Preserve paired probe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-046-approachability-smoke
+          path: cmaq-046-approachability-smoke.csv
+          if-no-files-found: error
