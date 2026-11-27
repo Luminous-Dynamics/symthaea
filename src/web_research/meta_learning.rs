@@ -180,8 +180,10 @@ pub struct EpistemicLearner {
     source_credibility: HashMap<String, SourceCredibility>,
     /// Verification strategies
     strategies: Vec<VerificationStrategy>,
-    /// Outcome history
+    /// Outcome history (bounded to the most recent 1,000 records)
     outcomes: VecDeque<VerificationOutcome>,
+    /// Adjudicated outcomes accumulated since the last Meta-Phi update.
+    adjudicated_since_meta_update: usize,
     /// Meta-Phi tracking
     meta_phi: MetaPhi,
     /// Domain expertise scores
@@ -202,6 +204,7 @@ impl EpistemicLearner {
             source_credibility: HashMap::new(),
             strategies: Vec::new(),
             outcomes: VecDeque::new(),
+            adjudicated_since_meta_update: 0,
             meta_phi: MetaPhi::default(),
             domain_expertise: HashMap::new(),
         }
@@ -224,10 +227,11 @@ impl EpistemicLearner {
     /// Unadjudicated predictions are retained for audit/counting but never
     /// update source credibility, domain expertise, accuracy or readiness.
     pub fn record_outcome(&mut self, outcome: VerificationOutcome) -> anyhow::Result<()> {
-        let adjudicated_before = self.adjudicated_outcome_count();
-        if outcome.was_correct.is_some() {
+        let is_adjudicated = outcome.was_correct.is_some();
+        if is_adjudicated {
             self.update_source_credibility(&outcome);
             self.update_domain_expertise(&outcome);
+            self.adjudicated_since_meta_update += 1;
         }
 
         self.outcomes.push_back(outcome);
@@ -247,11 +251,12 @@ impl EpistemicLearner {
             }
         }
 
-        // Update meta-phi only when a new adjudicated outcome reaches a
-        // ten-outcome boundary. Unadjudicated records cannot trigger learning.
-        let adjudicated_after = self.adjudicated_outcome_count();
-        if adjudicated_after > adjudicated_before && adjudicated_after % 10 == 0 {
+        // Update meta-phi after each ten new adjudicated outcomes.
+        // The counter is monotonic across bounded history eviction; pending
+        // records never advance it.
+        if self.adjudicated_since_meta_update >= 10 {
             self.update_meta_phi();
+            self.adjudicated_since_meta_update = 0;
         }
 
         Ok(())
@@ -542,6 +547,26 @@ mod tests {
             learner.get_source_credibility("self-referential.example").is_none(),
             "unadjudicated predictions must not train source credibility"
         );
+    }
+
+    #[test]
+    fn meta_phi_updates_after_ten_new_adjudications() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..9 {
+            learner
+                .record_outcome(make_outcome(
+                    "science",
+                    "adjudicated.example",
+                    index % 2 == 0,
+                ))
+                .unwrap();
+        }
+        assert_eq!(learner.meta_phi().cycles, 0);
+
+        learner
+            .record_outcome(make_outcome("science", "adjudicated.example", true))
+            .unwrap();
+        assert_eq!(learner.meta_phi().cycles, 1);
     }
 
     #[test]
