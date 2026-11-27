@@ -104,3 +104,33 @@ func TestTrustSeparationRequiresDistinctIDsAndKeys(t *testing.T) {
 		t.Fatal("same public key under different labels must not be accepted")
 	}
 }
+
+func TestVerifyCustodyBundleUnknownSignerIsIndeterminate(t *testing.T) {
+	root,manifestPath,runID,publicKey,_:=makeCustodyBundle(t)
+	_,result,err:=verifyCustodyBundle(root,manifestPath,"SUITE.json","untrusted-key",publicKey,
+		runID,1,"","benchmark-authority-clock",24*time.Hour,100*time.Millisecond)
+	if err==nil || result.Verdict!=custody.VerdictIndeterminate {
+		t.Fatalf("unknown trust identity must remain indeterminate, result=%+v err=%v",result,err)
+	}
+}
+
+func TestVerifyCustodyBundleRejectsWrongSequence(t *testing.T) {
+	root,manifestPath,runID,publicKey,_:=makeCustodyBundle(t)
+	_,result,err:=verifyCustodyBundle(root,manifestPath,"SUITE.json","suite-authority-key",publicKey,
+		runID,2,"","benchmark-authority-clock",24*time.Hour,100*time.Millisecond)
+	if err==nil || result.Verdict!=custody.VerdictBlocked {
+		t.Fatalf("wrong custody sequence must block, result=%+v err=%v",result,err)
+	}
+}
+
+func TestVerifyCustodyBundleDetectsArtifactMutation(t *testing.T) {
+	root,manifestPath,runID,publicKey,_:=makeCustodyBundle(t)
+	if err:=os.WriteFile(filepath.Join(root,"SUITE.json"),[]byte("substituted suite"),0o600); err!=nil {
+		t.Fatal(err)
+	}
+	_,result,err:=verifyCustodyBundle(root,manifestPath,"SUITE.json","suite-authority-key",publicKey,
+		runID,1,"","benchmark-authority-clock",24*time.Hour,100*time.Millisecond)
+	if err==nil || result.Verdict!=custody.VerdictBlocked {
+		t.Fatalf("suite artifact substitution must block, result=%+v err=%v",result,err)
+	}
+}
