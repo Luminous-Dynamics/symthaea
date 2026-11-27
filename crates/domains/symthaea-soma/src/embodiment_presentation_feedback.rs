@@ -15,7 +15,7 @@
 //! Cross-clock latency requires a separately measured and bounded conversion.
 
 use super::embodiment_receipt::{
-    ObservationSource, ObservedOutputState, OutputObservation, ReceiptStamp,
+    ObservationSource, ObservedOutputState, OutputObservation,
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
