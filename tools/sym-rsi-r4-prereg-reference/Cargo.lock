@@ -11,15 +11,11 @@ dependencies = [
  "generic-array",
 ]
 
-[[package
-
 [[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
-
-[[package
 
 [[package]]
 name = "cpufeatures"
@@ -29,8 +25,6 @@ checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
 ]
-
-[[package
 
 [[package]]
 name = "crypto-common"
@@ -42,8 +36,6 @@ dependencies = [
  "typenum",
 ]
 
-[[package
-
 [[package]]
 name = "digest"
 version = "0.10.7"
@@ -53,8 +45,6 @@ dependencies = [
  "block-buffer",
  "crypto-common",
 ]
-
-[[package
 
 [[package]]
 name = "generic-array"
@@ -66,15 +56,11 @@ dependencies = [
  "version_check",
 ]
 
-[[package
-
 [[package]]
 name = "itoa"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
-
-[[package
 
 [[package]]
 name = "libc"
@@ -82,15 +68,11 @@ version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
-[[package
-
 [[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
-
-[[package
 
 [[package]]
 name = "proc-macro2"
@@ -101,8 +83,6 @@ dependencies = [
  "unicode-ident",
 ]
 
-[[package
-
 [[package]]
 name = "quote"
 version = "1.0.47"
@@ -111,8 +91,6 @@ checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
 dependencies = [
  "proc-macro2",
 ]
-
-[[package
 
 [[package]]
 name = "serde"
@@ -124,8 +102,6 @@ dependencies = [
  "serde_derive",
 ]
 
-[[package
-
 [[package]]
 name = "serde_core"
 version = "1.0.229"
@@ -134,8 +110,6 @@ checksum = "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48"
 dependencies = [
  "serde_derive",
 ]
-
-[[package
 
 [[package]]
 name = "serde_derive"
@@ -147,8 +121,6 @@ dependencies = [
  "quote",
  "syn",
 ]
-
-[[package
 
 [[package]]
 name = "serde_json"
@@ -163,8 +135,6 @@ dependencies = [
  "zmij",
 ]
 
-[[package
-
 [[package]]
 name = "sha2"
 version = "0.10.9"
@@ -175,8 +145,6 @@ dependencies = [
  "cpufeatures 0.2.17",
  "digest",
 ]
-
-[[package
 
 [[package]]
 name = "sym-rsi-r4-prereg-reference"
@@ -198,15 +166,11 @@ dependencies = [
  "unicode-ident",
 ]
 
-[[package
-
 [[package]]
 name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
-
-[[package
 
 [[package]]
 name = "unicode-ident"
@@ -214,15 +178,11 @@ version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 
-[[package
-
 [[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package
 
 [[package]]
 name = "zmij"
