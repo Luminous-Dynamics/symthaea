@@ -273,16 +273,14 @@ fn validate_closure_structure(closure: &ClosureManifest) -> Result<(), ClosureBr
         if !strictly_sorted_strings(&block.member_unit_ids) {
             return Err(ClosureBridgeError::NonCanonicalMemberOrder);
         }
-        if block.score_receipts_sha256.is_empty()
-            || !strictly_sorted_strings(&block.score_receipts_sha256)
-        {
+        if block.score_receipts_sha256.is_empty() {
             return Err(ClosureBridgeError::NonCanonicalScoreReceiptOrder);
         }
         for receipt in &block.score_receipts_sha256 {
             validate_sha256(receipt, "block.score_receipts_sha256")?;
         }
-        if !strictly_sorted(&block.dependence_key_receipts) {
-            return Err(ClosureBridgeError::NonCanonicalDependenceReceiptOrder);
+        if !strictly_sorted_strings(&block.score_receipts_sha256) {
+            return Err(ClosureBridgeError::NonCanonicalScoreReceiptOrder);
         }
         for key in &block.dependence_key_receipts {
             if key.value.trim().is_empty() {
@@ -292,6 +290,9 @@ fn validate_closure_structure(closure: &ClosureManifest) -> Result<(), ClosureBr
                 &key.receipt_sha256,
                 "block.dependence_key_receipts.receipt_sha256",
             )?;
+        }
+        if !strictly_sorted(&block.dependence_key_receipts) {
+            return Err(ClosureBridgeError::NonCanonicalDependenceReceiptOrder);
         }
 
         let order_key = (block.split, block.block_id.as_str());
