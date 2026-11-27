@@ -82,7 +82,7 @@ pub struct EvidenceSetContextV1 {
     pub min_items: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct EvidenceSetCandidateV1<'a> {
     pub evidence_id: &'a str,
     pub representation_sha256: String,
@@ -457,3 +457,255 @@ pub fn select_evidence_set_v1(
     Ok(selection)
 }
 
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::evidence_use::synthetic_verified_receipt_for_test;
+
+    fn digest(value: &str) -> String {
+        Sha256::digest(value.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    fn scope() -> Scope {
+        Scope {
+            regime: broca_mace_policy::Regime::Baseline,
+            objective: broca_mace_policy::Objective::Quality,
+        }
+    }
+
+    fn context() -> EvidenceSetContextV1 {
+        EvidenceSetContextV1 {
+            valid_at_ms: 180,
+            known_at_ms: 220,
+            required_scope: scope(),
+            purpose_code: "research.memory_decision".into(),
+            consumer_policy_sha256: digest("consumer-policy"),
+            constraint_policy_sha256: digest("constraint-policy"),
+            require_complete_dependency_lineage: true,
+            max_token_cost: 100,
+            max_items: 8,
+            min_items: 1,
+        }
+    }
+
+    fn receipt(event_id: u32) -> EvidenceUseReceiptV1 {
+        let ctx = context();
+        synthetic_verified_receipt_for_test(
+            event_id, ctx.required_scope, ctx.valid_at_ms, ctx.known_at_ms,
+            &ctx.purpose_code, &ctx.consumer_policy_sha256,
+            SourceTrustStatus::TrustedForScope, SourceLifecycleStatus::Active,
+            DependencyLineageStatusV1::Complete,
+        )
+    }
+
+    fn candidate<'a>(
+        id: &'a str,
+        receipt: &'a EvidenceUseReceiptV1,
+        token_cost: u64,
+        relevance: u64,
+        required: bool,
+    ) -> EvidenceSetCandidateV1<'a> {
+        EvidenceSetCandidateV1 {
+            evidence_id: id,
+            representation_sha256: digest(id),
+            token_cost,
+            relevance_score_micros: relevance,
+            required,
+            receipt,
+        }
+    }
+
+    struct TestConstraintVerifier;
+    impl EvidenceSetConstraintVerifierV1 for TestConstraintVerifier {
+        fn verify_constraint(&self, c: &EvidencePairConstraintV1, policy: &str) -> bool {
+            c.verify_integrity()
+                && c.constraint_policy_sha256 == policy
+                && c.issuer_id == "did:key:constraint-authority"
+                && c.authority_receipt_sha256 == digest("constraint-receipt")
+        }
+    }
+
+    fn constraint(
+        id: &str,
+        left: &str,
+        right: &str,
+        relation: EvidencePairRelationV1,
+        reason: EvidencePairReasonV1,
+    ) -> EvidencePairConstraintV1 {
+        let mut value = EvidencePairConstraintV1 {
+            constraint_id: id.into(),
+            left_evidence_id: left.into(),
+            right_evidence_id: right.into(),
+            relation,
+            reason,
+            issuer_id: "did:key:constraint-authority".into(),
+            authority_receipt_sha256: digest("constraint-receipt"),
+            constraint_policy_sha256: digest("constraint-policy"),
+            canonical_sha256: String::new(),
+        };
+        value.seal_integrity();
+        value
+    }
+
+    #[test]
+    fn optimizer_maximizes_relevance_within_budget() {
+        let receipts = [receipt(1), receipt(2), receipt(3)];
+        let candidates = [
+            candidate("a", &receipts[0], 40, 5, false),
+            candidate("b", &receipts[1], 60, 9, false),
+            candidate("c", &receipts[2], 50, 8, false),
+        ];
+        let result = select_evidence_set_v1(&context(), &candidates, &[], &TestConstraintVerifier).unwrap();
+        assert_eq!(result.selected_evidence_ids, vec!["a", "b"]);
+        assert_eq!(result.total_token_cost, 100);
+        assert_eq!(result.total_relevance_score_micros, 14);
+        assert!(result.verify_integrity());
+    }
+
+    #[test]
+    fn must_link_is_all_or_none_and_cannot_link_excludes_pair() {
+        let receipts = [receipt(1), receipt(2), receipt(3)];
+        let candidates = [
+            candidate("a", &receipts[0], 20, 10, false),
+            candidate("b", &receipts[1], 20, 9, false),
+            candidate("c", &receipts[2], 20, 8, false),
+        ];
+        let must = constraint("m1", "a", "b", EvidencePairRelationV1::MustLink, EvidencePairReasonV1::DependencyRequires);
+        let must_result = select_evidence_set_v1(&context(), &candidates, &[must], &TestConstraintVerifier).unwrap();
+        assert_eq!(must_result.selected_evidence_ids, vec!["a", "b", "c"]);
+
+        let cannot = constraint("c1", "a", "b", EvidencePairRelationV1::CannotLink, EvidencePairReasonV1::Contradiction);
+        let cannot_result = select_evidence_set_v1(&context(), &candidates[..2], &[cannot], &TestConstraintVerifier).unwrap();
+        assert_eq!(cannot_result.selected_evidence_ids, vec!["a"]);
+    }
+
+    #[test]
+    fn must_link_cannot_link_cycle_returns_obstruction() {
+        let receipts = [receipt(1), receipt(2)];
+        let candidates = [
+            candidate("a", &receipts[0], 20, 10, false),
+            candidate("b", &receipts[1], 20, 9, false),
+        ];
+        let constraints = [
+            constraint("must", "a", "b", EvidencePairRelationV1::MustLink, EvidencePairReasonV1::DependencyRequires),
+            constraint("cannot", "a", "b", EvidencePairRelationV1::CannotLink, EvidencePairReasonV1::Contradiction),
+        ];
+        let obstruction = select_evidence_set_v1(&context(), &candidates, &constraints, &TestConstraintVerifier).unwrap_err();
+        assert_eq!(obstruction.reason, EvidenceSetObstructionReasonV1::MustLinkCannotLinkConflict);
+        assert_eq!(obstruction.blocking_evidence_ids, vec!["a", "b"]);
+        assert!(obstruction.verify_integrity());
+    }
+
+    #[test]
+    fn required_must_link_bundle_over_budget_fails_closed() {
+        let mut ctx = context();
+        ctx.max_token_cost = 30;
+        let receipts = [receipt(1), receipt(2)];
+        let candidates = [
+            candidate("a", &receipts[0], 20, 10, true),
+            candidate("b", &receipts[1], 20, 9, false),
+        ];
+        let must = constraint("must", "a", "b", EvidencePairRelationV1::MustLink, EvidencePairReasonV1::DependencyRequires);
+        let obstruction = select_evidence_set_v1(&ctx, &candidates, &[must], &TestConstraintVerifier).unwrap_err();
+        assert_eq!(obstruction.reason, EvidenceSetObstructionReasonV1::RequiredSetExceedsBudget);
+    }
+
+    #[test]
+    fn untrusted_and_partial_lineage_candidates_are_never_selected() {
+        let ctx = context();
+        let good = receipt(1);
+        let untrusted = synthetic_verified_receipt_for_test(
+            2, ctx.required_scope, 180, 220, &ctx.purpose_code, &ctx.consumer_policy_sha256,
+            SourceTrustStatus::Untrusted, SourceLifecycleStatus::Active, DependencyLineageStatusV1::Complete,
+        );
+        let partial = synthetic_verified_receipt_for_test(
+            3, ctx.required_scope, 180, 220, &ctx.purpose_code, &ctx.consumer_policy_sha256,
+            SourceTrustStatus::TrustedForScope, SourceLifecycleStatus::Active, DependencyLineageStatusV1::Partial,
+        );
+        let candidates = [
+            candidate("good", &good, 10, 5, false),
+            candidate("untrusted", &untrusted, 10, 100, false),
+            candidate("partial", &partial, 10, 90, false),
+        ];
+        let result = select_evidence_set_v1(&ctx, &candidates, &[], &TestConstraintVerifier).unwrap();
+        assert_eq!(result.selected_evidence_ids, vec!["good"]);
+        assert!(result.excluded.iter().any(|x| x.reason == CandidateExclusionReasonV1::SourceNotTrusted));
+        assert!(result.excluded.iter().any(|x| x.reason == CandidateExclusionReasonV1::DependencyLineageIncomplete));
+    }
+
+    #[test]
+    fn bitemporal_and_consumer_policy_mismatch_are_excluded() {
+        let ctx = context();
+        let stale = synthetic_verified_receipt_for_test(
+            1, ctx.required_scope, 180, 219, &ctx.purpose_code, &ctx.consumer_policy_sha256,
+            SourceTrustStatus::TrustedForScope, SourceLifecycleStatus::Active, DependencyLineageStatusV1::Complete,
+        );
+        let wrong_policy = synthetic_verified_receipt_for_test(
+            2, ctx.required_scope, 180, 220, &ctx.purpose_code, &digest("wrong-policy"),
+            SourceTrustStatus::TrustedForScope, SourceLifecycleStatus::Active, DependencyLineageStatusV1::Complete,
+        );
+        let candidates = [
+            candidate("stale", &stale, 10, 100, false),
+            candidate("wrong-policy", &wrong_policy, 10, 90, false),
+        ];
+        let obstruction = select_evidence_set_v1(&ctx, &candidates, &[], &TestConstraintVerifier).unwrap_err();
+        assert_eq!(obstruction.reason, EvidenceSetObstructionReasonV1::NoFeasibleSelection);
+        assert!(obstruction.verify_integrity());
+    }
+
+    #[test]
+    fn invalid_constraint_authority_and_unknown_endpoint_fail_closed() {
+        let receipts = [receipt(1), receipt(2)];
+        let candidates = [
+            candidate("a", &receipts[0], 10, 5, false),
+            candidate("b", &receipts[1], 10, 4, false),
+        ];
+        let mut untrusted = constraint("x", "a", "b", EvidencePairRelationV1::CannotLink, EvidencePairReasonV1::PrivacyConflict);
+        untrusted.issuer_id = "did:key:attacker".into();
+        untrusted.seal_integrity();
+        let error = select_evidence_set_v1(&context(), &candidates, &[untrusted], &TestConstraintVerifier).unwrap_err();
+        assert_eq!(error.reason, EvidenceSetObstructionReasonV1::ConstraintVerificationFailed);
+
+        let unknown = constraint("y", "a", "missing", EvidencePairRelationV1::MustLink, EvidencePairReasonV1::DependencyRequires);
+        let error = select_evidence_set_v1(&context(), &candidates, &[unknown], &TestConstraintVerifier).unwrap_err();
+        assert_eq!(error.reason, EvidenceSetObstructionReasonV1::UnknownConstraintEndpoint);
+    }
+
+    #[test]
+    fn candidate_order_does_not_change_selection_or_commitment() {
+        let receipts = [receipt(1), receipt(2), receipt(3)];
+        let candidates = [
+            candidate("a", &receipts[0], 10, 8, false),
+            candidate("b", &receipts[1], 10, 8, false),
+            candidate("c", &receipts[2], 10, 8, false),
+        ];
+        let forward = select_evidence_set_v1(&context(), &candidates, &[], &TestConstraintVerifier).unwrap();
+        let reverse = [candidates[2].clone(), candidates[1].clone(), candidates[0].clone()];
+        let backward = select_evidence_set_v1(&context(), &reverse, &[], &TestConstraintVerifier).unwrap();
+        assert_eq!(forward.selected_evidence_ids, backward.selected_evidence_ids);
+        assert_eq!(forward.canonical_sha256, backward.canonical_sha256);
+    }
+
+    #[test]
+    fn duplicate_event_and_candidate_ids_are_rejected() {
+        let receipts = [receipt(1), receipt(1)];
+        let duplicate_events = [
+            candidate("a", &receipts[0], 10, 5, false),
+            candidate("b", &receipts[1], 10, 4, false),
+        ];
+        assert_eq!(
+            select_evidence_set_v1(&context(), &duplicate_events, &[], &TestConstraintVerifier).unwrap_err().reason,
+            EvidenceSetObstructionReasonV1::DuplicateEventId
+        );
+        let duplicate_ids = [
+            candidate("a", &receipts[0], 10, 5, false),
+            candidate("a", &receipts[1], 10, 4, false),
+        ];
+        assert_eq!(
+            select_evidence_set_v1(&context(), &duplicate_ids, &[], &TestConstraintVerifier).unwrap_err().reason,
+            EvidenceSetObstructionReasonV1::DuplicateEvidenceId
+        );
+    }
+}
