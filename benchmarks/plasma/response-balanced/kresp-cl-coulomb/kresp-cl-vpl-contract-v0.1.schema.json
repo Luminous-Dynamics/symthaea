@@ -47,7 +47,7 @@
       "additionalProperties": false,
       "required": [
         "spatial_topology",
-        "spatial_domain_length",
+        "spatial_domain_lengths",
         "velocity_dimension",
         "velocity_domain_model",
         "velocity_cutoff",
