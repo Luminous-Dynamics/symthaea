@@ -495,6 +495,7 @@ fn audit(fixture: &Value) -> Result<(), String> {
     }
 
     let scalar_search = field(response_qualification, "scalar_separation_oracle")?;
+    validate_objective_error_contract(scalar_search)?;
     require_string(scalar_search, "status", "design_only_not_executed")?;
     require_string(
         scalar_search,
@@ -540,6 +541,7 @@ fn audit(fixture: &Value) -> Result<(), String> {
     }
 
     let joint_search = field(response_qualification, "joint_box_oracle")?;
+    validate_objective_error_contract(joint_search)?;
     require_string(joint_search, "status", "design_only_not_executed")?;
     require_string(
         joint_search,
@@ -642,6 +644,28 @@ fn audit(fixture: &Value) -> Result<(), String> {
             return Err(format!("synthetic fixture falsely claims {key}"));
         }
     }
+    Ok(())
+}
+
+fn validate_objective_error_contract(value: &Value) -> Result<(), String> {
+    if !boolean(value, "objective_sample_error_interval_required")?
+        || boolean(value, "convergence_flag_alone_means_zero_error")?
+    {
+        return Err(
+            "objective sample intervals are mandatory; convergence status alone is not zero error"
+                .to_owned(),
+        );
+    }
+    require_string(
+        value,
+        "sample_interval_semantics",
+        "max_zero_value_minus_abs_error_to_value_plus_abs_error",
+    )?;
+    require_string(
+        value,
+        "physical_sample_error_bound_status",
+        "not_issued_synthetic",
+    )?;
     Ok(())
 }
 
