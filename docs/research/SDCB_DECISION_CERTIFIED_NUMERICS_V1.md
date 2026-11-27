@@ -1,0 +1,168 @@
+# SDCB decision-certified numerical computation v1
+
+**Status:** Research specification and implementation handoff. No certified probability enclosure or decision-certificate implementation is claimed by this document.
+
+## 1. Motivation
+
+The bivariate rectangle oracle in #13951 computes bounded conditional Gaussian rectangle probabilities and retains per-cell diagnostics. Its adaptive-Simpson refinement difference is an error indicator, not a certified total error bound. The scalar inner quadrature and floating-point operations also need an explicit error contract before the result can be called a numerical certificate.
+
+The scientific decision system should not consume an unqualified point estimate when numerical uncertainty can change the selected action. The next increment is therefore not another Gaussian integrator or planner. It is a **validated enclosure layer and decision-sufficient refinement contract** that composes with:
+
+- #13945 / #13951 for joint Gaussian rectangle probabilities;
+- #13940 for interval-integrated dynamic observations;
+- #13567 for the exact sequential policy oracle;
+- #13739 for existing experiment-selector evaluation;
+- #13805 for independently owned evidence transitions and receipts.
+
+## 2. Core contract
+
+For each probability cell, return an enclosure
+
+\[
+p_i \in [p_i^-,p_i^+], \qquad 0 \le p_i^- \le p_i^+ \le 1.
+\]
+
+The enclosure must contain the exact probability for the exact input values represented by the numerical API. It must separately report:
+
+1. input/parameter interpretation (binary floating-point point inputs versus caller-supplied parameter intervals);
+2. arithmetic-rounding contribution;
+3. conditional normal-CDF / tail-evaluation contribution;
+4. outer-integration remainder;
+5. domain-truncation contribution;
+6. resource use and termination reason.
+
+The API must distinguish:
+- **CertifiedEnclosure:** every listed error component has a defensible inclusion bound;
+- **HeuristicEstimate:** useful estimate, but one or more components are not rigorously bounded;
+- **UnresolvedWithinBudget:** enclosure is valid but too wide for the requested decision;
+- **UnsupportedInput:** covariance/support or input class is not supported;
+- **NumericalFailure:** no trustworthy result can be returned.
+
+A refinement indicator, replicate spread, or agreement between two ordinary floating-point implementations must never be promoted to a certified error bound.
+
+## 3. Bivariate reference problem
+
+For a full-rank standardized bivariate Gaussian with correlation $\rho$, $|\rho|<1$, define $s=\sqrt{1-\rho^2}$. The rectangle probability can be written
+
+\[
+P = \int_{a_1}^{b_1} \phi(z)
+\left[
+\Phi\left(\frac{b_2-\rho z}{s}\right)
+-
+\Phi\left(\frac{a_2-\rho z}{s}\right)
+\right] dz.
+\]
+
+The implementation in #13951 remains the fast heuristic baseline. The first validated reference should use a conservative enclosure of the nonnegative integrand on a partition of the finite integration domain, plus an independently bounded omitted-tail allowance. Because the integrand is nonnegative, panel lower/upper bounds can be accumulated without cancellation. A more efficient validated Taylor/Gauss-type method can follow only after its remainder proof and special-function enclosures are explicit.
+
+This low-dimensional enclosure path is a correctness reference, not the proposed high-dimensional performance winner.
+
+### 3.1 Required numerical components
+
+- Establish certified bounds for the normal interval mass used by the conditional integrand, including far-tail and narrow-interval cases.
+- Establish outward-rounded or arbitrary-precision interval arithmetic for all enclosure calculations. Ordinary f64 arithmetic with an empirical epsilon allowance is insufficient.
+- Bound the outer integral by a mathematically valid remainder method. Do not use the Simpson |S2-S1|/15 expression alone as a certificate.
+- Bound truncation separately. For a first-coordinate standard-normal cutoff K, a conservative omitted mass is bounded by P(|Z|>K); the tail bound itself must be evaluated with a certified method.
+- Propagate all components to a final probability interval, clamp only by mathematically valid probability constraints, and record any loss of tightness.
+- Preserve exact rank-zero and rank-one support handling; do not use diagonal jitter or eigenvalue flooring.
+- Explicitly reject unsupported ill-conditioned inputs rather than silently regularizing them.
+
+### 3.2 Independent reference strategy
+
+Use two distinct paths:
+- a low-dimensional enclosure implementation in the Rust research module, with explicit panel/tail bounds;
+- an independent high-precision ball-arithmetic reference such as Arb/FLINT, or another documented interval package.
+
+Arb/FLINT is a candidate oracle, not a presumed production dependency. Its documentation describes rigorous ball arithmetic and integration support, while also warning that interval dependency can overestimate and that generic integration facilities require care. Benchmark enclosure tightness and failure modes rather than assuming that interval arithmetic is automatically sharp.
+
+## 4. Decision-sufficient refinement
+
+For a finite action a, state s, and terminal utility u(a,s), probability enclosures induce bounds on expected value:
+
+\[
+V(a)=\sum_s p_s u(a,s)-c(a).
+\]
+
+The finite decision adapter should preserve constraints already known about the probability vector: normalization, non-negativity, and validated marginal identities. Compute conservative action-value bounds under those constraints; a small linear program is a suitable first exact evaluator for finite outcome tables.
+
+An action a* is numerically certified as uniquely best only when
+
+\[
+V^-(a^*) > \max_{a\ne a^*} V^+(a).
+\]
+
+Otherwise:
+1. identify the cells and numerical components with the largest possible contribution to the unresolved action-value gap;
+2. allocate additional integration budget to those cells;
+3. recompute the affected enclosures without changing the scientific model, evidence state, or measurement budget;
+4. stop when the decision is separated, the hard computation budget is reached, or the result is otherwise unsupported;
+5. report UnresolvedWithinBudget and abstain when the ranking remains unresolved.
+
+This is numerical refinement, not a new experiment planner. #13567 remains the owner of policy-tree optimization, non-anticipativity, and resource budgets. #13739 remains the owner of selector benchmarking.
+
+## 5. Invariants and negative controls
+
+- Every certified interval contains every frozen analytical/high-precision known answer.
+- Joint cells remain nonnegative and jointly normalized within the sum of their enclosure widths; marginal constraints are preserved.
+- Duplicate channels and rank-one support never create independent-evidence multiplication.
+- Perfect positive/negative correlation controls preserve support geometry.
+- Probability complements and marginal recovery are checked with interval arithmetic.
+- Rare-tail tests cover small probabilities where relative error matters; do not rely on absolute tolerance alone.
+- Increasing precision or subdividing panels must not exclude a previously enclosed exact value.
+- Budget exhaustion never returns a point result labelled certified.
+- Numerical uncertainty alone never changes #13805 evidence state or authorizes a physical action.
+
+## 6. Benchmark protocol
+
+Compare on identical inputs, hardware, precision, and resource budgets:
+
+1. #13951 adaptive-Simpson point estimate and its current refinement indicator;
+2. deterministic low-dimensional quadrature references;
+3. Genz–Bretz randomized QMC and supported Miwa/TVPACK cases as established MVN baselines;
+4. Peterlin's 2026 doubly blocked Genz method on its published high-dimensional SPD workloads, with the exact workload and hardware reproduced before comparative claims;
+5. Arb/FLINT or a second validated-arithmetic implementation as an independent enclosure reference.
+
+Do not compare the bivariate support-aware method's runtime with a high-dimensional SPD throughput result as if the workloads were equivalent. The Peterlin paper's reported near/above-100x speedups apply to its tested large-dimensional settings; they do not establish singular-PSD correctness or decision quality for SDCB.
+
+### Metrics
+
+- enclosure containment rate on frozen known answers;
+- absolute and relative enclosure width, stratified by probability scale;
+- certified probability cells per second and time-to-target-width;
+- peak memory and hard-budget compliance;
+- fraction of decisions certified without refinement;
+- fraction unresolved at each budget;
+- false action-selection rate against exact small-world evaluators (target zero);
+- regret and abstention quality where the exact best action is known;
+- Pareto frontier of decision certification rate, enclosure width, latency, memory and computation budget.
+
+Publish all failed, unsupported, and unresolved cases. Do not collapse correctness, enclosure tightness, and throughput into one score.
+
+## 7. Acceptance gates (targets, not achieved results)
+
+- 100% containment of all frozen analytical and independently validated references.
+- Zero results labelled certified when any error component is unbounded or heuristic.
+- Zero incorrect certified action rankings on the exact finite-world benchmark.
+- Zero false-independent-confirmation claims on duplicate/shared-support controls.
+- Zero budget overruns and zero silent precision/covariance repair.
+- A declared fraction of supported bivariate cases reach useful enclosure widths within a frozen resource cap; preregister that fraction after a pilot, before blind test evaluation.
+- Decision refinement reduces median computation on clear-margin cases relative to a fixed stringent tolerance, without worsening false-ranking or containment gates.
+- Unresolved cases remain abstentions, not forced rankings.
+
+## 8. Implementation sequence
+
+1. Audit all current numerical error sources in #13944/#13951 and write an explicit error ledger.
+2. Implement certified normal interval/tail enclosures and validate them independently.
+3. Implement the conservative panel enclosure for bivariate rectangles, including rank-aware exact support cases.
+4. Add frozen analytical, high-precision, metamorphic, rare-tail, and adversarial near-singular fixtures.
+5. Add the finite utility-bound evaluator and exact decision-separation rule.
+6. Connect the bounded result to #13567 using an adapter only; do not create a second planner.
+7. Benchmark against the matched numerical comparators and publish enclosure-width/latency Pareto results.
+8. Only after the low-dimensional path is independently qualified, investigate validated higher-dimensional QMC/importance-sampling enclosures.
+
+## 9. References
+
+- Peterlin, J. (2026), “Doubly blocked variant of Genz's method for multivariate normal integration,” Computational Statistics 41(6), DOI: https://doi.org/10.1007/s00180-026-01794-8.
+- Genz and Bretz, Computation of Multivariate Normal and t Probabilities, Springer, and the R package mvtnorm: https://cran.r-project.org/package=mvtnorm.
+- Arb/FLINT documentation: https://flintlib.org/ and https://arblib.org/.
+- Existing implementation and ownership: #13903, #13904, #13940, #13944, #13945, #13951, #13567, #13739, #13805.
