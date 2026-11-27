@@ -1,7 +1,7 @@
 # MACE Decision-Sufficient Memory Benchmark
 
 **Version:** 0.1.0  
-**Status:** paired evaluator core and LongMemEval-V2 LAFS helper pass exact-head Rust 1.96 validation (45 tests); separate temporal BM25/weighted-RRF baseline reference and synthetic raw-trajectory contract authored; candidate-system integration, benchmark execution and external result reproduction remain pending  
+**Status:** paired evaluator core and LongMemEval-V2 LAFS helper pass exact-head Rust 1.96 validation (45 tests); separate temporal BM25/RRF reference (17 tests) and strict candidate JSON-to-index adapter (21 tests, committed nested lock, locked metadata and Clippy) pass exact-head validation; live production Add/Search integration, benchmark execution and external result reproduction remain pending  
 **Tracking:** [issue #13893](https://github.com/Luminous-Dynamics/symthaea/issues/13893)
 
 ## Thesis
