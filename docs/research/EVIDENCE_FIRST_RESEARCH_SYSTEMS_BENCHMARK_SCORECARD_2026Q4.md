@@ -324,9 +324,11 @@ The bivariate rectangle increment in #13952 passed its exact-source Rust 1.96 wo
 
 ### 9.2 Block-conformal dependence stress
 
-The standalone Monte Carlo experiment in #13959 passed 3/3 unit controls and completed 12 conditions × 5,000 trials on exact source head 30a508248f31d595d930224c852925e4762fc3d9. At rho=0.95 with 39 calibration blocks and nominal alpha=0.10, serial-path unit-length blocks without embargo produced a 13.54% alarm rate (Wilson 95%: 12.62–14.52%), above the 10% nominal target. Independent unit blocks produced 10.56% (9.74–11.44%). Embargoes of 16 and 64 steps returned the serial-path unit-block rate to 10.12% and 10.28%, with intervals containing 10%. At block lengths 8 and 32, all tested serial-path intervals contained 10%.
+The standalone Monte Carlo experiment in #13959 passed Rust 1.96 formatting and **4/4 harness tests**, and completed 72 conditions × 5,000 trials on exact source head `419dda0bba8d6f664b78a201172942c078e2c3cd` (360,000 simulations; [workflow run #14 and artifact](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45998581987)). The grid covers stationary Gaussian AR(1) coefficients 0, 0.5, 0.8, 0.9, 0.95, 0.99; block lengths 1, 8, 32; an independent-block control; and serial-path embargo gaps 0, 16, 64.
 
-This is a specific stationary Gaussian AR(1), block-maximum result, not a universally safe embargo, proof of block exchangeability, nonstationary guarantee or physical-data calibration. Full rows and manifest are retained in the workflow artifact linked from #13959.
+For block length 1, the serial-path no-gap alarm rate rises from 9.92% at rho=0 to 12.16% at rho=0.90, 13.54% at rho=0.95 and **17.62% at rho=0.99**. At rho=0.99, the 95% Wilson interval for the no-gap rate is 16.589–18.701%, entirely above nominal 10%. A 16-step gap still yields 12.64% (11.748–13.590%); a 64-step gap yields 10.40% (9.584–11.277%, interval includes nominal). Block length does not universally repair the issue: rho=0.99/block length 8/no gap yields 12.12% (11.244–13.054%), while length 32/no gap yields 10.94% (10.105–11.835%).
+
+This is a specific stationary Gaussian AR(1), block-maximum result, not a universally safe embargo, proof of block exchangeability, nonstationary guarantee or physical-data calibration. It motivates negative-rho, heavy-tail, common-cause, drift, independent-seed and held-out-regime controls. Full 72-row CSV and manifest are retained in the artifact linked from #13959.
 
 ### 9.3 MACE conventional baseline and source-event adapter
 
@@ -334,9 +336,10 @@ The temporal BM25/RRF reference in #13953 now:
 - partitions documents/postings by scope and knowledge-time before scoring;
 - computes BM25 corpus statistics over the eligible scope/time cohort;
 - preserves event ID, source ID, authority tier, uncertainty, parent relation, source family/root and bitemporal validity;
-- resolves retrieval hits to canonical source-event metadata by exact event ID.
+- resolves retrieval hits to canonical source-event metadata by exact event ID;
+- audits archive-wide parent edges as resolved, missing or cross-scope and reports strongly connected cycle components using an iterative SCC pass. This is an integrity diagnostic only: it does not inherit or grant parent authority.
 
-On exact head 8461d6073b9440789119b96152ba1ba5987ecd47, the dependency-free BM25 reference passed 17/17 tests and the parent MACE DSM evaluator passed 45/45 tests. A separate strict Serde adapter subsequently passed formatting, generated-lock test execution, strict Clippy and fixture/schema checks with **21/21 tests** on its adapter-validation run; the exact committed-lock workflow is being rerun after moving the generated Cargo.lock onto the feature branch. Treat the 21-test run as source/test evidence; do not yet state that the newest committed-lock revision is green until the final locked run completes.
+On the current lineage-audit source revision, the standalone BM25 baseline passed its exact-head workflow, and the parent MACE DSM evaluator passed 45/45 tests. The committed-lock strict adapter executed **26/26 tests successfully**, including the required-nullable-field negative control and new lineage-edge/cycle checks; strict Clippy then caught one `manual_contains` lint, fixed in a follow-on commit. The final exact-head locked Clippy run after that source fix is still pending, so the current adapter revision is not yet called fully qualified.
 
 ### 9.4 Scientific replay custody
 
