@@ -225,3 +225,14 @@ Publish all failed, unsupported, and unresolved cases. Do not collapse correctne
 - Genz and Bretz, Computation of Multivariate Normal and t Probabilities, Springer, and the R package mvtnorm: https://cran.r-project.org/package=mvtnorm.
 - Arb/FLINT documentation: https://flintlib.org/ and https://arblib.org/.
 - Existing implementation and ownership: #13903, #13904, #13940, #13944, #13945, #13951, #13567, #13739, #13805.
+
+
+### Local runner-independent execution
+
+Added `scripts/research/run_sdcb_decision_bounds_tests.sh`. From the repository root, run:
+
+```bash
+bash scripts/research/run_sdcb_decision_bounds_tests.sh
+```
+
+The script compiles the standalone module with `rustc --edition=2024 --test` into a temporary directory, runs the resulting test binary, and removes the temporary output. It was authored but not run in this environment because Rust is unavailable.
