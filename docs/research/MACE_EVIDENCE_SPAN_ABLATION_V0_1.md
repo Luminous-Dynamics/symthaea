@@ -49,7 +49,7 @@ The ablation mode is homogeneous within one analysis. Do not pool deletion and n
 
 ## Metrics and prospective targets
 
-Keep conventional memory accuracy and latency separate from this intervention report. It adds paired utility and regret effects with profile-cluster intervals, decision-change rate, added end-to-end cost, per-stratum utility/regret effects with confidence intervals and cluster counts, independent profile-cluster count and privacy/authority/erasure hard gates.
+Keep conventional memory accuracy and latency separate from this intervention report. It adds paired utility and regret effects with profile-cluster intervals, decision-change rate, added end-to-end cost, per-stratum utility/regret effects with confidence intervals (null below two clusters), cluster counts and confirmatory-floor flags, independent profile-cluster count and privacy/authority/erasure hard gates.
 
 Prospective target: positive utility and regret-reduction lower 95% cluster-bootstrap bounds, no worst-stratum regression, zero hard-gate violations, and lower user/compute burden than an equivalent active-reobservation strategy. These are targets, not achieved results.
 
