@@ -19,6 +19,7 @@ pub enum Error {
     InvalidIdentity,
     DuplicateCalibrationUnit,
     DuplicateCalibrationEpoch,
+    DuplicateConsumedUnit,
     DuplicateTestUnit,
     ModelSetMismatch,
     ScoringProtocolMismatch,
@@ -70,7 +71,9 @@ pub struct ConformalAdequacyReport {
     /// IDs the caller must append to its consumed ledgers before another
     /// adaptive stage is calibrated.
     pub consumed_calibration_epoch_ids: Vec<String>,
-    pub consumed_calibration_unit_ids: Vec<String>,
+    /// All calibration and test units consumed by this assessment. The caller
+    /// must carry the complete set into every later adaptive stage.
+    pub consumed_unit_ids: Vec<String>,
 }
 
 /// Minimum n for which the smallest non-randomized conformal p-value 1/(n+1)
@@ -102,17 +105,48 @@ pub fn upper_tail_conformal_p_value(
     Ok((1 + at_least_as_extreme) as f64 / (calibration_scores.len() + 1) as f64)
 }
 
-fn validate_digest(value: &str) -> bool {
-    !value.trim().is_empty()
+fn validate_identity(value: &str) -> bool {
+    !value.is_empty() && value.trim() == value
+}
+
+/// Identity digests are canonical lowercase SHA-256 hex, not descriptive labels.
+fn validate_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| {
+            byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+        })
 }
 
 fn validate_unique_ids(ids: &[String]) -> Result<(), Error> {
     for (index, id) in ids.iter().enumerate() {
-        if id.trim().is_empty() {
+        if !validate_identity(id) {
             return Err(Error::InvalidIdentity);
         }
         if ids[..index].contains(id) {
             return Err(Error::DuplicateCalibrationUnit);
+        }
+    }
+    Ok(())
+}
+
+fn validate_consumed_ledgers(
+    epoch_ids: &[String],
+    unit_ids: &[String],
+) -> Result<(), Error> {
+    for (index, id) in epoch_ids.iter().enumerate() {
+        if !validate_identity(id) {
+            return Err(Error::InvalidIdentity);
+        }
+        if epoch_ids[..index].contains(id) {
+            return Err(Error::DuplicateCalibrationEpoch);
+        }
+    }
+    for (index, id) in unit_ids.iter().enumerate() {
+        if !validate_identity(id) {
+            return Err(Error::InvalidIdentity);
+        }
+        if unit_ids[..index].contains(id) {
+            return Err(Error::DuplicateConsumedUnit);
         }
     }
     Ok(())
@@ -141,15 +175,15 @@ pub fn assess_block(
     if test.nonconformity_scores.is_empty() {
         return Err(Error::EmptyTestBlock);
     }
-    if !validate_digest(&calibration.epoch_id)
-        || !validate_digest(&calibration.model_set_digest)
-        || !validate_digest(&calibration.scoring_protocol_digest)
-        || !validate_digest(&test.unit_id)
+    if !validate_identity(&calibration.epoch_id)
+        || !validate_sha256(&calibration.model_set_digest)
+        || !validate_sha256(&calibration.scoring_protocol_digest)
+        || !validate_identity(&test.unit_id)
     {
         return Err(Error::InvalidIdentity);
     }
-    if !validate_digest(&test.model_set_digest)
-        || !validate_digest(&test.scoring_protocol_digest)
+    if !validate_sha256(&test.model_set_digest)
+        || !validate_sha256(&test.scoring_protocol_digest)
     {
         return Err(Error::InvalidIdentity);
     }
@@ -159,8 +193,12 @@ pub fn assess_block(
     if test.scoring_protocol_digest != calibration.scoring_protocol_digest {
         return Err(Error::ScoringProtocolMismatch);
     }
+    validate_consumed_ledgers(previously_consumed_epoch_ids, previously_consumed_unit_ids)?;
     if previously_consumed_epoch_ids.contains(&calibration.epoch_id) {
         return Err(Error::DuplicateCalibrationEpoch);
+    }
+    if previously_consumed_unit_ids.contains(&test.unit_id) {
+        return Err(Error::DuplicateTestUnit);
     }
     if previously_consumed_unit_ids.iter().any(|id| {
         calibration.blocks.iter().any(|block| &block.unit_id == id)
@@ -206,7 +244,11 @@ pub fn assess_block(
         significance_level_resolvable: minimum_resolvable_p_value <= alpha,
         alarm,
         consumed_calibration_epoch_ids: vec![calibration.epoch_id.clone()],
-        consumed_calibration_unit_ids: calibration_ids,
+        consumed_unit_ids: {
+            let mut ids = calibration_ids;
+            ids.push(test.unit_id.clone());
+            ids
+        },
     })
 }
 
