@@ -7,3 +7,6 @@ It keeps three claim levels distinct: artifact_validated, database_recovered and
 It calculates conservative RPO/RTO upper bounds from a shared trusted clock domain and bounded uncertainty. It consumes normalized evidence; it does not execute restore or authenticate upstream evidence.
 
 Run: go test -race -count=5 ./..., go vet ./..., go test -count=1 -cover ./..., go test -run=^$ -fuzz=FuzzRPOUpperBound -fuzztime=2s, go test -run=^$ -bench=BenchmarkEvaluateServiceRecovery -benchtime=3x.
+
+
+Additional invariants: the declared MON-022 surface scope must match the recovery plan and all required surface counts must reconcile. Service recovery requires read, write/readback (rollback verified) and business-invariant probes; missing/unverified evidence is indeterminate while a proven failed invariant is denied. A verified unavailable required dependency is denied; absent/stale/unverified dependency evidence is indeterminate. Traffic enablement is ordered after database readiness and fencing, and service acceptance follows traffic enablement. Conservative RPO/RTO upper bounds include clock uncertainty and require a common trusted clock domain.
