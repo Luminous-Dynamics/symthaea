@@ -744,6 +744,14 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
     let b = groups.get(&Action::B).cloned().unwrap_or_default();
     let a_ok = a.is_qualified();
     let b_ok = b.is_qualified();
+    #[cfg(test)]
+    eprintln!(
+        "MACE aggregate groups: A ok={a_ok} count={} families={:?} roots={} events={} one_estimand={} mixed={} digest={:?}; B ok={b_ok} count={} families={:?} roots={} events={} one_estimand={} mixed={} digest={:?}",
+        a.count, a.source_families, a.source_root_digests.len(), a.source_events.len(),
+        a.has_single_estimand(), a.mixed_estimands, a.estimand_digest,
+        b.count, b.source_families, b.source_root_digests.len(), b.source_events.len(),
+        b.has_single_estimand(), b.mixed_estimands, b.estimand_digest
+    );
     if MACE_REQUIRE_BOTH_ACTION_ALTERNATIVES && !(a_ok && b_ok) {
         return Decision::abstain();
     }
