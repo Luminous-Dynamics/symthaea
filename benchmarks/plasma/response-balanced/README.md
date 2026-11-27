@@ -145,6 +145,20 @@ Manufactured Rust tests cover the exact map, unit determinant / symplectic defec
 
 **Scope boundary:** this is the single-particle canonical map and its local derivatives. It does not yet implement the distribution pullback / velocity-grid interpolation, the complete Vlasov split integrator, or the full solver tangent/adjoint. It also exposes the local scheduled-event timing sensitivity (D R f^- + R_t - f^+), given caller-supplied pre/post vector fields and explicit reset-time derivative. This local formula has a manufactured algebraic test but has not been cross-checked by shifting pulse times through a full discrete Vlasov trajectory; that independent full-trajectory finite-difference test remains mandatory. Integer spatial mode is discrete and is not differentiated. The future finite-horizon A-sequence must compose this map Jacobian in the exact solver split order.
 
+## Positive conservative distribution pullback for the kick
+
+The new Rust module \`crates/domains/symthaea-plasma-probes/src/velocity_kick_remap.rs\` bridges the single-particle canonical map to a cell-average 1D1V distribution. For each spatial row it applies
+\[
+f^+(x_i,v)=f^-(x_i,v-\Delta v(x_i))
+\]
+by integrating the overlap of each target velocity cell's preimage with the piecewise-constant source cells. This yields non-negative output cell averages for non-negative input data and preserves row mass on an unbounded velocity line up to floating-point summation error.
+
+On a finite velocity interval, a shift can move physical mass outside the represented domain. The operator therefore returns a per-spatial-row and total ledger with mass before, mass after, boundary outflow, balance residual, and relative outflow. It never renormalizes the truncated result. A physical K-RESP run must either extend the velocity domain until pulse-induced outflow is negligible under an independently tested tolerance, or report the outflow as an unqualified boundary error; it cannot count the truncated remap as mass-conserving.
+
+This is deliberately a first-order piecewise-constant remap. It is not a high-order positivity-preserving reconstruction, does not evolve the Vlasov transport equation between pulses, and does not yet provide the distribution-space Jacobian. The single-particle state/control/time derivatives and the distribution remap are separate pieces of the future discrete pulse operator. Their composition and tangent/adjoint must be checked against the exact split solver.
+
+Manufactured tests cover zero-kick identity, interior mass preservation, positive-kick upper-boundary outflow, negative-kick lower-boundary outflow, independent spatial-row ledgers, non-negativity, and invalid grid/shape/negative-data rejection. The external public-API smoke target now exercises a pulse followed by the remap.
+
 For the first time-varying checkpoint formulation, the past and future Gramians must share one checkpoint coordinate system. With transitions defined by \(x_{k+1}=A_kx_k+B_ku_k\), the reachability factor for a past input channel is
 \[
 X_{k,j}=\Phi(t_c,t_{k+1})B_{k,:,j}/\sqrt{R_{k,j}},
