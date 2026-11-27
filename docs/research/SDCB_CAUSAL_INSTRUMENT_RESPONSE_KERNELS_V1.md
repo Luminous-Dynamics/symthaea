@@ -1,6 +1,6 @@
 # SDCB causal instrument-response kernels v1
 
-**Status:** The standalone scalar OU + first-order response analytic reference is authored in `scripts/research/sdcb_exponential_response.rs` with eleven Rust tests. The tests are not compiled or executed in this environment. No integration into the existing interval-observation module, high-rate experiment, physical qualification, or SOTA result is claimed.
+**Status:** The standalone scalar OU + first-order response analytic reference is authored in `scripts/research/sdcb_exponential_response.rs` with eighteen Rust tests. The tests are not compiled or executed in this environment. No integration into the existing interval-observation module, high-rate experiment, physical qualification, or SOTA result is claimed.
 
 ## 1. Motivation
 
@@ -65,7 +65,7 @@ Do not claim arbitrary nonlinear hysteresis in M0. Hysteresis must be represente
 `dz = (x-z)/tau_s dt`.
 It computes the stationary covariance, exact 2x2 transition matrix, future/past cross-covariance, filtered-sensor autocovariance, normalized step response, and first-order frequency response. It includes the repeated-root case (equal latent and sensor rates) and uses exp_m1-based rate-gap formulas near that case.
 
-Eleven Rust tests are authored for stationary covariance, equal-rate and distinct-rate fixtures, zero lag, near-equal-rate continuity, step response, -3 dB / phase behavior, invalid inputs and negative elapsed time. An independent authoring-runtime check using SciPy matrix exponential and continuous Lyapunov solution reproduced the distinct-rate transition/cross-covariance fixture to below 2e-15 absolute difference. This is an independent numerical calculation, not Rust execution, crate compilation, CI, or physical sensor validation.
+Eighteen Rust tests are authored for stationary covariance, equal-rate and distinct-rate fixtures, zero lag, near-equal-rate continuity, step response, -3 dB / phase behavior, invalid inputs and negative elapsed time. An independent authoring-runtime check using SciPy matrix exponential and continuous Lyapunov solution reproduced the distinct-rate transition/cross-covariance fixture to below 2e-15 absolute difference. This is an independent numerical calculation, not Rust execution, crate compilation, CI, or physical sensor validation.
 An additional independent convolution identity is used to test the state-space covariance calculation. With q = mu*sigma^2/(lambda+mu), for h >= 0 and mu != lambda:
 `C_zz(h) = q * (mu*exp(-lambda*h) - lambda*exp(-mu*h)) / (mu-lambda)`.
 At equal rates mu=lambda, the continuous limit is
@@ -152,3 +152,14 @@ Do not create another generic scheduler, decision planner, likelihood ledger, ev
 - Existing SDCB implementation and ownership: #13903, #13937, #13940, #13974, #13567, #13739, #13805.
 
 All acceptance gates are prospective research targets. This specification does not establish a new sensor law, SOTA, device certification, metrological traceability, physical validation, or production capability.
+
+
+### Dynamic-range numerical hardening
+
+A source audit and 50,000-case high-precision stress sweep found two nontrivial dynamic-range failures and prompted further changes:
+
+- **Transition propagation:** evaluating `mu * exp(-lambda*h) * expm1(-gap*h) / gap` in that order can underflow the intermediate product even when the final transition coefficient is representable. The formula now uses `(mu*h) * ((1-exp(-gap*h))/(gap*h)) * exp(-slow_rate*h)`, with an explicit repeated-root limit for subnormal gap-times-time products.
+- **Exponential argument:** the exact product rate×time may be lost when rounded to binary64 before the exponential. The reference now uses `mul_add` to recover the multiplication residual and corrects the exponential by `exp(-residual)`.
+- **Stationary covariance:** directly forming `mu/lambda` can underflow to zero while `variance*mu/lambda` remains representable. The low-ratio branch now evaluates `(variance*mu)/lambda` in an order whose intermediate range is bounded for finite binary64 inputs.
+
+New regressions cover a subnormal rate ratio with a large variance, subnormal rate-gap products in both rate orderings, and a high-precision transition fixture. The standalone file now contains eighteen authored Rust tests. An authoring-runtime Python/mpmath sweep of 50,000 logarithmically distributed cases (44,275 returned finite nonzero transition references) found at most 3 ulps absolute representation error on normal-range results and a maximum relative discrepancy of approximately 4.9e-16. Subnormal results are assessed by absolute ulp, not relative error, because relative error is not meaningful at the bottom of binary64. This is author-side numerical verification only; Rust remains uncompiled/unexecuted.
