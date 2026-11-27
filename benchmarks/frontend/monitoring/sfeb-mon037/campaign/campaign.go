@@ -96,6 +96,8 @@ type Input struct {
  OffsetTarget string `json:"offset_target,omitempty"`
  RequiredClaimIDs []string `json:"required_claim_ids"`
  RequiredSurfaceIDs []string `json:"required_surface_ids"`
+ SurfaceInventoryComplete bool `json:"surface_inventory_complete"`
+ SurfaceInventorySHA256 string `json:"surface_inventory_sha256"`
  SourceTruthComplete bool `json:"source_truth_complete"`
  SourceTruthManifestSHA256 string `json:"source_truth_manifest_sha256"`
  ObservedCaptureComplete bool `json:"observed_capture_complete"`
@@ -262,7 +264,7 @@ func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
  for id:=range byTx{if _,ok:=txProofs[id];!ok{r.TransactionViolations=append(r.TransactionViolations,id+":proof_missing")}};if len(r.TransactionViolations)>0{sort.Strings(r.TransactionViolations);txn.block("transaction_not_closed")}
 }
 func checkSurfaces(in Input,r *Reconciliation,f *flags){
- if in.SurfaceScope!="full_state"&&in.SurfaceScope!="row_stream"{f.hold("surface_scope_invalid")};if len(in.Surfaces)==0{f.hold("surface_inventory_missing")};if len(in.RequiredSurfaceIDs)==0{f.hold("required_surface_inventory_missing")}
+ if in.SurfaceScope!="full_state"&&in.SurfaceScope!="row_stream"{f.hold("surface_scope_invalid")};if len(in.Surfaces)==0{f.hold("surface_inventory_missing")};if len(in.RequiredSurfaceIDs)==0{f.hold("required_surface_inventory_missing")};if !in.SurfaceInventoryComplete||!validDigest(in.SurfaceInventorySHA256){f.hold("surface_inventory_manifest_incomplete_or_unbound")}
  required:=map[string]struct{}{};for _,id:=range in.RequiredSurfaceIDs{if !validID(id){f.block("required_surface_id_invalid");continue};if _,ok:=required[id];ok{f.block("duplicate_required_surface_id:"+id)};required[id]=struct{}{}}
  seen:=map[string]struct{}{};for _,s:=range in.Surfaces{if !validID(s.ID){f.block("surface_id_invalid");continue};if _,ok:=seen[s.ID];ok{f.block("duplicate_surface:"+s.ID);continue};seen[s.ID]=struct{}{};if _,ok:=required[s.ID];!ok{f.block("surface_not_in_required_inventory:"+s.ID)};r.SurfaceCounts[s.Disposition]++
  switch s.Disposition{case "covered":if !validDigest(s.SourceSHA256)||!validDigest(s.RestoredSHA256){f.hold("surface_digest_missing:"+s.ID)}else if s.SourceSHA256!=s.RestoredSHA256{f.block("surface_digest_mismatch:"+s.ID)}
