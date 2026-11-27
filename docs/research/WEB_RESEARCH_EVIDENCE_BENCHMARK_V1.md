@@ -84,8 +84,8 @@ Primary sources:
 
 These are proposed Symthaea stretch targets, not observed performance. They are meaningful only under the exact same pinned task release, model, tool permissions, judge/verifier versions, trial count and budget envelope as the reference run:
 
-- **FrontierChallenge:** at least 30% full completion on the released 97-task set (versus the reported 20.6% reference), while reducing unsupported completion claims to zero on adjudicated non-passing runs. Report partial-credit progress separately; it cannot substitute for full completion.
-- **SCI-AGENT-EXAM:** at least 85 overall and at least 40% of runs above the benchmark's 0.95 success threshold, with artifact execution/replay and trajectory stability reported independently.
+- **FrontierChallenge:** at least 35% full completion on the released 97-task set (versus the reported 20.6% reference), while reducing unsupported completion claims to zero whenever any required artifact/check is missing. Report partial-credit progress separately; it cannot substitute for full completion.
+- **SCI-AGENT-EXAM:** at least 85 final, at least 90 programmatic artifact correctness, and at least 45% Pass@0.95 across the same three-run/task protocol, with report quality, replay and trajectory stability reported independently.
 - **Both:** 100% denominator accounting for refusals, timeouts, missing artifacts and non-evaluable runs; publish full artifact and cost receipts. A higher mean score accompanied by worse completion calibration or unstable replay is not an improvement.
 
 The two benchmarks complement DISCERN rather than replace it: FrontierChallenge emphasizes complete execution of specified workflows; SCI-AGENT-EXAM emphasizes scientific executable/textual outputs and stability; DISCERN separately tests data integrity, methodological response and evidence-grounded hypothesis revision. Do not average these scores into one synthetic leaderboard.
