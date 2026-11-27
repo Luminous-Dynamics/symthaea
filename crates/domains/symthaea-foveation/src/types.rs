@@ -158,6 +158,12 @@ pub struct FoveationTelemetry {
     pub avg_processing_time_us: f32,
     /// Most recent result confidence (or 0.0 if none).
     pub last_confidence: f32,
+    /// Requests dropped because the bounded pending queue was full or IDs exhausted.
+    #[serde(default)]
+    pub total_dropped_pending: u64,
+    /// Saliency requests rejected for non-finite values.
+    #[serde(default)]
+    pub total_invalid_saliency: u64,
 }
 
 /// Wraps a stored full-resolution frame for later cropping.

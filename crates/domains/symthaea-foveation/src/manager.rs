@@ -8,7 +8,7 @@
 //! completed results for GWT injection.
 
 use std::collections::{BinaryHeap, VecDeque};
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 
 use crate::channel::FoveationChannel;
 use crate::crop::extract_crop;
@@ -16,20 +16,24 @@ use crate::types::{
     FoveationConfig, FoveationRequest, FoveationResult, FoveationTelemetry, FrameBuffer,
 };
 
+const MAX_PENDING_REQUESTS: usize = 4;
+const MAX_FRAME_DIMENSION: u32 = 8_192;
+const MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;
+
 /// Prioritized request wrapper for the BinaryHeap (highest surprise first).
 #[derive(Debug)]
 struct PrioritizedRequest {
+    request_id: u64,
+    frame: Arc<FrameBuffer>,
     grid_row: usize,
     grid_col: usize,
     surprise: f32,
-    frame_id: u64,
-    timestamp_us: u64,
     velocity: [f32; 2],
 }
 
 impl PartialEq for PrioritizedRequest {
     fn eq(&self, other: &Self) -> bool {
-        self.surprise == other.surprise
+        self.request_id == other.request_id
     }
 }
 
@@ -44,8 +48,8 @@ impl PartialOrd for PrioritizedRequest {
 impl Ord for PrioritizedRequest {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.surprise
-            .partial_cmp(&other.surprise)
-            .unwrap_or(std::cmp::Ordering::Equal)
+            .total_cmp(&other.surprise)
+            .then_with(|| other.request_id.cmp(&self.request_id))
     }
 }
 
@@ -65,7 +69,8 @@ pub struct FoveationManager {
     results: VecDeque<FoveationResult>,
     last_dispatch_us: u64,
     next_id: u64,
-    frame_buffer: Option<FrameBuffer>,
+    frame_buffer: Option<Arc<FrameBuffer>>,
+    max_pending: usize,
     patch_size: usize,
     // Neuromodulated effective parameters (updated via modulate())
     effective_surprise_threshold: f32,
@@ -73,6 +78,8 @@ pub struct FoveationManager {
     // Telemetry counters
     total_dispatched: u64,
     total_completed: u64,
+    total_dropped_pending: u64,
+    total_invalid_saliency: u64,
     avg_processing_time_us: f32,
     last_confidence: f32,
 }
@@ -82,7 +89,8 @@ impl FoveationManager {
     pub fn new(config: FoveationConfig, patch_size: usize) -> Self {
         let channel = FoveationChannel::spawn(&config);
         let effective_surprise_threshold = config.min_surprise_threshold;
-        let effective_max_concurrent = config.max_concurrent;
+        let effective_max_concurrent = config.max_concurrent.clamp(1, MAX_PENDING_REQUESTS);
+        let max_pending = config.channel_depth.clamp(1, MAX_PENDING_REQUESTS);
         Self {
             config,
             channel,
@@ -92,19 +100,65 @@ impl FoveationManager {
             last_dispatch_us: 0,
             next_id: 0,
             frame_buffer: None,
+            max_pending,
             patch_size,
             effective_surprise_threshold,
             effective_max_concurrent,
             total_dispatched: 0,
             total_completed: 0,
+            total_dropped_pending: 0,
+            total_invalid_saliency: 0,
             avg_processing_time_us: 0.0,
             last_confidence: 0.0,
         }
     }
 
-    /// Store the latest full-resolution frame for future cropping.
+    /// Store a validated full-resolution frame for future cropping.
+    pub fn on_frame_checked(&mut self, frame: FrameBuffer) -> Result<(), String> {
+        if frame.width == 0
+            || frame.height == 0
+            || frame.width > MAX_FRAME_DIMENSION
+            || frame.height > MAX_FRAME_DIMENSION
+        {
+            self.frame_buffer = None;
+            return Err("frame dimensions are zero or exceed the observer limit".to_string());
+        }
+        if !(1..=4).contains(&frame.channels) {
+            self.frame_buffer = None;
+            return Err("frame channels must be in 1..=4".to_string());
+        }
+        let expected_len = (frame.width as usize)
+            .checked_mul(frame.height as usize)
+            .and_then(|pixels| pixels.checked_mul(frame.channels))
+            .ok_or_else(|| "frame byte length overflow".to_string())?;
+        if expected_len > MAX_FRAME_BYTES || frame.pixels.len() != expected_len {
+            self.frame_buffer = None;
+            return Err(format!(
+                "frame byte length mismatch or exceeds {} bytes: expected {}, received {}",
+                MAX_FRAME_BYTES,
+                expected_len,
+                frame.pixels.len()
+            ));
+        }
+        self.frame_buffer = Some(Arc::new(frame));
+        Ok(())
+    }
+
+    /// Compatibility wrapper. Invalid input clears the current frame; it never
+    /// leaves an older frame available under the assumption that the new one arrived.
     pub fn on_frame(&mut self, frame: FrameBuffer) {
-        self.frame_buffer = Some(frame);
+        if let Err(error) = self.on_frame_checked(frame) {
+            tracing::warn!("Rejected foveation frame: {error}");
+        }
+    }
+
+    /// Release the manager's latest-frame reference.
+    ///
+    /// Pending requests retain their own immutable source-frame lease until
+    /// dispatch or cancellation. Clearing this reference therefore prevents
+    /// new saliency requests without changing the pixels bound to old ones.
+    pub fn clear_frame_buffer(&mut self) {
+        self.frame_buffer = None;
     }
 
     /// Enqueue salient patches from the dorsal stream.
@@ -115,23 +169,73 @@ impl FoveationManager {
     /// when the ventral result arrives 100-200ms later, the cognitive loop
     /// compensates for object motion.
     pub fn on_saliency(&mut self, patches: &[(usize, usize, f32, [f32; 2])]) {
-        let (frame_id, timestamp_us) = match &self.frame_buffer {
-            Some(fb) => (fb.frame_id, fb.timestamp_us),
-            None => return, // No frame stored yet
+        let Some(frame) = self.frame_buffer.as_ref().map(Arc::clone) else {
+            return; // No frame stored yet.
         };
 
+        if self.patch_size == 0 {
+            self.total_invalid_saliency = self
+                .total_invalid_saliency
+                .saturating_add(patches.len() as u64);
+            return;
+        }
+        let patch_rows = (frame.height as usize).div_ceil(self.patch_size);
+        let patch_cols = (frame.width as usize).div_ceil(self.patch_size);
+
         for &(row, col, surprise, velocity) in patches {
+            if !surprise.is_finite()
+                || !(0.0..=1.0).contains(&surprise)
+                || velocity.iter().any(|value| !value.is_finite())
+                || row >= patch_rows
+                || col >= patch_cols
+            {
+                self.total_invalid_saliency = self.total_invalid_saliency.saturating_add(1);
+                continue;
+            }
             if surprise >= self.effective_surprise_threshold {
-                self.pending.push(PrioritizedRequest {
+                let request_id = self.next_id;
+                let Some(next_id) = self.next_id.checked_add(1) else {
+                    self.total_dropped_pending = self.total_dropped_pending.saturating_add(1);
+                    continue;
+                };
+                self.next_id = next_id;
+
+                self.enqueue_pending(PrioritizedRequest {
+                    request_id,
+                    frame: Arc::clone(&frame),
                     grid_row: row,
                     grid_col: col,
                     surprise,
-                    frame_id,
-                    timestamp_us,
                     velocity,
                 });
             }
         }
+    }
+
+    /// Insert a request while keeping the queue bounded and highest-priority.
+    fn enqueue_pending(&mut self, request: PrioritizedRequest) {
+        if self.pending.len() < self.max_pending {
+            self.pending.push(request);
+            return;
+        }
+
+        let lowest = self
+            .pending
+            .iter()
+            .min_by(|left, right| {
+                left.surprise
+                    .total_cmp(&right.surprise)
+                    .then_with(|| right.request_id.cmp(&left.request_id))
+            })
+            .map(|queued| (queued.request_id, queued.surprise));
+
+        if let Some((lowest_id, lowest_surprise)) = lowest {
+            if request.surprise > lowest_surprise {
+                self.pending.retain(|queued| queued.request_id != lowest_id);
+                self.pending.push(request);
+            }
+        }
+        self.total_dropped_pending = self.total_dropped_pending.saturating_add(1);
     }
 
     /// Main tick: dispatch one request (if budget allows) and collect results.
@@ -153,25 +257,22 @@ impl FoveationManager {
             return;
         }
 
-        // Dispatch highest-priority pending request
-        if let Some(prioritized) = self.pending.pop()
-            && let Some(ref frame) = self.frame_buffer
-        {
+        // Dispatch using the immutable frame lease captured when saliency was observed.
+        // Replacing or clearing the latest frame buffer cannot change this request's pixels.
+        if let Some(prioritized) = self.pending.pop() {
+            let frame = prioritized.frame.as_ref();
             let (crop_pixels, crop_width, crop_height) = extract_crop(
                 frame,
                 prioritized.grid_row,
                 prioritized.grid_col,
                 self.patch_size,
-                1, // 1 patch padding for context
+                1, // 1 patch padding for context.
                 self.config.max_crop_pixels,
             );
 
             if crop_width > 0 && crop_height > 0 {
-                let id = self.next_id;
-                self.next_id += 1;
-
                 let request = FoveationRequest {
-                    id,
+                    id: prioritized.request_id,
                     crop_pixels,
                     crop_width,
                     crop_height,
@@ -179,8 +280,8 @@ impl FoveationManager {
                     grid_row: prioritized.grid_row,
                     grid_col: prioritized.grid_col,
                     surprise_value: prioritized.surprise,
-                    frame_id: prioritized.frame_id,
-                    timestamp_us: prioritized.timestamp_us,
+                    frame_id: frame.frame_id,
+                    timestamp_us: frame.timestamp_us,
                     velocity: prioritized.velocity,
                 };
 
@@ -188,10 +289,10 @@ impl FoveationManager {
                     Ok(rx) => {
                         self.in_flight.push(rx);
                         self.last_dispatch_us = now_us;
-                        self.total_dispatched += 1;
+                        self.total_dispatched = self.total_dispatched.saturating_add(1);
                     }
                     Err(_) => {
-                        // Channel full — re-enqueue
+                        // Channel full — preserve the same source-frame lease on retry.
                         self.pending.push(prioritized);
                     }
                 }
@@ -240,6 +341,8 @@ impl FoveationManager {
             ready_count: self.results.len(),
             total_dispatched: self.total_dispatched,
             total_completed: self.total_completed,
+            total_dropped_pending: self.total_dropped_pending,
+            total_invalid_saliency: self.total_invalid_saliency,
             avg_processing_time_us: self.avg_processing_time_us,
             last_confidence: self.last_confidence,
         }
@@ -284,6 +387,9 @@ impl FoveationManager {
     ///
     /// Both scale around 1.0 as baseline (no modulation).
     pub fn modulate(&mut self, ne: f32, da: f32) {
+        if !ne.is_finite() || !da.is_finite() {
+            return;
+        }
         let ne = ne.clamp(0.0, 2.0);
         let da = da.clamp(0.0, 2.0);
 
@@ -664,6 +770,168 @@ mod tests {
         );
         // DA clamped to 0.0: budget = max(round(0), 1) = 1
         assert_eq!(mgr.effective_max_concurrent(), 1, "DA should clamp to 0.0");
+    }
+
+    #[test]
+    fn pending_request_uses_the_exact_frame_that_generated_saliency() {
+        let config = FoveationConfig {
+            cooldown_ms: 0,
+            ..FoveationConfig::default()
+        };
+        let mut mgr = FoveationManager::new(config, 8);
+        let mut source = make_frame(64, 64, 100);
+        source.frame_id = 11;
+        source.timestamp_us = 1_100_000;
+        mgr.on_frame(source);
+        mgr.on_saliency(&[(0, 0, 0.9, [0.0, 0.0])]);
+
+        let mut replacement = make_frame(64, 64, 200);
+        replacement.frame_id = 12;
+        replacement.timestamp_us = 1_200_000;
+        mgr.on_frame(replacement);
+        mgr.clear_frame_buffer();
+
+        assert!(mgr.frame_buffer.is_none());
+        assert_eq!(mgr.pending_count(), 1);
+        mgr.tick(2_000_000);
+        assert_eq!(mgr.total_dispatched, 1);
+
+        for attempt in 0..20 {
+            if mgr.ready_count() > 0 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            mgr.tick(2_100_000 + attempt * 10_000);
+        }
+
+        let results = mgr.drain_results();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].source_frame_id, 11);
+        assert_eq!(results[0].source_timestamp_us, 1_100_000);
+
+        // The crop is 16x16 from the original frame: 256 bytes of value 100.
+        // The stub ventral backend samples every 16th byte when producing its
+        // deterministic test label; this verifies the payload came from frame 11.
+        let mut hash = 5381u64;
+        for _ in 0..16 {
+            hash = hash.wrapping_mul(33).wrapping_add(100);
+        }
+        let expected_label = format!("stub_object_{:04x}", hash & 0xFFFF);
+        match &results[0].content {
+            crate::types::RecognizedContent::Object { label, .. } => {
+                assert_eq!(label, &expected_label);
+            }
+            other => panic!("expected stub object result, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pending_queue_is_bounded_and_retains_highest_surprise_requests() {
+        let config = FoveationConfig {
+            channel_depth: 2,
+            ..FoveationConfig::default()
+        };
+        let mut mgr = FoveationManager::new(config, 8);
+        mgr.on_frame(make_frame(64, 64, 100));
+        mgr.on_saliency(&[
+            (0, 0, 0.6, [0.0, 0.0]),
+            (1, 1, 0.7, [0.0, 0.0]),
+            (2, 2, 0.99, [0.0, 0.0]),
+            (3, 3, 0.55, [0.0, 0.0]),
+        ]);
+
+        assert_eq!(mgr.pending_count(), 2);
+        assert_eq!(mgr.total_dropped_pending, 2);
+        let surprises: Vec<_> = mgr.pending.iter().map(|queued| queued.surprise).collect();
+        assert!(surprises.contains(&0.7));
+        assert!(surprises.contains(&0.99));
+        assert!(!surprises.contains(&0.6));
+        assert!(!surprises.contains(&0.55));
+    }
+
+    #[test]
+    fn checked_frame_ingestion_rejects_incomplete_or_oversized_frames() {
+        let mut mgr = default_manager();
+        let mut incomplete = make_frame(64, 64, 100);
+        incomplete.pixels.pop();
+
+        assert!(mgr.on_frame_checked(incomplete).is_err());
+        assert!(mgr.frame_buffer.is_none());
+
+        let mut oversized = make_frame(64, 64, 100);
+        oversized.width = MAX_FRAME_DIMENSION + 1;
+        assert!(mgr.on_frame_checked(oversized).is_err());
+        assert!(mgr.frame_buffer.is_none());
+    }
+
+    #[test]
+    fn invalid_new_frame_does_not_leave_an_old_frame_as_current() {
+        let mut mgr = default_manager();
+        mgr.on_frame(make_frame(64, 64, 100));
+        assert!(mgr.frame_buffer.is_some());
+
+        let mut invalid = make_frame(64, 64, 200);
+        invalid.channels = 0;
+        mgr.on_frame(invalid);
+
+        assert!(mgr.frame_buffer.is_none());
+        mgr.on_saliency(&[(0, 0, 0.9, [0.0, 0.0])]);
+        assert_eq!(mgr.pending_count(), 0);
+    }
+
+    #[test]
+    fn pending_and_in_flight_limits_are_hard_capped() {
+        let config = FoveationConfig {
+            channel_depth: usize::MAX,
+            max_concurrent: usize::MAX,
+            ..FoveationConfig::default()
+        };
+        let mgr = FoveationManager::new(config, 8);
+
+        assert_eq!(mgr.max_pending, MAX_PENDING_REQUESTS);
+        assert_eq!(mgr.effective_max_concurrent(), MAX_PENDING_REQUESTS);
+    }
+
+    #[test]
+    fn invalid_patch_coordinates_and_out_of_range_surprise_are_rejected() {
+        let mut mgr = default_manager();
+        mgr.on_frame(make_frame(64, 64, 100));
+        mgr.on_saliency(&[
+            (usize::MAX, 0, 0.9, [0.0, 0.0]),
+            (0, usize::MAX, 0.9, [0.0, 0.0]),
+            (0, 0, 1.1, [0.0, 0.0]),
+            (0, 0, 0.9, [0.0, 0.0]),
+        ]);
+
+        assert_eq!(mgr.pending_count(), 1);
+        assert_eq!(mgr.total_invalid_saliency, 3);
+    }
+
+    #[test]
+    fn non_finite_saliency_and_velocity_are_rejected() {
+        let mut mgr = default_manager();
+        mgr.on_frame(make_frame(64, 64, 100));
+        mgr.on_saliency(&[
+            (0, 0, f32::NAN, [0.0, 0.0]),
+            (1, 1, 0.9, [f32::INFINITY, 0.0]),
+            (2, 2, 0.9, [0.0, 0.0]),
+        ]);
+
+        assert_eq!(mgr.pending_count(), 1);
+        assert_eq!(mgr.total_invalid_saliency, 2);
+    }
+
+    #[test]
+    fn non_finite_neuromodulation_does_not_poison_threshold_or_budget() {
+        let mut mgr = default_manager();
+        let threshold = mgr.effective_surprise_threshold();
+        let concurrency = mgr.effective_max_concurrent();
+
+        mgr.modulate(f32::NAN, 2.0);
+        mgr.modulate(1.0, f32::INFINITY);
+
+        assert_eq!(mgr.effective_surprise_threshold(), threshold);
+        assert_eq!(mgr.effective_max_concurrent(), concurrency);
     }
 
     #[test]
