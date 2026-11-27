@@ -3,6 +3,7 @@ set -eu
 
 : "${MON025_BACKUP_ID:?MON025_BACKUP_ID is required}"
 : "${MON025_RECOVERY_TARGET_TIME:?MON025_RECOVERY_TARGET_TIME is required}"
+: "${MON025_SOURCE_DATA_DIR:?MON025_SOURCE_DATA_DIR is required}"
 
 case "$MON025_BACKUP_ID" in
     *[!A-Za-z0-9_-]*|'') echo "invalid backup ID" >&2; exit 64 ;;
