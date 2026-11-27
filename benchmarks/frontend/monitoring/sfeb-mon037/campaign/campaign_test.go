@@ -131,6 +131,7 @@ func TestDeterministicTenThousandUnsafeMutationsNeverPass(t *testing.T){
   case 6:in.Components.TimelineResult=nil
   case 7:in.Components.ContinuityResult=nil
   }
+  refreshRecordDigests(&in)
   if got:=Evaluate(in);got.ComponentVerdict==Qualified{t.Fatalf("unsafe mutation %d qualified: %+v",n,got)}
  }
 }
