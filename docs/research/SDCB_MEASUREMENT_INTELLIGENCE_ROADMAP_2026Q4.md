@@ -258,3 +258,8 @@ The covariance-model mixture path also includes a separate open-world diagnostic
 ## Block-conformal open-world adequacy follow-on — 27 November 2026
 
 The fixed-threshold adequacy diagnostic now has an exact finite-rank calibration companion in `scripts/research/sdcb_block_conformal_adequacy.rs`. It computes a conservative upper-tail conformal p-value from block-maximum predictive nonconformity scores, requires a frozen model-set/scoring-protocol digest, reports finite-sample p-value resolution, and rejects reuse of calibration epoch/unit IDs across adaptive stages. The guarantee is only for exchangeable calibration/test units; serially dependent time-series blocks are not automatically exchangeable. Eight Rust tests are authored, not compiled/executed here. This is not a time-series validity guarantee or physical calibration result.
+
+
+## Gaussian-to-categorical likelihood adapter follow-on — 27 November 2026
+
+The next integration primitive is `scripts/research/sdcb_gaussian_bin_likelihoods.rs`. It converts a scalar Gaussian predictive observation (mean/variance) into a declared finite categorical outcome likelihood row using ordered instrument thresholds. It uses direct 64-point Gauss–Legendre integration of normal tail intervals to avoid cancellation of extreme probabilities. This is the adapter boundary to existing instrument-aware/common-cause finite selectors (#13762/#13793/#13804); it is not another policy planner. Thresholds must be actual instrument quantization or a preregistered benchmark partition. The current implementation does not support multivariate rectangle probabilities or full continuous posterior updates after binning. Eight Rust tests are authored but not compiled/executed here.
