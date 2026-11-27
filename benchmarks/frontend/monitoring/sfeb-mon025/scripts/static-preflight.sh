@@ -17,6 +17,8 @@ done
 sh -n "$ROOT/compose/postgres/source-entrypoint.sh"
 sh -n "$ROOT/compose/restore/restore-entrypoint.sh"
 
+bash "$ROOT/scripts/test-transaction-metadata-order.sh"
+
 echo "MON-025 JSON structure and shell syntax checks passed."
 
 if command -v check-jsonschema >/dev/null 2>&1; then

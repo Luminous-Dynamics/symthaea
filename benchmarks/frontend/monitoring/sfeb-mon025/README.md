@@ -84,6 +84,7 @@ The Compose restore service remains isolated on loopback-only port 56418/56419. 
 - `compose/postgres/state-manifest.sql` — independent SQL manifest query for rows, schema, indexes, constraints, triggers, routines, extensions, sequences, large objects, views, partitions, unlogged data and authorization state.
 - `compose/restore/restore-entrypoint.sh` — isolated physical restore and PITR.
 - `scripts/` — static preflight, lifecycle, least-privilege connector provisioning, deterministic workload, independent CDC value readback, Debezium transaction-boundary verification, physical backup verification, WAL archive sealing, LSN/timeline recovery, wait/restore verification, per-surface comparison and opt-in fault injection.
+- `scripts/transaction-metadata-report.jq` and `scripts/test-transaction-metadata-order.sh` — independently runnable transaction-order adjudication filter and regression fixtures.
 - `BENCHMARKS-v0.1.md` — matched comparison protocol and targets.
 
 ## Execution status
