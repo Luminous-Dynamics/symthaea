@@ -1,6 +1,3 @@
-pub mod claims;
-pub mod providers;
-
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -9,6 +6,11 @@ pub mod providers;
 //! This crate does not implement cryptographic verification. A production
 //! EvidenceVerifier must delegate to Mycelix source-ledger, calibration and
 //! outcome-reconciliation receipts. Agent-authored labels are not trust anchors.
+
+mod evidence_use;
+pub mod claims;
+pub mod providers;
+pub use evidence_use::{revalidate_for_use_v1, EvidenceUseContextV1, EvidenceUseReceiptV1, EvidenceUseRejectV1};
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -223,6 +225,9 @@ pub struct EvidenceReceiptBundle {
     pub task_id: String,
     pub canonical_event_hash: String,
     pub authority_receipt_digest: String,
+    /// Original event valid-time bounds, preserved for decision-time revalidation.
+    pub event_valid_from_ms: i64,
+    pub event_valid_until_ms: Option<i64>,
     pub event_occurred_at_ms: i64,
     pub authority_received_at_ms: i64,
     pub lineage_digest: String,
@@ -540,6 +545,8 @@ pub fn ingest_as_known(
             task_id: event.task_id,
             canonical_event_hash: event.canonical_event_hash,
             authority_receipt_digest: event.authority_receipt_digest,
+            event_valid_from_ms: event.valid_from_ms,
+            event_valid_until_ms: event.valid_until_ms,
             event_occurred_at_ms: event.occurred_at_ms,
             authority_received_at_ms: event.received_at_ms,
             lineage_digest: lineage.receipt_digest,
