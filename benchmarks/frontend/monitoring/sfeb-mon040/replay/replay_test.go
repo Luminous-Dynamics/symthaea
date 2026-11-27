@@ -119,3 +119,15 @@ func BenchmarkEvaluateTwoHundredReplays(b *testing.B){
 	in:=fixture(200);b.ReportAllocs();b.ResetTimer()
 	for i:=0;i<b.N;i++{_ = Evaluate(in)}
 }
+
+
+func TestFaultListLimitBlocks(t *testing.T) {
+	in:=fixture(29)
+	in.FaultIDs=make([]string,MaxFaults+1)
+	for i:=range in.FaultIDs{in.FaultIDs[i]=fmt.Sprintf("fault-%03d",i)}
+	in.FaultSetSHA256=digestJSON(in.FaultIDs)
+	got:=Evaluate(in)
+	if got.ReproducibilityVerdict!=Blocked {
+		t.Fatalf("fault list exceeding the v1 cap must block: %+v",got)
+	}
+}
