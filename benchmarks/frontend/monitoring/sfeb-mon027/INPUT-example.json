@@ -1,0 +1,103 @@
+{
+  "profile": "mon027-evidence-bundle-input-v1",
+  "version": "1.0.0",
+  "run_id": "mon025-run-2026-11-27-001",
+  "sequence": 1,
+  "captured_at": "2026-11-27T10:00:00Z",
+  "clock_domain": "lab-clock",
+  "clock_uncertainty_ns": 5000000,
+  "source": {
+    "incident_id": "incident-001",
+    "source_cluster_id": "postgres-lab-cluster-18",
+    "database": "mon025",
+    "system_identifier": "7438291029384756102",
+    "timeline_id": "1",
+    "snapshot_id": "snapshot-boundary-001",
+    "capture_lsn": "0/ABCDEF0",
+    "scope_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inventory_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "signer_key_id": "luminous-custody-ed25519-2026-01",
+  "artifacts": [
+    {
+      "path": "run-manifest.json",
+      "media_type": "application/json",
+      "role": "run-metadata",
+      "producer": "mon025",
+      "command_id": "capture-run-manifest",
+      "collected_at": "2026-11-27T09:59:00Z",
+      "clock_domain": "lab-clock",
+      "clock_uncertainty_ns": 5000000
+    },
+    {
+      "path": "source-boundary.json",
+      "media_type": "application/json",
+      "role": "source-identity",
+      "producer": "mon025",
+      "command_id": "capture-source-boundary",
+      "collected_at": "2026-11-27T09:59:05Z",
+      "clock_domain": "lab-clock",
+      "clock_uncertainty_ns": 5000000
+    },
+    {
+      "path": "source-state.json",
+      "media_type": "application/json",
+      "role": "source-state",
+      "producer": "mon025",
+      "command_id": "capture-source-state",
+      "collected_at": "2026-11-27T09:59:10Z",
+      "clock_domain": "lab-clock",
+      "clock_uncertainty_ns": 5000000
+    },
+    {
+      "path": "cdc-event-report.json",
+      "media_type": "application/json",
+      "role": "cdc-event-reconciliation",
+      "producer": "mon025",
+      "command_id": "verify-cdc-events",
+      "collected_at": "2026-11-27T09:59:15Z",
+      "clock_domain": "lab-clock",
+      "clock_uncertainty_ns": 5000000
+    },
+    {
+      "path": "transaction-report.json",
+      "media_type": "application/json",
+      "role": "transaction-closure",
+      "producer": "mon025",
+      "command_id": "verify-transaction-metadata",
+      "collected_at": "2026-11-27T09:59:20Z",
+      "clock_domain": "lab-clock",
+      "clock_uncertainty_ns": 5000000
+    },
+    {
+      "path": "backup-manifest.sha256",
+      "media_type": "text/plain",
+      "role": "backup-integrity",
+      "producer": "mon025",
+      "command_id": "verify-base-backup",
+      "collected_at": "2026-11-27T09:59:25Z",
+      "clock_domain": "lab-clock",
+      "clock_uncertainty_ns": 5000000
+    },
+    {
+      "path": "restore-state.json",
+      "media_type": "application/json",
+      "role": "restore-state",
+      "producer": "mon025",
+      "command_id": "capture-restore-state",
+      "collected_at": "2026-11-27T09:59:30Z",
+      "clock_domain": "lab-clock",
+      "clock_uncertainty_ns": 5000000
+    },
+    {
+      "path": "state-comparison.json",
+      "media_type": "application/json",
+      "role": "surface-comparison",
+      "producer": "mon025",
+      "command_id": "compare-state",
+      "collected_at": "2026-11-27T09:59:35Z",
+      "clock_domain": "lab-clock",
+      "clock_uncertainty_ns": 5000000
+    }
+  ]
+}
