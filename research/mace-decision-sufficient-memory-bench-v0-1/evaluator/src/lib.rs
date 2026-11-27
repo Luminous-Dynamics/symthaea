@@ -1076,6 +1076,73 @@ mod tests {
     }
 
     #[test]
+    fn retrieval_and_decision_support_are_scored_separately() {
+        let mut candidate = run("mace", "hold", &["signed-current", "expired-account"]);
+        candidate.decision_support_evidence_ids = vec!["signed-current".to_owned()];
+        let score = score_run(&case(), &candidate).expect("candidate IDs resolve");
+
+        assert_eq!(score.returned_evidence_count, 2);
+        assert_eq!(score.inadmissible_returned_evidence_count, 1);
+        assert_eq!(score.decision_support_evidence_count, 1);
+        assert_eq!(score.admissible_decision_support_evidence_count, 1);
+        assert_eq!(score.inadmissible_decision_support_evidence_count, 0);
+        assert_eq!(score.retrieved_required_evidence_recall, Some(CountRatioV1 { numerator: 1, denominator: 1 }));
+        assert_eq!(score.required_evidence_recall, Some(CountRatioV1 { numerator: 1, denominator: 1 }));
+        assert_eq!(score.admissible_evidence_precision, Some(CountRatioV1 { numerator: 1, denominator: 2 }));
+        assert_eq!(score.decision_support_evidence_precision, Some(CountRatioV1 { numerator: 1, denominator: 1 }));
+        assert!(!score.decision_sufficient);
+    }
+
+    #[test]
+    fn decision_support_must_be_a_subset_of_retrieved_evidence() {
+        let mut candidate = run("mace", "hold", &["signed-current"]);
+        candidate.decision_support_evidence_ids = vec!["expired-account".to_owned()];
+        assert_eq!(
+            score_run(&case(), &candidate),
+            Err(EvaluationErrorV1::DecisionSupportEvidenceNotRetrieved)
+        );
+    }
+
+    #[test]
+    fn source_family_and_root_counts_deduplicate_repeated_lineage() {
+        let candidate = run(
+            "mace",
+            "hold",
+            &["signed-current", "expired-account", "chat-assertion"],
+        );
+        let score = score_run(&case(), &candidate).expect("candidate IDs resolve");
+        assert_eq!(score.retrieved_distinct_source_family_count, 2);
+        assert_eq!(score.retrieved_distinct_source_root_count, 1);
+        assert_eq!(score.retrieved_unknown_source_family_count, 0);
+        assert_eq!(score.retrieved_unknown_source_root_count, 1);
+        assert_eq!(score.decision_support_distinct_source_root_count, 1);
+    }
+
+    #[test]
+    fn retrieved_conflict_blocks_sufficiency_even_when_not_selected_as_support() {
+        let mut candidate = run(
+            "mace",
+            "hold",
+            &["signed-current", "chat-assertion", "signed-release-gate"],
+        );
+        candidate.decision_support_evidence_ids = vec!["signed-current".to_owned()];
+        let score = score_run(&case(), &candidate).expect("candidate IDs resolve");
+        assert_eq!(score.unresolved_retrieved_contradiction_pair_count, 1);
+        assert_eq!(score.unresolved_decision_support_contradiction_pair_count, 0);
+        assert!(!score.decision_sufficient);
+    }
+
+    #[test]
+    fn invalid_source_root_digest_is_rejected() {
+        let mut evaluator_case = case();
+        evaluator_case.evidence_lineage[0].source_root_digest_sha256 = Some("not-a-sha256".to_owned());
+        assert_eq!(
+            validate_case(&evaluator_case),
+            Err(EvaluationErrorV1::InvalidEvidenceLineage)
+        );
+    }
+
+    #[test]
     fn stale_or_unknown_evidence_is_counted_as_inadmissible() {
         let result = score_paired(
             &case(),
