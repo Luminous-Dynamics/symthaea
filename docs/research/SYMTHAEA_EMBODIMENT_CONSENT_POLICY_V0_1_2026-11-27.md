@@ -25,7 +25,7 @@ The Rust module at crates/domains/symthaea-soma/src/embodiment_policy.rs adds a 
 
 - A new policy instance starts paused, reduced-motion enabled, with zero grants.
 - Grants are session- and monotonic-clock-domain-scoped, expire, and name output channel, destination, allowed forms, and maximum intensity. Each exact grant version has a unique opaque `grant_id`.
-- The same output scope is replaced on grant refresh; each refresh must use a new `grant_id`, and a permit issued under the old grant is rejected by the final recheck.
+- The same output scope is replaced on grant refresh; each refresh must use a never-before-used `grant_id` within the policy session, and a permit issued under the old grant is rejected by the final recheck. The seen-ID history is capped at 65,536; exhaustion denies further grants.
 - Pause, event cancellation, and per-channel revocation deny subsequent evaluations.
 - Local-sensitive cues are restricted to local-private destinations.
 - Restricted cues are denied by this policy version.
@@ -34,6 +34,8 @@ The Rust module at crates/domains/symthaea-soma/src/embodiment_policy.rs adds a 
 - The function returns an opaque, process-local presentation permit. Permit fields are private, it cannot be deserialized through the public API, and downstream adapters use read-only accessors. The permit performs no rendering, sensor capture, network transmission, or actuation.
 
 The policy is intentionally small and synchronous. The production caller must serialize policy updates and presentation checks in a synchronization domain that makes pause/revocation visible before a subsequent output tick. It must call `recheck_permit()` immediately before renderer submission; that recheck validates the exact grant ID, expiry, cancellation, current policy and current motion preference.
+
+Wire contracts are published in `SYMTHAEA_PRESENTATION_CONSENT_GRANT_SCHEMA_V1_2026-11-27.json`, with positive and negative fixtures in `SYMTHAEA_PRESENTATION_CONSENT_GRANT_FIXTURES_V1_2026-11-27.json`. The fixtures cover basic shape validation; grant reuse, time-relative expiry, and authorization provenance remain semantic checks.
 
 ## Trust and safety boundaries
 
