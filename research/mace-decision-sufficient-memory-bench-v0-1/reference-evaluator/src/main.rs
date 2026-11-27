@@ -780,9 +780,14 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
 
 fn event(id: String, source: String, observed: i64, valid_from: i64, valid_until: Option<i64>,
     authority: AuthorityTier, uncertainty: u32, claim: &str, relation: Relation, parents: Vec<String>) -> SourceEvent {
-    SourceEvent { event_id:id, source_id:source, observed_at_ms:observed, valid_from_ms:valid_from,
-        valid_until_ms:valid_until, authority_tier:authority, uncertainty_ppm:uncertainty,
-        claim:claim.into(), relation_to_parent:Some(relation), parent_event_ids:parents }
+    let source_family = source.clone();
+    let source_root_sha256 = Some(digest(source.as_bytes()));
+    SourceEvent {
+        event_id:id, source_id:source, source_family, source_root_sha256,
+        observed_at_ms:observed, valid_from_ms:valid_from, valid_until_ms:valid_until,
+        authority_tier:authority, uncertainty_ppm:uncertainty, claim:claim.into(),
+        relation_to_parent:Some(relation), parent_event_ids:parents
+    }
 }
 fn mix(mut x: u64) -> u64 {
     x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
