@@ -1,21 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
-  echo "usage: $0 SOURCE_MANIFEST.json RESTORE_MANIFEST.json" >&2
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+  echo "usage: $0 SOURCE_MANIFEST.json RESTORE_MANIFEST.json [REPORT.json]" >&2
   exit 64
 fi
 source_file="$1"
 restore_file="$2"
+REPORT="${3:-$ROOT/out/state-comparison.json}"
 [ -s "$source_file" ] && [ -s "$restore_file" ] || { echo "both manifests must exist and be non-empty" >&2; exit 66; }
+mkdir -p "$(dirname "$REPORT")"
 
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-jq -S 'if has("state") then .state else . end' "$source_file" >"$tmp/source.json"
-jq -S 'if has("state") then .state else . end' "$restore_file" >"$tmp/restore.json"
-if diff -u "$tmp/source.json" "$tmp/restore.json"; then
-  echo "State manifests match."
-else
-  echo "State manifests diverge. This blocks a full-state recovery claim; investigate each typed surface." >&2
+jq -n --slurpfile source "$source_file" --slurpfile restored "$restore_file" \
+  '($source[0] | if has("state") then .state else . end) as $s
+   | ($restored[0] | if has("state") then .state else . end) as $r
+   | (($s | keys) + ($r | keys) | unique) as $keys
+   | [ $keys[] as $k | {
+        surface: $k,
+        source_present: ($s | has($k)),
+        restored_present: ($r | has($k)),
+        equal: (($s | has($k)) and ($r | has($k)) and ($s[$k] == $r[$k])),
+        source_value: (if ($s | has($k)) then $s[$k] else null end),
+        restored_value: (if ($r | has($k)) then $r[$k] else null end)
+      } ] as $rows
+   | {profile:"mon025-surface-comparison-v1",equal:(all($rows[]; .equal)),surface_results:$rows}' >"$REPORT"
+
+jq . "$REPORT"
+sha256sum "$REPORT"
+jq -e '.equal == true' "$REPORT" >/dev/null || {
+  echo "State surfaces diverge. Use the per-surface report to scope coverage; this blocks an unqualified full-state claim." >&2
   exit 1
-fi
+}
+echo "All captured state surfaces match."
