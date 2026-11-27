@@ -220,3 +220,41 @@ New regressions cover a subnormal rate ratio with a large variance, subnormal ra
 The same 50,000-case sweep also exercised the stationary filtered variance across rates/variances spanning approximately 10^-300 to 10^300. After adding a two-order evaluation for subnormal mu/lambda ratios, a separate 100,000-case mpmath comparison of the stationary covariance scalar found maximum 2 ulps error and maximum relative discrepancy 3.5e-16 on normal-range results. This is independent numerical stress evidence, not Rust execution or formal proof.
 
 The normalized step response now evaluates `1-exp(-mu*t)` through `-expm1(-mu*t)`, adding an FMA-derived correction for the rounded rate-times-time product. This avoids cancellation to zero for small response fractions. An authored regression checks a (10^{-20}) response fraction; an independent Python check confirmed the expm1 result retains that value while direct `1-exp(-x)` rounds to zero.
+
+## Composition with the existing interval-observation engine
+
+The response model now exposes its equivalent continuous-time linear-SDE matrices for state `S=[x,z]`:
+
+[
+A=\begin{bmatrix}-\lambda&0\\\mu&-\mu\end{bmatrix},
+qquad
+Q_c=\begin{bmatrix}2\lambda\sigma_x^2&0\\0&0\end{bmatrix}.
+]
+
+A separate bridge `scripts/research/sdcb_response_interval_bridge.rs` imports the response reference and the existing #13940 interval-observation implementation. It constructs observation windows loading the sensor state z, not the latent measurand x. It reuses #13940's piecewise augmented accumulator, Van Loan transition and endpoint/observation cross-covariance; no second interval integrator was added.
+
+Four bridge Rust tests are authored:
+1. Overlapping/nested windows [0,2] and [1,2].
+2. Adjacent windows [0,1] and [1,2], preserving their nonzero cross-window covariance.
+3. Duplicate window IDs and zero-duration rejection.
+4. Acquisition/electronics noise added separately after physical response averaging.
+
+For lambda=1, process variance=1 and sensor time constant tau=0.5 (mu=2), the latent-to-sensor covariance is (C_{zz}(h)=\frac{2}{3}(2e^{-h}-e^{-2h})). Independent SciPy double integration gives the nested-window covariance matrix:
+
+[
+\begin{bmatrix}
+0.5053638855836804 & 0.5053638855836804\\
+0.5053638855836804 & 0.6025667487115534
+\end{bmatrix}
+]
+
+For adjacent unit windows the expected matrix is:
+
+[
+\begin{bmatrix}
+0.6025667487115534 & 0.4081610224557192\\
+0.4081610224557192 & 0.6025667487115534
+\end{bmatrix}.
+]
+
+The authoring-runtime SciPy `dblquad` checks used absolute/relative tolerances 1e-13. These are independent numerical references, not Rust execution. The bridge adds four authored tests, all uncompiled/unexecuted.
