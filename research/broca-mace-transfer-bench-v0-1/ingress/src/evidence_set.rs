@@ -431,18 +431,14 @@ pub fn select_evidence_set_v1(
             .map(|(_,c)|c.evidence_id.to_owned()).collect();
         return Err(fail(EvidenceSetObstructionReasonV1::NoFeasibleSelection,invalid,constraints.iter().map(|c|c.constraint_id.clone()).collect()));
     };
-    let mut selected_representations=Vec::new();let mut selected_receipts=Vec::new();let mut excluded=Vec::new();
+    let mut excluded=Vec::new();
     for (i,c) in candidates.iter().enumerate(){
         if mask&(1u64<<i)!=0{
-            selected_representations.push((c.evidence_id,c.representation_sha256,c.receipt.canonical_sha256.as_str()));
+
         }else{
             let reason=match states[i]{CandidateState::Admissible=>CandidateExclusionReasonV1::NotSelectedByOptimizer,CandidateState::Excluded(r)=>r};
             excluded.push(ExcludedEvidenceV1{evidence_id:c.evidence_id.to_owned(),reason});
         }
-    }
-    selected_representations.sort_by(|a,b|a.0.cmp(b.0));
-    for (_,representation,receipt) in selected_representations{
-        selected_representations_push(&mut selected_receipts,&mut selected_representations,representation,receipt);
     }
     // Rebuild parallel digest arrays in selected-ID order.
     let selected_representation_sha256:Vec<String>=selected_ids.iter().map(|id|{
@@ -463,9 +459,3 @@ pub fn select_evidence_set_v1(
     Ok(selection)
 }
 
-fn selected_representations_push(
-    _receipts:&mut Vec<String>,
-    _representations:&mut Vec<String>,
-    _representation:&str,
-    _receipt:&str,
-) {}
