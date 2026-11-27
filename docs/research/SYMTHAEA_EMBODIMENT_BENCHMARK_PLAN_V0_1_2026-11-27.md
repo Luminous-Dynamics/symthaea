@@ -297,6 +297,23 @@ Do not set "beat 3.87/4.44" as one undifferentiated goal. Report at least:
 
 Our competitive objective is a Pareto improvement across task quality, timing, cross-form consistency, privacy, accessibility, and local compute—not a single aggregate score.
 
+
+### E8 — Event-triggered temporal attention
+
+Compare uniform 1, 2 and 4 FPS with a bounded adaptive 0.5–4 FPS policy and a ground-truth oracle upper bound. Match average frame count, processed pixels and attention/compute budget. Report each condition separately for audio-only, visual-only and fused triggers.
+
+Metrics:
+- recall/precision for each of VideoFDB's 11 conversational dynamics;
+- trigger delay and missed-event duration;
+- false triggers per conversation minute;
+- TOR alignment and median/p95 event-to-decision latency;
+- average/peak frame rate, pixel count, model input budget, energy and thermals;
+- permission, raw-frame retention and revocation behavior.
+
+Initial Pareto target: improve the perception aggregate by >= 0.15 points versus uniform 1 FPS at matched compute, or remain within 0.05 points of uniform 2 FPS while reducing processed frames by >= 20%, with no material generation/fluency regression. These are proposed margins, not evidence-based guarantees. Preregistered power analysis and pilot feasibility must precede confirmatory evaluation.
+
+See `SYMTHAEA_DYNAMIC_TEMPORAL_ATTENTION_V0_1_2026-11-27.md` for the full protocol. Oracle annotations are prohibited at inference time and only establish an upper bound.
+
 ## 11. New benchmark track — event-triggered temporal attention
 
 The VideoFDB sampling findings motivate a new track described in
