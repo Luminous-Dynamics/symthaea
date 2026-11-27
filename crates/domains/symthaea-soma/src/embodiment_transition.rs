@@ -318,8 +318,7 @@ pub fn plan_transition(
     let source_expired = source_expires <= now;
     let same_form = source.form == target.form;
     let same_cue = source.canonical_cue_digest == target.canonical_cue_digest;
-    let same_authority = source.grant_id == target.grant_id
-        && target.effective_expires_at_monotonic_ns >= source.effective_expires_at_monotonic_ns;
+    let same_authority = source.grant_id == target.grant_id && target_expires >= source_expires;
     let same_intensity = (source.effective_intensity - target.effective_intensity).abs() <= f32::EPSILON;
     let no_change = same_event && same_cue && same_form && same_authority && same_intensity
         && source.motion_mode == target.motion_mode;
@@ -516,6 +515,18 @@ mod tests {
         let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
         let target = descriptor("event-2", 1, DIGEST_B, EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "1200");
         assert_eq!(plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "200"), Err(TransitionError::SequenceRegression));
+    }
+
+    #[test]
+    fn shorter_numeric_expiry_forces_hard_cut_even_when_decimal_is_lexically_larger() {
+        let source = descriptor("event-1", 1, DIGEST_A, EmbodimentForm::LivingConstellation, MotionMode::Dynamic, 0.8, "1000");
+        let target = SceneContinuityDescriptor::new(
+            SESSION, CLOCK, "event-2", "grant-v1", DIGEST_B, 2,
+            EmbodimentForm::PuppetTheatre, MotionMode::Dynamic, 0.8, "200", "900",
+        ).unwrap();
+        let plan = plan_transition(Some(&source), &target, TransitionPolicy::default(), CLOCK, "250").unwrap();
+        assert_eq!(plan.kind(), TransitionKind::HardCut);
+        assert_eq!(plan.duration_ns(), 0);
     }
 
     #[test]
