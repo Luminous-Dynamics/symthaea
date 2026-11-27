@@ -206,8 +206,8 @@ func Minimize(in Input)Result{
 	out.FullFaultSetVerdict=full.Verdict
 	out.TargetFailureSignatureSHA256=full.FailureSignatureSHA256
 	if len(out.Steps)>0{out.Steps[0].TargetFailurePreserved=true}
-	if full.Verdict==Qualified{
-		f.hold("initial_fault_set_did_not_reproduce_failure")
+	if full.Verdict!=Blocked{
+		f.hold("initial_fault_set_did_not_reproduce_blocked_failure")
 		out.MinimizationKind="not_applicable"
 		out.SubsetEvaluations=evaluations
 		out.EvidenceComplete=true
