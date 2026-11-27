@@ -1,6 +1,6 @@
 # SDCB interval-integrated observation operator v1
 
-**Status:** bounded exact linear-Gaussian reference. Seven Rust tests are authored but not compiled or executed in this environment. The OU known answers are independently analytical; no sensor data or physical test is claimed.
+**Status:** bounded exact linear-Gaussian reference. Eight Rust tests are authored but not compiled or executed in this environment. The OU known answers are independently analytical; no sensor data or physical test is claimed.
 
 ## 1. Why this bridge matters
 
@@ -127,14 +127,15 @@ These are constructed analytical values, not physical sensor results.
 
 ## 6. Test coverage and limits
 
-Seven authored tests cover:
+Eight authored tests cover:
 1. nested windows against the #13903 scalar OU reference;
 2. duplicate interval covariance rows;
 3. disjoint-window exponential covariance;
 4. endpoint conditioning with process/observation cross-covariance;
 5. unequal loadings across coupled state factors;
 6. electronics/acquisition covariance kept separate;
-7. invalid windows, duplicate IDs and bounded dimensions.
+7. invalid windows, duplicate IDs and bounded dimensions;
+8. invalid acquisition covariance rejection.
 
 Current v1 uses rectangular averaging kernels and piecewise-constant state dynamics/loadings inside each declared interval. It does not yet handle arbitrary time-varying loadings, nonlinear dynamics, missing/irregular sub-samples, or general nonstationary kernels.
 
