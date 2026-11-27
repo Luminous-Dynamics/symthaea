@@ -87,7 +87,7 @@ The current release describes five locations within one laboratory, not five ind
 
 ### 4.3 UCI Gas Sensor Array Drift
 
-Use the ten chronological batches for channel-drift and concentration-transfer tasks. The 16 channels are in one array; they are not 16 independent deployed devices. The UCI description has a research-only restriction. Do not use it for commercial claims or mirror the raw dataset without permission.
+Use the ten chronological batches for channel-drift and concentration-transfer tasks. The 16 channels are in one array; they are not 16 independent deployed devices. The current official UCI page is internally inconsistent: its narrative says the dataset is for research purposes and excludes commercial use, while its structured licence field states CC BY 4.0 and permits reuse for any purpose. Treat the licence as unresolved; quarantine this dataset from redistribution and commercial use until UCI and/or the dataset authors clarify which terms govern.
 
 ### 4.4 Controlled synthetic counterfactual track
 
