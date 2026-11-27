@@ -22,6 +22,7 @@ CMAQ-035 established an internal comparison between fixed and ONS betting. CMAQ-
 | Fleet alpha allocation | CMAQ-043: hierarchical alpha_global/[i(i+1)j(j+1)k(k+1)] across asset/channel/deployment | Open-ended union-bound budget; does not assume stream independence; requires durable one-use ledger |
 | Paired effective-block inference | CMAQ-044: H+1 miss penalty, matched baseline/candidate deltas, block bootstrap, family breakdown and false events/hour | Statistical comparison layer; bootstrap conditional on representative/exchangeable effective blocks |
 | Conditional rank dependence | CMAQ-045: predictable history contexts × full dyadic rank spectrum | Targets temporal dependence with marginal rank invariance; finite context portfolio only |
+| Convex-target approachability | CMAQ-046: predictable OCO separator × support-function residual × conditional-mean e-process | Adaptive conditional-mean null; distinct from exchangeable PRM/CCTM; fixed-bet subset |
 | CS-risk | Anytime confidence-sequence monitor of a matched running/rolling average risk | Complementary estimand, not a like-for-like per-instance drift detector |
 
 Do not implement CCTM by multiplying repeated marginal conformal p-values or by using a rolling empirical breach rate. Implement its actual conditional calibration and martingale construction from the reference paper/code.
