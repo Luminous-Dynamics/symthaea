@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"luminousdynamics/mon027-packager"
 )
@@ -50,7 +51,7 @@ func run() int {
 			return 66
 		}
 		relative, err := filepath.Rel(root, absolute)
-		if err != nil || relative == "." || relative == ".." || (len(relative) >= 3 && relative[:3] == ".."+string(filepath.Separator)) {
+		if err != nil || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))) {
 			fmt.Fprintf(os.Stderr, "index and outputs must be outside artifact root: %s\n", output)
 			return 64
 		}
