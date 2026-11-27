@@ -2,8 +2,8 @@
   "schema_version": "sdcb_block_conformal_adequacy.v1",
   "calibration": {
     "epoch_id": "fold-stage-1",
-    "model_set_digest": "model-set-sha256:abc",
-    "scoring_protocol_digest": "score-protocol-sha256:def",
+    "model_set_digest": "9849be3d62e4c78ff8943facc7246b310f9575e8ad6d698bd6216950b031a7a1",
+    "scoring_protocol_digest": "ab308df6bc09c8d768aac21ccc606e531f57207747d5221e0756a25529a69ed8",
     "exchangeability_unit": "independent-episode",
     "blocks": [
       {
@@ -86,8 +86,8 @@
   },
   "test": {
     "unit_id": "test-episode",
-    "model_set_digest": "model-set-sha256:abc",
-    "scoring_protocol_digest": "score-protocol-sha256:def",
+    "model_set_digest": "9849be3d62e4c78ff8943facc7246b310f9575e8ad6d698bd6216950b031a7a1",
+    "scoring_protocol_digest": "ab308df6bc09c8d768aac21ccc606e531f57207747d5221e0756a25529a69ed8",
     "nonconformity_scores": [
       1.1,
       1.8,
