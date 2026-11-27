@@ -1710,12 +1710,22 @@ mod tests {
             value: None,
             status: ResourceMeasurementStatusV2::NotApplicable,
         };
-        assert!(not_applicable.is_consistent());
-        let forged_zero = ResourceQuantityV2 {
-            value: Some(0),
-            status: ResourceMeasurementStatusV2::Unknown,
+        let not_applicable_receipt = CostReceiptV2 {
+            network_bytes: not_applicable,
+            ..receipt
         };
-        assert!(!forged_zero.is_consistent());
+        assert_eq!(not_applicable_receipt.validate(), Ok(()));
+        let forged_zero = CostReceiptV2 {
+            network_bytes: ResourceQuantityV2 {
+                value: Some(0),
+                status: ResourceMeasurementStatusV2::Unknown,
+            },
+            ..receipt
+        };
+        assert_eq!(
+            forged_zero.validate(),
+            Err(CostReceiptErrorV2::ResourceStatusValueMismatch)
+        );
     }
 
     #[test]
