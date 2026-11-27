@@ -1,0 +1,159 @@
+{
+  "schema_version": "sdcb-gaussian-process-separation-v1",
+  "title": "Finite-sample near-equivalence for correlated OU sensor-response observations",
+  "status": "frozen-high-precision-analytic-reference-not-physical-validation",
+  "source_challenge": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "issue": 14002,
+    "path": "docs/research/SDCB_RESPONSE_IDENTIFIABILITY_CHALLENGE_V1.json",
+    "exact_world_a_id": "world_a_physical_slow_sensor_fast"
+  },
+  "model": {
+    "output": "zero_mean_stationary_gaussian_process",
+    "physical_process": "stationary_scalar_ou",
+    "sensor_response": "first_order_low_pass",
+    "physical_decay_rate_units": "1/time",
+    "sensor_rate_units": "1/time",
+    "process_stationary_variance_units": "measurand^2",
+    "readout_noise_variance_units": "measurand^2",
+    "covariance_for_non_equal_rates": "C(h)=q*exp(-r*h)*(1+r*h*(1-exp(-g*h))/(g*h))",
+    "definitions": {
+      "q": "mu*process_variance/(lambda+mu)",
+      "r": "min(lambda,mu)",
+      "g": "abs(lambda-mu)",
+      "psi_limit": "when g*h=0, (1-exp(-g*h))/(g*h) is defined as 1"
+    },
+    "observed_covariance": "Sigma_ij = C(abs(t_i-t_j)) + readout_noise_variance*I_ij",
+    "numerical_scope": "All covariance matrices in the frozen near-swap experiment are positive definite because the declared readout-noise variance is strictly positive. No jitter or covariance repair is used."
+  },
+  "worlds": [
+    {
+      "id": "near_world_a_physical_slow_sensor_fast",
+      "relation_to_source_world": "exact parameters from #14002 World A",
+      "lambda": "0.25",
+      "mu": "4.0",
+      "process_variance": "9.0",
+      "q": "8.47058823529411764705882352941176470588235294117647058823529"
+    },
+    {
+      "id": "near_world_b_physical_fast_sensor_slow",
+      "relation_to_source_world": "perturb the physical decay rate of exact pole-swap World B from 4.0 to 4.04 while preserving q",
+      "lambda": "4.04",
+      "mu": "0.25",
+      "process_variance": "145.35529411764705882352941176470588235294117647059",
+      "q": "8.47058823529411764705882352941176470588235294117647058823529"
+    }
+  ],
+  "sampling_design": {
+    "sample_times": "t_i = i * 0.5 for i=0,...,n-1",
+    "nested_prefix_sample_counts": [
+      8,
+      16,
+      32,
+      64
+    ],
+    "sample_interval": "0.5",
+    "readout_noise": "independent Gaussian readout noise added to each sample",
+    "readout_noise_variance": "0.1",
+    "readout_noise_covariance": "0.1 * identity(n)",
+    "cost_model": "one unit per acquired time sample; synthetic benchmark units only"
+  },
+  "structural_vs_practical": {
+    "kernels_are_equal": false,
+    "example_lag": "0.5",
+    "world_a_covariance_at_example_lag": "7.89719444223072776693323753225",
+    "world_b_covariance_at_example_lag": "7.89423872892642929696050463627",
+    "covariance_difference_b_minus_a": "-0.002955713304298469972733",
+    "interpretation": "The full covariance kernels differ, so the worlds are structurally distinguishable under ideal observation of the complete passive law. They remain practically near-indistinguishable under the frozen finite noisy sampling designs."
+  },
+  "finite_sample_kl_known_answers": [
+    {
+      "n": 8,
+      "kl_a_to_b": "0.00005516551920161024177780499993480445396569",
+      "kl_b_to_a": "0.00005542108725631821104168806998282875626367",
+      "pinsker_tv_upper_using_min_directional_kl": "0.00525192913135784048432682955744",
+      "equal_prior_accuracy_upper": "0.502625964565678920242163414779"
+    },
+    {
+      "n": 16,
+      "kl_a_to_b": "0.0001223882304458705095360053291888517843317",
+      "kl_b_to_a": "0.0001229660190790511576321498369080388017993",
+      "pinsker_tv_upper_using_min_directional_kl": "0.0078226667590365406519677958696",
+      "equal_prior_accuracy_upper": "0.503911333379518270325983897935"
+    },
+    {
+      "n": 32,
+      "kl_a_to_b": "0.0002568336529343929103512196480056398427797",
+      "kl_b_to_a": "0.0002580558827245191703731084905394443045507",
+      "pinsker_tv_upper_using_min_directional_kl": "0.0113321148276566830407823660234",
+      "equal_prior_accuracy_upper": "0.505666057413828341520391183012"
+    },
+    {
+      "n": 64,
+      "kl_a_to_b": "0.0005257244979114377119816482856388511513809",
+      "kl_b_to_a": "0.000528235610015455195855025797802004534409",
+      "pinsker_tv_upper_using_min_directional_kl": "0.0162130271373275279542794263152",
+      "equal_prior_accuracy_upper": "0.508106513568663763977139713158"
+    }
+  ],
+  "disambiguating_probe": {
+    "id": "traceable_sensor_inlet_step",
+    "elapsed_time": "0.5",
+    "world_a_expected_normalized_response": "0.864664716763387308106000505028",
+    "world_b_expected_normalized_response": "0.117503097415404597135107856771",
+    "interpretation": "Under the declared two-pole model, a known step applied at the sensor inlet directly exposes the instrument response rate and strongly separates the sensor poles. This is a synthetic noiseless reference; a physical implementation must declare stimulus uncertainty and readout noise."
+  },
+  "numerical_method": {
+    "distribution": "N(0,Sigma)",
+    "directional_kl": "0.5*(tr(Sigma_B^-1*Sigma_A)-n+log(det(Sigma_B)/det(Sigma_A)))",
+    "implementation_recommendation": "Cholesky factorizations, triangular solves and log determinants; do not form an explicit matrix inverse",
+    "pinsker": "TV(P_A,P_B) <= sqrt(KL(P_A||P_B)/2); it also holds with A and B reversed, so the minimum of the two valid directional upper bounds is valid",
+    "bayes_accuracy": "for equal priors, optimal classification accuracy=(1+TV)/2; substituting the TV upper bound yields an upper bound, not an achieved classifier score",
+    "high_precision_reference": "mpmath 60 decimal digits in the authoring runtime; source parameters and formulas are frozen here for independent replay"
+  },
+  "claim_boundary": "A synthetic finite-sample Gaussian-process identifiability reference. No physical sensor calibration, traceability, QUANT result, or SOTA performance is established.",
+  "fixed_sample_count_interval_sensitivity": {
+    "purpose": "Explore the joint effect of temporal spacing and observation horizon at a fixed 32-sample cost. This is a finite candidate-grid comparison, not a continuous optimum.",
+    "samples": 32,
+    "readout_noise_variance": "0.1",
+    "candidate_sample_intervals": [
+      {
+        "sample_interval": "0.1",
+        "observation_horizon": "3.1",
+        "kl_a_to_b": "0.000159870650617048704235035661059",
+        "kl_b_to_a": "0.000160730491600539894587335336311"
+      },
+      {
+        "sample_interval": "0.25",
+        "observation_horizon": "7.75",
+        "kl_a_to_b": "0.000237458040220367418461942115067",
+        "kl_b_to_a": "0.000238530556044180767265976829434"
+      },
+      {
+        "sample_interval": "0.5",
+        "observation_horizon": "15.5",
+        "kl_a_to_b": "0.000256833652934392910351219648006",
+        "kl_b_to_a": "0.000258055882724519170373108490539"
+      },
+      {
+        "sample_interval": "1.0",
+        "observation_horizon": "31.0",
+        "kl_a_to_b": "0.0000983278542217618636609345824017",
+        "kl_b_to_a": "0.0000986619533174646573670190117791"
+      },
+      {
+        "sample_interval": "2.0",
+        "observation_horizon": "62.0",
+        "kl_a_to_b": "0.0000157437383764742624385569972525",
+        "kl_b_to_a": "0.0000157653378499783301332773536119"
+      },
+      {
+        "sample_interval": "4.0",
+        "observation_horizon": "124.0",
+        "kl_a_to_b": "0.00000187924026148223060485427018917",
+        "kl_b_to_a": "0.00000188000188800181559985681683284"
+      }
+    ],
+    "interpretation": "Among this declared six-point grid, sample interval 0.5 has the largest directional KL (in either direction). Very short spacing uses the same sample budget over too short a horizon; very long spacing undersamples the response dynamics. This is not a globally optimal interval and must be compared under explicit elapsed-time and acquisition-cost budgets."
+  }
+}
