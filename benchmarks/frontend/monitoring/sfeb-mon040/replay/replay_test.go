@@ -20,7 +20,7 @@ func testDigest(s string)string{d:=sha256.Sum256([]byte(s));return hex.EncodeToS
 func observation(n int,verdict Verdict,signature string,complete bool)Observation{
 	o:=Observation{ReplayID:fmt.Sprintf("replay-%03d",n+1),TrialID:"trial-040-001",Seed:int64(1000+n),
 		FaultSetSHA256:faultSetSHA,ScenarioSHA256:scenarioSHA,RecoveryBoundarySHA256:boundarySHA,CodeRevision:revision,
-		ObservedAt:now.Add(-time.Duration(30-n)*time.Second),Verdict:verdict,FailureSignatureSHA256:signature,Complete:complete}
+		ObservedAt:now.Add(-time.Minute).Add(time.Duration(n)*time.Second),Verdict:verdict,FailureSignatureSHA256:signature,Complete:complete}
 	o.OutcomeReceiptSHA256=ObservationReceiptDigest(o)
 	return o
 }
