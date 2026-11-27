@@ -210,6 +210,8 @@ impl EpistemicConsciousness {
             total_phi_gain: integrator_stats.total_phi_gain,
             meta_phi: learner_stats.meta_phi,
             accuracy: learner_stats.accuracy,
+            brier_score: learner_stats.brier_score,
+            expected_calibration_error: learner_stats.expected_calibration_error,
             adjudicated_claims: learner_stats.adjudicated_outcomes,
             unadjudicated_claims: learner_stats.unadjudicated_outcomes,
             is_ready: self.learner.is_ready(),
@@ -274,6 +276,10 @@ pub struct EpistemicStats {
     pub meta_phi: f64,
     /// Accuracy over independently adjudicated outcomes only
     pub accuracy: f32,
+    /// Brier score over independently adjudicated outcomes; None until labelled data exists
+    pub brier_score: Option<f32>,
+    /// Ten-bin expected calibration error over independently adjudicated outcomes
+    pub expected_calibration_error: Option<f32>,
     /// Claims with independent correctness labels
     pub adjudicated_claims: usize,
     /// Claims still lacking independent correctness labels
