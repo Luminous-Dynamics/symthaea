@@ -65,12 +65,29 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
                 f"{task_id}: missing independent answer oracle")
         require(isinstance(audit["citation_contract"], dict)
                 and "allowed_citation_source_ids" in audit["citation_contract"]
-                and "forbidden_decoy_source_ids" in audit["citation_contract"],
+                and "forbidden_decoy_source_ids" in audit["citation_contract"]
+                and "origin_groups" in audit["citation_contract"]
+                and "independent_origin_count" in audit["citation_contract"]
+                and "minimum_independent_origins" in audit["citation_contract"]
+                and "corroboration_available" in audit["citation_contract"],
                 f"{task_id}: missing citation audit contract")
         require(set(audit["citation_contract"]["allowed_citation_source_ids"]) <= set(source_digests),
                 f"{task_id}: allowed citation source absent from candidate evidence")
         require(set(audit["citation_contract"]["forbidden_decoy_source_ids"]) <= set(source_digests),
                 f"{task_id}: decoy citation source absent from candidate evidence")
+        origin_groups: dict[str, list[str]] = {}
+        for source in candidate["sources"]:
+            origin = source["origin_id"]
+            origin_groups.setdefault(origin, []).append(source["source_id"])
+        origin_groups = {key: sorted(value) for key, value in sorted(origin_groups.items())}
+        require(origin_groups == audit["citation_contract"]["origin_groups"],
+                f"{task_id}: source-origin grouping differs between candidate and auditor streams")
+        independent_count = len(origin_groups)
+        require(independent_count == audit["citation_contract"]["independent_origin_count"],
+                f"{task_id}: independent-origin count mismatch")
+        require(audit["citation_contract"]["corroboration_available"]
+                == (independent_count >= audit["citation_contract"]["minimum_independent_origins"]),
+                f"{task_id}: corroboration-availability flag is incorrect")
         if audit["condition"] == "counterfactual":
             fact_id = audit["selected_intervention_fact"]
             require(audit["baseline_values"][fact_id] != audit["counterfactual_values"][fact_id],
@@ -87,9 +104,9 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
         else:
             require(audit["expanded_values"] == audit["baseline_values"],
                     f"{task_id}: non-counterfactual condition changed target facts")
-        if audit["condition"] == "source_removed" and audit["removed_source_id"]:
-            require(audit["removed_source_id"] not in source_digests,
-                    f"{task_id}: removed source remains in candidate stream")
+        if audit["condition"] == "source_removed" and audit["removed_source_ids"]:
+            require(not (set(audit["removed_source_ids"]) & set(source_digests)),
+                    f"{task_id}: a removed source remains in candidate stream")
 
     templates = {audit["template_id"] for audit in audits}
     expected_templates = {"train": 10, "development": 5, "sealed_test": 5, "all": 20}[expected_split]
@@ -114,6 +131,23 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
         require(baseline["citation_contract"] == counterfactual["citation_contract"]
                 == placebo["citation_contract"],
                 f"{template_id}: non-removal intervention changed citation eligibility")
+        if template_id == "CEDAR-08":
+            require(baseline["citation_contract"]["independent_origin_count"] == 2,
+                    "CEDAR-08 must have two independent origins despite three URLs")
+            require(len(baseline["citation_contract"]["origin_groups"]["origin-a"]) == 2,
+                    "CEDAR-08 mirror URLs must share one origin group")
+            require(baseline["expected_behavior"] == "TWO_INDEPENDENT_ORIGINS_CORROBORATE_VALUE_NOT_THREE_URLS",
+                    "CEDAR-08 baseline must count origin families, not URLs")
+            require(counterfactual["expected_behavior"] == "TRACKS_COUNTERFACTUAL_AND_PRESERVES_TWO_INDEPENDENT_ORIGINS",
+                    "CEDAR-08 counterfactual must track value and retain two origins")
+            require(placebo["expected_behavior"] == "PLACEBO_STABLE_AND_PRESERVES_TWO_INDEPENDENT_ORIGINS",
+                    "CEDAR-08 placebo must preserve answer and origin coverage")
+            require(removed["citation_contract"]["independent_origin_count"] == 1,
+                    "CEDAR-08 source removal must leave one origin, not two mirrored URLs")
+            require(removed["citation_contract"]["corroboration_available"] is False,
+                    "CEDAR-08 must downgrade corroboration after one origin is removed")
+            require(removed["expected_behavior"] == "REMAINS_SUPPORTED_BY_ONE_INDEPENDENT_ORIGIN_NOT_CROSS_CORROBORATED",
+                    "CEDAR-08 must caveat single-origin support after removal")
         if template_id == "CEDAR-15":
             require(baseline["expected_behavior"] == "SOURCE_CONFLICT_REPRESENTED",
                     "CEDAR-15 baseline must explicitly represent source conflict")
