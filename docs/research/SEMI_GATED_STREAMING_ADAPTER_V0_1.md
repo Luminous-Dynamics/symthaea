@@ -24,7 +24,7 @@ The streaming protocol is now:
 
 `feature observation -> immutable prediction receipt -> pending label -> label available -> K1 qualification -> adapter update receipt`
 
-The prediction records the exact selected feature vector, global baseline prediction, feature/context/temporal correction decomposition, context key, global-model artifact digest, feature-schema digest, policy digest and adapter-state digest.
+The prediction records the exact selected feature vector, global baseline prediction, feature/context/temporal correction decomposition, typed equipment/chamber identity, global-model artifact digest, feature-schema digest, policy digest and adapter-state digest.
 
 A later-arriving label does not recompute the old residual against the current adapter. The update uses the frozen prediction-time selected features and prediction value, which keeps delayed-label learning causally anchored to the original forecast.
 
@@ -36,14 +36,15 @@ The global VM predictor is supplied as an immutable baseline prediction in v0.1;
 
 Online state contains:
 - feature-level normalized LMS (NLMS) weights;
-- a global short-term residual EMA;
-- a global environment/context residual EMA;
-- per-context residual EMA and support count;
+- a global short-term temporal residual EMA;
+- global, equipment, chamber and equipment×chamber residual EMA states;
 - accepted update count and idempotency set.
 
-The environment correction shrinks local estimates toward the global correction until the context has sufficient support. A new tool/chamber context starts from global context state; it cannot inherit another context's local correction.
+The correction is a reliability-weighted mean of available hierarchy levels. Each level uses support weight (n/(n+n_{min})); unknown equipment/chamber combinations cannot collide with one another because the typed identities are encoded with length-prefixed keys. A prediction receipt freezes both equipment and chamber identity.
 
-NLMS uses a finite norm floor, maximum feature/error limits and bounded per-coordinate weight deltas. Zero feature norm is safe and does not divide by zero or cause unbounded updates.
+The feature and temporal adapters update from the frozen **pre-temporal base residual** (label minus base prediction). Context residual uses the upstream GRAPE decomposition: label minus the global prediction plus the newly updated feature-adapter contribution. It does not subtract the previous context or temporal correction.
+
+NLMS uses a finite norm floor, maximum feature/error limits and bounded per-coordinate weight deltas. The temporal activation threshold can be calibrated from an ordered training-only residual vector. The policy-bound receipt hashes both the training manifest and exact residual vector, and its digest flows into every prediction/update receipt. Zero feature norm is safe and does not divide by zero or cause unbounded updates.
 
 ## Evidence and availability gate
 
@@ -80,7 +81,7 @@ Prediction receipts remain immutable after label delivery. Repeated accepted lab
 
 ## Authored adversarial tests
 
-The module currently includes tests for:
+The module currently includes 23 tests for:
 1. prediction is read-only and freezes selected features/state digest;
 2. qualified zero-delay update;
 3. delayed label after an intervening update uses prediction-time data;
@@ -98,7 +99,12 @@ The module currently includes tests for:
 15. prediction sequence overflow does not partially register a sample;
 16. context-support overflow leaves the entire update transaction unchanged;
 17. K1 report cannot predate label availability;
-18. delivery revision must match the revision attested by the K1 report.
+18. delivery revision must match the revision attested by the K1 report;
+19. feature and temporal updates use the pre-temporal base residual;
+20. context residual excludes the previous context and temporal corrections;
+21. global/equipment/chamber/equipment×chamber hierarchy uses support reliability weights;
+22. delimiter-like equipment/chamber IDs do not collide;
+23. temporal activation threshold is sealed from an exact training-only residual vector and manifest.
 
 These tests are authored, not yet reported as passing. Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference runs are required.
 
@@ -129,6 +135,17 @@ Hard software targets:
 - 0 partial state mutation when an update fails.
 
 A predictive gain target is set only after faithful GRAPE reproduction; compare at equal qualified-label budgets and report paired confidence intervals.
+
+## GRAPE-parity improvement (stacked follow-up)
+
+The follow-up [#14069](https://github.com/Luminous-Dynamics/symthaea/issues/14069) brings the adapter closer to the pinned upstream decomposition:
+- Feature NLMS and global temporal EMA use the prediction-time **base** residual before the temporal correction.
+- Context residual uses the upstream form `label - (global prediction + updated feature correction)`; it does not subtract the prior context or temporal correction.
+- Context levels are global/equipment/chamber/equipment×chamber, with reliability weight `n/(n+n_min)` and a weighted-mean correction.
+- The context IDs and selected-feature vector are frozen at prediction time.
+- The temporal activation threshold can be calibrated from training-only residuals. The policy-bound receipt includes the training manifest and exact residual-vector digests.
+
+This is closer in update semantics, but still not a complete GRAPE reproduction: the Rust path does not yet fit the authors' TorchRidge global predictor, reproduce their training residual feature ranking, label clipping ranges, all configuration/hyperparameter choices, or execute the pinned dataset bundle. The official-code-faithful and corrected delayed-label tracks remain separate.
 
 ## Claim ceiling
 
