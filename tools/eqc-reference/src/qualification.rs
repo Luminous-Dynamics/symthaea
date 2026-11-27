@@ -76,6 +76,30 @@ fn input_digest_map(value: &Value, pointer: &str) -> anyhow::Result<BTreeMap<Str
     Ok(map)
 }
 
+pub fn validate_observation_schema(
+    observation: &Value,
+    repository_root: &Path,
+) -> anyhow::Result<()> {
+    let schema_path = repository_root.join("docs/research/eqc-system-observation-v0.1.schema.json");
+    let schema_bytes = std::fs::read(&schema_path)
+        .with_context(|| format!("read system observation schema {}", schema_path.display()))?;
+    let schema_value: Value = serde_json::from_slice(&schema_bytes)
+        .with_context(|| format!("parse system observation schema {}", schema_path.display()))?;
+    let validator = jsonschema::options()
+        .offline()
+        .should_validate_formats(true)
+        .build(&schema_value)
+        .with_context(|| format!("compile offline observation schema {}", schema_path.display()))?;
+    let errors = validator
+        .iter_errors(observation)
+        .map(|error| format!("{} at {}", error, error.instance_path()))
+        .collect::<Vec<_>>();
+    if !errors.is_empty() {
+        bail!("system observation schema validation failed: {}", errors.join("; "));
+    }
+    Ok(())
+}
+
 /// Qualify an adapter-produced system observation against one frozen EQC task.
 ///
 /// This function deliberately uses a conjunction, not a weighted score:
@@ -283,6 +307,45 @@ mod tests {
                 "replay_result_sha256": result_sha
             }
         })
+    }
+
+    #[test]
+    fn system_observation_schema_meta_validates_and_accepts_the_adapter_contract() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repository root resolves");
+        let schema_path = root.join("docs/research/eqc-system-observation-v0.1.schema.json");
+        let schema: Value = serde_json::from_slice(
+            &std::fs::read(schema_path).expect("read observation schema"),
+        )
+        .expect("observation schema parses");
+        let validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("Draft 2020-12 observation schema meta-validates");
+        let task = task();
+        let observation = valid_observation(&task);
+        assert!(validator.is_valid(&observation));
+        validate_observation_schema(&observation, &root)
+            .expect("observation validates against the adapter schema");
+    }
+
+    #[test]
+    fn observation_schema_rejects_unknown_fields_and_missing_digests() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repository root resolves");
+        let task = task();
+        let mut observation = valid_observation(&task);
+        observation["unreviewed_override"] = json!(true);
+        assert!(validate_observation_schema(&observation, &root).is_err());
+
+        let mut observation = valid_observation(&task);
+        observation["action_log_sha256"] = Value::Null;
+        assert!(validate_observation_schema(&observation, &root).is_err());
     }
 
     #[test]
