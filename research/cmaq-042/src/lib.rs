@@ -550,7 +550,7 @@ mod tests {
         );
 
         test = test_path(20.0);
-        test.trace_sha256 = SHA_A.into();
+        test.trace_sha256 = format!("{:064x}", 1);
         assert_eq!(
             gate.evaluate_once(&test),
             Err(CalibrationError::TestTraceAppearsInReferenceBank)
@@ -598,6 +598,8 @@ mod tests {
                     rejected_positions += 1;
                 }
             }
+            let expected_rejections = reference_count + 1 - threshold_rank;
+            assert_eq!(rejected_positions, expected_rejections);
             let observed = rejected_positions as f64 / (reference_count + 1) as f64;
             assert!(
                 observed <= f64::from(alpha_numerator) / f64::from(alpha_denominator),
