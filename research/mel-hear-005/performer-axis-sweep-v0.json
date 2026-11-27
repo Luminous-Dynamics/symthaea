@@ -1,0 +1,33 @@
+{
+  "bootstrap_replicates": 399,
+  "limitations": [
+    "balanced complete work-by-performer panel only",
+    "one performer identity per cell",
+    "Gaussian additive random-effects data-generating process",
+    "nominal percentile intervals; no small-sample correction",
+    "simulation does not establish real-world sampling exchangeability"
+  ],
+  "nominal_confidence_level": 0.95,
+  "numpy": "2.3.5",
+  "python": "3.13.5",
+  "random_effect_standard_deviations": {
+    "performer": 0.3,
+    "source_work": 0.18,
+    "work_performer_cell": 0.3
+  },
+  "research_only": true,
+  "scenarios": [
+    {"performers": 5, "two_way_mean_interval_width": 0.48063906752885055, "two_way_monte_carlo_se": 0.009894442884771228, "two_way_pigeonhole_coverage": 0.89, "work_only_coverage": 0.466, "work_only_mean_interval_width": 0.1549511767727274, "work_only_monte_carlo_se": 0.01577479001445027},
+    {"performers": 8, "two_way_mean_interval_width": 0.40692001747754925, "two_way_monte_carlo_se": 0.010050074626588601, "two_way_pigeonhole_coverage": 0.886, "work_only_coverage": 0.468, "work_only_mean_interval_width": 0.14373772778125105, "work_only_monte_carlo_se": 0.015778973350633434},
+    {"performers": 10, "two_way_mean_interval_width": 0.37789462282689806, "two_way_monte_carlo_se": 0.008771772910877251, "two_way_pigeonhole_coverage": 0.916, "work_only_coverage": 0.516, "work_only_mean_interval_width": 0.1396850589041469, "work_only_monte_carlo_se": 0.015803290796539814},
+    {"performers": 12, "two_way_mean_interval_width": 0.35090878152063615, "two_way_monte_carlo_se": 0.008676174272108645, "two_way_pigeonhole_coverage": 0.918, "work_only_coverage": 0.552, "work_only_mean_interval_width": 0.1376027975644356, "work_only_monte_carlo_se": 0.015725647910391186},
+    {"performers": 15, "two_way_mean_interval_width": 0.32521396125910473, "two_way_monte_carlo_se": 0.007683163410991592, "two_way_pigeonhole_coverage": 0.937, "work_only_coverage": 0.554, "work_only_mean_interval_width": 0.13498491622232134, "work_only_monte_carlo_se": 0.01571890581433708},
+    {"performers": 20, "two_way_mean_interval_width": 0.2895942566882409, "two_way_monte_carlo_se": 0.007739767438366605, "two_way_pigeonhole_coverage": 0.936, "work_only_coverage": 0.591, "work_only_mean_interval_width": 0.13108984563309609, "work_only_monte_carlo_se": 0.015547314880711718},
+    {"performers": 30, "two_way_mean_interval_width": 0.24948045354322806, "two_way_monte_carlo_se": 0.007084560677981384, "two_way_pigeonhole_coverage": 0.947, "work_only_coverage": 0.672, "work_only_mean_interval_width": 0.1292699280001562, "work_only_monte_carlo_se": 0.014846413708367418},
+    {"performers": 50, "two_way_mean_interval_width": 0.21155276389523958, "two_way_monte_carlo_se": 0.00762600813007697, "two_way_pigeonhole_coverage": 0.938, "work_only_coverage": 0.734, "work_only_mean_interval_width": 0.12797598360031476, "work_only_monte_carlo_se": 0.013972973913952606}
+  ],
+  "schema": "mel-hear-005-performer-axis-sweep-v0",
+  "seed": 20261127,
+  "simulations_per_axis": 1000,
+  "works": 30
+}
