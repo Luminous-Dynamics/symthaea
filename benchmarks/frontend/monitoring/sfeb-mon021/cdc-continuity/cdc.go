@@ -107,6 +107,31 @@ func ValidateInitialSnapshot(p Profile,s SlotState,point LSN,digest string)Resul
 	if s.ConfirmedFlushLSN!=nil&&*s.ConfirmedFlushLSN>*p.ConsistentPoint{return out(Indeterminate,"slot acknowledgement is beyond initial snapshot boundary; reconcile with a durable stream manifest",c...)}
 	return out(Qualified,"initial snapshot and logical slot are bound to the same source profile",append(c,"slot-retention-health")...)
 }
+func transactionMembersConsistent(m Manifest)(Decision,string){
+	txs:=map[string]Transaction{}
+	events:=map[string]DecodedEvent{}
+	for _,tx:=range m.Transactions{
+		if !present(tx.XID){return Indeterminate,"transaction envelope missing XID"}
+		if _,ok:=txs[tx.XID];ok{return Divergent,"duplicate transaction envelope: "+tx.XID}
+		txs[tx.XID]=tx
+	}
+	for _,e:=range m.Events{
+		if prior,ok:=events[e.ID];ok{if prior!=e{return Divergent,"duplicate event ID has conflicting transaction fields: "+e.ID};continue}
+		events[e.ID]=e
+	}
+	for xid,tx:=range txs{
+		members:=map[string]bool{}
+		for _,id:=range tx.EventIDs{
+			if members[id]{return Divergent,"transaction repeats event membership: "+id}
+			members[id]=true
+			e,ok:=events[id]
+			if !ok||e.XID!=xid||e.CommitLSN!=tx.CommitLSN{return Indeterminate,"transaction/event membership or commit boundary mismatch: "+id}
+		}
+		for id,e:=range events{if e.XID==xid&&!members[id]{return Indeterminate,"event missing from transaction envelope: "+id}}
+	}
+	for id,e:=range events{tx,ok:=txs[e.XID];if !ok{return Indeterminate,"event has no transaction envelope: "+id};if tx.State!="committed"||tx.CommitLSN!=e.CommitLSN{return Indeterminate,"event is not attached to a committed transaction boundary: "+id}}
+	return Qualified,""
+}
 func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
 	c:=[]string{"source-slot-profile","capture-range","decoded-event-order","durable-evidence-before-ack"}
 	if !profileOK(p){return out(Indeterminate,"source profile incomplete or PostgreSQL major version unsupported",c...)}
@@ -123,6 +148,7 @@ func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
 	if s.ConfirmedFlushLSN!=nil&&*s.ConfirmedFlushLSN>m.EvidenceThroughLSN{return out(Denied,"observed confirmed_flush_lsn exceeds durable evidence",c...)}
 	if *s.RestartLSN>m.StartExclusiveLSN{return out(Indeterminate,"slot restart_lsn is later than required capture start",c...)}
 	txByXID:=map[string]Transaction{}
+	commitOwner:=map[LSN]string{}
 	for _,tx:=range m.Transactions {
 		if !present(tx.XID) { return out(Indeterminate,"transaction envelope missing XID",c...) }
 		if _,ok:=txByXID[tx.XID];ok { return out(Divergent,"duplicate transaction envelope: "+tx.XID,c...) }
@@ -136,6 +162,8 @@ func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
 		default:
 			return out(Indeterminate,"unknown or incomplete transaction terminal state: "+tx.XID,c...)
 		}
+		if prior,ok:=commitOwner[tx.CommitLSN];ok&&prior!=tx.XID{return out(Divergent,"different XIDs claim the same commit record LSN",c...)}
+		commitOwner[tx.CommitLSN]=tx.XID
 		txByXID[tx.XID]=tx
 	}
 	seen:=map[string]DecodedEvent{}
@@ -143,7 +171,7 @@ func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
 	ordinalByXID:=map[string][]uint32{}
 	var prev LSN
 	for _,e:=range m.Events{
-		if !present(e.ID,e.XID,e.PayloadDigest){return out(Indeterminate,"decoded event identity incomplete",c...)}
+		if !present(e.ID,e.XID,e.PayloadDigest)||e.Ordinal==0{return out(Indeterminate,"decoded event identity/ordinal incomplete",c...)}
 		if prior,ok:=seen[e.ID];ok{if prior!=e{return out(Divergent,"same event identity has conflicting fields or payload: "+e.ID,c...)};continue}
 		if e.CommitLSN<=m.StartExclusiveLSN||e.CommitLSN>m.TerminalLSN{return out(Denied,"decoded event outside declared exclusive-start/terminal interval: "+e.ID,c...)}
 		if len(seen)>0&&e.CommitLSN<prev{return out(Denied,"decoded event LSN order regressed",c...)}
@@ -181,6 +209,8 @@ func sameTransaction(a,b Transaction)bool{
 }
 func ValidateReplay(old,next Manifest)Result{
 	c:=[]string{"overlap-replay-reconciliation","transaction-envelope-reconciliation","durable-watermark-and-acknowledgement"}
+	if d,r:=transactionMembersConsistent(old);d!=Qualified{return out(d,"old manifest: "+r,c...)}
+	if d,r:=transactionMembersConsistent(next);d!=Qualified{return out(d,"new manifest: "+r,c...)}
 	if old.SourceEpoch!=next.SourceEpoch||old.TimelineID!=next.TimelineID||old.SlotName!=next.SlotName||old.DatabaseOID!=next.DatabaseOID||old.PluginProfileDigest!=next.PluginProfileDigest||old.SchemaProfileDigest!=next.SchemaProfileDigest{return out(Divergent,"capture source epoch/slot/timeline/profile changed without handoff",c...)}
 	if !old.Complete||!old.Witnessed||!present(old.ManifestDigest)||!next.Complete||!next.Witnessed||!present(next.ManifestDigest){return out(Indeterminate,"old or new replay manifest lacks completeness/seal evidence",c...)}
 	if next.StartExclusiveLSN>old.EvidenceThroughLSN{return out(Indeterminate,"new capture starts after prior durable evidence; unaccounted range gap",c...)}
