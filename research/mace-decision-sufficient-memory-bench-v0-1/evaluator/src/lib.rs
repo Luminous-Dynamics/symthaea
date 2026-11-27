@@ -251,7 +251,7 @@ fn action_loss(case: &EvaluatorCaseV1, action: &str) -> Option<u64> {
 
 /// Validate evaluator-only ground truth before scoring any candidate output.
 pub fn validate_case(case: &EvaluatorCaseV1) -> Result<(), EvaluationErrorV1> {
-    if case.episode_id.is_empty() {
+    if case.episode_id.trim().is_empty() {
         return Err(EvaluationErrorV1::EmptyEpisodeId);
     }
     if case.allowed_actions.is_empty() {
@@ -329,7 +329,7 @@ fn validate_candidate(
     case: &EvaluatorCaseV1,
     candidate: &CandidateRunV1,
 ) -> Result<(), EvaluationErrorV1> {
-    if candidate.episode_id != case.episode_id {
+    if candidate.episode_id.trim().is_empty() || candidate.episode_id != case.episode_id {
         return Err(EvaluationErrorV1::EpisodeMismatch);
     }
     if candidate.system_id.trim().is_empty() {
@@ -575,18 +575,18 @@ impl SplitMix64V1 {
 fn validate_paired_score(score: &PairedScoreV1) -> Result<(), EvaluationErrorV1> {
     if score.memory.system_id == score.no_memory.system_id
         || score.memory.oracle_loss_micros != score.no_memory.oracle_loss_micros
-        || score.memory.decision_regret_micros
-            != score.memory.decision_loss_micros - score.memory.oracle_loss_micros
-        || score.no_memory.decision_regret_micros
-            != score.no_memory.decision_loss_micros - score.no_memory.oracle_loss_micros
+        || score.memory.decision_loss_micros.checked_sub(score.memory.oracle_loss_micros)
+            != Some(score.memory.decision_regret_micros)
+        || score.no_memory.decision_loss_micros.checked_sub(score.no_memory.oracle_loss_micros)
+            != Some(score.no_memory.decision_regret_micros)
         || score.memory.decision_optimal != (score.memory.decision_regret_micros == 0)
         || score.no_memory.decision_optimal != (score.no_memory.decision_regret_micros == 0)
         || score.no_memory.returned_evidence_count != 0
         || score.no_memory.admissible_returned_evidence_count != 0
         || score.no_memory.inadmissible_returned_evidence_count != 0
-        || score.memory.returned_evidence_count
-            != score.memory.admissible_returned_evidence_count
-                + score.memory.inadmissible_returned_evidence_count
+        || score.memory.admissible_returned_evidence_count
+            .checked_add(score.memory.inadmissible_returned_evidence_count)
+            != Some(score.memory.returned_evidence_count)
     {
         return Err(EvaluationErrorV1::InvalidPairedScore);
     }
