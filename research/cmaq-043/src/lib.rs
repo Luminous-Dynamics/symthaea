@@ -572,9 +572,8 @@ mod tests {
             Err(BudgetError::ScopeIdentityMismatch)
         );
 
-        let mut wrong_deployment = scope(1, 2, 1, "stream-4");
-        wrong_deployment.deployment_id = "deployment-other".into();
-        // The channel-index mismatch is caught first.
+        let mut wrong_deployment = scope(1, 1, 2, "stream-4");
+        wrong_deployment.deployment_id = "deployment-1".into();
         assert_eq!(
             ledger.allocate_once(&budget_plan, &wrong_deployment),
             Err(BudgetError::ScopeIdentityMismatch)
