@@ -64,7 +64,7 @@ A run directory must contain:
 2. Run ID, selected PostgreSQL major, Kafka/Connect versions and image digests.
 3. Source system identifier, database, source epoch, timeline, publication, slot and snapshot metadata.
 4. Workload manifest: expected event IDs, transaction groups, payload digests and generation parameters.
-5. Connector configuration, task state, observed source offsets, restart count and error log digest.
+5. Connector configuration, task state, observed source offsets, restart count and error log digest; transaction BEGIN/END receipts, `event_count`, transaction ID joins and per-event order checks.
 6. Independent Kafka readback: observed event IDs, exact payload digests, duplicate/replay groups, conflicting identities and missing events.
 7. Source SQL state manifest at the intended recovery point.
 8. Base-backup manifest, required archived WAL interval, requested recovery LSN/timeline and achieved recovery state.
@@ -84,7 +84,7 @@ The dedicated Debezium role has REPLICATION, CONNECT, schema USAGE and SELECT on
 5. Capture pre-workload SQL manifest; provision a dedicated least-privilege replication role, register the connector, and independently verify initial snapshot completion.
 6. Create a deterministic transaction batch and capture expected IDs directly from PostgreSQL.
 7. Execute one fault at a time from the fault matrix. Record injection time and exact command outcome.
-8. Recover connector/broker/database as required. Read Kafka independently and reconcile exact IDs and payload digests.
+8. Recover connector/broker/database as required. Read Kafka independently and reconcile exact IDs and payload digests; independently reconcile Debezium transaction boundary metadata and per-event ordering.
 9. Capture source state manifest at a known recovery boundary.
 10. Create physical base backup and ensure archive coverage for the required WAL interval.
 11. Capture a repeatable-read state manifest with its LSN, timeline, system identifier and wall-clock observation; restore into a separate volume at that LSN and pinned timeline; keep the restored service isolated.
