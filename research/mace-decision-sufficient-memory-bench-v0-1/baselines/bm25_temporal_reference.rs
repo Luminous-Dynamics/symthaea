@@ -80,6 +80,12 @@ pub struct RetrievalHitV1 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RetrievalWorkV1 {
     pub eligible_document_count: u64,
+    /// In-scope documents at the knowledge-time cut inspected for valid-time eligibility.
+    pub scope_knowledge_documents_checked: u64,
+    /// Eligible document lengths summed to compute BM25 average-length statistics.
+    pub eligible_document_lengths_scanned: u64,
+    /// Distinct query terms for which a scope/time-bounded posting lookup was attempted.
+    pub query_term_posting_lookups: u64,
     /// Posting rows visited inside the requested scope and knowledge-time cut.
     pub scope_knowledge_postings_visited: u64,
     /// Posting rows that also pass valid-time filtering and contribute to scores.
@@ -405,6 +411,9 @@ impl Bm25IndexV1 {
                 hits: Vec::new(),
                 work: RetrievalWorkV1 {
                     eligible_document_count: 0,
+                    scope_knowledge_documents_checked: 0,
+                    eligible_document_lengths_scanned: 0,
+                    query_term_posting_lookups: 0,
                     scope_knowledge_postings_visited: 0,
                     eligible_postings_scored: 0,
                     scored_document_count: 0,
@@ -433,6 +442,9 @@ impl Bm25IndexV1 {
                 hits: Vec::new(),
                 work: RetrievalWorkV1 {
                     eligible_document_count: eligible_count as u64,
+                    scope_knowledge_documents_checked: knowledge_visible_indexes.len() as u64,
+                    eligible_document_lengths_scanned: 0,
+                    query_term_posting_lookups: 0,
                     scope_knowledge_postings_visited: 0,
                     eligible_postings_scored: 0,
                     scored_document_count: 0,
@@ -448,11 +460,13 @@ impl Bm25IndexV1 {
             .sum();
         let average_length = total_tokens as f64 / eligible_count as f64;
         let mut scores = BTreeMap::<usize, f64>::new();
+        let mut query_term_posting_lookups = 0_u64;
         let mut scope_knowledge_postings_visited = 0_u64;
         let mut eligible_postings_scored = 0_u64;
 
         if average_length > 0.0 {
             for (term, query_frequency) in query_terms {
+                query_term_posting_lookups = query_term_posting_lookups.saturating_add(1);
                 let key = (query.scope_id.clone(), term);
                 let Some(postings) = self.postings.get(&key) else {
                     continue;
@@ -518,6 +532,9 @@ impl Bm25IndexV1 {
             hits,
             work: RetrievalWorkV1 {
                 eligible_document_count: eligible_count as u64,
+                scope_knowledge_documents_checked: knowledge_visible_indexes.len() as u64,
+                eligible_document_lengths_scanned: eligible_count as u64,
+                query_term_posting_lookups,
                 scope_knowledge_postings_visited,
                 eligible_postings_scored,
                 scored_document_count,
@@ -845,17 +862,24 @@ mod tests {
         }
         let extended = index(extended_documents);
         let q = query("pump pressure inspection", "tenant-a", 10, 10);
-        assert_eq!(base.search(&q).unwrap(), extended.search(&q).unwrap());
+        let base_result = base.search(&q).unwrap();
+        let extended_result = extended.search(&q).unwrap();
+        assert_eq!(extended_result, base_result);
         assert_eq!(
-            extended
-                .search(&q)
-                .unwrap()
-                .work
-                .scope_knowledge_postings_visited,
-            base.search(&q)
-                .unwrap()
-                .work
-                .scope_knowledge_postings_visited
+            extended_result.work.scope_knowledge_documents_checked,
+            base_result.work.scope_knowledge_documents_checked
+        );
+        assert_eq!(
+            extended_result.work.eligible_document_lengths_scanned,
+            base_result.work.eligible_document_lengths_scanned
+        );
+        assert_eq!(
+            extended_result.work.query_term_posting_lookups,
+            base_result.work.query_term_posting_lookups
+        );
+        assert_eq!(
+            extended_result.work.scope_knowledge_postings_visited,
+            base_result.work.scope_knowledge_postings_visited
         );
     }
 
