@@ -119,8 +119,7 @@ impl SinusoidalVelocityKick {
     /// Its determinant is one and it preserves the canonical symplectic form.
     pub fn state_jacobian(&self, position: f64) -> Result<Matrix2, PulseMapError> {
         let angle = self.angle(position)?;
-        let wave_number =
-            std::f64::consts::TAU * f64::from(self.mode) / self.domain_length;
+        let wave_number = std::f64::consts::TAU * f64::from(self.mode) / self.domain_length;
         let shear = self.amplitude * wave_number * angle.cos();
         if !shear.is_finite() {
             return Err(PulseMapError::NonFiniteDerivative);
@@ -163,11 +162,7 @@ impl SinusoidalVelocityKick {
     /// This is an external intervention. Kinetic energy and momentum are not
     /// invariants across the kick; record this change rather than enforcing
     /// conservation through the pulse.
-    pub fn kinetic_energy_delta(
-        &self,
-        position: f64,
-        velocity: f64,
-    ) -> Result<f64, PulseMapError> {
+    pub fn kinetic_energy_delta(&self, position: f64, velocity: f64) -> Result<f64, PulseMapError> {
         if !velocity.is_finite() {
             return Err(PulseMapError::InvalidParticleState);
         }
@@ -298,8 +293,7 @@ pub fn check_pulse_jacobians_central_difference(
         (fd_v_phase - analytic_parameters.dv_d_phase).abs(),
     ];
     let state_jacobian_max_abs_error = state_errors.into_iter().fold(0.0_f64, f64::max);
-    let parameter_jacobian_max_abs_error =
-        parameter_errors.into_iter().fold(0.0_f64, f64::max);
+    let parameter_jacobian_max_abs_error = parameter_errors.into_iter().fold(0.0_f64, f64::max);
     let symplectic_defect = analytic_state.symplectic_defect();
 
     if !state_jacobian_max_abs_error.is_finite()
@@ -346,13 +340,7 @@ mod tests {
     #[test]
     fn exact_state_jacobian_is_symplectic_and_unit_determinant() {
         let kick = manufactured_kick();
-        for x in [
-            -std::f64::consts::PI,
-            -1.2,
-            0.0,
-            2.1,
-            std::f64::consts::PI,
-        ] {
+        for x in [-std::f64::consts::PI, -1.2, 0.0, 2.1, std::f64::consts::PI] {
             let matrix = kick.state_jacobian(x).unwrap();
             assert!((matrix.determinant() - 1.0).abs() < 1.0e-14);
             assert!(matrix.symplectic_defect() < 1.0e-14);
