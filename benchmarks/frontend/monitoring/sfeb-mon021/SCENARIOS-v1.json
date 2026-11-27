@@ -3,7 +3,7 @@
   "corpus_version": "1.0.0",
   "status": "research_seed",
   "purpose": "Synthetic scenarios for PostgreSQL logical-decoding snapshot, slot, WAL, durability, retention and failover continuity assurance. Descriptive seeds, not runtime observations.",
-  "postgresql_profile": "PostgreSQL 18; adapters must pin exact minor version and output-plugin profile.",
+  "postgresql_profile": "PostgreSQL 18 and 19; pin exact minor version, effective_wal_level and output-plugin profile.",
   "scenarios": [
     {
       "id": "CDC-001",
@@ -344,6 +344,106 @@
       "required_control": "continue",
       "severity": "critical",
       "positive_control": true
+    },
+    {
+      "id": "CDC-035",
+      "family": "replay",
+      "description": "A Debezium PostgreSQL connector restarts with lsn_events_processed=1 or an offset at a transactional logical message; the known regression case must replay without losing an event.",
+      "expected_decision": "qualified",
+      "reason_code": "debezium_371_restart_regression_control",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-036",
+      "family": "durability",
+      "description": "One row event is present but its transaction envelope omits the event ID or commit/end LSN boundary.",
+      "expected_decision": "indeterminate",
+      "reason_code": "transaction_envelope_incomplete",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-037",
+      "family": "durability",
+      "description": "Multiple events share a transaction commit LSN and are bound to one XID with strictly increasing per-transaction ordinals and a complete commit/end envelope.",
+      "expected_decision": "qualified",
+      "reason_code": "multi_message_transaction_envelope_valid",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-038",
+      "family": "durability",
+      "description": "A prepared or unresolved two-phase transaction is treated as an ordinary committed transaction by a decoder profile that has not qualified PREPARE/COMMIT PREPARED handling.",
+      "expected_decision": "indeterminate",
+      "reason_code": "two_phase_transaction_unqualified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-039",
+      "family": "identity",
+      "description": "PostgreSQL 19 is configured with wal_level=replica but effective_wal_level is logical after logical slot creation, and the version-specific state is captured.",
+      "expected_decision": "qualified",
+      "reason_code": "postgres19_effective_wal_level_verified",
+      "required_control": "continue",
+      "severity": "high",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-040",
+      "family": "identity",
+      "description": "PostgreSQL 19 reports effective_wal_level=replica while the adapter attempts to claim logical decoding continuity.",
+      "expected_decision": "denied",
+      "reason_code": "effective_wal_level_not_logical",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-041",
+      "family": "completeness",
+      "description": "A failover claim relies only on a sequence page LSN, while nextval calls may have advanced within the cached sequence block without a new WAL record.",
+      "expected_decision": "indeterminate",
+      "reason_code": "sequence_page_lsn_not_exact_state",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-042",
+      "family": "completeness",
+      "description": "A PostgreSQL 19 sequence has been explicitly refreshed, and publisher/subscriber last_value, is_called and sequence definition match under a separately qualified snapshot.",
+      "expected_decision": "qualified",
+      "reason_code": "sequence_state_reconciled_outside_row_stream",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "CDC-043",
+      "family": "completeness",
+      "description": "A logical-replication completeness claim silently includes DDL, large objects or generated-column values that are not covered by the declared source/plugin profile.",
+      "expected_decision": "denied",
+      "reason_code": "unsupported_database_surface_overclaim",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "CDC-044",
+      "family": "timeline",
+      "description": "PostgreSQL 19 WAIT FOR LSN returns success on a numerically advanced standby position but the requested LSN belongs to an unexpected timeline.",
+      "expected_decision": "indeterminate",
+      "reason_code": "wait_lsn_requires_timeline_validation",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
     }
   ]
 }
