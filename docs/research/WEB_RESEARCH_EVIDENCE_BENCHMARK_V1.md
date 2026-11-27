@@ -156,6 +156,22 @@ Primary references:
 - Scientific knowledge graphs and dynamic evidence (2026): https://doi.org/10.1093/nsr/nwag140
 - Functionality–Evidence–Validation framework for agentic bioinformatics (25 Nov 2026): https://doi.org/10.1093/bib/bbag650
 
+## Decision value of the next experiment
+
+The selector contract is already owned by [SE-OPT-BENCH-001 #7803](https://github.com/Luminous-Dynamics/symthaea/issues/7803) and the evidence-acquisition planner [#5596](https://github.com/Luminous-Dynamics/symthaea/issues/5596). Do not add another research selector here.
+
+The research-lifecycle benchmarks above should inform the selector as **separate admissibility dimensions**:
+
+- Can the proposed observation change a decision, rather than merely reduce entropy?
+- Can the proposed measurement/reproduction be executed under the independently reviewed method and budget? (#14020 METHODE-Bench)
+- Will it provide genuinely independent, counterfactually relevant source evidence? (#13993 CEDAR-Bench)
+- Can the raw artifact be captured, parsed and located precisely? (#13900/#13901)
+- Can a future correction reach the dependent analysis and decision? (#13926/#13928 REPAIR-Bench)
+
+Keep expected value of sample information and expected decision regret separate from distribution-free worst-case regret/robust-feasibility. An interval is not a probability distribution. Failed, censored, unavailable and unauthorized actions retain their cost and disposition. High predicted information gain cannot override privacy, consent, safety or authority constraints. A calibration/provenance audit can be more decision-useful than another data sample when it makes existing evidence admissible.
+
+Evaluation should compare seeded-random, space-filling, max-uncertainty, declared information-gain, decision-regret, robust-feasibility and no-information/abstain controls under the same initial evidence and all-in cost budget. Hide oracle values until each next-action selection is committed. Report regret, false-feasible decisions, frontier stability, source independence, method fidelity, evidence eligibility, correction reach, cost and human authorization separately—not as one opaque utility score.
+
 ## Experimental method fidelity: METHODE-Bench
 
 A scientific workflow can execute successfully while failing to reproduce the experiment it claims to implement. The new [METHODE-Bench issue #14020](https://github.com/Luminous-Dynamics/symthaea/issues/14020) and [draft Rust contract PR #14022](https://github.com/Luminous-Dynamics/symthaea/pull/14022) make method fidelity an independent conformance axis. The first harness binds the reviewed method to exact dataset/split, preprocessing, component, baseline, metric, budget, output and replay identities. It classifies a declared exploratory deviation separately from faithful reproduction and unresolved execution.
