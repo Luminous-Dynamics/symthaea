@@ -115,6 +115,27 @@ fn audit(fixture: &Value) -> Result<(), String> {
         "branch_change_disposition",
         "UNKNOWN_OR_HANDOFF",
     )?;
+    if !boolean(linearization, "pulse_application_time_jacobian_required")?
+        || !boolean(
+            linearization,
+            "pulse_time_finite_difference_cross_check_required",
+        )?
+    {
+        return Err(
+            "pulse application-time sensitivity and independent cross-check are mandatory"
+                .to_owned(),
+        );
+    }
+    require_string(
+        linearization,
+        "pulse_time_sensitivity_convention",
+        "scheduled_reset_D_R_f_minus_plus_R_t_minus_f_plus",
+    )?;
+    require_string(
+        linearization,
+        "pulse_time_sensitivity_status",
+        "synthetic_not_computed",
+    )?;
 
     let horizon = field(fixture, "prediction_horizon")?;
     let horizon_start = number(horizon, "start_time")?;
