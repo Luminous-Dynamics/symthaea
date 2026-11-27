@@ -26,6 +26,9 @@ func independent(id,surface,scope string) Attestation {
 	a:=ev(id,surface,IndependentComparison,scope)
 	a.ObserverID="observer"
 	a.ObserverControlRoot="third-admin"
+	a.ObserverIdentityDigest="observer-identity-digest"
+	a.ObserverControlRootDigest="observer-root-membership-digest"
+	a.ObserverVerified=true
 	return a
 }
 func addFullStateEvidence(r *Request) {
@@ -122,12 +125,24 @@ func TestUnknownClaimScopeIndeterminate(t *testing.T) {
 func TestUnrecordedObserverControlDomainNotAccepted(t *testing.T) {
 	r:=base();addFullStateEvidence(&r);r.Attestations[1].ObserverControlRoot="";check(t,Evaluate(r),Indeterminate)
 }
+func TestObserverIdentityMustNotAliasSourceOrTarget(t *testing.T) {
+	r:=base();addFullStateEvidence(&r);r.Attestations[1].ObserverID=r.SourceSystem;check(t,Evaluate(r),Indeterminate)
+}
+func TestObserverControlRootMembershipMustBeVerified(t *testing.T) {
+	r:=base();addFullStateEvidence(&r);r.Attestations[1].ObserverVerified=false;check(t,Evaluate(r),Indeterminate)
+}
+func TestObserverIdentityEvidenceRequired(t *testing.T) {
+	r:=base();addFullStateEvidence(&r);r.Attestations[1].ObserverIdentityDigest="";check(t,Evaluate(r),Indeterminate)
+}
+func TestObserverControlRootEvidenceRequired(t *testing.T) {
+	r:=base();addFullStateEvidence(&r);r.Attestations[1].ObserverControlRootDigest="";check(t,Evaluate(r),Indeterminate)
+}
 func FuzzSurfaceScopeIdentity(f *testing.F) {
-	f.Add("rows-scope","rows-scope")
-	f.Add("schema-scope","other")
-	f.Fuzz(func(t *testing.T,expected,actual string) {
+	f.Add("rows-scope")
+	f.Add("different-scope")
+	f.Fuzz(func(t *testing.T,actual string) {
 		r:=base();addFullStateEvidence(&r);r.Attestations[0].ScopeDigest=actual
 		out:=Evaluate(r)
-		if actual!=expected && out.Decision==Qualified { t.Fatal("mismatched surface scope qualified") }
+		if actual!="rows-scope" && out.Decision==Qualified { t.Fatal("mismatched surface scope qualified") }
 	})
 }
