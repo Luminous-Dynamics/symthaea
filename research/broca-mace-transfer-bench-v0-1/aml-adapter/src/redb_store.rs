@@ -27,10 +27,13 @@ use sha2::{Digest, Sha256};
 
 use super::{
     add_payload_digest, AddRequest, AddVisibilityReceiptV1, AddVisibilityVerifierV1,
-    AmlReject, ContentPart, DurableAddKeyV1, DurableAddReconciliationV1,
-    DurableAddReservationV1, DurableMemoryRecordV1, DurableScopedSearchItemV1,
-    DurableStoreErrorV1, DurableAmlStoreV1, FrozenAdapterWordCounter,
-    MessageContent, SearchItem, SearchRequest, SearchResponse, Track,
+    AmlReject, ContentPart, MessageContent, SearchItem, SearchRequest,
+    SearchResponse, Track,
+};
+use super::durable_service::{
+    DurableAddKeyV1, DurableAddReconciliationV1, DurableAddReservationV1,
+    DurableMemoryRecordV1, DurableScopedSearchItemV1, DurableStoreErrorV1,
+    DurableAmlStoreV1,
 };
 
 const ADD_LEDGER: TableDefinition<&str, &[u8]> =
@@ -757,10 +760,8 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    use super::super::{
-        idempotency_payload_digest, DurableAmlServiceV1, DurableAmlServiceErrorV1,
-        FrozenAdapterWordCounter, Message, Role,
-    };
+    use super::super::{idempotency_payload_digest, FrozenAdapterWordCounter, Message, Role};
+    use super::super::durable_service::{DurableAmlServiceV1, DurableAmlServiceErrorV1};
 
     static NEXT_FILE: AtomicU64 = AtomicU64::new(1);
 
