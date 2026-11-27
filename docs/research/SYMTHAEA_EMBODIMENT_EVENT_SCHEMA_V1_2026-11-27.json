@@ -570,73 +570,87 @@
                 "pattern": "^[A-Za-z0-9._:-]+$"
               }
             },
-            "allOf": [
+            "oneOf": [
               {
-                "if": {
-                  "properties": {
-                    "action": {
-                      "const": "cancel"
-                    }
-                  },
-                  "required": [
-                    "action"
-                  ]
-                },
-                "then": {
-                  "required": [
-                    "target_event_id"
-                  ]
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "action"
+                ],
+                "properties": {
+                  "action": {
+                    "const": "pause"
+                  }
                 }
               },
               {
-                "if": {
-                  "properties": {
-                    "action": {
-                      "const": "choose_form"
-                    }
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "action",
+                  "target_event_id"
+                ],
+                "properties": {
+                  "action": {
+                    "const": "cancel"
                   },
-                  "required": [
-                    "action"
-                  ]
-                },
-                "then": {
-                  "required": [
-                    "form_id"
-                  ]
+                  "target_event_id": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  }
                 }
               },
               {
-                "if": {
-                  "properties": {
-                    "action": {
-                      "const": "set_reduced_motion"
-                    }
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "action",
+                  "form_id"
+                ],
+                "properties": {
+                  "action": {
+                    "const": "choose_form"
                   },
-                  "required": [
-                    "action"
-                  ]
-                },
-                "then": {
-                  "required": [
-                    "enabled"
-                  ]
+                  "form_id": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  }
                 }
               },
               {
-                "if": {
-                  "properties": {
-                    "action": {
-                      "const": "set_intensity"
-                    }
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "action",
+                  "enabled"
+                ],
+                "properties": {
+                  "action": {
+                    "const": "set_reduced_motion"
                   },
-                  "required": [
-                    "action"
-                  ]
-                },
-                "then": {
-                  "required": [
-                    "intensity"
-                  ]
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "action",
+                  "intensity"
+                ],
+                "properties": {
+                  "action": {
+                    "const": "set_intensity"
+                  },
+                  "intensity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
                 }
               }
             ]
