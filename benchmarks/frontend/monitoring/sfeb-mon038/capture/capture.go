@@ -235,7 +235,7 @@ func Evaluate(in Input)Result{
   if _,ok:=inventory[key];ok{f.block("topic_inventory_duplicate",t.Topic);continue}
   inventory[key]=t
   kafkaClusters[t.ClusterID]=struct{}{}
-  topicKey:=t.ClusterID+"\\x00"+t.TopicID
+  topicKey:=t.ClusterID+"\x00"+t.TopicID
   if previous,ok:=topicIDs[topicKey];ok&&previous!=t.Topic{f.block("duplicate_topic_id",t.Topic)}else{topicIDs[topicKey]=t.Topic}
   if expectedPartitions>MaxPartitions-t.PartitionCount { expectedPartitions=MaxPartitions+1 } else { expectedPartitions+=t.PartitionCount }
   if !validDigest(t.ConfigSHA256){f.hold("topic_config_digest_missing",t.Topic)}
