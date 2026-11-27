@@ -421,7 +421,11 @@ mod tests {
         }
         let mean = sum / samples as f64;
         let variance = sum_squares / samples as f64 - mean * mean;
-        assert!((variance - 1.0).abs() < 0.08, "observed variance {:.4}", variance);
+        assert!(
+            (variance - 1.0).abs() < 0.08,
+            "observed variance {:.4}",
+            variance
+        );
     }
 
     #[test]
