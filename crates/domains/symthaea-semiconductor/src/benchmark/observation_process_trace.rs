@@ -1386,6 +1386,15 @@ mod tests {
             independently_archived: false,
             archive_receipt_sha256: None,
         };
+        value.rows[1].audit = IndependentAuditEvidenceV1 {
+            state: IndependentAuditStateV1::NotSelected,
+            inclusion_probability: Some(0.2),
+            selection_receipt_sha256: Some(digest('g')),
+            measurement_receipt_sha256: None,
+            loss: None,
+            independently_archived: false,
+            archive_receipt_sha256: None,
+        };
         for row in &mut value.rows {
             row.row_sha256 = row_digest(row).unwrap();
         }
@@ -1418,6 +1427,8 @@ mod tests {
             proxy_delay_steps: Some(1),
             proxy_survival_probability: Some(0.5),
         };
+        value.rows[1].controller.state = ControllerTrackingStateV1::Pending;
+        value.rows[1].controller.prediction_receipt_sha256 = Some(digest('d'));
         for row in &mut value.rows {
             row.row_sha256 = row_digest(row).unwrap();
         }
@@ -1451,6 +1462,16 @@ mod tests {
             proxy_delay_steps: Some(3),
             proxy_survival_probability: Some(0.2),
         };
+        value.rows[1].controller = ControllerTrackingEvidenceV1 {
+            state: ControllerTrackingStateV1::NotAdmitted,
+            prediction_receipt_sha256: Some(digest('d')),
+            feedback_receipt_sha256: None,
+            degenerate_resolution_receipt_sha256: None,
+            feedback_update_applied: false,
+            actual_delay_steps: None,
+            proxy_delay_steps: Some(-1),
+            proxy_survival_probability: None,
+        };
         for row in &mut value.rows {
             row.row_sha256 = row_digest(row).unwrap();
         }
@@ -1479,6 +1500,15 @@ mod tests {
             loss: Some(0.4),
             independently_archived: true,
             archive_receipt_sha256: Some(digest('f')),
+        };
+        value.rows[1].audit = IndependentAuditEvidenceV1 {
+            state: IndependentAuditStateV1::NotSelected,
+            inclusion_probability: Some(0.2),
+            selection_receipt_sha256: Some(digest('g')),
+            measurement_receipt_sha256: None,
+            loss: None,
+            independently_archived: false,
+            archive_receipt_sha256: None,
         };
         for row in &mut value.rows {
             row.row_sha256 = row_digest(row).unwrap();
