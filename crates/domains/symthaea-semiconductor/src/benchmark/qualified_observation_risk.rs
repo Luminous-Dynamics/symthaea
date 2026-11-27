@@ -400,7 +400,12 @@ pub fn compute_qualified_observation_risk_v1(
 
     let mut sorted_units = input.units.clone();
     sorted_units.sort_by_key(|unit| unit.round);
-    for unit in &sorted_units {
+    for (index, unit) in sorted_units.iter().enumerate() {
+        if unit.round != index as u64 + 1 {
+            return Err(QualifiedObservationRiskErrorV1(
+                "observation rounds must be a consecutive 1..=population sequence".into(),
+            ));
+        }
         validate_unit(unit)?;
         if !rounds.insert(unit.round) || !samples.insert(unit.sample_id.as_str()) {
             return Err(QualifiedObservationRiskErrorV1(
@@ -666,9 +671,13 @@ mod tests {
 
     fn assumptions(ignorable: bool) -> ObservationProcessAssumptionsV1 {
         ObservationProcessAssumptionsV1 {
-            conditional_probability_factorization_verified: true,
-            conditional_ignorability_verified: ignorable,
-            positivity_verified: true,
+            conditional_probability_factorization: ObservationAssumptionStatusV1::Satisfied,
+            conditional_ignorability: if ignorable {
+                ObservationAssumptionStatusV1::Satisfied
+            } else {
+                ObservationAssumptionStatusV1::Unknown
+            },
+            positivity: ObservationAssumptionStatusV1::Satisfied,
             evidence_receipt_sha256: digest('a'),
         }
     }
@@ -684,6 +693,8 @@ mod tests {
         assert_eq!(report.identification, PopulationRiskIdentificationV1::ExactAllUnitRisk);
         assert!((report.worst_case_bounds.lower_bound - 2.0 / 3.0).abs() < 1.0e-12);
         assert_eq!(report.worst_case_bounds.interval_width, 0.0);
+        assert!((report.exact_population_risk.unwrap() - 2.0 / 3.0).abs() < 1.0e-12);
+        assert!(report.physical_observation_ipw.is_none());
         assert!(!report.theorem_or_guarantee_claimed);
     }
 
@@ -716,6 +727,33 @@ mod tests {
         .unwrap();
         assert_eq!(report.identification, PopulationRiskIdentificationV1::IpwIdentifiedUnderDeclaredAssumptions);
         assert!((report.physical_observation_ipw.unwrap().estimate - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn physical_ipw_does_not_require_online_tracking_propensity() {
+        let mut observed = qualified_unit(1, 1.0, false);
+        observed.available_by_update_frontier = false;
+        observed.probabilities.online_tracking_probability_given_selection = None;
+        observed.probabilities.frontier_availability_probability_given_qualified = None;
+        let mut missing = missing_unit(2, MetrologyQualificationStatusV1::NotSelected, false, false);
+        missing.probabilities.online_tracking_probability_given_selection = None;
+        missing.probabilities.frontier_availability_probability_given_qualified = None;
+
+        let report = compute_qualified_observation_risk_v1(&input(
+            vec![observed, missing],
+            assumptions(true),
+        ))
+        .unwrap();
+
+        assert_eq!(
+            report.identification,
+            PopulationRiskIdentificationV1::IpwIdentifiedUnderDeclaredAssumptions
+        );
+        assert!(report.physical_observation_ipw.is_some());
+        assert!(report.online_update_ipw.is_none());
+        assert!(report.reason_codes.contains(
+            &"online_stage_propensities_incomplete_or_invalid".to_string()
+        ));
     }
 
     #[test]
