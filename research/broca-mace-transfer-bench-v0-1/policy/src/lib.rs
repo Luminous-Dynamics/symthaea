@@ -169,6 +169,24 @@ impl EvidenceDigest256 {
     }
 }
 
+/// Named inputs for a versioned semantic estimand identity.
+///
+/// A named bundle avoids positional constructor mistakes: swapping two
+/// 256-bit digests must be explicit at the call site.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SemanticEstimandFieldsV1 {
+    pub schema_version: u16,
+    pub population_spec_digest: EvidenceDigest256,
+    pub treatment_version_digest: EvidenceDigest256,
+    pub comparator_version_digest: EvidenceDigest256,
+    pub outcome_definition_digest: EvidenceDigest256,
+    pub outcome_unit_digest: EvidenceDigest256,
+    pub follow_up_horizon_ms: u64,
+    pub censoring_strategy_digest: EvidenceDigest256,
+    pub intercurrent_event_strategy_digest: EvidenceDigest256,
+    pub target_weighting_digest: EvidenceDigest256,
+}
+
 /// Versioned semantic identity of a causal estimand. Each field digest is
 /// produced from a canonical typed subdocument by the trusted verifier.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -199,29 +217,18 @@ impl SemanticEstimandV1 {
         target_weighting_digest: EvidenceDigest256::UNKNOWN,
     };
 
-    pub const fn new(
-        schema_version: u16,
-        population_spec_digest: EvidenceDigest256,
-        treatment_version_digest: EvidenceDigest256,
-        comparator_version_digest: EvidenceDigest256,
-        outcome_definition_digest: EvidenceDigest256,
-        outcome_unit_digest: EvidenceDigest256,
-        follow_up_horizon_ms: u64,
-        censoring_strategy_digest: EvidenceDigest256,
-        intercurrent_event_strategy_digest: EvidenceDigest256,
-        target_weighting_digest: EvidenceDigest256,
-    ) -> Self {
+    pub const fn new(fields: SemanticEstimandFieldsV1) -> Self {
         Self {
-            schema_version,
-            population_spec_digest,
-            treatment_version_digest,
-            comparator_version_digest,
-            outcome_definition_digest,
-            outcome_unit_digest,
-            follow_up_horizon_ms,
-            censoring_strategy_digest,
-            intercurrent_event_strategy_digest,
-            target_weighting_digest,
+            schema_version: fields.schema_version,
+            population_spec_digest: fields.population_spec_digest,
+            treatment_version_digest: fields.treatment_version_digest,
+            comparator_version_digest: fields.comparator_version_digest,
+            outcome_definition_digest: fields.outcome_definition_digest,
+            outcome_unit_digest: fields.outcome_unit_digest,
+            follow_up_horizon_ms: fields.follow_up_horizon_ms,
+            censoring_strategy_digest: fields.censoring_strategy_digest,
+            intercurrent_event_strategy_digest: fields.intercurrent_event_strategy_digest,
+            target_weighting_digest: fields.target_weighting_digest,
         }
     }
 
@@ -999,18 +1006,18 @@ mod tests {
     }
 
     fn fixture_semantic_estimand() -> SemanticEstimandV1 {
-        SemanticEstimandV1::new(
-            1,
-            EvidenceDigest256::from_bytes([1; 32]),
-            EvidenceDigest256::from_bytes([2; 32]),
-            EvidenceDigest256::from_bytes([3; 32]),
-            EvidenceDigest256::from_bytes([4; 32]),
-            EvidenceDigest256::from_bytes([5; 32]),
-            30_000,
-            EvidenceDigest256::from_bytes([6; 32]),
-            EvidenceDigest256::from_bytes([7; 32]),
-            EvidenceDigest256::from_bytes([8; 32]),
-        )
+        SemanticEstimandV1::new(SemanticEstimandFieldsV1 {
+            schema_version: 1,
+            population_spec_digest: EvidenceDigest256::from_bytes([1; 32]),
+            treatment_version_digest: EvidenceDigest256::from_bytes([2; 32]),
+            comparator_version_digest: EvidenceDigest256::from_bytes([3; 32]),
+            outcome_definition_digest: EvidenceDigest256::from_bytes([4; 32]),
+            outcome_unit_digest: EvidenceDigest256::from_bytes([5; 32]),
+            follow_up_horizon_ms: 30_000,
+            censoring_strategy_digest: EvidenceDigest256::from_bytes([6; 32]),
+            intercurrent_event_strategy_digest: EvidenceDigest256::from_bytes([7; 32]),
+            target_weighting_digest: EvidenceDigest256::from_bytes([8; 32]),
+        })
     }
 
     fn fixture_causal_identification(seed: u32) -> CausalIdentificationV1 {
@@ -1569,18 +1576,18 @@ mod decision_need_contract_tests {
     use super::*;
 
     fn estimand(population: u8) -> SemanticEstimandV1 {
-        SemanticEstimandV1::new(
-            1,
-            EvidenceDigest256::from_bytes([population; 32]),
-            EvidenceDigest256::from_bytes([2; 32]),
-            EvidenceDigest256::from_bytes([3; 32]),
-            EvidenceDigest256::from_bytes([4; 32]),
-            EvidenceDigest256::from_bytes([5; 32]),
-            30_000,
-            EvidenceDigest256::from_bytes([6; 32]),
-            EvidenceDigest256::from_bytes([7; 32]),
-            EvidenceDigest256::from_bytes([8; 32]),
-        )
+        SemanticEstimandV1::new(SemanticEstimandFieldsV1 {
+            schema_version: 1,
+            population_spec_digest: EvidenceDigest256::from_bytes([population; 32]),
+            treatment_version_digest: EvidenceDigest256::from_bytes([2; 32]),
+            comparator_version_digest: EvidenceDigest256::from_bytes([3; 32]),
+            outcome_definition_digest: EvidenceDigest256::from_bytes([4; 32]),
+            outcome_unit_digest: EvidenceDigest256::from_bytes([5; 32]),
+            follow_up_horizon_ms: 30_000,
+            censoring_strategy_digest: EvidenceDigest256::from_bytes([6; 32]),
+            intercurrent_event_strategy_digest: EvidenceDigest256::from_bytes([7; 32]),
+            target_weighting_digest: EvidenceDigest256::from_bytes([8; 32]),
+        })
     }
 
     #[test]
