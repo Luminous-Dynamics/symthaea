@@ -607,6 +607,8 @@ mod tests {
         manifest.windows[1].window_pcm_sha256 = sha256_hex(&yoked_pcm[20..32]);
         manifest.context.items[0].payload_sha256 = manifest.windows[0].window_pcm_sha256.clone();
         manifest.context.items[1].payload_sha256 = manifest.windows[1].window_pcm_sha256.clone();
+        manifest.request_body.body_sha256 = sha256_hex(YOKED_REQUEST_BODY);
+        manifest.request_body.byte_length = YOKED_REQUEST_BODY.len() as u64;
         case.evidence.as_mut().unwrap().source_audio_sha256 = yoked_digest;
         case.evidence.as_mut().unwrap().evidence_payload_sha256 =
             manifest.windows[0].window_pcm_sha256.clone();
