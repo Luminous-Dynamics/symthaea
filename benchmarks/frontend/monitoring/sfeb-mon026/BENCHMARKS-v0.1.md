@@ -62,4 +62,4 @@ MON-026 should only claim an advantage if it provides:
 - cross-run chain verification;
 - less operator work and lower total custody cost than matched external attestations.
 
-A valid signature must never be described as proof that the database or recovery outcome is true.
+A valid signature must never be described as proof that the database or recovery outcome is true. The exact inventory also requires the signed manifest and signature envelope to be stored outside the artifact root.
