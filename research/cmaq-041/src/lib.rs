@@ -12,6 +12,22 @@ use std::collections::{BTreeMap, HashSet};
 const PROGRESS_SCALE_PPM: u32 = 1_000_000;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EvidenceBindings {
+    pub source_trace_sha256: String,
+    pub scenario_manifest_sha256: String,
+    pub ground_truth_receipt_sha256: String,
+    pub system_build_sha256: String,
+    pub monitor_build_sha256: String,
+    pub fallback_policy_sha256: String,
+    pub score_definition_sha256: String,
+    pub score_receipt_sha256: String,
+    pub closure_manifest_sha256: String,
+    pub closure_authority_receipt_sha256: String,
+    /// CMAQ-036 effective block identity; repeated IDs mark correlated episodes.
+    pub effective_block_id: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EpisodeTrace {
     pub episode_id: String,
     pub family_id: String,
@@ -34,6 +50,7 @@ pub struct EpisodeTrace {
     pub task_completed: bool,
     /// Useful progress in parts per million, in [0, 1_000_000].
     pub useful_progress_ppm: u32,
+    pub evidence: EvidenceBindings,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -41,6 +58,8 @@ pub enum EvaluationError {
     EmptyEpisodeId,
     EmptyFamilyId,
     DuplicateEpisodeId,
+    InvalidEvidenceDigest(&'static str),
+    EmptyEffectiveBlockId,
     ZeroDuration,
     MissingRecoverabilityDeadline,
     UnexpectedRecoverabilityDeadline,
@@ -56,6 +75,8 @@ pub enum EvaluationError {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Metrics {
     pub episodes: usize,
+    /// Number of unique CMAQ-036 effective block IDs, not raw episode count.
+    pub effective_block_count: usize,
     pub intervention_required_episodes: usize,
     pub timely_warnings: usize,
     pub late_or_missing_warnings: usize,
@@ -106,6 +127,7 @@ pub struct Scorecard {
 #[derive(Clone, Debug, Default)]
 struct Accumulator {
     metrics: Metrics,
+    effective_block_ids: HashSet<String>,
     warning_leads_us: Vec<u64>,
     quarantine_leads_us: Vec<u64>,
     fallback_leads_us: Vec<u64>,
@@ -114,6 +136,8 @@ struct Accumulator {
 impl Accumulator {
     fn add_episode(&mut self, episode: &EpisodeTrace) -> Result<(), EvaluationError> {
         bump(&mut self.metrics.episodes)?;
+        self.effective_block_ids
+            .insert(episode.evidence.effective_block_id.clone());
         if episode.safety_violation {
             bump(&mut self.metrics.safety_violations)?;
         }
@@ -177,6 +201,7 @@ impl Accumulator {
     }
 
     fn finish(mut self) -> Metrics {
+        self.metrics.effective_block_count = self.effective_block_ids.len();
         self.warning_leads_us.sort_unstable();
         self.quarantine_leads_us.sort_unstable();
         self.fallback_leads_us.sort_unstable();
@@ -248,6 +273,28 @@ fn validate_episode(episode: &EpisodeTrace) -> Result<(), EvaluationError> {
     if episode.useful_progress_ppm > PROGRESS_SCALE_PPM {
         return Err(EvaluationError::ProgressOutOfRange);
     }
+    if episode.evidence.effective_block_id.trim().is_empty() {
+        return Err(EvaluationError::EmptyEffectiveBlockId);
+    }
+    for (digest, label) in [
+        (&episode.evidence.source_trace_sha256, "source_trace_sha256"),
+        (&episode.evidence.scenario_manifest_sha256, "scenario_manifest_sha256"),
+        (&episode.evidence.ground_truth_receipt_sha256, "ground_truth_receipt_sha256"),
+        (&episode.evidence.system_build_sha256, "system_build_sha256"),
+        (&episode.evidence.monitor_build_sha256, "monitor_build_sha256"),
+        (&episode.evidence.fallback_policy_sha256, "fallback_policy_sha256"),
+        (&episode.evidence.score_definition_sha256, "score_definition_sha256"),
+        (&episode.evidence.score_receipt_sha256, "score_receipt_sha256"),
+        (&episode.evidence.closure_manifest_sha256, "closure_manifest_sha256"),
+        (
+            &episode.evidence.closure_authority_receipt_sha256,
+            "closure_authority_receipt_sha256",
+        ),
+    ] {
+        if !is_sha256(digest) {
+            return Err(EvaluationError::InvalidEvidenceDigest(label));
+        }
+    }
 
     match (episode.intervention_required, episode.recoverability_deadline_us) {
         (true, None) => return Err(EvaluationError::MissingRecoverabilityDeadline),
@@ -305,6 +352,13 @@ fn validate_episode(episode: &EpisodeTrace) -> Result<(), EvaluationError> {
     Ok(())
 }
 
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn bump(value: &mut usize) -> Result<(), EvaluationError> {
     *value = value
         .checked_add(1)
@@ -335,6 +389,23 @@ fn nearest_rank(sorted: &[u64], numerator: usize, denominator: usize) -> Option<
 mod tests {
     use super::*;
 
+    fn evidence_for(id: &str) -> EvidenceBindings {
+        let digest = "a".repeat(64);
+        EvidenceBindings {
+            source_trace_sha256: digest.clone(),
+            scenario_manifest_sha256: digest.clone(),
+            ground_truth_receipt_sha256: digest.clone(),
+            system_build_sha256: digest.clone(),
+            monitor_build_sha256: digest.clone(),
+            fallback_policy_sha256: digest.clone(),
+            score_definition_sha256: digest.clone(),
+            score_receipt_sha256: digest.clone(),
+            closure_manifest_sha256: digest.clone(),
+            closure_authority_receipt_sha256: digest,
+            effective_block_id: format!("block-{id}"),
+        }
+    }
+
     fn hazard(
         id: &str,
         family: &str,
@@ -355,6 +426,7 @@ mod tests {
             safety_violation: false,
             task_completed: false,
             useful_progress_ppm: 120_000,
+            evidence: evidence_for(id),
         }
     }
 
@@ -378,6 +450,7 @@ mod tests {
             safety_violation: false,
             task_completed: true,
             useful_progress_ppm: 875_000,
+            evidence: evidence_for(id),
         }
     }
 
@@ -426,9 +499,41 @@ mod tests {
         ])
         .unwrap();
         assert_eq!(score.overall.intervention_required_episodes, 2);
+        assert_eq!(score.overall.effective_block_count, 2);
         assert_eq!(score.by_family["highway"].timely_warnings, 1);
         assert_eq!(score.by_family["construction"].late_or_missing_warnings, 1);
         assert_eq!(score.by_family.len(), 2);
+    }
+
+    #[test]
+    fn effective_block_ids_are_counted_once_even_with_many_episodes() {
+        let mut first = hazard("h1", "merge", Some(500), Some(550), Some(700));
+        let mut second = hazard("h2", "merge", Some(510), Some(560), Some(710));
+        first.evidence.effective_block_id = "shared-drive-session".into();
+        second.evidence.effective_block_id = "shared-drive-session".into();
+        let score = evaluate(&[first, second]).unwrap();
+        assert_eq!(score.overall.episodes, 2);
+        assert_eq!(score.overall.effective_block_count, 1);
+    }
+
+    #[test]
+    fn malformed_evidence_digest_is_rejected() {
+        let mut episode = safe("s1", "urban", None, None, None);
+        episode.evidence.source_trace_sha256 = "not-a-sha256".into();
+        assert_eq!(
+            evaluate(&[episode]),
+            Err(EvaluationError::InvalidEvidenceDigest("source_trace_sha256"))
+        );
+    }
+
+    #[test]
+    fn empty_effective_block_id_is_rejected() {
+        let mut episode = safe("s1", "urban", None, None, None);
+        episode.evidence.effective_block_id = "   ".into();
+        assert_eq!(
+            evaluate(&[episode]),
+            Err(EvaluationError::EmptyEffectiveBlockId)
+        );
     }
 
     #[test]
