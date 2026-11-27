@@ -401,26 +401,6 @@
           },
           {
             "sequence": 4,
-            "at_monotonic_ns": 130,
-            "clock_domain_id": "clock:synthetic-1",
-            "event_type": "presentation",
-            "output_id": "output:1",
-            "semantic_event_id": "event:1",
-            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "grant_id": "grant:1",
-            "form": "living_constellation",
-            "channel": "visual",
-            "stage": "frame_presented",
-            "frame_index": 1,
-            "effective_intensity": 0.4,
-            "observed_by": "compositor-observer:test",
-            "destination": "local_private",
-            "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 130,
-            "privacy_class": "public"
-          },
-          {
-            "sequence": 5,
             "at_monotonic_ns": 140,
             "clock_domain_id": "clock:synthetic-1",
             "event_type": "policy_change",
@@ -430,7 +410,7 @@
             "affected_event_id": "event:1"
           },
           {
-            "sequence": 6,
+            "sequence": 5,
             "at_monotonic_ns": 145,
             "clock_domain_id": "clock:synthetic-1",
             "event_type": "authorization",
@@ -448,7 +428,7 @@
             "privacy_class": "public"
           },
           {
-            "sequence": 7,
+            "sequence": 6,
             "at_monotonic_ns": 150,
             "clock_domain_id": "clock:synthetic-1",
             "event_type": "presentation",
@@ -458,9 +438,9 @@
             "grant_id": "grant:1",
             "form": "living_constellation",
             "channel": "visual",
-            "stage": "output_stopped",
+            "stage": "frame_presented",
             "frame_index": 2,
-            "effective_intensity": 0,
+            "effective_intensity": 0.4,
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
@@ -468,7 +448,7 @@
             "privacy_class": "public"
           },
           {
-            "sequence": 8,
+            "sequence": 7,
             "at_monotonic_ns": 155,
             "clock_domain_id": "clock:synthetic-1",
             "event_type": "presentation",
@@ -478,9 +458,9 @@
             "grant_id": "grant:1",
             "form": "living_constellation",
             "channel": "visual",
-            "stage": "frame_presented",
+            "stage": "output_stopped",
             "frame_index": 3,
-            "effective_intensity": 0.4,
+            "effective_intensity": 0,
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
