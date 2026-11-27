@@ -1,0 +1,25 @@
+name: MACE Selective Risk Calibrator
+on:
+  pull_request:
+    paths:
+      - "research/mace-selective-risk-calibrator-v0-1/**"
+      - "data/schemas/mace_selective_evidence_sufficiency_v0_1.schema.json"
+      - "docs/research/MACE_SELECTIVE_RISK_CALIBRATOR_V0_1.md"
+      - ".github/workflows/mace-selective-risk-calibrator.yml"
+  push:
+    branches:
+      - "research/mace-selective-risk-calibrator-v0-1"
+jobs:
+  calibrator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Parse standalone evaluator
+        run: rustfmt --edition 2024 --emit stdout --config skip_children=true research/mace-selective-risk-calibrator-v0-1/src/lib.rs >/dev/null
+      - name: Test standalone calibrator
+        run: cargo test --manifest-path research/mace-selective-risk-calibrator-v0-1/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/mace-selective-risk-calibrator-v0-1/Cargo.toml --all-targets -- -D warnings
+      - name: Parse selective sufficiency schema
+        run: python3 -m json.tool data/schemas/mace_selective_evidence_sufficiency_v0_1.schema.json >/dev/null
