@@ -4,7 +4,7 @@ import "testing"
 
 func stamp(domain string,t,u int64) ClockStamp {return ClockStamp{Domain:domain,UnixNanos:t,UncertaintyNanos:u,Trusted:true}}
 func base() Request {
-	p:=Plan{ID:"plan",Version:"1",Digest:"plan-digest",RequestedClaim:ServiceRecovered,SourceSystem:"source-sys",Database:"app",SourceControlRoot:"source-root",RestoreTargetSystem:"restore-sys",RestoreControlRoot:"restore-root",RepositoryID:"repo",BackupMethodProfile:"pgbackrest-v1",RequestedTarget:RecoveryTarget{Mode:"lsn",Value:"0/500",LineageID:"lineage",TimelineID:1,LSN:0x500},RequiredWALStart:0x100,RequiredWALStop:0x600,RequireFullDatabaseStateFlag:true,SurfaceInventoryDigest:"surface-inventory",RequiredDependencyIDs:[]string{"kms","dns"},ApplicationReleaseDigest:"release",InvariantSuiteDigest:"suite",MaxRPOUpperNanos:60_000_000_000,MaxDatabaseRTOUpperNanos:600_000_000_000,MaxServiceRTOUpperNanos:900_000_000_000,IncidentAt:stamp("utc",10_000_000_000_000,1_000_000)}
+	p:=Plan{ID:"plan",Version:"1",Digest:"plan-digest",RequestedClaim:ServiceRecovered,SourceSystem:"source-sys",Database:"app",SourceControlRoot:"source-root",RestoreTargetSystem:"restore-sys",RestoreControlRoot:"restore-root",RepositoryID:"repo",BackupMethodProfile:"pgbackrest-v1",RequestedTarget:RecoveryTarget{Mode:"lsn",Value:"0/500",LineageID:"lineage",TimelineID:1,LSN:0x500},RequiredWALStart:0x100,RequiredWALStop:0x600,RequireFullDatabaseStateFlag:true,SurfaceInventoryDigest:"surface-inventory",SurfaceClaimScope:"full_database_state",RequiredDependencyIDs:[]string{"kms","dns"},ApplicationReleaseDigest:"release",InvariantSuiteDigest:"suite",MaxRPOUpperNanos:60_000_000_000,MaxDatabaseRTOUpperNanos:600_000_000_000,MaxServiceRTOUpperNanos:900_000_000_000,IncidentAt:stamp("utc",10_000_000_000_000,1_000_000)}
 	a:=ArtifactEvidence{SourceSystem:"source-sys",Database:"app",BackupSetID:"backup",RepositoryID:"repo",BackupDigest:"backup-digest",WALManifestDigest:"wal-digest",MethodProfileDigest:"pgbackrest-v1",EvidenceDigest:"artifact-evidence",WALStart:0x100,WALStop:0x700,LineageID:"lineage",TimelineID:1,IntegrityVerified:true,WALComplete:true,NoWALGaps:true,VerifierVerified:true,Complete:true,ObservedAt:9_900_000_000_000,FreshUntil:10_400_000_000_000}
 	x:=RestoreExecution{EnvironmentID:"restore-sys",ControlRoot:"restore-root",Isolated:true,NetworkEgressBlocked:true,ProductionWritesBlocked:true,ScopedCredentials:true,CommandProfileDigest:"restore-cmd",RestoreManifestDigest:"restore-manifest",SourceSystem:"source-sys",Database:"app",RestoredSystemIdentifier:"source-sys",TimelineID:1,LineageID:"lineage",TimelineHistoryDigest:"timeline-history",TimelineHistoryVerified:true,RecoveryState:"ready",ConsistencyReached:true,TargetReached:true,CatalogChecksPassed:true,RequestedTarget:p.RequestedTarget,AchievedTarget:RecoveryTarget{Mode:"lsn",Value:"0/500",LineageID:"lineage",TimelineID:1,LSN:0x500,RecoveryTimestamp:9_990_000_000_000,RecoveryClockDomain:"utc",RecoveryClockUncertainty:1_000_000,RecoveryClockTrusted:true},StartedAt:stamp("utc",10_001_000_000_000,1_000_000),DatabaseReadyAt:stamp("utc",10_100_000_000_000,1_000_000),EvidenceDigest:"restore-evidence",VerifierVerified:true,Complete:true,FreshUntil:10_400_000_000_000}
 	s:=SurfaceCoverage{Verified:true,FullDatabaseState:true,InventoryDigest:"surface-inventory",Scope:"full_database_state",RequiredCovered:14,RequiredTotal:14,EvidenceDigest:"surface-evidence"}
@@ -75,4 +75,23 @@ func TestDuplicateApplicationProbeDivergent(t *testing.T) {
 }
 func TestServiceObserverCannotAliasRestoreEnvironment(t *testing.T) {
  r:=base();r.Acceptance.ObserverID=r.Restore.EnvironmentID;check(t,Evaluate(r),Indeterminate)
+}
+
+func TestSurfaceClaimScopeMismatchIndeterminate(t *testing.T) {
+ r:=base();r.Surface.Scope="scoped_database_state";check(t,Evaluate(r),Indeterminate)
+}
+func TestUnverifiedApplicationProbeIndeterminate(t *testing.T) {
+ r:=base();r.Probes[0].Verified=false;check(t,Evaluate(r),Indeterminate)
+}
+func TestMissingInvariantProbeIndeterminate(t *testing.T) {
+ r:=base();r.Probes=r.Probes[:2];check(t,Evaluate(r),Indeterminate)
+}
+func TestDatabaseReadyBeforeRestoreStartDivergent(t *testing.T) {
+ r:=base();r.Restore.DatabaseReadyAt.UnixNanos=r.Restore.StartedAt.UnixNanos-1;check(t,Evaluate(r),Divergent)
+}
+func TestServiceReadyMustFollowTrafficEnable(t *testing.T) {
+ r:=base();r.Acceptance.ReadyAt.UnixNanos=r.Acceptance.TrafficEnabledAt.UnixNanos-1;check(t,Evaluate(r),Denied)
+}
+func TestVerifiedDependencyUnavailableDenied(t *testing.T) {
+ r:=base();r.Dependencies[0].Ready=false;check(t,Evaluate(r),Denied)
 }
