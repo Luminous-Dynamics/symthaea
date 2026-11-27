@@ -554,22 +554,6 @@ mod tests {
             "unadjudicated predictions must not train source credibility"
         );
     }
-        assert_eq!(stats.accuracy, 0.5);
-        assert_eq!(stats.source_count, 0);
-        assert_eq!(stats.domain_count, 0);
-        assert!(!learner.is_ready());
-        assert_eq!(
-            learner.get_domain_expertise("science"),
-            0.5,
-            "unadjudicated predictions must not train domain expertise"
-        );
-        assert!(
-            learner
-                .get_source_credibility("self-referential.example")
-                .is_none(),
-            "unadjudicated predictions must not train source credibility"
-        );
-    }
 
     #[test]
     fn meta_phi_updates_after_ten_new_adjudications() {
