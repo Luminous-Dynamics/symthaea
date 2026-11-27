@@ -63,6 +63,10 @@ fn main() -> anyhow::Result<()> {
         let task_id = task_id.ok_or_else(|| {
             anyhow::anyhow!("--observation requires --task-id")
         })?;
+        // Never trust an adapter's comparison against an arbitrary or mutated
+        // task definition. Re-validate the frozen corpus and all fixture
+        // digests before selecting the task for system-observation grading.
+        let _validated_seed = eqc::validate_corpus_file(&corpus_path, &repository_root)?;
         let corpus_bytes = fs::read(&corpus_path)?;
         let corpus_value: serde_json::Value = serde_json::from_slice(&corpus_bytes)?;
         let task = corpus_value
