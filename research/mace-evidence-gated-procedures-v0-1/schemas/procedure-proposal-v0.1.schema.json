@@ -168,7 +168,8 @@
             "items": {
               "type": "string",
               "minLength": 1
-            }
+            },
+            "minItems": 1
           },
           "inputs": {
             "type": "array",
@@ -203,7 +204,8 @@
                   "type": "string"
                 }
               }
-            }
+            },
+            "minItems": 1
           },
           "expected_observations": {
             "type": "array",
