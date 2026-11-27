@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/schemas/response-v0.1.schema.json",
+  "title": "MACE DSM Candidate Response v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_id",
+    "arm_id",
+    "action",
+    "selected_evidence_ids",
+    "observation_requests",
+    "cost"
+  ],
+  "properties": {
+    "schema_version": { "const": "mace_dsm_response_v0_1" },
+    "episode_id": { "type": "string", "minLength": 1 },
+    "arm_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "action": { "type": "string", "minLength": 1 },
+    "selected_evidence_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "observation_requests": { "type": "integer", "minimum": 0 },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingest_operations",
+        "query_operations",
+        "maintenance_operations",
+        "retained_bytes",
+        "returned_bytes",
+        "latency_us"
+      ],
+      "properties": {
+        "ingest_operations": { "type": "integer", "minimum": 0 },
+        "query_operations": { "type": "integer", "minimum": 0 },
+        "maintenance_operations": { "type": "integer", "minimum": 0 },
+        "retained_bytes": { "type": "integer", "minimum": 0 },
+        "returned_bytes": { "type": "integer", "minimum": 0 },
+        "latency_us": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}
