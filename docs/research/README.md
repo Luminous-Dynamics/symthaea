@@ -44,6 +44,8 @@ event contract.
 - [Presentation grant fixtures](SYMTHAEA_PRESENTATION_CONSENT_GRANT_FIXTURES_V1_2026-11-27.json)
 - [Competitive baselines and differentiation](SYMTHAEA_EMBODIMENT_COMPETITIVE_BASELINES_V0_1_2026-11-27.md)
 - [Integrated interaction benchmark protocol](SYMTHAEA_INTERACTION_BENCH_INTEGRATION_V0_1_2026-11-27.md)
+- [Interaction trace schema](SYMTHAEA_INTERACTION_TRACE_SCHEMA_V1_2026-11-27.json)
+- [Interaction trace fixtures](SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json)
 - [Turn-control benchmark protocol](SYMTHAEA_TURN_CONTROL_BENCHMARK_V0_1_2026-11-27.md)
 - [Cross-form semantic continuity](SYMTHAEA_CROSS_FORM_CONTINUITY_V0_1_2026-11-27.md)
 - [Scene continuity descriptor schema](SYMTHAEA_SCENE_CONTINUITY_SCHEMA_V1_2026-11-27.json)

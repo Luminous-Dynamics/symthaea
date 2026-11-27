@@ -1,0 +1,760 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea-interaction-trace-v1.json",
+  "title": "Symthaea Interaction Trace v1",
+  "description": "Privacy-minimized, monotonic-clock interaction trace for causal voice, visual embodiment, authorization and grounding evaluation. Cross-event causal rules are enforced by the trace verifier, not this structural schema.",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "symthaea.interaction-trace.v1"
+    },
+    "trace_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "protocol": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{40}$"
+    },
+    "dataset_digest": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "run_manifest": {
+      "type": "object",
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "renderer_build": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "device_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "os_build": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "policy_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scorer_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "network_profile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "evaluation_split": {
+          "enum": [
+            "development",
+            "validation",
+            "test",
+            "synthetic_fault_injection"
+          ]
+        }
+      },
+      "required": [
+        "model_id",
+        "renderer_build",
+        "device_id",
+        "os_build",
+        "policy_version",
+        "scorer_version",
+        "network_profile",
+        "evaluation_split"
+      ],
+      "additionalProperties": false
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/inputChunk"
+          },
+          {
+            "$ref": "#/$defs/semanticCue"
+          },
+          {
+            "$ref": "#/$defs/turnDecision"
+          },
+          {
+            "$ref": "#/$defs/authorization"
+          },
+          {
+            "$ref": "#/$defs/action"
+          },
+          {
+            "$ref": "#/$defs/presentation"
+          },
+          {
+            "$ref": "#/$defs/policyChange"
+          },
+          {
+            "$ref": "#/$defs/groundingProbe"
+          },
+          {
+            "$ref": "#/$defs/resourceSample"
+          }
+        ]
+      }
+    },
+    "declared_outcome": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "task_success": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "unauthorized_actions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "post_expiry_frames": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "user_visible_stop_latency_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "semantic_preservation_score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "task_success",
+        "unauthorized_actions",
+        "post_expiry_frames",
+        "user_visible_stop_latency_ms",
+        "semantic_preservation_score"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema",
+    "trace_id",
+    "session_id",
+    "protocol",
+    "source_commit",
+    "dataset_digest",
+    "run_manifest",
+    "events"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "eventBase": {
+      "type": "object",
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "at_monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "clock_domain_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        }
+      },
+      "required": [
+        "sequence",
+        "at_monotonic_ns",
+        "clock_domain_id"
+      ]
+    },
+    "inputChunk": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "const": "input_chunk"
+            },
+            "modality": {
+              "enum": [
+                "audio",
+                "video",
+                "text"
+              ]
+            },
+            "stream_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "payload_digest": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            },
+            "duration_ms": {
+              "type": "number",
+              "minimum": 0
+            },
+            "arrival_at_monotonic_ns": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "event_type",
+            "modality",
+            "stream_id",
+            "payload_digest",
+            "duration_ms",
+            "arrival_at_monotonic_ns"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "semanticCue": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "const": "semantic_cue"
+            },
+            "event_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "canonical_cue_digest": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            },
+            "semantic_key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "privacy_class": {
+              "enum": [
+                "public",
+                "local_sensitive",
+                "restricted"
+              ]
+            },
+            "epistemic_status": {
+              "enum": [
+                "measured",
+                "inferred",
+                "predicted",
+                "unknown",
+                "verified",
+                "unverified"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "event_id",
+            "canonical_cue_digest",
+            "semantic_key",
+            "privacy_class",
+            "epistemic_status"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "turnDecision": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "const": "turn_decision"
+            },
+            "candidate_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "decision": {
+              "enum": [
+                "wait",
+                "respond",
+                "continue",
+                "yield",
+                "abstain"
+              ]
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "deadline_at_monotonic_ns": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "emitted_at_monotonic_ns": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "abstain_reason": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            }
+          },
+          "required": [
+            "event_type",
+            "candidate_id",
+            "decision",
+            "confidence",
+            "deadline_at_monotonic_ns",
+            "emitted_at_monotonic_ns"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "authorization": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "const": "authorization"
+            },
+            "decision": {
+              "enum": [
+                "authorized",
+                "denied",
+                "revoked",
+                "expired"
+              ]
+            },
+            "grant_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "permit_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-fA-F0-9]{64}$"
+            },
+            "canonical_cue_digest": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            },
+            "channel": {
+              "enum": [
+                "visual",
+                "audio",
+                "haptic",
+                "actuator",
+                "network"
+              ]
+            },
+            "destination": {
+              "enum": [
+                "local_private",
+                "shared_local",
+                "remote"
+              ]
+            },
+            "expires_at_monotonic_ns": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "policy_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "event_type",
+            "decision",
+            "grant_id",
+            "permit_digest",
+            "canonical_cue_digest",
+            "channel",
+            "destination",
+            "expires_at_monotonic_ns",
+            "policy_version"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "action": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "const": "action"
+            },
+            "action_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "action_kind": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "authorization_sequence": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "state": {
+              "enum": [
+                "proposed",
+                "submitted",
+                "completed",
+                "cancelled",
+                "rejected"
+              ]
+            },
+            "side_effect": {
+              "type": "boolean"
+            },
+            "outcome_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          },
+          "required": [
+            "event_type",
+            "action_id",
+            "action_kind",
+            "authorization_sequence",
+            "state",
+            "side_effect",
+            "outcome_digest"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "presentation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "const": "presentation"
+            },
+            "output_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "semantic_event_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "canonical_cue_digest": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            },
+            "grant_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "form": {
+              "enum": [
+                "living_constellation",
+                "puppet_theatre",
+                "mycelial_being",
+                "swarm",
+                "living_instrument",
+                "hearth_companion",
+                "cognitive_mandala"
+              ]
+            },
+            "channel": {
+              "enum": [
+                "visual",
+                "audio",
+                "haptic",
+                "actuator",
+                "network"
+              ]
+            },
+            "stage": {
+              "enum": [
+                "adapter_submitted",
+                "frame_presented",
+                "output_stopped"
+              ]
+            },
+            "frame_index": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "effective_intensity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "observed_by": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "event_type",
+            "output_id",
+            "semantic_event_id",
+            "canonical_cue_digest",
+            "grant_id",
+            "form",
+            "channel",
+            "stage",
+            "frame_index",
+            "effective_intensity",
+            "observed_by"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "policyChange": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "const": "policy_change"
+            },
+            "policy_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "change": {
+              "enum": [
+                "pause",
+                "resume",
+                "revoke",
+                "replace_grant",
+                "reduce_motion",
+                "privacy_downgrade",
+                "cancel_event"
+              ]
+            },
+            "grant_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "affected_event_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          "required": [
+            "event_type",
+            "policy_version",
+            "change",
+            "grant_id",
+            "affected_event_id"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "groundingProbe": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "const": "grounding_probe"
+            },
+            "probe_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            },
+            "probe_kind": {
+              "enum": [
+                "known_fact",
+                "updated_fact",
+                "absent_fact",
+                "speaker_attribution",
+                "constraint",
+                "false_premise",
+                "correction"
+              ]
+            },
+            "answer_digest": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            },
+            "supporting_sequences": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "uniqueItems": true
+            },
+            "abstained": {
+              "type": "boolean"
+            },
+            "scored_correctly": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "event_type",
+            "probe_id",
+            "probe_kind",
+            "answer_digest",
+            "supporting_sequences",
+            "abstained",
+            "scored_correctly"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "resourceSample": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "const": "resource_sample"
+            },
+            "cpu_percent": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "gpu_percent": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "rss_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "dropped_frames": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "power_mw": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "thermal_state": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "event_type",
+            "cpu_percent",
+            "gpu_percent",
+            "rss_bytes",
+            "dropped_frames",
+            "power_mw",
+            "thermal_state"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
