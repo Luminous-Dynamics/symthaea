@@ -97,6 +97,9 @@ pub mod integrator;
 // Meta-learning for self-improvement
 pub mod meta_learning;
 
+// Versioned, adjudication-only selective-prediction evaluation
+pub mod selective_prediction;
+
 // Re-exports for ergonomic access
 pub use conjecture_feed::{
     ConjectureFeedError, ConjectureFeeder, ProvenancedConjecture, ResearchNumericDataset,
@@ -115,6 +118,10 @@ pub use meta_learning::{
     VerificationStrategy,
 };
 pub use researcher::WebResearcher;
+pub use selective_prediction::{
+    evaluate_risk_coverage, CoreRiskCoverageReport, CoverageOperatingPoint, DecisionCosts,
+    RiskCoverageConfig, RiskCoverageError, RiskCoverageReport, SelectivePredictionRecord,
+};
 pub use types::*;
 pub use verifier::{
     EpistemicVerifier, SourceEvidence, VerificationContext, VerificationResult, VerifierConfig,

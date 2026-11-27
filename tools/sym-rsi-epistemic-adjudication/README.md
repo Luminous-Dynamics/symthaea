@@ -33,3 +33,19 @@ The current verifier remains a source-evidence heuristic. This change prevents i
 ## Calibration metrics
 
 Brier score is the mean squared error between predicted confidence and the independent binary correctness outcome. ECE uses ten fixed confidence bins and weights each bin's absolute confidence/accuracy gap by its sample proportion. Both metrics use only adjudicated observations with finite probabilities in [0,1]; they are not computed from pending claims or the verifier's own confidence labels. The valid calibration sample count is reported alongside the scores, and both scores remain absent when that count is zero. A missing score is reported as `None`, not as an artificial zero or a neutral calibration claim.
+
+
+## Selective prediction and abstention
+
+The production module `src/web_research/selective_prediction.rs` implements the separately versioned `symthaea-risk-coverage-v1` evaluator. The standalone harness imports this exact source file; the metric logic is not copied into the tests.
+
+- Only independently adjudicated binary truth values with finite confidence in [0, 1] enter risk, AURC, operating points or confidence intervals. Pending and invalid records remain visible as separate counts.
+- Risk is the fraction of wrong accepted predictions. Confidence is confidence in the predicted label, not a correctness label.
+- Equal binary64 confidence values are admitted as one group. The requested coverage is rounded upward to the next complete tie group; no record is arbitrarily selected within a tie.
+- AURC is the conventional item-wise empirical area, with equal-confidence groups handled by the expected item-wise risk over all within-tie permutations. It therefore reduces to standard AURC for unique confidence values while remaining deterministic and input-order invariant.
+- Fixed 50%, 80% and 90% targets are accompanied by achieved coverage, selected sample count and a two-sided 95% Wilson interval when the selected sample meets the configured minimum. Always-answer, random-abstention expectation and inclusive confidence-threshold baselines are also reported.
+- Reports stratify by domain, source family, delayed/censored status and adjudicator. Unknown values remain an explicit group.
+- Decision costs are absent unless the evaluation supplies explicit false-positive, false-negative and abstention costs. Costs are normalized per original eligible case.
+- The default minimum eligible sample size is 20. Tests may lower it to exercise small-cohort edge cases; doing so is not an evaluation recommendation.
+
+Run the same locked harness commands above. The metric evaluates predictions against supplied labels; it does not authenticate adjudicator independence, establish truth, choose a production abstention policy or prove that the live researcher uses the metric.
