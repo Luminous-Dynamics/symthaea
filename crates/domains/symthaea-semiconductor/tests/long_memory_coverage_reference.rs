@@ -168,6 +168,7 @@ fn assumptions(model: &str) -> GaussianLinearLongMemoryEvidenceV1 {
         gaussian_iid_innovations_declared: true,
         regularly_varying_coefficients_declared: true,
         fixed_predictor_independent_of_calibration_and_test_declared: true,
+        leading_coefficient_abs_lower_bound: 0.1,
         coefficient_scale_lower_bound: 0.5,
         coefficient_refinement_exponent: 0.5,
     }
@@ -220,6 +221,24 @@ fn independent_normalization(n: usize, beta: f64) -> f64 {
         (d * log_n).exp_m1() / d
     };
     ((1.0 + integral) / n as f64).sqrt()
+}
+
+#[test]
+fn estimated_beta_outside_the_stationary_long_memory_range_is_unknown_not_clipped() {
+    let n = 256;
+    let model = digest('9');
+    let calibration = (1..=n as u64)
+        .map(|sequence| observation(sequence, 1.0, &model))
+        .collect::<Vec<_>>();
+    let test = ((n + 1)..=(2 * n) as u64)
+        .map(|sequence| observation(sequence, 1.0, &model))
+        .collect::<Vec<_>>();
+    let input = input(calibration, test, &model);
+    let report = evaluate_long_memory_coverage_inference_v1(&input).unwrap();
+    assert_eq!(report.beta_estimate, Some(0.5));
+    assert_eq!(report.status, LongMemoryCoverageStatusV1::AssumptionsNotSupported);
+    assert_eq!(report.normalization_r_n, None);
+    assert!(!report.long_memory_supported);
 }
 
 #[test]
