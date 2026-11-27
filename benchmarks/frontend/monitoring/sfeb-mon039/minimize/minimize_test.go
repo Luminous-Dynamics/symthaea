@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-const scenarioDigest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-const boundaryDigest = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+const scenarioDigest = "d99a938939c8d6adff3c96a1b4ebd05989e231b0c0da24b2c86bda26feb63932"
+const boundaryDigest = "ee4df0d1a62b60dd77c38b18a7e59bfb358b2022bb108a9f6c9638f5eb493f34"
 const codeRevision = "0123456789abcdef0123456789abcdef01234567"
 var evaluatedAt = time.Date(2026, 11, 27, 20, 0, 0, 0, time.UTC)
 
@@ -268,5 +268,16 @@ func TestMissingObservationFaultArrayIsRejected(t *testing.T) {
 	got:=Minimize(in)
 	if got.CampaignVerdict!=Blocked {
 		t.Fatalf("omitted observation fault array must block: %+v",got)
+	}
+}
+
+
+func TestObservationReceiptDigestBindsEveryObservationField(t *testing.T) {
+	o:=makeObservation([]string{"fault-a"},Blocked,testDigest("failure"),codeRevision,true)
+	o.TrialID="other-trial"
+	in:=baseInput([]string{"fault-a"},[]Observation{o})
+	got:=Minimize(in)
+	if got.CampaignVerdict!=Blocked {
+		t.Fatalf("modified trial identity with unchanged receipt digest must block: %+v",got)
 	}
 }
