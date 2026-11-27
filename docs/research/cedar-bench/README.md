@@ -13,7 +13,7 @@ The benchmark is motivated by Abbas, Zia and Windridge, “Cited but Unused: Par
 - CEDAR_BENCH_V0_TEMPLATES.json — 20 synthetic task templates, source aliases and intervention definitions.
 - scripts/generate_cedar_bench.py — expands a selected split using a per-run secret seed; writes candidate inputs and auditor key to separate files.
 - scripts/validate_cedar_bench_templates.py — standard-library-only template contract checker.
-- scripts/validate_cedar_bench_streams.py — checks generated candidate/auditor stream separation, source hashes and paired intervention semantics.
+- scripts/validate_cedar_bench_streams.py — checks generated candidate/auditor stream separation, source hashes, answer-oracle fields, citation eligibility and paired intervention semantics.
 
 ## Split isolation
 
@@ -24,7 +24,7 @@ Templates are assigned by task family to disjoint train (10), development (5) an
 The generator uses CEDAR_BENCH_SEED (at least 32 bytes; operators must supply 256 bits from a cryptographically secure random source). Do not expose it to the candidate. It emits:
 
 - candidate JSONL: one randomized trial per condition, with only prompt, source bundle and opaque task ID;
-- auditor JSONL: condition labels, generated values, source digests and expected behavior.
+- auditor JSONL: condition labels, generated values, expected answer oracle, allowed/forbidden citation sources, source digests and expected behavior.
 
 Store auditor output separately from the candidate environment. Do not upload generated auditor keys to public CI artifacts. The CI stream check uses a public deterministic smoke seed and is explicitly non-scoring. Never use that seed for evaluation. Current template structures are public; only generated values are hidden by the per-run seed.
 
@@ -35,7 +35,7 @@ Store auditor output separately from the candidate environment. Do not upload ge
 - placebo: change an unrelated field without changing the target fact;
 - source_removed: remove the declared source and test whether the answer becomes unresolved or remains supported by independent evidence.
 
-Additional template metadata calls out citation-swap, contradictory-source, multi-hop, alias and prompt-injection controls. The initial generator is contract scaffolding; it does not implement a model runner or an automated semantic judge.
+Each template now binds an answer-oracle specification to exact fact IDs and supporting source IDs. The generator chooses a counterfactual value only when the oracle answer actually changes, and records expected answer and citation rules in the auditor stream only. Citation-swap decoys are explicitly forbidden as support; prompt-injection tasks preserve source text as untrusted data. The initial generator is contract scaffolding; it does not implement a model runner or an automated semantic judge.
 
 ## Metrics and guardrails
 
