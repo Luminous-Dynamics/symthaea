@@ -11,7 +11,7 @@ A conformal rank guarantee requires exchangeability of the calibration and test 
 2. non-overlapping blocks cut from one stationary AR(1) trajectory with no embargo;
 3. the same serial path with embargo gaps between blocks.
 
-The initial stress point uses stationary Gaussian AR(1), `rho=0.95`, block maxima of absolute residuals, 39 calibration blocks, a single test block, and nominal `alpha=0.10`. It varies block lengths 1, 8 and 32 and serial-path embargo gaps 0, 16 and 64.
+The expanded executable grid uses stationary Gaussian AR(1) at rho = 0, 0.5, 0.8, 0.9, 0.95 and 0.99; block maxima of absolute residuals; 39 calibration blocks; a single test block; nominal alpha = 0.10; block lengths 1, 8 and 32; and serial-path embargo gaps 0, 16 and 64. This produces 72 design/rho/block/embargo conditions at 5,000 trials each. A rho=0 regression control checks that the serial-path construction behaves like the independent-block control when there is no autocorrelation.
 
 ## Statistic and decision rule
 
@@ -56,13 +56,13 @@ The seed used for every output row is included in the CSV. This experiment is de
 
 ## Required follow-on grid
 
-The first executable grid is a smoke experiment, not a final benchmark. Extend the confirmatory grid before making a coverage claim:
+The current 72-condition executable grid is still a first dependence-strength sweep, not a final benchmark. Extend the confirmatory grid before making a coverage claim:
 
 | Factor | Initial values to test |
 |---|---|
-| AR coefficient | 0, 0.5, 0.8, 0.9, 0.95, 0.99 |
-| Block length | 1, 2, 4, 8, 16, 32, 64 |
-| Embargo | 0, 1, 4, 16, 32, 64, dependence-adaptive |
+| AR coefficient | **Current:** 0, 0.5, 0.8, 0.9, 0.95, 0.99; extend to negative rho and regime-varying rho |
+| Block length | **Current:** 1, 8, 32; extend to 2, 4, 16, 64 |
+| Embargo | **Current:** 0, 16, 64; extend to 1, 4, 32 and dependence-adaptive |
 | Score | maximum absolute residual, mean absolute residual, block norm, model-set residual |
 | Drift | stationary, mean shift, variance shift, gradual drift, abrupt regime change |
 | Common cause | shared latent factor, correlated channels, shared sensor/calibration failure |
@@ -95,11 +95,13 @@ This experiment is a step toward falsifiable coverage evidence; it is not a conf
 
 ## First exact-head execution — 27 November 2026
 
-The focused workflow passed on source commit `30a508248f31d595d930224c852925e4762fc3d9`:
+The initial focused workflow passed on source commit `30a508248f31d595d930224c852925e4762fc3d9`:
 - Rust 1.96 formatting check passed;
 - 3/3 unit controls passed;
-- the full 12-condition, 5,000-trials-per-condition grid completed;
+- the rho=0.95 slice of the original 12-condition grid completed at 5,000 trials per condition;
 - report artifact: [coverage CSV and manifest](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45987147070/artifacts/15192042421).
+
+An expanded six-rho, 72-condition workflow is now being executed. It preserves the exact rho=0.95 seeds from the first run. Its output is not yet available and must not be conflated with the 12-row initial report.
 
 Observed nominal 10% alarm rates:
 
