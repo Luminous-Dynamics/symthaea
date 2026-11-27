@@ -7,12 +7,14 @@ on:
     paths:
       - "tools/sym-rsi-r4-prereg-reference/**"
       - "docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json"
+      - "docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_SCHEMA_V0_2026-11-06.json"
       - ".github/workflows/sym-rsi-r4-prereg-reference.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "tools/sym-rsi-r4-prereg-reference/**"
       - "docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json"
+      - "docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_SCHEMA_V0_2026-11-06.json"
       - ".github/workflows/sym-rsi-r4-prereg-reference.yml"
 
 permissions:
@@ -24,11 +26,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.96.0"
           components: clippy, rustfmt
+      - name: Parse preregistration JSON artifacts
+        run: |
+          jq empty docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json
+          jq empty docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_SCHEMA_V0_2026-11-06.json
       - name: Check formatting
         run: cargo fmt --locked --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
       - name: Run semantic validator tests
