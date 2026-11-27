@@ -1,0 +1,22 @@
+{
+  "schema_version": "sdcb_gaussian_bin_likelihoods.expected.v1",
+  "predictive_observation": {
+    "mean": 0,
+    "variance": 1
+  },
+  "thresholds": [
+    -1,
+    1
+  ],
+  "probabilities": [
+    0.15865525393145707,
+    0.6826894921370859,
+    0.15865525393145707
+  ],
+  "extreme_tail": {
+    "threshold": 8,
+    "upper_probability": 6.220960574271819e-16,
+    "interval_8_to_9_probability": 6.21983198586573e-16
+  },
+  "claim_boundary": "Numerical Gaussian likelihood fixture; not a physical or policy result."
+}
