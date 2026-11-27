@@ -73,7 +73,7 @@ struct EvaluatorPrivate {
     no_memory_action: String,
     oracle_action: String,
     attack_case: bool,
-    notes: String,
+    notes: Option<String>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -188,7 +188,8 @@ fn write_jsonl<T: Serialize>(path: &str, rows: &[T]) -> Result<(), String> {
 fn validate_episode(e: &Episode) -> Result<(), String> {
     let id = &e.episode_id;
     if e.schema_version != EPISODE_SCHEMA || id.trim().is_empty() ||
-        e.family.trim().is_empty() || e.candidate.query.trim().is_empty() ||
+        !matches!(e.family.as_str(), "temporal_drift" | "contradiction" | "revocation" | "insufficient_evidence" | "poisoning" | "decision_sufficient_compression" | "streaming_update" | "forgetting_replay" | "scope_isolation") ||
+        e.candidate.query.trim().is_empty() ||
         e.candidate.scope.trim().is_empty() { return Err(format!("{id}: invalid episode identity/schema")); }
     if !e.candidate.observation_cost_units.is_finite() || e.candidate.observation_cost_units < 0.0 {
         return Err(format!("{id}: invalid observation cost"));
@@ -265,9 +266,9 @@ fn invalidated(id: &str, events: &[SourceEvent]) -> bool {
         matches!(event.relation_to_parent, Some(Relation::Supersedes | Relation::Retracts)) &&
         event.parent_event_ids.iter().any(|parent| parent == id))
 }
-fn admissible(e: &SourceEvent, c: &Candidate, forbidden: &BTreeSet<&str>) -> bool {
+fn admissible(e: &SourceEvent, c: &Candidate, forbidden: &BTreeSet<String>) -> bool {
     current_at(e, c.query_time_ms) && !invalidated(&e.event_id, &c.source_events) &&
-        e.authority_tier != AuthorityTier::Untrusted && !forbidden.contains(e.event_id.as_str())
+        e.authority_tier != AuthorityTier::Untrusted && !forbidden.contains(&e.event_id)
 }
 fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow, String> {
     let id = &c.episode_id;
@@ -288,21 +289,21 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
     }
     let event_map: BTreeMap<&str, &SourceEvent> = c.candidate.source_events.iter()
         .map(|e| (e.event_id.as_str(), e)).collect();
-    let forbidden: BTreeSet<&str> = p.evaluator_private.forbidden_evidence_ids.iter().map(String::as_str).collect();
-    let required: BTreeSet<&str> = p.evaluator_private.required_evidence_ids.iter().map(String::as_str).collect();
-    let mut selected = BTreeSet::new();
+    let forbidden: BTreeSet<String> = p.evaluator_private.forbidden_evidence_ids.iter().cloned().collect();
+    let required: BTreeSet<String> = p.evaluator_private.required_evidence_ids.iter().cloned().collect();
+    let mut selected: BTreeSet<String> = BTreeSet::new();
     let (mut admissible_n, mut stale_n, mut untrusted_n, mut forbidden_n) = (0usize, 0usize, 0usize, 0usize);
     for event_id in &r.selected_evidence_ids {
-        if !selected.insert(event_id.as_str()) { return Err(format!("{id}: duplicate selected evidence {event_id}")); }
+        if !selected.insert(event_id.clone()) { return Err(format!("{id}: duplicate selected evidence {event_id}")); }
         let event = event_map.get(event_id.as_str()).ok_or_else(|| format!("{id}: unknown selected evidence {event_id}"))?;
         if !current_at(event, c.candidate.query_time_ms) || invalidated(event_id, &c.candidate.source_events) { stale_n += 1; }
         if event.authority_tier == AuthorityTier::Untrusted { untrusted_n += 1; }
-        if forbidden.contains(event_id.as_str()) { forbidden_n += 1; }
+        if forbidden.contains(event_id) { forbidden_n += 1; }
         if admissible(event, &c.candidate, &forbidden) { admissible_n += 1; }
     }
     let contradiction_pairs = c.candidate.source_events.iter()
-        .filter(|e| e.relation_to_parent == Some(Relation::Contradicts) && selected.contains(e.event_id.as_str()))
-        .map(|e| e.parent_event_ids.iter().filter(|parent| selected.contains(parent.as_str())).count())
+        .filter(|e| e.relation_to_parent == Some(Relation::Contradicts) && selected.contains(&e.event_id))
+        .map(|e| e.parent_event_ids.iter().filter(|parent| selected.contains(*parent)).count())
         .sum::<usize>();
     let loss_map: BTreeMap<&str, f64> = p.evaluator_private.action_losses.iter().map(|x| (x.action.as_str(), x.loss)).collect();
     let loss = *loss_map.get(r.action.as_str()).ok_or_else(|| format!("{id}: action has no loss"))?;
@@ -310,8 +311,8 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
     let no_memory_loss = *loss_map.get(p.evaluator_private.no_memory_action.as_str())
         .ok_or_else(|| format!("{id}: no-memory action has no loss"))?;
     let required_found = required.iter().filter(|event_id|
-        selected.contains(**event_id) &&
-        event_map.get(**event_id).is_some_and(|e| admissible(e, &c.candidate, &forbidden))
+        selected.contains(*event_id) &&
+        event_map.get(event_id.as_str()).is_some_and(|e| admissible(e, &c.candidate, &forbidden))
     ).count();
     let recall = if required.is_empty() { 1.0 } else { required_found as f64 / required.len() as f64 };
     let invalid_n = r.selected_evidence_ids.len().saturating_sub(admissible_n);
@@ -416,7 +417,7 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, report_p
     let per_family_arm: Vec<_> = family_groups.iter().map(|((f,a),v)| aggregate(&format!("{f}/{a}"),v)).collect();
     let report = json!({
         "schema_version": REPORT_SCHEMA,
-        "qualification_status": "reference_evaluator_completed_unvalidated_rust_execution",
+        "qualification_status": "reference_evaluation_generated_not_independently_qualified",
         "candidate_input_sha256": digest(&fs::read(candidate_path).map_err(|e|e.to_string())?),
         "evaluator_private_input_sha256": digest(&fs::read(private_path).map_err(|e|e.to_string())?),
         "response_input_sha256": digest(&fs::read(response_path).map_err(|e|e.to_string())?),
@@ -488,7 +489,7 @@ fn generated_episode(i: usize, seed: u64) -> Episode {
             action_losses:losses.into_iter().map(|(action,loss)|ActionLoss{action:action.into(),loss}).collect(),
             required_evidence_ids:required, forbidden_evidence_ids:forbidden,
             no_memory_action:no_memory.into(),oracle_action:oracle.into(),attack_case:false,
-            notes:"Generated deterministic control; not an externally validated scenario.".into() } }
+            notes:Some("Generated deterministic control; not an externally validated scenario.".into()) } }
 }
 fn generate(seed:u64,count:usize,path:&str)->Result<(),String>{
     if count==0 || count>1_000_000 {return Err("count must be 1..=1,000,000".into())}
