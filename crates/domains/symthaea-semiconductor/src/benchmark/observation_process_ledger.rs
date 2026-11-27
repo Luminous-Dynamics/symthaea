@@ -186,6 +186,7 @@ pub struct ObservationProcessInputV1 {
 pub struct ObservationProcessFunnelV1 {
     pub population_rounds: usize,
     pub not_selected: usize,
+    pub zero_selection_probability: usize,
     pub selected_pending: usize,
     pub measurement_unavailable: usize,
     pub measured: usize,
@@ -289,10 +290,18 @@ fn validate_acquisition(
             if acquisition.selection_design_sha256.is_none()
                 || !acquisition
                     .inclusion_probability
-                    .is_some_and(|p| p.is_finite() && p > 0.0 && p <= 1.0)
+                    .is_some_and(|p| p.is_finite() && p >= 0.0 && p <= 1.0)
             {
                 return Err(ObservationProcessErrorV1(format!(
-                    "round {} randomized acquisition requires a design digest and positive known inclusion probability",
+                    "round {} randomized acquisition requires a design digest and a known inclusion probability in [0,1]",
+                    row.round_id
+                )));
+            }
+            if acquisition.inclusion_probability == Some(0.0)
+                && acquisition.state != PhysicalAcquisitionStateV1::NotSelected
+            {
+                return Err(ObservationProcessErrorV1(format!(
+                    "round {} cannot be physically selected when its declared inclusion probability is zero",
                     row.round_id
                 )));
             }
@@ -1101,6 +1110,7 @@ pub fn evaluate_observation_process_v1(
     let mut funnel = ObservationProcessFunnelV1 {
         population_rounds: rows.len(),
         not_selected: 0,
+        zero_selection_probability: 0,
         selected_pending: 0,
         measurement_unavailable: 0,
         measured: 0,
@@ -1160,6 +1170,9 @@ pub fn evaluate_observation_process_v1(
         match row.acquisition.state {
             PhysicalAcquisitionStateV1::NotSelected => {
                 funnel.not_selected += 1;
+                if row.acquisition.inclusion_probability == Some(0.0) {
+                    funnel.zero_selection_probability += 1;
+                }
                 unmeasured_round_ids.push(row.round_id);
             }
             PhysicalAcquisitionStateV1::SelectedPending => {
@@ -1490,6 +1503,55 @@ mod tests {
         assert_eq!(report.funnel.k1_blocked, 1);
         assert_eq!(report.population_risk.partial_identification_lower, 0.0);
         assert_eq!(report.population_risk.partial_identification_upper, 0.75);
+    }
+
+    #[test]
+    fn zero_inclusion_probability_is_recorded_as_a_positivity_failure() {
+        let mut never_selected = row(
+            1,
+            PhysicalAcquisitionStateV1::NotSelected,
+            K1QualificationStateV1::NotApplicable,
+            FeedbackTrackingStateV1::NotApplicable,
+        );
+        never_selected.acquisition.selection_design_kind =
+            PhysicalSelectionDesignKindV1::RandomizedKnownInclusionProbability;
+        never_selected.acquisition.selection_design_sha256 = Some(digest('7'));
+        never_selected.acquisition.inclusion_probability = Some(0.0);
+        let measured = row(
+            2,
+            PhysicalAcquisitionStateV1::Measured,
+            K1QualificationStateV1::Eligible,
+            FeedbackTrackingStateV1::NotApplicable,
+        );
+        let report = evaluate_observation_process_v1(&input(
+            ObservationRiskControllerV1::None,
+            vec![never_selected.clone(), measured],
+        ))
+        .unwrap();
+        assert_eq!(report.funnel.zero_selection_probability, 1);
+        assert_eq!(report.population_risk.missing_count, 1);
+        assert_eq!(report.population_risk.population_point_estimate, None);
+        assert!(!report.population_risk.population_risk_exactly_identified);
+
+        never_selected.acquisition.state = PhysicalAcquisitionStateV1::Measured;
+        never_selected.acquisition.selected_at_round = Some(1);
+        never_selected.acquisition.measured_at_unix_seconds = Some(115);
+        never_selected.acquisition.operational_measurement_method_sha256 = Some(digest('0'));
+        assert!(
+            evaluate_observation_process_v1(&input(
+                ObservationRiskControllerV1::None,
+                vec![
+                    never_selected,
+                    row(
+                        2,
+                        PhysicalAcquisitionStateV1::Measured,
+                        K1QualificationStateV1::Eligible,
+                        FeedbackTrackingStateV1::NotApplicable,
+                    ),
+                ],
+            ))
+            .is_err()
+        );
     }
 
     #[test]
