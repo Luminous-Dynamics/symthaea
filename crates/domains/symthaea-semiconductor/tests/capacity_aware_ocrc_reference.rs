@@ -227,17 +227,19 @@ fn two_feedback_arrivals_match_independent_proxy_and_ipw_oracle() {
 fn proxy_deadline_inclusive_eviction_order_matches_independent_queue_oracle() {
     let mut controller = engine(1);
     let first_draw = 0.80; // proxy delay 2, expires at round 3.
+    let first_threshold = controller.threshold;
     let first = advance_ca_ocrc_round_v1(
         &mut controller,
-        &round(1, first_draw, controller.threshold),
+        &round(1, first_draw, first_threshold),
         &[],
     )
     .unwrap();
     assert_eq!(first.selected_proxy_delay_rounds, 2);
 
+    let second_threshold = controller.threshold;
     let second = advance_ca_ocrc_round_v1(
         &mut controller,
-        &round(2, 0.80, controller.threshold),
+        &round(2, 0.80, second_threshold),
         &[],
     )
     .unwrap();
@@ -245,9 +247,10 @@ fn proxy_deadline_inclusive_eviction_order_matches_independent_queue_oracle() {
 
     // Equality with the proxy deadline is still tracked; the round is not
     // evicted before round-3 feedback reception.
+    let third_threshold = controller.threshold;
     let third = advance_ca_ocrc_round_v1(
         &mut controller,
-        &round(3, 0.80, controller.threshold),
+        &round(3, 0.80, third_threshold),
         &[feedback(1, 3, 11.0, "label-deadline")],
     )
     .unwrap();
