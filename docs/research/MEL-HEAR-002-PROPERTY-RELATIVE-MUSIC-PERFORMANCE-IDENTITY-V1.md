@@ -40,6 +40,18 @@ Examples:
 
 The evaluator rejects incompatible property/factor combinations rather than forcing them into one generic label.
 
+V1 also requires a **property-specific canonical question**, shared byte-for-byte by all three arms:
+- ChordQuality — "Is the chord quality the same?"
+- RootPitchClass — "Is the root pitch class the same?"
+- Voicing — "Is the voicing the same?"
+- RelativeIntervalSequence — "Is the relative interval sequence the same?"
+- MelodicContour — "Is the melodic contour the same?"
+- RhythmicRatio — "Is the rhythmic ratio pattern the same?"
+- PulseRate — "Is the pulse rate the same?"
+- InstrumentFamily — "Is the instrument family the same?"
+
+The digest is recomputed from exact UTF-8 bytes. A generic "Is the target musical property the same?" question, or a different property question with a freshly recomputed digest, is rejected. V1 intentionally uses a small closed prompt vocabulary rather than claiming that arbitrary natural-language paraphrases can be verified semantically. Future paraphrases require a separately versioned, independently tested query profile.
+
 ## 3. V1 comparison contract
 
 Each triad contains:
