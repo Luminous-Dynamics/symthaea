@@ -115,9 +115,16 @@ func ValidateInitialSnapshot(p Profile,s SlotState,point LSN,digest string)Resul
 func transactionMembersConsistent(m Manifest)(Decision,string){
 	txs:=map[string]Transaction{}
 	events:=map[string]DecodedEvent{}
+	commitOwner:=map[LSN]string{}
+	var previous LSN
 	for _,tx:=range m.Transactions{
 		if !present(tx.XID){return Indeterminate,"transaction envelope missing XID"}
 		if _,ok:=txs[tx.XID];ok{return Divergent,"duplicate transaction envelope: "+tx.XID}
+		if tx.BeginLSN>tx.CommitLSN||tx.CommitLSN>tx.EndLSN||tx.EndLSN>m.TerminalLSN{
+			return Denied,"transaction envelope has impossible begin/commit/end LSN order: "+tx.XID
+		}
+		if owner,ok:=commitOwner[tx.CommitLSN];ok&&owner!=tx.XID{return Divergent,"different XIDs claim one commit-record LSN"}
+		commitOwner[tx.CommitLSN]=tx.XID
 		switch tx.State{
 		case "committed","aborted":
 		case "prepared","committed_prepared","rolled_back_prepared":return Indeterminate,"two-phase transaction state is not qualified: "+tx.XID
@@ -126,20 +133,32 @@ func transactionMembersConsistent(m Manifest)(Decision,string){
 		txs[tx.XID]=tx
 	}
 	for _,e:=range m.Events{
+		if !present(e.ID,e.XID,e.PayloadDigest)||e.Ordinal==0{return Indeterminate,"decoded event identity or ordinal incomplete"}
+		if e.CommitLSN<=m.StartExclusiveLSN||e.CommitLSN>m.TerminalLSN{return Denied,"event outside declared replay interval: "+e.ID}
+		if len(events)>0&&e.CommitLSN<previous{return Denied,"decoded event LSN order regressed"}
 		if prior,ok:=events[e.ID];ok{if prior!=e{return Divergent,"duplicate event ID has conflicting transaction fields: "+e.ID};continue}
 		events[e.ID]=e
+		previous=e.CommitLSN
 	}
 	for xid,tx:=range txs{
 		members:=map[string]bool{}
+		var ordinal uint32
 		for _,id:=range tx.EventIDs{
 			if members[id]{return Divergent,"transaction repeats event membership: "+id}
 			members[id]=true
 			e,ok:=events[id]
 			if !ok||e.XID!=xid||e.CommitLSN!=tx.CommitLSN{return Indeterminate,"transaction/event membership or commit boundary mismatch: "+id}
+			if e.Ordinal<=ordinal{return Denied,"transaction member ordinals are not strictly increasing: "+xid}
+			ordinal=e.Ordinal
 		}
 		for id,e:=range events{if e.XID==xid&&!members[id]{return Indeterminate,"event missing from transaction envelope: "+id}}
+		if tx.State=="aborted"&&len(members)>0{return Denied,"aborted transaction contains row events: "+xid}
 	}
-	for id,e:=range events{tx,ok:=txs[e.XID];if !ok{return Indeterminate,"event has no transaction envelope: "+id};if tx.State!="committed"||tx.CommitLSN!=e.CommitLSN{return Indeterminate,"event is not attached to a committed transaction boundary: "+id}}
+	for id,e:=range events{
+		tx,ok:=txs[e.XID]
+		if !ok{return Indeterminate,"event has no transaction envelope: "+id}
+		if tx.State!="committed"||tx.CommitLSN!=e.CommitLSN{return Indeterminate,"event is not attached to a committed transaction boundary: "+id}
+	}
 	return Qualified,""
 }
 func ValidateCapture(p Profile,s SlotState,m Manifest)Result{
