@@ -47,13 +47,13 @@ The evaluator calculates the interaction in signed integer micro-loss units. It 
 
 ## Qualification controls
 
-The focused tests include:
-- a constructed redundant/complementary pair where both single removals preserve the optimal action but removing both increases loss;
+The current focused tests exercise:
+- a constructed complementary pair where both single removals preserve the optimal action but removing both increases loss;
 - incomplete pair sets;
 - duplicate or reversed duplicate pairs;
-- missing or identical pair targets;
-- wrong episode/system/policy/seed;
-- outputs that retain a removed item or alter unrelated evidence.
+- a pair output that retains one of the removed items.
+
+The implementation also rejects missing/identical pair targets, wrong episode/system/policy/seed, and changes to unrelated evidence; these additional branches should receive dedicated negative tests before promotion.
 
 The first known-answer example is deliberately simple: each single removal preserves the correct action, while removing both causes abstention. Its interaction is exactly +2,000,000 micro-loss units. This is a test fixture, not a measured system result.
 
