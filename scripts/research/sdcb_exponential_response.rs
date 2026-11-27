@@ -12,8 +12,8 @@
 const MAX_SCALED_TIME: f64 = 700.0;
 
 /// Stable evaluation of (1 - exp(-x)) / x for x >= 0.
-/// For subnormal x, replacing the ratio by one changes it by less than half
-/// a subnormal-scale relative term and avoids division by a subnormal value.
+/// For subnormal x, the deviation from one is far smaller than half an ulp
+/// at one; using one avoids division by a subnormal value.
 fn one_minus_exp_neg_over_x(x: f64) -> f64 {
     if x < f64::MIN_POSITIVE {
         1.0
