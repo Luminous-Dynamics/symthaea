@@ -326,14 +326,14 @@ impl EvaluatorResolution {
                 }
             }
             OutcomeStatus::ImmediateObserved | OutcomeStatus::DelayedObserved => {
-                self.require_action(&p.selected_action_id)?;
+                self.require_action(&p.selected_action_id, &p.selected_action_payload_digest)?;
                 require_nonempty("observed outcome label", self.outcome_label.as_deref().unwrap_or_default())?;
                 if self.evaluator_evidence.is_empty() || self.finalized_at_ms.is_none() {
                     return Err("observed outcome requires evidence and finalization time".into());
                 }
             }
             OutcomeStatus::CensoredAtDeadline | OutcomeStatus::Indeterminate => {
-                self.require_action(&p.selected_action_id)?;
+                self.require_action(&p.selected_action_id, &p.selected_action_payload_digest)?;
                 if self.outcome_label.is_some() || self.evaluator_evidence.is_empty() || self.finalized_at_ms.is_none() {
                     return Err("censored/indeterminate outcome requires evidence, no label and finalization time".into());
                 }
