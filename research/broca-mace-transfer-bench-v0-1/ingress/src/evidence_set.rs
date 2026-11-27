@@ -76,6 +76,8 @@ pub struct EvidenceSetContextV1 {
     pub purpose_code: String,
     pub consumer_policy_sha256: String,
     pub constraint_policy_sha256: String,
+    /// Frozen digest of the candidate scoring and deterministic selection policy.
+    pub selection_policy_sha256: String,
     pub require_complete_dependency_lineage: bool,
     pub max_token_cost: u64,
     pub max_items: usize,
@@ -86,6 +88,8 @@ pub struct EvidenceSetContextV1 {
 pub struct EvidenceSetCandidateV1<'a> {
     pub evidence_id: &'a str,
     pub representation_sha256: String,
+    /// Must match the transformation digest in the verified use receipt.
+    pub transformation_sha256: String,
     pub token_cost: u64,
     pub relevance_score_micros: u64,
     pub required: bool,
@@ -120,6 +124,7 @@ pub struct EvidenceSetSelectionReceiptV1 {
     pub candidate_set_sha256: String,
     pub constraint_set_sha256: String,
     pub constraint_policy_sha256: String,
+    pub selection_policy_sha256: String,
     pub selected_evidence_ids: Vec<String>,
     pub selected_representation_sha256: Vec<String>,
     pub selected_use_receipt_sha256: Vec<String>,
@@ -138,6 +143,7 @@ impl EvidenceSetSelectionReceiptV1 {
             self.schema_version.as_str(), self.context_sha256.as_str(),
             self.candidate_set_sha256.as_str(), self.constraint_set_sha256.as_str(),
             self.constraint_policy_sha256.as_str(),
+            self.selection_policy_sha256.as_str(),
         ] { put_text(&mut h, value); }
         put_vec(&mut h, &self.selected_evidence_ids);
         put_vec(&mut h, &self.selected_representation_sha256);
@@ -212,7 +218,8 @@ fn context_digest(c: &EvidenceSetContextV1) -> String {
     h.update(b"luminous:mace:evidence-set-context:v1\0");
     h.update(c.valid_at_ms.to_be_bytes()); h.update(c.known_at_ms.to_be_bytes()); h.update(scope_code(c.required_scope));
     put_text(&mut h, &c.purpose_code); put_text(&mut h, &c.consumer_policy_sha256);
-    put_text(&mut h, &c.constraint_policy_sha256); h.update([u8::from(c.require_complete_dependency_lineage)]);
+    put_text(&mut h, &c.constraint_policy_sha256); put_text(&mut h, &c.selection_policy_sha256);
+    h.update([u8::from(c.require_complete_dependency_lineage)]);
     h.update(c.max_token_cost.to_be_bytes()); h.update((c.max_items as u64).to_be_bytes()); h.update((c.min_items as u64).to_be_bytes());
     hex(h.finalize().as_slice())
 }
@@ -223,6 +230,7 @@ fn candidate_digest(candidates: &[EvidenceSetCandidateV1<'_>]) -> String {
     h.update((values.len() as u64).to_be_bytes());
     for c in values {
         put_text(&mut h,c.evidence_id); put_text(&mut h,&c.representation_sha256);
+        put_text(&mut h,&c.transformation_sha256);
         h.update(c.token_cost.to_be_bytes()); h.update(c.relevance_score_micros.to_be_bytes());
         h.update([u8::from(c.required)]); h.update(c.receipt.event_id.to_be_bytes());
         put_text(&mut h,&c.receipt.canonical_sha256);
@@ -314,7 +322,8 @@ pub fn select_evidence_set_v1(
     let ctx=context_digest(context); let cand=candidate_digest(candidates); let cons=constraint_digest(constraints);
     let fail=|reason,ids,cs|obstruction(reason,&ctx,&cand,&cons,ids,cs);
     if !valid_id(&context.purpose_code) || !valid_sha(&context.consumer_policy_sha256)
-        || !valid_sha(&context.constraint_policy_sha256) || context.min_items>context.max_items {
+        || !valid_sha(&context.constraint_policy_sha256) || !valid_sha(&context.selection_policy_sha256)
+        || context.min_items>context.max_items {
         return Err(fail(EvidenceSetObstructionReasonV1::InvalidContext,vec![],vec![]));
     }
     if candidates.len()>MAX_EVIDENCE_CANDIDATES_V1 {
@@ -323,7 +332,10 @@ pub fn select_evidence_set_v1(
     let mut indices=BTreeMap::new(); let mut events=BTreeSet::new(); let mut states=Vec::new();
     for (i,c) in candidates.iter().enumerate(){
         if !valid_id(c.evidence_id){return Err(fail(EvidenceSetObstructionReasonV1::InvalidCandidateId,vec![c.evidence_id.into()],vec![]));}
-        if !valid_sha(&c.representation_sha256){return Err(fail(EvidenceSetObstructionReasonV1::InvalidCandidateDigest,vec![c.evidence_id.into()],vec![]));}
+        if !valid_sha(&c.representation_sha256) || !valid_sha(&c.transformation_sha256)
+            || c.transformation_sha256 != c.receipt.transformation_digest {
+            return Err(fail(EvidenceSetObstructionReasonV1::InvalidCandidateDigest,vec![c.evidence_id.into()],vec![]));
+        }
         if indices.insert(c.evidence_id,i).is_some(){return Err(fail(EvidenceSetObstructionReasonV1::DuplicateEvidenceId,vec![c.evidence_id.into()],vec![]));}
         if !events.insert(c.receipt.event_id){return Err(fail(EvidenceSetObstructionReasonV1::DuplicateEventId,vec![c.evidence_id.into()],vec![]));}
         states.push(receipt_exclusion(c.receipt,context).map_or(CandidateState::Admissible,CandidateState::Excluded));
@@ -449,6 +461,7 @@ pub fn select_evidence_set_v1(
     let mut selection=EvidenceSetSelectionReceiptV1{
         schema_version:EVIDENCE_SET_SCHEMA_V1.into(),context_sha256:ctx,candidate_set_sha256:cand,
         constraint_set_sha256:cons,constraint_policy_sha256:context.constraint_policy_sha256.clone(),
+        selection_policy_sha256:context.selection_policy_sha256.clone(),
         selected_evidence_ids:selected_ids,selected_representation_sha256,selected_use_receipt_sha256,
         excluded,total_token_cost:cost,total_relevance_score_micros:score,max_token_cost:context.max_token_cost,
         canonical_sha256:String::new()
