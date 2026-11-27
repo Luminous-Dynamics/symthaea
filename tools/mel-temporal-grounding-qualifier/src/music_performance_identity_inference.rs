@@ -1004,6 +1004,77 @@ mod tests {
     }
 
     #[test]
+    fn sparse_stay_and_flip_factor_strata_withhold_intervals_independently() {
+        let mut input = fixture();
+        let root_question = "Is the root pitch class the same?".to_string();
+        let root_question_sha256 =
+            crate::music_listen_bench::sha256_hex(root_question.as_bytes());
+
+        for case in [&mut input.baseline, &mut input.candidate] {
+            let triad = case.triads.last_mut().unwrap();
+            triad.target_property =
+                crate::music_performance_identity::MusicalIdentityPropertyV1::RootPitchClass;
+            triad.performance_stay_factor =
+                crate::music_performance_identity::PerformanceStayFactorV1::ExpressiveTimingChange;
+            triad.musical_flip_factor =
+                crate::music_performance_identity::MusicalFlipFactorV1::RootPitchClassChange;
+            triad.target_property_reference_sha256 = "3".repeat(64);
+            triad.pairing_manifest_sha256 = "4".repeat(64);
+            for variant in [
+                &mut triad.clean,
+                &mut triad.performance_stay,
+                &mut triad.musical_flip,
+            ] {
+                variant.response.question = root_question.clone();
+                variant.response.question_sha256 = root_question_sha256.clone();
+            }
+        }
+
+        let report = audit_paired_musical_identity_comparison(&input).unwrap();
+        assert_eq!(report.source_work_clusters, 30);
+
+        let stay_stratum = report
+            .by_performance_stay_factor
+            .iter()
+            .find(|stratum| {
+                stratum.target_property
+                    == crate::music_performance_identity::MusicalIdentityPropertyV1::RootPitchClass
+            })
+            .unwrap();
+        assert_eq!(stay_stratum.source_work_clusters, 1);
+        assert_eq!(
+            stay_stratum.status,
+            PairedInferenceStatusV1::InsufficientSourceWorkClusters
+        );
+        assert!(
+            stay_stratum
+                .performance_stay_false_difference
+                .candidate_improvement_interval
+                .is_none()
+        );
+
+        let flip_stratum = report
+            .by_musical_flip_factor
+            .iter()
+            .find(|stratum| {
+                stratum.target_property
+                    == crate::music_performance_identity::MusicalIdentityPropertyV1::RootPitchClass
+            })
+            .unwrap();
+        assert_eq!(flip_stratum.source_work_clusters, 1);
+        assert_eq!(
+            flip_stratum.status,
+            PairedInferenceStatusV1::InsufficientSourceWorkClusters
+        );
+        assert!(
+            flip_stratum
+                .musical_flip_miss
+                .candidate_improvement_interval
+                .is_none()
+        );
+    }
+
+    #[test]
     fn stay_improvement_does_not_hide_a_flip_regression() {
         let mut input = fixture();
         for triad in &mut input.candidate.triads {
