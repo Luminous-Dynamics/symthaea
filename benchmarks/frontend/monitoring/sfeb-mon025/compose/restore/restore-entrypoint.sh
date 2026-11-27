@@ -17,6 +17,7 @@ if ! date -u -d "$MON025_RECOVERY_TARGET_TIME" >/dev/null 2>&1; then
 fi
 
 BACKUP_DIR="/backups/$MON025_BACKUP_ID"
+mkdir -p "$PGDATA"
 if [ ! -s "$BACKUP_DIR/PG_VERSION" ]; then
     echo "backup directory is missing or has no PG_VERSION: $BACKUP_DIR" >&2
     exit 66
@@ -31,7 +32,6 @@ if [ -n "$OTHER_CONTENT" ]; then
     exit 73
 fi
 
-mkdir -p "$PGDATA"
 cp -a "$BACKUP_DIR/." "$PGDATA/"
 chown -R postgres:postgres "$PGDATA"
 
