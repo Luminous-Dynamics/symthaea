@@ -1,6 +1,6 @@
 # SDCB bivariate Gaussian rectangle reference v1
 
-**Status:** bounded, two-channel numerical reference authored in Rust. Sixteen tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
+**Status:** bounded, two-channel numerical reference authored in Rust. Seventeen tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
 
 ## 1. Why this increment
 
@@ -37,10 +37,10 @@ This is a low-dimensional reference method. The reported outer refinement differ
 ## 3. Covariance and tail policy
 
 - Requires a finite, symmetric, positive-semidefinite 2×2 covariance matrix.
-- Full-rank SPD inputs use conditional integration and are rejected when the correlation condition estimate exceeds (10^8).
+- Full-rank SPD inputs use conditional integration and are rejected when the correlation condition estimate exceeds \(10^8\).
 - Rank-one PSD inputs are integrated on their exact one-dimensional support by intersecting the two affine channel constraints. This includes exact duplicate channels, perfect negative correlation, and one deterministic channel.
 - Rank-zero covariance is handled as a deterministic rectangle-membership test.
-- A zero-variance coordinate with a nonzero cross-covariance is rejected as non-PSD. Correlation magnitude beyond the explicit 64-ulp roundoff allowance is rejected; no eigenvalue flooring, diagonal jitter, or silent covariance repair is used.
+- A zero-variance coordinate with a nonzero cross-covariance is rejected as non-PSD. Covariance symmetry is checked exactly; no near-symmetric averaging, eigenvalue flooring, diagonal jitter, or silent covariance repair is used. Correlation magnitude above one is rejected as non-PSD.
 - The result reports covariance support rank. Correlation condition is absent for rank-deficient inputs because it is not a finite SPD condition measure.
 - Standardized normal coordinates are truncated to ([-12,12]); the full-rank result carries an explicit union-bound allowance of (7.1\times10^{-33}). The rank-zero case is deterministic and has no truncation allowance.
 - A rectangle with positive support only beyond the numerical truncation window is rejected as ProbabilityBelowResolution.
@@ -79,7 +79,7 @@ These are mathematical numerical fixtures, not measured sensor probabilities. Or
 
 ## 6. Tests and limits
 
-The 16 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, and bounded evaluation.
+The 17 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, even-small-asymmetry rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, and bounded evaluation.
 
 Not implemented:
 - trivariate or general n-variate integration;
