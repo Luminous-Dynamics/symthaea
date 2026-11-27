@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/schemas/arm-manifest-v0.1.schema.json",
+  "title": "MACE DSM preregistered Arm Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "expected_arm_ids"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_dsm_arm_manifest_v0_1"
+    },
+    "expected_arm_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      }
+    }
+  }
+}
