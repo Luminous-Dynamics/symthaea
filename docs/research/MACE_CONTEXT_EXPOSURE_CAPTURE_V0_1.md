@@ -61,3 +61,19 @@ Run, on the exact PR head:
 - exact-head CI.
 
 Report compilation, unit tests, schema validation, and CI independently. Skipped checks are not passes.
+
+## Use-time admission before signed exposure
+
+The capture adapter now accepts an injected `MaceExposureAdmissionVerifierV1` and invokes it for every serialized memory-origin span **before** immutable artifact storage and provider transport. A rejection stops the invocation before either side effect.
+
+The new `MaceIngressUseTimeAdmissionVerifierV1` composes three independently supplied dependencies:
+
+- A state resolver retrieves the canonical raw event and its previously admitted ingress view.
+- The ingress `EvidenceVerifier` revalidates raw source, authority, trust, lineage, calibration, causal assessment, outcome and lifecycle using the independently pinned `valid_at_ms` / `known_at_ms` snapshot.
+- A separate purpose/rights verifier checks current consent/rights, purpose code, scope and consumer policy. Source trust is not treated as a substitute for user permission.
+
+The adapter checks the verified use receipt's process-local custody and integrity, exact evidence/event/payload/source/authority/transformation/lineage bindings, bitemporal snapshot, scope, purpose and consumer-policy identity. Its canonical receipt digest must exactly match the span's `lifecycle_revalidation_receipt_sha256`.
+
+The existing observer Ed25519 signature covers the span and this digest. Receipt consumers invoke the same admission-verifier interface again, so a signed exposure receipt alone cannot bypass current use-time revalidation. A consumer must provide the same independent run binding and current resolver/verifier implementations.
+
+The new pre-send gate proves only the configured verifiers' decisions at the pinned snapshot. It does not make the SHA-256 use receipt a signature, does not implement a rights authority, and does not guarantee a resolver or rights verifier is honest. Those are deployment trust roots and must be independently qualified. The capture still serializes the exact request once and sends the same byte buffer that was committed to immutable artifact storage.
