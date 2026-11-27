@@ -1,0 +1,402 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:symthaea:scene-graph:v2",
+  "title": "Symthaea renderer-facing scene graph v2",
+  "description": "Privacy-minimized scene graph. Semantic relations are explicit source-derived edges; layout attachments are renderer-only placement hints.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "session_id",
+    "clock_domain_id",
+    "event_id",
+    "event_sequence",
+    "event_kind",
+    "canonical_cue_digest",
+    "scene_graph_digest",
+    "form",
+    "privacy_class",
+    "destination",
+    "epistemic_status",
+    "effective_intensity",
+    "effective_permit_expires_at_monotonic_ns",
+    "nodes",
+    "relations",
+    "layout_attachments",
+    "accessible_description"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.scene-graph.v2"
+    },
+    "session_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "clock_domain_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "event_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "event_sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "event_kind": {
+      "enum": [
+        "conversation.listening",
+        "conversation.speaking",
+        "conversation.turn_state",
+        "conversation.backchannel",
+        "attention.focus",
+        "expression.intent",
+        "cognition.uncertainty",
+        "evidence.status",
+        "user.control"
+      ]
+    },
+    "canonical_cue_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "scene_graph_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "form": {
+      "enum": [
+        "living_constellation",
+        "puppet_theatre",
+        "mycelial_being",
+        "swarm",
+        "living_instrument",
+        "hearth_companion",
+        "cognitive_mandala"
+      ]
+    },
+    "privacy_class": {
+      "enum": [
+        "public",
+        "local_sensitive"
+      ]
+    },
+    "destination": {
+      "enum": [
+        "local_private",
+        "local_shared",
+        "remote"
+      ]
+    },
+    "epistemic_status": {
+      "enum": [
+        "measured",
+        "derived",
+        "inferred",
+        "proposed",
+        "presentation_only"
+      ]
+    },
+    "effective_intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "effective_permit_expires_at_monotonic_ns": {
+      "$ref": "#/$defs/uintString"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "relations": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/relation"
+      }
+    },
+    "layout_attachments": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/layoutAttachment"
+      }
+    },
+    "accessible_description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "privacy_class": {
+            "const": "local_sensitive"
+          }
+        },
+        "required": [
+          "privacy_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "destination": {
+            "const": "local_private"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "uintString": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "maxLength": 20
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "glyph",
+        "weight",
+        "motion",
+        "layout_anchor"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "role": {
+          "enum": [
+            "core",
+            "connection",
+            "turn_state",
+            "backchannel",
+            "attention",
+            "expression",
+            "alternative",
+            "evidence",
+            "user_control"
+          ]
+        },
+        "glyph": {
+          "enum": [
+            "star_node",
+            "filament",
+            "orbit",
+            "marionette_joint",
+            "puppet_thread",
+            "hypha_node",
+            "hypha",
+            "particle",
+            "particle_trail",
+            "resonator",
+            "string_line",
+            "ember",
+            "hearth_arc",
+            "mandala_center",
+            "radial_line",
+            "marker",
+            "branch",
+            "label_anchor"
+          ]
+        },
+        "weight": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "motion": {
+          "enum": [
+            "static",
+            "pulse",
+            "flow",
+            "radiate"
+          ]
+        },
+        "layout_anchor": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "core"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "slot"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "periphery"
+                },
+                "slot": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "node_id",
+                "slot"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "attached_to"
+                },
+                "node_id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "slot": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "relation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "source_node_id",
+            "target_node_id",
+            "kind",
+            "source_field"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "source_node_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "target_node_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "kind": {
+              "const": "attention_to"
+            },
+            "source_field": {
+              "const": "attention_focus.target"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "source_node_id",
+            "target_node_id",
+            "kind",
+            "source_field"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "source_node_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "target_node_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "kind": {
+              "const": "handoff_to"
+            },
+            "source_field": {
+              "const": "turn_state.target"
+            }
+          }
+        }
+      ]
+    },
+    "layoutAttachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_node_id",
+        "target_node_id",
+        "slot"
+      ],
+      "properties": {
+        "source_node_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "target_node_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "slot": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      }
+    }
+  }
+}
