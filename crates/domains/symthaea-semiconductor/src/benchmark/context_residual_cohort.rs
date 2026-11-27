@@ -260,6 +260,8 @@ pub fn evaluate_context_residual_cohort_v1(
     }
 
     let mut observation_ids = BTreeSet::new();
+    let mut label_revision_keys = BTreeSet::new();
+    let mut measurement_event_ids = BTreeSet::new();
     let mut grouped_residuals: BTreeMap<String, Vec<f64>> = BTreeMap::new();
     let mut context_residuals: BTreeMap<String, Vec<f64>> = BTreeMap::new();
     let mut eligible_observation_count = 0_usize;
@@ -293,8 +295,23 @@ pub fn evaluate_context_residual_cohort_v1(
                 observation.observation_id
             )));
         }
+        if !label_revision_keys.insert((observation.label_id.as_str(), observation.label_revision)) {
+            return Err(ContextResidualCohortErrorV1(format!(
+                "duplicate label/revision {}:{}",
+                observation.label_id, observation.label_revision
+            )));
+        }
+        if !measurement_event_ids.insert(observation.prediction_receipt.measurement_event_id.as_str()) {
+            return Err(ContextResidualCohortErrorV1(format!(
+                "duplicate measurement event {}",
+                observation.prediction_receipt.measurement_event_id
+            )));
+        }
         if !valid_sha256(&observation.common_cause_membership_receipt_sha256)
             || !valid_sha256(&observation.label_payload_sha256)
+            || !valid_sha256(&observation.prediction_receipt.global_model_artifact_sha256)
+            || !valid_sha256(&observation.prediction_receipt.feature_schema_sha256)
+            || !valid_sha256(&observation.prediction_receipt.policy_sha256)
             || observation_digest(observation)? != observation.observation_sha256
             || prediction_receipt_digest(&observation.prediction_receipt)?
                 != observation.prediction_receipt.receipt_sha256
@@ -316,6 +333,14 @@ pub fn evaluate_context_residual_cohort_v1(
             || report.label_revision != observation.label_revision
             || report.measurement_event_id != observation.prediction_receipt.measurement_event_id
             || report.label_sha256 != observation.label_payload_sha256
+            || !valid_sha256(&report.measurement_sha256)
+            || !valid_sha256(&report.qualification_report_sha256)
+            || !valid_sha256(&report.requalification_report_sha256)
+            || !valid_sha256(&report.requalification_frontier_sha256)
+            || report.qualified_standard_uncertainty_upper_bound.is_none()
+            || report
+                .qualified_standard_uncertainty_upper_bound
+                .is_some_and(|value| !value.is_finite() || value < 0.0)
             || report.qualified_corrected_value != observation.label_value
         {
             return Err(ContextResidualCohortErrorV1(format!(
@@ -655,6 +680,34 @@ mod tests {
             assert_eq!(report.reason_codes, vec![reason]);
             assert!(report.global_common_mode_residual.is_none());
         }
+    }
+
+    #[test]
+    fn duplicate_label_revision_cannot_count_twice_across_contexts() {
+        let mut first = observation("1", "tool-a/ch-1", "cal-a", 2.0);
+        let mut second = observation("2", "tool-b/ch-1", "cal-b", 2.1);
+        second.label_id = first.label_id.clone();
+        second.label_revision = first.label_revision;
+        second.eligibility_report.label_id = second.label_id.clone();
+        second.eligibility_report.label_revision = second.label_revision;
+        second.eligibility_report.report_sha256 =
+            eligibility_report_digest(&second.eligibility_report).unwrap();
+        second.observation_sha256 = observation_digest(&second).unwrap();
+        first.observation_sha256 = observation_digest(&first).unwrap();
+        let input = cohort(vec![first, second], 2, true, true);
+        assert!(evaluate_context_residual_cohort_v1(&input).is_err());
+    }
+
+    #[test]
+    fn mismatched_clock_domain_cannot_enter_one_cohort() {
+        let first = observation("1", "tool-a/ch-1", "cal-a", 2.0);
+        let mut second = observation("2", "tool-b/ch-1", "cal-b", 2.1);
+        second.prediction_receipt.clock_domain_id = "other-clock".into();
+        second.prediction_receipt.receipt_sha256 =
+            prediction_receipt_digest(&second.prediction_receipt).unwrap();
+        second.observation_sha256 = observation_digest(&second).unwrap();
+        let input = cohort(vec![first, second], 2, true, true);
+        assert!(evaluate_context_residual_cohort_v1(&input).is_err());
     }
 
     #[test]
