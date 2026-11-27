@@ -18,6 +18,10 @@ use crate::streaming_session::{
     StreamingInvalidationCauseV1, StreamingSessionLedgerV1,
     StreamingSessionMutationReceiptV1,
 };
+use crate::temporal_projection::{
+    DerivedProjectionIndexV1, DerivedProjectionSpecV1, ProjectionRegisterStatusV1,
+    TemporalProjectionRejectV1,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClaimRevalidationOutcomeV1 {
@@ -77,6 +81,11 @@ pub enum ClaimRevalidationRejectV1 {
     EvidenceBindingMismatch,
     InvalidEvidence,
     InvalidVerifierReceipt,
+    InvalidAssessment,
+    RebuildNotPermitted,
+    AssessmentBindingMismatch,
+    ProjectionDoesNotBindCorrectedEvent,
+    ProjectionRegistrationRejected(TemporalProjectionRejectV1),
 }
 
 /// Exact binding for one claim-relative check after one source transition.
@@ -140,6 +149,9 @@ pub trait ClaimRevalidationEvidenceVerifierV1 {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClaimRevalidationAssessmentV1 {
     pub claim_id: String,
+    pub claim_sha256: String,
+    pub source_event_id: String,
+    pub source_transition_receipt_sha256: String,
     pub disposition: ClaimRevalidationDispositionV1,
     pub binding_sha256: String,
     pub source_transition_event_id: String,
@@ -157,8 +169,17 @@ pub struct ClaimRevalidationAssessmentV1 {
 impl ClaimRevalidationAssessmentV1 {
     pub fn verify_integrity(&self) -> bool {
         !self.old_projection_may_be_reactivated
+            && valid_atom(&self.claim_id, 512)
+            && valid_atom(&self.source_event_id, 512)
+            && valid_atom(&self.source_transition_event_id, 512)
+            && validate_digest(&self.claim_sha256).is_ok()
+            && validate_digest(&self.source_transition_receipt_sha256).is_ok()
+            && validate_digest(&self.binding_sha256).is_ok()
             && self.assessment_sha256 == assessment_digest(
                 &self.claim_id,
+                &self.claim_sha256,
+                &self.source_event_id,
+                &self.source_transition_receipt_sha256,
                 self.disposition,
                 &self.binding_sha256,
                 &self.source_transition_event_id,
@@ -170,6 +191,61 @@ impl ClaimRevalidationAssessmentV1 {
                 self.verification_receipt_sha256.as_deref(),
             )
     }
+}
+
+/// Register a new derived projection only after a claim has independently
+/// passed revalidation following a correction.
+///
+/// The current ledger must still be at the exact transition sequence, and the
+/// new projection must depend on the correction event (the new active source
+/// revision), never on the superseded source event. The projection index must
+/// already have consumed the same transition; otherwise its sequence gate
+/// rejects registration. This function cannot revive an old projection ID.
+pub fn register_rebuilt_projection_after_claim_revalidation_v1(
+    ledger: &StreamingSessionLedgerV1,
+    index: &mut DerivedProjectionIndexV1,
+    transition: &StreamingSessionMutationReceiptV1,
+    binding: &ClaimRevalidationBindingV1,
+    assessment: &ClaimRevalidationAssessmentV1,
+    spec: DerivedProjectionSpecV1,
+) -> Result<ProjectionRegisterStatusV1, ClaimRevalidationRejectV1> {
+    if !assessment.verify_integrity() {
+        return Err(ClaimRevalidationRejectV1::InvalidAssessment);
+    }
+    if assessment.disposition != ClaimRevalidationDispositionV1::PreservedNeedsRebuild
+        || !assessment.new_projection_may_be_built
+        || assessment.old_projection_may_be_reactivated
+    {
+        return Err(ClaimRevalidationRejectV1::RebuildNotPermitted);
+    }
+    if assessment.claim_id != binding.claim_id
+        || assessment.claim_sha256 != binding.claim_sha256
+        || assessment.source_event_id != binding.source_event_id
+        || assessment.source_transition_receipt_sha256 != binding.source_transition_receipt_sha256
+        || assessment.binding_sha256 != binding.binding_sha256()
+    {
+        return Err(ClaimRevalidationRejectV1::AssessmentBindingMismatch);
+    }
+    if !ledger.verify_recorded_receipt(transition) {
+        return Err(ClaimRevalidationRejectV1::UnrecordedSourceTransition);
+    }
+    if transition.invalidation_cause != Some(StreamingInvalidationCauseV1::Correction)
+        || assessment.source_transition_event_id != transition.event_id
+        || assessment.source_transition_sequence != transition.sequence
+        || assessment.source_transition_receipt_sha256 != transition.receipt_sha256
+        || !transition.affected_event_ids.iter().any(|id| id == &binding.source_event_id)
+    {
+        return Err(ClaimRevalidationRejectV1::TransitionBindingMismatch);
+    }
+    if ledger.last_sequence() != transition.sequence
+        || spec.built_at_sequence != transition.sequence
+        || !spec.source_event_ids.iter().any(|id| id == &transition.event_id)
+        || spec.source_event_ids.iter().any(|id| id == &binding.source_event_id)
+    {
+        return Err(ClaimRevalidationRejectV1::ProjectionDoesNotBindCorrectedEvent);
+    }
+    index.register_projection(ledger, spec)
+        .map_err(ClaimRevalidationRejectV1::ProjectionRegistrationRejected)
 }
 
 /// Assess one claim against one exact, ledger-recorded transition.
@@ -310,6 +386,9 @@ fn build_assessment(
     let old_projection_may_be_reactivated = false;
     let assessment_sha256 = assessment_digest(
         &binding.claim_id,
+        &binding.claim_sha256,
+        &binding.source_event_id,
+        &transition.receipt_sha256,
         disposition,
         &binding_sha256,
         &transition.event_id,
@@ -322,6 +401,9 @@ fn build_assessment(
     );
     ClaimRevalidationAssessmentV1 {
         claim_id: binding.claim_id.clone(),
+        claim_sha256: binding.claim_sha256.clone(),
+        source_event_id: binding.source_event_id.clone(),
+        source_transition_receipt_sha256: transition.receipt_sha256.clone(),
         disposition,
         binding_sha256,
         source_transition_event_id: transition.event_id.clone(),
@@ -363,6 +445,9 @@ fn evidence_digest(evidence: &ClaimRevalidationEvidenceV1) -> String {
 #[allow(clippy::too_many_arguments)]
 fn assessment_digest(
     claim_id: &str,
+    claim_sha256: &str,
+    source_event_id: &str,
+    source_transition_receipt_sha256: &str,
     disposition: ClaimRevalidationDispositionV1,
     binding_sha256: &str,
     transition_event_id: &str,
@@ -376,6 +461,9 @@ fn assessment_digest(
     let mut hasher = Sha256::new();
     hasher.update(b"luminous:mace:claim-revalidation-assessment:v1\0");
     hash_field(&mut hasher, claim_id);
+    hash_field(&mut hasher, claim_sha256);
+    hash_field(&mut hasher, source_event_id);
+    hash_field(&mut hasher, source_transition_receipt_sha256);
     hasher.update([disposition.tag()]);
     hash_field(&mut hasher, binding_sha256);
     hash_field(&mut hasher, transition_event_id);
@@ -530,6 +618,161 @@ mod tests {
                 verification_receipt_sha256: "8".repeat(64),
             })
         }
+    }
+
+    fn projection_spec(
+        projection_id: &str,
+        sequence: u64,
+        source_event_id: &str,
+    ) -> DerivedProjectionSpecV1 {
+        DerivedProjectionSpecV1 {
+            projection_id: projection_id.to_owned(),
+            kind: crate::temporal_projection::DerivedProjectionKindV1::Summary,
+            content_sha256: "b".repeat(64),
+            derivation_receipt_sha256: "c".repeat(64),
+            source_event_ids: vec![source_event_id.to_owned()],
+            parent_projection_ids: Vec::new(),
+            built_at_sequence: sequence,
+        }
+    }
+
+    #[test]
+    fn passing_claim_revalidation_registers_new_projection_not_old_projection() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        index.register_projection(&ledger, projection_spec(
+            "summary-old", 1, "source-event-1",
+        )).unwrap();
+
+        let receipt = ledger.apply(StreamingSessionMutationV1 {
+            event_id: "source-transition-2".into(),
+            sequence: 2,
+            effective_at_ms: 100,
+            kind: StreamingMutationKindV1::Correct {
+                target_event_id: "source-event-1".into(),
+                message: message("turn-1", 100, "A property has value five."),
+            },
+        }, 1_100).unwrap().receipt;
+        index.apply_transition(&ledger, &receipt).unwrap();
+
+        let binding = binding(&receipt);
+        let evidence = evidence(&binding, ClaimRevalidationOutcomeV1::Pass);
+        let assessment = assess_claim_revalidation_v1(
+            &ledger, &receipt, &binding, Some(&evidence), Some(&FixtureIndependentVerifier),
+        ).unwrap();
+
+        let status = register_rebuilt_projection_after_claim_revalidation_v1(
+            &ledger, &mut index, &receipt, &binding, &assessment,
+            projection_spec("summary-new", 2, "source-transition-2"),
+        ).unwrap();
+        assert_eq!(status, ProjectionRegisterStatusV1::Created);
+        assert_eq!(
+            index.projection("summary-old").unwrap().status(),
+            crate::temporal_projection::DerivedProjectionStatusV1::Stale
+        );
+        assert_eq!(
+            index.projection("summary-new").unwrap().status(),
+            crate::temporal_projection::DerivedProjectionStatusV1::Current
+        );
+        assert_eq!(
+            index.projection("summary-new").unwrap().source_event_ids(),
+            &["source-transition-2".to_owned()]
+        );
+    }
+
+    #[test]
+    fn a_passed_claim_cannot_rebuild_from_the_superseded_source_event() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        index.register_projection(&ledger, projection_spec(
+            "summary-old", 1, "source-event-1",
+        )).unwrap();
+        let receipt = ledger.apply(StreamingSessionMutationV1 {
+            event_id: "source-transition-2".into(),
+            sequence: 2,
+            effective_at_ms: 100,
+            kind: StreamingMutationKindV1::Correct {
+                target_event_id: "source-event-1".into(),
+                message: message("turn-1", 100, "Corrected value."),
+            },
+        }, 1_100).unwrap().receipt;
+        index.apply_transition(&ledger, &receipt).unwrap();
+        let binding = binding(&receipt);
+        let evidence = evidence(&binding, ClaimRevalidationOutcomeV1::Pass);
+        let assessment = assess_claim_revalidation_v1(
+            &ledger, &receipt, &binding, Some(&evidence), Some(&FixtureIndependentVerifier),
+        ).unwrap();
+        assert_eq!(
+            register_rebuilt_projection_after_claim_revalidation_v1(
+                &ledger, &mut index, &receipt, &binding, &assessment,
+                projection_spec("summary-bad", 2, "source-event-1"),
+            ),
+            Err(ClaimRevalidationRejectV1::ProjectionDoesNotBindCorrectedEvent)
+        );
+    }
+
+    #[test]
+    fn revalidation_cannot_register_projection_before_index_consumes_transition() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        index.register_projection(&ledger, projection_spec(
+            "summary-old", 1, "source-event-1",
+        )).unwrap();
+        let receipt = ledger.apply(StreamingSessionMutationV1 {
+            event_id: "source-transition-2".into(),
+            sequence: 2,
+            effective_at_ms: 100,
+            kind: StreamingMutationKindV1::Correct {
+                target_event_id: "source-event-1".into(),
+                message: message("turn-1", 100, "Corrected value."),
+            },
+        }, 1_100).unwrap().receipt;
+        let binding = binding(&receipt);
+        let evidence = evidence(&binding, ClaimRevalidationOutcomeV1::Pass);
+        let assessment = assess_claim_revalidation_v1(
+            &ledger, &receipt, &binding, Some(&evidence), Some(&FixtureIndependentVerifier),
+        ).unwrap();
+
+        assert!(matches!(
+            register_rebuilt_projection_after_claim_revalidation_v1(
+                &ledger, &mut index, &receipt, &binding, &assessment,
+                projection_spec("summary-new", 2, "source-transition-2"),
+            ),
+            Err(ClaimRevalidationRejectV1::ProjectionRegistrationRejected(
+                TemporalProjectionRejectV1::SequenceGap { expected: 1, actual: 2 }
+            ))
+        ));
+    }
+
+    #[test]
+    fn failed_or_unverified_claim_never_reaches_projection_registration() {
+        let mut ledger = ledger();
+        let mut index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        index.register_projection(&ledger, projection_spec(
+            "summary-old", 1, "source-event-1",
+        )).unwrap();
+        let receipt = ledger.apply(StreamingSessionMutationV1 {
+            event_id: "source-transition-2".into(),
+            sequence: 2,
+            effective_at_ms: 100,
+            kind: StreamingMutationKindV1::Correct {
+                target_event_id: "source-event-1".into(),
+                message: message("turn-1", 100, "Corrected value."),
+            },
+        }, 1_100).unwrap().receipt;
+        index.apply_transition(&ledger, &receipt).unwrap();
+        let binding = binding(&receipt);
+        let evidence = evidence(&binding, ClaimRevalidationOutcomeV1::Fail);
+        let assessment = assess_claim_revalidation_v1(
+            &ledger, &receipt, &binding, Some(&evidence), Some(&FixtureIndependentVerifier),
+        ).unwrap();
+        assert_eq!(
+            register_rebuilt_projection_after_claim_revalidation_v1(
+                &ledger, &mut index, &receipt, &binding, &assessment,
+                projection_spec("summary-new", 2, "source-transition-2"),
+            ),
+            Err(ClaimRevalidationRejectV1::RebuildNotPermitted)
+        );
     }
 
     #[test]
