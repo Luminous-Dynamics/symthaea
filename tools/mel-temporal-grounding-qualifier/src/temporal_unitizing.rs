@@ -1233,13 +1233,7 @@ mod tests {
         let item = test_item(
             "piano",
             vec![
-                test_annotation(
-                    '1',
-                    'a',
-                    GroundTruthStateV1::Present,
-                    vec![event],
-                    None,
-                ),
+                test_annotation('1', 'a', GroundTruthStateV1::Present, vec![event], None),
                 test_annotation('2', 'b', GroundTruthStateV1::Absent, Vec::new(), None),
                 test_annotation(
                     '3',
