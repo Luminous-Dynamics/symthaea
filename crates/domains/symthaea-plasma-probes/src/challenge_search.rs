@@ -332,12 +332,483 @@ fn is_sha256_hex(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+/// Configuration for a joint intervention-box response search.
+///
+/// The coordinate-wise Lipschitz constants certify
+/// |J(x)-J(y)| <= sum_i L_i * |x_i-y_i|.
+/// This is an anisotropic L1-domain envelope. The certificate digest must
+/// bind the entire closed box, objective definition, QoI scaling, branch
+/// identity, and every L_i; per-axis bounds from unrelated boxes cannot be
+/// combined into a global certificate.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BoxChallengeSearchConfig {
+    pub axis_ids: Vec<String>,
+    pub lower_bounds: Vec<f64>,
+    pub upper_bounds: Vec<f64>,
+    pub lipschitz_constants: Vec<f64>,
+    pub absolute_gap_tolerance: f64,
+    pub maximum_evaluations: usize,
+    pub branch_id: String,
+    pub lipschitz_certificate_sha256: String,
+}
+
+impl BoxChallengeSearchConfig {
+    pub fn new(
+        axis_ids: Vec<String>,
+        lower_bounds: Vec<f64>,
+        upper_bounds: Vec<f64>,
+        lipschitz_constants: Vec<f64>,
+        absolute_gap_tolerance: f64,
+        maximum_evaluations: usize,
+        branch_id: impl Into<String>,
+        lipschitz_certificate_sha256: impl Into<String>,
+    ) -> Self {
+        Self {
+            axis_ids,
+            lower_bounds,
+            upper_bounds,
+            lipschitz_constants,
+            absolute_gap_tolerance,
+            maximum_evaluations,
+            branch_id: branch_id.into(),
+            lipschitz_certificate_sha256: lipschitz_certificate_sha256.into(),
+        }
+    }
+
+    fn validate(&self) -> Result<(), ChallengeSearchError> {
+        let dimension = self.axis_ids.len();
+        if dimension < 2
+            || self.lower_bounds.len() != dimension
+            || self.upper_bounds.len() != dimension
+            || self.lipschitz_constants.len() != dimension
+            || !self.absolute_gap_tolerance.is_finite()
+            || self.absolute_gap_tolerance <= 0.0
+            || self.maximum_evaluations == 0
+            || self.branch_id.trim().is_empty()
+            || !is_sha256_hex(&self.lipschitz_certificate_sha256)
+        {
+            return Err(ChallengeSearchError::InvalidConfiguration);
+        }
+
+        let mut seen = std::collections::HashSet::with_capacity(dimension);
+        for index in 0..dimension {
+            let axis = &self.axis_ids[index];
+            let lower = self.lower_bounds[index];
+            let upper = self.upper_bounds[index];
+            let lipschitz = self.lipschitz_constants[index];
+            if axis.trim().is_empty()
+                || !seen.insert(axis)
+                || !lower.is_finite()
+                || !upper.is_finite()
+                || lower >= upper
+                || !lipschitz.is_finite()
+                || lipschitz < 0.0
+            {
+                return Err(ChallengeSearchError::InvalidConfiguration);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Result of a joint, branch-conditioned intervention-box search.
+///
+/// ConditionalGapSatisfied is conditional on the supplied coordinate-wise
+/// Lipschitz certificate being valid over the complete closed box and on the
+/// declared response branch remaining stable throughout that box.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BoxChallengeSearchReport {
+    pub axis_ids: Vec<String>,
+    pub branch_id: String,
+    pub lipschitz_certificate_sha256: String,
+    pub best_parameters: Vec<f64>,
+    pub best_sampled_objective: f64,
+    pub global_upper_bound: f64,
+    pub absolute_gap: f64,
+    pub evaluations: usize,
+    pub termination: ChallengeSearchTermination,
+}
+
+#[derive(Clone, Debug)]
+struct BoxSearchCell {
+    lower: Vec<f64>,
+    upper: Vec<f64>,
+    upper_bound: f64,
+}
+
+/// Search jointly over a closed multi-parameter intervention box.
+///
+/// The objective must be non-negative and every sample must be confirmed by
+/// the registered full-order convergence contract on one stable response
+/// branch. The global upper envelope for a cell is formed from a sample point
+/// and the coordinate-wise Lipschitz radii. The cell with the largest upper
+/// envelope is subdivided along the axis with the largest L_i * half_width_i.
+///
+/// The oracle explores interior points; it does not infer a global maximum
+/// from boundary checks. Budget exhaustion, floating-point resolution
+/// exhaustion, branch changes, or unqualified full-order samples never yield
+/// a qualified global bound.
+pub fn search_box_response_challenge<F>(
+    config: &BoxChallengeSearchConfig,
+    mut evaluate: F,
+) -> Result<BoxChallengeSearchReport, ChallengeSearchError>
+where
+    F: FnMut(&[f64]) -> Result<ChallengeObjectiveSample, ChallengeSearchError>,
+{
+    config.validate()?;
+    let (initial_center, initial_radii) =
+        box_center_and_radii(&config.lower_bounds, &config.upper_bounds)?;
+    let initial_value =
+        evaluate_box_checked(&mut evaluate, &initial_center, &config.branch_id)?;
+    let initial_upper = box_upper_envelope(
+        initial_value,
+        &config.lipschitz_constants,
+        &initial_radii,
+    )?;
+
+    let mut best_parameters = initial_center;
+    let mut best_value = initial_value;
+    let mut evaluations = 1_usize;
+    let mut cells = vec![BoxSearchCell {
+        lower: config.lower_bounds.clone(),
+        upper: config.upper_bounds.clone(),
+        upper_bound: initial_upper,
+    }];
+
+    let termination = loop {
+        let (worst_index, global_upper_bound) = worst_box_cell(&cells);
+        let absolute_gap = (global_upper_bound - best_value).max(0.0);
+        if absolute_gap <= config.absolute_gap_tolerance {
+            break ChallengeSearchTermination::ConditionalGapSatisfied;
+        }
+        if evaluations
+            .checked_add(2)
+            .is_none_or(|next_count| next_count > config.maximum_evaluations)
+        {
+            break ChallengeSearchTermination::EvaluationBudgetExhausted;
+        }
+
+        let cell = cells.remove(worst_index);
+        let Some(split_axis) = choose_box_split_axis(&cell, &config.lipschitz_constants) else {
+            cells.push(cell);
+            break ChallengeSearchTermination::FloatingPointResolutionExhausted;
+        };
+        let split = midpoint(cell.lower[split_axis], cell.upper[split_axis]);
+        if split <= cell.lower[split_axis] || split >= cell.upper[split_axis] {
+            cells.push(cell);
+            break ChallengeSearchTermination::FloatingPointResolutionExhausted;
+        }
+
+        for choose_left in [true, false] {
+            let mut lower = cell.lower.clone();
+            let mut upper = cell.upper.clone();
+            if choose_left {
+                upper[split_axis] = split;
+            } else {
+                lower[split_axis] = split;
+            }
+            let (center, radii) = box_center_and_radii(&lower, &upper)?;
+            let sample_value =
+                evaluate_box_checked(&mut evaluate, &center, &config.branch_id)?;
+            evaluations = evaluations
+                .checked_add(1)
+                .ok_or(ChallengeSearchError::InvalidConfiguration)?;
+            let cell_upper =
+                box_upper_envelope(sample_value, &config.lipschitz_constants, &radii)?;
+            if sample_value > best_value
+                || (sample_value == best_value
+                    && lexicographically_less(&center, &best_parameters))
+            {
+                best_value = sample_value;
+                best_parameters = center;
+            }
+            cells.push(BoxSearchCell {
+                lower,
+                upper,
+                upper_bound: cell_upper,
+            });
+        }
+    };
+
+    let (_, global_upper_bound) = worst_box_cell(&cells);
+    let absolute_gap = (global_upper_bound - best_value).max(0.0);
+    Ok(BoxChallengeSearchReport {
+        axis_ids: config.axis_ids.clone(),
+        branch_id: config.branch_id.clone(),
+        lipschitz_certificate_sha256: config.lipschitz_certificate_sha256.clone(),
+        best_parameters,
+        best_sampled_objective: best_value,
+        global_upper_bound,
+        absolute_gap,
+        evaluations,
+        termination,
+    })
+}
+
+fn evaluate_box_checked<F>(
+    evaluate: &mut F,
+    parameters: &[f64],
+    expected_branch_id: &str,
+) -> Result<f64, ChallengeSearchError>
+where
+    F: FnMut(&[f64]) -> Result<ChallengeObjectiveSample, ChallengeSearchError>,
+{
+    let sample = evaluate(parameters)?;
+    if sample.branch_id != expected_branch_id {
+        return Err(ChallengeSearchError::ResponseBranchChanged);
+    }
+    if !sample.full_order_reference_converged {
+        return Err(ChallengeSearchError::FullOrderResponseUnqualified);
+    }
+    if !sample.objective_value.is_finite() || sample.objective_value < 0.0 {
+        return Err(ChallengeSearchError::InvalidObjective);
+    }
+    Ok(sample.objective_value)
+}
+
+fn box_center_and_radii(
+    lower: &[f64],
+    upper: &[f64],
+) -> Result<(Vec<f64>, Vec<f64>), ChallengeSearchError> {
+    if lower.is_empty() || lower.len() != upper.len() {
+        return Err(ChallengeSearchError::InvalidConfiguration);
+    }
+    let mut center = Vec::with_capacity(lower.len());
+    let mut radii = Vec::with_capacity(lower.len());
+    for (&left, &right) in lower.iter().zip(upper) {
+        let middle = midpoint(left, right);
+        let half = half_width(left, right);
+        let (sample, radius) = if middle > left && middle < right {
+            (middle, half)
+        } else {
+            // Adjacent representable endpoints have no interior midpoint.
+            // Sampling one endpoint remains valid when the full radius is
+            // retained in the Lipschitz envelope.
+            (left, half * 2.0)
+        };
+        if !radius.is_finite() || radius < 0.0 {
+            return Err(ChallengeSearchError::NonFiniteUpperBound);
+        }
+        center.push(sample);
+        radii.push(radius);
+    }
+    Ok((center, radii))
+}
+
+fn box_upper_envelope(
+    sample_value: f64,
+    lipschitz_constants: &[f64],
+    radii: &[f64],
+) -> Result<f64, ChallengeSearchError> {
+    if lipschitz_constants.len() != radii.len() {
+        return Err(ChallengeSearchError::InvalidConfiguration);
+    }
+    let mut upper = sample_value;
+    for (&lipschitz, &radius) in lipschitz_constants.iter().zip(radii) {
+        if lipschitz == 0.0 {
+            continue;
+        }
+        upper += lipschitz * radius;
+        if !upper.is_finite() {
+            return Err(ChallengeSearchError::NonFiniteUpperBound);
+        }
+    }
+    Ok(upper)
+}
+
+fn choose_box_split_axis(
+    cell: &BoxSearchCell,
+    lipschitz_constants: &[f64],
+) -> Option<usize> {
+    let mut selected: Option<(usize, f64)> = None;
+    for (axis, (&lower, &upper)) in cell.lower.iter().zip(&cell.upper).enumerate() {
+        let lipschitz = lipschitz_constants[axis];
+        if lipschitz == 0.0 {
+            continue;
+        }
+        let middle = midpoint(lower, upper);
+        if middle <= lower || middle >= upper {
+            continue;
+        }
+        let contribution = lipschitz * half_width(lower, upper);
+        match selected {
+            None => selected = Some((axis, contribution)),
+            Some((best_axis, best_contribution))
+                if contribution > best_contribution
+                    || (contribution == best_contribution && axis < best_axis) =>
+            {
+                selected = Some((axis, contribution));
+            }
+            _ => {}
+        }
+    }
+    selected.map(|(axis, _)| axis)
+}
+
+fn worst_box_cell(cells: &[BoxSearchCell]) -> (usize, f64) {
+    let mut worst_index = 0_usize;
+    for index in 1..cells.len() {
+        let candidate = &cells[index];
+        let incumbent = &cells[worst_index];
+        if candidate.upper_bound > incumbent.upper_bound
+            || (candidate.upper_bound == incumbent.upper_bound
+                && lexicographically_less(&candidate.lower, &incumbent.lower))
+        {
+            worst_index = index;
+        }
+    }
+    (worst_index, cells[worst_index].upper_bound)
+}
+
+fn lexicographically_less(left: &[f64], right: &[f64]) -> bool {
+    for (&left_value, &right_value) in left.iter().zip(right) {
+        let ordering = left_value.total_cmp(&right_value);
+        if ordering != std::cmp::Ordering::Equal {
+            return ordering == std::cmp::Ordering::Less;
+        }
+    }
+    left.len() < right.len()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn certificate() -> String {
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned()
+    }
+
+    #[test]
+    fn box_search_finds_joint_interior_response_peak_and_bounds_the_full_box() {
+        let config = BoxChallengeSearchConfig::new(
+            vec![
+                "second_pulse_phase".to_owned(),
+                "second_pulse_amplitude".to_owned(),
+                "pulse_separation".to_owned(),
+            ],
+            vec![0.0, 0.0, 0.0],
+            vec![1.0, 1.0, 1.0],
+            vec![1.0, 2.0, 0.5],
+            5.0e-2,
+            1_024,
+            "echo-branch-7",
+            certificate(),
+        );
+        let objective = |parameters: &[f64]| {
+            let value = 3.0
+                - (parameters[0] - 0.37).abs()
+                - 2.0 * (parameters[1] - 0.61).abs()
+                - 0.5 * (parameters[2] - 0.22).abs();
+            Ok(ChallengeObjectiveSample::new(
+                value,
+                "echo-branch-7",
+                true,
+            ))
+        };
+        let report = search_box_response_challenge(&config, objective).unwrap();
+
+        assert!((report.best_parameters[0] - 0.37).abs() < 0.05);
+        assert!((report.best_parameters[1] - 0.61).abs() < 0.05);
+        assert!((report.best_parameters[2] - 0.22).abs() < 0.1);
+        assert!(report.global_upper_bound >= 3.0);
+        assert!(report.absolute_gap <= config.absolute_gap_tolerance);
+        assert_eq!(
+            report.termination,
+            ChallengeSearchTermination::ConditionalGapSatisfied
+        );
+        assert!(report.evaluations <= config.maximum_evaluations);
+    }
+
+    #[test]
+    fn box_search_budget_exhaustion_is_explicitly_unqualified() {
+        let config = BoxChallengeSearchConfig::new(
+            vec!["phase".to_owned(), "amplitude".to_owned()],
+            vec![0.0, 0.0],
+            vec![1.0, 1.0],
+            vec![1.0, 1.0],
+            1.0e-6,
+            1,
+            "stable-branch",
+            certificate(),
+        );
+        let report = search_box_response_challenge(&config, |_| {
+            Ok(ChallengeObjectiveSample::new(0.5, "stable-branch", true))
+        })
+        .unwrap();
+        assert_eq!(
+            report.termination,
+            ChallengeSearchTermination::EvaluationBudgetExhausted
+        );
+        assert!(report.absolute_gap > config.absolute_gap_tolerance);
+        assert_eq!(report.evaluations, 1);
+    }
+
+    #[test]
+    fn box_search_rejects_duplicate_axes_branch_changes_and_unconverged_samples() {
+        let invalid_axes = BoxChallengeSearchConfig::new(
+            vec!["phase".to_owned(), "phase".to_owned()],
+            vec![0.0, 0.0],
+            vec![1.0, 1.0],
+            vec![1.0, 1.0],
+            1.0e-2,
+            8,
+            "stable-branch",
+            certificate(),
+        );
+        assert_eq!(
+            search_box_response_challenge(&invalid_axes, |_| {
+                Ok(ChallengeObjectiveSample::new(0.5, "stable-branch", true))
+            }),
+            Err(ChallengeSearchError::InvalidConfiguration)
+        );
+
+        let valid = BoxChallengeSearchConfig::new(
+            vec!["phase".to_owned(), "amplitude".to_owned()],
+            vec![0.0, 0.0],
+            vec![1.0, 1.0],
+            vec![1.0, 1.0],
+            1.0e-2,
+            8,
+            "stable-branch",
+            certificate(),
+        );
+        assert_eq!(
+            search_box_response_challenge(&valid, |_| {
+                Ok(ChallengeObjectiveSample::new(0.5, "different-branch", true))
+            }),
+            Err(ChallengeSearchError::ResponseBranchChanged)
+        );
+        assert_eq!(
+            search_box_response_challenge(&valid, |_| {
+                Ok(ChallengeObjectiveSample::new(0.5, "stable-branch", false))
+            }),
+            Err(ChallengeSearchError::FullOrderResponseUnqualified)
+        );
+    }
+
+    #[test]
+    fn box_search_zero_lipschitz_axes_do_not_consume_refinement_budget() {
+        let config = BoxChallengeSearchConfig::new(
+            vec!["phase".to_owned(), "irrelevant_axis".to_owned()],
+            vec![0.0, -1.0],
+            vec![1.0, 1.0],
+            vec![0.0, 0.0],
+            1.0e-10,
+            1,
+            "constant-branch",
+            certificate(),
+        );
+        let report = search_box_response_challenge(&config, |_| {
+            Ok(ChallengeObjectiveSample::new(0.125, "constant-branch", true))
+        })
+        .unwrap();
+        assert_eq!(report.best_sampled_objective, 0.125);
+        assert_eq!(report.global_upper_bound, 0.125);
+        assert_eq!(report.evaluations, 1);
+        assert_eq!(
+            report.termination,
+            ChallengeSearchTermination::ConditionalGapSatisfied
+        );
     }
 
     #[test]
