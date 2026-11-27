@@ -1475,8 +1475,9 @@ pub struct EvidencePairAblationV1 {
 }
 
 /// Non-additive interaction between two evidence items under one frozen policy.
-/// Positive interaction means joint removal is more harmful than the sum of
-/// the two individual removals; negative means the items are partly redundant.
+/// Positive interaction means the items are substitutable/redundant: either can
+/// compensate for the other. Negative interaction means complementarity: the
+/// pair together contributes more than the sum of its individual contributions.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvidenceInteractionV1 {
     pub left_evidence_id: String,
