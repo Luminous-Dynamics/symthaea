@@ -4,7 +4,7 @@
 **Base implementation:** #13578 / draft PR #13892  
 **Implementation branch:** `feat/semi-ca-ocrc-stochastic-v1`  
 **Reference:** Wang & Simeone, *Capacity-Constrained Delayed Feedback for Online Conformal Risk Control*, arXiv:2611.17059 (12 Nov 2026), https://arxiv.org/abs/2611.17059  
-**Status:** Section VI stochastic-delay policy, update, theorem bound and proxy optimizer implemented; 25 inherited unit tests + 6 stochastic integration tests authored; exact-head validation pending.
+**Status:** Section VI stochastic-delay policy, update, theorem bound and proxy optimizer implemented; 25 inherited unit tests + 7 stochastic integration tests authored; exact-head validation pending.
 
 ## 1. Why a distinct mode is necessary
 
@@ -51,7 +51,7 @@ The policy validator requires:
 - positive (q_G);
 - (ar d_{max}) is a supported delay point with positive mass (G(ar d_{max})-G(ar d_{max}+1));
 - a finite monotone proxy survival vector (F) on ([0,ar d_{max}]), with positive (F(ar d_{max}));
-- a valid SHA-256 delay-law evidence-manifest digest for IID mode.
+- a valid SHA-256 delay-law evidence-manifest digest for IID mode. The manifest digest is included in every round receipt and the stochastic risk-bound output.
 
 The manifest binds the declared delay law to its data/source window and estimation procedure. It does not prove IID or stationarity by itself.
 
@@ -129,6 +129,8 @@ expleft[-K hleft(rac{ell_{F,G}}{K}ight)ight],
 ]
 where (h(x)=x-1-ln x).
 
+The stochastic risk-bound output carries the status `DeclaredByCallerNotIndependentlyVerified`: the engine binds the claimed G evidence but does not infer IID from the feedback records that survive proxy censoring. An independent arrival-time audit is necessary to investigate IID assumptions; correlated/queue-driven delays must remain stress-test-only unless their law is established.
+
 The code reports the individual terms—(q_G), (ell_{F,G}), conditional mean delay, (Q_{F,G}), (R_{F,G}), capacity term and final bound—rather than a single opaque number. It refuses (q_G=0), zero proxy survival on a possible feedback age, non-finite terms, or tracking load above (K).
 
 ## 5. Proposition 2 proxy optimizer
@@ -183,7 +185,8 @@ The stochastic integration tests currently cover:
 3. the Theorem 2 bound against an independently calculated scalar formula;
 4. monotone/supported optimizer output and tracking-load constraint;
 5. rejection of (q_G=0) and rejection of stochastic policies by the bounded theorem helper;
-6. rejection of an IID profile without a content-addressed delay-law manifest.
+6. rejection of an IID profile without a content-addressed delay-law manifest;
+7. optimizer comparison against an independent dense-grid theta/horizon reference.
 
 Inherited unit tests cover bounded-mode invariants and the stochastic unit tests will be run in the full semiconductor crate. Exact-head rustfmt, strict Clippy, all unit/integration tests, an independent stochastic known-answer oracle and SEMI-BENCH-001 Reference Oracle validation are still required.
 
