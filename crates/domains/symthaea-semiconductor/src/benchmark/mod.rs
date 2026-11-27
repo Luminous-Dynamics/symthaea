@@ -12,6 +12,7 @@ pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
+pub mod qualified_observation_risk;
 pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
 pub mod secom_missingness;
@@ -166,4 +167,13 @@ pub use capacity_constrained_ocr_control::{
     advance_capacity_ocrc_round_v1, capacity_ocrc_risk_bound_v1,
     capacity_ocrc_tracking_load_v1, create_capacity_ocrc_engine_v1,
     optimize_capacity_ocrc_proxy_v1, validate_capacity_ocrc_policy_v1,
+};
+
+pub use qualified_observation_risk::{
+    QUALIFIED_OBSERVATION_RISK_REPORT_SCHEMA_V1, QUALIFIED_OBSERVATION_RISK_SCHEMA_V1,
+    InverseProbabilityRiskEstimateV1, MetrologyQualificationStatusV1,
+    ObservationProcessAssumptionsV1, ObservationRiskInputV1, ObservationStageProbabilitiesV1,
+    PopulationRiskBoundsV1, PopulationRiskIdentificationV1, QualifiedObservationRiskErrorV1,
+    QualifiedObservationRiskReportV1, QualifiedObservationUnitV1,
+    compute_qualified_observation_risk_v1,
 };
