@@ -6,7 +6,7 @@
 
 Every result is one benchmark × track × protocol × dataset revision × split. A published external result, local reproduction and local MACE experiment are different evidence classes. AML textual, coding and multimodal are distinct tracks; the contract refuses to pool them.
 
-The matcher allows memory method, implementation and adapter to differ. It freezes benchmark/protocol, dataset/split, seed set, reader model, prompt, judge, tool contract, evaluator, metric definitions, evaluator isolation and the full declared resource budget. The resulting receipt records comparability; it is not a significance test. Paired effects and cluster uncertainty still require task-level outcomes.
+The matcher allows memory method, implementation and adapter to differ. It freezes benchmark/protocol, dataset/split, seed set, reader model, prompt, judge, tool contract, evaluator, metric definitions and denominators, evaluator isolation and the full declared resource budget. The resulting receipt records comparability; it is not a significance test. Paired effects and cluster uncertainty still require task-level outcomes.
 
 ## 2. Current external reference points (published results, not MACE results)
 
@@ -68,7 +68,7 @@ These are stretch targets. Beating an aggregate score while violating a hard gov
 
 ## 7. Implemented validator
 
-The standalone Rust crate validates one run record and sets of runs claimed to be matched. It rejects cross-track mixing, changed reader/prompt/judge/tool/evaluator/budget, evaluator-label exposure, duplicate arms, metric-definition mismatches and invalid latency quantiles. It emits a deterministic comparison receipt. The receipt is an integrity commitment, not an external signature; the validator does not compute a leaderboard or statistical significance.
+The standalone Rust crate validates one run record and sets of runs claimed to be matched. It rejects cross-track mixing, changed reader/prompt/judge/tool/evaluator/budget, evaluator-label exposure, duplicate arms, metric-definition/denominator mismatches and invalid latency quantiles. It emits a deterministic comparison receipt. The receipt is an integrity commitment, not an external signature; the validator does not compute a leaderboard or statistical significance.
 
 ## 8. Related work
 
