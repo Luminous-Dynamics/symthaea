@@ -1,0 +1,148 @@
+{
+  "schema_version": "sdcb-response-identifiability-challenge-v1",
+  "title": "First-order process-versus-sensor pole-swap challenge",
+  "status": "frozen-analytic-reference-not-physical-validation",
+  "model": {
+    "physical_process": "stationary_scalar_ou",
+    "instrument_response": "first_order_low_pass",
+    "output_distribution": "zero_mean_gaussian",
+    "physical_decay_rate_units": "1/time",
+    "sensor_response_rate_units": "1/time",
+    "physical_stationary_variance_units": "measurand^2"
+  },
+  "worlds": [
+    {
+      "id": "world_a_physical_slow_sensor_fast",
+      "lambda": "0.25",
+      "mu": "4.0",
+      "process_variance": "9.0"
+    },
+    {
+      "id": "world_b_physical_fast_sensor_slow",
+      "lambda": "4.0",
+      "mu": "0.25",
+      "process_variance": "144.0"
+    }
+  ],
+  "equivalence_transform": {
+    "from": "world_a_physical_slow_sensor_fast",
+    "to": "world_b_physical_fast_sensor_slow",
+    "mapping": {
+      "lambda_prime": "mu",
+      "mu_prime": "lambda",
+      "process_variance_prime": "(mu/lambda)*process_variance"
+    },
+    "claim": "The complete passive single-channel Gaussian output law is identical because its mean and full autocovariance function are identical."
+  },
+  "probes": {
+    "passive_sensor_output_autocovariance": {
+      "observable": "Cov(z(t+h),z(t))",
+      "lags": ["0", "0.1", "0.5", "1", "4"],
+      "world_a_expected": [
+        "8.47058823529411764705882352941",
+        "8.43367823797704473817329755810",
+        "7.89719444223072776693323753225",
+        "7.02635118508446703715520352963",
+        "3.32389888727034489954029128027"
+      ],
+      "world_b_expected": [
+        "8.47058823529411764705882352941",
+        "8.43367823797704473817329755810",
+        "7.89719444223072776693323753225",
+        "7.02635118508446703715520352963",
+        "3.32389888727034489954029128027"
+      ],
+      "expected_relation": "equal",
+      "required_identifiability_result": "non_identifiable_equivalence_class"
+    },
+    "upstream_command_first_order_relaxation_cascade": {
+      "transfer_function": "H(s)=lambda*mu/((s+lambda)*(s+mu))",
+      "angular_frequencies": ["0", "0.25", "1", "4"],
+      "magnitude_expected": [
+        "1.0",
+        "0.705729746225969425",
+        "0.235294117647058824",
+        "0.0441081091391230891"
+      ],
+      "phase_radians_expected": [
+        "0.0",
+        "-0.847816973393405658",
+        "-1.57079632679489662",
+        "-2.29377568019638758"
+      ],
+      "expected_relation": "equal_under_pole_swap",
+      "required_identifiability_result": "non_identifiable_equivalence_class"
+    },
+    "traceable_sensor_inlet_step": {
+      "step_times": ["0.5", "1", "2"],
+      "world_a_expected": [
+        "0.864664716763387308106000505028",
+        "0.981684361111265819706281978727",
+        "0.999664537372097488161178610874"
+      ],
+      "world_b_expected": [
+        "0.117503097415404597135107856771",
+        "0.221199216928595131754829733022",
+        "0.393469340287366576396200465009"
+      ],
+      "expected_relation": "different",
+      "required_identifiability_result": "sensor_pole_identified_for_declared_model"
+    },
+    "traceable_sensor_inlet_frequency_sweep": {
+      "angular_frequencies": ["0.25", "1", "4"],
+      "world_a_magnitude_expected": [
+        "0.9980525784828885519",
+        "0.97014250014533189408",
+        "0.7071067811865475244"
+      ],
+      "world_a_phase_radians_expected": [
+        "-0.062418809995957348474",
+        "-0.24497866312686415417",
+        "-0.78539816339744830962"
+      ],
+      "world_b_magnitude_expected": [
+        "0.7071067811865475244",
+        "0.24253562503633297352",
+        "0.062378286155180534494"
+      ],
+      "world_b_phase_radians_expected": [
+        "-0.78539816339744830962",
+        "-1.3258176636680324651",
+        "-1.5083775167989392708"
+      ],
+      "expected_relation": "different",
+      "required_identifiability_result": "sensor_pole_identified_for_declared_model"
+    },
+    "independent_reference_of_latent_process": {
+      "reference_response": "known_instantaneous_or_independently_characterized",
+      "lags": ["0.5", "1", "4"],
+      "world_a_expected": [
+        "7.94247212326135862578402928906",
+        "7.00920704764264381420653240280",
+        "3.31091497054298089435971393145"
+      ],
+      "world_b_expected": [
+        "19.488280786072227632735927276",
+        "2.63745199997772196229539506335",
+        "0.0000162050651595733124899836257847"
+      ],
+      "expected_relation": "different",
+      "required_identifiability_result": "physical_pole_identified_given_reference_contract"
+    }
+  },
+  "scoring": {
+    "passive_or_upstream_probe_false_unique_assignment": "hard_failure",
+    "sensor_inlet_or_reference_probe_failure_to_distinguish": "hard_failure_for_this_frozen_pair",
+    "equivalence_class_coverage": "report",
+    "selective_prediction_risk_and_abstention_coverage": "report",
+    "experiment_cost_and_exact_oracle_regret": "evaluate_through_existing_13567",
+    "authority_boundary": "no_physical_action_or_evidence_ledger_mutation"
+  },
+  "numerical_contract": {
+    "reference_digits": 60,
+    "stored_decimal_values_are_strings": true,
+    "comparison": "use declared absolute/relative tolerances; never compare decimal strings lexically",
+    "known_answer_basis": "analytic closed forms with independent high-precision authoring-runtime calculations"
+  },
+  "claim_boundary": "A synthetic analytic identifiability challenge only. It does not establish physical sensor response, device calibration, metrological traceability, SOTA performance, or a validated experiment policy."
+}
