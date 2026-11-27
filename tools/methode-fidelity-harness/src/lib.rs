@@ -314,29 +314,44 @@ fn valid_contract(contract: &MethodContract) -> bool {
 }
 
 fn contains_required_components(contract: &MethodContract, receipt: &ExecutionReceipt) -> bool {
-    contract.required_components.iter().all(|required| {
-        receipt.components.iter().any(|actual| {
-            actual.role == required.role && actual.implementation_sha256 == required.implementation_sha256
+    let required_roles: BTreeSet<&str> = contract.required_components.iter().map(|c| c.role.as_str()).collect();
+    let actual_roles: BTreeSet<&str> = receipt.components.iter().map(|c| c.role.as_str()).collect();
+    required_roles.len() == contract.required_components.len()
+        && actual_roles.len() == receipt.components.len()
+        && required_roles == actual_roles
+        && contract.required_components.iter().all(|required| {
+            receipt.components.iter().any(|actual| {
+                actual.role == required.role && actual.implementation_sha256 == required.implementation_sha256
+            })
         })
-    })
 }
 
 fn contains_required_baselines(contract: &MethodContract, receipt: &ExecutionReceipt) -> bool {
-    contract.required_baselines.iter().all(|required| {
-        receipt.baselines.iter().any(|actual| {
-            actual.baseline_id == required.baseline_id
-                && actual.configuration_sha256 == required.configuration_sha256
+    let required_ids: BTreeSet<&str> = contract.required_baselines.iter().map(|b| b.baseline_id.as_str()).collect();
+    let actual_ids: BTreeSet<&str> = receipt.baselines.iter().map(|b| b.baseline_id.as_str()).collect();
+    required_ids.len() == contract.required_baselines.len()
+        && actual_ids.len() == receipt.baselines.len()
+        && required_ids == actual_ids
+        && contract.required_baselines.iter().all(|required| {
+            receipt.baselines.iter().any(|actual| {
+                actual.baseline_id == required.baseline_id
+                    && actual.configuration_sha256 == required.configuration_sha256
+            })
         })
-    })
 }
 
 fn contains_required_metrics(contract: &MethodContract, receipt: &ExecutionReceipt) -> bool {
-    contract.required_metrics.iter().all(|required| {
-        receipt.metrics.iter().any(|actual| {
-            actual.metric_id == required.metric_id
-                && actual.definition_sha256 == required.definition_sha256
+    let required_ids: BTreeSet<&str> = contract.required_metrics.iter().map(|m| m.metric_id.as_str()).collect();
+    let actual_ids: BTreeSet<&str> = receipt.metrics.iter().map(|m| m.metric_id.as_str()).collect();
+    required_ids.len() == contract.required_metrics.len()
+        && actual_ids.len() == receipt.metrics.len()
+        && required_ids == actual_ids
+        && contract.required_metrics.iter().all(|required| {
+            receipt.metrics.iter().any(|actual| {
+                actual.metric_id == required.metric_id
+                    && actual.definition_sha256 == required.definition_sha256
+            })
         })
-    })
 }
 
 fn contains_required_outputs(contract: &MethodContract, receipt: &ExecutionReceipt) -> bool {
@@ -465,9 +480,13 @@ pub fn audit_method(contract: &MethodContract, receipt: &ExecutionReceipt) -> Au
     );
     check(
         &mut checks, &mut flags, "budget.training_records",
-        receipt.training_records_used == contract.dataset.train_records
-            && receipt.training_records_used <= contract.budget.max_training_records,
-        false, &deviations, "Training sample count differs from the reference or exceeds its cap.",
+        receipt.training_records_used == contract.dataset.train_records,
+        false, &deviations, "Training sample count differs from the reference protocol.",
+    );
+    check(
+        &mut checks, &mut flags, "budget.training_records_cap",
+        receipt.training_records_used <= contract.budget.max_training_records,
+        true, &deviations, "Training sample count exceeded the independently reviewed resource cap.",
     );
     check(
         &mut checks, &mut flags, "budget.resources",
@@ -720,6 +739,29 @@ mod tests {
             rationale: "Alternative model implementation used for a separately labelled ablation.".into(),
         });
         assert_eq!(disposition(&c, &r), Disposition::ExecutedWithDeclaredDeviation);
+    }
+
+    #[test]
+    fn unreviewed_extra_component_is_not_faithful() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.components.push(ComponentUse {
+            role: "lookup_oracle".into(),
+            implementation_sha256: h('9'),
+        });
+        assert_eq!(disposition(&c, &r), Disposition::Unresolved);
+    }
+
+    #[test]
+    fn declared_deviation_cannot_authorize_training_cap_overrun() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.training_records_used = c.budget.max_training_records + 1;
+        r.declared_deviations.push(DeclaredDeviation {
+            check_id: "budget.training_records".into(),
+            rationale: "Exploratory enlarged training set.".into(),
+        });
+        assert_eq!(disposition(&c, &r), Disposition::Unresolved);
     }
 
     #[test]
