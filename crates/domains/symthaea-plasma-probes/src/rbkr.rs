@@ -135,12 +135,6 @@ pub struct ScenarioResponseResidual {
     pub response_residual: f64,
 }
 
-/// Distribution summary of scenario-wise response residuals.
-///
-/// The worst-case value includes every supplied scenario, including scenarios
-/// with zero statistical weight. Weighted mean and CVaR use normalized
-/// non-negative scenario weights.
-#[derive(Clone, Debug, PartialEq)]
 /// Auditable result of one worst-scenario response enrichment step.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResponseEnrichmentReceipt {
@@ -158,6 +152,12 @@ pub struct ResponseEnrichmentReceipt {
     pub added_transfer_singular_value: f64,
 }
 
+/// Distribution summary of scenario-wise response residuals.
+///
+/// The worst-case value includes every supplied scenario, including scenarios
+/// with zero statistical weight. Weighted mean and CVaR use normalized
+/// non-negative scenario weights.
+#[derive(Clone, Debug, PartialEq)]
 pub struct ResponseResidualReport {
     pub task_contract_id: String,
     pub checkpoint_id: String,
@@ -275,10 +275,8 @@ pub fn evaluate_response_scenario_residuals(
     let mut worst_case = 0.0_f64;
     for scenario in scenarios {
         let normalized_weight = (scenario.scenario_weight / maximum_weight) / scaled_total;
-        let residual = basis.linearized_response_residual(
-            scenario.reachability,
-            scenario.observability,
-        )?;
+        let residual =
+            basis.linearized_response_residual(scenario.reachability, scenario.observability)?;
         weighted_mean += normalized_weight * residual;
         if !weighted_mean.is_finite() {
             return Err(RbkrError::NonFiniteArithmetic);
@@ -377,9 +375,7 @@ pub fn aggregate_response_gramians(
     let mut input_factor_count = 0_usize;
     let mut aggregate_factor_count = 0_usize;
     for scenario in scenarios {
-        if scenario.scenario_id.trim().is_empty()
-            || !scenario_ids.insert(scenario.scenario_id)
-        {
+        if scenario.scenario_id.trim().is_empty() || !scenario_ids.insert(scenario.scenario_id) {
             return Err(RbkrError::InvalidScenarioSet);
         }
         if !is_sha256_hex(scenario.trajectory_sha256)
@@ -848,11 +844,7 @@ impl ResponseBalancedBasis {
         // and n reachability factors.
         let per_pair_work = observe_count
             .checked_mul(16)
-            .and_then(|value| {
-                reach_count
-                    .checked_mul(8)
-                    .and_then(|right| value.checked_add(right))
-            })
+            .and_then(|value| reach_count.checked_mul(8).and_then(|right| value.checked_add(right)))
             .and_then(|value| value.checked_add(64))
             .ok_or(RbkrError::JacobiWorkBudgetExceeded)?;
         let jacobi_work = pairs
@@ -1240,9 +1232,7 @@ impl ResponseBalancedBasis {
                     return Err(RbkrError::NonFiniteArithmetic);
                 }
             }
-            for (row_index, output_factor) in
-                observability.weighted_factors.iter().enumerate()
-            {
+            for (row_index, output_factor) in observability.weighted_factors.iter().enumerate() {
                 validate_factor(output_factor, dimension)?;
                 let reference = checked_dot(output_factor, input_factor)?;
                 let lost = checked_dot(output_factor, &residual)?;
@@ -1272,9 +1262,7 @@ impl ResponseBalancedBasis {
             .max_by(|left, right| left.1.total_cmp(&right.1))
             .ok_or(RbkrError::ResponseEnrichmentUnavailable)?;
         let sigma = sigma_squared.sqrt();
-        if !sigma.is_finite()
-            || sigma <= reference_norm * config.relative_singular_value_cutoff
-        {
+        if !sigma.is_finite() || sigma <= reference_norm * config.relative_singular_value_cutoff {
             return Err(RbkrError::ResponseEnrichmentUnavailable);
         }
 
@@ -1347,7 +1335,11 @@ impl ResponseBalancedBasis {
             .iter()
             .map(|value| value * normalization)
             .collect::<Vec<_>>();
-        if new_trial.iter().chain(&new_test).any(|value| !value.is_finite()) {
+        if new_trial
+            .iter()
+            .chain(&new_test)
+            .any(|value| !value.is_finite())
+        {
             return Err(RbkrError::NonFiniteArithmetic);
         }
 
@@ -1361,8 +1353,7 @@ impl ResponseBalancedBasis {
         }
         candidate.response_enrichment_singular_values.push(sigma);
         candidate.biorthogonality_defect = defect;
-        let post_residual =
-            candidate.linearized_response_residual(reachability, observability)?;
+        let post_residual = candidate.linearized_response_residual(reachability, observability)?;
         if post_residual > pre_residual + config.biorthogonality_tolerance {
             return Err(RbkrError::ResponseEnrichmentUnavailable);
         }
@@ -1502,9 +1493,7 @@ impl ResponseBalancedBasis {
         {
             return Err(RbkrError::StateDimensionMismatch);
         }
-        if reachability.weighted_factors.is_empty()
-            || observability.weighted_factors.is_empty()
-        {
+        if reachability.weighted_factors.is_empty() || observability.weighted_factors.is_empty() {
             return Err(RbkrError::EmptyGramian);
         }
 
@@ -1858,16 +1847,10 @@ mod tests {
         let post_pulse_observe = gramian(2, &[vec![0.0, 1.0]]);
 
         let preserved = basis
-            .linearized_pulse_response_residual(
-                &[vec![1.0, 0.0]],
-                &checkpoint_observe,
-            )
+            .linearized_pulse_response_residual(&[vec![1.0, 0.0]], &checkpoint_observe)
             .unwrap();
         let lost = basis
-            .linearized_pulse_response_residual(
-                &[vec![0.0, 1.0]],
-                &post_pulse_observe,
-            )
+            .linearized_pulse_response_residual(&[vec![0.0, 1.0]], &post_pulse_observe)
             .unwrap();
 
         assert!(preserved < 1.0e-12);
@@ -1906,17 +1889,12 @@ mod tests {
                 scenario_weight: 0.4,
             },
         ];
-        let (reach, observe) = aggregate_response_gramians(
-            &scenarios,
-            ResponseGramianAggregationConfig::default(),
-        )
-        .unwrap();
-        let mut basis = ResponseBalancedBasis::from_empirical_gramians(
-            &reach,
-            &observe,
-            RbkrConfig::new(1),
-        )
-        .unwrap();
+        let (reach, observe) =
+            aggregate_response_gramians(&scenarios, ResponseGramianAggregationConfig::default())
+                .unwrap();
+        let mut basis =
+            ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
+                .unwrap();
         let before = basis.reduced_order();
         let mut config = RbkrConfig::new(2);
         // For n=2, current order 1 and candidate order 2 require
@@ -1980,7 +1958,10 @@ mod tests {
             .enrich_from_worst_scenario(&scenarios, RbkrConfig::new(2))
             .unwrap();
         assert_eq!(receipt.scenario_id, "rare-response");
-        assert_eq!(receipt.checkpoint_sha256, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        assert_eq!(
+            receipt.checkpoint_sha256,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
         assert_eq!(receipt.state_coordinate_id, "vlasov-1d1v-layout-v1");
         assert_eq!(receipt.state_metric_id, "metric-v1");
         assert_eq!(receipt.previous_order, 1);
@@ -2028,17 +2009,12 @@ mod tests {
                 scenario_weight: 0.49,
             },
         ];
-        let (reach, observe) = aggregate_response_gramians(
-            &scenarios,
-            ResponseGramianAggregationConfig::default(),
-        )
-        .unwrap();
-        let basis = ResponseBalancedBasis::from_empirical_gramians(
-            &reach,
-            &observe,
-            RbkrConfig::new(1),
-        )
-        .unwrap();
+        let (reach, observe) =
+            aggregate_response_gramians(&scenarios, ResponseGramianAggregationConfig::default())
+                .unwrap();
+        let basis =
+            ResponseBalancedBasis::from_empirical_gramians(&reach, &observe, RbkrConfig::new(1))
+                .unwrap();
         let report = evaluate_response_scenario_residuals(&basis, &scenarios, 0.9).unwrap();
 
         assert!(report.scenarios[0].response_residual < 1.0e-10);
@@ -2093,7 +2069,8 @@ mod tests {
                 < 1.0e-12
         );
         assert!(
-            (checked_dot(&[1.0, 0.0], &observe.apply(&[1.0, 0.0]).unwrap()).unwrap() - 0.0625).abs()
+            (checked_dot(&[1.0, 0.0], &observe.apply(&[1.0, 0.0]).unwrap()).unwrap() - 0.0625)
+                .abs()
                 < 1.0e-12
         );
         assert!(
@@ -2111,10 +2088,8 @@ mod tests {
     fn response_scenario_aggregation_counts_zero_weight_source_storage() {
         let positive_reach = gramian(2, &[vec![1.0, 0.0]]);
         let positive_observe = gramian(2, &[vec![1.0, 0.0]]);
-        let zero_weight_reach =
-            gramian(2, &[vec![1.0, 0.0], vec![0.0, 1.0]]);
-        let zero_weight_observe =
-            gramian(2, &[vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let zero_weight_reach = gramian(2, &[vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let zero_weight_observe = gramian(2, &[vec![1.0, 0.0], vec![0.0, 1.0]]);
         let scenarios = [
             ResponseGramianScenario {
                 scenario_id: "positive",
@@ -2145,10 +2120,7 @@ mod tests {
         // aggregate storage = 2 factors * 2 coordinates = 4 scalars.
         // A budget of 12 must fail because peak live storage is 16.
         assert_eq!(
-            aggregate_response_gramians(
-                &scenarios,
-                ResponseGramianAggregationConfig::new(12),
-            ),
+            aggregate_response_gramians(&scenarios, ResponseGramianAggregationConfig::new(12),),
             Err(RbkrError::ScenarioFactorStorageBudgetExceeded)
         );
     }
