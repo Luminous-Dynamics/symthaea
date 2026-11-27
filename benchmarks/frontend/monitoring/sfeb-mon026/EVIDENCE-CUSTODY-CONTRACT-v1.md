@@ -70,7 +70,7 @@ The current reference requires an exact directory inventory: every regular file 
 
 ## 7. Clock and freshness semantics
 
-Manifest and artifact times identify their clock domain and uncertainty. Missing or mismatched domains and uncertainty above policy limits are indeterminate. A capture time outside the maximum age is indeterminate. Future timestamps beyond the declared uncertainty are indeterminate, not silently trusted.
+Manifest and artifact times identify their clock domain and uncertainty. Missing or mismatched domains and uncertainty above policy limits are indeterminate. When comparing an artifact's collection time with manifest capture time, uncertainty bounds are added conservatively; taking only the larger bound would understate the possible ordering error. A manifest or individual artifact capture time outside the maximum age is indeterminate. Future timestamps beyond the declared uncertainty are indeterminate, not silently trusted.
 
 These rules are not a trusted timestamp authority. The signature only authenticates the signer's assertion of time. A trusted time source or transparency log is a separate production dependency.
 
