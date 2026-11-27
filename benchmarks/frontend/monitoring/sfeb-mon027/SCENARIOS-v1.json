@@ -1,0 +1,167 @@
+{
+  "profile": "mon027-evidence-bundle-assembly-v1",
+  "version": "1.0.0",
+  "classification": "synthetic-descriptive-seeds",
+  "scenarios": [
+    {
+      "id": "MON027-P001",
+      "class": "positive_control",
+      "name": "valid_allowlisted_assembly",
+      "expected_outcome": "qualified",
+      "mutation": "none",
+      "notes": "Every declared file exists, is regular, hashes correctly and exactly matches the artifact root inventory."
+    },
+    {
+      "id": "MON027-P002",
+      "class": "positive_control",
+      "name": "valid_external_signature_round_trip",
+      "expected_outcome": "qualified",
+      "mutation": "sign the exact request message and attach the envelope with matching request ID",
+      "notes": "External signing key remains outside the assembler; the trusted public key verifies the signature."
+    },
+    {
+      "id": "MON027-P003",
+      "class": "positive_control",
+      "name": "valid_chained_bundle",
+      "expected_outcome": "qualified",
+      "mutation": "sequence 2 uses the independently expected previous root",
+      "notes": "Previous root, run ID and sequence match verifier policy."
+    },
+    {
+      "id": "MON027-N001",
+      "class": "negative_control",
+      "name": "missing_allowlisted_file",
+      "expected_outcome": "blocked",
+      "mutation": "remove a file named by the input index",
+      "notes": "The bundle cannot be assembled without all declared artifacts."
+    },
+    {
+      "id": "MON027-N002",
+      "class": "negative_control",
+      "name": "unlisted_file_in_artifact_root",
+      "expected_outcome": "blocked",
+      "mutation": "add a regular file absent from the allowlist",
+      "notes": "Exact directory inventory rejects undeclared files."
+    },
+    {
+      "id": "MON027-N003",
+      "class": "negative_control",
+      "name": "symlink_artifact",
+      "expected_outcome": "blocked",
+      "mutation": "replace a declared artifact or parent with a symlink",
+      "notes": "The assembler rejects path indirection."
+    },
+    {
+      "id": "MON027-N004",
+      "class": "negative_control",
+      "name": "path_traversal",
+      "expected_outcome": "blocked",
+      "mutation": "use ../ or absolute artifact path",
+      "notes": "No file outside the artifact root may be read."
+    },
+    {
+      "id": "MON027-N005",
+      "class": "negative_control",
+      "name": "duplicate_artifact_path",
+      "expected_outcome": "blocked",
+      "mutation": "declare the same path twice",
+      "notes": "Ambiguous allowlist entries are invalid."
+    },
+    {
+      "id": "MON027-N006",
+      "class": "negative_control",
+      "name": "artifact_mutated_after_assembly",
+      "expected_outcome": "blocked",
+      "mutation": "alter bytes after hashing but before signature attachment",
+      "notes": "Attach step re-verifies every file and rejects digest/size mismatch."
+    },
+    {
+      "id": "MON027-N007",
+      "class": "negative_control",
+      "name": "manifest_root_mutated",
+      "expected_outcome": "blocked",
+      "mutation": "alter source boundary or artifact metadata after request creation",
+      "notes": "Detached signature binds the root; manifest mutation fails verification."
+    },
+    {
+      "id": "MON027-N008",
+      "class": "negative_control",
+      "name": "signature_from_different_request",
+      "expected_outcome": "blocked",
+      "mutation": "return a valid signature envelope with another request ID",
+      "notes": "The response must bind exact run, sequence, root, algorithm and key."
+    },
+    {
+      "id": "MON027-N009",
+      "class": "negative_control",
+      "name": "wrong_key_id",
+      "expected_outcome": "blocked",
+      "mutation": "return signature envelope with a different key ID",
+      "notes": "Signature response key identity must match the requested signer."
+    },
+    {
+      "id": "MON027-N010",
+      "class": "indeterminate_control",
+      "name": "unknown_trusted_key",
+      "expected_outcome": "indeterminate",
+      "mutation": "supply a public key that is not an independently trusted key",
+      "notes": "The bundle remains indeterminate, not qualified."
+    },
+    {
+      "id": "MON027-N011",
+      "class": "negative_control",
+      "name": "wrong_expected_run",
+      "expected_outcome": "blocked",
+      "mutation": "attach bundle under another expected run ID",
+      "notes": "Out-of-band expected run ID prevents replay."
+    },
+    {
+      "id": "MON027-N012",
+      "class": "negative_control",
+      "name": "wrong_expected_sequence",
+      "expected_outcome": "blocked",
+      "mutation": "attach bundle under another exact sequence",
+      "notes": "Out-of-band sequence prevents replay/reordering."
+    },
+    {
+      "id": "MON027-N013",
+      "class": "negative_control",
+      "name": "previous_root_splice",
+      "expected_outcome": "blocked",
+      "mutation": "change predecessor root from verifier's expected chain head",
+      "notes": "A chain fork/splice is blocked."
+    },
+    {
+      "id": "MON027-N014",
+      "class": "indeterminate_control",
+      "name": "signer_unavailable",
+      "expected_outcome": "indeterminate",
+      "mutation": "do not produce a detached signature envelope",
+      "notes": "Assembler output alone is not a signed custody bundle."
+    },
+    {
+      "id": "MON027-N015",
+      "class": "negative_control",
+      "name": "output_path_collision",
+      "expected_outcome": "blocked",
+      "mutation": "set unsigned manifest and signing-request output to the same path",
+      "notes": "CLI refuses before writing either output."
+    },
+    {
+      "id": "MON027-N016",
+      "class": "negative_control",
+      "name": "index_inside_artifact_root",
+      "expected_outcome": "blocked",
+      "mutation": "store input index under the strict artifact root",
+      "notes": "The artifact root must contain only allowlisted raw evidence files."
+    },
+    {
+      "id": "MON027-N017",
+      "class": "indeterminate_control",
+      "name": "unbounded_collection_clock",
+      "expected_outcome": "indeterminate",
+      "mutation": "declare a missing clock domain or uncertainty below policy",
+      "notes": "Verifier will not promote incomparable artifact times."
+    }
+  ]
+}
