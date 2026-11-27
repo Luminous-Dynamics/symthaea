@@ -131,7 +131,8 @@ impl FirstOrderResponseOu {
                 }
                 scaled * e_l
             } else {
-                m * e_l * ((-(-gap_scaled).exp_m1()) / delta)
+                let response_gain = m * ((-(-gap_scaled).exp_m1()) / delta);
+                e_l * response_gain
             }
         } else if delta < 0.0 {
             // m * exp(-m t) * (1 - exp(-(-delta) t)) / (-delta).
@@ -144,7 +145,8 @@ impl FirstOrderResponseOu {
                 }
                 scaled * e_m
             } else {
-                m * e_m * ((-(-gap_scaled).exp_m1()) / gap)
+                let response_gain = m * ((-(-gap_scaled).exp_m1()) / gap);
+                e_m * response_gain
             }
         } else {
             // The repeated-root term is (lambda*t)*exp(-lambda*t). If
@@ -386,6 +388,16 @@ mod tests {
         let (magnitude, phase) = model.frequency_response(4.0).unwrap();
         close(magnitude, std::f64::consts::FRAC_1_SQRT_2, 2.0e-15);
         close(phase, -std::f64::consts::FRAC_PI_4, 2.0e-15);
+    }
+
+    #[test]
+    fn tiny_rate_and_large_elapsed_time_preserve_representable_transition() {
+        let lambda = 1.1606977977727926e-247;
+        let tau = 1.0 / 1.1606977977727924e-247;
+        let model = FirstOrderResponseOu::new(lambda, 1.0, tau).unwrap();
+        let actual = model.transition_matrix(5.169304199174938e249).unwrap()[1][0];
+        assert!(actual > 0.0);
+        close(actual, 1.5902379318026358e-258, 2.0e-270);
     }
 
     #[test]
