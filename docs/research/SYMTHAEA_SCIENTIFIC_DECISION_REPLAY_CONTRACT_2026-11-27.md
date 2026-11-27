@@ -298,7 +298,7 @@ Implemented in this branch:
 - twelve authored decision-contract tests;
 - custodian-only replay-archive/evaluator projection, BLAKE3 digests, opaque IDs, empty/disjoint-root checks, no-overwrite writes, manifest-last materialization and disk-readback checks;
 - decision-time observation-prefix builder with digest and out-of-range rejection;
-- nine authored custody/prefix tests, two output-root tests and a capsule materializer example (22 authored tests total across these new files).
+- nine authored custody/prefix tests, two output-root tests and a capsule materializer example (23 authored tests total across these new files).
 
 Not implemented or not yet verified:
 - the ten worlds have not been generated or split in this environment; the existing source seed split is public and is not a sealed confirmatory split;
