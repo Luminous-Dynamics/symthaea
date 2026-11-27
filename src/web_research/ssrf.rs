@@ -435,6 +435,16 @@ mod tests {
         format!("{address}:0").parse().expect("valid socket address")
     }
 
+    fn last_ipv4(network: Ipv4Addr, prefix: u8) -> Ipv4Addr {
+        let mask = if prefix == 0 { 0 } else { u32::MAX << (32 - u32::from(prefix)) };
+        Ipv4Addr::from(u32::from(network) | !mask)
+    }
+
+    fn last_ipv6(network: Ipv6Addr, prefix: u8) -> Ipv6Addr {
+        let mask = if prefix == 0 { 0 } else { u128::MAX << (128 - u32::from(prefix)) };
+        Ipv6Addr::from(u128::from(network) | !mask)
+    }
+
     #[test]
     fn allows_global_unicast_v4_and_v6() {
         assert!(is_public_destination("8.8.8.8".parse().unwrap()));
@@ -445,7 +455,9 @@ mod tests {
     fn rejects_private_and_special_use_v4() {
         for (network, prefix) in IPV4_SPECIAL_USE {
             let address = network.parse::<Ipv4Addr>().unwrap();
-            assert!(!is_public_destination(IpAddr::V4(address)), "{network}/{prefix}");
+            let last = last_ipv4(address, *prefix);
+            assert!(!is_public_destination(IpAddr::V4(address)), "start {network}/{prefix}");
+            assert!(!is_public_destination(IpAddr::V4(last)), "end {network}/{prefix}: {last}");
         }
     }
 
@@ -453,7 +465,9 @@ mod tests {
     fn rejects_special_use_v6_and_non_global_ranges() {
         for (network, prefix) in IPV6_SPECIAL_USE {
             let address = network.parse::<Ipv6Addr>().unwrap();
-            assert!(!is_public_destination(IpAddr::V6(address)), "{network}/{prefix}");
+            let last = last_ipv6(address, *prefix);
+            assert!(!is_public_destination(IpAddr::V6(address)), "start {network}/{prefix}");
+            assert!(!is_public_destination(IpAddr::V6(last)), "end {network}/{prefix}: {last}");
         }
         assert!(!is_public_destination("ff02::1".parse().unwrap()));
         assert!(!is_public_destination("fe80::1".parse().unwrap()));
@@ -475,6 +489,19 @@ mod tests {
         let resolver = GuardedDnsResolver::with_lookup(StubLookup::with_answers(vec![answers]));
         let error = resolve(&resolver, "mixed.example").await.unwrap_err();
         assert!(error.contains("DNS_POLICY_REJECTED"));
+    }
+
+    #[tokio::test]
+    async fn rejects_entire_mixed_ipv4_ipv6_answer_set() {
+        let answers = vec![
+            socket("8.8.8.8"),
+            socket("2606:4700:4700::1111"),
+            socket("fc00::1"),
+        ];
+        let resolver = GuardedDnsResolver::with_lookup(StubLookup::with_answers(vec![answers]));
+        let error = resolve(&resolver, "mixed-v4-v6.example").await.unwrap_err();
+        assert!(error.contains("DNS_POLICY_REJECTED"));
+        assert!(error.contains("fc00::1"));
     }
 
     #[tokio::test]
