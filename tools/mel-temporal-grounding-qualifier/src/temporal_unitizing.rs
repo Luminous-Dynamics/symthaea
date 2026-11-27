@@ -184,7 +184,10 @@ pub fn audit_unitizing_corpus(
     case: &UnitizingCorpusCaseV1,
 ) -> Result<UnitizingCorpusReportV1, String> {
     if case.schema != CASE_SCHEMA_V1 {
-        return Err(format!("unsupported unitizing corpus schema: {}", case.schema));
+        return Err(format!(
+            "unsupported unitizing corpus schema: {}",
+            case.schema
+        ));
     }
     validate_digest(
         &case.annotation_manifest_sha256,
@@ -225,15 +228,11 @@ pub fn audit_unitizing_corpus(
         for (annotation_index, annotation) in item.annotations.iter().enumerate() {
             validate_digest(
                 &annotation.annotator_id_sha256,
-                &format!(
-                    "items[{item_index}].annotations[{annotation_index}].annotator_id_sha256"
-                ),
+                &format!("items[{item_index}].annotations[{annotation_index}].annotator_id_sha256"),
             )?;
             validate_digest(
                 &annotation.annotation_sha256,
-                &format!(
-                    "items[{item_index}].annotations[{annotation_index}].annotation_sha256"
-                ),
+                &format!("items[{item_index}].annotations[{annotation_index}].annotation_sha256"),
             )?;
             if !annotator_ids.insert(annotation.annotator_id_sha256.as_str()) {
                 return Err(format!(
@@ -268,10 +267,8 @@ pub fn audit_unitizing_corpus(
                             )
                         })
                         .collect();
-                    eligible_partitions.push(build_partition(
-                        &labeled,
-                        item.artifact.total_frames,
-                    )?);
+                    eligible_partitions
+                        .push(build_partition(&labeled, item.artifact.total_frames)?);
                     dispositions.push(UnitizingAnnotatorDispositionV1 {
                         annotator_id_sha256: annotation.annotator_id_sha256.clone(),
                         annotation_sha256: annotation.annotation_sha256.clone(),
@@ -289,10 +286,7 @@ pub fn audit_unitizing_corpus(
                             item.item_id, annotation_index
                         ));
                     }
-                    eligible_partitions.push(build_partition(
-                        &[],
-                        item.artifact.total_frames,
-                    )?);
+                    eligible_partitions.push(build_partition(&[], item.artifact.total_frames)?);
                     dispositions.push(UnitizingAnnotatorDispositionV1 {
                         annotator_id_sha256: annotation.annotator_id_sha256.clone(),
                         annotation_sha256: annotation.annotation_sha256.clone(),
@@ -306,7 +300,9 @@ pub fn audit_unitizing_corpus(
                 GroundTruthStateV1::Ambiguous => {
                     require_text(
                         annotation.status_reason.as_deref().unwrap_or(""),
-                        &format!("items[{item_index}].annotations[{annotation_index}].status_reason"),
+                        &format!(
+                            "items[{item_index}].annotations[{annotation_index}].status_reason"
+                        ),
                     )?;
                     validate_annotation_intervals(
                         &annotation.intervals,
@@ -329,7 +325,9 @@ pub fn audit_unitizing_corpus(
                 GroundTruthStateV1::NotEstimable => {
                     require_text(
                         annotation.status_reason.as_deref().unwrap_or(""),
-                        &format!("items[{item_index}].annotations[{annotation_index}].status_reason"),
+                        &format!(
+                            "items[{item_index}].annotations[{annotation_index}].status_reason"
+                        ),
                     )?;
                     validate_annotation_intervals(
                         &annotation.intervals,
@@ -358,30 +356,31 @@ pub fn audit_unitizing_corpus(
         excluded_ambiguous += ambiguous;
         excluded_not_estimable += not_estimable;
 
-        let (status, undefined_reason, coefficients) =
-            if eligible_partitions.len() < case.minimum_eligible_unitizers_per_item as usize {
-                (
-                    UnitizingItemStatusV1::InsufficientEligibleUnitizers,
-                    Some(format!(
-                        "eligible unitizations {} are below the required minimum {}",
-                        eligible_partitions.len(),
-                        case.minimum_eligible_unitizers_per_item
-                    )),
-                    None,
-                )
+        let (status, undefined_reason, coefficients) = if eligible_partitions.len()
+            < case.minimum_eligible_unitizers_per_item as usize
+        {
+            (
+                UnitizingItemStatusV1::InsufficientEligibleUnitizers,
+                Some(format!(
+                    "eligible unitizations {} are below the required minimum {}",
+                    eligible_partitions.len(),
+                    case.minimum_eligible_unitizers_per_item
+                )),
+                None,
+            )
+        } else {
+            let profile =
+                compute_unitizing_profile(&eligible_partitions, item.artifact.total_frames)?;
+            if profile.u_alpha_nominal.is_some() {
+                (UnitizingItemStatusV1::Scored, None, Some(profile))
             } else {
-                let profile =
-                    compute_unitizing_profile(&eligible_partitions, item.artifact.total_frames)?;
-                if profile.u_alpha_nominal.is_some() {
-                    (UnitizingItemStatusV1::Scored, None, Some(profile))
-                } else {
-                    (
+                (
                         UnitizingItemStatusV1::UndefinedExpectedDisagreement,
                         Some("u_alpha_nominal has zero expected disagreement but nonzero observed disagreement".into()),
                         Some(profile),
                     )
-                }
-            };
+            }
+        };
 
         results.push(UnitizingItemReportV1 {
             item_id: item.item_id.clone(),
@@ -463,9 +462,7 @@ pub fn audit_unitizing_corpus(
                 .count(),
             undefined_items: results
                 .iter()
-                .filter(|item| {
-                    item.status == UnitizingItemStatusV1::UndefinedExpectedDisagreement
-                })
+                .filter(|item| item.status == UnitizingItemStatusV1::UndefinedExpectedDisagreement)
                 .count(),
             total_annotation_records,
             total_eligible_unitizations,
@@ -541,9 +538,7 @@ fn validate_annotation_intervals(
         ));
     }
     for (interval_index, interval) in intervals.iter().enumerate() {
-        if interval.start_frame >= interval.end_frame
-            || interval.end_frame > continuum_frames
-        {
+        if interval.start_frame >= interval.end_frame || interval.end_frame > continuum_frames {
             return Err(format!(
                 "item {item_id} annotation {annotation_index} interval {interval_index} is invalid or outside the continuum"
             ));
@@ -573,7 +568,9 @@ fn build_partition(
             return Err(format!("unit interval {index} has an empty category value"));
         }
         if start >= end || *end > continuum_frames {
-            return Err(format!("unit interval {index} is invalid or outside the continuum"));
+            return Err(format!(
+                "unit interval {index} is invalid or outside the continuum"
+            ));
         }
         if *start < cursor {
             return Err(format!(
@@ -622,7 +619,9 @@ fn compute_unitizing_profile(
             || partition[0].start_frame != 0
             || partition.last().map(|segment| segment.end_frame) != Some(continuum_frames)
         {
-            return Err(format!("observer {rater} does not partition the whole continuum"));
+            return Err(format!(
+                "observer {rater} does not partition the whole continuum"
+            ));
         }
         for (index, pair) in partition.windows(2).enumerate() {
             if pair[0].end_frame != pair[1].start_frame {
@@ -658,16 +657,14 @@ fn compute_unitizing_profile(
             }
             for left_segment in left_partition {
                 for right_segment in right_partition {
-                    let overlap_start =
-                        left_segment.start_frame.max(right_segment.start_frame);
+                    let overlap_start = left_segment.start_frame.max(right_segment.start_frame);
                     let overlap_end = left_segment.end_frame.min(right_segment.end_frame);
                     if overlap_end <= overlap_start {
                         continue;
                     }
                     let left_category = category_indices[&left_segment.category];
                     let right_category = category_indices[&right_segment.category];
-                    observed[left_category][right_category] +=
-                        (overlap_end - overlap_start) as f64;
+                    observed[left_category][right_category] += (overlap_end - overlap_start) as f64;
                 }
             }
         }
@@ -682,9 +679,7 @@ fn compute_unitizing_profile(
     let observed_total: f64 = observed.iter().flatten().sum();
     let expected_observed_total = observer_count as f64 * continuum_frames as f64;
     let tolerance = (expected_observed_total * 1.0e-12).max(1.0e-8);
-    if !observed_total.is_finite()
-        || (observed_total - expected_observed_total).abs() > tolerance
-    {
+    if !observed_total.is_finite() || (observed_total - expected_observed_total).abs() > tolerance {
         return Err("observed coincidence total does not equal m × continuum length".into());
     }
 
@@ -749,12 +744,8 @@ fn compute_unitizing_profile(
         observed_disagreement_u_binary: binary.observed,
         expected_disagreement_u_binary: binary.expected,
         u_alpha_binary,
-        observed_disagreement_cu_nominal: cu_nominal
-            .as_ref()
-            .map(|value| value.observed),
-        expected_disagreement_cu_nominal: cu_nominal
-            .as_ref()
-            .map(|value| value.expected),
+        observed_disagreement_cu_nominal: cu_nominal.as_ref().map(|value| value.observed),
+        expected_disagreement_cu_nominal: cu_nominal.as_ref().map(|value| value.expected),
         cu_alpha_nominal: cu_nominal.and_then(|value| value.alpha),
         per_value,
     })
@@ -777,10 +768,8 @@ fn expected_matrix(
     }
     let categories = row_margins.len();
     let mut expected = vec![vec![0.0_f64; categories]; categories];
-    for (row_index, (row_margin, correction)) in row_margins
-        .iter()
-        .zip(correction_by_category)
-        .enumerate()
+    for (row_index, (row_margin, correction)) in
+        row_margins.iter().zip(correction_by_category).enumerate()
     {
         for (column_index, column_margin) in column_margins.iter().enumerate() {
             let mut numerator = row_margin * column_margin;
@@ -809,10 +798,7 @@ fn collapse_binary_matrix(matrix: &[Vec<f64>], gap_index: usize) -> Vec<Vec<f64>
     binary
 }
 
-fn disagreement_pair(
-    observed: &[Vec<f64>],
-    expected: &[Vec<f64>],
-) -> DisagreementPairV1 {
+fn disagreement_pair(observed: &[Vec<f64>], expected: &[Vec<f64>]) -> DisagreementPairV1 {
     let mut observed_total = 0.0_f64;
     let mut expected_total = 0.0_f64;
     let mut observed_diagonal = 0.0_f64;
@@ -865,8 +851,7 @@ fn conditional_coding_profile(
     let mut observed = vec![vec![0.0_f64; size]; size];
     for (row_index, full_row_index) in non_gap_indices.iter().enumerate() {
         for (column_index, full_column_index) in non_gap_indices.iter().enumerate() {
-            observed[row_index][column_index] =
-                observed_full[*full_row_index][*full_column_index];
+            observed[row_index][column_index] = observed_full[*full_row_index][*full_column_index];
         }
     }
     let observed_total: f64 = observed.iter().flatten().sum();
@@ -922,10 +907,7 @@ fn conditional_coding_profile(
     for (value_index, _) in non_gap_indices.iter().enumerate() {
         let observed_pairable_column = column_margins[value_index];
         let observed_same_value = observed[value_index][value_index];
-        let expected_column: f64 = expected
-            .iter()
-            .map(|row| row[value_index])
-            .sum();
+        let expected_column: f64 = expected.iter().map(|row| row[value_index]).sum();
         let expected_same_value = expected[value_index][value_index];
         let full_column = observed_full_column[non_gap_indices[value_index]];
         let coverage = if full_column > 0.0 {
@@ -933,8 +915,7 @@ fn conditional_coding_profile(
         } else {
             0.0
         };
-        let observed_value_disagreement =
-            observed_pairable_column - observed_same_value;
+        let observed_value_disagreement = observed_pairable_column - observed_same_value;
         let expected_value_disagreement = expected_column - expected_same_value;
         let alpha = if expected_value_disagreement.abs() <= NUMERIC_EPSILON
             || observed_pairable_column.abs() <= NUMERIC_EPSILON
@@ -1033,10 +1014,7 @@ fn median(values: &[f64]) -> Option<f64> {
 mod tests {
     use super::*;
 
-    fn labeled_partition(
-        intervals: &[(u64, u64, &str)],
-        continuum: u64,
-    ) -> Vec<UnitSegmentV1> {
+    fn labeled_partition(intervals: &[(u64, u64, &str)], continuum: u64) -> Vec<UnitSegmentV1> {
         let intervals: Vec<_> = intervals
             .iter()
             .map(|(start, end, value)| (*start, *end, (*value).to_string()))
@@ -1153,9 +1131,19 @@ mod tests {
         let mut reordered = original.clone();
         reordered.reverse();
         let reordered_profile = compute_unitizing_profile(&reordered, 60).unwrap();
-        assert!((baseline.u_alpha_nominal.unwrap() - reordered_profile.u_alpha_nominal.unwrap()).abs() < 1e-12);
-        assert!((baseline.u_alpha_binary.unwrap() - reordered_profile.u_alpha_binary.unwrap()).abs() < 1e-12);
-        assert!((baseline.cu_alpha_nominal.unwrap() - reordered_profile.cu_alpha_nominal.unwrap()).abs() < 1e-12);
+        assert!(
+            (baseline.u_alpha_nominal.unwrap() - reordered_profile.u_alpha_nominal.unwrap()).abs()
+                < 1e-12
+        );
+        assert!(
+            (baseline.u_alpha_binary.unwrap() - reordered_profile.u_alpha_binary.unwrap()).abs()
+                < 1e-12
+        );
+        assert!(
+            (baseline.cu_alpha_nominal.unwrap() - reordered_profile.cu_alpha_nominal.unwrap())
+                .abs()
+                < 1e-12
+        );
 
         let scale = 7_u64;
         let scaled: Vec<Vec<UnitSegmentV1>> = original
@@ -1172,9 +1160,18 @@ mod tests {
             })
             .collect();
         let scaled_profile = compute_unitizing_profile(&scaled, 60 * scale).unwrap();
-        assert!((baseline.u_alpha_nominal.unwrap() - scaled_profile.u_alpha_nominal.unwrap()).abs() < 1e-12);
-        assert!((baseline.u_alpha_binary.unwrap() - scaled_profile.u_alpha_binary.unwrap()).abs() < 1e-12);
-        assert!((baseline.cu_alpha_nominal.unwrap() - scaled_profile.cu_alpha_nominal.unwrap()).abs() < 1e-12);
+        assert!(
+            (baseline.u_alpha_nominal.unwrap() - scaled_profile.u_alpha_nominal.unwrap()).abs()
+                < 1e-12
+        );
+        assert!(
+            (baseline.u_alpha_binary.unwrap() - scaled_profile.u_alpha_binary.unwrap()).abs()
+                < 1e-12
+        );
+        assert!(
+            (baseline.cu_alpha_nominal.unwrap() - scaled_profile.cu_alpha_nominal.unwrap()).abs()
+                < 1e-12
+        );
     }
 
     fn test_digest(ch: char) -> String {
@@ -1230,7 +1227,13 @@ mod tests {
         let item = test_item(
             "piano",
             vec![
-                test_annotation('1', 'a', GroundTruthStateV1::Present, vec![event.clone()], None),
+                test_annotation(
+                    '1',
+                    'a',
+                    GroundTruthStateV1::Present,
+                    vec![event.clone()],
+                    None,
+                ),
                 test_annotation('2', 'b', GroundTruthStateV1::Absent, Vec::new(), None),
                 test_annotation(
                     '3',
@@ -1263,7 +1266,10 @@ mod tests {
         assert_eq!(result.query_text, "Every piano entrance");
         assert_eq!(result.sample_rate_hz, 48_000);
         assert_eq!(result.annotator_dispositions[0].intervals, vec![event]);
-        assert_eq!(result.annotator_dispositions[2].intervals, vec![ambiguous_interval]);
+        assert_eq!(
+            result.annotator_dispositions[2].intervals,
+            vec![ambiguous_interval]
+        );
         assert_eq!(
             result.annotator_dispositions[2].exclusion_reason,
             Some(UnitizingExclusionReasonV1::Ambiguous)
@@ -1316,7 +1322,10 @@ mod tests {
         };
         let report = audit_unitizing_corpus(&case).unwrap();
         let result = &report.item_results[0];
-        assert_eq!(result.status, UnitizingItemStatusV1::InsufficientEligibleUnitizers);
+        assert_eq!(
+            result.status,
+            UnitizingItemStatusV1::InsufficientEligibleUnitizers
+        );
         assert_eq!(result.eligible_unitizers, 1);
         assert_eq!(result.excluded_ambiguous, 1);
         assert_eq!(result.excluded_not_estimable, 1);
@@ -1326,15 +1335,9 @@ mod tests {
 
     #[test]
     fn same_rater_overlapping_or_unsorted_intervals_are_rejected() {
-        let overlap = build_partition(
-            &[(0, 10, "event".into()), (9, 15, "event".into())],
-            30,
-        );
+        let overlap = build_partition(&[(0, 10, "event".into()), (9, 15, "event".into())], 30);
         assert!(overlap.is_err());
-        let unsorted = build_partition(
-            &[(10, 15, "event".into()), (0, 5, "event".into())],
-            30,
-        );
+        let unsorted = build_partition(&[(10, 15, "event".into()), (0, 5, "event".into())], 30);
         assert!(unsorted.is_err());
     }
 }
