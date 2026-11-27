@@ -232,7 +232,7 @@ pub fn is_public_destination(address: IpAddr) -> bool {
         }
         IpAddr::V6(ip) => {
             let value = u128::from(ip);
-            let global_unicast = ipv6_in_prefix(ip, Ipv6Addr::from(0x2000_u128 << 96), 3);
+            let global_unicast = ipv6_in_prefix(ip, Ipv6Addr::from(0x2000_u128 << 112), 3);
             if !global_unicast || ip.is_loopback() || ip.is_unspecified() || ip.is_multicast() {
                 return false;
             }
