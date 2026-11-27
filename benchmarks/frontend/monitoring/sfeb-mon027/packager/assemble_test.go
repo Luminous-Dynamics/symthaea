@@ -225,3 +225,31 @@ func TestAttachRejectsMismatchedSigningRequestID(t *testing.T) {
 		t.Fatalf("detached signature from another request must block: %+v", result)
 	}
 }
+
+func TestBuildRejectsArtifactTimeOutsideCombinedClockBounds(t *testing.T) {
+	now := time.Date(2026, 11, 27, 10, 0, 0, 0, time.UTC)
+	index := testIndex(now)
+	index.Artifacts[0].CollectedAt = now.Add(20 * time.Millisecond)
+	if _, err := BuildManifest(writeFixture(t), index); err == nil {
+		t.Fatal("collection time beyond combined clock uncertainty must be rejected")
+	}
+}
+
+func TestBuildRejectsSymlinkArtifact(t *testing.T) {
+	now := time.Date(2026, 11, 27, 10, 0, 0, 0, time.UTC)
+	root := writeFixture(t)
+	external := filepath.Join(t.TempDir(), "outside.json")
+	if err := os.WriteFile(external, []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "state", "source.json")
+	if err := os.Remove(target); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, target); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, err := BuildManifest(root, testIndex(now)); err == nil {
+		t.Fatal("symlinked artifact must be rejected")
+	}
+}
