@@ -959,7 +959,11 @@ mod tests {
             ],
             prediction(intervals),
         );
-        assert!(audit_multi_annotator_case(&original).is_ok());
+        let valid_report = audit_multi_annotator_case(&original).unwrap();
+        assert!(valid_report.annotation_manifest_digest_recomputed);
+        assert!(valid_report.annotation_record_digests_recomputed);
+        assert!(!valid_report.annotation_manifest_authenticated);
+        assert!(!valid_report.annotator_receipts_authenticated);
 
         let mut changed_interval = original.clone();
         changed_interval.annotations[0].intervals[0].end_frame = 201;
@@ -986,12 +990,12 @@ mod tests {
             vec![
                 annotation('1', 'a', GroundTruthStateV1::Present, intervals.clone(), None),
                 annotation('2', 'b', GroundTruthStateV1::Present, intervals.clone(), None),
+                annotation('3', 'c', GroundTruthStateV1::Present, intervals.clone(), None),
             ],
             prediction(intervals),
         );
         let mut changed_panel = original.clone();
         changed_panel.annotations.pop();
-        changed_panel.minimum_annotator_count = 1;
         assert!(audit_multi_annotator_case(&changed_panel)
             .unwrap_err()
             .contains("annotation manifest digest mismatch"));
