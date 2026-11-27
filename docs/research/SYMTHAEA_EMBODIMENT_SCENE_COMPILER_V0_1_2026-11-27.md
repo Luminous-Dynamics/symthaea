@@ -55,7 +55,7 @@ The compiler clamps all output weights to the permit's effective intensity and f
 
 ## Privacy and accessibility
 
-The scene frame is immutable outside the scene compiler and is serialize-only (not deserializable through the public type). Read-only accessors expose event/source/build/clock/grant IDs, sequence, semantic key, canonical-cue digest, epistemic status, privacy class, event time and expiry, plus the accessibility description produced by CanonicalCue. Raw evidence-reference identifiers and semantic target payloads are not copied into the renderer-facing frame; their integrity remains bound by the canonical-cue digest. Sensitive subjects are redacted from generic accessible text. Restricted data cannot be compiled because no policy permit may be issued for it.
+The scene frame is immutable outside the scene compiler and is serialize-only (not deserializable through the public type). Read-only accessors expose event/source/build/clock/grant IDs, sequence, semantic key, canonical-cue digest, epistemic status, privacy class, event time, event expiry, grant expiry and effective permit expiry, plus the accessibility description produced by CanonicalCue. The effective permit expiry (the earlier deadline) governs how long a renderer may retain or display the frame; it must not remain active beyond that value. Raw evidence-reference identifiers and semantic target payloads are not copied into the renderer-facing frame; their integrity remains bound by the canonical-cue digest. Sensitive subjects are redacted from generic accessible text. Restricted data cannot be compiled because no policy permit may be issued for it.
 
 Essential state must be communicated through shape and text, not colour alone, animation alone, sound alone, or gaze. Reduced-motion mode makes all primitives static.
 
@@ -63,7 +63,7 @@ Essential state must be communicated through shape and text, not colour alone, a
 
 - Implementation: crates/domains/symthaea-soma/src/embodiment_scene.rs
 - Exported as symthaea_soma::embodiment_scene.
-- Nine authored Rust regression tests cover deterministic compilation, all seven forms, reduced motion, privacy-aware accessibility and no raw-reference disclosure, uncertainty branching, evidence-status honesty, channel mismatch, and modified-payload rejection.
+- Ten authored Rust regression tests cover deterministic compilation, all seven forms, reduced motion, privacy-aware accessibility and no raw-reference disclosure, uncertainty branching, evidence-status honesty, channel mismatch, and modified-payload rejection.
 - The tests are authored, not compiled or executed. No Bevy renderer, frame timing, accessibility user study, or hardware profiling is claimed.
 
 ## Next renderer integration
