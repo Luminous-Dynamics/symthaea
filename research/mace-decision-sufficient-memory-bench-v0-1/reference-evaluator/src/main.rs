@@ -48,7 +48,7 @@ struct Candidate {
 struct SourceEvent {
     event_id: String,
     source_id: String,
-    source_family: String,
+    source_family: Option<String>,
     source_root_sha256: Option<String>,
     observed_at_ms: i64,
     valid_from_ms: i64,
@@ -286,7 +286,9 @@ fn validate_episode(e: &Episode) -> Result<(), String> {
     let mut event_ids = BTreeSet::new();
     for v in &e.candidate.source_events {
         if v.event_id.trim().is_empty() || !event_ids.insert(v.event_id.as_str()) ||
-            v.source_id.trim().is_empty() || v.source_family.trim().is_empty() || v.claim.trim().is_empty() ||
+            v.source_id.trim().is_empty() || v.claim.trim().is_empty() ||
+            v.source_family.as_ref().is_some_and(|family| family.trim().is_empty()) ||
+            (v.source_root_sha256.is_some() && v.source_family.is_none()) ||
             v.source_root_sha256.as_ref().is_some_and(|root| !valid_sha256(root)) ||
             v.uncertainty_ppm > 1_000_000 ||
             v.valid_until_ms.is_some_and(|end| end < v.valid_from_ms) {
@@ -780,7 +782,7 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
 
 fn event(id: String, source: String, observed: i64, valid_from: i64, valid_until: Option<i64>,
     authority: AuthorityTier, uncertainty: u32, claim: &str, relation: Relation, parents: Vec<String>) -> SourceEvent {
-    let source_family = source.clone();
+    let source_family = Some(source.clone());
     let source_root_sha256 = Some(digest(source.as_bytes()));
     SourceEvent {
         event_id:id, source_id:source, source_family, source_root_sha256,
