@@ -338,6 +338,16 @@ impl Resolve for GuardedDnsResolver {
     }
 }
 
+/// Classify typed URL-policy failures carried through anyhow context.
+pub fn is_url_policy_rejection_anyhow(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| cause.downcast_ref::<UrlPolicyRejection>().is_some())
+}
+
+/// Classify typed DNS-policy failures carried through anyhow context.
+pub fn is_dns_policy_rejection_anyhow(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| cause.downcast_ref::<DnsPolicyRejection>().is_some())
+}
+
 /// Used to classify policy failures in the acquisition receipt without turning
 /// ordinary DNS timeouts or resolver failures into policy rejections.
 pub fn is_dns_policy_rejection(error: &reqwest::Error) -> bool {
@@ -451,6 +461,24 @@ mod tests {
         let resolver = GuardedDnsResolver::with_lookup(StubLookup::with_answers(answers));
         assert_eq!(resolve(&resolver, "rebind.example").await.unwrap(), vec![socket("8.8.8.8")]);
         assert!(resolve(&resolver, "rebind.example").await.unwrap_err().contains("DNS_POLICY_REJECTED"));
+    }
+
+    #[test]
+    fn typed_url_policy_errors_survive_anyhow_context() {
+        let error = anyhow::Error::new(UrlPolicyRejection::ForbiddenIpLiteral(
+            "127.0.0.1".parse().unwrap(),
+        ))
+        .context("page target rejected");
+        assert!(is_url_policy_rejection_anyhow(&error));
+    }
+
+    #[test]
+    fn typed_dns_policy_errors_survive_anyhow_context() {
+        let error = anyhow::Error::new(DnsPolicyRejection::EmptyAnswerSet(
+            "empty.example".to_string(),
+        ))
+        .context("search provider DNS failed");
+        assert!(is_dns_policy_rejection_anyhow(&error));
     }
 
     #[test]
