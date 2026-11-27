@@ -101,11 +101,17 @@ impl IdentifiabilityScore {
     }
 
     pub fn ambiguity_abstention_rate(&self) -> Option<f64> {
-        ratio(self.ambiguous_unknown_cells, self.unidentifiable_view_cluster_cells)
+        ratio(
+            self.ambiguous_unknown_cells,
+            self.unidentifiable_view_cluster_cells,
+        )
     }
 
     pub fn unnecessary_abstention_rate(&self) -> Option<f64> {
-        ratio(self.identifiable_unknown_cells, self.identifiable_view_cluster_cells)
+        ratio(
+            self.identifiable_unknown_cells,
+            self.identifiable_view_cluster_cells,
+        )
     }
 
     pub fn prediction_set_miss_rate(&self) -> Option<f64> {
@@ -113,7 +119,10 @@ impl IdentifiabilityScore {
     }
 
     pub fn irreducible_point_error_rate(&self) -> Option<f64> {
-        ratio(self.irreducible_point_error_floor, self.unidentifiable_view_cluster_cells)
+        ratio(
+            self.irreducible_point_error_floor,
+            self.unidentifiable_view_cluster_cells,
+        )
     }
 }
 
@@ -135,7 +144,10 @@ pub fn score_identifiability(
         (&custody.contract_id, "contract_id"),
         (&custody.contract_sha256, "contract_sha256"),
         (&custody.source_manifest_sha256, "source_manifest_sha256"),
-        (&custody.candidate_checkpoint_sha256, "candidate_checkpoint_sha256"),
+        (
+            &custody.candidate_checkpoint_sha256,
+            "candidate_checkpoint_sha256",
+        ),
     ] {
         if value.trim().is_empty() {
             return Err(ValidationError::EmptyIdentity(name));
@@ -144,7 +156,10 @@ pub fn score_identifiability(
     for (name, digest) in [
         ("contract_sha256", &custody.contract_sha256),
         ("source_manifest_sha256", &custody.source_manifest_sha256),
-        ("candidate_checkpoint_sha256", &custody.candidate_checkpoint_sha256),
+        (
+            "candidate_checkpoint_sha256",
+            &custody.candidate_checkpoint_sha256,
+        ),
     ] {
         if !is_sha256_hex(digest) {
             return Err(ValidationError::InvalidSha256(name));
@@ -204,7 +219,10 @@ pub fn score_identifiability(
         }
         clusters.insert(item.independent_cluster_id.clone());
         families.insert(item.environment_family_id.clone());
-        oracle.entry(item.candidate_view_sha256.clone()).or_default().push(item);
+        oracle
+            .entry(item.candidate_view_sha256.clone())
+            .or_default()
+            .push(item);
     }
     if predicted.keys().any(|view| !oracle.contains_key(view)) {
         return Err(ValidationError::UnmatchedCandidateView);
@@ -221,7 +239,10 @@ pub fn score_identifiability(
         let output = &predicted[view];
         let mut responses = BTreeMap::new();
         for item in group {
-            match responses.insert(item.independent_cluster_id.as_str(), item.reference_response) {
+            match responses.insert(
+                item.independent_cluster_id.as_str(),
+                item.reference_response,
+            ) {
                 Some(old) if old != item.reference_response => {
                     return Err(ValidationError::ClusterResponseConflict);
                 }
@@ -248,7 +269,10 @@ pub fn score_identifiability(
         match output {
             CandidateOutput::Point(value) => {
                 score.point_prediction_cells += count;
-                score.point_error_cells += responses.values().filter(|actual| **actual != *value).count();
+                score.point_error_cells += responses
+                    .values()
+                    .filter(|actual| **actual != *value)
+                    .count();
                 if ambiguous {
                     score.ambiguous_point_forecast_groups += 1;
                     score.ambiguous_unsafe_groups += 1;
@@ -257,10 +281,16 @@ pub fn score_identifiability(
             CandidateOutput::Set(values) => {
                 score.set_prediction_cells += count;
                 score.prediction_set_width_sum += values.len() * count;
-                score.maximum_prediction_set_width = score.maximum_prediction_set_width.max(values.len());
-                score.set_miss_cells += responses.values().filter(|actual| values.binary_search(*actual).is_err()).count();
+                score.maximum_prediction_set_width =
+                    score.maximum_prediction_set_width.max(values.len());
+                score.set_miss_cells += responses
+                    .values()
+                    .filter(|actual| values.binary_search(*actual).is_err())
+                    .count();
                 if ambiguous {
-                    let covers_observed = frequencies.keys().all(|actual| values.binary_search(actual).is_ok());
+                    let covers_observed = frequencies
+                        .keys()
+                        .all(|actual| values.binary_search(actual).is_ok());
                     if covers_observed {
                         score.ambiguous_complete_set_groups += 1;
                     } else {
@@ -283,7 +313,11 @@ pub fn score_identifiability(
 }
 
 fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
-    if denominator == 0 { None } else { Some(numerator as f64 / denominator as f64) }
+    if denominator == 0 {
+        None
+    } else {
+        Some(numerator as f64 / denominator as f64)
+    }
 }
 
 fn is_sha256_hex(value: &str) -> bool {
@@ -294,7 +328,9 @@ fn is_sha256_hex(value: &str) -> bool {
 mod tests {
     use super::*;
 
-    fn digest(c: char) -> String { c.to_string().repeat(64) }
+    fn digest(c: char) -> String {
+        c.to_string().repeat(64)
+    }
     fn custody() -> EvaluationCustody {
         EvaluationCustody {
             contract_id: "contract-v1".into(),
@@ -304,7 +340,10 @@ mod tests {
         }
     }
     fn pred(view: char, output: CandidateOutput) -> CandidatePrediction {
-        CandidatePrediction { candidate_view_sha256: digest(view), output }
+        CandidatePrediction {
+            candidate_view_sha256: digest(view),
+            output,
+        }
     }
     fn oracle(view: char, family: &str, cluster: &str, response: i64) -> OracleAnnotation {
         OracleAnnotation {
@@ -339,11 +378,18 @@ mod tests {
     #[test]
     fn unknown_on_alias_and_identifiable_view_measures_over_abstention() {
         let p = vec![
-            pred('d', CandidateOutput::Unknown(UnknownReason::AmbiguousContext)),
-            pred('e', CandidateOutput::Unknown(UnknownReason::InsufficientSupport)),
+            pred(
+                'd',
+                CandidateOutput::Unknown(UnknownReason::AmbiguousContext),
+            ),
+            pred(
+                'e',
+                CandidateOutput::Unknown(UnknownReason::InsufficientSupport),
+            ),
         ];
         let o = vec![
-            oracle('d', "fa", "ca", 10), oracle('d', "fb", "cb", 20),
+            oracle('d', "fa", "ca", 10),
+            oracle('d', "fb", "cb", 20),
             oracle('e', "fc", "cc", 30),
         ];
         let s = score_identifiability(&p, &o, &custody()).unwrap();
@@ -367,7 +413,10 @@ mod tests {
 
     #[test]
     fn informative_probe_changes_view_and_separates_responses() {
-        let p = vec![pred('d', CandidateOutput::Point(10)), pred('e', CandidateOutput::Point(20))];
+        let p = vec![
+            pred('d', CandidateOutput::Point(10)),
+            pred('e', CandidateOutput::Point(20)),
+        ];
         let o = vec![oracle('d', "fa", "ca", 10), oracle('e', "fb", "cb", 20)];
         let s = score_identifiability(&p, &o, &custody()).unwrap();
         assert_eq!(s.unidentifiable_view_groups, 0);
@@ -376,7 +425,10 @@ mod tests {
 
     #[test]
     fn uninformative_probe_does_not_split_alias() {
-        let p = vec![pred('d', CandidateOutput::Unknown(UnknownReason::AmbiguousContext))];
+        let p = vec![pred(
+            'd',
+            CandidateOutput::Unknown(UnknownReason::AmbiguousContext),
+        )];
         let o = vec![oracle('d', "fa", "ca", 10), oracle('d', "fb", "cb", 20)];
         let s = score_identifiability(&p, &o, &custody()).unwrap();
         assert_eq!(s.unidentifiable_view_groups, 1);
@@ -387,7 +439,8 @@ mod tests {
     fn repeated_annotations_do_not_inflate_cluster_count() {
         let p = vec![pred('d', CandidateOutput::Point(10))];
         let o = vec![
-            oracle('d', "fa", "ca", 10), oracle('d', "fa", "ca", 10),
+            oracle('d', "fa", "ca", 10),
+            oracle('d', "fa", "ca", 10),
             oracle('d', "fb", "cb", 20),
         ];
         let s = score_identifiability(&p, &o, &custody()).unwrap();
@@ -398,33 +451,57 @@ mod tests {
 
     #[test]
     fn cluster_reuse_across_families_is_rejected() {
-        let p = vec![pred('d', CandidateOutput::Point(10)), pred('e', CandidateOutput::Point(20))];
+        let p = vec![
+            pred('d', CandidateOutput::Point(10)),
+            pred('e', CandidateOutput::Point(20)),
+        ];
         let o = vec![oracle('d', "fa", "same", 10), oracle('e', "fb", "same", 20)];
-        assert_eq!(score_identifiability(&p, &o, &custody()), Err(ValidationError::ClusterAliasedAcrossFamilies));
+        assert_eq!(
+            score_identifiability(&p, &o, &custody()),
+            Err(ValidationError::ClusterAliasedAcrossFamilies)
+        );
     }
 
     #[test]
     fn duplicate_candidate_view_must_have_identical_output() {
-        let p = vec![pred('d', CandidateOutput::Point(10)), pred('d', CandidateOutput::Point(20))];
+        let p = vec![
+            pred('d', CandidateOutput::Point(10)),
+            pred('d', CandidateOutput::Point(20)),
+        ];
         let o = vec![oracle('d', "fa", "ca", 10)];
-        assert_eq!(score_identifiability(&p, &o, &custody()), Err(ValidationError::CandidateViewOutputMismatch));
+        assert_eq!(
+            score_identifiability(&p, &o, &custody()),
+            Err(ValidationError::CandidateViewOutputMismatch)
+        );
     }
 
     #[test]
     fn unmatched_prediction_and_oracle_views_are_rejected() {
         let p = vec![pred('d', CandidateOutput::Point(10))];
         let o = vec![oracle('e', "fa", "ca", 10)];
-        assert_eq!(score_identifiability(&p, &o, &custody()), Err(ValidationError::UnmatchedOracleView));
-        let p2 = vec![pred('d', CandidateOutput::Point(10)), pred('e', CandidateOutput::Point(20))];
+        assert_eq!(
+            score_identifiability(&p, &o, &custody()),
+            Err(ValidationError::UnmatchedOracleView)
+        );
+        let p2 = vec![
+            pred('d', CandidateOutput::Point(10)),
+            pred('e', CandidateOutput::Point(20)),
+        ];
         let o2 = vec![oracle('d', "fa", "ca", 10)];
-        assert_eq!(score_identifiability(&p2, &o2, &custody()), Err(ValidationError::UnmatchedCandidateView));
+        assert_eq!(
+            score_identifiability(&p2, &o2, &custody()),
+            Err(ValidationError::UnmatchedCandidateView)
+        );
     }
 
     #[test]
     fn conflicting_outcomes_inside_one_cluster_are_rejected() {
         let p = vec![pred('d', CandidateOutput::Point(10))];
         let o = vec![oracle('d', "fa", "ca", 10), oracle('d', "fa", "ca", 20)];
-        assert_eq!(score_identifiability(&p, &o, &custody()), Err(ValidationError::ClusterResponseConflict));
+        assert_eq!(
+            score_identifiability(&p, &o, &custody()),
+            Err(ValidationError::ClusterResponseConflict)
+        );
     }
 
     #[test]
@@ -433,8 +510,14 @@ mod tests {
         let o = vec![oracle('d', "fa", "ca", 10)];
         let mut bad_custody = custody();
         bad_custody.contract_sha256 = "bad".into();
-        assert_eq!(score_identifiability(&p, &o, &bad_custody), Err(ValidationError::InvalidSha256("contract_sha256")));
+        assert_eq!(
+            score_identifiability(&p, &o, &bad_custody),
+            Err(ValidationError::InvalidSha256("contract_sha256"))
+        );
         let bad_set = vec![pred('d', CandidateOutput::Set(vec![20, 10]))];
-        assert_eq!(score_identifiability(&bad_set, &o, &custody()), Err(ValidationError::NonCanonicalPredictionSet));
+        assert_eq!(
+            score_identifiability(&bad_set, &o, &custody()),
+            Err(ValidationError::NonCanonicalPredictionSet)
+        );
     }
 }
