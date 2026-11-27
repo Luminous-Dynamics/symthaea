@@ -1,0 +1,47 @@
+name: SDCB Conformal Calibration Custody
+
+on:
+  push:
+    branches:
+      - research/sdcb-conformal-custody-hardening-2026-11-27
+    paths:
+      - "scripts/research/sdcb_block_conformal_adequacy.rs"
+      - "docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.example.json"
+      - "docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.schema.json"
+      - "docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.expected.json"
+      - ".github/workflows/sdcb-conformal-custody.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/research/sdcb_block_conformal_adequacy.rs"
+      - "docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.example.json"
+      - "docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.schema.json"
+      - "docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.expected.json"
+      - ".github/workflows/sdcb-conformal-custody.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    name: Rust 1.96 conformal custody negative controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+      - name: Compile exact-source reference tests
+        run: rustc --edition=2024 --test scripts/research/sdcb_block_conformal_adequacy.rs -o /tmp/sdcb-block-conformal-adequacy
+      - name: Run conformal rank and custody controls
+        run: /tmp/sdcb-block-conformal-adequacy
+      - name: Parse frozen JSON fixtures
+        run: |
+          python3 -m json.tool docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.example.json >/dev/null
+          python3 -m json.tool docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.expected.json >/dev/null
+          python3 -m json.tool docs/research/SDCB_BLOCK_CONFORMAL_ADEQUACY_V1.schema.json >/dev/null
