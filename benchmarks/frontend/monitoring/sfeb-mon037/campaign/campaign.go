@@ -441,7 +441,7 @@ func reconcileEvents(in Input,r *Reconciliation,cdc,txn *flags){
  for _,e:=range unique{key:=topicPartitionKey{topic:e.Topic,partition:e.Partition};byTopicPartition[key]=append(byTopicPartition[key],e)}
  for key,records:=range byTopicPartition{
   sort.Slice(records,func(i,j int)bool{return records[i].Offset<records[j].Offset})
-  if declared,ok:=parts[key.topic];ok&&declared==1&&key.partition!=0{r.OrderingViolations=append(r.OrderingViolations,key.topic+":nonzero_partition")}
+  if declared,ok:=parts[key.topic];ok&&key.partition>=declared{r.OrderingViolations=append(r.OrderingViolations,key.topic+":partition_out_of_range")}
   for i:=1;i<len(records);i++{if records[i].Offset<=records[i-1].Offset{r.OrderingViolations=append(r.OrderingViolations,key.topic+":partition_offset_not_monotonic")}}
  }
  if len(r.OrderingViolations)>0{sort.Strings(r.OrderingViolations);cdc.block("per_topic_order_violation")}
