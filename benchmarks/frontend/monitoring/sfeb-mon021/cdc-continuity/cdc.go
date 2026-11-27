@@ -39,6 +39,7 @@ type SlotState struct {
 	DatabaseOID uint32
 	DatabaseName,SlotName,OutputPlugin string
 	Temporary bool
+	TwoPhase bool
 	InvalidationReason,WALStatus string
 	Failover,Synced,OnStandby bool
 	RestartLSN,ConfirmedFlushLSN *LSN
