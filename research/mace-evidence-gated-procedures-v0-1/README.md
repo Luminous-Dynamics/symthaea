@@ -40,7 +40,7 @@ MACE should not claim novelty for temporal graphs, source-linked skill versions,
 
 ### 1. Procedure proposal — untrusted candidate output
 
-The schema is at schemas/procedure-proposal-v0.1.schema.json.
+The schema is at schemas/procedure-proposal-v0.1.schema.json. A synthetic read-only release-gate example is at fixtures/procedure-proposal-release-gate-v0.1.json. It performs no deployment, approval or mutation; its trace identifiers and digests are illustrative fixtures, not verified real execution evidence.
 
 A compiler or agent proposes a procedure with:
 - intended task family and objective;
@@ -159,4 +159,4 @@ Do not compare Zep's reported transfer gains with MACE results unless task sets,
 
 ## Current status and non-claims
 
-This branch contains proposed schemas and a research specification only. No procedure compiler, admission authority, signer/key service, replay sandbox, runtime guard, benchmark adapter, test result, transfer improvement or production feature is implemented. Vendor results are not MACE results.
+This branch contains a research specification, three JSON Schemas and one synthetic candidate proposal fixture. The fixture was read back and its JSON structure, step/source-event references and absence of self-asserted trust fields were checked. The JSON Schemas have been parsed as JSON but have not yet been run through a full JSON Schema validator. No procedure compiler, admission authority, signer/key service, replay sandbox, runtime guard, benchmark adapter, test result, transfer improvement or production feature is implemented. Vendor results are not MACE results.
