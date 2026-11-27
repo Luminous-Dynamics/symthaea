@@ -765,6 +765,28 @@ mod tests {
     }
 
     #[test]
+    fn unreviewed_extra_baseline_is_not_faithful() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.baselines.push(BaselineUse {
+            baseline_id: "unregistered-oracle".into(),
+            configuration_sha256: h('9'),
+        });
+        assert_eq!(disposition(&c, &r), Disposition::Unresolved);
+    }
+
+    #[test]
+    fn unreviewed_extra_metric_is_not_faithful() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.metrics.push(MetricUse {
+            metric_id: "posthoc-metric".into(),
+            definition_sha256: h('9'),
+        });
+        assert_eq!(disposition(&c, &r), Disposition::Unresolved);
+    }
+
+    #[test]
     fn missing_baseline_is_detected() {
         let c = contract();
         let mut r = receipt(&c);
