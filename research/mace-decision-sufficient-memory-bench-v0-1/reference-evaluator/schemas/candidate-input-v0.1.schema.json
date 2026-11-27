@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/schemas/candidate-input-v0.1.schema.json",
+  "title": "MACE DSM Candidate Input v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_id",
+    "seed",
+    "family",
+    "candidate"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_dsm_candidate_input_v0_1"
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "family": {
+      "enum": [
+        "temporal_drift",
+        "contradiction",
+        "revocation",
+        "insufficient_evidence",
+        "poisoning",
+        "decision_sufficient_compression",
+        "streaming_update",
+        "forgetting_replay",
+        "scope_isolation"
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_time_ms",
+        "query",
+        "source_events",
+        "allowed_actions",
+        "evidence_budget",
+        "observation_budget",
+        "observation_cost_units",
+        "scope"
+      ],
+      "properties": {
+        "query_time_ms": {
+          "type": "integer"
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Opaque benchmark namespace; never substitute for an authenticated tenant boundary."
+        },
+        "source_events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event_id",
+              "source_id",
+              "observed_at_ms",
+              "valid_from_ms",
+              "valid_until_ms",
+              "authority_tier",
+              "uncertainty_ppm",
+              "claim",
+              "parent_event_ids"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "observed_at_ms": {
+                "type": "integer"
+              },
+              "valid_from_ms": {
+                "type": "integer"
+              },
+              "valid_until_ms": {
+                "oneOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "authority_tier": {
+                "enum": [
+                  "verified",
+                  "authenticated",
+                  "user_asserted",
+                  "untrusted"
+                ]
+              },
+              "uncertainty_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "claim": {
+                "type": "string",
+                "minLength": 1
+              },
+              "relation_to_parent": {
+                "enum": [
+                  "asserts",
+                  "supersedes",
+                  "retracts",
+                  "contradicts",
+                  "derived_from"
+                ]
+              },
+              "parent_event_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              }
+            }
+          }
+        },
+        "allowed_actions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence_budget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "observation_budget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "observation_cost_units": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
