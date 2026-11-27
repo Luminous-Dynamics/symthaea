@@ -7,9 +7,9 @@
 mod bm25;
 
 pub use bm25::{
-    AuthorityTierV1, Bm25ConfigV1, Bm25IndexV1, Bm25ResultV1, EventRelationV1,
-    FusedHitV1, RankedChannelV1, RetrievalHitV1, RetrievalQueryV1, RetrievalWorkV1,
-    SourceDocumentV1, weighted_rrf_v1,
+    AuthorityTierV1, Bm25ConfigV1, Bm25IndexV1, Bm25ResultV1, EventRelationV1, FusedHitV1,
+    RankedChannelV1, RetrievalHitV1, RetrievalQueryV1, RetrievalWorkV1, SourceDocumentV1,
+    weighted_rrf_v1,
 };
 
 use serde::Deserialize;
@@ -170,8 +170,8 @@ impl SourceDocumentWireV1 {
 /// Returned IDs are resolved by exact event identity. No text-similarity join
 /// is performed between retrieval output and canonical source metadata.
 pub fn run_candidate_fixture_v1(json: &str) -> Result<FixtureExecutionV1, AdapterErrorV1> {
-    let fixture: CandidateFixtureWireV1 =
-        serde_json::from_str(json).map_err(|error| AdapterErrorV1::InvalidJson(error.to_string()))?;
+    let fixture: CandidateFixtureWireV1 = serde_json::from_str(json)
+        .map_err(|error| AdapterErrorV1::InvalidJson(error.to_string()))?;
     if fixture.schema_version != SCHEMA_VERSION {
         return Err(AdapterErrorV1::UnsupportedSchemaVersion);
     }
@@ -245,8 +245,7 @@ pub fn run_candidate_fixture_v1(json: &str) -> Result<FixtureExecutionV1, Adapte
 mod tests {
     use super::*;
 
-    const FIXTURE: &str =
-        include_str!("../../raw-trajectory-baseline-v0.1.example.json");
+    const FIXTURE: &str = include_str!("../../raw-trajectory-baseline-v0.1.example.json");
 
     #[test]
     fn candidate_json_fixture_runs_through_index_search_and_exact_lineage_resolution() {
@@ -259,16 +258,20 @@ mod tests {
             assert!(!resolved.source_id.is_empty());
             assert!(resolved.uncertainty_ppm <= 1_000_000);
         }
-        assert!(report
-            .bm25
-            .hits
-            .iter()
-            .all(|hit| hit.document_id != "late-correction-041"));
-        assert!(report
-            .bm25
-            .hits
-            .iter()
-            .all(|hit| hit.document_id != "other-tenant-001"));
+        assert!(
+            report
+                .bm25
+                .hits
+                .iter()
+                .all(|hit| hit.document_id != "late-correction-041")
+        );
+        assert!(
+            report
+                .bm25
+                .hits
+                .iter()
+                .all(|hit| hit.document_id != "other-tenant-001")
+        );
     }
 
     #[test]
@@ -311,10 +314,12 @@ mod tests {
     #[test]
     fn future_observed_backdated_event_is_not_visible_at_earlier_query_cut() {
         let report = run_candidate_fixture_v1(FIXTURE).expect("candidate fixture");
-        assert!(report
-            .bm25
-            .hits
-            .iter()
-            .all(|hit| hit.document_id != "late-correction-041"));
+        assert!(
+            report
+                .bm25
+                .hits
+                .iter()
+                .all(|hit| hit.document_id != "late-correction-041")
+        );
     }
 }
