@@ -128,6 +128,7 @@ pub struct DelayedAciPredictionReceiptV1 {
     pub calibration_model_sha256: String,
     pub alpha_state_used: f64,
     pub feedback_phase: Option<u64>,
+    pub policy_sha256: String,
     pub point_prediction: f64,
     pub interval_lower: f64,
     pub interval_upper: f64,
@@ -163,7 +164,6 @@ pub struct DelayedAciEngineV1 {
     pub calibration_model_sha256: String,
     pub policy: DelayedAciPolicyV1,
     pub policy_sha256: String,
-    pub current_alpha: f64,
     pub prediction_sequence: u64,
     /// Used only by ArrivalOrder mode.
     pub current_alpha: f64,
