@@ -3,9 +3,11 @@ package benchmark
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash"
+	"io"
 	"math"
 	"sort"
 	"strings"
@@ -203,17 +205,44 @@ func ValidateSuite(s Suite) error {
 	return nil
 }
 
-// ComputeSuiteDigest hashes a canonical struct encoding with cases sorted by CaseID.
+// ComputeSuiteDigest uses a domain-separated, length-prefixed encoding with
+// cases sorted by CaseID. The format is independent of JSON serializer behavior.
 // The suite should additionally be signed/custodied independently (MON-026/027).
 func ComputeSuiteDigest(s Suite) (string, error) {
 	if err := ValidateSuite(s); err != nil { return "", err }
-	canonical := s
-	canonical.Cases = append([]CaseSpec(nil), s.Cases...)
-	sort.Slice(canonical.Cases, func(i, j int) bool { return canonical.Cases[i].CaseID < canonical.Cases[j].CaseID })
-	encoded, err := json.Marshal(canonical)
-	if err != nil { return "", err }
-	sum := sha256.Sum256(encoded)
-	return hex.EncodeToString(sum[:]), nil
+	cases := append([]CaseSpec(nil), s.Cases...)
+	sort.Slice(cases, func(i, j int) bool { return cases[i].CaseID < cases[j].CaseID })
+	h := sha256.New()
+	writeSuiteString(h, "MON028-SUITE-ROOT-V1\x00")
+	writeSuiteString(h, s.Profile)
+	writeSuiteString(h, s.Version)
+	writeSuiteString(h, s.CampaignID)
+	writeSuiteString(h, s.BenchmarkID)
+	writeSuiteString(h, strings.ToLower(s.FaultMatrixSHA256))
+	writeSuiteString(h, strings.ToLower(s.OracleSHA256))
+	writeSuiteString(h, strings.ToLower(s.WorkloadSHA256))
+	writeSuiteString(h, strings.ToLower(s.EnvironmentSHA256))
+	writeSuiteString(h, strings.ToLower(s.ResourceBudgetSHA256))
+	writeSuiteUint64(h, uint64(len(cases)))
+	for _, c := range cases {
+		writeSuiteString(h, c.CaseID)
+		writeSuiteString(h, c.FaultID)
+		writeSuiteString(h, c.Family)
+		writeSuiteString(h, string(c.Expected))
+		writeSuiteUint64(h, uint64(c.Replicates))
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func writeSuiteString(h hash.Hash, value string) {
+	writeSuiteUint64(h, uint64(len(value)))
+	_, _ = io.WriteString(h, value)
+}
+
+func writeSuiteUint64(h hash.Hash, value uint64) {
+	var encoded [8]byte
+	binary.BigEndian.PutUint64(encoded[:], value)
+	_, _ = h.Write(encoded[:])
 }
 
 func ScoreRun(s Suite, result CampaignResult) (Score, error) {
