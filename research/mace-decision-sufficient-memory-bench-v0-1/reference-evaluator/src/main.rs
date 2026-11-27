@@ -74,6 +74,7 @@ struct EvaluatorPrivate {
     oracle_action: String,
     attack_case: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     notes: Option<String>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -409,7 +410,7 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, report_p
     let mut scored = Vec::with_capacity(responses.len());
     for ((id, arm), r) in pairs {
         scored.push(score_one(cm[id], pm[id], r)?);
-        if scored.last().is_some_and(|row| row.arm_id != arm) { return Err("response key mismatch".into()); }
+        if scored.last().is_some_and(|row| row.arm_id.as_str() != arm) { return Err("response key mismatch".into()); }
     }
     scored.sort_by(|a,b| (&a.episode_id,&a.arm_id).cmp(&(&b.episode_id,&b.arm_id)));
     let mut arm_groups: BTreeMap<String, Vec<ScoreRow>> = BTreeMap::new();
