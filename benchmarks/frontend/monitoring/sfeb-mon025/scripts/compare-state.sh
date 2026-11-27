@@ -11,8 +11,8 @@ restore_file="$2"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-jq -S . "$source_file" >"$tmp/source.json"
-jq -S . "$restore_file" >"$tmp/restore.json"
+jq -S 'if has("state") then .state else . end' "$source_file" >"$tmp/source.json"
+jq -S 'if has("state") then .state else . end' "$restore_file" >"$tmp/restore.json"
 if diff -u "$tmp/source.json" "$tmp/restore.json"; then
   echo "State manifests match."
 else
