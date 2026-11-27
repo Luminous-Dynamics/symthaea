@@ -269,6 +269,30 @@ func checkBoundaryBindings(in Input,f *flags) {
  bindBoundary("mon024",in.Mon024BoundarySHA256,expected,f)
  if in.OffsetTargetRequired { bindBoundary("mon033",in.Mon033BoundarySHA256,expected,f) }
 }
+func bindEnvelopeBoundary(raw json.RawMessage, digest string) (json.RawMessage, bool) {
+ if len(raw)==0 || !validDigest(digest) { return raw,false }
+ var envelope map[string]json.RawMessage
+ if err:=json.Unmarshal(raw,&envelope);err!=nil || envelope==nil { return raw,false }
+ value,err:=json.Marshal(digest);if err!=nil{return raw,false}
+ envelope["boundary_sha256"]=value
+ encoded,err:=json.Marshal(envelope);if err!=nil{return raw,false}
+ return encoded,true
+}
+func deriveComponentBoundaryBindings(in *Input,digest string) bool {
+ var ok bool
+ if in.Components.TimelineResult,ok=bindEnvelopeBoundary(in.Components.TimelineResult,digest);!ok{return false}
+ if in.Components.ObserverResult,ok=bindEnvelopeBoundary(in.Components.ObserverResult,digest);!ok{return false}
+ if in.Components.ContinuityResult,ok=bindEnvelopeBoundary(in.Components.ContinuityResult,digest);!ok{return false}
+ if in.Components.ProofGraphResult,ok=bindEnvelopeBoundary(in.Components.ProofGraphResult,digest);!ok{return false}
+ if in.OffsetTargetRequired {
+  var proof OffsetProof
+  if err:=json.Unmarshal(in.Components.OffsetProof,&proof);err!=nil||len(in.Components.OffsetProof)==0{return false}
+  proof.BoundarySHA256=digest
+  encoded,err:=json.Marshal(proof);if err!=nil{return false}
+  in.Components.OffsetProof=encoded
+ }
+ return true
+}
 func DeriveFixtureRecordSetDigests(in *Input) bool {
  if in==nil||in.Mode!=OfflineFixture{return false}
  in.SourceEventsSHA256=sourceEventsDigest(in.SourceEvents)
@@ -277,10 +301,12 @@ func DeriveFixtureRecordSetDigests(in *Input) bool {
  in.TopicPartitionsSHA256=topicPartitionsDigest(in.TopicPartitions)
  in.RequiredSurfaceIDsSHA256=surfaceIDsDigest(in.RequiredSurfaceIDs)
  in.SurfaceAssertionsSHA256=surfaceAssertionsDigest(in.Surfaces)
+ if !recoveryBoundaryComplete(in.Boundary){return false}
  digest:=recoveryBoundaryDigest(in.Boundary)
  in.SourceTruthBoundarySHA256=digest;in.ObservedCaptureBoundarySHA256=digest;in.TransactionReportBoundarySHA256=digest;in.SurfaceInventoryBoundarySHA256=digest
  in.Mon034BoundarySHA256=digest;in.Mon035BoundarySHA256=digest;in.Mon036BoundarySHA256=digest;in.Mon024BoundarySHA256=digest
  if in.OffsetTargetRequired { in.Mon033BoundarySHA256=digest }
+ if !deriveComponentBoundaryBindings(in,digest){return false}
  return true
 }
 func checkRecordManifest(label string,complete bool,artifactSHA,recordsSHA,expectedSHA string,f *flags) {
@@ -347,7 +373,7 @@ func Evaluate(in Input)Result{
  for _,n:=range names[:8]{out.Components=append(out.Components,status(n,fs[n]))}
  domain:=newFlags();merge(domain,fs["shared_recovery_boundary"],"shared_recovery_boundary");for _,n:=range names[:8]{merge(domain,fs[n],n)};out.ComponentVerdict=domain.verdict()
  checkProofGraph(in,out.ComponentVerdict,fs["mon024_proof_graph"]);out.Components=append(out.Components,status("mon024_proof_graph",fs["mon024_proof_graph"]))
- final:=newFlags();merge(final,global,"input");for _,n:=range names{merge(final,fs[n],n)}
+ final:=newFlags();merge(final,global,"input");merge(final,fs["shared_recovery_boundary"],"shared_recovery_boundary");for _,n:=range names{merge(final,fs[n],n)}
  if in.Mode==OfflineFixture{final.hold("offline_fixture_cannot_qualify_live_recovery")}
  if in.Mode==RuntimeCandidate{final.hold("runtime_attestation_adapter_not_implemented")}
  out.CampaignVerdict=final.verdict()
