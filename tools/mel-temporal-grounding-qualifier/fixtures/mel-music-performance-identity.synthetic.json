@@ -21,7 +21,7 @@
       "clean": {
         "response": {
           "variant_id": "item-01-clean",
-          "audio_sha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -38,7 +38,7 @@
       "performance_stay": {
         "response": {
           "variant_id": "item-01-performance-stay",
-          "audio_sha256": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -55,7 +55,7 @@
       "musical_flip": {
         "response": {
           "variant_id": "item-01-musical-flip",
-          "audio_sha256": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -86,7 +86,7 @@
       "clean": {
         "response": {
           "variant_id": "item-02-clean",
-          "audio_sha256": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -103,7 +103,7 @@
       "performance_stay": {
         "response": {
           "variant_id": "item-02-performance-stay",
-          "audio_sha256": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -120,7 +120,7 @@
       "musical_flip": {
         "response": {
           "variant_id": "item-02-musical-flip",
-          "audio_sha256": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -151,7 +151,7 @@
       "clean": {
         "response": {
           "variant_id": "item-03-clean",
-          "audio_sha256": "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -168,7 +168,7 @@
       "performance_stay": {
         "response": {
           "variant_id": "item-03-performance-stay",
-          "audio_sha256": "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -185,7 +185,7 @@
       "musical_flip": {
         "response": {
           "variant_id": "item-03-musical-flip",
-          "audio_sha256": "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -216,7 +216,7 @@
       "clean": {
         "response": {
           "variant_id": "item-04-clean",
-          "audio_sha256": "JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ",
+          "audio_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -233,7 +233,7 @@
       "performance_stay": {
         "response": {
           "variant_id": "item-04-performance-stay",
-          "audio_sha256": "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK",
+          "audio_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -250,7 +250,7 @@
       "musical_flip": {
         "response": {
           "variant_id": "item-04-musical-flip",
-          "audio_sha256": "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+          "audio_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -281,7 +281,7 @@
       "clean": {
         "response": {
           "variant_id": "item-05-clean",
-          "audio_sha256": "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM",
+          "audio_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -298,7 +298,7 @@
       "performance_stay": {
         "response": {
           "variant_id": "item-05-performance-stay",
-          "audio_sha256": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+          "audio_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -315,7 +315,7 @@
       "musical_flip": {
         "response": {
           "variant_id": "item-05-musical-flip",
-          "audio_sha256": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+          "audio_sha256": "000000000000000000000000000000000000000000000000000000000000000f",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -346,7 +346,7 @@
       "clean": {
         "response": {
           "variant_id": "item-06-clean",
-          "audio_sha256": "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000010",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -363,7 +363,7 @@
       "performance_stay": {
         "response": {
           "variant_id": "item-06-performance-stay",
-          "audio_sha256": "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -380,7 +380,7 @@
       "musical_flip": {
         "response": {
           "variant_id": "item-06-musical-flip",
-          "audio_sha256": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000012",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -411,7 +411,7 @@
       "clean": {
         "response": {
           "variant_id": "item-07-clean",
-          "audio_sha256": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000013",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -428,7 +428,7 @@
       "performance_stay": {
         "response": {
           "variant_id": "item-07-performance-stay",
-          "audio_sha256": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000014",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -445,7 +445,7 @@
       "musical_flip": {
         "response": {
           "variant_id": "item-07-musical-flip",
-          "audio_sha256": "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -476,7 +476,7 @@
       "clean": {
         "response": {
           "variant_id": "item-08-clean",
-          "audio_sha256": "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000016",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -493,7 +493,7 @@
       "performance_stay": {
         "response": {
           "variant_id": "item-08-performance-stay",
-          "audio_sha256": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000017",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
@@ -510,7 +510,7 @@
       "musical_flip": {
         "response": {
           "variant_id": "item-08-musical-flip",
-          "audio_sha256": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+          "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
           "question": "Is the target musical property the same?",
           "question_sha256": "18b01d76b45bfc01faca730320be2e4cb67d6cbb52e50292300bc14f8cf447ad",
           "option_a_relation": "Same",
