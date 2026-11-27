@@ -813,6 +813,27 @@ mod tests {
         }
     }
 
+    fn question_for(target_property: MusicalTargetPropertyV1) -> &'static str {
+        match target_property {
+            MusicalTargetPropertyV1::ChordQuality => "Are these chord qualities the same?",
+            MusicalTargetPropertyV1::RootPitchClass => "Do these clips share the same chord root pitch class?",
+            MusicalTargetPropertyV1::ChordVoicing => "Do these chords have the same voicing?",
+            MusicalTargetPropertyV1::RelativeIntervalSequence => {
+                "Is the ordered melodic interval sequence the same?"
+            }
+            MusicalTargetPropertyV1::MelodicContour => {
+                "Is the melodic contour the same?"
+            }
+            MusicalTargetPropertyV1::RhythmicRatioPattern => {
+                "Is the rhythmic ratio pattern the same?"
+            }
+            MusicalTargetPropertyV1::PulseRate => "Is the pulse rate the same?",
+            MusicalTargetPropertyV1::InstrumentFamily => {
+                "Are these performances from the same instrument family?"
+            }
+        }
+    }
+
     fn triad(
         item_id: &str,
         target_property: MusicalTargetPropertyV1,
@@ -823,17 +844,18 @@ mod tests {
     ) -> PerformanceTriadV1 {
         let clean_condition = digest('1');
         let stay_condition = digest('2');
+        let question = question_for(target_property);
         let clean = variant(
             &format!("{item_id}-clean"),
             &digest('a'),
-            "Are the chord qualities the same?",
+            question,
             MusicalRelationV1::Same,
             MusicListenAnswerV1::ChoiceA,
         );
         let performance_stay = variant(
             &format!("{item_id}-performance-stay"),
             &digest('b'),
-            "Are the chord qualities the same?",
+            question,
             MusicalRelationV1::Same,
             if stay_correct {
                 MusicListenAnswerV1::ChoiceA
@@ -844,7 +866,7 @@ mod tests {
         let musical_flip = variant(
             &format!("{item_id}-musical-flip"),
             &digest('c'),
-            "Are the chord qualities the same?",
+            question,
             MusicalRelationV1::Different,
             if flip_correct {
                 MusicListenAnswerV1::ChoiceB
@@ -1040,29 +1062,6 @@ mod tests {
             true,
         )]);
         assert!(audit_performance_invariance_case(&input).is_err());
-    }
-
-    #[test]
-    fn performance_identity_only_admits_acoustic_not_performance_changes_as_stay() {
-        let acoustic = case(vec![triad(
-            "performance-identity",
-            MusicalTargetPropertyV1::PerformanceIdentity,
-            PerformanceVariationFactorV1::Hiss,
-            MusicalChangeFactorV1::PerformanceIdentity,
-            true,
-            true,
-        )]);
-        assert!(audit_performance_invariance_case(&acoustic).is_ok());
-
-        let new_take = case(vec![triad(
-            "performance-identity-new-take",
-            MusicalTargetPropertyV1::PerformanceIdentity,
-            PerformanceVariationFactorV1::DifferentTake,
-            MusicalChangeFactorV1::PerformanceIdentity,
-            true,
-            true,
-        )]);
-        assert!(audit_performance_invariance_case(&new_take).is_err());
     }
 
     #[test]
