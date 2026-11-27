@@ -11,9 +11,13 @@ The benchmark is motivated by Abbas, Zia and Windridge, “Cited but Unused: Par
 ## Files
 
 - CEDAR_BENCH_V0_TEMPLATES.json — 20 synthetic task templates, source aliases and intervention definitions.
-- scripts/generate_cedar_bench.py — expands templates using a per-run secret seed; writes candidate inputs and auditor key to separate files.
+- scripts/generate_cedar_bench.py — expands a selected split using a per-run secret seed; writes candidate inputs and auditor key to separate files.
 - scripts/validate_cedar_bench_templates.py — standard-library-only template contract checker.
 - scripts/validate_cedar_bench_streams.py — checks generated candidate/auditor stream separation, source hashes and paired intervention semantics.
+
+## Split isolation
+
+Templates are assigned by task family to disjoint train (10), development (5) and sealed-test (5) groups. The generator defaults to `sealed_test`; pass `train`, `development` or `sealed_test` as the third argument to select a split. `all` exists only for the non-scoring CI smoke test. The candidate output does not disclose split labels; the auditor stream records them. Do not expose the sealed-test family templates or seed during candidate development.
 
 ## Separation of duties
 
