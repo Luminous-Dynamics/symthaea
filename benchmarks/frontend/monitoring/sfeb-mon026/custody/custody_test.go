@@ -358,3 +358,31 @@ func TestFutureArtifactCollectionTimeIsIndeterminate(t *testing.T) {
 		t.Fatalf("future artifact time must remain indeterminate: %+v", r)
 	}
 }
+
+func TestCaptureOrderingUsesCombinedClockUncertainty(t *testing.T) {
+	root, m, _, private, policy := testFixture(t)
+	m.ClockUncertaintyNS = int64(10 * time.Millisecond)
+	m.Artifacts[0].ClockUncertaintyNS = int64(10 * time.Millisecond)
+	m.Artifacts[0].CollectedAt = m.CapturedAt.Add(15 * time.Millisecond)
+	if err := SignManifest(&m, "custody-key-1", private); err != nil {
+		t.Fatal(err)
+	}
+	r := VerifyBundle(root, m, policy)
+	if r.Verdict != VerdictQualified {
+		t.Fatalf("15ms ordering difference fits the combined 20ms clock uncertainty: %+v", r)
+	}
+}
+
+func TestCaptureOrderingOutsideCombinedClockUncertaintyIsIndeterminate(t *testing.T) {
+	root, m, _, private, policy := testFixture(t)
+	m.ClockUncertaintyNS = int64(10 * time.Millisecond)
+	m.Artifacts[0].ClockUncertaintyNS = int64(10 * time.Millisecond)
+	m.Artifacts[0].CollectedAt = m.CapturedAt.Add(25 * time.Millisecond)
+	if err := SignManifest(&m, "custody-key-1", private); err != nil {
+		t.Fatal(err)
+	}
+	r := VerifyBundle(root, m, policy)
+	if r.Verdict != VerdictIndeterminate || !hasReason(r, "artifact_collected_after_manifest_capture") {
+		t.Fatalf("25ms ordering difference exceeds combined 20ms clock uncertainty: %+v", r)
+	}
+}
