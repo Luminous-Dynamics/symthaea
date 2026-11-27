@@ -40,7 +40,8 @@
         "positive_control_effect",
         "cross_context_isolation",
         "erasure_restore",
-        "store_only_boundary"
+        "store_only_boundary",
+        "counterfactual_repair_replay"
       ]
     },
     "sut_boundary": {
@@ -208,7 +209,9 @@
               "restore_attempt",
               "witness_reconciliation",
               "post_restore_read",
-              "clean_task"
+              "clean_task",
+              "counterfactual_replay",
+              "residual_influence_check"
             ]
           },
           "actor": {
@@ -259,7 +262,9 @@
               "reconciled",
               "not_served",
               "clean_task_passed",
-              "unknown"
+              "unknown",
+              "residual_influence_detected",
+              "residual_influence_absent"
             ]
           },
           "record_ids": {
@@ -352,7 +357,9 @@
               "erasure_survives_stale_restore",
               "complete_deletion_not_inferred_from_t10",
               "store_only_does_not_claim_agent_action",
-              "native_scores_not_blended"
+              "native_scores_not_blended",
+              "causal_memory_effect_supported_by_counterfactual",
+              "residual_influence_absent_after_repair"
             ]
           },
           "status": {
@@ -382,7 +389,9 @@
         "cross_context_access_denied",
         "erasure_reconciled",
         "store_only_observation_only",
-        "not_evaluable"
+        "not_evaluable",
+        "counterfactual_memory_effect_attributable",
+        "residual_influence_absent_after_repair"
       ]
     },
     "notes": {
