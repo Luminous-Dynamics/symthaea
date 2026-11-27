@@ -34,5 +34,107 @@
     "grid_normalization_absolute": 1e-9,
     "scalar_marginalization_absolute": 1e-9
   },
-  "claim_boundary": "Synthetic numerical reference only; not a physical measurement, hosted CI, or SOTA result."
+  "claim_boundary": "Synthetic numerical reference only; not physical measurement, hosted CI, or SOTA evidence.",
+  "rank_deficient_cases": [
+    {
+      "id": "duplicate-channels-rank-one",
+      "covariance": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "lower": [
+        0,
+        0
+      ],
+      "upper": [
+        1,
+        1
+      ],
+      "probability": 0.3413447460685429,
+      "support_rank": 1
+    },
+    {
+      "id": "perfect-anticorrelation-rank-one",
+      "covariance": [
+        [
+          1,
+          -1
+        ],
+        [
+          -1,
+          1
+        ]
+      ],
+      "lower": [
+        0,
+        -1
+      ],
+      "upper": [
+        1,
+        0
+      ],
+      "probability": 0.3413447460685429,
+      "support_rank": 1
+    },
+    {
+      "id": "one-deterministic-channel",
+      "covariance": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "mean": [
+        2,
+        0
+      ],
+      "lower": [
+        1,
+        -0.5
+      ],
+      "upper": [
+        2,
+        0.5
+      ],
+      "probability": 0.3829249225480262,
+      "support_rank": 1
+    },
+    {
+      "id": "rank-zero-point-inside",
+      "covariance": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "mean": [
+        0,
+        2
+      ],
+      "lower": [
+        -1,
+        1
+      ],
+      "upper": [
+        0,
+        3
+      ],
+      "probability": 1,
+      "support_rank": 0
+    }
+  ]
 }
