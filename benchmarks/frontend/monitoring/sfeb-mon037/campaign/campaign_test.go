@@ -22,6 +22,10 @@ func fixture()Input{
  return Input{
   Profile:Profile,Version:Version,TrialID:"trial-001",ScenarioID:"MON037-P001",Mode:OfflineFixture,EvaluatedAt:now,
   RequiredClaimIDs:[]string{"claim-cdc","claim-backup"},
+  RequiredSurfaceIDs:[]string{"heap","index","large-object"},
+  SourceTruthComplete:true,SourceTruthManifestSHA256:da,
+  ObservedCaptureComplete:true,ObservedCaptureManifestSHA256:db,
+  TransactionReportComplete:true,TransactionReportSHA256:dc,
   SourceEvents:events,ObservedEvents:events,
   TopicPartitions:[]TopicPartition{{Topic:"ledger",PartitionCount:1},{Topic:"message",PartitionCount:1}},
   Transactions:[]TransactionProof{{TransactionID:"tx-1",ExpectedEventCount:2,BeginObserved:true,EndObserved:true,EndEventCount:2,DataCollections:map[string]int{"public.ledger":1,"LOGICAL_DECODING_MESSAGE":1}}},
@@ -100,9 +104,9 @@ func TestOffsetPredicateMismatchBlocks(t *testing.T){
  in.Components.OffsetProof=raw(p);expect(t,in,Blocked)
 }
 func TestSurfaceDigestMismatchBlocks(t *testing.T){in:=fixture();in.Surfaces[0].RestoredSHA256=dc;expect(t,in,Blocked)}
-func TestFullStateExclusionBlocks(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded"});expect(t,in,Blocked)}
-func TestRowStreamAllowsExplicitExclusion(t *testing.T){in:=fixture();in.SurfaceScope="row_stream";in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded"});expect(t,in,Qualified)}
-func TestUnknownSurfaceIsIndeterminate(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"unknown",Disposition:"unknown"});expect(t,in,Indeterminate)}
+func TestFullStateExclusionBlocks(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");expect(t,in,Blocked)}
+func TestRowStreamAllowsExplicitExclusion(t *testing.T){in:=fixture();in.SurfaceScope="row_stream";in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded",ExclusionManifestSHA256:da});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");expect(t,in,Qualified)}
+func TestUnknownSurfaceIsIndeterminate(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"unknown",Disposition:"unknown"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"unknown");expect(t,in,Indeterminate)}
 func TestOldPrimaryUnfencedBlocks(t *testing.T){in:=fixture();in.RestoreChecks["old_primary_fenced"]="failed";expect(t,in,Blocked)}
 func TestMissingRestoreCheckIsIndeterminate(t *testing.T){in:=fixture();delete(in.RestoreChecks,"application_write_readback");expect(t,in,Indeterminate)}
 func TestTrafficAlreadyEnabledBlocks(t *testing.T){in:=fixture();in.TrafficCurrentlyEnabled=true;got:=Evaluate(in);if got.CampaignVerdict!=Blocked||got.TrafficActivationPermitted{t.Fatalf("unsafe traffic not blocked: %+v",got)}}
@@ -135,4 +139,34 @@ func BenchmarkEvaluate1000Events100Transactions(b *testing.B){
  }
  b.ReportAllocs();b.ResetTimer()
  for n:=0;n<b.N;n++{if Evaluate(in).ComponentVerdict!=Qualified{b.Fatal("benchmark fixture failed")}}
+}
+
+
+func TestIncompleteSourceTruthAndTopicCaptureAreIndeterminate(t *testing.T) {
+	in := fixture()
+	in.SourceTruthComplete = false
+	expect(t, in, Indeterminate)
+	in = fixture()
+	in.ObservedCaptureComplete = false
+	expect(t, in, Indeterminate)
+	in = fixture()
+	in.TransactionReportComplete = false
+	expect(t, in, Indeterminate)
+}
+
+func TestMissingRequiredSurfaceIsIndeterminate(t *testing.T) {
+	in := fixture()
+	in.Surfaces = in.Surfaces[:2]
+	got := Evaluate(in)
+	if got.ComponentVerdict != Indeterminate {
+		t.Fatalf("omitted required surface must remain indeterminate: %+v", got)
+	}
+}
+
+func TestRowStreamExclusionRequiresManifest(t *testing.T) {
+	in := fixture()
+	in.SurfaceScope = "row_stream"
+	in.Surfaces = append(in.Surfaces, Surface{ID:"generated", Disposition:"excluded"})
+	in.RequiredSurfaceIDs = append(in.RequiredSurfaceIDs, "generated")
+	expect(t, in, Indeterminate)
 }
