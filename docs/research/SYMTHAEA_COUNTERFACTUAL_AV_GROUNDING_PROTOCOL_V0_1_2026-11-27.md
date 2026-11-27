@@ -131,6 +131,19 @@ This protocol should become an evidence-gated benchmark lane:
 
 Symthaea proposes and records a decision; the evaluator controls the counterfactual pair and independently computes correctness.
 
+## 9. Machine-readable paired-item contract (2026-11-27)
+
+Two companion artifacts define a reproducible manifest format:
+
+- `SYMTHAEA_AV_COUNTERFACTUAL_ITEM_SCHEMA_V1_2026-11-27.json`: Draft 2020-12 schema for condition types, audio/video payload digests, timing profiles, cue annotations, task family, and expected decisions.
+- `SYMTHAEA_AV_COUNTERFACTUAL_ITEM_FIXTURES_V1_2026-11-27.json`: one six-condition turn-yield example plus four negative cross-condition cases.
+
+The six conditions include AV-positive, AV-counterfactual, irrelevant visual control, audio-only, video-only, and temporally shuffled AV. The same baseline audio digest is declared for all audio-bearing conditions. Video conditions share an identical timing profile in the positive fixture.
+
+JSON Schema validates record shape. A paired-item verifier must separately compare audio digests, video timing profiles, cue intervals against clip duration, and the requirement for decision-relevant visual annotations. Those cross-condition checks are intentionally not misrepresented as JSON Schema capabilities.
+
+The fixture manifest contains hashes and annotations only; it does not include raw audio/video, identity, or biometric data. The schema/fixtures have been authored and should next be run through an independent Draft 2020-12 validator and paired-invariant verifier.
+
 ## 9. Qualification status
 
 This protocol is a proposed benchmark lane. No paired dataset, annotation set, runtime harness, counterfactual run, or Symthaea score has been produced by this document.
