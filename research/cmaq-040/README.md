@@ -38,6 +38,8 @@ The weights telescope to one. For one feature/direction/rate tuple, its restarte
 
 It starts at one. It is a normalized mixture of nonnegative e-processes, not a fresh unit of wealth added at each round. Under the null, the conditional expectation of the new active wealth plus residual cash equals the previous total wealth.
 
+The implementation evaluates the tiny restart increment with ln1p(1/(t+1)) / (ln(t+1) ln(t+2)), an algebraically equivalent form that avoids subtractive cancellation at very large horizons. It includes an extreme-index regression test through the u64 time boundary.
+
 The implementation uses the exact scalar recurrence
 
     A_t = (A_{t-1} + rho_t) * f_t
