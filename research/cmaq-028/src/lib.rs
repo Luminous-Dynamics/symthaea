@@ -136,8 +136,6 @@ pub fn assess_recovery_portfolio(
     }
 
     let mut per_prefix: Vec<Vec<SelectedRecoveryOption>> = Vec::new();
-    let mut min_count = usize::MAX;
-    let mut weakest_step = 0u32;
     let mut first_deficient_step = None;
 
     for prefix in &request.prefixes {
@@ -148,12 +146,7 @@ pub fn assess_recovery_portfolio(
             prefix.reachable_error_bound_units,
             prefix.step,
         );
-        let count = eligible.len();
-        if count < min_count {
-            min_count = count;
-            weakest_step = prefix.step;
-        }
-        if count < required_independent_options && first_deficient_step.is_none() {
+        if eligible.len() < required_independent_options && first_deficient_step.is_none() {
             first_deficient_step = Some(prefix.step);
         }
         per_prefix.push(eligible);
@@ -164,8 +157,8 @@ pub fn assess_recovery_portfolio(
         return Ok(assessment_from_options(
             PortfolioDisposition::NoAdmissibleRecoveryPortfolio,
             required_independent_options,
-            min_count,
-            weakest_step,
+            current_options.len(),
+            0,
             0,
             current_options,
             options,
@@ -173,29 +166,20 @@ pub fn assess_recovery_portfolio(
     }
 
     let final_step = request.prefixes.last().expect("non-empty prefixes").step;
+    let initial_prefix = &request.prefixes[0];
     let max_dwell = options
         .iter()
         .filter(|option| {
             option.plant_model_sha256 == request.plant_model_sha256
-                && option.entry_radius_units >= 0
+                && option.context_scope_sha256 == initial_prefix.context_scope_sha256
+                && initial_prefix.reachable_error_bound_units <= option.entry_radius_units
         })
         .map(|option| option.max_high_performance_dwell_steps)
         .max()
         .unwrap_or(0);
     let allowed_limit = final_step.min(max_dwell);
 
-    let stop = match first_deficient_step {
-        Some(0) => {
-            return Ok(assessment_from_options(
-                PortfolioDisposition::NoAdmissibleRecoveryPortfolio,
-                required_independent_options,
-                min_count,
-                weakest_step,
-                0,
-                current_options,
-                options,
-            ));
-        }
+    match first_deficient_step {
         Some(step) if step <= allowed_limit => {
             let last_safe = step - 1;
             let selected = &per_prefix[last_safe as usize];
@@ -209,10 +193,12 @@ pub fn assess_recovery_portfolio(
                     reassess_before_any_further_commitment: false,
                 }
             };
+            let (minimum, weakest_step) =
+                minimum_option_count_through(&per_prefix, last_safe);
             return Ok(assessment_from_options(
                 disposition,
                 required_independent_options,
-                min_count,
+                minimum,
                 weakest_step,
                 last_safe,
                 selected,
@@ -220,7 +206,7 @@ pub fn assess_recovery_portfolio(
             ));
         }
         _ => {}
-    };
+    }
 
     let (last_safe, reason, reassess) = if max_dwell <= final_step {
         (
@@ -235,6 +221,7 @@ pub fn assess_recovery_portfolio(
             true,
         )
     };
+    let (minimum, weakest_step) = minimum_option_count_through(&per_prefix, last_safe);
     let disposition = PortfolioDisposition::CommitPrefix {
         last_safe_commit_step: last_safe,
         switch_no_later_than_step: max_dwell,
@@ -244,12 +231,25 @@ pub fn assess_recovery_portfolio(
     Ok(assessment_from_options(
         disposition,
         required_independent_options,
-        min_count,
+        minimum,
         weakest_step,
         last_safe,
         &per_prefix[last_safe as usize],
         options,
     ))
+}
+
+fn minimum_option_count_through(
+    per_prefix: &[Vec<SelectedRecoveryOption>],
+    last_step: u32,
+) -> (usize, u32) {
+    per_prefix
+        .iter()
+        .take(last_step as usize + 1)
+        .enumerate()
+        .map(|(step, options)| (options.len(), step as u32))
+        .min_by_key(|(count, _)| *count)
+        .unwrap_or((0, 0))
 }
 
 fn empty_assessment(
