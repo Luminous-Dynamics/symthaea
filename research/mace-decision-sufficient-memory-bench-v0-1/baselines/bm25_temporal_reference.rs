@@ -595,7 +595,7 @@ fn lineage_cycle_components(
         }
 
         let has_self_loop =
-            component.len() == 1 && adjacency[start].iter().any(|&neighbor| neighbor == start);
+            component.len() == 1 && adjacency[start].contains(&start);
         if component.len() > 1 || has_self_loop {
             component.sort();
             components.push(component);
