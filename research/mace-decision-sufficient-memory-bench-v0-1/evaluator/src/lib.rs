@@ -857,6 +857,18 @@ fn valid_run_score_v1(score: &RunScoreV1) -> bool {
         || retrieved_partition != Some(score.returned_evidence_count)
         || selected_partition != Some(score.decision_support_evidence_count)
         || score.decision_support_evidence_count > score.returned_evidence_count
+        || score.admissible_decision_support_evidence_count
+            > score.admissible_returned_evidence_count
+        || score.inadmissible_decision_support_evidence_count
+            > score.inadmissible_returned_evidence_count
+        || score.decision_support_distinct_source_family_count
+            > score.retrieved_distinct_source_family_count
+        || score.decision_support_unknown_source_family_count
+            > score.retrieved_unknown_source_family_count
+        || score.decision_support_distinct_source_root_count
+            > score.retrieved_distinct_source_root_count
+        || score.decision_support_unknown_source_root_count
+            > score.retrieved_unknown_source_root_count
         || !valid_ratio_v1(score.admissible_evidence_precision, Some(score.returned_evidence_count))
         || !valid_ratio_v1(
             score.decision_support_evidence_precision,
@@ -1171,6 +1183,17 @@ mod tests {
             &run("no-memory", "abstain", &[]),
         ).expect("valid paired result");
         paired.memory.inadmissible_returned_evidence_count += 1;
+        assert_eq!(validate_paired_score(&paired), Err(EvaluationErrorV1::InvalidPairedScore));
+    }
+
+    #[test]
+    fn paired_validation_rejects_decision_support_metrics_exceeding_retrieval() {
+        let mut paired = score_paired(
+            &case(),
+            &run("mace", "hold", &["signed-current", "expired-account"]),
+            &run("no-memory", "abstain", &[]),
+        ).expect("valid paired result");
+        paired.memory.decision_support_distinct_source_root_count += 1;
         assert_eq!(validate_paired_score(&paired), Err(EvaluationErrorV1::InvalidPairedScore));
     }
 
