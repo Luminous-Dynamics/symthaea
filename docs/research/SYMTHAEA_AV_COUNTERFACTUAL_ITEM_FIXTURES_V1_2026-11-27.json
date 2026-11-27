@@ -1,0 +1,188 @@
+{
+  "schema": "symthaea.av-counterfactual-fixtures.v1",
+  "positive": [
+    {
+      "name": "turn-yield-counterfactual-pair",
+      "expected": "accept",
+      "item": {
+        "schema": "symthaea.av-counterfactual-item.v1",
+        "item_id": "av-turn-yield-001",
+        "pair_id": "pair-turn-yield-001",
+        "task_family": "turn_floor_state",
+        "task_requires_visual_evidence": true,
+        "baseline_audio_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "baseline_timing_profile": {
+          "duration_ms": 5000,
+          "frame_count": 150,
+          "width": 640,
+          "height": 360,
+          "fps_numerator": 30,
+          "fps_denominator": 1
+        },
+        "gold_decision": "yield",
+        "gold_decision_when_visual_counterfactual": "continue",
+        "conditions": [
+          {
+            "condition_id": "av-positive",
+            "condition_type": "av_positive",
+            "audio_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "video_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "timing_profile": {
+              "duration_ms": 5000,
+              "frame_count": 150,
+              "width": 640,
+              "height": 360,
+              "fps_numerator": 30,
+              "fps_denominator": 1
+            },
+            "visual_variant": "cue_present",
+            "annotated_visual_cue": {
+              "cue_type": "turn_yield",
+              "start_ms": 1000,
+              "end_ms": 1400,
+              "task_relevance": true
+            },
+            "expected_decision": "yield",
+            "model_visible_payloads": [
+              "audio",
+              "video"
+            ]
+          },
+          {
+            "condition_id": "av-counterfactual",
+            "condition_type": "av_counterfactual",
+            "audio_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "video_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "timing_profile": {
+              "duration_ms": 5000,
+              "frame_count": 150,
+              "width": 640,
+              "height": 360,
+              "fps_numerator": 30,
+              "fps_denominator": 1
+            },
+            "visual_variant": "cue_removed",
+            "annotated_visual_cue": null,
+            "expected_decision": "continue",
+            "model_visible_payloads": [
+              "audio",
+              "video"
+            ]
+          },
+          {
+            "condition_id": "av-irrelevant",
+            "condition_type": "av_irrelevant_control",
+            "audio_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "video_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "timing_profile": {
+              "duration_ms": 5000,
+              "frame_count": 150,
+              "width": 640,
+              "height": 360,
+              "fps_numerator": 30,
+              "fps_denominator": 1
+            },
+            "visual_variant": "irrelevant_appearance_change",
+            "annotated_visual_cue": {
+              "cue_type": "turn_yield",
+              "start_ms": 1000,
+              "end_ms": 1400,
+              "task_relevance": true
+            },
+            "expected_decision": "yield",
+            "model_visible_payloads": [
+              "audio",
+              "video"
+            ]
+          },
+          {
+            "condition_id": "audio-only",
+            "condition_type": "audio_only",
+            "audio_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "video_digest": null,
+            "timing_profile": null,
+            "visual_variant": "none",
+            "annotated_visual_cue": null,
+            "expected_decision": "continue",
+            "model_visible_payloads": [
+              "audio"
+            ]
+          },
+          {
+            "condition_id": "video-only",
+            "condition_type": "video_only",
+            "audio_digest": null,
+            "video_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "timing_profile": {
+              "duration_ms": 5000,
+              "frame_count": 150,
+              "width": 640,
+              "height": 360,
+              "fps_numerator": 30,
+              "fps_denominator": 1
+            },
+            "visual_variant": "cue_present",
+            "annotated_visual_cue": {
+              "cue_type": "turn_yield",
+              "start_ms": 1000,
+              "end_ms": 1400,
+              "task_relevance": true
+            },
+            "expected_decision": "yield",
+            "model_visible_payloads": [
+              "video"
+            ]
+          },
+          {
+            "condition_id": "av-shuffled",
+            "condition_type": "av_temporally_shuffled",
+            "audio_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "video_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "timing_profile": {
+              "duration_ms": 5000,
+              "frame_count": 150,
+              "width": 640,
+              "height": 360,
+              "fps_numerator": 30,
+              "fps_denominator": 1
+            },
+            "visual_variant": "temporally_shuffled",
+            "annotated_visual_cue": {
+              "cue_type": "turn_yield",
+              "start_ms": 3500,
+              "end_ms": 3900,
+              "task_relevance": false
+            },
+            "expected_decision": "continue",
+            "model_visible_payloads": [
+              "audio",
+              "video"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "audio-bytes-differ-across-counterfactual-pair",
+      "expected_rejection": "audio_digest_mismatch",
+      "mutation": "Change av-counterfactual audio_digest to a new valid 64-character digest."
+    },
+    {
+      "name": "video-timing-profile-mismatch",
+      "expected_rejection": "video_timing_profile_mismatch",
+      "mutation": "Change the av-counterfactual frame_count to 149 while retaining the same pair_id."
+    },
+    {
+      "name": "cue-interval-exceeds-video-duration",
+      "expected_rejection": "cue_interval_out_of_bounds",
+      "mutation": "Set av-positive cue end_ms to 6000 when duration_ms is 5000."
+    },
+    {
+      "name": "task-requires-visual-evidence-but-no-positive-cue",
+      "expected_rejection": "missing_decision_relevant_visual_cue",
+      "mutation": "Set task_requires_visual_evidence=true but remove the positive visual cue annotation."
+    }
+  ]
+}
