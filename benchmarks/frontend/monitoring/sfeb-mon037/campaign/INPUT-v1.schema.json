@@ -29,7 +29,9 @@
     "observed_capture_complete",
     "observed_capture_manifest_sha256",
     "transaction_report_complete",
-    "transaction_report_sha256"
+    "transaction_report_sha256",
+    "surface_inventory_complete",
+    "surface_inventory_sha256"
   ],
   "properties": {
     "profile": {
@@ -262,6 +264,12 @@
       "type": "boolean"
     },
     "transaction_report_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "surface_inventory_complete": {
+      "type": "boolean"
+    },
+    "surface_inventory_sha256": {
       "$ref": "#/$defs/digest"
     }
   },
