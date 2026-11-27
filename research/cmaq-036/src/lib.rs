@@ -210,13 +210,12 @@ pub fn build_common_cause_closure(
             let identity = (key.kind, key.value.clone());
             if let Some(previous_receipt) =
                 local_keys.insert(identity.clone(), key.receipt_sha256.clone())
+                && previous_receipt != key.receipt_sha256
             {
-                if previous_receipt != key.receipt_sha256 {
-                    return Err(ClosureError::ConflictingDependenceReceipt {
-                        kind: key.kind,
-                        value: key.value.clone(),
-                    });
-                }
+                return Err(ClosureError::ConflictingDependenceReceipt {
+                    kind: key.kind,
+                    value: key.value.clone(),
+                });
             }
         }
 
