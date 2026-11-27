@@ -34,7 +34,7 @@ The candidate must not receive assignment receipts, evaluator outcome receipts, 
 - Added lifecycle cost = exposed cost minus ablated cost.
 - Average episode-pair effects within each independent profile cluster first.
 - Bootstrap profile-cluster means with a deterministic SplitMix64 stream, 2,000 percentile replicates, and 95% bounds.
-- Report subgroup effects by population stratum.
+- Report subgroup utility and regret effects, 95% profile-cluster bootstrap intervals, and independent profile-cluster counts by population stratum.
 - Report privacy violations, unauthorized actions and erasure resurrections as non-compensable hard gates. Utility cannot offset them; no composite score is formed.
 
 A minimum of 30 independent profile clusters is the prospective confirmatory floor. Fewer clusters are exploratory; the code reports this floor rather than silently inflating sample size with repeated episodes.
@@ -49,7 +49,7 @@ The ablation mode is homogeneous within one analysis. Do not pool deletion and n
 
 ## Metrics and prospective targets
 
-Keep conventional memory accuracy and latency separate from this intervention report. It adds paired utility and regret effects with profile-cluster intervals, decision-change rate, added end-to-end cost, per-stratum effects, independent profile-cluster count and privacy/authority/erasure hard gates.
+Keep conventional memory accuracy and latency separate from this intervention report. It adds paired utility and regret effects with profile-cluster intervals, decision-change rate, added end-to-end cost, per-stratum utility/regret effects with confidence intervals and cluster counts, independent profile-cluster count and privacy/authority/erasure hard gates.
 
 Prospective target: positive utility and regret-reduction lower 95% cluster-bootstrap bounds, no worst-stratum regression, zero hard-gate violations, and lower user/compute burden than an equivalent active-reobservation strategy. These are targets, not achieved results.
 
