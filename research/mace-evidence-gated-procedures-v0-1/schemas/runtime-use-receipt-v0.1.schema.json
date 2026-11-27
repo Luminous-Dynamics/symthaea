@@ -468,6 +468,100 @@
                 ]
               }
             }
+          },
+          "applicability": {
+            "properties": {
+              "matched": {
+                "const": true
+              }
+            },
+            "required": [
+              "matched"
+            ]
+          },
+          "authorization": {
+            "properties": {
+              "authorized": {
+                "const": true
+              }
+            },
+            "required": [
+              "authorized"
+            ]
+          },
+          "source_dependencies": {
+            "properties": {
+              "all_active": {
+                "const": true
+              },
+              "revoked_source_ids": {
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "all_active",
+              "revoked_source_ids"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_dependencies": {
+            "properties": {
+              "revoked_source_ids": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "revoked_source_ids"
+            ]
+          }
+        },
+        "required": [
+          "source_dependencies"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_dependencies": {
+            "properties": {
+              "all_active": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_dependencies": {
+            "properties": {
+              "all_active": {
+                "const": true
+              }
+            },
+            "required": [
+              "all_active"
+            ]
+          }
+        },
+        "required": [
+          "source_dependencies"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_dependencies": {
+            "properties": {
+              "revoked_source_ids": {
+                "maxItems": 0
+              }
+            }
           }
         }
       }
