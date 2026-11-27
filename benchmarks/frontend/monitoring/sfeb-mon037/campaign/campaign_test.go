@@ -73,7 +73,7 @@ func TestExactReplayRequiresDeduplicationProof(t *testing.T){
 func TestPayloadMismatchBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].PayloadSHA256=dc;expect(t,in,Blocked)}
 func TestTransactionEndCountMismatchBlocks(t *testing.T){in:=fixture();in.Transactions[0].EndEventCount=1;expect(t,in,Blocked)}
 func TestTransactionDataCollectionsMismatchBlocks(t *testing.T){in:=fixture();in.Transactions[0].DataCollections["message"]=2;expect(t,in,Blocked)}
-func TestPerTopicOrderViolationBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].Offset=5;expect(t,in,Blocked)}
+func TestPerTopicPartitionViolationBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].Partition=1;expect(t,in,Blocked)}
 func TestMultiplePartitionsAreIndeterminate(t *testing.T){in:=fixture();in.TopicPartitions[0].PartitionCount=2;expect(t,in,Indeterminate)}
 func TestTimelineBlockedPropagates(t *testing.T){in:=fixture();in.Components.TimelineResult=raw(map[string]any{"profile":"mon034-postgres-timeline-ancestry-result-v1","version":"1.0.0","result":map[string]any{"verdict":"blocked"}});expect(t,in,Blocked)}
 func TestObserverSharedDomainBlocks(t *testing.T){
@@ -174,4 +174,44 @@ func TestRowStreamExclusionRequiresManifest(t *testing.T) {
 	in.Surfaces = append(in.Surfaces, Surface{ID:"generated", Disposition:"excluded"})
 	in.RequiredSurfaceIDs = append(in.RequiredSurfaceIDs, "generated")
 	expect(t, in, Indeterminate)
+}
+
+
+func TestCollectionOrderMayResetAcrossTransactions(t *testing.T) {
+	in := fixture()
+	row2 := in.SourceEvents[0]
+	row2.EventID = "row-2"
+	row2.TransactionID = "tx-2"
+	row2.Offset = 11
+	row2.TotalOrder = 1
+	row2.CollectionOrder = 1
+	message2 := in.SourceEvents[1]
+	message2.EventID = "message-2"
+	message2.TransactionID = "tx-2"
+	message2.Offset = 8
+	message2.TotalOrder = 2
+	message2.CollectionOrder = 1
+	in.SourceEvents = append(in.SourceEvents, row2, message2)
+	in.ObservedEvents = append(in.ObservedEvents, row2, message2)
+	in.Transactions = append(in.Transactions, TransactionProof{
+		TransactionID: "tx-2", ExpectedEventCount: 2, BeginObserved: true,
+		EndObserved: true, EndEventCount: 2,
+		DataCollections: map[string]int{"public.ledger": 1, "LOGICAL_DECODING_MESSAGE": 1},
+	})
+	expect(t, in, Qualified)
+}
+
+func TestRowCollectionOrderGapWithinTransactionBlocks(t *testing.T) {
+	in := fixture()
+	row2 := in.SourceEvents[0]
+	row2.EventID = "row-2"
+	row2.TotalOrder = 3
+	row2.CollectionOrder = 3
+	row2.Offset = 11
+	in.SourceEvents = append(in.SourceEvents, row2)
+	in.ObservedEvents = append(in.ObservedEvents, row2)
+	in.Transactions[0].ExpectedEventCount = 3
+	in.Transactions[0].EndEventCount = 3
+	in.Transactions[0].DataCollections["public.ledger"] = 2
+	expect(t, in, Blocked)
 }
