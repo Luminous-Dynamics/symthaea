@@ -1,9 +1,9 @@
-use std::sync::OnceLock;
-
 //! Gaussian predictive distribution -> finite categorical likelihoods.
 //! Standalone numerical adapter; not a planner. Thresholds must represent
 //! actual instrument quantization or a frozen benchmark outcome partition.
 //! Standard-normal tails use direct 64-point Gauss-Legendre integration.
+
+use std::sync::OnceLock;
 
 const N: usize = 64;
 const CUTOFF: f64 = 12.0;
