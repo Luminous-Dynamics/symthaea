@@ -257,17 +257,47 @@ impl StoreMetamemorySummaryV1 {
     /// Verifies the snapshot's internal commitment and count invariants.
     /// This does not establish freshness against a newer external ledger head.
     pub fn verify_integrity(&self) -> bool {
+        let expected_statuses = [
+            DerivedProjectionStatusV1::Current,
+            DerivedProjectionStatusV1::Stale,
+            DerivedProjectionStatusV1::Quarantined,
+            DerivedProjectionStatusV1::Revoked,
+            DerivedProjectionStatusV1::ErasureRequested,
+            DerivedProjectionStatusV1::Rebuilt,
+            DerivedProjectionStatusV1::Erased,
+        ];
+        let expected_kinds = [
+            DerivedProjectionKindV1::Summary,
+            DerivedProjectionKindV1::Embedding,
+            DerivedProjectionKindV1::PreferenceModel,
+            DerivedProjectionKindV1::Plan,
+            DerivedProjectionKindV1::FactIndex,
+            DerivedProjectionKindV1::AnswerCache,
+            DerivedProjectionKindV1::Other,
+        ];
+        let status_total = self.status_counts.iter().try_fold(0_u64, |sum, item| {
+            sum.checked_add(item.count)
+        });
+        let kind_total = self.kind_counts.iter().try_fold(0_u64, |sum, item| {
+            sum.checked_add(item.count)
+        });
+        let status_order_valid = self.status_counts.iter().zip(expected_statuses)
+            .all(|(item, expected)| item.status == expected);
+        let kind_order_valid = self.kind_counts.iter().zip(expected_kinds)
+            .all(|(item, expected)| item.kind == expected);
+
         self.schema_version == 1
             && self.status_counts.len() == 7
             && self.kind_counts.len() == 7
             && self.ledger_sequence == self.projection_index_sequence
+            && self.projection_count <= MAX_PROJECTIONS_V1 as u64
             && valid_digest(&self.scope_commitment_sha256)
             && valid_digest(&self.ledger_snapshot_sha256)
             && valid_digest(&self.projection_index_state_sha256)
-            && self.status_counts.iter().map(|item| item.count).sum::<u64>()
-                == self.projection_count
-            && self.kind_counts.iter().map(|item| item.count).sum::<u64>()
-                == self.projection_count
+            && status_order_valid
+            && kind_order_valid
+            && status_total == Some(self.projection_count)
+            && kind_total == Some(self.projection_count)
             && self.summary_sha256 == metamemory_summary_digest(self)
     }
 
@@ -380,7 +410,7 @@ impl DerivedProjectionIndexV1 {
         }).collect::<Vec<_>>();
 
         let mut scope_hasher = Sha256::new();
-        scope_hasher.update(b"luminous:mace:metamemory-scope:v1\\0");
+        scope_hasher.update(b"luminous:mace:metamemory-scope:v1\0");
         hash_field(&mut scope_hasher, &self.user_id);
         hash_field(&mut scope_hasher, &self.session_id);
         let scope_commitment_sha256 = hex_digest(&scope_hasher.finalize());
@@ -754,7 +784,7 @@ impl DerivedProjectionIndexV1 {
 
 fn metamemory_summary_digest(summary: &StoreMetamemorySummaryV1) -> String {
     let mut h = Sha256::new();
-    h.update(b"luminous:mace:store-metamemory-summary:v1\\0");
+    h.update(b"luminous:mace:store-metamemory-summary:v1\0");
     h.update(summary.schema_version.to_be_bytes());
     hash_field(&mut h, &summary.scope_commitment_sha256);
     h.update(summary.ledger_sequence.to_be_bytes());
@@ -986,6 +1016,22 @@ mod tests {
             1
         );
         assert!(summary.verify_integrity());
+    }
+
+    #[test]
+    fn metamemory_summary_rejects_reordered_and_overflowing_status_counts() {
+        let ledger = ledger();
+        let index = DerivedProjectionIndexV1::new("user-1", "session-1").unwrap();
+        let summary = index.metamemory_summary(&ledger).unwrap();
+
+        let mut reordered = summary.clone();
+        reordered.status_counts.swap(0, 1);
+        assert!(!reordered.verify_integrity());
+
+        let mut overflowing = summary;
+        overflowing.status_counts[0].count = u64::MAX;
+        overflowing.status_counts[1].count = 1;
+        assert!(!overflowing.verify_integrity());
     }
 
     #[test]
