@@ -1,0 +1,13 @@
+[package]
+name = "scientific-artifact-delimited"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Bounded CSV/TSV scientific artifact parser with byte-accurate cell provenance"
+
+[workspace]
+resolver = "2"
+
+[dependencies]
+sha2 = "=0.10.9"
