@@ -43,7 +43,7 @@ Compare end-to-end recovery assurance on a matched fault schedule. Do not compar
 
 ## 5. Performance and correctness measures
 
-1. **Capture correctness:** expected unique event IDs, payload digest matches, duplicates, conflicting identities, missing IDs and transaction-envelope closure.
+1. **Capture correctness:** expected unique event IDs, payload digest matches, duplicates, conflicting identities, missing IDs and transaction-envelope closure, BEGIN/END pair cardinality, END event_count and per-event total/data-collection order.
 2. **Capture performance:** event throughput, commit-to-Kafka latency p50/p95/p99, WAL retained bytes, slot lag, Kafka bytes, CPU, memory and disk I/O.
 3. **Recovery correctness:** requested vs achieved recovery LSN/timeline, database identity, timeline lineage and per-surface source/target digest comparison.
 4. **RPO:** incident upper time minus recovery-point lower time, with clock uncertainty.
@@ -57,7 +57,7 @@ Compare end-to-end recovery assurance on a matched fault schedule. Do not compar
 - Deterministic fixture IDs prevent accidental success from row counts alone.
 - Equal row counts with altered values must fail the digest check.
 - A duplicate replay with identical payload is reported as replay; conflicting payload under the same event ID is a hard mismatch.
-- Missing and out-of-order transaction records must be identified separately.
+- Missing BEGIN/END records, incorrect END event_count, missing per-event transaction IDs and non-contiguous total/data-collection order must be identified separately.
 - A restored target is compared to source truth captured at the requested LSN/timeline, not against source's later live state. Record both requested and actual replay LSN; state equality is mandatory.
 - A service process can be healthy while dependencies, fencing or invariants are broken; such a run must not pass service readiness.
 - Benchmark scorer and expected data must be controlled separately from the implementation under test.
