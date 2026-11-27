@@ -1240,7 +1240,7 @@ mod tests {
         assert_eq!(receipt.adapter_state_after_sha256, before);
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
         assert_eq!(receipt.selected_feature_vector, vec![1.0, 2.0]);
-        assert_eq!(receipt.context_key.as_deref(), Some("eqp-1/ch-1"));
+        assert_eq!(receipt.context_key.as_deref(), Some(("eqp-1", "ch-1")));
         assert_eq!(receipt.prediction_value, 10.0);
     }
 
@@ -1561,20 +1561,20 @@ mod tests {
                 "event-1",
                 100,
                 102,
-                Some("eqp-1/ch-1"),
+                Some(("eqp-1", "ch-1")),
                 vec![1.0, 1.0],
             ),
         )
         .unwrap();
         let context_key = context_id_key(
             StreamingContextLevelV1::EquipmentChamber,
-            "8:eqp-1|4:ch-1",
+            "5:eqp-1|4:ch-1",
         );
         engine.adapter_state.contexts.insert(
             context_key,
             StreamingContextStateV1 {
                 level: StreamingContextLevelV1::EquipmentChamber,
-                context_id: "8:eqp-1|4:ch-1".into(),
+                context_id: "5:eqp-1|4:ch-1".into(),
                 residual_ema: 0.25,
                 support_count: u64::MAX,
             },
@@ -1748,7 +1748,7 @@ mod tests {
                 "event-1",
                 100,
                 102,
-                Some("eqp-1/ch-1"),
+                Some(("eqp-1", "ch-1")),
                 vec![1.0, 0.0],
             ),
         )
@@ -1791,12 +1791,203 @@ mod tests {
         )));
         assert!(engine.adapter_state.contexts.contains_key(&context_id_key(
             StreamingContextLevelV1::EquipmentChamber,
-            "8:eqp-1|4:ch-1"
+            "5:eqp-1|4:ch-1"
         )));
         assert!(!engine.adapter_state.contexts.contains_key(&context_id_key(
             StreamingContextLevelV1::Equipment,
             "eqp-2"
         )));
+    }
+
+    #[test]
+    fn feature_and_temporal_adapters_update_from_pre_temporal_base_residual() {
+        let mut engine = engine();
+        engine.adapter_state.global_temporal_residual_ema = 5.0;
+        let prediction = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction(
+                "sample-1",
+                "event-1",
+                100,
+                102,
+                Some(("eqp-1", "ch-1")),
+                vec![1.0, 0.0],
+            ),
+        )
+        .unwrap();
+        assert_eq!(prediction.base_prediction, 10.0);
+        assert_eq!(prediction.temporal_correction, 5.0);
+        assert_eq!(prediction.prediction_value, 15.0);
+
+        let receipt = deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                ("sample-1", "event-1", "label-1"),
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                (110, 112),
+            ),
+        )
+        .unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Updated);
+        let expected_weight = 0.20 / (1.0 + 1.0e-6);
+        assert!((engine.adapter_state.feature_weights[0] - expected_weight).abs() < 1.0e-9);
+        assert!((engine.adapter_state.global_temporal_residual_ema - 4.2).abs() < 1.0e-9);
+        // Context residual = 11 - (10 + updated feature correction), not
+        // 11 - final prediction and not 11 - (base + old temporal correction).
+        let expected_context_residual = 11.0 - (10.0 + expected_weight);
+        assert!(
+            (engine.adapter_state.global_context_residual_ema
+                - 0.25 * expected_context_residual)
+                .abs()
+                < 1.0e-9
+        );
+    }
+
+    #[test]
+    fn hierarchical_context_uses_global_equipment_chamber_and_pair_levels() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction(
+                "sample-1",
+                "event-1",
+                100,
+                102,
+                Some(("eqp-1", "ch-1")),
+                vec![1.0, 0.0],
+            ),
+        )
+        .unwrap();
+        deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                ("sample-1", "event-1", "label-1"),
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                (110, 112),
+            ),
+        )
+        .unwrap();
+
+        let same_equipment_new_chamber = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction(
+                "sample-2",
+                "event-2",
+                113,
+                115,
+                Some(("eqp-1", "ch-2")),
+                vec![1.0, 0.0],
+            ),
+        )
+        .unwrap();
+        // One eligible global level and one eligible equipment level have
+        // equal support (1/(1+2)), so their reliability-weighted mean is 0.5.
+        assert!((same_equipment_new_chamber.context_correction - 0.5).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn length_prefixed_context_identity_avoids_delimiter_collisions() {
+        let mut engine = engine();
+        for (sample, event, equipment, chamber, label) in [
+            ("s1", "e1", "A_B", "C", "l1"),
+            ("s2", "e2", "A", "B_C", "l2"),
+        ] {
+            predict_and_register_stream_sample_v1(
+                &mut engine,
+                &prediction(
+                    sample,
+                    event,
+                    100,
+                    102,
+                    Some((equipment, chamber)),
+                    vec![1.0, 0.0],
+                ),
+            )
+            .unwrap();
+            deliver_qualified_stream_label_v1(
+                &mut engine,
+                &delivery(
+                    (sample, event, label),
+                    1,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                    LabelEvidenceFrontierV1::CurrentAtK1,
+                    (110, 112),
+                ),
+            )
+            .unwrap();
+        }
+        let pair_keys: Vec<String> = engine
+            .adapter_state
+            .contexts
+            .iter()
+            .filter(|(_, value)| value.level == StreamingContextLevelV1::EquipmentChamber)
+            .map(|(key, _)| key.clone())
+            .collect();
+        assert_eq!(pair_keys.len(), 2);
+        assert_ne!(pair_keys[0], pair_keys[1]);
+    }
+
+    #[test]
+    fn temporal_threshold_is_sealed_from_training_only_residual_manifest() {
+        let calibrated = calibrate_streaming_temporal_threshold_v1(
+            policy(),
+            &digest('h'),
+            &[1.0, -2.0, 3.0, -4.0],
+            0.5,
+        )
+        .unwrap();
+        assert!((calibrated.temporal_activation_threshold - 2.5).abs() < 1.0e-12);
+        let receipt = calibrated.temporal_threshold_calibration.as_ref().unwrap();
+        assert_eq!(receipt.training_manifest_sha256, digest('h'));
+        assert_eq!(receipt.residual_count, 4);
+
+        let engine = create_gated_streaming_adapter_engine_v1(
+            "calibrated-engine",
+            "fab-clock",
+            &digest('g'),
+            &digest('a'),
+            vec![0.0, 0.0],
+            calibrated.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            engine.policy.temporal_threshold_calibration,
+            calibrated.temporal_threshold_calibration
+        );
+
+        let mut tampered = calibrated;
+        tampered.temporal_activation_threshold = 9.0;
+        assert!(create_gated_streaming_adapter_engine_v1(
+            "tampered-engine",
+            "fab-clock",
+            &digest('g'),
+            &digest('a'),
+            vec![0.0, 0.0],
+            tampered,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn non_finite_or_unpinned_training_residuals_cannot_calibrate_temporal_threshold() {
+        assert!(calibrate_streaming_temporal_threshold_v1(
+            policy(),
+            &digest('h'),
+            &[1.0, f64::NAN],
+            0.96,
+        )
+        .is_err());
+        assert!(calibrate_streaming_temporal_threshold_v1(
+            policy(),
+            "not-a-digest",
+            &[1.0, 2.0],
+            0.96,
+        )
+        .is_err());
     }
 
     #[test]
@@ -1826,7 +2017,7 @@ mod tests {
                         &event_id,
                         100 + index * 3,
                         102 + index * 3,
-                        Some("eqp-1/ch-1"),
+                        Some(("eqp-1", "ch-1")),
                         vec![1.0 + index as f64, 2.0],
                     ),
                 )
