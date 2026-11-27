@@ -44,13 +44,14 @@ pub enum CoverageInferenceMethodV1 {
 pub enum CoverageBacktestStatusV1 {
     Complete,
     InsufficientQualifiedOutcomes,
+    AssumptionNotSupported,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoverageAssumptionStateV1 {
     ShortMemoryHacAssumptionDeclaredButNotProven,
-    LongMemoryNotSupported,
+    HacAssumptionNotDeclared,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -238,7 +239,6 @@ fn validate_policy(policy: &RealizedCoveragePolicyV1) -> Result<(), RealizedCove
 
 fn validate_observation(
     row: &RealizedCoverageObservationV1,
-    cutoff: i64,
 ) -> Result<(), RealizedCoverageBacktestErrorV1> {
     if row.schema != REALIZED_COVERAGE_OBSERVATION_SCHEMA_V1 {
         return Err(RealizedCoverageBacktestErrorV1(
@@ -291,12 +291,12 @@ fn validate_observation(
     if row.clock_domain_id != prediction.clock_domain_id
         || prediction.event_time_unix_seconds > prediction.feature_available_at_unix_seconds
         || prediction.feature_available_at_unix_seconds > prediction.prediction_at_unix_seconds
-        || row.label_available_at_unix_seconds < prediction.event_time_unix_seconds
+        || row.label_available_at_unix_seconds < prediction.prediction_at_unix_seconds
         || row.eligibility_report_available_at_unix_seconds
             < row.label_available_at_unix_seconds
         || row.delivered_at_unix_seconds < row.eligibility_report_available_at_unix_seconds
         || row.delivered_at_unix_seconds < row.label_available_at_unix_seconds
-        || row.delivered_at_unix_seconds > cutoff
+        || row.delivered_at_unix_seconds < prediction.prediction_at_unix_seconds
     {
         return Err(RealizedCoverageBacktestErrorV1(
             "coverage outcome/report availability chronology or cutoff is invalid".into(),
@@ -304,6 +304,11 @@ fn validate_observation(
     }
     if !report.qualified_corrected_value.is_finite()
         || report.qualified_corrected_value != row.outcome_value
+        || report.equipment_control_authority
+        || report.training_snapshot_mutated
+        || report
+            .qualified_standard_uncertainty_upper_bound
+            .is_none_or(|value| !value.is_finite() || value < 0.0)
     {
         return Err(RealizedCoverageBacktestErrorV1(
             "outcome differs from the qualified corrected measurement value".into(),
@@ -393,14 +398,27 @@ pub fn evaluate_realized_coverage_backtest_v1(
     let mut late_or_unavailable_count = 0;
 
     for row in &observations {
-        validate_observation(row, input.cutoff_at_unix_seconds)?;
+        validate_observation(row)?;
         if !sample_ids.insert(row.prediction_receipt.sample_id.as_str())
             || !event_ids.insert(row.prediction_receipt.measurement_event_id.as_str())
             || !label_revisions.insert((row.label_id.as_str(), row.label_revision))
+            || !prediction_sequences.insert(row.prediction_receipt.sequence)
         {
             return Err(RealizedCoverageBacktestErrorV1(
-                "duplicate sample, measurement event or label revision".into(),
+                "duplicate sample, measurement event, label revision or prediction sequence".into(),
             ));
+        }
+        if previous_event_time.is_some_and(|time| {
+            row.prediction_receipt.event_time_unix_seconds < time
+        }) {
+            return Err(RealizedCoverageBacktestErrorV1(
+                "prediction event time regresses in sequence order".into(),
+            ));
+        }
+        previous_event_time = Some(row.prediction_receipt.event_time_unix_seconds);
+        if row.delivered_at_unix_seconds > input.cutoff_at_unix_seconds {
+            late_or_unavailable_count += 1;
+            continue;
         }
         match row.eligibility_report.eligibility {
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
@@ -443,7 +461,9 @@ pub fn evaluate_realized_coverage_backtest_v1(
         run_id: input.run_id.clone(),
         input_sha256: input_digest(input)?,
         source_stream_sha256: input.source_stream_sha256.clone(),
-        status: if n < input.policy.minimum_qualified_observations
+        status: if !input.policy.short_memory_assumption_declared {
+            CoverageBacktestStatusV1::AssumptionNotSupported
+        } else if n < input.policy.minimum_qualified_observations
             || input.policy.hac_max_lag >= n
         {
             CoverageBacktestStatusV1::InsufficientQualifiedOutcomes
@@ -455,7 +475,7 @@ pub fn evaluate_realized_coverage_backtest_v1(
         assumption_state: if input.policy.short_memory_assumption_declared {
             CoverageAssumptionStateV1::ShortMemoryHacAssumptionDeclaredButNotProven
         } else {
-            CoverageAssumptionStateV1::LongMemoryNotSupported
+            CoverageAssumptionStateV1::HacAssumptionNotDeclared
         },
         target_coverage: input.policy.target_coverage,
         observed_coverage: None,
@@ -729,7 +749,9 @@ mod tests {
         let mut value = input(rows, 2);
         value.policy.short_memory_assumption_declared = false;
         let report = evaluate_realized_coverage_backtest_v1(&value).unwrap();
-        assert_eq!(report.assumption_state, CoverageAssumptionStateV1::LongMemoryNotSupported);
+        assert_eq!(report.status, CoverageBacktestStatusV1::AssumptionNotSupported);
+        assert_eq!(report.assumption_state, CoverageAssumptionStateV1::HacAssumptionNotDeclared);
+        assert_eq!(report.hac_standard_error, None);
         assert!(!report.long_memory_supported);
     }
 
@@ -761,6 +783,27 @@ mod tests {
             value.observations[0].label_available_at_unix_seconds - 1;
         value.observations[0].observation_sha256 = observation_digest(&value.observations[0]).unwrap();
         assert!(evaluate_realized_coverage_backtest_v1(&value).is_err());
+    }
+
+    #[test]
+    fn outcomes_delivered_after_the_frozen_cutoff_are_counted_but_not_used() {
+        let mut rows = (1..=6)
+            .map(|sequence| {
+                observation(
+                    sequence,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                    10.0,
+                )
+            })
+            .collect::<Vec<_>>();
+        rows[5].delivered_at_unix_seconds = 100_001;
+        rows[5].eligibility_report_available_at_unix_seconds = 100_000;
+        rows[5].observation_sha256 = observation_digest(&rows[5]).unwrap();
+        let mut value = input(rows, 1);
+        value.cutoff_at_unix_seconds = 100_000;
+        let report = evaluate_realized_coverage_backtest_v1(&value).unwrap();
+        assert_eq!(report.qualified_count, 5);
+        assert_eq!(report.late_or_unavailable_count, 1);
     }
 
     #[test]
