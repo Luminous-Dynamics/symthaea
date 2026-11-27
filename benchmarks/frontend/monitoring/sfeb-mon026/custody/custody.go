@@ -302,10 +302,7 @@ func VerifyBundle(rootDir string, m Manifest, policy Policy) Result {
 					}
 				}
 				if !m.CapturedAt.IsZero() && a.ClockUncertaintyNS >= 0 {
-				combined := time.Duration(a.ClockUncertaintyNS)
-				if m.ClockUncertaintyNS > a.ClockUncertaintyNS {
-					combined = time.Duration(m.ClockUncertaintyNS)
-				}
+				combined := boundedCombinedUncertainty(a.ClockUncertaintyNS, m.ClockUncertaintyNS)
 					if a.CollectedAt.After(m.CapturedAt.Add(combined)) {
 						addIndeterminate("artifact_collected_after_manifest_capture")
 					}
@@ -552,6 +549,19 @@ func validSHA256(s string) bool {
 	}
 	_, err := hex.DecodeString(s)
 	return err == nil
+}
+
+func boundedCombinedUncertainty(a, b int64) time.Duration {
+	if a < 0 || b < 0 {
+		return time.Duration(1<<63 - 1)
+	}
+	maxDuration := time.Duration(1<<63 - 1)
+	left := time.Duration(a)
+	right := time.Duration(b)
+	if left > maxDuration-right {
+		return maxDuration
+	}
+	return left + right
 }
 
 func signatureMessage(root, algorithm, keyID string) []byte {
