@@ -5,7 +5,9 @@ SELECT jsonb_build_object(
     'server_version_num', current_setting('server_version_num'),
     'wal_level', current_setting('wal_level'),
     'system_identifier', (SELECT system_identifier::text FROM pg_control_system()),
-    'timeline_id', (SELECT timeline_id::text FROM pg_control_checkpoint()),
+    'timeline_id', (
+        SELECT (('x' || substring(pg_walfile_name(pg_current_wal_lsn()) from 1 for 8))::bit(32)::bigint)::text
+    ),
     'publications', (
         SELECT coalesce(jsonb_agg(jsonb_build_object(
             'name', p.pubname,
