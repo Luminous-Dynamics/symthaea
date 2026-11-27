@@ -319,7 +319,11 @@
     "pulse_map_parameter_jacobian_required": true,
     "split_solver_composition_order_required": true,
     "independent_finite_difference_cross_check_required": true,
-    "branch_change_disposition": "UNKNOWN_OR_HANDOFF"
+    "branch_change_disposition": "UNKNOWN_OR_HANDOFF",
+    "pulse_application_time_jacobian_required": true,
+    "pulse_time_finite_difference_cross_check_required": true,
+    "pulse_time_sensitivity_convention": "scheduled_reset_D_R_f_minus_plus_R_t_minus_f_plus",
+    "pulse_time_sensitivity_status": "synthetic_not_computed"
   },
   "response_qualification": {
     "checkpoint_state_residual_required": true,
