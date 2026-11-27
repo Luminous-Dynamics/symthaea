@@ -122,12 +122,14 @@ impl DecisionObjectiveReference {
 pub struct PermittedActionOfferRef {
     /// Upstream AgentView offer ID from #11015; this contract does not mint offers.
     pub offer_id: String,
-    /// Exact payload digest on the upstream offer.
+    /// Exact payload digest on the upstream offer. It must cover the full immutable offer,
+    /// including parameters, resource costs, permission/scope and risk metadata.
     pub action_payload_sha256: String,
 }
 
 #[derive(Serialize)]
 struct CanonicalPermittedOfferListV1<'a> {
+    domain: &'static str,
     schema_version: u16,
     offers: &'a [PermittedActionOfferRef],
 }
@@ -213,6 +215,7 @@ impl CandidateDecisionContext {
     /// The bytes are compact serde JSON for {schema_version, offers}; changes require a version bump.
     pub fn canonical_permitted_offer_list_sha256(&self) -> Result<String, String> {
         let canonical = CanonicalPermittedOfferListV1 {
+            domain: "symthaea.agentview.permitted-action-offer-list",
             schema_version: PERMITTED_OFFER_LIST_SCHEMA_VERSION,
             offers: &self.permitted_action_offers,
         };
