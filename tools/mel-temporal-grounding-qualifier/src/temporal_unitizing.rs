@@ -1015,6 +1015,7 @@ fn median(values: &[f64]) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::temporal_consensus::IndependentTemporalAnnotationV1;
 
     fn labeled_partition(intervals: &[(u64, u64, &str)], continuum: u64) -> Vec<UnitSegmentV1> {
         let intervals: Vec<_> = intervals
