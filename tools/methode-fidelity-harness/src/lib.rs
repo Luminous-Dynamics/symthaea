@@ -311,14 +311,21 @@ fn valid_contract(contract: &MethodContract) -> bool {
         && is_sha256(&contract.budget.policy_sha256)
         && !contract.required_outputs.is_empty()
         && contract.required_outputs.iter().all(|id| !id.trim().is_empty())
+        && {
+            let output_ids: BTreeSet<&str> = contract.required_outputs.iter().map(String::as_str).collect();
+            output_ids.len() == contract.required_outputs.len()
+        }
         && contract.preprocessing.fit_scope != FitScope::Unknown
         && contract.preprocessing.fitted_on_split_manifest_sha256 == contract.dataset.split_manifest_sha256
         && match contract.preprocessing.fit_scope {
             FitScope::TrainingOnly => contract.preprocessing.fitted_record_count == contract.dataset.train_records,
-            FitScope::TrainingAndValidation => contract.preprocessing.fitted_record_count
-                == contract.dataset.train_records + contract.dataset.validation_records,
-            FitScope::AllRecords => contract.preprocessing.fitted_record_count
-                == contract.dataset.train_records + contract.dataset.validation_records + contract.dataset.test_records,
+            FitScope::TrainingAndValidation => contract.dataset.train_records
+                .checked_add(contract.dataset.validation_records)
+                == Some(contract.preprocessing.fitted_record_count),
+            FitScope::AllRecords => contract.dataset.train_records
+                .checked_add(contract.dataset.validation_records)
+                .and_then(|count| count.checked_add(contract.dataset.test_records))
+                == Some(contract.preprocessing.fitted_record_count),
             FitScope::Unknown => false,
         }
         && contract.dataset.train_records > 0
@@ -557,6 +564,24 @@ pub fn audit_method(contract: &MethodContract, receipt: &ExecutionReceipt) -> Au
     } else {
         Disposition::ReferenceProtocolReproduced
     };
+
+    if receipt.execution_id.trim().is_empty() {
+        flags.hard_failure = true;
+        checks.push(CheckResult {
+            check_id: "execution.identity".to_string(),
+            status: CheckStatus::Mismatch,
+            explanation: "Execution receipt has no stable execution identifier.".to_string(),
+        });
+    }
+    let output_ids: BTreeSet<&str> = receipt.outputs.iter().map(|output| output.artifact_id.as_str()).collect();
+    if output_ids.len() != receipt.outputs.len() {
+        flags.hard_failure = true;
+        checks.push(CheckResult {
+            check_id: "outputs.unique".to_string(),
+            status: CheckStatus::Mismatch,
+            explanation: "Execution receipt contains duplicate output artifact identifiers.".to_string(),
+        });
+    }
 
     let reproduced = disposition == Disposition::ReferenceProtocolReproduced;
     AuditReport {
@@ -929,6 +954,36 @@ mod tests {
         let mut c = contract();
         c.reference_source_id.clear();
         let r = receipt(&c);
+        assert_eq!(disposition(&c, &r), Disposition::Unresolved);
+    }
+
+    #[test]
+    fn partition_sum_overflow_invalidates_reference_contract() {
+        let mut c = contract();
+        c.dataset.train_records = u64::MAX;
+        c.dataset.validation_records = 1;
+        c.dataset.test_records = 1;
+        c.preprocessing.fitted_record_count = u64::MAX;
+        c.preprocessing.fit_scope = FitScope::AllRecords;
+        let mut r = receipt(&contract());
+        r.method_contract_sha256 = c.contract_sha256.clone();
+        assert_eq!(disposition(&c, &r), Disposition::Unresolved);
+    }
+
+    #[test]
+    fn duplicate_output_artifact_ids_are_rejected() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.outputs.push(r.outputs[0].clone());
+        r.replay.replayed_outputs = r.outputs.clone();
+        assert_eq!(disposition(&c, &r), Disposition::Unresolved);
+    }
+
+    #[test]
+    fn blank_execution_identity_is_rejected() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.execution_id.clear();
         assert_eq!(disposition(&c, &r), Disposition::Unresolved);
     }
 
