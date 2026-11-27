@@ -83,13 +83,13 @@ pub enum BaselineErrorV1 {
     IneligibleChannelDocument,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct PreparedDocument {
     document: SourceDocumentV1,
     token_count: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Bm25IndexV1 {
     documents: Vec<PreparedDocument>,
     by_id: BTreeMap<String, usize>,
