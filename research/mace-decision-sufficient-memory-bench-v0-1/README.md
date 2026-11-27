@@ -79,7 +79,7 @@ The native profile may expose typed evidence and lifecycle operations that are n
 
 ### Conventional retrieval reference
 
-A separate dependency-free temporal BM25 and weighted-RRF reference is under `baselines/`. It consumes raw candidate-visible source text, applies scope and bitemporal filters before computing BM25 corpus statistics, and accepts independently produced ranked channels for validated RRF composition. This makes a conventional lexical control explicit; it does not reproduce Resurface/Khipu/InsightMem, implement dense retrieval or replace the paired decision evaluator. See [MACE_TEMPORAL_BM25_BASELINE_V0_1.md](../../../../docs/research/MACE_TEMPORAL_BM25_BASELINE_V0_1.md).
+A separate dependency-free temporal BM25 and weighted-RRF reference is under `baselines/`. It consumes raw candidate-visible source text, applies scope and bitemporal filters before computing BM25 corpus statistics, and accepts independently produced ranked channels for validated RRF composition. This makes a conventional lexical control explicit; it does not reproduce Resurface/Khipu/InsightMem, implement dense retrieval or replace the paired decision evaluator. See [MACE_TEMPORAL_BM25_BASELINE_V0_1.md](../../docs/research/MACE_TEMPORAL_BM25_BASELINE_V0_1.md).
 
 ### AML-compatible profiles
 
