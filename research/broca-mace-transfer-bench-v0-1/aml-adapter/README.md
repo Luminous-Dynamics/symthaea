@@ -173,3 +173,10 @@ Protocol and schema: [MACE Claim-Relative Invalidation V1](../../../docs/researc
 
 
 The guarded function `register_rebuilt_projection_after_claim_revalidation_v1` connects a passing claim assessment to the temporal projection index. It requires a valid assessment bound to the exact retained correction receipt, an index that has consumed that transition, and a new projection whose source dependencies include the corrected event rather than the superseded source event. Failed/unverified claims and stale source dependencies cannot enter this path. Fourteen tests are authored for claim assessment and rebuild integration; they have not been executed.
+
+
+## Store metamemory summary
+
+The temporal projection index exposes `metamemory_summary(&ledger)`, a value-free view of active source count, projection count, per-lifecycle and per-kind counts, the exact available metadata-attribute inventory, matching ledger/index sequence numbers and integrity commitments. It refuses to return a summary while the projection index is behind the authoritative session ledger.
+
+The summary omits record IDs, user identifiers and memory content. The caller must still enforce tenant/role authorization and compare freshness against a trusted current head. Protocol: [MACE Store Metamemory Summary V1](../../../docs/research/MACE_STORE_METAMEMORY_SUMMARY_V1.md); schema: [mace_store_metamemory_summary_v1.schema.json](../../../data/schemas/mace_store_metamemory_summary_v1.schema.json). Five deterministic summary tests are authored but not executed.
