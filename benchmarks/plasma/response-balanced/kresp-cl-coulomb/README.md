@@ -12,7 +12,7 @@ Zhao and Zi (15 November 2026), *Stability of Plasma Echo Growth and the Sharp S
 \]
 whose transport profiles exhibit norm inflation before the enhanced-dissipation scale \(\nu^{-1/3}\). They emphasize forward-time preparation from physical initial data because collisions preclude the backward Sobolev construction used in collisionless echo arguments. This is a mathematical stability result, not a numerical reduced-order model or a benchmark dataset. Source: https://arxiv.org/abs/2611.20080
 
-The December 2026 SIAM Review survey on Landau damping and plasma echoes also emphasizes infinitely many interacting elementary waves and arbitrarily high spatial frequencies in collisionless Vlasov–Poisson echo constructions: https://doi.org/10.1137/26M1938650
+The SIAM Review survey on Landau damping and plasma echoes (published online 12 November 2026; Volume 68, Issue 4, December 2026) also emphasizes infinitely many interacting elementary waves and arbitrarily high spatial frequencies in collisionless Vlasov–Poisson echo constructions: https://doi.org/10.1137/26M1938650
 
 ## Research question
 
@@ -22,7 +22,7 @@ The differentiator is **not** “plasma echoes exist,” “second-order echoes 
 
 ## Frozen model and scaling
 
-Use the 1D1V Vlasov–Poisson–Landau equation with Coulomb collisions near a global Maxwellian. The contract records three spatial periods of \\(2\\pi\\), a three-dimensional velocity cube with tail extension, and the perturbation scaling
+Use the 3D3V Vlasov–Poisson–Landau equation with Coulomb collisions near a global Maxwellian. The contract records three spatial periods of \\(2\\pi\\), a three-dimensional velocity cube \\(v_i\\in[-12,12]\\) with tail extension, and the perturbation scaling
 \[
 \epsilon=c\,\nu^{1/3}\,[\log(1/\nu)]^p,\qquad 0<\nu<1,
 \]
@@ -50,6 +50,18 @@ Mandatory comparisons include:
 - entropy VPD ROM only as an explicitly **different-equation** comparator, never a direct Landau baseline.
 
 Use matched initial data, \(\nu\), spatial wavevectors, collision normalization, time horizon, boundary/tail treatment and QoIs. Match equal rank, equal stored bytes, equal end-to-end wall time and equal full-order solver budget. Report collision-operator quadrature, nonlinear field solve, diagnostics and fallback costs.
+
+## Staged computational programme
+
+A 3D3V VPL calculation is a six-dimensional phase-space problem with a nonlocal, velocity-singular Coulomb collision operator. Do not jump directly from the synthetic contract to a large nonlinear benchmark. The execution ladder should be:
+
+1. **Operator verification:** independently test the Landau collision discretization on Maxwellian equilibria and manufactured perturbations; verify conservation, entropy dissipation, positivity handling, symmetry and collision quadrature convergence before coupling Poisson.
+2. **Linearized 3D3V echo-response test:** reproduce the prescribed linearized operator / evolving-background coefficient challenge with forward-time initial data. Compare field, transport Sobolev norm and high-(k) tail with the reference proof's declared regimes. Do not substitute a 1D1V scalar model and call it a theorem reproduction.
+3. **Nonlinear VPL reference:** couple the self-consistent Poisson field and nonlinear Landau operator, first at reduced spectral/tensor resolution, then refine space, velocity, collision quadrature and time independently.
+4. **Reduction tournament:** compare RBKR, tensor/Hermite/POD baselines and full-order reference using the same 3D3V initial data and QoIs. Count operator construction, collision quadrature, field solve, enrichment, monitoring, fallback and diagnostics in the lifecycle budget.
+5. **Sealed 3D3V cascade holdout:** only after operator and full-order convergence qualification, open the 3-/4-cascade sealed holdouts and score the reduced model.
+
+A 1D1V or 2D3V toy model remains useful for implementation debugging and manufactured tests, but it is an auxiliary test tier. It cannot be used as evidence that the cited 3D3V theorem or its sharp threshold has been reproduced.
 
 ## Qualification protocol
 
