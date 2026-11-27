@@ -93,10 +93,7 @@ pub fn remap_distribution_after_velocity_kick(
         return Err(VelocityKickRemapError::InvalidVelocityGrid);
     }
     let velocity_cells = velocity_edges.len() - 1;
-    if distribution
-        .iter()
-        .any(|row| row.len() != velocity_cells)
-    {
+    if distribution.iter().any(|row| row.len() != velocity_cells) {
         return Err(VelocityKickRemapError::ShapeMismatch);
     }
 
@@ -112,7 +109,10 @@ pub fn remap_distribution_after_velocity_kick(
             return Err(VelocityKickRemapError::InvalidSpatialPosition);
         }
         let source = &distribution[row_index];
-        if source.iter().any(|value| !value.is_finite() || *value < 0.0) {
+        if source
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0)
+        {
             return Err(VelocityKickRemapError::InvalidDistribution);
         }
         let shift = kick.delta_v(x)?;
@@ -242,8 +242,7 @@ mod tests {
     use super::*;
 
     fn kick(amplitude: f64) -> SinusoidalVelocityKick {
-        SinusoidalVelocityKick::new(0.0, 2.0 * std::f64::consts::PI, 1, amplitude, 0.0)
-            .unwrap()
+        SinusoidalVelocityKick::new(0.0, 2.0 * std::f64::consts::PI, 1, amplitude, 0.0).unwrap()
     }
 
     fn uniform_edges(min: f64, max: f64, cells: usize) -> Vec<f64> {
@@ -267,19 +266,25 @@ mod tests {
     #[test]
     fn interior_translation_preserves_mass_and_positivity() {
         let edges = uniform_edges(-4.0, 4.0, 64);
-        let distribution = vec![(0..64)
-            .map(|index| {
-                let center = 0.5 * (edges[index] + edges[index + 1]);
-                if (-1.0..=1.0).contains(&center) {
-                    1.0 + 0.2 * center
-                } else {
-                    0.0
-                }
-            })
-            .collect::<Vec<_>>()];
-        let report =
-            remap_distribution_after_velocity_kick(&kick(0.1), &[std::f64::consts::PI / 2.0], &edges, &distribution)
-                .unwrap();
+        let distribution = vec![
+            (0..64)
+                .map(|index| {
+                    let center = 0.5 * (edges[index] + edges[index + 1]);
+                    if (-1.0..=1.0).contains(&center) {
+                        1.0 + 0.2 * center
+                    } else {
+                        0.0
+                    }
+                })
+                .collect::<Vec<_>>(),
+        ];
+        let report = remap_distribution_after_velocity_kick(
+            &kick(0.1),
+            &[std::f64::consts::PI / 2.0],
+            &edges,
+            &distribution,
+        )
+        .unwrap();
         assert!(report.distribution[0].iter().all(|value| *value >= 0.0));
         assert!(report.total_boundary_outflow < 1.0e-14);
         assert!((report.total_mass_after - report.total_mass_before).abs() < 1.0e-12);
@@ -290,12 +295,23 @@ mod tests {
     fn finite_domain_boundary_loss_is_reported_not_renormalized() {
         let edges = uniform_edges(0.0, 1.0, 10);
         let distribution = vec![vec![1.0; 10]];
-        let report = remap_distribution_after_velocity_kick(&kick(0.1), &[std::f64::consts::PI / 2.0], &edges, &distribution)
-            .unwrap();
+        let report = remap_distribution_after_velocity_kick(
+            &kick(0.1),
+            &[std::f64::consts::PI / 2.0],
+            &edges,
+            &distribution,
+        )
+        .unwrap();
         assert!((report.total_mass_before - 1.0).abs() < 1.0e-12);
         assert!((report.total_boundary_outflow - 0.1).abs() < 1.0e-12);
         assert!((report.total_mass_after - 0.9).abs() < 1.0e-12);
-        assert!(report.distribution.iter().flatten().all(|value| *value >= 0.0));
+        assert!(
+            report
+                .distribution
+                .iter()
+                .flatten()
+                .all(|value| *value >= 0.0)
+        );
     }
 
     #[test]
@@ -335,13 +351,23 @@ mod tests {
         assert_eq!(report.spatial_mass.len(), 2);
         assert!((report.spatial_mass[0].boundary_outflow - 0.1).abs() < 1.0e-12);
         assert!((report.spatial_mass[1].boundary_outflow - 0.1).abs() < 1.0e-12);
-        assert!(report.spatial_mass.iter().all(|ledger| ledger.residual.abs() < 1.0e-12));
+        assert!(
+            report
+                .spatial_mass
+                .iter()
+                .all(|ledger| ledger.residual.abs() < 1.0e-12)
+        );
     }
 
     #[test]
     fn invalid_grids_shapes_and_negative_distribution_are_rejected() {
         assert_eq!(
-            remap_distribution_after_velocity_kick(&kick(0.1), &[0.0], &[0.0, 1.0, 0.5], &[vec![1.0, 1.0]]),
+            remap_distribution_after_velocity_kick(
+                &kick(0.1),
+                &[0.0],
+                &[0.0, 1.0, 0.5],
+                &[vec![1.0, 1.0]]
+            ),
             Err(VelocityKickRemapError::InvalidVelocityGrid)
         );
         assert_eq!(
@@ -349,7 +375,12 @@ mod tests {
             Err(VelocityKickRemapError::InvalidDistribution)
         );
         assert_eq!(
-            remap_distribution_after_velocity_kick(&kick(0.1), &[0.0, 1.0], &[0.0, 1.0], &[vec![1.0]]),
+            remap_distribution_after_velocity_kick(
+                &kick(0.1),
+                &[0.0, 1.0],
+                &[0.0, 1.0],
+                &[vec![1.0]]
+            ),
             Err(VelocityKickRemapError::ShapeMismatch)
         );
     }
