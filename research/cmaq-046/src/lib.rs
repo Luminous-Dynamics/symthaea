@@ -453,7 +453,7 @@ fn project_unit_ball(vector: &mut [f64]) -> Result<(), ApproachabilityError> {
         return Err(ApproachabilityError::ArithmeticOverflow);
     }
     if norm > 1.0 {
-        for value in vector {
+        for value in vector.iter_mut() {
             *value /= norm;
         }
     }
