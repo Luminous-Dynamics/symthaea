@@ -543,7 +543,7 @@
     },
     "adjacent_methods": {
       "type": "array",
-      "minItems": 6,
+      "minItems": 8,
       "uniqueItems": true,
       "items": {
         "enum": [
@@ -552,7 +552,9 @@
           "adaptive_opinf_nitrom_hybrid_port",
           "symmetry_augmented_kinetic_closure",
           "entropy_based_vlasov_poisson_dougherty_moment_port",
-          "adaptive_symplectic_particle_vlasov_rom_port"
+          "adaptive_symplectic_particle_vlasov_rom_port",
+          "goal_oriented_dwr_hyperreduction_port",
+          "balanced_truncation_a_posteriori_bound_port"
         ]
       }
     },
@@ -865,7 +867,9 @@
       "items": {
         "enum": [
           "semi_infinite_worst_case_scenario_generation",
-          "adaptive_symplectic_particle_vlasov_rom"
+          "adaptive_symplectic_particle_vlasov_rom",
+          "dual_weighted_residual_goal_oriented_sampling",
+          "balanced_truncation_a_posteriori_error_bound"
         ]
       }
     }
