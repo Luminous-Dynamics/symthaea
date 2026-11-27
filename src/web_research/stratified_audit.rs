@@ -48,6 +48,9 @@ pub struct AuditStratumPlan {
     /// Joint inclusion probability for two distinct units in this stratum:
     /// n_h(n_h-1) / (N_h(N_h-1)).
     pub distinct_pair_joint_inclusion_probability: f64,
+    /// A design-based sample variance is estimable in this stratum when at
+    /// least two units are sampled or the stratum is a full census.
+    pub variance_estimable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -249,6 +252,9 @@ pub fn build_stratified_random_audit_plan(
             sampling_fraction: inclusion_probability,
             first_order_inclusion_probability: inclusion_probability,
             distinct_pair_joint_inclusion_probability: distinct_pair_probability,
+            variance_estimable: sample_size == population_size
+                || sample_size >= 2
+                || population_size == 1,
         });
         audit_sample_size += sample_size;
     }
@@ -281,6 +287,12 @@ pub fn build_stratified_random_audit_plan(
 }
 
 impl StratifiedAuditPlan {
+    /// Whether every stratum supports a design-based variance estimate from
+    /// observed within-stratum variation, including census strata.
+    pub fn supports_design_based_variance_estimation(&self) -> bool {
+        self.strata.iter().all(|stratum| stratum.variance_estimable)
+    }
+
     /// Exact second-order inclusion probability under independent random
     /// selection across strata and simple random sampling without replacement
     /// within each stratum.
@@ -458,6 +470,35 @@ mod tests {
             row.selected_for_adjudication && row.inclusion_probability == 1.0
         }));
         assert_eq!(plan.joint_inclusion_probability("b1", "b2"), Some(1.0));
+    }
+
+    #[test]
+    fn single_sample_non_census_stratum_does_not_claim_variance_estimability() {
+        let plan = build();
+        assert!(!plan.supports_design_based_variance_estimation());
+        assert!(plan
+            .strata
+            .iter()
+            .find(|stratum| stratum.stratum_id == "domain-b")
+            .is_some_and(|stratum| !stratum.variance_estimable));
+    }
+
+    #[test]
+    fn full_census_strata_are_variance_estimable() {
+        let mut input = candidates();
+        input.retain(|candidate| candidate.stratum_id == "domain-b");
+        let quota = vec![AuditStratumQuota {
+            stratum_id: "domain-b".to_owned(),
+            sample_size: 3,
+        }];
+        let plan = build_stratified_random_audit_plan(
+            &input,
+            &quota,
+            "census-audit-v1",
+            "custody://randomization-manifest/census",
+        )
+        .unwrap();
+        assert!(plan.supports_design_based_variance_estimation());
     }
 
     #[test]
