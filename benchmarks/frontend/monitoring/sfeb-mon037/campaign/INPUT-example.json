@@ -18,7 +18,8 @@
       "operation": "INSERT",
       "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "total_order": 1,
-      "collection_order": 1
+      "collection_order": 1,
+      "data_collection": "public.ledger"
     },
     {
       "event_id": "message-1",
@@ -27,7 +28,8 @@
       "operation": "MESSAGE",
       "payload_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "total_order": 2,
-      "collection_order": 1
+      "collection_order": 1,
+      "data_collection": "LOGICAL_DECODING_MESSAGE"
     }
   ],
   "observed_events": [
@@ -40,7 +42,8 @@
       "total_order": 1,
       "collection_order": 1,
       "partition": 0,
-      "offset": 10
+      "offset": 10,
+      "data_collection": "public.ledger"
     },
     {
       "event_id": "message-1",
@@ -51,7 +54,8 @@
       "total_order": 2,
       "collection_order": 1,
       "partition": 0,
-      "offset": 7
+      "offset": 7,
+      "data_collection": "LOGICAL_DECODING_MESSAGE"
     }
   ],
   "topic_partitions": [
@@ -72,8 +76,8 @@
       "end_observed": true,
       "end_event_count": 2,
       "data_collections": {
-        "ledger": 1,
-        "message": 1
+        "public.ledger": 1,
+        "LOGICAL_DECODING_MESSAGE": 1
       }
     }
   ],
