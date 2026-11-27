@@ -12,6 +12,8 @@ use std::collections::HashSet;
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReferencePathMaximum {
     pub trajectory_id: String,
+    /// Must equal the enclosing bank's frozen finite horizon.
+    pub horizon: u64,
     pub trace_sha256: String,
     /// Log of the maximum pre-registered e-process statistic over 0..=T.
     /// The path must include initial wealth one, so this value is nonnegative.
@@ -54,6 +56,7 @@ pub enum CalibrationError {
     InvalidAlpha,
     DuplicateReferenceTrajectory,
     DuplicateReferenceTrace,
+    ReferenceHorizonMismatch,
     InvalidEvidenceDigest(&'static str),
     NonFiniteLogMaximum,
     LogMaximumBelowInitialWealth,
@@ -146,6 +149,9 @@ impl FiniteHorizonGate {
             }
             if !reference_ids.insert(reference.trajectory_id.clone()) {
                 return Err(CalibrationError::DuplicateReferenceTrajectory);
+            }
+            if reference.horizon != bank.horizon {
+                return Err(CalibrationError::ReferenceHorizonMismatch);
             }
             validate_digest(&reference.trace_sha256, "reference_trace_sha256")?;
             if !reference_trace_hashes.insert(reference.trace_sha256.clone()) {
@@ -369,7 +375,8 @@ mod tests {
             references: (0..reference_count)
                 .map(|index| ReferencePathMaximum {
                     trajectory_id: format!("null-{index}"),
-                    trace_sha256: SHA_A.into(),
+                    horizon: 500,
+                    trace_sha256: format!("{:064x}", index + 1),
                     log_max_e_value: index as f64,
                 })
                 .collect(),
@@ -483,6 +490,16 @@ mod tests {
         assert_eq!(
             FiniteHorizonGate::calibrate(input).err(),
             Some(CalibrationError::DuplicateReferenceTrajectory)
+        );
+    }
+
+    #[test]
+    fn mismatched_reference_path_horizon_is_rejected() {
+        let mut input = bank(19);
+        input.references[0].horizon = 499;
+        assert_eq!(
+            FiniteHorizonGate::calibrate(input).err(),
+            Some(CalibrationError::ReferenceHorizonMismatch)
         );
     }
 
