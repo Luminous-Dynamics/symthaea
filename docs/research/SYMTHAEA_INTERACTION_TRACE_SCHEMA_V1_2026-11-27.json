@@ -443,6 +443,13 @@
                 "type": "string",
                 "pattern": "^[A-Za-z0-9._:-]{1,128}$"
               }
+            },
+            "privacy_class": {
+              "enum": [
+                "public",
+                "local_sensitive",
+                "restricted"
+              ]
             }
           },
           "required": [
@@ -457,7 +464,8 @@
             "policy_version",
             "semantic_event_id",
             "form",
-            "action_scope"
+            "action_scope",
+            "privacy_class"
           ]
         }
       ],
@@ -607,6 +615,13 @@
             "source_now_monotonic_ns": {
               "type": "integer",
               "minimum": 0
+            },
+            "privacy_class": {
+              "enum": [
+                "public",
+                "local_sensitive",
+                "restricted"
+              ]
             }
           },
           "required": [
@@ -623,7 +638,8 @@
             "observed_by",
             "destination",
             "source_clock_domain_id",
-            "source_now_monotonic_ns"
+            "source_now_monotonic_ns",
+            "privacy_class"
           ]
         }
       ],

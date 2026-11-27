@@ -32,6 +32,8 @@ pub enum InteractionTraceError {
     ConflictingCueDigest { index: usize },
     MissingAuthorization { index: usize },
     AuthorizationMismatch { index: usize },
+    PrivacyMismatch { index: usize },
+    PolicyVersionRegression { index: usize },
     AuthorizationExpired { index: usize },
     AuthorizationRevoked { index: usize },
     SourceClockMismatch { index: usize },
@@ -71,6 +73,7 @@ struct AuthorizationKey {
     form: String,
     channel: String,
     destination: String,
+    privacy_class: String,
 }
 
 #[derive(Debug, Clone)]
@@ -80,6 +83,7 @@ struct AuthorizationRecord {
     clock_domain_id: String,
     expires_at_monotonic_ns: u64,
     action_scope: HashSet<String>,
+    policy_version: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +92,14 @@ struct OutputRecord {
     authorization_sequence: u64,
     last_frame_index: Option<u64>,
     stopped: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SemanticEventRecord {
+    digest: String,
+    clock_domain_id: String,
+    sequence: u64,
+    privacy_class: String,
 }
 
 pub struct InteractionTraceVerifier;
@@ -132,10 +144,15 @@ impl InteractionTraceVerifier {
             ..Default::default()
         };
         let mut last_sequence = None;
+        let mut last_policy_version = trace
+            .get("run_manifest")
+            .and_then(|manifest| manifest.get("policy_version"))
+            .and_then(Value::as_u64)
+            .ok_or(InteractionTraceError::InvalidRoot("run_manifest.policy_version"))?;
         let mut last_event_time_by_clock: HashMap<String, u64> = HashMap::new();
         let mut last_source_time_by_clock: HashMap<String, u64> = HashMap::new();
         let mut seen_sequences = HashSet::new();
-        let mut semantic_events: HashMap<String, (String, String, u64)> = HashMap::new();
+        let mut semantic_events: HashMap<String, SemanticEventRecord> = HashMap::new();
         let mut turn_candidates = HashSet::new();
         let mut authorization_by_sequence: HashMap<u64, AuthorizationRecord> = HashMap::new();
         let mut authorization_by_key: HashMap<AuthorizationKey, Vec<u64>> = HashMap::new();
@@ -191,14 +208,29 @@ impl InteractionTraceVerifier {
                     validate_identifier(&event_id, Some(index), "event_id")?;
                     let digest = event_string(event, "canonical_cue_digest", index)?.to_owned();
                     validate_hex(&digest, 64, Some(index), "canonical_cue_digest")?;
-                    if let Some((previous, _, _)) = semantic_events.get(&event_id) {
-                        if previous != &digest {
+                    let privacy_class = event_string(event, "privacy_class", index)?.to_owned();
+                    if !matches!(privacy_class.as_str(), "public" | "local_sensitive" | "restricted") {
+                        return Err(InteractionTraceError::InvalidField { index: Some(index), field: "privacy_class" });
+                    }
+                    if let Some(previous) = semantic_events.get(&event_id) {
+                        if previous.digest != digest {
                             return Err(InteractionTraceError::ConflictingCueDigest { index });
+                        }
+                        if previous.privacy_class != privacy_class {
+                            return Err(InteractionTraceError::PrivacyMismatch { index });
+                        }
+                        if previous.clock_domain_id != clock_domain_id {
+                            return Err(InteractionTraceError::AuthorizationMismatch { index });
                         }
                     } else {
                         semantic_events.insert(
                             event_id,
-                            (digest, clock_domain_id.clone(), sequence),
+                            SemanticEventRecord {
+                                digest,
+                                clock_domain_id: clock_domain_id.clone(),
+                                sequence,
+                                privacy_class,
+                            },
                         );
                     }
                     summary.semantic_cues += 1;
@@ -242,6 +274,11 @@ impl InteractionTraceVerifier {
                     let form = event_string(event, "form", index)?.to_owned();
                     let channel = event_string(event, "channel", index)?.to_owned();
                     let destination = event_string(event, "destination", index)?.to_owned();
+                    let privacy_class = event_string(event, "privacy_class", index)?.to_owned();
+                    let policy_version = event_u64(event, "policy_version", index)?;
+                    if policy_version != last_policy_version {
+                        return Err(InteractionTraceError::PolicyVersionRegression { index });
+                    }
                     let action_scope_values = event
                         .get("action_scope")
                         .and_then(Value::as_array)
@@ -260,11 +297,14 @@ impl InteractionTraceVerifier {
                     }
                     let semantic = semantic_events.get(&semantic_event_id)
                         .ok_or(InteractionTraceError::MissingAuthorization { index })?;
-                    if semantic.0 != canonical_cue_digest
-                        || semantic.1 != clock_domain_id
-                        || semantic.2 >= sequence
+                    if semantic.digest != canonical_cue_digest
+                        || semantic.clock_domain_id != clock_domain_id
+                        || semantic.sequence >= sequence
                     {
                         return Err(InteractionTraceError::AuthorizationMismatch { index });
+                    }
+                    if semantic.privacy_class != privacy_class {
+                        return Err(InteractionTraceError::PrivacyMismatch { index });
                     }
 
                     if decision == "authorized" {
@@ -284,6 +324,7 @@ impl InteractionTraceVerifier {
                             form,
                             channel,
                             destination,
+                            privacy_class,
                         };
                         let record = AuthorizationRecord {
                             sequence,
@@ -291,6 +332,7 @@ impl InteractionTraceVerifier {
                             clock_domain_id: clock_domain_id.clone(),
                             expires_at_monotonic_ns: expires,
                             action_scope,
+                            policy_version,
                         };
                         authorization_by_sequence.insert(sequence, record);
                         authorization_by_key.entry(key).or_default().push(sequence);
@@ -349,13 +391,17 @@ impl InteractionTraceVerifier {
                         form: event_string(event, "form", index)?.to_owned(),
                         channel: event_string(event, "channel", index)?.to_owned(),
                         destination: event_string(event, "destination", index)?.to_owned(),
+                        privacy_class: event_string(event, "privacy_class", index)?.to_owned(),
                     };
                     let semantic = semantic_events.get(&key.semantic_event_id)
                         .ok_or(InteractionTraceError::AuthorizationMismatch { index })?;
-                    if semantic.0 != key.canonical_cue_digest
-                        || semantic.2 >= sequence
+                    if semantic.digest != key.canonical_cue_digest
+                        || semantic.sequence >= sequence
                     {
                         return Err(InteractionTraceError::AuthorizationMismatch { index });
+                    }
+                    if semantic.privacy_class != key.privacy_class {
+                        return Err(InteractionTraceError::PrivacyMismatch { index });
                     }
                     let source_clock = event_string(event, "source_clock_domain_id", index)?.to_owned();
                     validate_identifier(&source_clock, Some(index), "source_clock_domain_id")?;
@@ -467,6 +513,11 @@ impl InteractionTraceVerifier {
                 }
                 "policy_change" => {
                     let change = event_string(event, "change", index)?;
+                    let next_policy_version = event_u64(event, "policy_version", index)?;
+                    if next_policy_version <= last_policy_version {
+                        return Err(InteractionTraceError::PolicyVersionRegression { index });
+                    }
+                    last_policy_version = next_policy_version;
                     let grant_id = optional_event_string(event, "grant_id", index)?;
                     let affected_event_id = optional_event_string(event, "affected_event_id", index)?;
                     match change {
@@ -903,5 +954,35 @@ mod tests {
             InteractionTraceVerifier::verify_value(&trace),
             Err(InteractionTraceError::OutputNotStopped { .. })
         ));
+    }
+
+    #[test]
+    fn presentation_privacy_must_match_the_semantic_cue_and_grant() {
+        let mut trace = valid_trace();
+        trace["events"][4]["privacy_class"] = json!("restricted");
+        assert_eq!(
+            InteractionTraceVerifier::verify_value(&trace),
+            Err(InteractionTraceError::PrivacyMismatch { index: 4 })
+        );
+    }
+
+    #[test]
+    fn policy_version_cannot_roll_back() {
+        let mut trace = valid_trace();
+        trace["events"][5]["policy_version"] = json!(2);
+        assert_eq!(
+            InteractionTraceVerifier::verify_value(&trace),
+            Err(InteractionTraceError::PolicyVersionRegression { index: 5 })
+        );
+    }
+
+    #[test]
+    fn authorization_must_use_current_policy_version() {
+        let mut trace = valid_trace();
+        trace["events"][2]["policy_version"] = json!(2);
+        assert_eq!(
+            InteractionTraceVerifier::verify_value(&trace),
+            Err(InteractionTraceError::PolicyVersionRegression { index: 2 })
+        );
     }
 }

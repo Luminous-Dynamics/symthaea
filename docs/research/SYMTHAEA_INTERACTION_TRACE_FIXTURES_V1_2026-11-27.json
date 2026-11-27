@@ -57,7 +57,8 @@
           "policy_version": 3,
           "semantic_event_id": "event:1",
           "form": "living_constellation",
-          "action_scope": []
+          "action_scope": [],
+          "privacy_class": "public"
         },
         {
           "sequence": 3,
@@ -76,7 +77,8 @@
           "observed_by": null,
           "destination": "local_private",
           "source_clock_domain_id": "clock:synthetic-1",
-          "source_now_monotonic_ns": 125
+          "source_now_monotonic_ns": 125,
+          "privacy_class": "public"
         },
         {
           "sequence": 4,
@@ -95,7 +97,8 @@
           "observed_by": "compositor-observer:test",
           "destination": "local_private",
           "source_clock_domain_id": "clock:synthetic-1",
-          "source_now_monotonic_ns": 130
+          "source_now_monotonic_ns": 130,
+          "privacy_class": "public"
         },
         {
           "sequence": 5,
@@ -122,7 +125,8 @@
           "policy_version": 4,
           "semantic_event_id": "event:1",
           "form": "living_constellation",
-          "action_scope": []
+          "action_scope": [],
+          "privacy_class": "public"
         },
         {
           "sequence": 7,
@@ -141,7 +145,8 @@
           "observed_by": "compositor-observer:test",
           "destination": "local_private",
           "source_clock_domain_id": "clock:synthetic-1",
-          "source_now_monotonic_ns": 150
+          "source_now_monotonic_ns": 150,
+          "privacy_class": "public"
         }
       ],
       "declared_outcome": {
@@ -212,7 +217,8 @@
             "policy_version": 3,
             "semantic_event_id": "event:1",
             "form": "living_constellation",
-            "action_scope": []
+            "action_scope": [],
+            "privacy_class": "public"
           },
           {
             "sequence": 3,
@@ -231,7 +237,8 @@
             "observed_by": null,
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 125
+            "source_now_monotonic_ns": 125,
+            "privacy_class": "public"
           },
           {
             "sequence": 3,
@@ -250,7 +257,8 @@
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 130
+            "source_now_monotonic_ns": 130,
+            "privacy_class": "public"
           },
           {
             "sequence": 5,
@@ -277,7 +285,8 @@
             "policy_version": 4,
             "semantic_event_id": "event:1",
             "form": "living_constellation",
-            "action_scope": []
+            "action_scope": [],
+            "privacy_class": "public"
           },
           {
             "sequence": 7,
@@ -296,7 +305,8 @@
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 150
+            "source_now_monotonic_ns": 150,
+            "privacy_class": "public"
           }
         ],
         "declared_outcome": {
@@ -366,7 +376,8 @@
             "policy_version": 3,
             "semantic_event_id": "event:1",
             "form": "living_constellation",
-            "action_scope": []
+            "action_scope": [],
+            "privacy_class": "public"
           },
           {
             "sequence": 3,
@@ -385,7 +396,8 @@
             "observed_by": null,
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 125
+            "source_now_monotonic_ns": 125,
+            "privacy_class": "public"
           },
           {
             "sequence": 4,
@@ -404,7 +416,8 @@
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 130
+            "source_now_monotonic_ns": 130,
+            "privacy_class": "public"
           },
           {
             "sequence": 5,
@@ -431,7 +444,8 @@
             "policy_version": 4,
             "semantic_event_id": "event:1",
             "form": "living_constellation",
-            "action_scope": []
+            "action_scope": [],
+            "privacy_class": "public"
           },
           {
             "sequence": 7,
@@ -450,7 +464,8 @@
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 150
+            "source_now_monotonic_ns": 150,
+            "privacy_class": "public"
           },
           {
             "sequence": 8,
@@ -469,7 +484,8 @@
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 155
+            "source_now_monotonic_ns": 155,
+            "privacy_class": "public"
           }
         ],
         "declared_outcome": {
@@ -539,7 +555,8 @@
             "policy_version": 3,
             "semantic_event_id": "event:1",
             "form": "living_constellation",
-            "action_scope": []
+            "action_scope": [],
+            "privacy_class": "public"
           },
           {
             "sequence": 3,
@@ -558,7 +575,8 @@
             "observed_by": null,
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 125
+            "source_now_monotonic_ns": 125,
+            "privacy_class": "public"
           },
           {
             "sequence": 4,
@@ -577,7 +595,8 @@
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 130
+            "source_now_monotonic_ns": 130,
+            "privacy_class": "public"
           },
           {
             "sequence": 5,
@@ -604,7 +623,8 @@
             "policy_version": 4,
             "semantic_event_id": "event:1",
             "form": "living_constellation",
-            "action_scope": []
+            "action_scope": [],
+            "privacy_class": "public"
           },
           {
             "sequence": 7,
@@ -623,7 +643,8 @@
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 150
+            "source_now_monotonic_ns": 150,
+            "privacy_class": "public"
           }
         ],
         "declared_outcome": {
@@ -695,7 +716,8 @@
             "observed_by": null,
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 125
+            "source_now_monotonic_ns": 125,
+            "privacy_class": "public"
           },
           {
             "sequence": 4,
@@ -714,7 +736,8 @@
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 130
+            "source_now_monotonic_ns": 130,
+            "privacy_class": "public"
           },
           {
             "sequence": 5,
@@ -741,7 +764,8 @@
             "policy_version": 4,
             "semantic_event_id": "event:1",
             "form": "living_constellation",
-            "action_scope": []
+            "action_scope": [],
+            "privacy_class": "public"
           },
           {
             "sequence": 7,
@@ -760,7 +784,326 @@
             "observed_by": "compositor-observer:test",
             "destination": "local_private",
             "source_clock_domain_id": "clock:synthetic-1",
-            "source_now_monotonic_ns": 150
+            "source_now_monotonic_ns": 150,
+            "privacy_class": "public"
+          }
+        ],
+        "declared_outcome": {
+          "task_success": null,
+          "unauthorized_actions": 0,
+          "post_expiry_frames": 0,
+          "user_visible_stop_latency_ms": 0.01,
+          "semantic_preservation_score": 1
+        }
+      }
+    },
+    {
+      "name": "presentation-privacy-does-not-match-cue-and-grant",
+      "expected_rejection": "privacy_mismatch",
+      "trace": {
+        "schema": "symthaea.interaction-trace.v1",
+        "trace_id": "trace:invalid-privacy-class-upgrade",
+        "session_id": "session:benchmark-001",
+        "protocol": "symthaea-interaction-v0.1",
+        "source_commit": "55e01e7563087dff303865f5036963ea1cb36737",
+        "dataset_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "run_manifest": {
+          "model_id": "symthaea-local-unqualified",
+          "renderer_build": "symthaea-soma-bevy-source",
+          "device_id": "reference-device-unqualified",
+          "os_build": "linux-unqualified",
+          "policy_version": 3,
+          "scorer_version": "trace-verifier-v0.1",
+          "network_profile": "local-no-network",
+          "evaluation_split": "synthetic_fault_injection"
+        },
+        "events": [
+          {
+            "sequence": 0,
+            "at_monotonic_ns": 100,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "input_chunk",
+            "modality": "audio",
+            "stream_id": "mic:synthetic",
+            "payload_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "duration_ms": 20,
+            "arrival_at_monotonic_ns": 101
+          },
+          {
+            "sequence": 1,
+            "at_monotonic_ns": 110,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "semantic_cue",
+            "event_id": "event:1",
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "semantic_key": "turn:respond",
+            "privacy_class": "public",
+            "epistemic_status": "measured"
+          },
+          {
+            "sequence": 2,
+            "at_monotonic_ns": 120,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "authorization",
+            "decision": "authorized",
+            "grant_id": "grant:1",
+            "permit_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "channel": "visual",
+            "destination": "local_private",
+            "expires_at_monotonic_ns": 1000,
+            "policy_version": 3,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation",
+            "action_scope": [],
+            "privacy_class": "public"
+          },
+          {
+            "sequence": 3,
+            "at_monotonic_ns": 125,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "presentation",
+            "output_id": "output:1",
+            "semantic_event_id": "event:1",
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "grant_id": "grant:1",
+            "form": "living_constellation",
+            "channel": "visual",
+            "stage": "adapter_submitted",
+            "frame_index": null,
+            "effective_intensity": 0.4,
+            "observed_by": null,
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 125,
+            "privacy_class": "public"
+          },
+          {
+            "sequence": 4,
+            "at_monotonic_ns": 130,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "presentation",
+            "output_id": "output:1",
+            "semantic_event_id": "event:1",
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "grant_id": "grant:1",
+            "form": "living_constellation",
+            "channel": "visual",
+            "stage": "frame_presented",
+            "frame_index": 1,
+            "effective_intensity": 0.4,
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 130,
+            "privacy_class": "restricted"
+          },
+          {
+            "sequence": 5,
+            "at_monotonic_ns": 140,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "policy_change",
+            "policy_version": 4,
+            "change": "revoke",
+            "grant_id": "grant:1",
+            "affected_event_id": "event:1"
+          },
+          {
+            "sequence": 6,
+            "at_monotonic_ns": 145,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "authorization",
+            "decision": "revoked",
+            "grant_id": "grant:1",
+            "permit_digest": null,
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "channel": "visual",
+            "destination": "local_private",
+            "expires_at_monotonic_ns": null,
+            "policy_version": 4,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation",
+            "action_scope": [],
+            "privacy_class": "public"
+          },
+          {
+            "sequence": 7,
+            "at_monotonic_ns": 150,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "presentation",
+            "output_id": "output:1",
+            "semantic_event_id": "event:1",
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "grant_id": "grant:1",
+            "form": "living_constellation",
+            "channel": "visual",
+            "stage": "output_stopped",
+            "frame_index": 2,
+            "effective_intensity": 0,
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 150,
+            "privacy_class": "public"
+          }
+        ],
+        "declared_outcome": {
+          "task_success": null,
+          "unauthorized_actions": 0,
+          "post_expiry_frames": 0,
+          "user_visible_stop_latency_ms": 0.01,
+          "semantic_preservation_score": 1
+        }
+      }
+    },
+    {
+      "name": "policy-version-rollback",
+      "expected_rejection": "policy_version_regression",
+      "trace": {
+        "schema": "symthaea.interaction-trace.v1",
+        "trace_id": "trace:invalid-policy-version-rollback",
+        "session_id": "session:benchmark-001",
+        "protocol": "symthaea-interaction-v0.1",
+        "source_commit": "55e01e7563087dff303865f5036963ea1cb36737",
+        "dataset_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "run_manifest": {
+          "model_id": "symthaea-local-unqualified",
+          "renderer_build": "symthaea-soma-bevy-source",
+          "device_id": "reference-device-unqualified",
+          "os_build": "linux-unqualified",
+          "policy_version": 3,
+          "scorer_version": "trace-verifier-v0.1",
+          "network_profile": "local-no-network",
+          "evaluation_split": "synthetic_fault_injection"
+        },
+        "events": [
+          {
+            "sequence": 0,
+            "at_monotonic_ns": 100,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "input_chunk",
+            "modality": "audio",
+            "stream_id": "mic:synthetic",
+            "payload_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "duration_ms": 20,
+            "arrival_at_monotonic_ns": 101
+          },
+          {
+            "sequence": 1,
+            "at_monotonic_ns": 110,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "semantic_cue",
+            "event_id": "event:1",
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "semantic_key": "turn:respond",
+            "privacy_class": "public",
+            "epistemic_status": "measured"
+          },
+          {
+            "sequence": 2,
+            "at_monotonic_ns": 120,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "authorization",
+            "decision": "authorized",
+            "grant_id": "grant:1",
+            "permit_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "channel": "visual",
+            "destination": "local_private",
+            "expires_at_monotonic_ns": 1000,
+            "policy_version": 3,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation",
+            "action_scope": [],
+            "privacy_class": "public"
+          },
+          {
+            "sequence": 3,
+            "at_monotonic_ns": 125,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "presentation",
+            "output_id": "output:1",
+            "semantic_event_id": "event:1",
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "grant_id": "grant:1",
+            "form": "living_constellation",
+            "channel": "visual",
+            "stage": "adapter_submitted",
+            "frame_index": null,
+            "effective_intensity": 0.4,
+            "observed_by": null,
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 125,
+            "privacy_class": "public"
+          },
+          {
+            "sequence": 4,
+            "at_monotonic_ns": 130,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "presentation",
+            "output_id": "output:1",
+            "semantic_event_id": "event:1",
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "grant_id": "grant:1",
+            "form": "living_constellation",
+            "channel": "visual",
+            "stage": "frame_presented",
+            "frame_index": 1,
+            "effective_intensity": 0.4,
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 130,
+            "privacy_class": "public"
+          },
+          {
+            "sequence": 5,
+            "at_monotonic_ns": 140,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "policy_change",
+            "policy_version": 2,
+            "change": "revoke",
+            "grant_id": "grant:1",
+            "affected_event_id": "event:1"
+          },
+          {
+            "sequence": 6,
+            "at_monotonic_ns": 145,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "authorization",
+            "decision": "revoked",
+            "grant_id": "grant:1",
+            "permit_digest": null,
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "channel": "visual",
+            "destination": "local_private",
+            "expires_at_monotonic_ns": null,
+            "policy_version": 4,
+            "semantic_event_id": "event:1",
+            "form": "living_constellation",
+            "action_scope": [],
+            "privacy_class": "public"
+          },
+          {
+            "sequence": 7,
+            "at_monotonic_ns": 150,
+            "clock_domain_id": "clock:synthetic-1",
+            "event_type": "presentation",
+            "output_id": "output:1",
+            "semantic_event_id": "event:1",
+            "canonical_cue_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "grant_id": "grant:1",
+            "form": "living_constellation",
+            "channel": "visual",
+            "stage": "output_stopped",
+            "frame_index": 2,
+            "effective_intensity": 0,
+            "observed_by": "compositor-observer:test",
+            "destination": "local_private",
+            "source_clock_domain_id": "clock:synthetic-1",
+            "source_now_monotonic_ns": 150,
+            "privacy_class": "public"
           }
         ],
         "declared_outcome": {
