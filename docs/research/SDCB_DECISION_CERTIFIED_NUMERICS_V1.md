@@ -115,6 +115,8 @@ and evaluates utility breakpoints as dual multipliers. Each multiplication/addit
 
 Nine Rust tests are authored for exact unit sums, decimal-float overage, a 3-cell utility fixture, exact probabilities, negative utilities, infeasible boxes, unique action separation, unresolved overlap and malformed inputs. A separate Python oracle using exact `Fraction.from_float` summation and `nextafter` outward arithmetic passed the fixed fixtures and 2,000 randomized box-plus-normalization LP-extrema checks; a separate exact-sum bit-accumulator check matched `Fraction.from_float` on 10,000 random vectors of up to 64 cells. This is independent authoring-runtime verification, not Rust execution or a formally verified compiler/arithmetic proof.
 
+**Arithmetic qualification assumption:** the one-step outward expansion relies on correctly rounded IEEE-754 binary64 basic operations with gradual underflow and without flush-to-zero / fast-math transformations. The target architecture, compiler flags, and floating-point environment must be independently qualified before this helper is promoted from a conservative research bound to a certified numerical contract.
+
 Current scope is deliberately limited to interval boxes plus one normalization equality. Extra pairwise marginal or cross-moment constraints are not handled by this module; they require a richer constrained LP. This is an evaluator only: it does not construct experiments, mutate #13805, authorize actions or validate the supplied probability enclosures themselves.
 
 ## 6. Invariants and negative controls
