@@ -146,6 +146,8 @@ pub struct PredictedOutcome {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActionProbability {
     pub action_id: String,
+    /// Digest of the exact action parameters/payload assigned under this identity.
+    pub action_payload_digest: String,
     pub probability_micros: u32,
 }
 
@@ -168,6 +170,8 @@ pub struct DecisionProposal {
     pub policy_id: String,
     pub policy_version: String,
     pub selected_action_id: String,
+    /// Digest of the exact selected payload (for example, an ordered AS-Bench design batch).
+    pub selected_action_payload_digest: String,
     pub rationale_digest: String,
     pub assumption_digests: Vec<String>,
     pub predicted_outcomes: Vec<PredictedOutcome>,
@@ -182,6 +186,7 @@ impl DecisionProposal {
         require_nonempty("policy_id", &self.policy_id)?;
         require_nonempty("policy_version", &self.policy_version)?;
         require_nonempty("selected_action_id", &self.selected_action_id)?;
+        require_nonempty("selected_action_payload_digest", &self.selected_action_payload_digest)?;
         require_nonempty("rationale_digest", &self.rationale_digest)?;
         if self.episode_id != c.episode_id { return Err("proposal episode mismatch".into()); }
         if !c.permits(&self.selected_action_id) { return Err("selected action outside permitted set".into()); }
@@ -207,13 +212,16 @@ impl DecisionProposal {
                 let mut selected_probability = 0_u32;
                 for entry in action_probabilities {
                     require_nonempty("randomized action_id", &entry.action_id)?;
+                    require_nonempty("randomized action_payload_digest", &entry.action_payload_digest)?;
                     if !c.permits(&entry.action_id) {
                         return Err("randomization distribution contains an action outside the permitted set".into());
                     }
                     if entry.probability_micros > PROBABILITY_SCALE {
                         return Err("action propensity exceeds probability scale".into());
                     }
-                    if entry.action_id == self.selected_action_id {
+                    if entry.action_id == self.selected_action_id
+                        && entry.action_payload_digest == self.selected_action_payload_digest
+                    {
                         selected_probability = entry.probability_micros;
                     }
                     action_ids.push(entry.action_id.clone());
@@ -267,6 +275,7 @@ pub struct EvaluatorResolution {
     pub outcome_status: OutcomeStatus,
     pub action_support: ActionSupport,
     pub observed_action_id: Option<String>,
+    pub observed_action_payload_digest: Option<String>,
     pub outcome_label: Option<String>,
     pub evaluator_evidence: Vec<EvidenceReference>,
     pub finalized_at_ms: Option<u64>,
@@ -311,7 +320,7 @@ impl EvaluatorResolution {
 
         match self.outcome_status {
             OutcomeStatus::AwaitingObservation => {
-                self.require_action(&p.selected_action_id)?;
+                self.require_action(&p.selected_action_id, &p.selected_action_payload_digest)?;
                 if self.outcome_label.is_some() || self.finalized_at_ms.is_some() {
                     return Err("awaiting outcome cannot have final label/time".into());
                 }
@@ -332,30 +341,37 @@ impl EvaluatorResolution {
             OutcomeStatus::UnsupportedCounterfactual => {
                 if self.execution_status != ExecutionStatus::NotStarted
                     || self.action_support != ActionSupport::NoObservedOutcome
-                    || self.observed_action_id.is_some() || self.outcome_label.is_some()
+                    || self.observed_action_id.is_some() || self.observed_action_payload_digest.is_some() || self.outcome_label.is_some()
                     || !self.evaluator_evidence.is_empty() {
                     return Err("unsupported counterfactual cannot carry execution or fabricated outcome".into());
                 }
             }
             OutcomeStatus::NotRun => {
                 if self.action_support != ActionSupport::NoObservedOutcome
-                    || self.observed_action_id.is_some() || self.outcome_label.is_some()
+                    || self.observed_action_id.is_some() || self.observed_action_payload_digest.is_some() || self.outcome_label.is_some()
                     || !self.evaluator_evidence.is_empty() {
                     return Err("not-run cannot carry observed action or outcome".into());
                 }
             }
             OutcomeStatus::InvalidExecution => {
                 if self.outcome_label.is_some() { return Err("invalid execution cannot carry scientific label".into()); }
-                if self.action_support == ActionSupport::ObservedOutcome { self.require_action(&p.selected_action_id)?; }
-                else if self.observed_action_id.is_some() { return Err("unobserved action cannot have an action ID".into()); }
+                if self.action_support == ActionSupport::ObservedOutcome {
+                    self.require_action(&p.selected_action_id, &p.selected_action_payload_digest)?;
+                } else if self.observed_action_id.is_some() || self.observed_action_payload_digest.is_some() {
+                    return Err("unobserved action cannot have an action ID or payload digest".into());
+                }
             }
         }
         Ok(())
     }
-    fn require_action(&self, expected: &str) -> Result<(), String> {
+    fn require_action(&self, expected_id: &str, expected_payload_digest: &str) -> Result<(), String> {
         if self.action_support != ActionSupport::ObservedOutcome { return Err("observed action support required".into()); }
-        let actual = self.observed_action_id.as_deref().ok_or_else(|| "observed action ID required".to_string())?;
-        if actual != expected { return Err("observed action differs from proposal".into()); }
+        let actual_id = self.observed_action_id.as_deref().ok_or_else(|| "observed action ID required".to_string())?;
+        let actual_payload = self.observed_action_payload_digest.as_deref()
+            .ok_or_else(|| "observed action payload digest required".to_string())?;
+        if actual_id != expected_id || actual_payload != expected_payload_digest {
+            return Err("observed action identity/payload differs from proposal".into());
+        }
         Ok(())
     }
 }
@@ -400,7 +416,8 @@ mod tests {
     fn proposal(c: &CandidateDecisionContext) -> DecisionProposal {
         DecisionProposal {
             episode_id: c.episode_id.clone(), policy_id: "fixed".into(), policy_version: "1".into(),
-            selected_action_id: "a".into(), rationale_digest: "sha256:rationale".into(),
+            selected_action_id: "a".into(), selected_action_payload_digest: "sha256:payload-a".into(),
+            rationale_digest: "sha256:rationale".into(),
             assumption_digests: vec![],
             predicted_outcomes: vec![
                 PredictedOutcome { outcome_label: "yes".into(), probability_micros: 400_000 },
@@ -408,8 +425,8 @@ mod tests {
             ],
             assignment_mechanism: AssignmentMechanism::Randomized {
                 action_probabilities: vec![
-                    ActionProbability { action_id: "a".into(), probability_micros: 500_000 },
-                    ActionProbability { action_id: "b".into(), probability_micros: 500_000 },
+                    ActionProbability { action_id: "a".into(), action_payload_digest: "sha256:payload-a".into(), probability_micros: 500_000 },
+                    ActionProbability { action_id: "b".into(), action_payload_digest: "sha256:payload-b".into(), probability_micros: 500_000 },
                 ],
                 protocol_ref: "random-protocol".into(),
             },
@@ -427,7 +444,8 @@ mod tests {
         EvaluatorResolution {
             episode_id: c.episode_id.clone(), execution_status: ExecutionStatus::Completed,
             outcome_status: OutcomeStatus::DelayedObserved, action_support: ActionSupport::ObservedOutcome,
-            observed_action_id: Some("a".into()), outcome_label: Some("yes".into()),
+            observed_action_id: Some("a".into()), observed_action_payload_digest: Some("sha256:payload-a".into()),
+            outcome_label: Some("yes".into()),
             evaluator_evidence: vec![EvidenceReference {
                 evidence_id: "result".into(), content_digest: "sha256:result".into(),
                 observed_at_ms: 900, available_at_ms: 950,
@@ -461,7 +479,7 @@ mod tests {
         let mut p = proposal(&c);
         p.assignment_mechanism = AssignmentMechanism::Randomized {
             action_probabilities: vec![
-                ActionProbability { action_id: "a".into(), probability_micros: 1_000_000 },
+                ActionProbability { action_id: "a".into(), action_payload_digest: "sha256:payload-a".into(), probability_micros: 1_000_000 },
             ],
             protocol_ref: "random-protocol".into(),
         };
@@ -469,8 +487,8 @@ mod tests {
 
         p.assignment_mechanism = AssignmentMechanism::Randomized {
             action_probabilities: vec![
-                ActionProbability { action_id: "a".into(), probability_micros: 0 },
-                ActionProbability { action_id: "b".into(), probability_micros: 1_000_000 },
+                ActionProbability { action_id: "a".into(), action_payload_digest: "sha256:payload-a".into(), probability_micros: 0 },
+                ActionProbability { action_id: "b".into(), action_payload_digest: "sha256:payload-b".into(), probability_micros: 1_000_000 },
             ],
             protocol_ref: "random-protocol".into(),
         };
@@ -482,10 +500,20 @@ mod tests {
         assert!(p.validate_against(&c).unwrap_err().contains("outside"));
     }
     #[test]
+    fn rejects_result_for_different_action_payload() {
+        let c = context();
+        let p = proposal(&c);
+        let mut r = resolution(&c);
+        r.observed_action_payload_digest = Some("sha256:different-batch".into());
+        assert!(r.validate_against(&c, &p).unwrap_err().contains("identity/payload differs"));
+    }
+
+    #[test]
     fn rejects_fabricated_unsupported_outcome() {
         let c = context(); let p = proposal(&c); let mut r = resolution(&c);
         r.execution_status = ExecutionStatus::NotStarted; r.outcome_status = OutcomeStatus::UnsupportedCounterfactual;
         r.action_support = ActionSupport::NoObservedOutcome; r.observed_action_id = None;
+        r.observed_action_payload_digest = None;
         r.outcome_label = Some("yes".into()); r.evaluator_evidence.clear(); r.finalized_at_ms = None;
         assert!(r.validate_against(&c, &p).unwrap_err().contains("unsupported counterfactual"));
     }
