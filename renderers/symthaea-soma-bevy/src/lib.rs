@@ -50,6 +50,7 @@ pub enum AdapterError {
     InvalidClockDomain,
     ClockRegression,
     ClockUnavailable,
+    PolicyUnavailable,
     PermitChangedAfterAuthorization,
     PolicyDenied(DenialReason),
     QueueRevisionExhausted,
@@ -353,7 +354,7 @@ fn render_pending_scene(
     mut materials: ResMut<Assets<ColorMaterial>>,
     queue: Res<SceneSubmissionQueue>,
     clock: Res<SceneClock>,
-    policy: Res<PresentationPolicyState>,
+    policy: Option<Res<PresentationPolicyState>>,
     mut latest_ack: ResMut<LatestSceneSubmissionAck>,
     mut active: ResMut<ActiveScene>,
     existing: Query<Entity, With<RenderedSceneEntity>>,
@@ -372,6 +373,11 @@ fn render_pending_scene(
 
     let Some(submission) = queue.pending.as_ref() else { return; };
     let frame = submission.frame();
+
+    let Some(policy) = policy else {
+        latest_ack.latest = Some(rejected_ack(submission, AdapterError::PolicyUnavailable));
+        return;
+    };
 
     if !clock.is_changed() || !clock.permits_frame(frame) {
         latest_ack.latest = Some(rejected_ack(submission, AdapterError::ClockUnavailable));
@@ -467,12 +473,20 @@ fn render_pending_scene(
 fn enforce_active_scene(
     mut commands: Commands,
     clock: Res<SceneClock>,
-    policy: Res<PresentationPolicyState>,
+    policy: Option<Res<PresentationPolicyState>>,
     mut active: ResMut<ActiveScene>,
     rendered: Query<(Entity, &SceneFrameGuard), With<RenderedSceneEntity>>,
 ) {
     let Some(submission) = active.submission.as_ref() else { return; };
     let frame = submission.frame();
+
+    let Some(policy) = policy else {
+        for (entity, _) in &rendered {
+            commands.entity(entity).despawn();
+        }
+        active.submission = None;
+        return;
+    };
 
     let valid_clock = clock.is_changed() && clock.permits_frame(frame);
     let policy_still_allows = match (clock.now_monotonic_ns(), clock.clock_domain_id()) {
