@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	custody "luminousdynamics/mon026-custody"
@@ -46,7 +47,7 @@ func run() int {
 			return 64
 		}
 		rel, relErr := filepath.Rel(root, absolute)
-		if relErr != nil || rel == "." || rel == ".." || (len(rel) >= 3 && rel[:3] == ".."+string(filepath.Separator)) {
+		if relErr != nil || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))) {
 			fmt.Fprintf(os.Stderr, "manifest, signature and output must be outside artifact root: %s\n", p)
 			return 64
 		}
