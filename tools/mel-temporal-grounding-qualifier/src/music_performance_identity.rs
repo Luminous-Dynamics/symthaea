@@ -1232,6 +1232,8 @@ mod tests {
         second.clean.performer_identity_sha256 = digest('1');
         second.performance_stay.performer_identity_sha256 = digest('2');
         second.musical_flip.performer_identity_sha256 = digest('1');
+        second.performance_stay.take_identity_sha256 = digest('0');
+        second.performance_stay.performance_identity_sha256 = digest('9');
         second.source_work_lineage_sha256 = digest('3');
 
         let report = audit_musical_performance_identity(&case(vec![first, second])).unwrap();
