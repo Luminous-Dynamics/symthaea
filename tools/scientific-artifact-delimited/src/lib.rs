@@ -5,7 +5,7 @@
 //! establish the scientific validity of the measured values.
 
 use sha2::{Digest, Sha256};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub const PARSER_ID: &str = "symthaea.delimited-text";
 pub const PARSER_VERSION: &str = "0.1.0";
@@ -328,7 +328,7 @@ pub fn parse_delimited(raw: &[u8], receipt: &RawReceipt, config: ParseConfig) ->
     };
 
     let elapsed_ms = started.elapsed().as_millis() as u64;
-    if elapsed_ms > config.limits.max_elapsed_ms {
+    if started.elapsed() > Duration::from_millis(config.limits.max_elapsed_ms) {
         return result_with_failure(
             Disposition::LimitExceeded,
             &config,
@@ -390,7 +390,7 @@ fn parse_observations(
     let mut observations = Vec::new();
     let mut record_index = 0u64;
     while cursor < raw.len() {
-        if started.elapsed().as_millis() as u64 > config.limits.max_elapsed_ms {
+        if started.elapsed() > Duration::from_millis(config.limits.max_elapsed_ms) {
             return Err(CsvError::LimitExceeded(
                 "Elapsed-time limit reached while building cell observations.".to_string(),
             ));
