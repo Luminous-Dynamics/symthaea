@@ -1194,7 +1194,10 @@ mod tests {
             source_evidence_sha256: digest('e'),
         });
         let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
-        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert_eq!(
+            assessment.diagnostic_state,
+            ShiftDiagnosticStateV1::InsufficientEvidence
+        );
         assert!(!engine.process_markers.contains_key("tool-a/ch-1"));
         assert!(engine.channel_states.is_empty());
     }
@@ -1298,10 +1301,12 @@ mod tests {
         let mut engine = engine();
         let mut seq = 1;
         for i in 0..3 {
-            let ref_obs = reference_observation(seq, &format!("ref-{i}"), "tool-a/ch-1", 10 + i, 0.0);
+            let ref_obs =
+                reference_observation(seq, &format!("ref-{i}"), "tool-a/ch-1", 10 + i, 0.0);
             observe_evidence_shift_v1(&mut engine, &ref_obs).unwrap();
             seq += 1;
-            let sensor = sensor_observation(seq, &format!("sensor-{i}"), "tool-a/ch-1", 10 + i, 0.0);
+            let sensor =
+                sensor_observation(seq, &format!("sensor-{i}"), "tool-a/ch-1", 10 + i, 0.0);
             observe_evidence_shift_v1(&mut engine, &sensor).unwrap();
             seq += 1;
             let mut vm = vm_residual_observation(
