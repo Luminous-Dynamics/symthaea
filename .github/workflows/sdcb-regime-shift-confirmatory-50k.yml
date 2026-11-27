@@ -1,0 +1,70 @@
+name: SDCB Dependence Regime Shift Confirmatory 50k
+
+on:
+  push:
+    branches:
+      - research/sdcb-regime-shift-confirmatory-50k-2026-11-27
+    paths:
+      - "scripts/research/sdcb_regime_shift_confirmatory_50k.rs"
+      - ".github/workflows/sdcb-regime-shift-confirmatory-50k.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/research/sdcb_regime_shift_confirmatory_50k.rs"
+      - ".github/workflows/sdcb-regime-shift-confirmatory-50k.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  confirmatory-dependence-regime-shift:
+    name: Rust 1.96 50k-per-condition independent-block confirmation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Generate rustfmt preview
+        run: rustfmt --edition 2024 scripts/research/sdcb_regime_shift_confirmatory_50k.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-regime-shift-confirmatory-rustfmt-preview
+          path: scripts/research/sdcb_regime_shift_confirmatory_50k.rs
+      - name: Restore exact committed source
+        run: git checkout -- scripts/research/sdcb_regime_shift_confirmatory_50k.rs
+      - name: Check formatting on exact committed source
+        run: rustfmt --edition 2024 --check scripts/research/sdcb_regime_shift_confirmatory_50k.rs
+      - name: Compile and run unit controls
+        run: |
+          rustc --edition=2024 --test scripts/research/sdcb_regime_shift_confirmatory_50k.rs -o /tmp/sdcb-confirmatory-tests
+          /tmp/sdcb-confirmatory-tests
+      - name: Run fresh-seed 50,000-trial confirmation grid
+        run: |
+          rustc --edition=2024 -C opt-level=2 scripts/research/sdcb_regime_shift_confirmatory_50k.rs -o /tmp/sdcb-confirmatory
+          mkdir -p "$RUNNER_TEMP/sdcb-confirmatory-50k"
+          /tmp/sdcb-confirmatory > "$RUNNER_TEMP/sdcb-confirmatory-50k/confirmatory.csv"
+          {
+            echo "source_commit=$(git rev-parse HEAD)"
+            rustc --version
+            echo "compile_flags=-C opt-level=2"
+            echo "experiment=independent-block confirmation; Gaussian and standardized Student-t(5) common-scale marginals"
+            echo "calibration_test_pairs={(0.05,0.95),(0.95,0.05)}; block_lengths={8,32}; calibration_blocks=39; alpha=0.10; trials=50000 per condition"
+            echo "grid=marginal:{gaussian,student_t5_common_scale}; 8 conditions; 400000 total Monte Carlo trials; fresh seed domain 0x5344434350000000"
+          } > "$RUNNER_TEMP/sdcb-confirmatory-50k/manifest.txt"
+      - name: Upload confirmatory report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-regime-shift-confirmatory-50k-report
+          path: ${{ runner.temp }}/sdcb-confirmatory-50k/
+          if-no-files-found: error
+          retention-days: 30
