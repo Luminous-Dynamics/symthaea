@@ -230,8 +230,25 @@ fn validate_episode(e: &Episode) -> Result<(), String> {
         }
     }
     for v in &e.candidate.source_events {
-        if v.parent_event_ids.iter().any(|p| !event_ids.contains(p.as_str()) || p == &v.event_id) {
-            return Err(format!("{id}: unresolved/self parent on {}", v.event_id));
+        let mut unique_parents = BTreeSet::new();
+        if v.parent_event_ids.iter().any(|p| !event_ids.contains(p.as_str()) ||
+            p == &v.event_id || !unique_parents.insert(p.as_str())) {
+            return Err(format!("{id}: unresolved/self/duplicate parent on {}", v.event_id));
+        }
+    }
+    let event_by_id: BTreeMap<&str, &SourceEvent> = e.candidate.source_events.iter()
+        .map(|event| (event.event_id.as_str(), event)).collect();
+    for origin in &e.candidate.source_events {
+        let mut pending: Vec<&str> = origin.parent_event_ids.iter().map(String::as_str).collect();
+        let mut visited = BTreeSet::new();
+        while let Some(parent_id) = pending.pop() {
+            if parent_id == origin.event_id {
+                return Err(format!("{id}: cyclic source dependency at {}", origin.event_id));
+            }
+            if !visited.insert(parent_id) { continue; }
+            if let Some(parent) = event_by_id.get(parent_id) {
+                pending.extend(parent.parent_event_ids.iter().map(String::as_str));
+            }
         }
     }
     let allowed: BTreeSet<String> = e.candidate.allowed_actions.iter().cloned().collect();
@@ -609,6 +626,12 @@ mod tests {
         let e=event("e".into(),"s".into(),1,0,None,AuthorityTier::Untrusted,0,"x",Relation::Asserts,vec![]);
         let c=Candidate{query_time_ms:2,query:"q".into(),source_events:vec![e.clone()],allowed_actions:vec!["a".into()],evidence_budget:1,observation_budget:0,observation_cost_units:0.0,scope:"s".into()};
         assert!(!admissible(&e,&c,&BTreeSet::new()));
+    }
+    #[test] fn cyclic_source_dependency_is_rejected(){
+        let mut e=generated_episode(0,77);
+        e.candidate.source_events[0].parent_event_ids=vec![e.candidate.source_events[1].event_id.clone()];
+        e.candidate.source_events[1].parent_event_ids=vec![e.candidate.source_events[0].event_id.clone()];
+        assert!(validate_episode(&e).is_err());
     }
     #[test] fn generator_is_deterministic_and_covers_four_confirmatory_families(){
         let a:Vec<_>=(0..40).map(|i|generated_episode(i,77)).collect();
