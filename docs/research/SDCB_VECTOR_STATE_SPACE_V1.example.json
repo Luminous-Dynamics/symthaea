@@ -1,0 +1,48 @@
+{
+  "schema_version": "sdcb_vector_state_space.v1",
+  "state_ids": [
+    "scientific-parameter",
+    "shared-reference-bias",
+    "device-local-drift"
+  ],
+  "generator": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      -0.7,
+      0
+    ],
+    [
+      0,
+      0,
+      -0.25
+    ]
+  ],
+  "diffusion_covariance": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      2.1,
+      0.12
+    ],
+    [
+      0,
+      0.12,
+      0.3
+    ]
+  ],
+  "elapsed_seconds": 2.3,
+  "notes": [
+    "Synthetic design example only.",
+    "The scientific parameter is static; the two nuisance states evolve.",
+    "Cross-diffusion covariance between nuisance coordinates is retained."
+  ]
+}
