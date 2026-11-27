@@ -22,18 +22,22 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-      - name: Resolve standalone lock and compile tests
-        run: |
-          cargo generate-lockfile --manifest-path tools/scientific-artifact-delimited/Cargo.toml
-          cargo test --manifest-path tools/scientific-artifact-delimited/Cargo.toml
-      - name: Verify formatting
-        run: cargo fmt --manifest-path tools/scientific-artifact-delimited/Cargo.toml -- --check
-      - name: Clippy
-        run: cargo clippy --manifest-path tools/scientific-artifact-delimited/Cargo.toml --all-targets -- -D warnings
-      - name: Upload standalone dependency lock for exact pinning
+      - name: Generate standalone dependency lock
+        run: cargo generate-lockfile --manifest-path tools/scientific-artifact-delimited/Cargo.toml
+      - name: Normalize source using pinned rustfmt
+        run: cargo fmt --manifest-path tools/scientific-artifact-delimited/Cargo.toml
+      - name: Upload parser source and dependency lock for exact review
         uses: actions/upload-artifact@v4
         with:
-          name: scientific-artifact-delimited-lockfile
-          path: tools/scientific-artifact-delimited/Cargo.lock
+          name: scientific-artifact-delimited-qualified-inputs
+          path: |
+            tools/scientific-artifact-delimited/Cargo.lock
+            tools/scientific-artifact-delimited/src/lib.rs
           if-no-files-found: error
           retention-days: 7
+      - name: Verify formatting
+        run: cargo fmt --manifest-path tools/scientific-artifact-delimited/Cargo.toml -- --check
+      - name: Compile and test
+        run: cargo test --manifest-path tools/scientific-artifact-delimited/Cargo.toml
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/scientific-artifact-delimited/Cargo.toml --all-targets -- -D warnings
