@@ -355,7 +355,7 @@ impl PresentationReceiptLedger {
     ) -> Result<PresentationReceipt, ReceiptError> {
         validate_stamp(&submitted_at)?;
         let attempt = self.attempts.get(attempt_id).ok_or(ReceiptError::AttemptNotFound)?;
-        if !same_permit_identity(&attempt.permit, authorized_permit) {
+        if &attempt.permit != authorized_permit {
             return Err(ReceiptError::PermitIdentityMismatch);
         }
         self.append_transition(
@@ -773,6 +773,25 @@ mod tests {
             Err(ReceiptError::PolicyDenied(DenialReason::NoMatchingGrant))
         ));
         assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Permitted);
+    }
+
+    #[test]
+    fn submission_requires_the_exact_refreshed_authorized_permit() {
+        let (mut policy, original, mut ledger) = fixture();
+        begin(&mut ledger, &original);
+        policy.set_reduced_motion(false);
+        let (authorized, _) = ledger.record_authorized(
+            "attempt-1", &policy, stamp(CLOCK, "121"),
+        ).unwrap();
+        assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Authorized);
+        assert_ne!(authorized, original);
+        assert_eq!(
+            ledger.record_submitted("attempt-1", &original, stamp(OUTPUT_CLOCK, "10")),
+            Err(ReceiptError::PermitIdentityMismatch)
+        );
+        assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Authorized);
+        ledger.record_submitted("attempt-1", &authorized, stamp(OUTPUT_CLOCK, "11")).unwrap();
+        assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Submitted);
     }
 
     #[test]
