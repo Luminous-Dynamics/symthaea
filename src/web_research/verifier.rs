@@ -361,6 +361,7 @@ impl EpistemicVerifier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::web_research::ResearchStatus;
 
     #[test]
     fn test_verify_with_no_sources() {

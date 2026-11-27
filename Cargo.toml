@@ -837,7 +837,7 @@ benchmarks = []                 # Causal validation benchmarks (used by examples
 integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
-web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
+web_research_module = ["dep:futures", "dep:sha2"] # Web research with bounded acquisition and SHA-256 receipts
 prism_search = []  # [standalone-neutered] deps stripped, kept declared for check-cfg
 unstable-examples = []          # UNTESTED: quarantine gate for examples with stale APIs (never enabled by default, gates test files only)
 

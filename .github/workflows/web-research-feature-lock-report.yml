@@ -1,0 +1,74 @@
+name: WebResearch Feature Lockfile Report
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/web_research/**"
+      - ".github/workflows/web-research-feature-lock-report.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  feature-lock-report:
+    name: Preview web_research_module test-target lock resolution
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up repository-pinned Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+      - name: Preserve baseline lockfile
+        run: |
+          mkdir -p "$RUNNER_TEMP/web-research-lock-report"
+          cp Cargo.lock "$RUNNER_TEMP/web-research-lock-report/Cargo.lock.before"
+      - name: Resolve the focused WebResearch test target and capture lockfile delta
+        id: resolve
+        shell: bash
+        run: |
+          set +e
+          cargo test --no-run --no-default-features --features web_research_module --lib web_research:: > "$RUNNER_TEMP/web-research-lock-report/focused-compile-unlocked.log" 2>&1
+          compile_exit=$?
+          cp Cargo.lock "$RUNNER_TEMP/web-research-lock-report/Cargo.lock.after"
+          diff -u "$RUNNER_TEMP/web-research-lock-report/Cargo.lock.before" "$RUNNER_TEMP/web-research-lock-report/Cargo.lock.after" > "$RUNNER_TEMP/web-research-lock-report/Cargo.lock.diff"
+          diff_exit=$?
+          cargo metadata --locked --no-default-features --features web_research_module --format-version 1 > "$RUNNER_TEMP/web-research-lock-report/metadata-locked.json" 2> "$RUNNER_TEMP/web-research-lock-report/metadata-locked.stderr"
+          metadata_exit=$?
+          printf 'compile_unlocked_exit=%s\ndiff_exit=%s\nmetadata_locked_exit=%s\n' "$compile_exit" "$diff_exit" "$metadata_exit" > "$RUNNER_TEMP/web-research-lock-report/status.txt"
+          echo "compile_exit=$compile_exit" >> "$GITHUB_OUTPUT"
+          echo "metadata_exit=$metadata_exit" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload exact test-target lockfile proposal and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-research-feature-lock-report
+          path: |
+            ${{ runner.temp }}/web-research-lock-report/Cargo.lock.before
+            ${{ runner.temp }}/web-research-lock-report/Cargo.lock.after
+            ${{ runner.temp }}/web-research-lock-report/Cargo.lock.diff
+            ${{ runner.temp }}/web-research-lock-report/status.txt
+            ${{ runner.temp }}/web-research-lock-report/focused-compile-unlocked.log
+            ${{ runner.temp }}/web-research-lock-report/metadata-locked.json
+            ${{ runner.temp }}/web-research-lock-report/metadata-locked.stderr
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify the regenerated test-target lockfile with locked resolution
+        if: steps.resolve.outputs.compile_exit == '0' && steps.resolve.outputs.metadata_exit == '0'
+        run: cargo test --no-run --locked --no-default-features --features web_research_module --lib web_research::
+      - name: Require test-target lock resolution
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.resolve.outputs.compile_exit }}" != "0" || "${{ steps.resolve.outputs.metadata_exit }}" != "0" ]]; then
+            echo "Focused test-target resolution failed; inspect the uploaded report."
+            exit 1
+          fi
