@@ -1,0 +1,639 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/eqc-observer-receipt-v0.2.schema.json",
+  "title": "EQC Trusted Observer Receipt v0.2",
+  "description": "Evidence emitted by a separately provisioned observer. This schema validates structure only; it does not verify signatures, key trust, measurement truth, replay independence, or qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "observation_id",
+    "task_binding",
+    "execution",
+    "sut",
+    "observer",
+    "measurements",
+    "artifact",
+    "replay",
+    "signature"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.eqc.observer-receipt.v0.2"
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128
+    },
+    "task_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "task_digest_sha256",
+        "nonce",
+        "issued_at",
+        "expires_at"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^eqc-[a-z0-9][a-z0-9._-]{2,95}$"
+        },
+        "task_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 32,
+          "maxLength": 256
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "finished_at",
+        "exit_code",
+        "environment_image_digest",
+        "runtime_identity"
+      ],
+      "properties": {
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "environment_image_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runtime_identity": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "sut": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_id",
+        "version",
+        "harness_version",
+        "artifact_image_digest",
+        "source_head"
+      ],
+      "properties": {
+        "system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "harness_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_versions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "artifact_image_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_head": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    },
+    "observer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observer_id",
+        "observer_binary_sha256",
+        "observer_policy_sha256",
+        "key_id",
+        "trust_level",
+        "measurement_sources"
+      ],
+      "properties": {
+        "observer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observer_binary_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "observer_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_level": {
+          "enum": [
+            "L1_HOST_OBSERVED",
+            "L2_PLATFORM_ATTESTED"
+          ]
+        },
+        "measurement_sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "cgroup_v2",
+              "network_namespace",
+              "tool_broker",
+              "filesystem_snapshot",
+              "service_audit_log",
+              "replay_worker",
+              "platform_attestation"
+            ]
+          }
+        },
+        "platform_attestation_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_ms",
+        "cpu_time_usec",
+        "peak_memory_bytes",
+        "peak_process_count",
+        "tool_call_count",
+        "network",
+        "state"
+      ],
+      "properties": {
+        "wall_time_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cpu_time_usec": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "peak_process_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tool_call_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy",
+            "bytes_in",
+            "bytes_out",
+            "observed_endpoints",
+            "enforcement"
+          ],
+          "properties": {
+            "policy": {
+              "enum": [
+                "none",
+                "allowlist",
+                "open",
+                "unknown"
+              ]
+            },
+            "bytes_in": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "bytes_out": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "observed_endpoints": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "enforcement": {
+              "enum": [
+                "enforced",
+                "not_enforced",
+                "unknown"
+              ]
+            }
+          }
+        },
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "before_sha256",
+            "after_sha256",
+            "measurement_source",
+            "event_log_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "unchanged",
+                "mutated",
+                "unknown"
+              ]
+            },
+            "before_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "after_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "measurement_source": {
+              "enum": [
+                "filesystem_snapshot",
+                "service_audit_log",
+                "transaction_log",
+                "none"
+              ]
+            },
+            "event_log_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "sha256",
+        "size_bytes"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "patch",
+            "action_bundle",
+            "simulation_input",
+            "result_bundle",
+            "other"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "worker_id",
+        "run_id",
+        "environment_image_digest",
+        "verifier_sha256",
+        "input_artifact_sha256",
+        "result_sha256",
+        "comparison"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_run",
+            "unknown"
+          ]
+        },
+        "worker_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment_image_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifier_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "input_artifact_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "result_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "comparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "metric",
+            "tolerance",
+            "observed_value"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "byte_exact",
+                "numeric_tolerance",
+                "statistical_interval",
+                "not_applicable"
+              ]
+            },
+            "metric": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tolerance": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "observed_value": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "canonicalization",
+        "signed_payload_sha256",
+        "value_base64"
+      ],
+      "properties": {
+        "algorithm": {
+          "enum": [
+            "Ed25519"
+          ]
+        },
+        "canonicalization": {
+          "const": "RFC8785_JCS"
+        },
+        "signed_payload_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "value_base64": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "trust_level": {
+            "const": "L2_PLATFORM_ATTESTED"
+          }
+        },
+        "required": [
+          "trust_level"
+        ]
+      },
+      "then": {
+        "properties": {
+          "platform_attestation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "platform_attestation_sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "network": {
+            "properties": {
+              "policy": {
+                "const": "none"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          }
+        },
+        "required": [
+          "network"
+        ]
+      },
+      "then": {
+        "properties": {
+          "network": {
+            "properties": {
+              "bytes_in": {
+                "const": 0
+              },
+              "bytes_out": {
+                "const": 0
+              },
+              "observed_endpoints": {
+                "maxItems": 0
+              },
+              "enforcement": {
+                "const": "enforced"
+              }
+            },
+            "required": [
+              "bytes_in",
+              "bytes_out",
+              "observed_endpoints",
+              "enforcement"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "properties": {
+              "status": {
+                "const": "unchanged"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "properties": {
+              "before_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "after_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "event_log_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "before_sha256",
+              "after_sha256",
+              "event_log_sha256"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "replay": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "replay"
+        ]
+      },
+      "then": {
+        "properties": {
+          "replay": {
+            "properties": {
+              "result_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
