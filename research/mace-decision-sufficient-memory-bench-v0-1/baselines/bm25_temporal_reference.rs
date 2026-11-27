@@ -756,6 +756,10 @@ mod tests {
             .unwrap();
         assert_eq!(result.hits[0].document_id, "complete");
         assert_eq!(result.hits[1].document_id, "partial");
+        assert_eq!(result.work.eligible_document_count, 3);
+        assert_eq!(result.work.scope_knowledge_documents_checked, 3);
+        assert_eq!(result.work.eligible_document_lengths_scanned, 3);
+        assert_eq!(result.work.query_term_posting_lookups, 3);
         assert_eq!(result.work.scored_document_count, 2);
     }
 
