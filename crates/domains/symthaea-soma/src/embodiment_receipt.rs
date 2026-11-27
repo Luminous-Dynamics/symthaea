@@ -134,6 +134,8 @@ pub enum ReceiptError {
     InvalidTimestamp,
     WrongSession,
     WrongDecisionClock,
+    PermitDecisionTimestampMismatch,
+    ObserverChannelMismatch,
     PermitExpired,
     DuplicateAttempt,
     AttemptNotFound,
@@ -285,6 +287,9 @@ impl PresentationReceiptLedger {
         let now = parse_monotonic_ns(&decision_stamp.monotonic_ns)?;
         let issued = parse_monotonic_ns(permit.issued_at_monotonic_ns())?;
         let expires = parse_monotonic_ns(permit.expires_at_monotonic_ns())?;
+        if decision_stamp.monotonic_ns != permit.issued_at_monotonic_ns() {
+            return Err(ReceiptError::PermitDecisionTimestampMismatch);
+        }
         if issued > now || expires <= now {
             return Err(ReceiptError::PermitExpired);
         }
@@ -443,6 +448,11 @@ impl PresentationReceiptLedger {
         if !same_permit_identity(&attempt.permit, &permit) {
             return Err(ReceiptError::PermitIdentityMismatch);
         }
+        if let Some(evidence) = observation.as_ref() {
+            if !observation_source_matches(permit.channel(), evidence.source) {
+                return Err(ReceiptError::ObserverChannelMismatch);
+            }
+        }
         attempt.permit = permit.clone();
         attempt.clock_high_water.insert(stamp.clock_domain_id.clone(), timestamp);
 
@@ -536,6 +546,29 @@ fn transition_allowed(from: Option<ReceiptPhase>, to: ReceiptPhase) -> bool {
         (Some(ReceiptPhase::OutcomeUnknown), ReceiptPhase::Observed | ReceiptPhase::Failed) => true,
         (Some(ReceiptPhase::Observed), ReceiptPhase::Stopped | ReceiptPhase::Failed) => true,
         _ => false,
+    }
+}
+
+fn observation_source_matches(channel: OutputChannel, source: ObservationSource) -> bool {
+    match channel {
+        OutputChannel::Visual | OutputChannel::Spatial => matches!(
+            source,
+            ObservationSource::AdapterCallback
+                | ObservationSource::Compositor
+                | ObservationSource::ExternalObserver
+        ),
+        OutputChannel::Audio => matches!(
+            source,
+            ObservationSource::AdapterCallback
+                | ObservationSource::AudioDeviceLoopback
+                | ObservationSource::ExternalObserver
+        ),
+        OutputChannel::Haptic => matches!(
+            source,
+            ObservationSource::AdapterCallback
+                | ObservationSource::HapticDriverAcknowledgement
+                | ObservationSource::ExternalObserver
+        ),
     }
 }
 
@@ -674,7 +707,7 @@ mod tests {
     }
 
     fn begin(ledger: &mut PresentationReceiptLedger, permit: &PresentationPermit) {
-        ledger.record_permitted("attempt-1", permit, stamp(CLOCK, "120")).unwrap();
+        ledger.record_permitted("attempt-1", permit, stamp(CLOCK, "110")).unwrap();
     }
 
     fn submit(
@@ -767,11 +800,28 @@ mod tests {
     }
 
     #[test]
+    fn observer_type_must_match_the_permitted_output_channel() {
+        let (policy, permit, mut ledger) = fixture();
+        submit(&mut ledger, &policy, &permit);
+        let wrong_observer = OutputObservation::new(
+            "audio-loopback-1",
+            "sha256:audio-observer",
+            ObservationSource::AudioDeviceLoopback,
+            ObservedOutputState::Started,
+        ).unwrap();
+        assert_eq!(
+            ledger.record_observed("attempt-1", stamp(OUTPUT_CLOCK, "12"), wrong_observer),
+            Err(ReceiptError::ObserverChannelMismatch)
+        );
+        assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Submitted);
+    }
+
+    #[test]
     fn not_submitted_is_a_distinct_terminal_outcome() {
         let (_policy, permit, mut ledger) = fixture();
         begin(&mut ledger, &permit);
         ledger.record_not_submitted(
-            "attempt-1", stamp(OUTPUT_CLOCK, "15"), NotSubmittedReason::UserCancelled,
+            "attempt-1", stamp(CLOCK, "125"), NotSubmittedReason::UserCancelled,
         ).unwrap();
         assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::NotSubmitted);
         assert!(ledger.status("attempt-1").unwrap().phase.is_terminal());
