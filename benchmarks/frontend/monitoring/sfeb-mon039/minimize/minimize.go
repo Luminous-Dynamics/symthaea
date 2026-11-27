@@ -123,6 +123,7 @@ func validateInput(in Input,f *flags)map[string]Observation{
 	if !validDigest(in.ScenarioSHA256){f.block("scenario_digest_invalid")}
 	if !validDigest(in.RecoveryBoundarySHA256){f.block("recovery_boundary_digest_invalid")}
 	if !validRevision(in.CodeRevision){f.block("code_revision_invalid")}
+	if in.InitialFaultIDs==nil{f.block("initial_fault_ids_missing")}
 	initial,ok:=canonicalFaults(in.InitialFaultIDs)
 	if !ok{f.block("initial_fault_ids_invalid_or_duplicated")}
 	if len(initial)>MaxFaults{f.block("fault_limit_exceeded")}
@@ -130,6 +131,7 @@ func validateInput(in Input,f *flags)map[string]Observation{
 	if in.ExpectedFailureSignatureSHA256!=""&&!validDigest(in.ExpectedFailureSignatureSHA256){f.block("expected_failure_signature_invalid")}
 	index:=map[string]Observation{}
 	for _,o:=range in.Observations{
+		if o.FaultIDs==nil{f.block("observation_fault_ids_missing");continue}
 		ids,valid:=canonicalFaults(o.FaultIDs)
 		if !valid{f.block("observation_fault_ids_invalid");continue}
 		digest:=digestJSON(ids)
