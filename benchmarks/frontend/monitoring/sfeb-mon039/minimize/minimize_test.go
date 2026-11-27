@@ -23,6 +23,7 @@ func makeObservation(ids []string, verdict Verdict, signature string, revision s
 	if !ok { panic("invalid test fault IDs") }
 	return Observation{
 		FaultIDs: canonical,
+		TrialID: "trial-039-001",
 		FaultSetSHA256: FaultSetDigest(canonical),
 		ScenarioSHA256: scenarioDigest,
 		RecoveryBoundarySHA256: boundaryDigest,
