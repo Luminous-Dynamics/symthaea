@@ -56,7 +56,8 @@
           "expires_at_monotonic_ns": 1000,
           "policy_version": 3,
           "semantic_event_id": "event:1",
-          "form": "living_constellation"
+          "form": "living_constellation",
+          "action_scope": []
         },
         {
           "sequence": 3,
@@ -120,7 +121,8 @@
           "expires_at_monotonic_ns": null,
           "policy_version": 4,
           "semantic_event_id": "event:1",
-          "form": "living_constellation"
+          "form": "living_constellation",
+          "action_scope": []
         },
         {
           "sequence": 7,
@@ -209,7 +211,8 @@
             "expires_at_monotonic_ns": 1000,
             "policy_version": 3,
             "semantic_event_id": "event:1",
-            "form": "living_constellation"
+            "form": "living_constellation",
+            "action_scope": []
           },
           {
             "sequence": 3,
@@ -273,7 +276,8 @@
             "expires_at_monotonic_ns": null,
             "policy_version": 4,
             "semantic_event_id": "event:1",
-            "form": "living_constellation"
+            "form": "living_constellation",
+            "action_scope": []
           },
           {
             "sequence": 7,
@@ -361,7 +365,8 @@
             "expires_at_monotonic_ns": 1000,
             "policy_version": 3,
             "semantic_event_id": "event:1",
-            "form": "living_constellation"
+            "form": "living_constellation",
+            "action_scope": []
           },
           {
             "sequence": 3,
@@ -425,7 +430,8 @@
             "expires_at_monotonic_ns": null,
             "policy_version": 4,
             "semantic_event_id": "event:1",
-            "form": "living_constellation"
+            "form": "living_constellation",
+            "action_scope": []
           },
           {
             "sequence": 7,
@@ -532,7 +538,8 @@
             "expires_at_monotonic_ns": 1000,
             "policy_version": 3,
             "semantic_event_id": "event:1",
-            "form": "living_constellation"
+            "form": "living_constellation",
+            "action_scope": []
           },
           {
             "sequence": 3,
@@ -596,7 +603,8 @@
             "expires_at_monotonic_ns": null,
             "policy_version": 4,
             "semantic_event_id": "event:1",
-            "form": "living_constellation"
+            "form": "living_constellation",
+            "action_scope": []
           },
           {
             "sequence": 7,
@@ -732,7 +740,8 @@
             "expires_at_monotonic_ns": null,
             "policy_version": 4,
             "semantic_event_id": "event:1",
-            "form": "living_constellation"
+            "form": "living_constellation",
+            "action_scope": []
           },
           {
             "sequence": 7,

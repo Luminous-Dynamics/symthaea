@@ -79,6 +79,7 @@ struct AuthorizationRecord {
     key: AuthorizationKey,
     clock_domain_id: String,
     expires_at_monotonic_ns: u64,
+    action_scope: HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -241,6 +242,22 @@ impl InteractionTraceVerifier {
                     let form = event_string(event, "form", index)?.to_owned();
                     let channel = event_string(event, "channel", index)?.to_owned();
                     let destination = event_string(event, "destination", index)?.to_owned();
+                    let action_scope_values = event
+                        .get("action_scope")
+                        .and_then(Value::as_array)
+                        .ok_or(InteractionTraceError::InvalidField {
+                            index: Some(index),
+                            field: "action_scope",
+                        })?;
+                    let mut action_scope = HashSet::new();
+                    for value in action_scope_values {
+                        let action = value.as_str().ok_or(InteractionTraceError::InvalidField {
+                            index: Some(index),
+                            field: "action_scope",
+                        })?;
+                        validate_identifier(action, Some(index), "action_scope")?;
+                        action_scope.insert(action.to_owned());
+                    }
                     let semantic = semantic_events.get(&semantic_event_id)
                         .ok_or(InteractionTraceError::MissingAuthorization { index })?;
                     if semantic.0 != canonical_cue_digest
@@ -273,12 +290,16 @@ impl InteractionTraceVerifier {
                             key: key.clone(),
                             clock_domain_id: clock_domain_id.clone(),
                             expires_at_monotonic_ns: expires,
+                            action_scope,
                         };
                         authorization_by_sequence.insert(sequence, record);
                         authorization_by_key.entry(key).or_default().push(sequence);
                         summary.authorizations += 1;
-                    } else if matches!(decision, "denied" | "revoked" | "expired") {
+                    } else if matches!(decision, "revoked" | "expired") {
                         revoked_grants.insert(grant_id, sequence);
+                    } else if decision == "denied" {
+                        // A denied request does not revoke an independently
+                        // issued, still-live permit for the same grant.
                     } else {
                         return Err(InteractionTraceError::InvalidField {
                             index: Some(index),
@@ -299,7 +320,11 @@ impl InteractionTraceVerifier {
                             index: Some(index),
                             field: "side_effect",
                         })?;
-                    if side_effect && auth.key.channel != "actuator" {
+                    let action_kind = event_string(event, "action_kind", index)?;
+                    if side_effect
+                        && (auth.key.channel != "actuator"
+                            || !auth.action_scope.contains(action_kind))
+                    {
                         return Err(InteractionTraceError::ActionAuthorizationMissing { index });
                     }
                     check_live_authorization(

@@ -283,11 +283,10 @@
             "epistemic_status": {
               "enum": [
                 "measured",
+                "derived",
                 "inferred",
-                "predicted",
-                "unknown",
-                "verified",
-                "unverified"
+                "proposed",
+                "presentation_only"
               ]
             }
           },
@@ -435,6 +434,15 @@
                 "hearth_companion",
                 "cognitive_mandala"
               ]
+            },
+            "action_scope": {
+              "type": "array",
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+              }
             }
           },
           "required": [
@@ -448,7 +456,8 @@
             "expires_at_monotonic_ns",
             "policy_version",
             "semantic_event_id",
-            "form"
+            "form",
+            "action_scope"
           ]
         }
       ],
