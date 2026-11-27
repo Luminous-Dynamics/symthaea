@@ -16,6 +16,7 @@
     "event_kind",
     "semantic_key",
     "form",
+    "effective_intensity",
     "motion_mode",
     "epistemic_status",
     "privacy_class",
@@ -229,6 +230,11 @@
     "effective_permit_expires_at_monotonic_ns": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "effective_intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
     }
   }
 }
