@@ -9,7 +9,7 @@
 //! allocations sum to at most the global alpha. No independence assumption
 //! between monitor streams is needed for the union-bound claim.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 const ALLOCATION_RULE_VERSION: u32 = 1;
 
@@ -28,6 +28,7 @@ pub enum BudgetError {
     DuplicateStreamId,
     DuplicateScope,
     PlanMismatch,
+    ScopeIdentityMismatch,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -169,6 +170,12 @@ pub struct AllocationLedger {
     global_alpha_denominator: u128,
     consumed_stream_ids: HashSet<String>,
     consumed_scopes: HashSet<(u64, u64, u64)>,
+    asset_indices: HashMap<u64, String>,
+    asset_ids: HashMap<String, u64>,
+    channel_indices: HashMap<(u64, u64), String>,
+    channel_ids: HashMap<(String, String), u64>,
+    deployment_indices: HashMap<(u64, u64, u64), String>,
+    deployment_ids: HashMap<(String, String, String), u64>,
     receipts: Vec<AllocationReceipt>,
 }
 
@@ -182,6 +189,12 @@ impl AllocationLedger {
             global_alpha_denominator: plan.global_alpha_denominator,
             consumed_stream_ids: HashSet::new(),
             consumed_scopes: HashSet::new(),
+            asset_indices: HashMap::new(),
+            asset_ids: HashMap::new(),
+            channel_indices: HashMap::new(),
+            channel_ids: HashMap::new(),
+            deployment_indices: HashMap::new(),
+            deployment_ids: HashMap::new(),
             receipts: Vec::new(),
         }
     }
@@ -211,10 +224,67 @@ impl AllocationLedger {
             return Err(BudgetError::DuplicateScope);
         }
 
+        // Enforce one-to-one identity/index bindings at every hierarchy level.
+        // This prevents a caller from reusing one priority index for a different
+        // real asset, channel or deployment under the same frozen inventory.
+        if self
+            .asset_indices
+            .get(&scope.asset_index)
+            .is_some_and(|asset_id| asset_id != &scope.asset_id)
+            || self
+                .asset_ids
+                .get(&scope.asset_id)
+                .is_some_and(|asset_index| *asset_index != scope.asset_index)
+        {
+            return Err(BudgetError::ScopeIdentityMismatch);
+        }
+        let channel_index_key = (scope.asset_index, scope.channel_index);
+        let channel_identity_key = (scope.asset_id.clone(), scope.channel_id.clone());
+        if self
+            .channel_indices
+            .get(&channel_index_key)
+            .is_some_and(|channel_id| channel_id != &scope.channel_id)
+            || self
+                .channel_ids
+                .get(&channel_identity_key)
+                .is_some_and(|channel_index| *channel_index != scope.channel_index)
+        {
+            return Err(BudgetError::ScopeIdentityMismatch);
+        }
+        let deployment_index_key = scope_key;
+        let deployment_identity_key = (
+            scope.asset_id.clone(),
+            scope.channel_id.clone(),
+            scope.deployment_id.clone(),
+        );
+        if self
+            .deployment_indices
+            .get(&deployment_index_key)
+            .is_some_and(|deployment_id| deployment_id != &scope.deployment_id)
+            || self
+                .deployment_ids
+                .get(&deployment_identity_key)
+                .is_some_and(|deployment_index| *deployment_index != scope.deployment_index)
+        {
+            return Err(BudgetError::ScopeIdentityMismatch);
+        }
+
         // Compute the receipt before mutating the ledger.
         let receipt = plan.allocation_for(scope)?;
         self.consumed_stream_ids.insert(scope.stream_id.clone());
         self.consumed_scopes.insert(scope_key);
+        self.asset_indices
+            .insert(scope.asset_index, scope.asset_id.clone());
+        self.asset_ids
+            .insert(scope.asset_id.clone(), scope.asset_index);
+        self.channel_indices
+            .insert(channel_index_key, scope.channel_id.clone());
+        self.channel_ids
+            .insert(channel_identity_key, scope.channel_index);
+        self.deployment_indices
+            .insert(deployment_index_key, scope.deployment_id.clone());
+        self.deployment_ids
+            .insert(deployment_identity_key, scope.deployment_index);
         self.receipts.push(receipt.clone());
         Ok(receipt)
     }
@@ -478,6 +548,42 @@ mod tests {
             Err(BudgetError::DuplicateScope)
         );
         assert_eq!(ledger.allocation_count(), 1);
+    }
+
+    #[test]
+    fn hierarchy_indices_cannot_be_reassigned_to_different_real_entities() {
+        let budget_plan = plan();
+        let mut ledger = AllocationLedger::new(&budget_plan);
+        ledger
+            .allocate_once(&budget_plan, &scope(1, 1, 1, "stream-1"))
+            .unwrap();
+
+        let mut wrong_asset = scope(1, 2, 1, "stream-2");
+        wrong_asset.asset_id = "asset-other".into();
+        assert_eq!(
+            ledger.allocate_once(&budget_plan, &wrong_asset),
+            Err(BudgetError::ScopeIdentityMismatch)
+        );
+
+        let mut wrong_channel = scope(1, 1, 2, "stream-3");
+        wrong_channel.channel_id = "channel-other".into();
+        assert_eq!(
+            ledger.allocate_once(&budget_plan, &wrong_channel),
+            Err(BudgetError::ScopeIdentityMismatch)
+        );
+
+        let mut wrong_deployment = scope(1, 2, 1, "stream-4");
+        wrong_deployment.deployment_id = "deployment-other".into();
+        // The channel-index mismatch is caught first.
+        assert_eq!(
+            ledger.allocate_once(&budget_plan, &wrong_deployment),
+            Err(BudgetError::ScopeIdentityMismatch)
+        );
+
+        assert_eq!(ledger.allocation_count(), 1);
+        assert!(!ledger.has_stream_id("stream-2"));
+        assert!(!ledger.has_stream_id("stream-3"));
+        assert!(!ledger.has_stream_id("stream-4"));
     }
 
     #[test]
