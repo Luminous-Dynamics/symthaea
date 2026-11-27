@@ -22,8 +22,10 @@ pub struct EpisodeTrace {
     /// Counterfactual margin-exhaustion time without successful fallback.
     /// Required for hazard episodes and forbidden for safe episodes.
     pub recoverability_deadline_us: Option<u64>,
-    /// First monitor warning/quarantine time, if any.
+    /// First monitor warning time, if any.
     pub first_warning_us: Option<u64>,
+    /// Time the system actually entered its quarantine state, if any.
+    pub quarantined_us: Option<u64>,
     /// First fallback start time, if any.
     pub fallback_started_us: Option<u64>,
     /// Fallback completion time, if completed.
@@ -57,8 +59,11 @@ pub struct Metrics {
     pub intervention_required_episodes: usize,
     pub timely_warnings: usize,
     pub late_or_missing_warnings: usize,
+    pub timely_quarantines: usize,
+    pub late_or_missing_quarantines: usize,
     pub timely_fallback_completions: usize,
     pub late_or_missing_fallback_completions: usize,
+    pub false_warnings: usize,
     pub false_quarantines: usize,
     pub unnecessary_fallbacks: usize,
     pub safety_violations: usize,
@@ -70,6 +75,8 @@ pub struct Metrics {
     /// Nearest-rank percentiles over positive, timely lead times only.
     pub warning_lead_p50_us: Option<u64>,
     pub warning_lead_p90_us: Option<u64>,
+    pub quarantine_lead_p50_us: Option<u64>,
+    pub quarantine_lead_p90_us: Option<u64>,
     pub fallback_completion_lead_p50_us: Option<u64>,
     pub fallback_completion_lead_p90_us: Option<u64>,
 }
@@ -100,6 +107,7 @@ pub struct Scorecard {
 struct Accumulator {
     metrics: Metrics,
     warning_leads_us: Vec<u64>,
+    quarantine_leads_us: Vec<u64>,
     fallback_leads_us: Vec<u64>,
 }
 
@@ -122,6 +130,14 @@ impl Accumulator {
                     self.warning_leads_us.push(deadline - warning);
                 }
                 _ => bump(&mut self.metrics.late_or_missing_warnings)?,
+            }
+
+            match episode.quarantined_us {
+                Some(quarantined) if quarantined < deadline => {
+                    bump(&mut self.metrics.timely_quarantines)?;
+                    self.quarantine_leads_us.push(deadline - quarantined);
+                }
+                _ => bump(&mut self.metrics.late_or_missing_quarantines)?,
             }
 
             match episode.fallback_completed_us {
@@ -148,6 +164,9 @@ impl Accumulator {
                 bump(&mut self.metrics.safe_task_completed)?;
             }
             if episode.first_warning_us.is_some() {
+                bump(&mut self.metrics.false_warnings)?;
+            }
+            if episode.quarantined_us.is_some() {
                 bump(&mut self.metrics.false_quarantines)?;
             }
             if episode.fallback_started_us.is_some() {
@@ -159,9 +178,14 @@ impl Accumulator {
 
     fn finish(mut self) -> Metrics {
         self.warning_leads_us.sort_unstable();
+        self.quarantine_leads_us.sort_unstable();
         self.fallback_leads_us.sort_unstable();
         self.metrics.warning_lead_p50_us = nearest_rank(&self.warning_leads_us, 50, 100);
         self.metrics.warning_lead_p90_us = nearest_rank(&self.warning_leads_us, 90, 100);
+        self.metrics.quarantine_lead_p50_us =
+            nearest_rank(&self.quarantine_leads_us, 50, 100);
+        self.metrics.quarantine_lead_p90_us =
+            nearest_rank(&self.quarantine_leads_us, 90, 100);
         self.metrics.fallback_completion_lead_p50_us =
             nearest_rank(&self.fallback_leads_us, 50, 100);
         self.metrics.fallback_completion_lead_p90_us =
@@ -236,6 +260,7 @@ fn validate_episode(episode: &EpisodeTrace) -> Result<(), EvaluationError> {
 
     for (timestamp, label) in [
         (episode.first_warning_us, "first_warning_us"),
+        (episode.quarantined_us, "quarantined_us"),
         (episode.fallback_started_us, "fallback_started_us"),
         (episode.fallback_completed_us, "fallback_completed_us"),
     ] {
@@ -252,6 +277,20 @@ fn validate_episode(episode: &EpisodeTrace) -> Result<(), EvaluationError> {
         episode.fallback_completed_us,
     ) {
         if completed < start {
+            return Err(EvaluationError::EventOrderViolation);
+        }
+    }
+    if let (Some(warning), Some(quarantined)) =
+        (episode.first_warning_us, episode.quarantined_us)
+    {
+        if quarantined < warning {
+            return Err(EvaluationError::EventOrderViolation);
+        }
+    }
+    if let (Some(quarantined), Some(start)) =
+        (episode.quarantined_us, episode.fallback_started_us)
+    {
+        if start < quarantined {
             return Err(EvaluationError::EventOrderViolation);
         }
     }
@@ -310,6 +349,7 @@ mod tests {
             intervention_required: true,
             recoverability_deadline_us: Some(800),
             first_warning_us: warning,
+            quarantined_us: warning,
             fallback_started_us: start,
             fallback_completed_us: completed,
             safety_violation: false,
@@ -318,7 +358,13 @@ mod tests {
         }
     }
 
-    fn safe(id: &str, family: &str, warning: Option<u64>, fallback: Option<u64>) -> EpisodeTrace {
+    fn safe(
+        id: &str,
+        family: &str,
+        warning: Option<u64>,
+        quarantine: Option<u64>,
+        fallback: Option<u64>,
+    ) -> EpisodeTrace {
         EpisodeTrace {
             episode_id: id.into(),
             family_id: family.into(),
@@ -326,6 +372,7 @@ mod tests {
             intervention_required: false,
             recoverability_deadline_us: None,
             first_warning_us: warning,
+            quarantined_us: quarantine,
             fallback_started_us: fallback,
             fallback_completed_us: fallback.map(|time| time + 10),
             safety_violation: false,
@@ -358,14 +405,16 @@ mod tests {
     #[test]
     fn safe_false_quarantine_and_unnecessary_fallback_stay_visible() {
         let score = evaluate(&[
-            safe("s1", "urban", Some(100), Some(120)),
-            safe("s2", "urban", None, None),
+            safe("s1", "urban", Some(100), Some(110), Some(120)),
+            safe("s2", "urban", None, None, None),
+            safe("s3", "urban", Some(300), None, None),
         ])
         .unwrap();
+        assert_eq!(score.overall.false_warnings, 2);
         assert_eq!(score.overall.false_quarantines, 1);
         assert_eq!(score.overall.unnecessary_fallbacks, 1);
-        assert_eq!(score.overall.safe_task_completed, 2);
-        assert_eq!(score.overall.safe_operating_time_us, 4_000_000);
+        assert_eq!(score.overall.safe_task_completed, 3);
+        assert_eq!(score.overall.safe_operating_time_us, 6_000_000);
         assert_eq!(score.overall.mean_safe_useful_progress_ppm(), Some(875_000));
     }
 
@@ -386,8 +435,8 @@ mod tests {
     fn duplicate_episode_identity_is_rejected() {
         assert_eq!(
             evaluate(&[
-                safe("same", "urban", None, None),
-                safe("same", "rural", None, None),
+                safe("same", "urban", None, None, None),
+                safe("same", "rural", None, None, None),
             ]),
             Err(EvaluationError::DuplicateEpisodeId)
         );
@@ -424,7 +473,7 @@ mod tests {
             evaluate(&[episode]),
             Err(EvaluationError::DeadlineExceedsTrace)
         );
-        let mut episode = safe("s1", "urban", None, None);
+        let mut episode = safe("s1", "urban", None, None, None);
         episode.useful_progress_ppm = PROGRESS_SCALE_PPM + 1;
         assert_eq!(
             evaluate(&[episode]),
