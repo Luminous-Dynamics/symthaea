@@ -65,10 +65,11 @@ Source: https://arxiv.org/abs/2611.02430
 1. **One identity, many forms:** all renderers receive the same versioned semantic cue and provenance. A puppet, constellation, humanoid avatar, or instrument may differ in visual grammar, never in the event's meaning.
 2. **Presentation as a permissioned effect:** events propose expression; a default-deny policy grants a bounded form/channel/destination/expiry/intensity. Sensor capture and physical actuation are separate permissions.
 3. **Causal turn-taking:** WAIT, RESPOND, CONTINUE and YIELD are timestamped state transitions, not animation labels guessed from a final transcript.
-4. **Epistemic fidelity:** measured, derived, inferred, proposed, and presentation-only states remain distinct. Uncertainty is rendered as uncertainty; a visual glow is never treated as evidence.
-5. **Local-first graceful degradation:** text, static, reduced-motion and low-power modes are first-class; the core event and policy logic should run without a hosted avatar API.
-6. **Outcome receipts:** distinguish permitted, submitted, observed, stopped and failed. Never equate an authorization decision with a successful presentation.
-7. **User agency:** pause, cancel, form selection, privacy and motion controls override queued aesthetic or model preferences.
+4. **Content-bound rendering:** each presentation permit binds the full canonical cue with a deterministic digest; scene compilers reject payload substitution even when event IDs and semantic categories match. Renderer frames carry the digest but not raw evidence-reference identifiers.
+5. **Epistemic fidelity:** measured, derived, inferred, proposed, and presentation-only states remain distinct. Uncertainty is rendered as uncertainty; a visual glow is never treated as evidence.
+6. **Local-first graceful degradation:** text, static, reduced-motion and low-power modes are first-class; the core event and policy logic should run without a hosted avatar API.
+7. **Outcome receipts:** distinguish permitted, submitted, observed, stopped and failed. Never equate an authorization decision with a successful presentation.
+8. **User agency:** pause, cancel, form selection, privacy and motion controls override queued aesthetic or model preferences.
 
 ## Benchmark portfolio and proposed win conditions
 
