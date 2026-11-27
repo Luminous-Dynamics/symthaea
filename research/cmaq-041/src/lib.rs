@@ -393,21 +393,20 @@ fn validate_episode(episode: &EpisodeTrace) -> Result<(), EvaluationError> {
             return Err(EvaluationError::EventOrderViolation);
         }
     }
-    if let (Some(warning), Some(quarantined)) = (episode.first_warning_us, episode.quarantined_us) {
-        if quarantined < warning {
-            return Err(EvaluationError::EventOrderViolation);
-        }
+    if let (Some(warning), Some(quarantined)) = (episode.first_warning_us, episode.quarantined_us)
+        && quarantined < warning
+    {
+        return Err(EvaluationError::EventOrderViolation);
     }
     if let (Some(quarantined), Some(start)) = (episode.quarantined_us, episode.fallback_started_us)
+        && start < quarantined
     {
-        if start < quarantined {
-            return Err(EvaluationError::EventOrderViolation);
-        }
+        return Err(EvaluationError::EventOrderViolation);
     }
-    if let (Some(warning), Some(start)) = (episode.first_warning_us, episode.fallback_started_us) {
-        if start < warning {
-            return Err(EvaluationError::EventOrderViolation);
-        }
+    if let (Some(warning), Some(start)) = (episode.first_warning_us, episode.fallback_started_us)
+        && start < warning
+    {
+        return Err(EvaluationError::EventOrderViolation);
     }
 
     Ok(())
