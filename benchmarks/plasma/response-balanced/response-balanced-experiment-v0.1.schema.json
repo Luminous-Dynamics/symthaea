@@ -578,7 +578,10 @@
         "distribution_pulse_remap_jacobian_status",
         "distribution_pulse_boundary_outflow_disposition",
         "distribution_pulse_remap_jacobian_finite_difference_required",
-        "distribution_pulse_remap_topology_change_disposition"
+        "distribution_pulse_remap_topology_change_disposition",
+        "distribution_pulse_spatial_integral_weights_required",
+        "distribution_pulse_unweighted_total_mass_interpretation",
+        "distribution_pulse_weighted_quadrature_api_status"
       ],
       "properties": {
         "status": {
@@ -637,6 +640,15 @@
         },
         "distribution_pulse_remap_topology_change_disposition": {
           "const": "UNKNOWN_OR_HANDOFF"
+        },
+        "distribution_pulse_spatial_integral_weights_required": {
+          "const": true
+        },
+        "distribution_pulse_unweighted_total_mass_interpretation": {
+          "const": "unit_weight_row_sum_not_general_spatial_integral"
+        },
+        "distribution_pulse_weighted_quadrature_api_status": {
+          "const": "positive_spatial_weight_api_implemented_module_only"
         }
       }
     },
