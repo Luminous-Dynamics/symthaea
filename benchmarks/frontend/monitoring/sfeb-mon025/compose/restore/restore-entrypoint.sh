@@ -18,7 +18,6 @@ fi
 
 BACKUP_DIR="/backups/$MON025_BACKUP_ID"
 mkdir -p "$PGDATA"
-mkdir -p "$PGDATA"
 if [ ! -s "$BACKUP_DIR/PG_VERSION" ]; then
     echo "backup directory is missing or has no PG_VERSION: $BACKUP_DIR" >&2
     exit 66
