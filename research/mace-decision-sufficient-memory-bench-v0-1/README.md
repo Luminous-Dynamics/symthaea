@@ -1,7 +1,7 @@
 # MACE Decision-Sufficient Memory Benchmark
 
 **Version:** 0.1.0  
-**Status:** research protocol and seed fixtures authored; executable evaluator not yet implemented  
+**Status:** research protocol and candidate-only fixtures authored; dependency-free Rust paired evaluator core and LongMemEval-V2 LAFS helper implemented (execution/CI validation still pending)  
 **Tracking:** [issue #13893](https://github.com/Luminous-Dynamics/symthaea/issues/13893)
 
 ## Thesis
@@ -99,6 +99,7 @@ An episode is generated from a frozen world seed and contains:
 Each source event should retain, where available:
 
 - stable event and source identifiers;
+- source-family identity and canonical upstream-root digest where available (identifiers are lineage keys, not signatures or proof of statistical independence);
 - observed-at time and valid-from / valid-until interval;
 - source authority class and uncertainty declaration;
 - original claim or ordered content;
@@ -147,10 +148,10 @@ For each episode:
 1. Deliver source events in chronological order through the declared Add/ingest interface.
 2. Freeze the candidate memory state at the episode's query time.
 3. Submit the original decision query and declared evidence/observation budget.
-4. Accept ranked evidence IDs and content from the memory system.
-5. Resolve every returned ID independently against canonical source records.
-6. Pass only the admissible evidence packet to a frozen downstream decision policy.
-7. Score the chosen action using evaluator-private state and loss tables.
+4. Accept ranked `retrieved_evidence_ids` from the memory system.
+5. Resolve every returned ID independently against canonical source records; compute admissibility, source-family/root lineage and contradiction relationships evaluator-side.
+6. Pass a selected evidence packet to the frozen downstream decision policy and record its IDs separately as `decision_support_evidence_ids`. The selected set must be a unique subset of the retrieved set.
+7. Score the chosen action using evaluator-private state and loss tables. Keep retrieval precision/recall distinct from decision-support precision/recall.
 
 This separates the memory subsystem's evidence contribution from the downstream model's ability to answer. A later end-to-end agent experiment may be added, but it must be reported separately.
 
@@ -197,7 +198,10 @@ Do not collapse these dimensions into one unqualified score.
 
 ### Evidence quality
 
-- Valid-evidence precision and required-evidence recall, determined by independent resolution.
+- Retrieved-context admissible precision and required-evidence recall, determined by independent resolution.
+- Decision-support admissible precision and required-evidence recall, computed from the evidence IDs actually passed to the downstream policy.
+- Distinct source-family and upstream-root counts for both retrieval and decision-support sets, with unknown lineage counts. Repeated event records from the same root count as one root. Root IDs remain unauthenticated until independently verified.
+- Unresolved contradiction-pair count in retrieved context and decision-support context. In v0.2, any unresolved conflict in retrieved context blocks decision sufficiency because the protocol has no conflict-resolution receipt.
 - Stale-evidence action rate.
 - Supersession, revocation and correction propagation delay.
 - Contradiction detection and resolution accuracy.
@@ -370,6 +374,7 @@ For AML, keep the independent target of +3 absolute points over the published op
 
 - [PR #13836](https://github.com/Luminous-Dynamics/symthaea/pull/13836) improves paired experiment integrity, common-cause source identities, matched arms and qualification-aware symbolic retrieval.
 - [PR #13869](https://github.com/Luminous-Dynamics/symthaea/pull/13869) adds phase-attributed cost receipts.
+- The evaluator core now distinguishes retrieved evidence from decision-support evidence, scores source-family/root diversity and fails decision sufficiency on unresolved retrieved conflicts. See the `CandidateRunV1` and `RunScoreV1` contracts in `evaluator/src/lib.rs`.
 - [PR #13867](https://github.com/Luminous-Dynamics/symthaea/pull/13867), [PR #13871](https://github.com/Luminous-Dynamics/symthaea/pull/13871) and [PR #13873](https://github.com/Luminous-Dynamics/symthaea/pull/13873) form the durable Add/Search service workstream.
 - [Issue #13874](https://github.com/Luminous-Dynamics/symthaea/issues/13874) tracks encryption, retention and verifiable erasure.
 - [Issue #13875](https://github.com/Luminous-Dynamics/symthaea/issues/13875) tracks the official frozen Textual word counter.
