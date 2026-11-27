@@ -476,7 +476,7 @@ fn summarize(
         let decision_cost = decision_cost(&eligible, &accepted, config.decision_costs);
         let random_cost = random_abstention_cost(
             &eligible,
-            target,
+            point.coverage,
             config.decision_costs,
         );
         report.operating_points.push(CoverageOperatingPoint {
@@ -811,7 +811,10 @@ mod tests {
         let report = evaluate_risk_coverage(&records, &cfg).unwrap();
         let point = &report.report.operating_points[0];
         assert!((point.mean_decision_cost.unwrap() - 2.0).abs() < 1e-12);
-        assert!((point.random_abstention_expected_cost.unwrap() - 1.05).abs() < 1e-12);
+        // Compare with random abstention at the actually achieved 1/3 coverage.
+        assert!(
+            (point.random_abstention_expected_cost.unwrap() - 10.0 / 9.0).abs() < 1e-12
+        );
     }
 
     #[test]
