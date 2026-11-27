@@ -141,6 +141,7 @@ pub fn handoff_after_calibration_quarantine(
     if portfolio_request.prefixes.len() != 1
         || portfolio_request.prefixes[0].step != 0
         || portfolio_request.prefixes[0].context_scope_sha256 != reconciliation.context_scope_sha256
+        || portfolio_request.prefixes[0].state_evidence_sha256 != reconciliation.current_state_sha256
     {
         return Ok(RecoveryHandoffAssessment {
             disposition: HandoffDisposition::RejectedNonImmediateAssessment,
@@ -361,6 +362,8 @@ mod tests {
                 .map(|step| PortfolioPrefix {
                     step: step as u32,
                     context_scope_sha256: digest('2'),
+                    state_evidence_sha256: digest('d'),
+                    reachability_evidence_sha256: digest('8'),
                     reachable_error_bound_units: 5,
                 })
                 .collect(),
