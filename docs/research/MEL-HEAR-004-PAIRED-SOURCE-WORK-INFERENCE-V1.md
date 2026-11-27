@@ -62,6 +62,13 @@ Only model/prompt/runtime/decoding identities and model answers may differ. Miss
 
 The report contains baseline and candidate cluster-average point estimates plus three separate paired candidate-improvement intervals. No composite score can hide a STAY/FLIP trade-off.
 
+It also emits separate source-work-clustered slices:
+- by target property;
+- by target property × Performance-STAY factor;
+- by target property × Musical-FLIP factor.
+
+Every stratum carries its item count, distinct source-work count, status and the same three separate metrics. Its own cluster count must meet the declared minimum before it receives bootstrap intervals. An overall 30-work sample cannot make a one-work property/factor slice estimable. Sparse strata keep descriptive point estimates and explicit `InsufficientSourceWorkClusters` status; no parent or pooled interval is copied into them.
+
 `SourceWorkClusterFloorMet` means only that the declared cluster-count floor is reached. It does **not** mean the study is scientifically confirmatory. The sampling frame, work-lineage assignments, annotation quality, independence assumptions, preregistration, power and multiplicity controls still require independent qualification.
 
 Below 30 clusters the tool emits descriptive equal-work estimates and `InsufficientSourceWorkClusters`, but no bootstrap intervals.
