@@ -488,7 +488,16 @@ fn enforce_active_scene(
         return;
     };
 
-    let valid_clock = clock.is_changed() && clock.permits_frame(frame);
+    let valid_clock = clock.is_changed()
+        && clock.permits_frame(frame)
+        && clock.now_monotonic_ns().is_some_and(|now| {
+            rendered.iter().all(|(_, guard)| {
+                guard.clock_domain_id == frame.clock_domain_id()
+                    && guard.effective_expires_at_monotonic_ns
+                        .parse::<u64>()
+                        .is_ok_and(|expires| is_before_expiry(now, expires))
+            })
+        });
     let policy_still_allows = match (clock.now_monotonic_ns(), clock.clock_domain_id()) {
         (Some(now), Some(clock_id)) => policy.policy().recheck_permit(
             submission.permit(),
