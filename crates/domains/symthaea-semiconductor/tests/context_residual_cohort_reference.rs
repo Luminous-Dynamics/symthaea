@@ -158,10 +158,7 @@ fn estimator_matches_independent_two_stage_group_median_oracle() {
         oracle_groups
             .entry(observation.common_cause_group_id.clone())
             .or_default()
-            .push(
-                observation.label_value
-                    - observation.prediction_receipt.prediction_value,
-            );
+            .push(observation.label_value - observation.prediction_receipt.prediction_value);
     }
     let mut group_medians = oracle_groups
         .values_mut()
@@ -171,15 +168,13 @@ fn estimator_matches_independent_two_stage_group_median_oracle() {
 
     let report = evaluate_context_residual_cohort_v1(&fixture(observations)).unwrap();
     assert_eq!(report.status, ContextResidualCohortStatusV1::Complete);
-    assert!(
-        (report.global_common_mode_residual.unwrap() - expected_global).abs() < 1.0e-12
-    );
+    assert!((report.global_common_mode_residual.unwrap() - expected_global).abs() < 1.0e-12);
 }
 
 #[test]
 fn observation_volume_inside_one_group_does_not_increase_its_global_weight() {
     let mut observations = Vec::new();
-    for index in 0.. 9 {
+    for index in 0..9 {
         observations.push(make_observation(
             &format!("a-{index}"),
             &format!("tool-a/ch-{index}"),
@@ -187,12 +182,7 @@ fn observation_volume_inside_one_group_does_not_increase_its_global_weight() {
             10.0,
         ));
     }
-    observations.push(make_observation(
-        "b-1",
-        "tool-b/ch-1",
-        "reference-b",
-        0.0,
-    ));
+    observations.push(make_observation("b-1", "tool-b/ch-1", "reference-b", 0.0));
     let report = evaluate_context_residual_cohort_v1(&fixture(observations)).unwrap();
     assert_eq!(report.independent_common_cause_group_count, 2);
     assert!((report.global_common_mode_residual.unwrap() - 5.0).abs() < 1.0e-12);
