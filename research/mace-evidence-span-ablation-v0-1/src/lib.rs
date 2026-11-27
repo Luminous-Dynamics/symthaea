@@ -607,7 +607,7 @@ mod tests {
             pair_block_id: format!("pair-{pair:03}"),
             profile_cluster_id: format!("profile-{cluster:03}"),
             episode_id: format!("episode-{pair:03}"),
-            population_stratum: if cluster % 2 == 0 { "standard" } else { "sparse" }.to_owned(),
+            population_stratum: if cluster.is_multiple_of(2) { "standard" } else { "sparse" }.to_owned(),
             arm,
             ablation_mode: SpanAblationModeV1::RemoveSpan,
             execution_order: order,
@@ -839,7 +839,7 @@ mod tests {
         assert!(report.stratum_regret_reduction_ci95["sparse"].is_some_and(|ci| ci.lower > 0.0));
         assert_eq!(report.stratum_independent_profile_clusters["standard"], 2);
         assert_eq!(report.stratum_independent_profile_clusters["sparse"], 2);
-        assert_eq!(report.stratum_confirmatory_cluster_floor_met["standard"], false);
+        assert!(!report.stratum_confirmatory_cluster_floor_met["standard"]);
         assert!(valid_sha256(&report.canonical_sha256));
         assert!(report.verify_integrity());
     }
@@ -851,7 +851,7 @@ mod tests {
         assert_eq!(report.stratum_independent_profile_clusters["sparse"], 1);
         assert_eq!(report.stratum_utility_effect_ci95["sparse"], None);
         assert_eq!(report.stratum_regret_reduction_ci95["sparse"], None);
-        assert_eq!(report.stratum_confirmatory_cluster_floor_met["sparse"], false);
+        assert!(!report.stratum_confirmatory_cluster_floor_met["sparse"]);
         assert!(report.stratum_utility_effect_ci95["standard"].is_some());
     }
 
