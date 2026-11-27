@@ -468,6 +468,53 @@ mod tests {
     }
 
     #[test]
+    fn conditional_upper_envelope_covers_multiple_interior_peaks() {
+        // A max of L-Lipschitz cones remains L-Lipschitz. The peaks are all
+        // interior, so a boundary-only search is not a valid substitute.
+        let centers = [0.07_f64, 0.19, 0.37, 0.61, 0.88];
+        let heights = [0.8_f64, 2.4, 1.7, 2.9, 1.2];
+        let lipschitz = 4.0;
+        let objective = |parameter: f64| {
+            let value = centers
+                .iter()
+                .zip(heights)
+                .map(|(center, height)| height - lipschitz * (parameter - center).abs())
+                .fold(0.0_f64, f64::max);
+            Ok(ChallengeObjectiveSample::new(value, "stable-multi-peak", true))
+        };
+        let config = ScalarChallengeSearchConfig::new(
+            0.0,
+            1.0,
+            lipschitz,
+            5.0e-3,
+            512,
+            "second_pulse_phase_rad",
+            "stable-multi-peak",
+            certificate(),
+        );
+        let report = search_scalar_response_challenge(&config, objective).unwrap();
+        let dense_grid_max = (0..=20_000)
+            .map(|index| {
+                let parameter = index as f64 / 20_000.0;
+                centers
+                    .iter()
+                    .zip(heights)
+                    .map(|(center, height)| {
+                        height - lipschitz * (parameter - center).abs()
+                    })
+                    .fold(0.0_f64, f64::max)
+            })
+            .fold(0.0_f64, f64::max);
+
+        assert!(report.global_upper_bound + 1.0e-12 >= dense_grid_max);
+        assert!(report.absolute_gap <= config.absolute_gap_tolerance);
+        assert_eq!(
+            report.termination,
+            ChallengeSearchTermination::ConditionalGapSatisfied
+        );
+    }
+
+    #[test]
     fn zero_lipschitz_objective_is_bounded_after_one_evaluation() {
         let config = ScalarChallengeSearchConfig::new(
             -1.0,
