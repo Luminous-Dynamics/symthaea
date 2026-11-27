@@ -373,7 +373,17 @@ pub fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
     let half = z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
-    ((center - half).max(0.0), (center + half).min(1.0))
+    let lower = if successes == 0 {
+        0.0
+    } else {
+        (center - half).max(0.0)
+    };
+    let upper = if successes == trials {
+        1.0
+    } else {
+        (center + half).min(1.0)
+    };
+    (lower, upper)
 }
 
 fn format_method_row(scenario: Scenario, summary: &MethodSummary) -> String {
