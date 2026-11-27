@@ -464,6 +464,121 @@ mod tests {
     }
 
     #[test]
+    fn observer_receipt_schema_meta_validates_and_cannot_self_qualify() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repository root resolves");
+        let schema_path = root.join("docs/research/eqc-observer-receipt-v0.2.schema.json");
+        let schema: Value = serde_json::from_slice(
+            &std::fs::read(schema_path).expect("read observer receipt schema"),
+        )
+        .expect("observer receipt schema parses");
+
+        assert!(schema["properties"].get("qualified").is_none());
+        let validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("Draft 2020-12 observer receipt schema meta-validates");
+
+        let digest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let receipt = json!({
+            "schema": "luminous.eqc.observer-receipt.v0.2",
+            "observation_id": "observation-2026-11-27-0001",
+            "task_binding": {
+                "task_id": "eqc-health-wrong-subject-deny-001",
+                "task_digest_sha256": digest,
+                "nonce": "0123456789abcdef0123456789abcdef",
+                "issued_at": "2026-11-27T10:00:00Z",
+                "expires_at": "2026-11-27T10:05:00Z"
+            },
+            "execution": {
+                "started_at": "2026-11-27T10:00:01Z",
+                "finished_at": "2026-11-27T10:00:02Z",
+                "exit_code": 0,
+                "environment_image_digest": "sha256:synthetic-image",
+                "runtime_identity": "eqc-l1-test-runtime"
+            },
+            "sut": {
+                "system_id": "synthetic-test-adapter",
+                "version": "0.1.0",
+                "model_id": null,
+                "harness_version": "0.1.0",
+                "tool_versions": {},
+                "artifact_image_digest": "sha256:synthetic-sut",
+                "source_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "observer": {
+                "observer_id": "test-host-observer",
+                "observer_binary_sha256": digest,
+                "observer_policy_sha256": digest,
+                "key_id": "test-observer-key-01",
+                "trust_level": "L1_HOST_OBSERVED",
+                "measurement_sources": [
+                    "cgroup_v2",
+                    "network_namespace",
+                    "filesystem_snapshot",
+                    "replay_worker"
+                ],
+                "platform_attestation_sha256": null
+            },
+            "measurements": {
+                "wall_time_ms": 1000,
+                "cpu_time_usec": 500000,
+                "peak_memory_bytes": 16777216,
+                "peak_process_count": 2,
+                "tool_call_count": 1,
+                "network": {
+                    "policy": "none",
+                    "bytes_in": 0,
+                    "bytes_out": 0,
+                    "observed_endpoints": [],
+                    "enforcement": "enforced"
+                },
+                "state": {
+                    "status": "unchanged",
+                    "before_sha256": digest,
+                    "after_sha256": digest,
+                    "measurement_source": "filesystem_snapshot",
+                    "event_log_sha256": digest
+                }
+            },
+            "artifact": {
+                "kind": "patch",
+                "sha256": digest,
+                "size_bytes": 128
+            },
+            "replay": {
+                "status": "passed",
+                "worker_id": "clean-replay-worker-01",
+                "run_id": "replay-2026-11-27-0001",
+                "environment_image_digest": "sha256:pristine-image",
+                "verifier_sha256": digest,
+                "input_artifact_sha256": digest,
+                "result_sha256": digest,
+                "comparison": {
+                    "mode": "byte_exact",
+                    "metric": "result_sha256",
+                    "tolerance": null,
+                    "observed_value": null
+                }
+            },
+            "signature": {
+                "algorithm": "Ed25519",
+                "canonicalization": "RFC8785_JCS",
+                "signed_payload_sha256": digest,
+                "value_base64": "c3ludGhldGljLXNpZ25hdHVyZS1ub3QtZm9yLXByb2R1Y3Rpb24="
+            }
+        });
+
+        assert!(validator.is_valid(&receipt));
+        let mut self_qualified = receipt;
+        self_qualified["qualified"] = json!(true);
+        assert!(!validator.is_valid(&self_qualified));
+    }
+
+    #[test]
     fn self_reported_observation_passes_contract_checks_but_is_not_independently_qualified() {
         let task = task();
         let observation = valid_observation(&task);
