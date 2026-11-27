@@ -226,6 +226,62 @@
       "expected_outcome": "indeterminate",
       "mutation": "score a campaign without any executed unsafe test case",
       "notes": "No false-qualification rate is inferred without an unsafe denominator."
+    },
+    {
+      "id": "MON028-P004",
+      "class": "positive_control",
+      "name": "complete_MON025_oracle_join",
+      "expected_outcome": "qualified",
+      "mutation": "generate a suite from the full 41-case matrix with every case matched to exactly one independent oracle entry",
+      "notes": "Suite generation retains all case IDs, families, replicate counts and raw source digests."
+    },
+    {
+      "id": "MON028-N026",
+      "class": "negative_control",
+      "name": "missing_oracle_case",
+      "expected_outcome": "blocked",
+      "mutation": "remove one oracle entry while leaving the MON-025 matrix unchanged",
+      "notes": "The generator must reject the incomplete oracle and not reduce the planned benchmark denominator."
+    },
+    {
+      "id": "MON028-N027",
+      "class": "negative_control",
+      "name": "oracle_expected_outcome_disagreement",
+      "expected_outcome": "blocked",
+      "mutation": "change an oracle verdict or matrix expected_outcome for one shared case ID",
+      "notes": "The generator fails closed when the two separately maintained declarations disagree."
+    },
+    {
+      "id": "MON028-N028",
+      "class": "negative_control",
+      "name": "duplicate_oracle_case_id",
+      "expected_outcome": "blocked",
+      "mutation": "repeat a case ID in the independent oracle with a second family or verdict",
+      "notes": "Duplicate oracle identity is ambiguous and must prevent suite creation."
+    },
+    {
+      "id": "MON028-N029",
+      "class": "negative_control",
+      "name": "extra_oracle_case_id",
+      "expected_outcome": "blocked",
+      "mutation": "add an oracle entry absent from the MON-025 fault matrix",
+      "notes": "The oracle and fault corpus must match exactly in both directions."
+    },
+    {
+      "id": "MON028-N030",
+      "class": "negative_control",
+      "name": "substituted_workload_environment_or_budget_profile",
+      "expected_outcome": "blocked",
+      "mutation": "supply a workload, environment or resource document with the wrong profile identity",
+      "notes": "A generated suite cannot claim a matched environment or resource envelope from a different profile type."
+    },
+    {
+      "id": "MON028-N031",
+      "class": "indeterminate_control",
+      "name": "example_environment_placeholders_not_replaced",
+      "expected_outcome": "indeterminate",
+      "mutation": "use the illustrative environment profile with REPLACE_WITH placeholders as a confirmatory run identity",
+      "notes": "An example profile is useful for a smoke build but cannot support confirmatory hardware or immutable-image claims until replaced with observed values."
     }
   ]
 }
