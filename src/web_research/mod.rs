@@ -100,6 +100,9 @@ pub mod meta_learning;
 // Versioned, adjudication-only selective-prediction evaluation
 pub mod selective_prediction;
 
+// Population-risk evaluation under declared selective-adjudication designs
+pub mod selective_observation;
+
 // Re-exports for ergonomic access
 pub use conjecture_feed::{
     ConjectureFeedError, ConjectureFeeder, ProvenancedConjecture, ResearchNumericDataset,
@@ -121,6 +124,11 @@ pub use researcher::WebResearcher;
 pub use selective_prediction::{
     evaluate_risk_coverage, CoreRiskCoverageReport, CoverageOperatingPoint, DecisionCosts,
     RiskCoverageConfig, RiskCoverageError, RiskCoverageReport, SelectivePredictionRecord,
+};
+pub use selective_observation::{
+    evaluate_selective_observation, AdjudicationSamplingDesign,
+    AdjudicationSamplingMechanism, PropensitySupportDiagnostics,
+    PropensityWeightedReport, SelectiveObservationEvaluation, SelectiveObservationRecord,
 };
 pub use types::*;
 pub use verifier::{

@@ -49,3 +49,21 @@ The production module `src/web_research/selective_prediction.rs` implements the 
 - The default minimum eligible sample size is 20. Tests may lower it to exercise small-cohort edge cases; doing so is not an evaluation recommendation.
 
 Run the same locked harness commands above. The metric evaluates predictions against supplied labels; it does not authenticate adjudicator independence, establish truth, choose a production abstention policy or prove that the live researcher uses the metric.
+
+
+## Selective adjudication and population-risk estimation
+
+The production module `src/web_research/selective_observation.rs` adds an opt-in population-risk lane without changing the ordinary adjudicated-cohort metrics.
+
+A frozen cohort row wraps its prediction, any adjudicator/panel assignment made before the outcome is observed, and a known probability that the independent label is observed by the evaluation cutoff. This pre-label assignment is distinct from the actual adjudicator on a completed label. The caller must also identify the sampling design (randomized audit or known propensity conditional on pre-label history) and reference its frozen manifest.
+
+- Every record in the target population must have a finite inclusion probability in (0, 1]. Zero or missing support blocks population estimation; the evaluator will not extrapolate into never-adjudicated regions.
+- A pending record with inclusion probability 1.0 is inconsistent with a design defined at the frozen evaluation cutoff and is rejected.
+- The implementation uses Horvitz-Thompson estimates of error totals divided by known full-cohort accepted counts. Finite-sample risk estimates are deliberately not clipped and can exceed 1.
+- Kish effective sample size gates the report and each fixed operating point. Domain, source-family, delayed/censored and pre-label adjudicator-assignment strata are evaluated separately; unsupported or underpowered strata remain visible without scores. The completed label's actual adjudicator is not used as a population stratum because it may be unknown on pending rows.
+- No confidence interval is generated. Marginal inclusion probabilities alone do not determine a design-valid variance under arbitrary dependence or clustered sampling. A future confirmatory estimator must use joint inclusion probabilities or an independently qualified cluster/design-aware variance procedure.
+- Conditional ignorability and the declared pre-label sampling design are assumptions supplied by the evaluator. The module does not authenticate the manifest or prove those assumptions.
+
+This is an exploratory population estimator, not the finite-sample martingale risk-control procedure in the recent SOWRC literature. It does not inherit SOWRC's guarantees. Its role is to expose selection bias and support failures before making population-level selective-risk claims.
+
+The standalone Rust 1.96 harness imports the production source by path. Exact-head formatting, tests and strict Clippy are required before qualification.
