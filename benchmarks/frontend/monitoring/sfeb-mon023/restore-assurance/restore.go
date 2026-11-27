@@ -30,6 +30,17 @@ type RecoveryTarget struct {
 	LineageID string
 	TimelineID uint32
 	LSN uint64
+	RecoveryTimestamp int64
+	RecoveryClockDomain string
+	RecoveryClockUncertainty int64
+	RecoveryClockTrusted bool
+}
+func (t RecoveryTarget) TimestampNanos() int64 { return t.RecoveryTimestamp }
+func (t RecoveryTarget) TimestampDomain() string { return t.RecoveryClockDomain }
+func (t RecoveryTarget) TimestampUncertainty() int64 { return t.RecoveryClockUncertainty }
+func (t RecoveryTarget) TimestampTrusted() bool { return t.RecoveryClockTrusted }
+func validTargetStamp(t RecoveryTarget) bool {
+	return present(t.RecoveryClockDomain) && t.RecoveryTimestamp>0 && t.RecoveryClockUncertainty>=0 && t.RecoveryClockTrusted
 }
 type Plan struct {
 	ID,Version,Digest string
@@ -39,7 +50,7 @@ type Plan struct {
 	RepositoryID,BackupMethodProfile string
 	RequestedTarget RecoveryTarget
 	RequiredWALStart,RequiredWALStop uint64
-	RequireFullDatabaseState bool
+	RequireFullDatabaseStateFlag bool
 	SurfaceInventoryDigest string
 	RequiredDependencyIDs []string
 	ApplicationReleaseDigest,InvariantSuiteDigest string
@@ -78,6 +89,7 @@ type SurfaceCoverage struct {
 	InventoryDigest string
 	Scope string
 	RequiredCovered int
+	RequiredTotal int
 	Excluded []string
 	NotApplicable int
 	EvidenceDigest string
@@ -146,13 +158,13 @@ func Evaluate(req Request)Result{
 
 	r.Checked=append(r.Checked,"isolated-restore","recovery-point-lineage","database-consistency","surface-coverage","rpo-rto")
 	x:=req.Restore
-	if !present(x.EnvironmentID,x.ControlRoot,x.CommandProfileDigest,x.RestoreManifestDigest,x.SourceSystem,x.Database,x.RestoredSystemIdentifier,x.LineageID,x.EvidenceDigest)||x.EnvironmentID==p.SourceSystem||x.ControlRoot==p.SourceControlRoot{return done(Indeterminate,"restore environment/source identity incomplete or not isolated",r)}
+	if !present(x.EnvironmentID,x.ControlRoot,x.CommandProfileDigest,x.RestoreManifestDigest,x.SourceSystem,x.Database,x.RestoredSystemIdentifier,x.LineageID,x.EvidenceDigest)||x.EnvironmentID!=p.RestoreTargetSystem||x.ControlRoot!=p.RestoreControlRoot||x.EnvironmentID==p.SourceSystem||x.ControlRoot==p.SourceControlRoot{return done(Indeterminate,"restore environment/source identity incomplete or not bound to the declared isolated target",r)}
 	if !x.Isolated||!x.NetworkEgressBlocked||!x.ProductionWritesBlocked||!x.ScopedCredentials{return done(Denied,"restore rehearsal is not safely isolated from production",r)}
 	if x.SourceSystem!=p.SourceSystem||x.Database!=p.Database||x.RestoredSystemIdentifier!=p.SourceSystem{return done(Denied,"restored cluster/database identity differs from source plan",r)}
 	if !x.VerifierVerified||!x.Complete||x.FreshUntil<=req.EvaluatedAt||!withinFreshness(x.StartedAt.UnixNanos,x.FreshUntil,req.EvaluatedAt){return done(Indeterminate,"restore execution evidence unverified, incomplete or stale",r)}
 	if !x.ConsistencyReached||!x.CatalogChecksPassed{return done(Indeterminate,"database consistency/catalog checks not established",r)}
 	if x.RecoveryState!="ready"&&x.RecoveryState!="validation_only"{return done(Indeterminate,"database is not at a terminal recovered/validation-only state",r)}
-	if !validStamp(x.StartedAt)||!validStamp(x.DatabaseReadyAt)||!validStamp(p.IncidentAt)||!validStamp(req.Restore.AchievedTargetClock()) {return done(Indeterminate,"incident, recovery-point or database-ready clock evidence incomplete",r)}
+	if !validStamp(x.StartedAt)||!validStamp(x.DatabaseReadyAt)||!validStamp(p.IncidentAt)||!validTargetStamp(x.AchievedTarget) {return done(Indeterminate,"incident, recovery-point or database-ready clock evidence incomplete",r)}
 	if x.StartedAt.Domain!=p.IncidentAt.Domain||x.DatabaseReadyAt.Domain!=p.IncidentAt.Domain||x.AchievedTarget.TimestampDomain()!=p.IncidentAt.Domain{return done(Indeterminate,"incident/recovery/database-ready clocks are incomparable",r)}
 	if !x.TargetReached||x.RequestedTarget!=p.RequestedTarget{return done(Denied,"restore did not reach the exact requested recovery target",r)}
 	if x.AchievedTarget.LineageID!=p.RequestedTarget.LineageID||x.AchievedTarget.TimelineID!=p.RequestedTarget.TimelineID||x.LineageID!=p.RequestedTarget.LineageID||x.TimelineID!=p.RequestedTarget.TimelineID||!x.TimelineHistoryVerified||!present(x.TimelineHistoryDigest){return done(Indeterminate,"achieved recovery point is not proven on the requested timeline/lineage",r)}
@@ -162,9 +174,10 @@ func Evaluate(req Request)Result{
 	if r.RPOUpperNanos<0||r.DatabaseRTOUpperNanos<0{return done(Divergent,"clock evidence produces a negative RPO or database RTO",r)}
 	if r.RPOUpperNanos>p.MaxRPOUpperNanos||r.DatabaseRTOUpperNanos>p.MaxDatabaseRTOUpperNanos{return done(Denied,"RPO or database RTO exceeds recovery objective",r)}
 	s:=req.Surface
-	if !s.Verified||!present(s.InventoryDigest,s.Scope,s.EvidenceDigest)||s.InventoryDigest!=p.SurfaceInventoryDigest||s.RequiredCovered<=0{return done(Indeterminate,"MON-022 surface inventory result missing or stale",r)}
+	if !s.Verified||!present(s.InventoryDigest,s.Scope,s.EvidenceDigest)||s.InventoryDigest!=p.SurfaceInventoryDigest||s.RequiredTotal<=0||s.RequiredCovered!=s.RequiredTotal{return done(Indeterminate,"MON-022 surface inventory result missing, incomplete or stale",r)}
 	if p.RequireFullDatabaseState()&&(!s.FullDatabaseState||len(s.Excluded)>0){return done(Denied,"full-state recovery plan has excluded/unqualified database surfaces",r)}
-	if !p.RequireFullDatabaseState()&&s.Scope!="row_stream_continuity"&&s.Scope!="scoped_database_state"{return done(Indeterminate,"database recovery scope is unsupported or unnamed",r)}
+	if !p.RequireFullDatabaseStateFlag&&s.Scope!="row_stream_continuity"&&s.Scope!="scoped_database_state"{return done(Indeterminate,"database recovery scope is unsupported or unnamed",r)}
+	if p.RequestedClaim==ServiceRecovered&&x.RecoveryState!="ready"{return done(Indeterminate,"validation-only paused restore cannot qualify service recovery",r)}
 	r.ExcludedSurfaces=append([]string(nil),s.Excluded...)
 	r.DatabaseRecovered=true;r.HighestQualifiedClaim=DatabaseRecovered
 	if p.RequestedClaim==DatabaseRecovered{return done(Qualified,"database recovered at the requested lineage/target with declared surface scope and RPO/RTO",r)}
@@ -191,7 +204,7 @@ func Evaluate(req Request)Result{
 		if !probe.Passed{r.FailedProbes=append(r.FailedProbes,probe.ID);continue}
 		switch probe.Kind{
 		case "read":readSeen=true
-		case "write":if !probe.RollbackVerified{r.FailedProbes=append(r.FailedProbes,probe.ID)}else{writeSeen=true}
+		case "write":if !probe.RollbackVerified{return done(Indeterminate,"safe write probe lacks rollback/containment evidence",r)}else{writeSeen=true}
 		case "invariant":
 		default:r.FailedProbes=append(r.FailedProbes,probe.ID)
 		}
@@ -210,8 +223,4 @@ func Evaluate(req Request)Result{
 	return done(Qualified,"service recovered: database, surfaces, dependencies, application invariants, safe probes, fencing and independent acceptance all qualify",r)
 }
 
-// Helpers below keep clock-field arithmetic explicit at the call site.
-type TargetClock struct { Domain string; UnixNanos,UncertaintyNanos int64; Trusted bool }
-func (r RestoreExecution) AchievedTargetClock() TargetClock { return TargetClock{Domain:r.AchievedTarget.TimestampDomain(),UnixNanos:r.AchievedTarget.TimestampNanos(),UncertaintyNanos:r.AchievedTarget.TimestampUncertainty(),Trusted:r.AchievedTarget.TimestampTrusted()} }
-func (p Plan) SurfaceInventoryDigestForPlan() string { return p.SurfaceInventoryDigest }
-func (p Plan) RequireFullDatabaseState() bool { return p.RequireFullDatabaseStateFlag }
+
