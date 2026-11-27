@@ -64,3 +64,18 @@ The strict case schema is at schemas/mel-music-listen-bench-case-v1.schema.json.
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-listen-bench-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-listen-bench.synthetic.json
 
 The synthetic case deliberately includes one wrong CLEAN answer and one unparseable FLIP answer, uses a reversed A/B semantic mapping in one variant, and contains two source lineages. Its metrics are adapter-plumbing checks only. Audio bytes are not fetched or rehashed, model inference is not invoked, and transformation authenticity is not established.
+
+
+## Property-relative musical performance identity extension
+
+The `music_performance_identity` module extends, but does not modify, the official MusicListenBench v1.0 CLEAN/FLIP/STAY protocol. Each case is a CLEAN / Performance-STAY / Musical-FLIP triad. It distinguishes chord quality, root pitch class, voicing, relative interval sequence, melodic contour, rhythmic ratio, pulse rate and instrument family.
+
+Performance-STAY factors are typed as a different take by the same performer, a different performer on the same instrument family, strum/articulation change, expressive timing change, a different tempo with the same rhythmic-ratio pattern, or a different renderer for the same performance. The evaluator checks the corresponding identity metadata. Musical-FLIP must change exactly the declared target-property family; it cannot be treated as a generic waveform difference.
+
+Run the synthetic eight-triad extension panel with:
+
+    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-performance-identity-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-performance-identity.synthetic.json
+
+The report keeps CLEAN accuracy, performance-STAY false-difference rate and musical-FLIP miss rate separate, with conditional-on-CLEAN-correct rates and property/performance-factor/performer/take/renderer slices. It does not emit a composite music identity score.
+
+The dataset, target-property references and pairing manifests are digest-shaped metadata only. The evaluator does not rehash audio bytes or authenticate musician annotations, performance identities or rights/consent. The synthetic panel is a deterministic evaluator control, not evidence of real-performance invariance or SOTA.
