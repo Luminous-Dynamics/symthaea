@@ -663,6 +663,11 @@ pub enum EvaluationErrorV1 {
     AblationEvidenceSetMismatch,
     AblationSelectedSetMismatch,
     AblationSystemMismatch,
+    PairAblationTargetMissing,
+    DuplicatePairAblation,
+    PairAblationSetIncomplete,
+    PairAblationEvidenceSetMismatch,
+    PairAblationSelectedSetMismatch,
     NoClusteredEpisodes,
     EmptyClusterId,
     DuplicateEpisodeId,
@@ -1461,6 +1466,129 @@ pub fn summarize_clustered_pairs(
     })
 }
 
+/// Joint intervention that removes exactly two returned evidence items.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidencePairAblationV1 {
+    pub left_evidence_id: String,
+    pub right_evidence_id: String,
+    pub output_without_pair: CandidateRunV1,
+}
+
+/// Non-additive interaction between two evidence items under one frozen policy.
+/// Positive interaction means joint removal is more harmful than the sum of
+/// the two individual removals; negative means the items are partly redundant.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidenceInteractionV1 {
+    pub left_evidence_id: String,
+    pub right_evidence_id: String,
+    pub full_decision_loss_micros: u64,
+    pub loss_without_left_micros: u64,
+    pub loss_without_right_micros: u64,
+    pub loss_without_pair_micros: u64,
+    pub interaction_micros: i128,
+}
+
+/// Estimate pairwise non-additivity using paired single-item and joint
+/// interventions. The single-item set must be complete, and every rerun must
+/// preserve system, episode, policy digest and decision seed. This is an
+/// exact pairwise finite-difference, not a Shapley value or causal claim beyond
+/// the frozen deterministic policy and evaluator case.
+pub fn score_pairwise_interactions(
+    case: &EvaluatorCaseV1,
+    full: &CandidateRunV1,
+    single_ablations: &[EvidenceAblationV1],
+    pair_ablations: &[EvidencePairAblationV1],
+) -> Result<Vec<EvidenceInteractionV1>, EvaluationErrorV1> {
+    let single_scores = score_leave_one_out(case, full, single_ablations)?;
+    let full_score = score_run(case, full)?;
+    let single_losses: std::collections::BTreeMap<&str, u64> = single_scores
+        .iter()
+        .map(|score| (score.evidence_id.as_str(), score.loss_without_evidence_micros))
+        .collect();
+
+    let expected_pairs = full
+        .retrieved_evidence_ids
+        .len()
+        .saturating_mul(full.retrieved_evidence_ids.len().saturating_sub(1))
+        / 2;
+    if pair_ablations.len() != expected_pairs {
+        return Err(EvaluationErrorV1::PairAblationSetIncomplete);
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut results = Vec::with_capacity(pair_ablations.len());
+    for pair in pair_ablations {
+        let left = pair.left_evidence_id.as_str();
+        let right = pair.right_evidence_id.as_str();
+        if left == right
+            || !contains(&full.retrieved_evidence_ids, left)
+            || !contains(&full.retrieved_evidence_ids, right)
+        {
+            return Err(EvaluationErrorV1::PairAblationTargetMissing);
+        }
+        let key = if left < right { (left, right) } else { (right, left) };
+        if !seen.insert(key) {
+            return Err(EvaluationErrorV1::DuplicatePairAblation);
+        }
+
+        let candidate = &pair.output_without_pair;
+        if candidate.episode_id != full.episode_id {
+            return Err(EvaluationErrorV1::EpisodeMismatch);
+        }
+        if candidate.system_id != full.system_id {
+            return Err(EvaluationErrorV1::AblationSystemMismatch);
+        }
+        if candidate.downstream_policy_digest != full.downstream_policy_digest {
+            return Err(EvaluationErrorV1::DownstreamPolicyMismatch);
+        }
+        if candidate.decision_seed != full.decision_seed {
+            return Err(EvaluationErrorV1::DecisionSeedMismatch);
+        }
+        validate_candidate(case, candidate)?;
+
+        let expected_evidence: Vec<String> = full
+            .retrieved_evidence_ids
+            .iter()
+            .filter(|id| id.as_str() != left && id.as_str() != right)
+            .cloned()
+            .collect();
+        if candidate.retrieved_evidence_ids != expected_evidence {
+            return Err(EvaluationErrorV1::PairAblationEvidenceSetMismatch);
+        }
+        let expected_support: Vec<String> = full
+            .decision_support_evidence_ids
+            .iter()
+            .filter(|id| id.as_str() != left && id.as_str() != right)
+            .cloned()
+            .collect();
+        if candidate.decision_support_evidence_ids != expected_support {
+            return Err(EvaluationErrorV1::PairAblationSelectedSetMismatch);
+        }
+
+        let left_loss = *single_losses
+            .get(left)
+            .ok_or(EvaluationErrorV1::PairAblationTargetMissing)?;
+        let right_loss = *single_losses
+            .get(right)
+            .ok_or(EvaluationErrorV1::PairAblationTargetMissing)?;
+        let pair_loss = score_run(case, candidate)?.decision_loss_micros;
+        let interaction_micros = i128::from(pair_loss)
+            - i128::from(left_loss)
+            - i128::from(right_loss)
+            + i128::from(full_score.decision_loss_micros);
+        results.push(EvidenceInteractionV1 {
+            left_evidence_id: left.to_owned(),
+            right_evidence_id: right.to_owned(),
+            full_decision_loss_micros: full_score.decision_loss_micros,
+            loss_without_left_micros: left_loss,
+            loss_without_right_micros: right_loss,
+            loss_without_pair_micros: pair_loss,
+            interaction_micros,
+        });
+    }
+    Ok(results)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1680,6 +1808,51 @@ mod tests {
         assert_eq!(result.memory_gain_micros, -7_000_000);
         assert!(result.memory_induced_harm);
         assert!(result.changed_action_harmed);
+    }
+
+    #[test]
+    fn pairwise_intervention_detects_redundant_evidence() {
+        let full = run("mace", "hold", &["signed-current", "signed-release-gate"]);
+        let without_left = CandidateRunV1 {
+            retrieved_evidence_ids: vec!["signed-release-gate".to_owned()],
+            decision_support_evidence_ids: vec!["signed-release-gate".to_owned()],
+            chosen_action: "hold".to_owned(),
+            ..full.clone()
+        };
+        let without_right = CandidateRunV1 {
+            retrieved_evidence_ids: vec!["signed-current".to_owned()],
+            decision_support_evidence_ids: vec!["signed-current".to_owned()],
+            chosen_action: "hold".to_owned(),
+            ..full.clone()
+        };
+        let without_pair = CandidateRunV1 {
+            retrieved_evidence_ids: vec![],
+            decision_support_evidence_ids: vec![],
+            chosen_action: "abstain".to_owned(),
+            ..full.clone()
+        };
+        let interactions = score_pairwise_interactions(
+            &case(),
+            &full,
+            &[
+                EvidenceAblationV1 {
+                    removed_evidence_id: "signed-current".to_owned(),
+                    output_without_evidence: without_left,
+                },
+                EvidenceAblationV1 {
+                    removed_evidence_id: "signed-release-gate".to_owned(),
+                    output_without_evidence: without_right,
+                },
+            ],
+            &[EvidencePairAblationV1 {
+                left_evidence_id: "signed-current".to_owned(),
+                right_evidence_id: "signed-release-gate".to_owned(),
+                output_without_pair: without_pair,
+            }],
+        )
+        .expect("valid pairwise intervention");
+        assert_eq!(interactions.len(), 1);
+        assert_eq!(interactions[0].interaction_micros, 2_000_000);
     }
 
     #[test]
