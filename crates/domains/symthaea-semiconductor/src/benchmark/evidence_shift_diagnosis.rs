@@ -61,6 +61,7 @@ pub enum ShiftReasonCodeV1 {
     BaselineDigestMismatch,
     PolicyDigestMismatch,
     ClockDomainMismatch,
+    EvidenceNotAvailableAtObservation,
     EventSequenceNotContiguous,
     EventTimeRegression,
     DuplicateObservation,
@@ -199,6 +200,7 @@ pub struct EvidenceShiftMonitorV1 {
     pub policy: EvidenceShiftPolicyV1,
     pub policy_sha256: String,
     pub last_stream_sequence: u64,
+    pub last_scope_event_times: BTreeMap<String, i64>,
     pub channel_states: BTreeMap<(String, ShiftSignalChannelV1), ShiftChannelStateV1>,
     pub process_markers: BTreeMap<String, ProcessEventMarkerV1>,
     pub seen_observation_ids: BTreeSet<String>,
@@ -315,6 +317,7 @@ pub fn create_evidence_shift_monitor_v1(
         policy,
         policy_sha256,
         last_stream_sequence: 0,
+        last_scope_event_times: BTreeMap::new(),
         channel_states: BTreeMap::new(),
         process_markers: BTreeMap::new(),
         seen_observation_ids: BTreeSet::new(),
@@ -620,21 +623,26 @@ pub fn observe_evidence_shift_v1(
         early_reasons.push(ShiftReasonCodeV1::ReferenceEvidenceMissing);
     }
     if observation.event_time_unix_seconds > observation.available_at_unix_seconds {
-        early_reasons.push(ShiftReasonCodeV1::NonFiniteObservation);
+        early_reasons.push(ShiftReasonCodeV1::EvidenceNotAvailableAtObservation);
     }
     let expected_sequence = engine.last_stream_sequence.saturating_add(1);
     if observation.stream_sequence != expected_sequence {
         early_reasons.push(ShiftReasonCodeV1::EventSequenceNotContiguous);
     }
-    if let Some(previous) = engine
-        .channel_states
-        .get(&(observation.scope_id.clone(), observation.channel))
-        && observation.event_time_unix_seconds < previous.last_event_time_unix_seconds
+    if engine
+        .last_scope_event_times
+        .get(&observation.scope_id)
+        .is_some_and(|previous| observation.event_time_unix_seconds < *previous)
     {
         early_reasons.push(ShiftReasonCodeV1::EventTimeRegression);
     }
 
     let mut qualified_label_ids = Vec::new();
+    if early_reasons.is_empty() && observation.channel == ShiftSignalChannelV1::ProcessEventMarker
+        && observation.process_event_marker.is_none()
+    {
+        early_reasons.push(ShiftReasonCodeV1::ProcessEventEvidenceMissing);
+    }
     if early_reasons.is_empty() {
         if let Some(marker) = observation.process_event_marker.as_ref()
             && (marker.event_id.trim().is_empty()
@@ -784,6 +792,9 @@ pub fn observe_evidence_shift_v1(
     // Valid process markers are retained separately as contextual evidence.
     if early_reasons.is_empty() {
         engine.last_stream_sequence = observation.stream_sequence;
+        engine
+            .last_scope_event_times
+            .insert(observation.scope_id.clone(), observation.event_time_unix_seconds);
         engine.seen_observation_ids.insert(observation.observation_id.clone());
     }
     engine
@@ -1097,6 +1108,34 @@ mod tests {
         let report = observe_evidence_shift_v1(&mut engine, &tool_b).unwrap();
         assert_eq!(report.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
         assert!(!report.channel_assessments.iter().any(|c| c.channel == ShiftSignalChannelV1::VmResidual && c.alert));
+    }
+
+    #[test]
+    fn event_time_regression_across_different_channels_is_rejected() {
+        let mut engine = engine();
+        let reference = reference_observation(1, "ref-1", "tool-a/ch-1", 20, 0.0);
+        observe_evidence_shift_v1(&mut engine, &reference).unwrap();
+
+        let vm = vm_residual_observation(2, "vm-1", "tool-a/ch-1", 19, 0.0, "label-1");
+        let assessment = observe_evidence_shift_v1(&mut engine, &vm).unwrap();
+        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert!(assessment.reason_codes.contains(&ShiftReasonCodeV1::EventTimeRegression));
+        assert_eq!(engine.last_stream_sequence, 1);
+    }
+
+    #[test]
+    fn process_marker_channel_requires_explicit_marker_evidence() {
+        let mut engine = engine();
+        let observation = base_observation(
+            1,
+            "marker-missing",
+            "tool-a/ch-1",
+            10,
+            ShiftSignalChannelV1::ProcessEventMarker,
+        );
+        let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
+        assert!(assessment.reason_codes.contains(&ShiftReasonCodeV1::ProcessEventEvidenceMissing));
+        assert!(!engine.process_markers.contains_key("tool-a/ch-1"));
     }
 
     #[test]
