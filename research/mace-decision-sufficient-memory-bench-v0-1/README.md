@@ -261,6 +261,20 @@ Source: https://agentmemoryleaderboard.ai/results/cycle-2/
 
 Initial AML goals remain at least three absolute points above the current open-source leader in each track: Textual 64.22, Multimodal 46.26, Coding 66.33%. These are proposed targets only. They are not DSM scores and not predictions.
 
+### AML capability-level opportunity map
+
+The official Cycle 2 score breakdown suggests that the three tracks need different research interventions. The aggregate scores are not enough to infer architecture quality, so these are hypotheses to test with targeted ablations:
+
+| Track | Published leading result | Reported capability gap | MACE intervention to test |
+|---|---|---|---|
+| Textual | Resurface 61.22 open-source; MemoraX 69.26 commercial | Resurface personalization 38.82 and Streaming 49.65, despite Governance 76.55 | User-scoped preference/version evidence, temporal supersession, incremental streaming updates, and decision-aware personalization |
+| Multimodal | Khipu 43.26 open-source; MemoraX 53.68 commercial | Khipu personalization 11.04 and evidence governance 31.29; MemoraX reports 12.21 and 33.59 respectively | Cross-modal provenance, image/text entity continuity, source revocation and temporal linking; do not reduce images to untraceable captions |
+| Coding | InsightMem 63.33% resolved open-source; MemoraX 68.00% commercial | Overall resolved rate remains the public headline; noisy/relevant and bug-fix/new-feature conditions need separate reporting | Repository- and commit-scoped episodic evidence, failure-to-fix lineage, environment gotchas and verified workflow reuse |
+
+The proposed advantage is not that HDC automatically solves these gaps. It is that typed temporal evidence, incremental update paths and explicit lineage give us testable hypotheses for addressing them. We should compare each intervention to a strong non-HDC baseline under the same model, evidence budget and query policy.
+
+The +3-point open-source goals are first external targets. The later stretch objective is to close the gap to the commercial leader without violating the academic model rules or sacrificing evidence governance.
+
 The industry comparison must include both framework families and fixed baselines: lexical/vector hybrids, temporal or knowledge-graph memory, tiered episodic/semantic memory, reflection/consolidation systems and lifecycle-aware evidence models. Compare exact versions, models, prompts, budgets and evaluation procedures. A vendor feature list is not performance evidence.
 
 A recent preprint on memory lifecycle modelling is relevant to local merge, supersession and contradiction handling: https://arxiv.org/abs/2609.03201. A separate 2026 preprint explores fast write routing and slow consolidation: https://arxiv.org/abs/2608.22215. Treat these as research leads until independent reproduction; do not import their headline numbers as MACE baselines.
