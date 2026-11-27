@@ -71,7 +71,7 @@ Even a COMPLETE result sets physical_independence_proven=false and source_authen
 
 ## Authored adversarial tests
 
-Nine Rust unit tests cover:
+Nine Rust unit tests and two independent integration-oracle tests cover:
 1. one common-cause group cannot identify global drift;
 2. coherent shifts over independent groups produce a common-mode estimate and local offsets;
 3. one extreme group outlier does not dominate the group-median estimator;
@@ -81,6 +81,8 @@ Nine Rust unit tests cover:
 7. late observations and calibration-epoch mismatch are rejected;
 8. duplicate label/revision cannot be double-counted across contexts;
 9. mismatched clock domain cannot enter the same cohort.
+
+The independent oracle separately computes the group medians and median of group medians, then verifies that increasing observation count within one common-cause group does not increase that group's global estimator weight.
 
 ## Integration boundary
 
