@@ -6,8 +6,7 @@ use symthaea_semiconductor::benchmark::{
     FeedbackTrackingRecordV1, FeedbackTrackingStateV1, K1QualificationRecordV1,
     K1QualificationStateV1, OBSERVATION_PROCESS_SCHEMA_V1, ObservationProcessInputV1,
     ObservationProcessRoundV1, ObservationRiskControllerV1, PhysicalAcquisitionRecordV1,
-    PhysicalAcquisitionStateV1, PhysicalSelectionDesignKindV1,
-    evaluate_observation_process_v1,
+    PhysicalAcquisitionStateV1, PhysicalSelectionDesignKindV1, evaluate_observation_process_v1,
 };
 
 fn digest(ch: char) -> String {
@@ -146,14 +145,22 @@ fn population_bounds_match_independent_manual_partition_oracle() {
 
     assert!((report.population_risk.partial_identification_lower - expected_lower).abs() < 1e-12);
     assert!((report.population_risk.partial_identification_upper - expected_upper).abs() < 1e-12);
-    assert!((report.population_risk.identification_interval_width - (expected_upper - expected_lower)).abs() < 1e-12);
+    assert!(
+        (report.population_risk.identification_interval_width - (expected_upper - expected_lower))
+            .abs()
+            < 1e-12
+    );
     assert_eq!(report.funnel.not_selected, 1);
     assert_eq!(report.funnel.k1_eligible, 1);
     assert_eq!(report.funnel.k1_unknown, 1);
     assert_eq!(report.funnel.k1_blocked, 1);
     assert_eq!(report.funnel.measured, 3);
     assert_eq!(report.funnel.population_rounds, 4);
-    assert!(!report.population_risk.population_claim_authorized_by_qualified_subset_alone);
+    assert!(
+        !report
+            .population_risk
+            .population_claim_authorized_by_qualified_subset_alone
+    );
 }
 
 #[test]
