@@ -21,7 +21,9 @@
     "privacy_class",
     "source",
     "observed_at_monotonic_ns",
-    "expires_at_monotonic_ns",
+    "event_expires_at_monotonic_ns",
+    "grant_expires_at_monotonic_ns",
+    "effective_permit_expires_at_monotonic_ns",
     "accessible_description",
     "elements"
   ],
@@ -140,10 +142,6 @@
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)$"
     },
-    "expires_at_monotonic_ns": {
-      "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)$"
-    },
     "accessible_description": {
       "type": "string",
       "minLength": 1,
@@ -219,6 +217,18 @@
           }
         }
       }
+    },
+    "event_expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "grant_expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "effective_permit_expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
     }
   }
 }
