@@ -195,16 +195,34 @@ impl SceneClock {
     pub fn clock_domain_id(&self) -> Option<&str> { self.clock_domain_id.as_deref() }
     pub fn now_monotonic_ns(&self) -> Option<u64> { self.now_monotonic_ns }
 
+    fn permits_frame_clock_id(&self, clock_domain_id: &str) -> bool {
+        self.clock_domain_id.as_deref() == Some(clock_domain_id)
+    }
+
     fn permits_frame(&self, frame: &EmbodimentSceneFrame) -> bool {
-        if self.clock_domain_id.as_deref() != Some(frame.clock_domain_id()) {
+        if !self.permits_frame_clock_id(frame.clock_domain_id()) {
             return false;
         }
         let Some(now) = self.now_monotonic_ns else { return false; };
         let Ok(expires) = frame.effective_permit_expires_at_monotonic_ns().parse::<u64>() else {
             return false;
         };
-        now < expires
+        is_before_expiry(now, expires)
     }
+}
+
+fn is_before_expiry(now_monotonic_ns: u64, expires_at_monotonic_ns: u64) -> bool {
+    now_monotonic_ns < expires_at_monotonic_ns
+}
+
+/// Scene weights are output amplitudes, not semantic confidence. Explicit
+/// scene weights are already bounded by the policy intensity; an unspecified
+/// weight uses the authorized global intensity instead of a renderer constant.
+fn render_amplitude(scene_weight: Option<f32>, authorized_intensity: f32) -> f32 {
+    let authorized_intensity = authorized_intensity.clamp(0.0, 1.0);
+    scene_weight
+        .unwrap_or(authorized_intensity)
+        .clamp(0.0, authorized_intensity)
 }
 
 #[derive(Resource, Default)]
@@ -405,8 +423,8 @@ fn render_pending_scene(
         let angle = index as f32 * std::f32::consts::TAU / count.max(1) as f32;
         let radius = if element.role == SceneRole::Core { 0.0 } else { 62.0 };
         let base_translation = Vec3::new(angle.cos() * radius, angle.sin() * radius, 0.0);
-        let amplitude = element.weight.unwrap_or(0.65).clamp(0.1, 1.0);
-        let base_scale = Vec3::splat(0.45 + amplitude * 0.55);
+        let amplitude = render_amplitude(element.weight, frame.effective_intensity());
+        let base_scale = Vec3::splat(amplitude);
         let rotation = Quat::from_rotation_z(angle);
         let mesh = meshes.add(mesh_for_glyph(element.glyph));
         let material = materials.add(ColorMaterial::from_color(color_for_role(element.role)));
@@ -418,7 +436,7 @@ fn render_pending_scene(
                 rotation,
                 scale: base_scale,
             },
-            Visibility::Visible,
+            if amplitude > 0.0 { Visibility::Visible } else { Visibility::Hidden },
             RenderedSceneEntity,
             SceneFrameGuard {
                 clock_domain_id: clock_domain_id.clone(),
@@ -568,12 +586,33 @@ mod tests {
     }
 
     #[test]
-    fn scene_clock_does_not_authorize_expired_or_cross_domain_frames() {
+    fn scene_clock_denies_exact_effective_expiry() {
+        assert!(is_before_expiry(99, 100));
+        assert!(!is_before_expiry(100, 100));
+        assert!(!is_before_expiry(101, 100));
+    }
+
+    #[test]
+    fn unweighted_primitives_use_authorized_intensity_not_a_renderer_default() {
+        assert!((render_amplitude(None, 0.2) - 0.2).abs() < f32::EPSILON);
+        assert!((render_amplitude(None, 0.0) - 0.0).abs() < f32::EPSILON);
+        assert!((render_amplitude(None, 1.0) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn explicit_scene_weights_never_exceed_the_authorized_intensity() {
+        assert!((render_amplitude(Some(0.8), 0.3) - 0.3).abs() < f32::EPSILON);
+        assert!((render_amplitude(Some(0.1), 0.3) - 0.1).abs() < f32::EPSILON);
+        assert!((render_amplitude(Some(1.5), 0.3) - 0.3).abs() < f32::EPSILON);
+        assert!((render_amplitude(Some(0.5), 0.0) - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn scene_clock_exposes_host_clock_without_substituting_game_time() {
         let mut clock = SceneClock::default();
         clock.update("clock:scene-1", 100).unwrap();
         assert_eq!(clock.clock_domain_id(), Some("clock:scene-1"));
         assert_eq!(clock.now_monotonic_ns(), Some(100));
-        assert!(clock.clock_domain_id() != Some("clock:other"));
-        assert!(100 >= 100); // exact expiry is denied by the frame guard
+        assert!(!clock.permits_frame_clock_id("clock:other"));
     }
 }
