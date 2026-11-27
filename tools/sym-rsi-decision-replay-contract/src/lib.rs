@@ -54,3 +54,6 @@ pub mod scientific_decision_replay;
 
 #[path = "../../../crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs"]
 pub mod evolutionary_rescue_custody;
+
+#[path = "../../../crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs"]
+pub mod asb_action_payload;
