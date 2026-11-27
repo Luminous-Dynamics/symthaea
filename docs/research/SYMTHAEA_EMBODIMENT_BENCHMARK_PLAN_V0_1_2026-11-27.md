@@ -319,6 +319,36 @@ Initial Pareto target: improve the perception aggregate by >= 0.15 points versus
 
 See `SYMTHAEA_DYNAMIC_TEMPORAL_ATTENTION_V0_1_2026-11-27.md` for the full protocol. Oracle annotations are prohibited at inference time and only establish an upper bound.
 
+
+### E9 — HEARTBEAT Challenge 2027 compatibility
+
+HEARTBEAT is a complementary external protocol, not a substitute for VideoFDB:
+
+- Track I Reciprocal Audio Turn-Taking: WAIT, RESPOND, CONTINUE, YIELD; offline action/content and online speech with timestamped logs.
+- Track II Streaming Proactive Understanding: online audio-visual and audio-only perception, comprehension, and reasoning; responses must be timely and relevant.
+- The published release contains 132,571 samples (127,371 train, 5,200 development), approximately 3,103 hours, and about 599.83 GB packed.
+- Every Track II input chunk must be logged, including chunks with no response; response timestamps cannot be backdated.
+- The published rules require end-to-end models and disallow cascaded pipelines and agent-based systems. This may constrain Symthaea's modular architecture; competition eligibility must be assessed separately before entry.
+- The evaluation environment advertises 8 × A100 80GB GPUs. Local development and official leaderboard execution must not be conflated.
+
+The existing MEL-RTI-001 evaluator's WAIT / RESPOND / CONTINUE / YIELD vocabulary is a direct semantic starting point. A HEARTBEAT adapter must preserve its official chunk semantics, online/offline split, and evaluation rules; it must not relabel missing chunks as WAIT or backdate output.
+
+**Schedule as published:** evaluation leaderboard opens December 2, 2026; both leaderboards close December 22; final container submissions are due December 25. Dates are UTC 23:59.
+
+Initial research target:
+- build a trace adapter and schema-mapping tests against public protocol examples;
+- evaluate only on the official development split once data access, licensing, and resource constraints are checked;
+- keep Track I and Track II results separate;
+- verify model eligibility and end-to-end constraints before considering a competition submission.
+
+References:
+- https://heartbeat-challenge.github.io/
+- https://github.com/ (official baseline repository link is published on the challenge site)
+- Internal evaluator: MEL-RTI-001, docs/research/MEL-RTI-001-STREAMING-TURNTAKING-SCORER-V1.md
+
+No HEARTBEAT dataset has been downloaded, no official baseline has been run, and no leaderboard score is claimed.
+
+
 ## 11. New benchmark track — event-triggered temporal attention
 
 The VideoFDB sampling findings motivate a new track described in
