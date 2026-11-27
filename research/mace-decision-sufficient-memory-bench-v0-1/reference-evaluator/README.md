@@ -14,7 +14,7 @@ Split combined episode records into candidate-visible and evaluator-private JSON
 
     cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- prepare /tmp/dsm-episodes.jsonl /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl
 
-A candidate adapter consumes only the candidate stream, conforming to schemas/candidate-input-v0.1.schema.json, and emits one response per episode and arm, conforming to schemas/response-v0.1.schema.json. The response contains a selected action, resolved evidence identifiers, observation-request count and candidate-reported resource counters.
+A candidate adapter consumes only the candidate stream, conforming to schemas/candidate-input-v0.1.schema.json, and emits one response per episode and arm, conforming to schemas/response-v0.1.schema.json. The response echoes the candidate row's candidate_sha256 and contains a selected action, resolved evidence identifiers, observation-request count and candidate-reported resource counters. The scorer verifies that the echoed digest matches both the candidate row and evaluator-private commitment.
 
 Score a balanced set of candidate responses:
 
@@ -31,7 +31,7 @@ Run the six synthetic positive-control records against the six source episodes a
 - Every candidate response must resolve to a known episode and an allowed action.
 - The evidence and observation budgets are enforced before scoring.
 - Each episode has exactly one response per declared arm. Missing and duplicate episode/arm pairs are rejected; no arm can silently drop hard episodes.
-- Candidate-visible and evaluator-private inventories must match exactly. The private record commits to a domain-separated SHA-256 digest of the exact typed candidate projection; a modified candidate input is rejected.
+- Candidate-visible and evaluator-private inventories must match exactly. The candidate row and private record commit to a domain-separated SHA-256 digest of the exact typed candidate projection; the response must echo the same digest. Modified or mismatched candidate/response inputs are rejected. This binds the response to the presented input but is not a signature or proof that the adapter reasoned from it.
 - Valid time is half-open: valid-from is inclusive and valid-until is exclusive.
 - Superseded or retracted parent records are stale at query time. A contradiction edge does not itself erase its parent; it is measured as a conflict requiring policy handling.
 - Untrusted and evaluator-labelled forbidden records are inadmissible. The evaluator does not interpret similarity, authority tiers or uncertainty as proof of truth.
