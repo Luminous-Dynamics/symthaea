@@ -205,3 +205,23 @@ func TestAttachBlocksAfterArtifactMutation(t *testing.T) {
 		t.Fatalf("post-assembly artifact mutation must block signature attachment: %+v", result)
 	}
 }
+
+func TestAttachRejectsMismatchedSigningRequestID(t *testing.T) {
+	now := time.Date(2026, 11, 27, 10, 0, 0, 0, time.UTC)
+	root := writeFixture(t)
+	built, err := BuildManifest(root, testIndex(now))
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope := SignatureEnvelope{
+		Profile: SignatureEnvelopeProfile, Version: "1.0.0",
+		RequestID: "wrong-request-id",
+		RunID: built.Manifest.RunID, Sequence: built.Manifest.Sequence,
+		RootSHA256: built.Manifest.RootSHA256, Algorithm: "Ed25519",
+		KeyID: built.Manifest.Signature.KeyID, Value: "not-used",
+	}
+	_, result := AttachSignature(root, built.Manifest, envelope, custody.Policy{})
+	if result.Verdict != custody.VerdictBlocked {
+		t.Fatalf("detached signature from another request must block: %+v", result)
+	}
+}
