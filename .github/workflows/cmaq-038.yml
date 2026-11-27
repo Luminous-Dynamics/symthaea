@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "research/cmaq-031/**"
+      - "research/cmaq-037/**"
       - "research/cmaq-038/**"
       - ".github/workflows/cmaq-038.yml"
   push:
