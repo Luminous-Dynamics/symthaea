@@ -32,7 +32,7 @@ The article also assumes independent identically distributed measurement errors 
 
 The paper's six-case simulation offers frozen regression/calibration controls:
 - The nominal expected sensor-performance pass percentage is 95%.
-- When process variability is ignored, reported percentages drop to 72.9% in the DU-ML-YH, DU-MH-YH, SU-ML-YH and SU-MH-YH scenarios; incorporating the process variability restores these to 95%.
+- The publisher's Table 3 reports the following pass percentages when process variability is ignored: DU-MH-YL 93.7%; DU-ML-YH 72.9%; DU-MH-YH 72.9%; SU-MH-YL 94.1%; SU-ML-YH 79.2%; SU-MH-YH 79.2%. Incorporating process variability restores all six scenarios to the nominal 95.0%.
 - In the DU-MH-YL scenario, the reported parameter-interval coverage CP(a)/CP(b) is 94.7%/94.8% for OLS and 93.8%/93.7% for C-GDR.
 - In the SU-ML-YH scenario, OLS reports 38.8%/37.4% parameter coverage, while C-GDR reports 91.7%/91.4%.
 - In the SU-MH-YH scenario, OLS reports 76.2%/74.4%, YB-GDR 95.7%/95.7%, and C-GDR 93.7%/93.5%.
