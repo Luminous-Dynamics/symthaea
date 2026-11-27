@@ -84,6 +84,37 @@ physical actuator safety are separate contracts and must not be inferred from
 this module. See
 [Embodiment Consent and Presentation Policy](SYMTHAEA_EMBODIMENT_CONSENT_POLICY_V0_1_2026-11-27.md).
 
+### E0.6 — Presentation outcome receipt correctness
+
+**Purpose:** Prove that authorization, submission, observed output and confirmed
+cessation are distinct events.
+
+Run the receipt ledger against the positive/negative lifecycle fixtures and
+fault-injection traces. Enforce the permitted transition graph, single terminal
+outcome, attempt identity, exact grant identity, event/grant/effective expiry,
+observer-channel compatibility, and per-clock monotonicity. Verify every
+ledger digest and previous-digest link.
+
+**Hard gate:**
+- 100% expected transition outcomes on frozen fixtures;
+- zero accepted invalid transitions or second terminal outcomes;
+- missing output observation remains OutcomeUnknown, never Observed or Stopped;
+- Stopped requires a named observer reporting a stopped output state;
+- receipt chain verification succeeds for every unmodified accepted trace;
+- source and output timestamps are never compared across unrelated clock domains.
+
+Targets (not results):
+- p99 permit-recheck-to-submission overhead below 1 ms on named hardware;
+- p95 submission-to-observation latency below 100 ms for the local visual renderer;
+- cancellation-to-observed-stop p95 below one render update;
+- zero raw-media data in receipt records;
+- 100% records carry policy/adapter/build identity and both event and grant expiry.
+
+Report observer type, adapter build, clock domains, unknown outcomes, dropped
+observations, terminal failure types, and resource cost. An adapter callback
+alone is not independent observation; external observer independence must be
+qualified separately.
+
 ### E1 — Full-duplex conversational behavior
 
 Use VideoFDB's published protocol and dataset if its terms permit. Do not claim a VideoFDB leaderboard result unless the official evaluation path and artifact requirements are followed.
@@ -143,7 +174,8 @@ figures are not a combined system score and are not universal rankings.
 Symthaea stretch targets on the same frozen protocol:
 - >= 80% spoken-task accuracy;
 - >= 90% conversational timing;
-- >= 85% whisper/volume control;
+- >= 90% explicit whisper compliance, >= 90% user-volume understanding, and
+  >= 80% appropriate output-volume adaptation to whispered users;
 - >= 92% groundedness probes;
 - response latency measured at the client output device, with p50 <= 1.0 s and
   p95 <= 1.5 s on a named network/hardware profile.
