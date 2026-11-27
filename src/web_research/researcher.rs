@@ -25,6 +25,11 @@ use super::ssrf::{
     GuardedDnsResolver, is_dns_policy_rejection, is_dns_policy_rejection_anyhow,
     is_url_policy_rejection_anyhow, validate_request_url,
 };
+use super::ssrf::{
+    GuardedDnsResolver, is_dns_policy_rejection, is_dns_policy_rejection_anyhow,
+    is_redirect_policy_rejection_anyhow, is_url_policy_rejection_anyhow,
+    reject_redirect_response, validate_request_url,
+};
 use super::verifier::{EpistemicVerifier, SourceEvidence, VerificationContext};
 
 const EXTRACTOR_VERSION: &str = "web-research-content-extractor-v1";
@@ -533,8 +538,11 @@ impl WebResearcher {
                     let http_status = http_status_from_error(&error);
                     let url_rejected = is_url_policy_rejection_anyhow(&error);
                     let dns_rejected = is_dns_policy_rejection_anyhow(&error);
+                    let redirect_rejected = is_redirect_policy_rejection_anyhow(&error);
                     let outcome = if http_status == Some(429) {
                         AcquisitionOutcome::RateLimited
+                    } else if redirect_rejected {
+                        AcquisitionOutcome::RedirectRejected
                     } else if url_rejected {
                         AcquisitionOutcome::UrlPolicyRejected
                     } else if dns_rejected {
@@ -552,7 +560,9 @@ impl WebResearcher {
                     receipt.provider = Some(provider.to_string());
                     receipt.requested_url = requested_url;
                     receipt.http_status = http_status;
-                    receipt.reason_code = Some(if url_rejected {
+                    receipt.reason_code = Some(if redirect_rejected {
+                        "REDIRECT_REJECTED".to_string()
+                    } else if url_rejected {
                         "URL_POLICY_REJECTED".to_string()
                     } else if dns_rejected {
                         "DNS_POLICY_REJECTED".to_string()
@@ -812,6 +822,8 @@ impl WebResearcher {
                         query,
                         if status.as_u16() == 429 {
                             AcquisitionOutcome::RateLimited
+                        } else if status.is_redirection() {
+                            AcquisitionOutcome::RedirectRejected
                         } else {
                             AcquisitionOutcome::HttpError
                         },
@@ -823,10 +835,16 @@ impl WebResearcher {
                     receipt.content_type = content_type;
                     receipt.reason_code = Some(if status.as_u16() == 429 {
                         "SEARCH_RATE_LIMITED".to_string()
+                    } else if status.is_redirection() {
+                        "REDIRECT_REJECTED".to_string()
                     } else {
                         "SEARCH_HTTP_ERROR".to_string()
                     });
-                    receipt.reason = Some(format!("DuckDuckGo returned HTTP {status}"));
+                    receipt.reason = Some(if status.is_redirection() {
+                        format!("automatic redirects are disabled; refused HTTP {status}")
+                    } else {
+                        format!("DuckDuckGo returned HTTP {status}")
+                    });
                     receipt.elapsed_ms = elapsed_ms(started);
                     receipts.push(receipt);
                 } else {
@@ -1042,7 +1060,9 @@ impl WebResearcher {
             .json(&body)
             .send()
             .await
-            .context("Serper search request failed")?
+            .context("Serper search request failed")?;
+        let response = reject_redirect_response(response)?;
+        let response = response
             .error_for_status()
             .context("Serper search returned a non-success HTTP status")?;
 
@@ -1071,7 +1091,9 @@ impl WebResearcher {
             .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .send()
             .await
-            .context("Brave search request failed")?
+            .context("Brave search request failed")?;
+        let response = reject_redirect_response(response)?;
+        let response = response
             .error_for_status()
             .context("Brave search returned a non-success HTTP status")?;
 
@@ -1100,7 +1122,9 @@ impl WebResearcher {
             .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .send()
             .await
-            .context("SearXNG search request failed")?
+            .context("SearXNG search request failed")?;
+        let response = reject_redirect_response(response)?;
+        let response = response
             .error_for_status()
             .context("SearXNG search returned a non-success HTTP status")?;
 
@@ -1138,7 +1162,9 @@ impl WebResearcher {
             .get(url)
             .send()
             .await
-            .context("arXiv API request failed")?
+            .context("arXiv API request failed")?;
+        let response = reject_redirect_response(response)?;
+        let response = response
             .error_for_status()
             .context("arXiv API returned a non-success HTTP status")?;
 
@@ -1161,7 +1187,9 @@ impl WebResearcher {
         let response = request
             .send()
             .await
-            .context("OpenReview search failed")?
+            .context("OpenReview search failed")?;
+        let response = reject_redirect_response(response)?;
+        let response = response
             .error_for_status()
             .context("OpenReview search returned a non-success HTTP status")?;
         let json: Value = response
@@ -1246,6 +1274,8 @@ impl WebResearcher {
                 &candidate.query,
                 if status.as_u16() == 429 {
                     AcquisitionOutcome::RateLimited
+                } else if status.is_redirection() {
+                    AcquisitionOutcome::RedirectRejected
                 } else {
                     AcquisitionOutcome::HttpError
                 },
@@ -1256,10 +1286,21 @@ impl WebResearcher {
             receipt.content_type = content_type;
             receipt.reason_code = Some(if status.as_u16() == 429 {
                 "PAGE_RATE_LIMITED".to_string()
+            } else if status.is_redirection() {
+                "REDIRECT_REJECTED".to_string()
             } else {
                 "PAGE_HTTP_ERROR".to_string()
             });
-            receipt.reason = Some(format!("page fetch returned HTTP {status}"));
+            receipt.reason = Some(if status.is_redirection() {
+                let location = response
+                    .headers()
+                    .get(reqwest::header::LOCATION)
+                    .and_then(|value| value.to_str().ok())
+                    .unwrap_or("<missing or invalid Location>");
+                format!("automatic redirects are disabled; refused next hop {location}")
+            } else {
+                format!("page fetch returned HTTP {status}")
+            });
             receipt.elapsed_ms = elapsed_ms(started);
             return PageAcquisition {
                 candidate,
