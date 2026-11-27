@@ -7,6 +7,7 @@ license = "AGPL-3.0-or-later"
 description = "Standalone reference-contract evaluator for the Evidence-Qualified Capability seed"
 
 [workspace]
+resolver = "2"
 
 [dependencies]
 anyhow = "1"
