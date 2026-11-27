@@ -51,7 +51,7 @@ func TestDuplicateIDChangedLSNDivergent(t *testing.T){p,s,m:=base();e:=m.Events[
 func TestExactReplayDuplicateAccepted(t *testing.T){p,s,m:=base();m.Events=append(m.Events,m.Events[1]);want(t,ValidateCapture(p,s,m),Qualified)}
 func TestUnsealedManifestIndeterminate(t *testing.T){p,s,m:=base();m.Witnessed=false;want(t,ValidateCapture(p,s,m),Indeterminate)}
 func TestPluginProfileChangedDenied(t *testing.T){p,s,m:=base();m.PluginProfileDigest="changed";want(t,ValidateCapture(p,s,m),Denied)}
-func TestReplayOverlapQualified(t *testing.T){_,_,m:=base();n:=m;n.Events=append([]DecodedEvent(nil),m.Events...);n.StartExclusiveLSN=0x120;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;n.AcknowledgementRequestedLSN=0x160;n.Events=append(n.Events,DecodedEvent{ID:"e3",XID:"12",CommitLSN:0x150,Ordinal:1,PayloadDigest:"d3"});want(t,ValidateReplay(m,n),Qualified)}
+func TestReplayOverlapQualified(t *testing.T){_,_,m:=base();n:=m;n.Events=append([]DecodedEvent(nil),m.Events...);n.Transactions=append([]Transaction(nil),m.Transactions...);n.StartExclusiveLSN=0x120;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;n.AcknowledgementRequestedLSN=0x160;n.Events=append(n.Events,DecodedEvent{ID:"e3",XID:"12",CommitLSN:0x150,Ordinal:1,PayloadDigest:"d3"});n.Transactions=append(n.Transactions,Transaction{XID:"12",State:"committed",BeginLSN:0x148,CommitLSN:0x150,EndLSN:0x158,EventIDs:[]string{"e3"}});want(t,ValidateReplay(m,n),Qualified)}
 func TestReplayGapIndeterminate(t *testing.T){_,_,m:=base();n:=m;n.StartExclusiveLSN=0x150;n.TerminalLSN=0x160;want(t,ValidateReplay(m,n),Indeterminate)}
 func TestReplayConflictingEventDivergent(t *testing.T){_,_,m:=base();n:=m;n.Events=append([]DecodedEvent(nil),m.Events...);n.StartExclusiveLSN=0x120;n.TerminalLSN=0x160;n.Events[1].CommitLSN++;want(t,ValidateReplay(m,n),Divergent)}
 func TestReplayTerminalRegressionIndeterminate(t *testing.T){_,_,m:=base();n:=m;n.StartExclusiveLSN=0x120;n.TerminalLSN=0x130;n.EvidenceThroughLSN=0x130;want(t,ValidateReplay(m,n),Indeterminate)}
@@ -68,3 +68,8 @@ func TestTransactionEventMembershipMissingIndeterminate(t *testing.T){p,s,m:=bas
 func TestTransactionEnvelopeContradictsCommitBoundaryDenied(t *testing.T){p,s,m:=base();m.Transactions[0].CommitLSN=0x111;want(t,ValidateCapture(p,s,m),Denied)}
 func TestPreparedTransactionNotYetQualified(t *testing.T){p,s,m:=base();m.Transactions[0].State="prepared";want(t,ValidateCapture(p,s,m),Indeterminate)}
 func TestTwoPhaseSlotNotQualified(t *testing.T){p,s,m:=base();s.TwoPhase=true;want(t,ValidateCapture(p,s,m),Indeterminate)}
+
+func TestReplayAckAheadDenied(t *testing.T){_,_,m:=base();n:=m;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x150;n.AcknowledgementRequestedLSN=0x160;want(t,ValidateReplay(m,n),Indeterminate)}
+func TestReplayAcknowledgementExceedsEvidenceDenied(t *testing.T){_,_,m:=base();n:=m;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;n.AcknowledgementRequestedLSN=0x170;want(t,ValidateReplay(m,n),Denied)}
+func TestReplayTransactionConflictDivergent(t *testing.T){_,_,m:=base();n:=m;n.Transactions=append([]Transaction(nil),m.Transactions...);n.Transactions[0].CommitLSN++;n.TerminalLSN=0x160;n.EvidenceThroughLSN=0x160;want(t,ValidateReplay(m,n),Divergent)}
+func TestSlotTwoPhaseCapabilityHolds(t *testing.T){p,s,_:=base();s.TwoPhase=true;want(t,ValidateInitialSnapshot(p,s,0x100,"snapshot-digest"),Qualified)}
