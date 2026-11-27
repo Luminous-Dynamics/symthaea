@@ -965,8 +965,14 @@ mod tests {
         c.dataset.test_records = 1;
         c.preprocessing.fitted_record_count = u64::MAX;
         c.preprocessing.fit_scope = FitScope::AllRecords;
-        let mut r = receipt(&contract());
-        r.method_contract_sha256 = c.contract_sha256.clone();
+        c.budget.max_training_records = u64::MAX;
+        let mut r = receipt(&c);
+        r.train_records = u64::MAX;
+        r.validation_records = 1;
+        r.test_records = 1;
+        r.training_records_used = u64::MAX;
+        r.preprocessing_fit_scope = FitScope::AllRecords;
+        r.preprocessing_fitted_record_count = u64::MAX;
         assert_eq!(disposition(&c, &r), Disposition::Unresolved);
     }
 
