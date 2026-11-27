@@ -39,7 +39,6 @@ struct HaarContrast {
     start: usize,
     midpoint: usize,
     end: usize,
-    resolution_level: usize,
     contrasts_at_level: usize,
     active_resolution_levels: usize,
 }
@@ -178,7 +177,6 @@ impl RestartedRankSpectrumMonitor {
                             start,
                             midpoint,
                             end,
-                            resolution_level,
                             contrasts_at_level: count,
                             active_resolution_levels: 0,
                         })
@@ -437,7 +435,10 @@ fn centered_payoff_from_prefix(
     observation_index_one_based: u64,
     weighted_prefix: &[i128],
 ) -> Result<f64, RestartError> {
-    if rank_one_based == 0 || weighted_prefix.len() != calibration_count + 2 {
+    if rank_one_based == 0
+        || rank_one_based > calibration_count + 1
+        || weighted_prefix.len() != calibration_count + 2
+    {
         return Err(RestartError::InvalidRank);
     }
     let total = (calibration_count as u128)
@@ -477,7 +478,7 @@ fn restart_masses(start_time_one_based: u64) -> Result<(f64, f64), RestartError>
         || !residual_mass.is_finite()
         || start_mass <= 0.0
         || residual_mass <= 0.0
-        || (start_mass + residual_mass - 1.0).abs() > 1e-10
+        || (start_mass + residual_mass - LN_2 / first_log).abs() > 1e-10
     {
         return Err(RestartError::ArithmeticOverflow);
     }
@@ -541,11 +542,11 @@ mod tests {
         for count in counts {
             prefix.push(prefix.last().copied().unwrap() + i128::from(count) + 1);
         }
-        let t = 17u64;
+        let t = 18u64;
         let denominator = 15.0 + t as f64;
         let mut weighted_payoff = 0.0;
         for rank in 1..=16 {
-            let mass = (1.0 + prefix[rank] - prefix[rank - 1]) / denominator as f64;
+            let mass = (prefix[rank] - prefix[rank - 1]) as f64 / denominator;
             let payoff = centered_payoff_from_prefix(
                 15,
                 contrast,
@@ -651,6 +652,8 @@ mod tests {
         let (start_mass, residual_mass) = restart_masses(8_001).unwrap();
         assert!(start_mass > 0.0);
         assert!(residual_mass > 0.0);
-        assert!((-(start_mass.ln()) - (8_001.0f64).ln()).abs() < 2.0);
+        let time = 8_001.0f64;
+        let asymptotic_cost = time.ln() + 2.0 * time.ln().ln() - LN_2.ln();
+        assert!((-start_mass.ln() - asymptotic_cost).abs() < 1.0);
     }
 }
