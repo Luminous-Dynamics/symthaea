@@ -93,6 +93,36 @@ def validate() -> None:
                 require(len(set(fact["values"])) >= 2, f"{tid}: enum needs distinct values")
             if kind == "date":
                 require(int(fact["days"]) > 1, f"{tid}: date interval too small")
+        answer_spec = template["answer_spec"]
+        valid_fact_ids = set(fact_ids)
+        kind = answer_spec["kind"]
+        referenced_facts = set()
+        if kind == "fact":
+            referenced_facts.add(answer_spec["fact_id"])
+        elif kind == "value_and_unit":
+            referenced_facts.update([answer_spec["value_fact"], answer_spec["unit_fact"]])
+        elif kind == "absolute_difference":
+            referenced_facts.update([answer_spec["left_fact"], answer_spec["right_fact"]])
+        elif kind == "ratio":
+            referenced_facts.update([answer_spec["numerator_fact"], answer_spec["denominator_fact"]])
+        elif kind == "fact_map":
+            referenced_facts.update(answer_spec["fact_source_map"].keys())
+        else:
+            raise ValueError(f"{tid}: unknown answer-oracle kind {kind}")
+        require(referenced_facts <= valid_fact_ids, f"{tid}: answer oracle references undeclared facts")
+        referenced_sources = set(answer_spec.get("source_ids", []))
+        if kind == "fact_map":
+            referenced_sources.update(answer_spec["fact_source_map"].values())
+        require(referenced_sources <= set(source_ids), f"{tid}: answer oracle references unknown sources")
+        if kind == "fact" and answer_spec.get("source_mode", "all") not in {"all", "any"}:
+            raise ValueError(f"{tid}: invalid source_mode")
+        citation = template["citation_contract"]
+        support_ids = set(citation["support_source_ids"])
+        decoy_ids = set(citation["decoy_source_ids"])
+        require(support_ids <= set(source_ids), f"{tid}: citation support source missing")
+        require(decoy_ids <= set(source_ids), f"{tid}: citation decoy source missing")
+        require(not (support_ids & decoy_ids), f"{tid}: a source cannot be both support and decoy")
+        require(citation.get("must_not_cite_decoy") is True, f"{tid}: decoy-citation prohibition missing")
         placebo = template["placebo"]
         require(placebo.get("id") == "P", f"{tid}: placebo fact ID must be P")
         require(bool(placebo.get("paths")), f"{tid}: placebo paths missing")
