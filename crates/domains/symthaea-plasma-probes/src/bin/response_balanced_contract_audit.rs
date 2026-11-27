@@ -170,6 +170,20 @@ fn audit(fixture: &Value) -> Result<(), String> {
         "distribution_pulse_boundary_outflow_disposition",
         "UNQUALIFIED_UNLESS_GRID_CONVERGENCE_OR_EXPLICIT_BOUNDARY_ERROR",
     )?;
+    if !boolean(
+        linearization,
+        "distribution_pulse_boundary_outflow_jacobian_required",
+    )? || !boolean(
+        linearization,
+        "distribution_pulse_boundary_outflow_finite_difference_required",
+    )? {
+        return Err("boundary outflow Jacobian and finite-difference check are mandatory".to_owned());
+    }
+    require_string(
+        linearization,
+        "distribution_pulse_boundary_outflow_jacobian_status",
+        "fixed_topology_piecewise_constant_analytic_module_only",
+    )?;
 
     let horizon = field(fixture, "prediction_horizon")?;
     let horizon_start = number(horizon, "start_time")?;
