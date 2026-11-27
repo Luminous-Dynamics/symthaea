@@ -41,7 +41,9 @@ The calibration contract binds:
 - rollouts per cluster, action/query cell count, maximum horizon and state dimension;
 - miscoverage level.
 
-Training, scale-validation, calibration and held-out evaluation cluster IDs must be disjoint. The block inventory is checked exactly. Increasing the horizon, adding action/query cells, changing the selected-action/search procedure, changing coordinate normalization, or switching context scope invalidates the calibrator.
+The calibration manifest itself has a SHA-256 identity. Each cluster receipt binds its complete block inventory and aggregate score; the independent ingestion boundary must recompute these from the exact source prediction/target bytes before the calibration manifest is admitted.
+
+Training, scale-validation, calibration and held-out evaluation cluster IDs must be disjoint and each split must be non-empty. The block inventory is checked exactly, including scope, metric, selection protocol, rollout count, action/query cells, horizon and state dimension. Increasing the horizon, adding action/query cells, changing the selected-action/search procedure, changing coordinate normalization, or switching context scope invalidates the calibrator.
 
 ## Candidate / evaluator information separation
 
