@@ -23,6 +23,9 @@
 use bevy::color::Alpha;
 use bevy::sprite_render::AlphaMode2d;
 use bevy::prelude::*;
+
+mod visual_grammar;
+use visual_grammar::layout_scene_elements;
 use symthaea_soma::embodiment_policy::{
     DenialReason, OutputChannel, PresentationPermit, PresentationPolicy,
 };
@@ -562,13 +565,12 @@ fn render_pending_scene(
     ));
 
     let count = frame.elements().len();
-    for (index, element) in frame.elements().iter().enumerate() {
-        let angle = index as f32 * std::f32::consts::TAU / count.max(1) as f32;
-        let radius = if element.role == SceneRole::Core { 0.0 } else { 62.0 };
-        let base_translation = Vec3::new(angle.cos() * radius, angle.sin() * radius, 0.0);
+    let placements = layout_scene_elements(frame.form(), frame.elements());
+    for (element, placement) in frame.elements().iter().zip(placements) {
+        let base_translation = placement.translation;
         let amplitude = render_amplitude(element.weight, frame.effective_intensity());
         let base_scale = Vec3::splat(amplitude);
-        let rotation = Quat::from_rotation_z(angle);
+        let rotation = Quat::from_rotation_z(placement.rotation_radians);
         let mesh = meshes.add(mesh_for_glyph(element.glyph));
         let base_color = color_for_role(element.role);
         let material = materials.add(ColorMaterial {
@@ -833,19 +835,31 @@ fn rejected_ack(
 }
 
 fn mesh_for_glyph(glyph: SceneGlyph) -> Mesh {
+    // Each semantic glyph has a documented silhouette. Similar roles may share
+    // a visual family, but they no longer collapse into one generic circle or bar.
     match glyph {
         SceneGlyph::StarNode => Mesh::from(RegularPolygon::new(20.0, 5)),
-        SceneGlyph::Filament | SceneGlyph::PuppetThread | SceneGlyph::Hypha
-        | SceneGlyph::ParticleTrail | SceneGlyph::StringLine | SceneGlyph::HearthArc
-        | SceneGlyph::RadialLine => Mesh::from(Rectangle::new(44.0, 3.5)),
-        SceneGlyph::Orbit | SceneGlyph::Marker | SceneGlyph::LabelAnchor => {
-            Mesh::from(Circle::new(16.0))
-        }
-        SceneGlyph::MarionetteJoint | SceneGlyph::HyphaNode | SceneGlyph::Particle
-        | SceneGlyph::Resonator | SceneGlyph::Ember | SceneGlyph::MandalaCenter => {
-            Mesh::from(Circle::new(13.0))
-        }
+        SceneGlyph::Filament => Mesh::from(Capsule2d::new(2.0, 20.0)),
+        SceneGlyph::Orbit => Mesh::from(Annulus::new(14.0, 18.0)),
+        SceneGlyph::MarionetteJoint => Mesh::from(Rhombus::new(22.0, 22.0)),
+        SceneGlyph::PuppetThread => Mesh::from(Rectangle::new(2.5, 44.0)),
+        SceneGlyph::HyphaNode => Mesh::from(RegularPolygon::new(16.0, 6)),
+        SceneGlyph::Hypha => Mesh::from(RegularPolygon::new(20.0, 7)),
+        SceneGlyph::Particle => Mesh::from(Circle::new(9.0)),
+        SceneGlyph::ParticleTrail => Mesh::from(Ellipse::new(22.0, 4.0)),
+        SceneGlyph::Resonator => Mesh::from(Capsule2d::new(12.0, 18.0)),
+        SceneGlyph::StringLine => Mesh::from(Rectangle::new(44.0, 1.7)),
+        SceneGlyph::Ember => Mesh::from(CircularSector::new(18.0, 2.2)),
+        SceneGlyph::HearthArc => Mesh::from(Annulus::new(24.0, 28.0)),
+        SceneGlyph::MandalaCenter => Mesh::from(RegularPolygon::new(15.0, 8)),
+        SceneGlyph::RadialLine => Mesh::from(Rectangle::new(1.7, 44.0)),
+        SceneGlyph::Marker => Mesh::from(Rhombus::new(13.0, 17.0)),
         SceneGlyph::Branch => Mesh::from(RegularPolygon::new(18.0, 3)),
+        SceneGlyph::LabelAnchor => Mesh::from(Triangle2d::new(
+            Vec2::new(0.0, 18.0),
+            Vec2::new(-16.0, -12.0),
+            Vec2::new(16.0, -12.0),
+        )),
     }
 }
 
