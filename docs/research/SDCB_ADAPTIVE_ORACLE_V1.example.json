@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "sdcb-adaptive-two-stage-paired-worlds-v1",
+  "world_a_id": "scientific-world-a",
+  "world_b_id": "scientific-world-b",
+  "prior_world_a": 0.5,
+  "abstain_utility": 0.6,
+  "budget_units": 2,
+  "experiments": [
+    {
+      "id": "uninformative-control",
+      "cost_units": 1,
+      "likelihood_world_a": [0.5, 0.5],
+      "likelihood_world_b": [0.5, 0.5]
+    },
+    {
+      "id": "triage-test",
+      "cost_units": 1,
+      "likelihood_world_a": [0.7, 0.3],
+      "likelihood_world_b": [0.1, 0.9]
+    },
+    {
+      "id": "confirm-a",
+      "cost_units": 1,
+      "likelihood_world_a": [0.75, 0.25],
+      "likelihood_world_b": [0.45, 0.55]
+    },
+    {
+      "id": "confirm-b",
+      "cost_units": 1,
+      "likelihood_world_a": [0.1, 0.9],
+      "likelihood_world_b": [0.6, 0.4]
+    }
+  ]
+}

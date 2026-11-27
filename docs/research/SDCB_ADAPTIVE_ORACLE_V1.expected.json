@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "sdcb-adaptive-two-stage-paired-worlds-v1",
+  "execution_kind": "independent_exhaustive_policy_enumeration",
+  "rust_compiled_or_executed": false,
+  "expected_report": {
+    "first_experiment_id": "triage-test",
+    "second_experiments_by_first_outcome": ["confirm-b", "triage-test"],
+    "expected_utility": 0.864,
+    "baseline_utility": 0.6,
+    "decision_value_gain": 0.264,
+    "expected_cost_units": 2.0,
+    "maximum_path_cost_units": 2,
+    "budget_units": 2,
+    "policies_evaluated": 100
+  },
+  "best_fixed_second_experiment_comparator": {
+    "expected_utility": 0.86,
+    "best_fixed_first_experiment": "triage-test",
+    "best_fixed_second_experiment": "triage-test"
+  },
+  "claim_boundary": "Constructed categorical two-world example with conditional independence; not a physical or external benchmark result."
+}

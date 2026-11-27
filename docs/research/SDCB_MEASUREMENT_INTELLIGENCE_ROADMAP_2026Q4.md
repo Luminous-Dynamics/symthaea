@@ -195,3 +195,18 @@ Every public report must label each result as one of:
 - **Physically validated:** declared real measurement procedure was executed with traceable evidence.
 
 Never promote a result to a stronger class because a branch is mergeable, a workflow is skipped, or an approximate policy agrees on one fixture.
+
+
+## Full-covariance and adaptive-planning follow-on
+
+The next stacked increment adds:
+- \`scripts/research/sdcb_full_covariance_gaussian.rs\`: exact subset selection with full latent prior covariance and full candidate residual covariance; selected actions use the corresponding principal residual-covariance submatrix.
+- \`scripts/research/sdcb_two_stage_adaptive_oracle.rs\`: exact categorical two-stage planning where the second action may depend on the first outcome and every path must fit the hard budget.
+- \`docs/research/SDCB_FULL_COVARIANCE_GAUSSIAN_V1.md\` and \`docs/research/SDCB_ADAPTIVE_TWO_STAGE_ORACLE_V1.md\`: mathematical references and limits.
+- \`docs/research/SDCB_COVARIANCE_ADAPTIVE_TOURNAMENT_V1.md\`: full covariance, adaptive-policy, model-misspecification and mobile short-collocation tournament protocol.
+
+A key mathematical point: for a fixed linear-Gaussian model with known covariance, posterior covariance does not depend on observed values. Therefore, a variance-only design over a fixed action subset is not outcome-adaptive. The separate categorical planner is used for non-Gaussian paired-world discrimination, outcome-dependent actions and terminal abstention.
+
+A new real-world track is short mobile-sensor collocation with a slower reference instrument. It must account for unequal averaging windows and process covariance; paired rows do not necessarily represent the same measurand average. See Kok & Tabandeh (2026), DOI 10.1002/qre.70319.
+
+The same evidence rules apply: exact arithmetic and schema parsing are not Rust execution; skipped hosted workflows are not passes; synthetic common-cause perturbations do not establish a physical failure mechanism.
