@@ -20,9 +20,9 @@ V1 requires read_committed. It uses the Last Stable Offset as the exclusive boun
 
 The producer-fence time must precede the capture window. The input binds a fence proof digest. The semantic evaluator does not authenticate that proof; the runtime adapter/custody verifier must.
 
-## Offset gaps and ordering
+## Offset holes and ordering
 
-Offsets need only be strictly increasing within the partition, not contiguous. Aborted transactions and control records can create gaps in a read_committed view. Gaps are recorded, not counted as missing business events.
+Offsets need only be strictly increasing within the partition, not contiguous. The reported hole count for a range is its width (end-exclusive minus start-inclusive) minus the number of visible records. This includes leading, interior and trailing offset positions not represented by visible records. Such holes can arise from aborted transactions or control records hidden from a read_committed consumer; the evaluator does not infer a cause from the count.
 
 Ordering is local to (cluster, topic, partition). No global order is inferred between partitions. A transaction may span multiple partitions; its relationship is joined by transaction/event identity and verified separately by MON-037.
 
