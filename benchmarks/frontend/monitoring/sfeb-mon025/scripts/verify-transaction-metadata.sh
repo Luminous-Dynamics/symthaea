@@ -50,11 +50,16 @@ jq -n --arg batch "$BATCH_ID" --argjson expected "$EXPECTED_COUNT" --slurpfile r
     | select((.payload.after? // null) != null and .payload.after.batch_id == $batch)
     | {
         event_id: .payload.after.event_id,
+        account_id: .payload.after.account_id,
+        amount: .payload.after.amount,
         transaction_id: (.payload.transaction.id // null),
         total_order: ((.payload.transaction.total_order // null) | if type == "string" then tonumber else . end),
         data_collection_order: ((.payload.transaction.data_collection_order // null) | if type == "string" then tonumber else . end)
       }
-  ] as $events
+  ] as $raw_events
+  | ($raw_events | group_by(.event_id)) as $event_groups
+  | [ $event_groups[] | select((map(tojson) | unique | length) > 1) | .[0].event_id ] as $conflicts
+  | [ $event_groups[] | .[0] ] as $events
   | [ $tx[0][] | .payload | select(.status? == "BEGIN") ] as $begins
   | [ $tx[0][] | .payload | select(.status? == "END") ] as $ends
   | ($events | group_by(.transaction_id)) as $groups
@@ -84,11 +89,15 @@ jq -n --arg batch "$BATCH_ID" --argjson expected "$EXPECTED_COUNT" --slurpfile r
       profile:"mon025-transaction-closure-v1",
       batch_id:$batch,
       expected_row_count:$expected,
-      observed_row_events:($events | length),
+      observed_raw_messages:($raw_events | length),
+      observed_unique_event_ids:($events | length),
+      exact_duplicate_replays:(($raw_events | length) - ($events | length)),
+      conflicting_event_ids:$conflicts,
       events_without_transaction_id:([$events[] | select(.transaction_id == null)] | length),
       transaction_groups:$checks,
       complete:(
         (($events | length) == $expected)
+        and (($conflicts | length) == 0)
         and (all($events[]; .transaction_id != null))
         and (all($checks[]; .boundary_pair_complete and .event_count_matches and .total_order_contiguous and .collection_order_contiguous))
       )
