@@ -25,6 +25,11 @@ func fixture()Input{
  }
  in := Input{
   Profile:Profile,Version:Version,TrialID:"trial-001",ScenarioID:"MON037-P001",Mode:OfflineFixture,EvaluatedAt:now,
+  Boundary:RecoveryBoundary{
+   IncidentID:"mon037-fixture-incident-001",ClaimID:"claim-cdc",SourceClusterID:"fixture-source-cluster",
+   Database:"mon037_fixture",SourceEpoch:"primary-epoch-001",TimelineID:"1",SnapshotID:"snapshot-001",
+   TerminalPosition:"0/200",ScopeDigest:da,InventoryDigest:db,
+  },
   RequiredClaimIDs:[]string{"claim-cdc","claim-backup"},
   SourceTruthComplete:true,SourceTruthManifestSHA256:fixtureDigest("MON037 synthetic SQL source-truth manifest v1\n"),
   ObservedCaptureComplete:true,ObservedCaptureManifestSHA256:fixtureDigest("MON037 synthetic Kafka capture manifest v1\n"),
@@ -54,7 +59,7 @@ func fixture()Input{
    ProofGraphResult:raw(map[string]any{"verdict":"indeterminate","may_enable_traffic":false}),
   },
  }
- refreshRecordDigests(&in)
+ if !DeriveFixtureRecordSetDigests(&in) { panic("fixture boundary binding failed") }
  return in
 }
 func expect(t *testing.T,in Input,want Verdict){t.Helper();got:=Evaluate(in);if got.ComponentVerdict!=want{t.Fatalf("want %s, got %+v",want,got)}}
