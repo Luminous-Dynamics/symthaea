@@ -408,6 +408,14 @@ The implication is sharper than ordinary marginal drift: **an unchanged pointwis
 
 This is specific to two stationary Gaussian AR(1) regimes, block-max scores, 39 calibration blocks, alpha=.10, the tested grid and 2,500 trials per condition. The 36-condition report is an initial diagnostic, not a universal guarantee, production detector or physical calibration. Confirmatory work must add independent seeds, more trials, negative rho, heavy tails, latent common causes, drift and held-out regimes.
 
+### 9.10 SDCB cross-channel common-cause shift (pending exact-head qualification)
+
+PR #14049 adds a two-channel stationary AR(1) stress where both channels retain the same unit Gaussian or standardized Student-t(5) marginal and the same within-channel `rho=0.80`, while contemporaneous cross-channel correlation changes from `gamma=0.05` to `gamma=0.95`. The score is the maximum absolute residual across both channels and all ticks.
+
+This is a genuinely new dimension relative to the univariate rho grid: a channel-wise marginal and autocorrelation check can pass while the joint max-score distribution shifts. The grid covers both change directions, no-change controls, block lengths 1/8/32, two marginal families, 39 calibration blocks and 2,500 trials per condition (24 conditions / 60,000 trials). Seven exact-source controls check marginal variances, realized cross-channel correlation, both direction-specific alarm intervals, replay and complete report rows. Code and report specification are in [PR #14049](https://github.com/Luminous-Dynamics/symthaea/pull/14049) and `docs/research/SDCB_CROSS_CHANNEL_COMMON_CAUSE_STRESS_V1.md`.
+
+The exact-head workflow is queued, so no empirical result is claimed yet. The confirmatory extension should test covariance rotations, 3–8 channels, multiple latent factors, lagged cross-channel structure, time-varying dependence and held-out multivariate telemetry. A validated dependence envelope must cover the joint score—not merely each channel's marginal fit.
+
 ### 9.9 SDCB score-aware reduction of redundant dependence experiments
 
 A metamorphic control in #14045 encodes the alternating-sign transform for stationary AR(1): `Y_t=(-1)^t X_t` maps `rho` to `-rho` while preserving `|X_t|` at every tick. For symmetric Gaussian innovations, and for the positive path-level Student-t(5) common scale, the distribution of the max-absolute-residual block score is therefore identical under `rho` and `-rho`.
