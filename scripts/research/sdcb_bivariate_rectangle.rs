@@ -15,7 +15,7 @@ const TRUNCATION_BOUND: f64 = 7.1e-33;
 const MAX_CONDITION: f64 = 1.0e8;
 const REL_TOL: f64 = 2.0e-10;
 const ABS_TOL: f64 = 1.0e-32;
-const MAX_DEPTH: usize = 16;
+const MAX_DEPTH: usize = 24;
 const MAX_EVALS: u64 = 1_000_000;
 const MAX_CELLS: usize = 64;
 const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
@@ -98,7 +98,7 @@ where F: FnMut(f64) -> Result<f64, RectangleError> {
     let refined = left + right;
     let delta = refined - whole;
     let error = delta.abs() / 15.0;
-    if error <= abs_tol + REL_TOL * refined.abs() {
+    if error <= abs_tol {
         let corrected = refined + delta / 15.0;
         return if corrected.is_finite() && corrected >= 0.0 {
             Ok((corrected, error))
@@ -108,23 +108,6 @@ where F: FnMut(f64) -> Result<f64, RectangleError> {
     let (lv, le) = refine(f, a, m, fa, fl, fm, left, abs_tol * 0.5, depth - 1, evals)?;
     let (rv, re) = refine(f, m, b, fm, fr, fb, right, abs_tol * 0.5, depth - 1, evals)?;
     Ok((lv + rv, le + re))
-}
-
-fn integrate_segment<F>(
-    f: &mut F, a: f64, b: f64, full_width: f64, evals: &mut u64,
-) -> Result<(f64, f64), RectangleError>
-where F: FnMut(f64) -> Result<f64, RectangleError> {
-    let m = 0.5 * (a + b);
-    let fa = f(a)?;
-    let fm = f(m)?;
-    let fb = f(b)?;
-    *evals += 3;
-    let whole = simpson(a, b, fa, fm, fb);
-    refine(
-        f, a, b, fa, fm, fb, whole,
-        ABS_TOL * ((b - a) / full_width).max(1.0e-12),
-        MAX_DEPTH, evals,
-    )
 }
 
 fn add_transition_points(
@@ -211,6 +194,11 @@ pub fn bivariate_gaussian_rectangle(
         Ok(normal_pdf(z1) * normal_interval(lo, hi)?)
     };
 
+    // First estimate the total probability coarsely, then distribute one
+    // global absolute error budget across all segments. A local relative
+    // tolerance would over-refine negligible far-tail pieces unnecessarily.
+    let mut segments: Vec<(f64, f64, f64, f64, f64, f64)> = Vec::new();
+    let mut rough_probability = 0.0;
     for pair in points.windows(2) {
         let start = pair[0];
         let end = pair[1];
@@ -219,11 +207,28 @@ pub fn bivariate_gaussian_rectangle(
         for i in 0..count {
             let a = start + (end - start) * i as f64 / count as f64;
             let b = start + (end - start) * (i + 1) as f64 / count as f64;
-            let (value, error) =
-                integrate_segment(&mut integrand, a, b, full_width, &mut evals)?;
-            probability += value;
-            error_indicator += error;
+            let midpoint = 0.5 * (a + b);
+            let fa = integrand(a)?;
+            let fm = integrand(midpoint)?;
+            let fb = integrand(b)?;
+            evals += 3;
+            let whole = simpson(a, b, fa, fm, fb);
+            rough_probability += whole;
+            segments.push((a, b, fa, fm, fb, whole));
         }
+    }
+    if !rough_probability.is_finite() || rough_probability < 0.0 {
+        return Err(RectangleError::NumericFailure);
+    }
+    let global_tolerance = ABS_TOL.max(REL_TOL * rough_probability.abs());
+    for (a, b, fa, fm, fb, whole) in segments {
+        let local_tolerance = global_tolerance * ((b - a) / full_width);
+        let (value, error) = refine(
+            &mut integrand, a, b, fa, fm, fb, whole,
+            local_tolerance, MAX_DEPTH, &mut evals,
+        )?;
+        probability += value;
+        error_indicator += error;
     }
 
     if !probability.is_finite() || probability < 0.0 || probability > 1.0 + 1.0e-10 {
