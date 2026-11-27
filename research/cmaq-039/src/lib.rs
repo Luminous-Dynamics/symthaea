@@ -476,7 +476,6 @@ fn strictly_sorted<T: Ord>(values: &[T]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cmaq_031_anytime_calibration_monitor::AnytimeCalibrationMonitor;
     use cmaq_036_common_cause_closure::{
         DependenceKey, DependenceKind, EvidenceUnit, build_common_cause_closure,
     };
