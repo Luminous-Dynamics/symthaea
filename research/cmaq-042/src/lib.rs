@@ -587,6 +587,8 @@ mod tests {
             let mut rejected_positions = 0usize;
             for test_rank in 1..=reference_count + 1 {
                 let mut input = bank(reference_count);
+                input.alpha_numerator = alpha_numerator;
+                input.alpha_denominator = alpha_denominator;
                 for (index, reference) in input.references.iter_mut().enumerate() {
                     reference.trace_sha256 = format!("{:064x}", index + 1);
                     reference.log_max_e_value = index as f64 + 0.5;
