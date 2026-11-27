@@ -39,5 +39,14 @@ jobs:
         run: cargo +1.100.0 test --manifest-path research/cmaq-035/Cargo.toml --locked
       - name: Strict Clippy
         run: cargo +1.100.0 clippy --manifest-path research/cmaq-035/Cargo.toml --locked --all-targets -- -D warnings
-      - name: Run paired simulation smoke test
-        run: cargo +1.100.0 run --release --manifest-path research/cmaq-035/Cargo.toml --locked -- 128 200 20261127
+      - name: Run paired Monte Carlo benchmark (10,000 replications per scenario)
+        run: |
+          mkdir -p cmaq-035-results
+          cargo +1.100.0 run --release --manifest-path research/cmaq-035/Cargo.toml --locked -- 10000 500 20261127 > cmaq-035-results/results.csv 2> cmaq-035-results/run-metadata.txt
+      - name: Preserve benchmark output
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-035-paired-prm-results
+          path: cmaq-035-results/
+          if-no-files-found: error
+          retention-days: 30
