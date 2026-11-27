@@ -224,6 +224,69 @@ fn independent_normalization(n: usize, beta: f64) -> f64 {
 }
 
 #[test]
+fn unqualified_k1_label_cannot_enter_the_long_memory_stream() {
+    let n = 256;
+    let m = 256;
+    let model = digest('9');
+    let residuals = synthetic_power_law_residuals(31, n + m, 0.85);
+    let rows = residuals
+        .iter()
+        .enumerate()
+        .map(|(index, value)| observation(index as u64 + 1, *value, &model))
+        .collect::<Vec<_>>();
+    let mut value = input(rows[..n].to_vec(), rows[n..].to_vec(), &model);
+    value.test[2].eligibility_report.eligibility = LabelConsumptionEligibilityV1::Unknown;
+    value.test[2].eligibility_report.downstream_consumption_allowed = false;
+    let mut canonical_report = value.test[2].eligibility_report.clone();
+    canonical_report.report_sha256.clear();
+    value.test[2].eligibility_report.report_sha256 = json_sha(&canonical_report);
+    let mut canonical_observation = value.test[2].clone();
+    canonical_observation.observation_sha256.clear();
+    value.test[2].observation_sha256 = json_sha(&canonical_observation);
+    assert!(evaluate_long_memory_coverage_inference_v1(&value).is_err());
+}
+
+#[test]
+fn non_adjacent_calibration_and_test_windows_are_rejected() {
+    let n = 256;
+    let m = 256;
+    let model = digest('9');
+    let residuals = synthetic_power_law_residuals(37, n + m, 0.85);
+    let rows = residuals
+        .iter()
+        .enumerate()
+        .map(|(index, value)| observation(index as u64 + 1, *value, &model))
+        .collect::<Vec<_>>();
+    let mut value = input(rows[..n].to_vec(), rows[n..].to_vec(), &model);
+    value.test[0].prediction_receipt.sequence += 2;
+    let mut canonical_prediction = value.test[0].prediction_receipt.clone();
+    canonical_prediction.receipt_sha256.clear();
+    value.test[0].prediction_receipt.receipt_sha256 = json_sha(&canonical_prediction);
+    let mut canonical_observation = value.test[0].clone();
+    canonical_observation.observation_sha256.clear();
+    value.test[0].observation_sha256 = json_sha(&canonical_observation);
+    assert!(evaluate_long_memory_coverage_inference_v1(&value).is_err());
+}
+
+#[test]
+fn insufficient_paired_block_count_returns_no_distributional_claim() {
+    let n = 256;
+    let model = digest('9');
+    let residuals = synthetic_power_law_residuals(41, 2 * n, 0.85);
+    let rows = residuals
+        .iter()
+        .enumerate()
+        .map(|(index, value)| observation(index as u64 + 1, *value, &model))
+        .collect::<Vec<_>>();
+    let mut value = input(rows[..n].to_vec(), rows[n..].to_vec(), &model);
+    value.policy.minimum_paired_block_count = 200;
+    let report = evaluate_long_memory_coverage_inference_v1(&value).unwrap();
+    assert_eq!(report.status, LongMemoryCoverageStatusV1::InsufficientInput);
+    assert!(!report.long_memory_supported);
+    assert_eq!(report.block_distribution_lower_quantile, None);
+}
+
+#[test]
 fn permuted_identical_frozen_stream_replays_to_the_same_block_distribution_receipt() {
     let n = 256;
     let m = 256;
