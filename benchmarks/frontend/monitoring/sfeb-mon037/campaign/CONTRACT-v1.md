@@ -32,7 +32,7 @@ A helper can derive canonical record-set digests only for `offline_fixture` inpu
 Expected and observed records are joined by event ID. The comparison tuple is transaction ID, topic, Debezium data_collection label, operation, payload SHA-256, transaction total_order and collection_order.
 
 - Missing acknowledged events, unexpected records, conflicting identity reuse and payload mismatch block.
-- Exact duplicate replay is counted separately. It remains indeterminate unless a digest-bound consumer idempotency proof is supplied. The proof digest is not authenticated by this semantic evaluator.
+- Exact duplicate replay is counted separately. It remains indeterminate unless a digest-bound consumer idempotency proof is supplied and its coverage digest matches the exact duplicate event-ID set. The proof digest is not authenticated by this semantic evaluator.
 - Kafka offsets are monotonically checked within each topic/partition.
 - V1 requires one partition per topic for ordered qualification. Multi-partition ordering is indeterminate; no cross-partition global order is guessed.
 
