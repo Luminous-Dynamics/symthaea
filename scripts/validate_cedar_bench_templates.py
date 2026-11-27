@@ -87,6 +87,7 @@ def validate() -> None:
             if kind == "date":
                 require(int(fact["days"]) > 1, f"{tid}: date interval too small")
         placebo = template["placebo"]
+        require(placebo.get("id") == "P", f"{tid}: placebo fact ID must be P")
         require(bool(placebo.get("paths")), f"{tid}: placebo paths missing")
         require(bool(re.fullmatch(r"\{\{[A-Z][A-Z0-9_]*\}\}", placebo["placeholder"])),
                 f"{tid}: placebo placeholder invalid")
