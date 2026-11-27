@@ -802,6 +802,10 @@ jobs:
           assert linearization["split_solver_composition_order_required"] is True
           assert linearization["independent_finite_difference_cross_check_required"] is True
           assert linearization["branch_change_disposition"] == "UNKNOWN_OR_HANDOFF"
+          assert linearization["pulse_application_time_jacobian_required"] is True
+          assert linearization["pulse_time_finite_difference_cross_check_required"] is True
+          assert linearization["pulse_time_sensitivity_convention"] == "scheduled_reset_D_R_f_minus_plus_R_t_minus_f_plus"
+          assert linearization["pulse_time_sensitivity_status"] == "synthetic_not_computed"
           assert horizon["start_time"] == checkpoint["time"]
           assert checkpoint["first_pulse_applied"] is True
           assert checkpoint["second_pulse_not_yet_applied"] is True
