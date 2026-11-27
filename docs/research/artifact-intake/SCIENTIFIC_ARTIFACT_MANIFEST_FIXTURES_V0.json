@@ -1,0 +1,248 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_class": "synthetic_contract_only",
+  "claim_boundary": "These fixtures test the manifest contract only. They are not parser executions, benchmark observations, or scientific evidence.",
+  "cases": [
+    {
+      "case_id": "csv_cell_exact_decimal",
+      "expected_disposition": "PARSED",
+      "expected_acceptance": "schema_valid_and_cross_field_invariants_valid",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "acquisition": {
+          "receipt_id": "acq-receipt-csv-001",
+          "receipt_content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "requested_uri": "https://data.example.test/study.csv",
+          "final_uri": "https://data.example.test/releases/2026-11/study.csv",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "text/csv",
+          "detected_content_type": "text/csv",
+          "filename": "study.csv",
+          "encoding": "utf-8"
+        },
+        "raw": {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "byte_length": 64,
+          "capture_ref": "cas://sha256/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "parser": {
+          "parser_id": "symthaea.delimited-text",
+          "parser_version": "0.1.0",
+          "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "PARSED",
+          "derived_payload_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "observations": [
+            {
+              "observation_id": "study-row-0-temperature",
+              "locator": {
+                "kind": "CSV_CELL",
+                "record_index": 0,
+                "column_index": 1,
+                "column_name": "temperature_C",
+                "byte_start": 28,
+                "byte_end": 33
+              },
+              "raw_lexeme": "21.50",
+              "value_kind": "DECIMAL",
+              "unit_lexeme": "degC"
+            }
+          ],
+          "issues": [],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 64,
+            "elapsed_ms": 4,
+            "observations_emitted": 1
+          }
+        }
+      }
+    },
+    {
+      "case_id": "json_pointer_numeric",
+      "expected_disposition": "PARSED",
+      "expected_acceptance": "schema_valid_and_cross_field_invariants_valid",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "acquisition": {
+          "receipt_id": "acq-receipt-json-001",
+          "receipt_content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "requested_uri": "https://data.example.test/results.json",
+          "final_uri": "https://data.example.test/results.json",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "application/json",
+          "detected_content_type": "application/json",
+          "filename": "results.json",
+          "encoding": "utf-8"
+        },
+        "raw": {
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "byte_length": 48,
+          "capture_ref": "cas://sha256/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        "parser": {
+          "parser_id": "symthaea.json",
+          "parser_version": "0.1.0",
+          "config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "PARSED",
+          "derived_payload_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "observations": [
+            {
+              "observation_id": "results-effect-estimate",
+              "locator": {
+                "kind": "JSON_POINTER",
+                "pointer": "/results/0/effect_estimate"
+              },
+              "raw_lexeme": "0.032",
+              "value_kind": "DECIMAL",
+              "unit_lexeme": null
+            }
+          ],
+          "issues": [],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 48,
+            "elapsed_ms": 2,
+            "observations_emitted": 1
+          }
+        }
+      }
+    },
+    {
+      "case_id": "unsupported_pdf",
+      "expected_disposition": "UNSUPPORTED",
+      "expected_acceptance": "schema_valid_but_not_policy_usable",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "acquisition": {
+          "receipt_id": "acq-receipt-pdf-001",
+          "receipt_content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "requested_uri": "https://data.example.test/figure.pdf",
+          "final_uri": "https://data.example.test/figure.pdf",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "application/pdf",
+          "detected_content_type": "application/pdf",
+          "filename": "figure.pdf",
+          "encoding": null
+        },
+        "raw": {
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "byte_length": 2048,
+          "capture_ref": "cas://sha256/1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "parser": {
+          "parser_id": "symthaea.artifact-intake",
+          "parser_version": "0.1.0",
+          "config_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "UNSUPPORTED",
+          "derived_payload_sha256": null,
+          "observations": [],
+          "issues": [
+            {
+              "reason_code": "PARSER_NOT_ADMITTED",
+              "message": "PDF parser has not been qualified for this intake profile."
+            }
+          ],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 2048,
+            "elapsed_ms": 1,
+            "observations_emitted": 0
+          }
+        }
+      }
+    },
+    {
+      "case_id": "receipt_digest_mismatch",
+      "expected_disposition": "INTEGRITY_FAILED",
+      "expected_acceptance": "schema_valid_but_cross_field_integrity_rejected",
+      "manifest": {
+        "schema_version": "0.1.0",
+        "artifact_id": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "acquisition": {
+          "receipt_id": "acq-receipt-integrity-mismatch",
+          "receipt_content_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "requested_uri": "https://data.example.test/figure.pdf",
+          "final_uri": "https://data.example.test/figure.pdf",
+          "captured_at_unix_ms": 1795770000000
+        },
+        "media": {
+          "declared_content_type": "application/pdf",
+          "detected_content_type": "application/pdf",
+          "filename": "figure.pdf",
+          "encoding": null
+        },
+        "raw": {
+          "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "byte_length": 2048,
+          "capture_ref": "cas://sha256/3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        "parser": {
+          "parser_id": "symthaea.artifact-intake",
+          "parser_version": "0.1.0",
+          "config_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtime_digest": "rust-1.96.0"
+        },
+        "parse": {
+          "disposition": "INTEGRITY_FAILED",
+          "derived_payload_sha256": null,
+          "observations": [],
+          "issues": [
+            {
+              "reason_code": "ACQUISITION_DIGEST_MISMATCH",
+              "message": "The acquisition receipt digest does not match the bytes bound by this manifest."
+            }
+          ],
+          "limits": {
+            "max_input_bytes": 4096,
+            "max_elapsed_ms": 2000,
+            "max_observations": 64
+          },
+          "usage": {
+            "bytes_read": 2048,
+            "elapsed_ms": 1,
+            "observations_emitted": 0
+          }
+        }
+      }
+    }
+  ],
+  "cross_field_invariants": [
+    "artifact_id must equal 'sha256:' + raw.sha256",
+    "acquisition.receipt_content_sha256 must equal raw.sha256",
+    "parse.usage.bytes_read must not exceed parse.limits.max_input_bytes",
+    "parse.usage.elapsed_ms must not exceed parse.limits.max_elapsed_ms",
+    "parse.usage.observations_emitted must equal parse.observations.length and not exceed parse.limits.max_observations",
+    "For CSV_CELL, byte_start must be strictly less than byte_end and the span must resolve inside raw.byte_length",
+    "A non-PARSED disposition is never sufficient for downstream claim support or decision use"
+  ]
+}
