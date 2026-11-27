@@ -136,10 +136,7 @@ impl RankSpectrumMonitor {
         if calibration_count == 0 {
             return Err(SpectrumError::InvalidCalibrationCount);
         }
-        if alpha_numerator == 0
-            || alpha_denominator == 0
-            || alpha_numerator >= alpha_denominator
-        {
+        if alpha_numerator == 0 || alpha_denominator == 0 || alpha_numerator >= alpha_denominator {
             return Err(SpectrumError::InvalidMiscoverage);
         }
 
@@ -255,10 +252,7 @@ impl RankSpectrumMonitor {
     /// predictive rank distribution before the current rank is counted.
     /// State is committed only after all feature factors and mixture arithmetic
     /// have been validated.
-    pub fn observe_rank(
-        &mut self,
-        rank_one_based: usize,
-    ) -> Result<SpectrumUpdate, SpectrumError> {
+    pub fn observe_rank(&mut self, rank_one_based: usize) -> Result<SpectrumUpdate, SpectrumError> {
         if self.quarantined {
             return Err(SpectrumError::AlreadyQuarantined);
         }
@@ -321,9 +315,7 @@ impl RankSpectrumMonitor {
         }
 
         let log_mixture = self.log_mixture_from(&next_log_wealths)?;
-        let threshold = (f64::from(self.alpha_denominator)
-            / f64::from(self.alpha_numerator))
-            .ln();
+        let threshold = (f64::from(self.alpha_denominator) / f64::from(self.alpha_numerator)).ln();
         if !log_mixture.is_finite() || !threshold.is_finite() {
             return Err(SpectrumError::ArithmeticOverflow);
         }
@@ -592,12 +584,8 @@ mod tests {
         for contrast in monitor.contrasts() {
             let mut expectation = 0.0;
             for rank in 1..=monitor.calibration_count() + 1 {
-                let probability =
-                    (1 + monitor.rank_counts[rank - 1]) as f64 / denominator as f64;
-                expectation += probability
-                    * monitor
-                        .test_payoff(contrast, rank, next_t)
-                        .unwrap();
+                let probability = (1 + monitor.rank_counts[rank - 1]) as f64 / denominator as f64;
+                expectation += probability * monitor.test_payoff(contrast, rank, next_t).unwrap();
             }
             assert!(expectation.abs() < 1e-12, "expectation={expectation}");
         }
@@ -623,10 +611,7 @@ mod tests {
         let before = monitor.clone();
         assert_eq!(monitor.observe_rank(0), Err(SpectrumError::InvalidRank));
         assert_eq!(monitor, before);
-        assert_eq!(
-            monitor.observe_rank(21),
-            Err(SpectrumError::InvalidRank)
-        );
+        assert_eq!(monitor.observe_rank(21), Err(SpectrumError::InvalidRank));
         assert_eq!(monitor, before);
     }
 
