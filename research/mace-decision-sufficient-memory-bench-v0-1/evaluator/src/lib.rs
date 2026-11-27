@@ -899,7 +899,7 @@ mod tests {
     fn paired_arms_require_identical_downstream_policy_digest() {
         let memory = run("mace", "hold", &["signed-current"]);
         let mut baseline = run("no-memory", "abstain", &[]);
-        baseline.downstream_policy_digest = "different-reader".to_owned();
+        baseline.downstream_policy_digest = "c".repeat(64);
         assert_eq!(
             score_paired(&case(), &memory, &baseline),
             Err(EvaluationErrorV1::DownstreamPolicyMismatch)
@@ -928,7 +928,7 @@ mod tests {
             chosen_action: "abstain".to_owned(),
             retrieved_evidence_ids: vec![],
         };
-        without.downstream_policy_digest = "different-reader".to_owned();
+        without.downstream_policy_digest = "c".repeat(64);
         assert_eq!(
             score_leave_one_out(
                 &case(),
