@@ -120,6 +120,7 @@ def validate() -> None:
         support_ids = set(citation["support_source_ids"])
         decoy_ids = set(citation["decoy_source_ids"])
         require(support_ids <= set(source_ids), f"{tid}: citation support source missing")
+        require(referenced_sources <= support_ids, f"{tid}: answer oracle uses a source not allowed as support")
         require(decoy_ids <= set(source_ids), f"{tid}: citation decoy source missing")
         require(not (support_ids & decoy_ids), f"{tid}: a source cannot be both support and decoy")
         require(citation.get("must_not_cite_decoy") is True, f"{tid}: decoy-citation prohibition missing")
