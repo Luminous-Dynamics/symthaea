@@ -198,3 +198,21 @@ func TestTombstoneWithKeyDigestCanBeCaptured(t *testing.T) {
 	refresh(&in)
 	expect(t, in, Qualified)
 }
+
+
+func TestDuplicateImmutableTopicIDBlocks(t *testing.T) {
+	in := fixture()
+	second := in.TopicInventory[0]
+	second.Topic = "recreated-ledger"
+	in.TopicInventory = append(in.TopicInventory, second)
+	refresh(&in)
+	expect(t, in, Blocked)
+}
+
+func TestOversizedPartitionVectorBlocksBeforeRangeExpansion(t *testing.T) {
+	in := fixture()
+	in.TopicInventory[0].PartitionCount = MaxPartitions
+	in.TopicInventory[1].PartitionCount = MaxPartitions
+	refresh(&in)
+	expect(t, in, Blocked)
+}
