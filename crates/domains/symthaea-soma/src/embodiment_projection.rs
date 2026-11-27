@@ -1,0 +1,395 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+//! Canonical semantic cues and deterministic replay for Symthaea embodiments.
+//!
+//! This module deliberately stops before animation or rendering. Every form gets
+//! the same typed semantic cue; a renderer may choose its own visual grammar but
+//! may not silently alter the cue's meaning or epistemic provenance.
+
+use super::embodiment_event::{
+    BackchannelSignal, EmbodimentEvent, EmbodimentStreamValidator, EpistemicStatus,
+    EventKind, EventPayload, EventSource, EventValidationError, EvidenceState,
+    ExpressionChannel, ExpressionIntentKind, PrivacyClass, TurnState,
+    UserControlAction, UserControlPayload,
+};
+use serde::{Deserialize, Serialize};
+
+/// Presentation form identifiers. They describe adapters, not separate agents.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EmbodimentForm {
+    LivingConstellation,
+    PuppetTheatre,
+    MycelialBeing,
+    Swarm,
+    LivingInstrument,
+    HearthCompanion,
+    CognitiveMandala,
+}
+
+impl EmbodimentForm {
+    pub const ALL: [Self; 7] = [
+        Self::LivingConstellation,
+        Self::PuppetTheatre,
+        Self::MycelialBeing,
+        Self::Swarm,
+        Self::LivingInstrument,
+        Self::HearthCompanion,
+        Self::CognitiveMandala,
+    ];
+
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::LivingConstellation => "living_constellation",
+            Self::PuppetTheatre => "puppet_theatre",
+            Self::MycelialBeing => "mycelial_being",
+            Self::Swarm => "swarm",
+            Self::LivingInstrument => "living_instrument",
+            Self::HearthCompanion => "hearth_companion",
+            Self::CognitiveMandala => "cognitive_mandala",
+        }
+    }
+}
+
+/// Semantic content shared by every embodiment renderer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "cue", rename_all = "snake_case")]
+pub enum SemanticCue {
+    Listening {
+        active: bool,
+    },
+    Speaking {
+        active: bool,
+        segment_id: String,
+    },
+    TurnState {
+        state: TurnState,
+        target: Option<String>,
+    },
+    Backchannel {
+        signal: BackchannelSignal,
+        intensity: f32,
+    },
+    AttentionFocus {
+        target: String,
+        strength: Option<f32>,
+    },
+    ExpressionIntent {
+        intent: ExpressionIntentKind,
+        intensity: f32,
+        channel: Option<ExpressionChannel>,
+    },
+    Uncertainty {
+        subject: String,
+        level: f32,
+        calibration_ref: Option<String>,
+    },
+    EvidenceStatus {
+        subject_id: String,
+        status: EvidenceState,
+        verifier_receipt_ref: Option<String>,
+    },
+    UserControl {
+        action: UserControlAction,
+        form_id: Option<String>,
+        target_event_id: Option<String>,
+        enabled: Option<bool>,
+        intensity: Option<f32>,
+    },
+}
+
+impl SemanticCue {
+    /// Stable semantic key for renderer mappings and benchmark aggregation.
+    pub fn semantic_key(&self) -> &'static str {
+        match self {
+            Self::Listening { active: true } => "conversation.listening.active",
+            Self::Listening { active: false } => "conversation.listening.inactive",
+            Self::Speaking { active: true, .. } => "conversation.speaking.active",
+            Self::Speaking { active: false, .. } => "conversation.speaking.inactive",
+            Self::TurnState { state: TurnState::Wait, .. } => "conversation.turn.wait",
+            Self::TurnState { state: TurnState::Respond, .. } => "conversation.turn.respond",
+            Self::TurnState { state: TurnState::Continue, .. } => "conversation.turn.continue",
+            Self::TurnState { state: TurnState::Yield, .. } => "conversation.turn.yield",
+            Self::Backchannel { .. } => "conversation.backchannel",
+            Self::AttentionFocus { .. } => "attention.focus",
+            Self::ExpressionIntent { .. } => "expression.intent",
+            Self::Uncertainty { .. } => "cognition.uncertainty",
+            Self::EvidenceStatus { .. } => "evidence.status",
+            Self::UserControl { .. } => "user.control",
+        }
+    }
+
+    /// Text alternative describes the reported event, not an inferred emotion
+    /// or a claim that a downstream action has completed.
+    pub fn accessible_description(&self) -> String {
+        match self {
+            Self::Listening { active: true } => "Listening state reported active.".to_owned(),
+            Self::Listening { active: false } => "Listening state reported inactive.".to_owned(),
+            Self::Speaking { active: true, .. } => "Speech segment reported active.".to_owned(),
+            Self::Speaking { active: false, .. } => "Speech segment reported inactive.".to_owned(),
+            Self::TurnState { state, .. } => match state {
+                TurnState::Wait => "Conversation action: wait.".to_owned(),
+                TurnState::Respond => "Conversation action: respond.".to_owned(),
+                TurnState::Continue => "Conversation action: continue.".to_owned(),
+                TurnState::Yield => "Conversation action: yield the floor.".to_owned(),
+            },
+            Self::Backchannel { signal, .. } => {
+                format!("Backchannel signal requested: {signal:?}.")
+            }
+            Self::AttentionFocus { target, .. } => {
+                format!("Reported attention target: {target}.")
+            }
+            Self::ExpressionIntent { intent, .. } => {
+                format!("Presentation intent reported: {intent:?}.")
+            }
+            Self::Uncertainty { subject, level, .. } => {
+                format!("Reported uncertainty indicator for {subject}: {level:.3}.")
+            }
+            Self::EvidenceStatus { subject_id, status, verifier_receipt_ref } => {
+                let receipt = if verifier_receipt_ref.is_some() {
+                    " A verifier receipt reference is present."
+                } else {
+                    ""
+                };
+                format!("Evidence status reported for {subject_id}: {status:?}.{receipt}")
+            }
+            Self::UserControl { action, .. } => {
+                format!("User control requested: {action:?}.")
+            }
+        }
+    }
+}
+
+/// Form-independent cue with the full provenance needed by a renderer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CanonicalCue {
+    pub session_id: String,
+    pub clock_domain_id: String,
+    pub event_id: String,
+    pub sequence: u64,
+    pub event_kind: EventKind,
+    pub semantic: SemanticCue,
+    pub source: EventSource,
+    pub observed_at_monotonic_ns: String,
+    pub expires_at_monotonic_ns: String,
+    pub epistemic_status: EpistemicStatus,
+    pub confidence: Option<f64>,
+    pub evidence_refs: Vec<String>,
+    pub privacy_class: PrivacyClass,
+}
+
+impl CanonicalCue {
+    pub fn from_event(event: &EmbodimentEvent) -> Result<Self, EventValidationError> {
+        event.validate()?;
+        let semantic = match &event.payload {
+            EventPayload::Listening(value) => SemanticCue::Listening {
+                active: value.active,
+            },
+            EventPayload::Speaking(value) => SemanticCue::Speaking {
+                active: value.active,
+                segment_id: value.segment_id.clone(),
+            },
+            EventPayload::TurnState(value) => SemanticCue::TurnState {
+                state: value.state,
+                target: value.target.clone(),
+            },
+            EventPayload::Backchannel(value) => SemanticCue::Backchannel {
+                signal: value.signal,
+                intensity: value.intensity,
+            },
+            EventPayload::AttentionFocus(value) => SemanticCue::AttentionFocus {
+                target: value.target.clone(),
+                strength: value.strength,
+            },
+            EventPayload::ExpressionIntent(value) => SemanticCue::ExpressionIntent {
+                intent: value.intent,
+                intensity: value.intensity,
+                channel: value.channel,
+            },
+            EventPayload::Uncertainty(value) => SemanticCue::Uncertainty {
+                subject: value.subject.clone(),
+                level: value.level,
+                calibration_ref: value.calibration_ref.clone(),
+            },
+            EventPayload::EvidenceStatus(value) => SemanticCue::EvidenceStatus {
+                subject_id: value.subject_id.clone(),
+                status: value.status,
+                verifier_receipt_ref: value.verifier_receipt_ref.clone(),
+            },
+            EventPayload::UserControl(value) => SemanticCue::UserControl {
+                action: value.action,
+                form_id: value.form_id.clone(),
+                target_event_id: value.target_event_id.clone(),
+                enabled: value.enabled,
+                intensity: value.intensity,
+            },
+        };
+
+        Ok(Self {
+            session_id: event.session_id.clone(),
+            clock_domain_id: event.clock_domain_id.clone(),
+            event_id: event.event_id.clone(),
+            sequence: event.sequence,
+            event_kind: event.event_kind,
+            semantic,
+            source: event.source.clone(),
+            observed_at_monotonic_ns: event.observed_at_monotonic_ns.clone(),
+            expires_at_monotonic_ns: event.expires_at_monotonic_ns.clone(),
+            epistemic_status: event.epistemic_status,
+            confidence: event.confidence,
+            evidence_refs: event.evidence_refs.clone(),
+            privacy_class: event.privacy_class,
+        })
+    }
+}
+
+/// Renderer-facing envelope. The semantic cue is identical across forms; only
+/// the selected form identifier changes. No animation or physical output occurs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FormCue {
+    pub form: EmbodimentForm,
+    pub cue: CanonicalCue,
+}
+
+pub fn project_for_form(cue: &CanonicalCue, form: EmbodimentForm) -> FormCue {
+    FormCue {
+        form,
+        cue: cue.clone(),
+    }
+}
+
+/// One recorded event and the monotonic "now" sampled from that event's clock
+/// domain. Cross-device traces require explicit clock synchronization before
+/// they can be represented in this format.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReplayStep {
+    pub event: EmbodimentEvent,
+    pub now_monotonic_ns: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplayError {
+    pub step_index: usize,
+    pub cause: EventValidationError,
+}
+
+/// Validate and replay a trace without a renderer, GPU, audio device, or network.
+/// The returned cues are deterministic for byte-identical input events and
+/// preserve the source event order.
+pub fn replay_trace(
+    session_id: impl Into<String>,
+    steps: &[ReplayStep],
+) -> Result<Vec<CanonicalCue>, ReplayError> {
+    let mut validator = EmbodimentStreamValidator::new(session_id)
+        .map_err(|cause| ReplayError { step_index: 0, cause })?;
+    let mut cues = Vec::with_capacity(steps.len());
+
+    for (step_index, step) in steps.iter().enumerate() {
+        validator
+            .accept(&step.event, &step.now_monotonic_ns)
+            .map_err(|cause| ReplayError { step_index, cause })?;
+        let cue = CanonicalCue::from_event(&step.event)
+            .map_err(|cause| ReplayError { step_index, cause })?;
+        cues.push(cue);
+    }
+
+    Ok(cues)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::embodiment_event::{
+        EmbodimentEvent, EventPayload, EventSource, ListeningPayload,
+    };
+
+    fn event(sequence: u64, event_id: &str) -> EmbodimentEvent {
+        EmbodimentEvent {
+            schema: "symthaea.embodiment-event.v1".to_owned(),
+            session_id: "session-1".to_owned(),
+            clock_domain_id: "clock:dialogue-epoch-1".to_owned(),
+            event_id: event_id.to_owned(),
+            sequence,
+            observed_at_monotonic_ns: (100 + sequence).to_string(),
+            expires_at_monotonic_ns: "1000".to_owned(),
+            event_kind: EventKind::ConversationListening,
+            payload: EventPayload::Listening(ListeningPayload { active: true }),
+            source: EventSource {
+                component: "dialogue".to_owned(),
+                instance_id: "dialogue-1".to_owned(),
+                source_event_id: None,
+                build_id: None,
+            },
+            epistemic_status: EpistemicStatus::Measured,
+            confidence: None,
+            evidence_refs: Vec::new(),
+            privacy_class: PrivacyClass::Public,
+        }
+    }
+
+    fn steps() -> Vec<ReplayStep> {
+        vec![
+            ReplayStep {
+                event: event(0, "event-0"),
+                now_monotonic_ns: "200".to_owned(),
+            },
+            ReplayStep {
+                event: event(1, "event-1"),
+                now_monotonic_ns: "300".to_owned(),
+            },
+        ]
+    }
+
+    #[test]
+    fn replay_is_deterministic_for_identical_traces() {
+        let trace = steps();
+        assert_eq!(
+            replay_trace("session-1", &trace).unwrap(),
+            replay_trace("session-1", &trace).unwrap()
+        );
+    }
+
+    #[test]
+    fn replay_preserves_source_sequence_and_identity() {
+        let cues = replay_trace("session-1", &steps()).unwrap();
+        assert_eq!(cues.len(), 2);
+        assert_eq!(cues[0].sequence, 0);
+        assert_eq!(cues[0].event_id, "event-0");
+        assert_eq!(cues[1].sequence, 1);
+        assert_eq!(cues[1].event_id, "event-1");
+    }
+
+    #[test]
+    fn replay_rejects_invalid_second_step_without_returning_partial_trace() {
+        let mut trace = steps();
+        trace[1].event.sequence = 3;
+        let error = replay_trace("session-1", &trace).unwrap_err();
+        assert_eq!(error.step_index, 1);
+        assert_eq!(error.cause, EventValidationError::SequenceGap);
+    }
+
+    #[test]
+    fn every_form_receives_the_same_canonical_semantics() {
+        let cue = CanonicalCue::from_event(&event(0, "event-0")).unwrap();
+        let projections = EmbodimentForm::ALL.map(|form| project_for_form(&cue, form));
+        for projection in &projections {
+            assert_eq!(projection.cue, cue);
+            assert_eq!(projection.cue.semantic.semantic_key(), "conversation.listening.active");
+        }
+        assert_eq!(
+            projections.iter().map(|p| p.form.id()).collect::<Vec<_>>(),
+            EmbodimentForm::ALL.map(EmbodimentForm::id).to_vec()
+        );
+    }
+
+    #[test]
+    fn accessible_description_does_not_claim_an_emotion() {
+        let cue = CanonicalCue::from_event(&event(0, "event-0")).unwrap();
+        assert_eq!(
+            cue.semantic.accessible_description(),
+            "Listening state reported active."
+        );
+    }
+}
