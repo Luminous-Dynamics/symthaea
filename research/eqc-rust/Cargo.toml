@@ -1,0 +1,15 @@
+[package]
+name = "eqc-reference"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Standalone reference-contract evaluator for the Evidence-Qualified Capability seed"
+
+[workspace]
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
