@@ -82,7 +82,7 @@ fn path_log_maximum(rng: &mut SplitMix64, horizon: u64) -> f64 {
     let log_up = 1.5f64.ln();
     let log_down = 0.5f64.ln();
     let mut log_wealth = 0.0;
-    let mut maximum = 0.0;
+    let mut maximum = 0.0f64;
 
     for _ in 0..horizon {
         log_wealth += if rng.fair_sign() > 0.0 {
@@ -117,6 +117,7 @@ fn run_replication(
         let log_maximum = path_log_maximum(&mut reference_rng, config.horizon);
         references.push(ReferencePathMaximum {
             trajectory_id: format!("null-{replication}-{index}"),
+            horizon: config.horizon,
             trace_sha256: digest_for(reference_key),
             log_max_e_value: log_maximum,
         });
