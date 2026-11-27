@@ -6,6 +6,7 @@
 
 use serde::Serialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 const SCHEMA_VERSION: &str = "sym-rsi-r4-ignition-preregistration-v0";
@@ -423,6 +424,88 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
     }
 }
 
+#[derive(Serialize)]
+struct CanonicalBudgetCapsV1<'a> {
+    model_inference_tokens: &'a str,
+    model_training_compute: &'a str,
+    accelerator_hours_by_type: &'a str,
+    cpu_hours: &'a str,
+    evaluator_calls: &'a str,
+    candidate_builds_and_executions: &'a str,
+    retries: &'a str,
+    wall_clock: &'a str,
+    peak_memory: &'a str,
+    energy: &'a str,
+    human_active_minutes: &'a str,
+    human_review_and_rework_minutes: &'a str,
+}
+
+#[derive(Serialize)]
+struct CanonicalBudgetEnvelopeV1<'a> {
+    domain: &'static str,
+    schema_version: u16,
+    accounting_boundary: &'a str,
+    total_budget: &'a str,
+    currency_and_price_basis: &'a str,
+    per_arm_caps: CanonicalBudgetCapsV1<'a>,
+    failure_accounting: &'a str,
+    same_envelope_for_all_arms: bool,
+    inclusive_cost_boundary: bool,
+    includes_failed_invalid_retries: bool,
+    includes_human_review_and_rework: bool,
+}
+
+fn required_nonempty_string_at<'a>(root: &'a Value, path: &[&str]) -> Result<&'a str, String> {
+    string_at(root, path)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| format!("{} must be a non-empty string", path.join(".")))
+}
+
+fn required_bool_at(root: &Value, path: &[&str]) -> Result<bool, String> {
+    bool_at(root, path).ok_or_else(|| format!("{} must be a boolean", path.join(".")))
+}
+
+/// Recompute the v1 inclusive budget envelope hash from every cost-bearing declaration.
+///
+/// The preimage uses a fixed field-order struct and a domain/schema tag so another
+/// implementation can reproduce the exact serde JSON bytes without relying on
+/// object-map iteration order. Arm bindings refer to this digest; they are not
+/// included in the preimage, avoiding a recursive hash.
+pub fn canonical_budget_envelope_sha256(root: &Value) -> Result<String, String> {
+    let budget = at(root, &["budget"])
+        .ok_or_else(|| "budget object is missing".to_owned())?;
+    let caps = CanonicalBudgetCapsV1 {
+        model_inference_tokens: required_nonempty_string_at(budget, &["per_arm_caps", "model_inference_tokens"] )?,
+        model_training_compute: required_nonempty_string_at(budget, &["per_arm_caps", "model_training_compute"] )?,
+        accelerator_hours_by_type: required_nonempty_string_at(budget, &["per_arm_caps", "accelerator_hours_by_type"] )?,
+        cpu_hours: required_nonempty_string_at(budget, &["per_arm_caps", "cpu_hours"] )?,
+        evaluator_calls: required_nonempty_string_at(budget, &["per_arm_caps", "evaluator_calls"] )?,
+        candidate_builds_and_executions: required_nonempty_string_at(budget, &["per_arm_caps", "candidate_builds_and_executions"] )?,
+        retries: required_nonempty_string_at(budget, &["per_arm_caps", "retries"] )?,
+        wall_clock: required_nonempty_string_at(budget, &["per_arm_caps", "wall_clock"] )?,
+        peak_memory: required_nonempty_string_at(budget, &["per_arm_caps", "peak_memory"] )?,
+        energy: required_nonempty_string_at(budget, &["per_arm_caps", "energy"] )?,
+        human_active_minutes: required_nonempty_string_at(budget, &["per_arm_caps", "human_active_minutes"] )?,
+        human_review_and_rework_minutes: required_nonempty_string_at(budget, &["per_arm_caps", "human_review_and_rework_minutes"] )?,
+    };
+    let canonical = CanonicalBudgetEnvelopeV1 {
+        domain: "symthaea.r4.inclusive-budget-envelope",
+        schema_version: 1,
+        accounting_boundary: required_nonempty_string_at(budget, &["accounting_boundary"] )?,
+        total_budget: required_nonempty_string_at(budget, &["total_budget"] )?,
+        currency_and_price_basis: required_nonempty_string_at(budget, &["currency_and_price_basis"] )?,
+        per_arm_caps: caps,
+        failure_accounting: required_nonempty_string_at(budget, &["failure_accounting"] )?,
+        same_envelope_for_all_arms: required_bool_at(budget, &["same_envelope_for_all_arms"] )?,
+        inclusive_cost_boundary: required_bool_at(budget, &["inclusive_cost_boundary"] )?,
+        includes_failed_invalid_retries: required_bool_at(budget, &["includes_failed_invalid_retries"] )?,
+        includes_human_review_and_rework: required_bool_at(budget, &["includes_human_review_and_rework"] )?,
+    };
+    let bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| format!("serialize canonical budget envelope: {error}"))?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
 fn check_budget(report: &mut ValidationReport, root: &Value) {
     require_sha256(report, root, &["budget", "shared_envelope_digest"]);
     for field in [
@@ -480,6 +563,15 @@ fn check_budget(report: &mut ValidationReport, root: &Value) {
             Some(value) if value.is_string() && non_empty(value.as_str()) => {}
             _ => report.issue("BUDGET_CAP_MISSING", key),
         }
+    }
+
+    match canonical_budget_envelope_sha256(root) {
+        Ok(computed) if shared == Some(computed.as_str()) => {}
+        Ok(_) => report.issue(
+            "BUDGET_ENVELOPE_DIGEST_MISMATCH",
+            "shared_envelope_digest must equal the domain-separated canonical hash of all cost-bearing fields",
+        ),
+        Err(detail) => report.issue("BUDGET_ENVELOPE_INVALID", detail),
     }
 }
 
@@ -881,11 +973,13 @@ mod tests {
             Value::Number(10_u64.into());
         value["rounds"]["planned_outer_loop_steps"] = Value::Number(4_u64.into());
 
-        let shared_budget = value["budget"]["shared_envelope_digest"].clone();
+        let shared_budget = canonical_budget_envelope_sha256(&value)
+            .expect("synthetic budget envelope serializes");
+        value["budget"]["shared_envelope_digest"] = Value::String(shared_budget.clone());
         value["budget"]["arm_budget_bindings"]["evolved_outer_loop"]["envelope_digest"] =
-            shared_budget.clone();
+            Value::String(shared_budget.clone());
         value["budget"]["arm_budget_bindings"]["reference_outer_loop"]["envelope_digest"] =
-            shared_budget;
+            Value::String(shared_budget);
 
         value
     }
@@ -1052,6 +1146,18 @@ mod tests {
             Value::String("f".repeat(64));
         let report = validate_preregistration(&value);
         assert!(report.issues.iter().any(|issue| issue.starts_with("UNEQUAL_ARM_BUDGET")));
+    }
+
+    #[test]
+    fn rejects_budget_cap_substitution_without_digest_update() {
+        let mut value = valid_specimen();
+        value["budget"]["per_arm_caps"]["evaluator_calls"] =
+            Value::String("999999".to_owned());
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("BUDGET_ENVELOPE_DIGEST_MISMATCH")));
     }
 
     #[test]
