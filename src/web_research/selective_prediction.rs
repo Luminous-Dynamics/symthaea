@@ -411,9 +411,11 @@ fn summarize(
             .collect(),
     });
 
-    // Build one point per distinct confidence. A tie group is admitted in full.
-    // AURC uses a right-step integral: each newly admitted coverage interval is
-    // charged the risk of the resulting accepted set.
+    // Build one point per distinct confidence. A tie group is admitted in full
+    // for operating points. For AURC, average the standard item-wise risk at
+    // every rank over all permutations within a tie group. This is deterministic,
+    // invariant to input order and reduces to standard empirical AURC when
+    // confidence values are unique.
     let mut index = 0;
     let mut cumulative_errors = 0;
     let mut area = 0.0_f64;
@@ -428,12 +430,22 @@ fn summarize(
             }
             end += 1;
         }
+        let group_size = end - index;
+        let previous_accepted = index;
+        let previous_errors = cumulative_errors;
+        // Expected cumulative errors after j members of a tied group under
+        // a uniformly random tie permutation is E_prev + j * group_errors/m.
+        // Summing expected risk at each rank gives the conventional 1/N sum.
+        for j in 1..=group_size {
+            let expected_errors = previous_errors as f64
+                + (j as f64 * group_errors as f64 / group_size as f64);
+            let accepted_at_rank = previous_accepted + j;
+            area += (expected_errors / accepted_at_rank as f64) / total as f64;
+        }
         cumulative_errors += group_errors;
         let accepted_count = end;
         let coverage = accepted_count as f64 / total as f64;
         let risk = cumulative_errors as f64 / accepted_count as f64;
-        let newly_added_coverage = (end - index) as f64 / total as f64;
-        area += newly_added_coverage * risk;
         report.curve.push(RiskCoveragePoint {
             confidence_cutoff: cutoff,
             accepted_count,
