@@ -414,6 +414,120 @@ mod tests {
     }
 
     #[test]
+    fn maps_all_event_kinds_to_stable_semantic_keys() {
+        use crate::embodiment_event::{
+            AttentionFocusPayload, BackchannelPayload, EvidenceStatusPayload,
+            ExpressionIntentPayload, ListeningPayload, SpeakingPayload,
+            TurnStatePayload, UncertaintyPayload, UserControlPayload,
+        };
+
+        let cases = vec![
+            (
+                EventKind::ConversationListening,
+                EventPayload::Listening(ListeningPayload { active: true }),
+                "conversation.listening.active",
+            ),
+            (
+                EventKind::ConversationSpeaking,
+                EventPayload::Speaking(SpeakingPayload {
+                    active: true,
+                    segment_id: "segment-1".to_owned(),
+                    text_ref: None,
+                }),
+                "conversation.speaking.active",
+            ),
+            (
+                EventKind::ConversationTurnState,
+                EventPayload::TurnState(TurnStatePayload {
+                    state: TurnState::Yield,
+                    target: None,
+                }),
+                "conversation.turn.yield",
+            ),
+            (
+                EventKind::ConversationBackchannel,
+                EventPayload::Backchannel(BackchannelPayload {
+                    signal: BackchannelSignal::VisualAck,
+                    intensity: 0.5,
+                }),
+                "conversation.backchannel",
+            ),
+            (
+                EventKind::AttentionFocus,
+                EventPayload::AttentionFocus(AttentionFocusPayload {
+                    target: "document-1".to_owned(),
+                    strength: Some(0.7),
+                }),
+                "attention.focus",
+            ),
+            (
+                EventKind::ExpressionIntent,
+                EventPayload::ExpressionIntent(ExpressionIntentPayload {
+                    intent: ExpressionIntentKind::Question,
+                    intensity: 0.4,
+                    channel: Some(ExpressionChannel::Gesture),
+                }),
+                "expression.intent",
+            ),
+            (
+                EventKind::CognitionUncertainty,
+                EventPayload::Uncertainty(UncertaintyPayload {
+                    subject: "hypothesis-1".to_owned(),
+                    level: 0.4,
+                    calibration_ref: None,
+                }),
+                "cognition.uncertainty",
+            ),
+            (
+                EventKind::EvidenceStatus,
+                EventPayload::EvidenceStatus(EvidenceStatusPayload {
+                    subject_id: "claim-1".to_owned(),
+                    status: EvidenceState::Unverified,
+                    verifier_receipt_ref: None,
+                }),
+                "evidence.status",
+            ),
+            (
+                EventKind::UserControl,
+                EventPayload::UserControl(UserControlPayload {
+                    action: UserControlAction::Pause,
+                    form_id: None,
+                    target_event_id: None,
+                    enabled: None,
+                    intensity: None,
+                }),
+                "user.control",
+            ),
+        ];
+
+        for (kind, payload, expected_key) in cases {
+            let mut source = event(0, "event-0");
+            source.event_kind = kind;
+            source.payload = payload;
+            let cue = CanonicalCue::from_event(&source).unwrap();
+            assert_eq!(cue.semantic.semantic_key(), expected_key);
+        }
+    }
+
+    #[test]
+    fn supported_evidence_accessibility_does_not_upgrade_status_to_verified() {
+        let mut source = event(0, "event-0");
+        source.event_kind = EventKind::EvidenceStatus;
+        source.payload = EventPayload::EvidenceStatus(
+            crate::embodiment_event::EvidenceStatusPayload {
+                subject_id: "claim-1".to_owned(),
+                status: EvidenceState::Supported,
+                verifier_receipt_ref: Some("receipt:verifier-1".to_owned()),
+            },
+        );
+        source.evidence_refs = vec!["sha256:abc123".to_owned()];
+        let cue = CanonicalCue::from_event(&source).unwrap();
+        let description = cue.accessible_description();
+        assert!(description.contains("Supported"));
+        assert!(!description.to_lowercase().contains("verified"));
+    }
+
+    #[test]
     fn restricted_cues_do_not_leak_subjects_through_accessible_text() {
         let mut restricted = event(0, "event-0");
         restricted.event_kind = EventKind::CognitionUncertainty;
