@@ -22,7 +22,7 @@ cargo test --locked --manifest-path tools/sym-rsi-epistemic-adjudication/Cargo.t
 cargo clippy --locked --manifest-path tools/sym-rsi-epistemic-adjudication/Cargo.toml --all-targets -- -D warnings
 ```
 
-This harness compiles the repository's production type and meta-learning source modules and now runs **19 tests** (five type tests, eleven learner/calibration tests, and three serialization-compatibility tests). It does not compile the entire web-research runtime or prove that external adjudication references are authentic. The caller remains responsible for ensuring any supplied `Some(bool)` is backed by an independent outcome rather than the verifier's own confidence.
+This harness compiles the repository's production type and meta-learning source modules and now runs **20 tests** (five type tests, twelve learner/calibration tests, and three serialization-compatibility tests). It does not compile the entire web-research runtime or prove that external adjudication references are authentic. The caller remains responsible for ensuring any supplied `Some(bool)` is backed by an independent outcome rather than the verifier's own confidence.
 
 ## Interpretation boundary
 
@@ -32,4 +32,4 @@ The current verifier remains a source-evidence heuristic. This change prevents i
 
 ## Calibration metrics
 
-Brier score is the mean squared error between predicted confidence and the independent binary correctness outcome. ECE uses ten fixed confidence bins and weights each bin's absolute confidence/accuracy gap by its sample proportion. Both metrics use only adjudicated observations; they are not computed from pending claims or the verifier's own confidence labels. A missing score is reported as `None`, not as an artificial zero or a neutral calibration claim.
+Brier score is the mean squared error between predicted confidence and the independent binary correctness outcome. ECE uses ten fixed confidence bins and weights each bin's absolute confidence/accuracy gap by its sample proportion. Both metrics use only adjudicated observations with finite probabilities in [0,1]; they are not computed from pending claims or the verifier's own confidence labels. The valid calibration sample count is reported alongside the scores, and both scores remain absent when that count is zero. A missing score is reported as `None`, not as an artificial zero or a neutral calibration claim.
