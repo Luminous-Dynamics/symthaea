@@ -124,6 +124,10 @@ struct Cost {
     returned_bytes: u64,
     latency_us: Option<u64>,
 }
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArmManifest { schema_version: String, expected_arm_ids: Vec<String> }
+
 #[derive(Clone, Debug, Serialize)]
 struct ScoreRow {
     episode_id: String,
@@ -382,10 +386,18 @@ fn aggregate(key: &str, rows: &[ScoreRow]) -> serde_json::Value {
         "mean_reported_latency_us": average(latencies.into_iter())
     })
 }
-fn score(candidate_path: &str, private_path: &str, response_path: &str, report_path: &str) -> Result<(), String> {
+fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path: &str, report_path: &str) -> Result<(), String> {
     let candidates: Vec<CandidateRow> = read_jsonl(candidate_path)?;
     let privates: Vec<PrivateRow> = read_jsonl(private_path)?;
     let responses: Vec<Response> = read_jsonl(response_path)?;
+    let arm_bytes = fs::read(arm_path).map_err(|e| format!("read arm manifest: {e}"))?;
+    let arm_manifest: ArmManifest = serde_json::from_slice(&arm_bytes).map_err(|e| format!("parse arm manifest: {e}"))?;
+    if arm_manifest.schema_version != "mace_dsm_arm_manifest_v0_1" || arm_manifest.expected_arm_ids.is_empty() ||
+        arm_manifest.expected_arm_ids.iter().any(|arm| arm.trim().is_empty()) {
+        return Err("invalid or empty arm manifest".into());
+    }
+    let expected_arms: BTreeSet<String> = arm_manifest.expected_arm_ids.iter().cloned().collect();
+    if expected_arms.len() != arm_manifest.expected_arm_ids.len() { return Err("duplicate arm in manifest".into()); }
     let mut cm = BTreeMap::new();
     let mut pm = BTreeMap::new();
     for c in &candidates {
@@ -397,20 +409,18 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, report_p
     if cm.len() != pm.len() || cm.keys().any(|id| !pm.contains_key(id)) {
         return Err("candidate/private episode inventories differ".into());
     }
-    let mut arms = BTreeSet::new();
     let mut pairs = BTreeMap::new();
     for r in &responses {
         if !cm.contains_key(r.episode_id.as_str()) { return Err(format!("unknown episode {}", r.episode_id)); }
-        arms.insert(r.arm_id.as_str());
+        if !expected_arms.contains(&r.arm_id) { return Err(format!("response contains undeclared arm {}", r.arm_id)); }
         if pairs.insert((r.episode_id.as_str(), r.arm_id.as_str()), r).is_some() {
             return Err(format!("duplicate response {}/{}", r.episode_id, r.arm_id));
         }
     }
-    if arms.is_empty() { return Err("no arms provided".into()); }
-    let needed = cm.len().checked_mul(arms.len()).ok_or("response matrix overflow")?;
+    let needed = cm.len().checked_mul(expected_arms.len()).ok_or("response matrix overflow")?;
     if pairs.len() != needed { return Err(format!("unbalanced response matrix: need {needed}, got {}", pairs.len())); }
-    for id in cm.keys() { for arm in &arms {
-        if !pairs.contains_key(&(*id, *arm)) { return Err(format!("missing response for {id}/{arm}")); }
+    for id in cm.keys() { for arm in &expected_arms {
+        if !pairs.contains_key(&(*id, arm.as_str())) { return Err(format!("missing response for {id}/{arm}")); }
     }}
     let mut scored = Vec::with_capacity(responses.len());
     for ((id, arm), r) in pairs {
@@ -432,7 +442,8 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, report_p
         "candidate_input_sha256": digest(&fs::read(candidate_path).map_err(|e|e.to_string())?),
         "evaluator_private_input_sha256": digest(&fs::read(private_path).map_err(|e|e.to_string())?),
         "response_input_sha256": digest(&fs::read(response_path).map_err(|e|e.to_string())?),
-        "episode_count": candidates.len(), "arm_ids": arms,
+        "episode_count": candidates.len(), "arm_ids": expected_arms,
+        "arm_manifest_sha256": digest(&arm_bytes),
         "paired_response_count": scored.len(),
         "per_arm": per_arm, "per_family_arm": per_family_arm, "per_episode": scored,
         "interpretation": {
@@ -514,8 +525,8 @@ fn run()->Result<(),String>{
         Some("generate") if a.len()==5 => generate(a[2].parse().map_err(|e|format!("seed: {e}"))?,
             a[3].parse().map_err(|e|format!("count: {e}"))?,&a[4]),
         Some("prepare") if a.len()==5 => prepare(&a[2],&a[3],&a[4]),
-        Some("score") if a.len()==6 => score(&a[2],&a[3],&a[4],&a[5]),
-        _ => Err("usage: generate <seed> <count> <episodes.jsonl> | prepare <episodes.jsonl> <candidate.jsonl> <private.jsonl> | score <candidate.jsonl> <private.jsonl> <responses.jsonl> <report.json>".into())
+        Some("score") if a.len()==7 => score(&a[2],&a[3],&a[4],&a[5],&a[6]),
+        _ => Err("usage: generate <seed> <count> <episodes.jsonl> | prepare <episodes.jsonl> <candidate.jsonl> <private.jsonl> | score <candidate.jsonl> <private.jsonl> <responses.jsonl> <arms.json> <report.json>".into())
     }
 }
 fn main(){if let Err(e)=run(){eprintln!("error: {e}");std::process::exit(2);}}
