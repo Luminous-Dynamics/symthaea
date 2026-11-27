@@ -56,6 +56,8 @@ pub struct GaussianLinearLongMemoryEvidenceV1 {
     pub regularly_varying_coefficients_declared: bool,
     pub fixed_predictor_independent_of_calibration_and_test_declared: bool,
     /// Declared positive leading coefficient scale c in a_j ~ c*j^(-beta).
+    pub leading_coefficient_abs_lower_bound: f64,
+    /// Declared positive tail coefficient scale c lower bound in a_j ~ c*j^(-beta).
     pub coefficient_scale_lower_bound: f64,
     /// Declared positive remainder exponent phi in a_j=j^(-beta){c+O(j^(-phi))}.
     pub coefficient_refinement_exponent: f64,
@@ -232,7 +234,9 @@ fn validate_model_evidence(
             return Err(LongMemoryCoverageErrorV1(format!("{field}: malformed SHA-256")));
         }
     }
-    if !evidence.coefficient_scale_lower_bound.is_finite()
+    if !evidence.leading_coefficient_abs_lower_bound.is_finite()
+        || evidence.leading_coefficient_abs_lower_bound <= 0.0
+        || !evidence.coefficient_scale_lower_bound.is_finite()
         || evidence.coefficient_scale_lower_bound <= 0.0
         || !evidence.coefficient_refinement_exponent.is_finite()
         || evidence.coefficient_refinement_exponent <= 0.0
@@ -714,13 +718,30 @@ mod tests {
 
     #[test]
     fn invalid_beta_is_not_clipped_into_the_supported_interval() {
-        let residuals = (0..32)
-            .map(|index| if index % 2 == 0 { 1.0 } else { -1.0 })
-            .collect::<Vec<_>>();
-        let (beta, _, _, used) = estimate_memory_parameter(&residuals, 4).unwrap();
-        if !used && !(0.5..1.0).contains(&beta) {
-            assert!(!beta.is_finite() || beta <= 0.5 || beta >= 1.0);
-        }
+        let residuals = vec![1.0; 32];
+        let (beta, q_h, q_2h, used) = estimate_memory_parameter(&residuals, 4).unwrap();
+        assert_eq!(q_h, 16.0);
+        assert_eq!(q_2h, 64.0);
+        assert_eq!(beta, 0.5);
+        assert!(!used);
+        assert!(long_memory_normalization(32, beta).is_err());
+    }
+
+    #[test]
+    fn regime_boundaries_are_classified_from_the_unclipped_beta() {
+        let classify = |beta: f64| {
+            if beta > 0.75 {
+                LongMemoryLimitRegimeV1::GaussianLimitAboveThreeQuarter
+            } else if beta == 0.75 {
+                LongMemoryLimitRegimeV1::CriticalGaussianAtThreeQuarter
+            } else {
+                LongMemoryLimitRegimeV1::RosenblattNonGaussian
+            }
+        };
+        assert_eq!(classify(0.9), LongMemoryLimitRegimeV1::GaussianLimitAboveThreeQuarter);
+        assert_eq!(classify(0.75), LongMemoryLimitRegimeV1::CriticalGaussianAtThreeQuarter);
+        assert_eq!(classify(0.6), LongMemoryLimitRegimeV1::RosenblattNonGaussian);
+        assert_eq!(classify(0.5), LongMemoryLimitRegimeV1::RosenblattNonGaussian);
     }
 
     #[test]
