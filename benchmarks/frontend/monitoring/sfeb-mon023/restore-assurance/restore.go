@@ -52,6 +52,7 @@ type Plan struct {
 	RequiredWALStart,RequiredWALStop uint64
 	RequireFullDatabaseStateFlag bool
 	SurfaceInventoryDigest string
+	SurfaceClaimScope string
 	RequiredDependencyIDs []string
 	ApplicationReleaseDigest,InvariantSuiteDigest string
 	MaxRPOUpperNanos,MaxDatabaseRTOUpperNanos,MaxServiceRTOUpperNanos int64
@@ -130,7 +131,7 @@ type Result struct {
 	ArtifactValidated,DatabaseRecovered,ServiceRecovered bool
 	RPOUpperNanos,DatabaseRTOUpperNanos,ServiceRTOUpperNanos int64
 	ExcludedSurfaces []string
-	UnreadyDependencies,FailedProbes []string
+	UnreadyDependencies,UnavailableDependencies,UnqualifiedProbes,FailedProbes []string
 	Checked []string
 }
 func present(xs ...string)bool{for _,x:=range xs{if strings.TrimSpace(x)==""{return false}};return true}
@@ -142,7 +143,7 @@ func Evaluate(req Request)Result{
 	p:=req.Plan
 	r:=Result{RequestedClaim:p.RequestedClaim,Checked:[]string{"recovery-plan","artifact-and-wal-lineage"}}
 	if p.RequestedClaim!=ArtifactValidated&&p.RequestedClaim!=DatabaseRecovered&&p.RequestedClaim!=ServiceRecovered{return done(Indeterminate,"unknown recovery claim level",r)}
-	if !present(p.ID,p.Version,p.Digest,p.SourceSystem,p.Database,p.SourceControlRoot,p.RestoreTargetSystem,p.RestoreControlRoot,p.RepositoryID,p.BackupMethodProfile,p.RequestedTarget.Mode,p.RequestedTarget.Value,p.RequestedTarget.LineageID,p.SurfaceInventoryDigest)||p.SourceSystem==p.RestoreTargetSystem||p.SourceControlRoot==p.RestoreControlRoot||p.MaxRPOUpperNanos<0||p.MaxDatabaseRTOUpperNanos<0||p.MaxServiceRTOUpperNanos<0||req.EvaluatedAt<=0{
+	if !present(p.ID,p.Version,p.Digest,p.SourceSystem,p.Database,p.SourceControlRoot,p.RestoreTargetSystem,p.RestoreControlRoot,p.RepositoryID,p.BackupMethodProfile,p.RequestedTarget.Mode,p.RequestedTarget.Value,p.RequestedTarget.LineageID,p.SurfaceInventoryDigest,p.SurfaceClaimScope)||p.SourceSystem==p.RestoreTargetSystem||p.SourceControlRoot==p.RestoreControlRoot||p.MaxRPOUpperNanos<0||p.MaxDatabaseRTOUpperNanos<0||p.MaxServiceRTOUpperNanos<0||req.EvaluatedAt<=0{
 		return done(Indeterminate,"recovery plan identity, scope or objectives incomplete",r)
 	}
 	a:=req.Artifact
@@ -166,6 +167,7 @@ func Evaluate(req Request)Result{
 	if x.RecoveryState!="ready"&&x.RecoveryState!="validation_only"{return done(Indeterminate,"database is not at a terminal recovered/validation-only state",r)}
 	if !validStamp(x.StartedAt)||!validStamp(x.DatabaseReadyAt)||!validStamp(p.IncidentAt)||!validTargetStamp(x.AchievedTarget) {return done(Indeterminate,"incident, recovery-point or database-ready clock evidence incomplete",r)}
 	if x.StartedAt.Domain!=p.IncidentAt.Domain||x.DatabaseReadyAt.Domain!=p.IncidentAt.Domain||x.AchievedTarget.TimestampDomain()!=p.IncidentAt.Domain{return done(Indeterminate,"incident/recovery/database-ready clocks are incomparable",r)}
+	if x.DatabaseReadyAt.UnixNanos<x.StartedAt.UnixNanos{return done(Divergent,"database-ready event precedes restore start",r)}
 	if !x.TargetReached||x.RequestedTarget!=p.RequestedTarget{return done(Denied,"restore did not reach the exact requested recovery target",r)}
 	if x.AchievedTarget.LineageID!=p.RequestedTarget.LineageID||x.AchievedTarget.TimelineID!=p.RequestedTarget.TimelineID||x.LineageID!=p.RequestedTarget.LineageID||x.TimelineID!=p.RequestedTarget.TimelineID||!x.TimelineHistoryVerified||!present(x.TimelineHistoryDigest){return done(Indeterminate,"achieved recovery point is not proven on the requested timeline/lineage",r)}
 	if p.RequestedTarget.LSN>0&&x.AchievedTarget.LSN<p.RequestedTarget.LSN{return done(Denied,"achieved recovery LSN is before requested target",r)}
@@ -175,7 +177,8 @@ func Evaluate(req Request)Result{
 	if r.RPOUpperNanos>p.MaxRPOUpperNanos||r.DatabaseRTOUpperNanos>p.MaxDatabaseRTOUpperNanos{return done(Denied,"RPO or database RTO exceeds recovery objective",r)}
 	s:=req.Surface
 	if !s.Verified||!present(s.InventoryDigest,s.Scope,s.EvidenceDigest)||s.InventoryDigest!=p.SurfaceInventoryDigest||s.RequiredTotal<=0||s.RequiredCovered!=s.RequiredTotal{return done(Indeterminate,"MON-022 surface inventory result missing, incomplete or stale",r)}
-	if p.RequireFullDatabaseStateFlag&&(!s.FullDatabaseState||len(s.Excluded)>0){return done(Denied,"full-state recovery plan has excluded/unqualified database surfaces",r)}
+	if s.Scope!=p.SurfaceClaimScope{return done(Indeterminate,"MON-022 claim scope does not match recovery plan",r)}
+	if p.RequireFullDatabaseStateFlag&&(!s.FullDatabaseState||s.Scope!="full_database_state"||len(s.Excluded)>0){return done(Denied,"full-state recovery plan has excluded/unqualified database surfaces",r)}
 	if !p.RequireFullDatabaseStateFlag&&s.Scope!="row_stream_continuity"&&s.Scope!="scoped_database_state"{return done(Indeterminate,"database recovery scope is unsupported or unnamed",r)}
 	if p.RequestedClaim==ServiceRecovered&&x.RecoveryState!="ready"{return done(Indeterminate,"validation-only paused restore cannot qualify service recovery",r)}
 	r.ExcludedSurfaces=append([]string(nil),s.Excluded...)
@@ -196,27 +199,29 @@ func Evaluate(req Request)Result{
 		d,ok:=deps[id]
 		if !ok{r.UnreadyDependencies=append(r.UnreadyDependencies,id);continue}
 		if !d.Required||!d.Verified||!present(d.VersionDigest,d.ControlRoot,d.EvidenceDigest)||!withinFreshness(d.ObservedAt,d.FreshUntil,req.EvaluatedAt){r.UnreadyDependencies=append(r.UnreadyDependencies,id);continue}
-		if !d.Ready{r.UnreadyDependencies=append(r.UnreadyDependencies,id)}
+		if !d.Ready{r.UnavailableDependencies=append(r.UnavailableDependencies,id)}
 	}
-	if len(r.UnreadyDependencies)>0{return done(Indeterminate,"one or more required dependencies are unavailable or unqualified",r)}
-	readSeen,writeSeen:=false,false
+	if len(r.UnavailableDependencies)>0{return done(Denied,"a verified required dependency is unavailable",r)}
+	if len(r.UnreadyDependencies)>0{return done(Indeterminate,"one or more required dependencies are missing, stale or unverified",r)}
+	readSeen,writeSeen,invariantSeen:=false,false,false
 	probeIDs:=map[string]bool{}
 	for _,probe:=range req.Probes{
+		if !present(probe.ID,probe.Kind){return done(Indeterminate,"application probe identity missing",r)}
 		if probeIDs[probe.ID]{return done(Divergent,"duplicate application probe ID: "+probe.ID,r)}
 		probeIDs[probe.ID]=true
-		if !present(probe.ID,probe.Kind){return done(Indeterminate,"application probe identity missing",r)}
 		if !probe.Required{continue}
-		if !probe.Verified||!present(probe.ApplicationReleaseDigest,probe.SuiteDigest,probe.EvidenceDigest)||probe.ApplicationReleaseDigest!=p.ApplicationReleaseDigest||probe.SuiteDigest!=p.InvariantSuiteDigest||!withinFreshness(probe.ObservedAt,probe.FreshUntil,req.EvaluatedAt){r.FailedProbes=append(r.FailedProbes,probe.ID);continue}
+		if !probe.Verified||!present(probe.ApplicationReleaseDigest,probe.SuiteDigest,probe.EvidenceDigest)||probe.ApplicationReleaseDigest!=p.ApplicationReleaseDigest||probe.SuiteDigest!=p.InvariantSuiteDigest||!withinFreshness(probe.ObservedAt,probe.FreshUntil,req.EvaluatedAt){r.UnqualifiedProbes=append(r.UnqualifiedProbes,probe.ID);continue}
 		if !probe.Passed{r.FailedProbes=append(r.FailedProbes,probe.ID);continue}
 		switch probe.Kind{
 		case "read":readSeen=true
 		case "write":if !probe.RollbackVerified{return done(Indeterminate,"safe write probe lacks rollback/containment evidence",r)}else{writeSeen=true}
-		case "invariant":
-		default:r.FailedProbes=append(r.FailedProbes,probe.ID)
+		case "invariant":invariantSeen=true
+		default:r.UnqualifiedProbes=append(r.UnqualifiedProbes,probe.ID)
 		}
 	}
-	if len(r.FailedProbes)>0{return done(Denied,"required application probe/invariant failed or is unqualified",r)}
-	if !readSeen||!writeSeen{return done(Indeterminate,"service recovery requires qualified read and safe write/readback probes",r)}
+	if len(r.FailedProbes)>0{return done(Denied,"a required application probe/invariant has failed",r)}
+	if len(r.UnqualifiedProbes)>0{return done(Indeterminate,"one or more required application probes are missing, stale or unverified",r)}
+	if !readSeen||!writeSeen||!invariantSeen{return done(Indeterminate,"service recovery requires qualified read, safe write/readback and invariant probes",r)}
 	ac:=req.Acceptance
 	if !ac.TrafficEnabled||!ac.OldPrimaryFenced||!ac.StaleEndpointsFenced{return done(Denied,"traffic is not safely enabled after old-primary and endpoint fencing",r)}
 	if !ac.ObserverVerified||!present(ac.ObserverID,ac.ObserverControlRoot,ac.ObserverIdentityDigest,ac.ObserverMembershipDigest,ac.EvidenceDigest)||ac.ObserverID==p.SourceSystem||ac.ObserverID==x.EnvironmentID||ac.ObserverControlRoot==p.SourceControlRoot||ac.ObserverControlRoot==x.ControlRoot{return done(Indeterminate,"independent service acceptance observer is not qualified",r)}
