@@ -19,3 +19,4 @@ symthaea-alife = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
 uuid = { workspace = true }
+sha2 = { workspace = true }
