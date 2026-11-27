@@ -51,7 +51,7 @@ pub struct PairedMusicalIdentityComparisonCaseV1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PairedInferenceStatusV1 {
-    ConfirmatoryEligible,
+    SourceWorkClusterFloorMet,
     InsufficientSourceWorkClusters,
 }
 
@@ -166,7 +166,7 @@ pub fn audit_paired_musical_identity_comparison(
 
     let observed = summarize_cluster_means(&clusters);
     let status = if cluster_count >= case.inference_policy.minimum_source_work_clusters {
-        PairedInferenceStatusV1::ConfirmatoryEligible
+        PairedInferenceStatusV1::SourceWorkClusterFloorMet
     } else {
         PairedInferenceStatusV1::InsufficientSourceWorkClusters
     };
@@ -532,7 +532,7 @@ mod tests {
     #[test]
     fn paired_cluster_bootstrap_reports_three_noncollapsed_metrics() {
         let report = audit_paired_musical_identity_comparison(&fixture()).unwrap();
-        assert_eq!(report.status, PairedInferenceStatusV1::ConfirmatoryEligible);
+        assert_eq!(report.status, PairedInferenceStatusV1::SourceWorkClusterFloorMet);
         assert_eq!(report.item_count, 30);
         assert_eq!(report.source_work_clusters, 30);
         assert!(report.performance_stay_false_difference.estimate.candidate_improvement > 0.0);
@@ -587,6 +587,65 @@ mod tests {
         input.candidate.triads[0].source_work_lineage_sha256 =
             "e".repeat(64);
         assert!(audit_paired_musical_identity_comparison(&input).is_err());
+    }
+
+    #[test]
+    fn adding_an_item_to_one_work_does_not_reweight_the_equal_work_estimand() {
+        let original_case = fixture();
+        let original = audit_paired_musical_identity_comparison(&original_case).unwrap();
+
+        let mut expanded = original_case;
+        let mut baseline_extra = expanded.baseline.triads[0].clone();
+        let mut candidate_extra = expanded.candidate.triads[0].clone();
+        baseline_extra.item_id = "additional-item-same-source-work".into();
+        candidate_extra.item_id = baseline_extra.item_id.clone();
+        baseline_extra.pair_id = "additional-pair-same-source-work".into();
+        candidate_extra.pair_id = baseline_extra.pair_id.clone();
+        baseline_extra.target_property_reference_sha256 = "1".repeat(64);
+        candidate_extra.target_property_reference_sha256 =
+            baseline_extra.target_property_reference_sha256.clone();
+        baseline_extra.pairing_manifest_sha256 = "2".repeat(64);
+        candidate_extra.pairing_manifest_sha256 =
+            baseline_extra.pairing_manifest_sha256.clone();
+        for (index, (left, right)) in [
+            (&mut baseline_extra.clean, &mut candidate_extra.clean),
+            (
+                &mut baseline_extra.performance_stay,
+                &mut candidate_extra.performance_stay,
+            ),
+            (
+                &mut baseline_extra.musical_flip,
+                &mut candidate_extra.musical_flip,
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let audio = format!("{:064x}", 0x9000_u64 + index as u64);
+            left.response.audio_sha256 = audio.clone();
+            right.response.audio_sha256 = audio;
+            left.response.variant_id.push_str("-additional");
+            right.response.variant_id = left.response.variant_id.clone();
+            left.take_identity_sha256 = format!("{:064x}", 0xa000_u64 + index as u64);
+            right.take_identity_sha256 = left.take_identity_sha256.clone();
+            left.performance_identity_sha256 = format!("{:064x}", 0xb000_u64 + index as u64);
+            right.performance_identity_sha256 = left.performance_identity_sha256.clone();
+        }
+        expanded.baseline.triads.push(baseline_extra);
+        expanded.candidate.triads.push(candidate_extra);
+
+        let report = audit_paired_musical_identity_comparison(&expanded).unwrap();
+        assert_eq!(report.item_count, 31);
+        assert_eq!(report.source_work_clusters, 30);
+        assert_eq!(
+            report.performance_stay_false_difference.estimate,
+            original.performance_stay_false_difference.estimate
+        );
+        assert_eq!(
+            report.musical_flip_miss.estimate,
+            original.musical_flip_miss.estimate
+        );
+        assert_eq!(report.joint_exact.estimate, original.joint_exact.estimate);
     }
 
     #[test]
