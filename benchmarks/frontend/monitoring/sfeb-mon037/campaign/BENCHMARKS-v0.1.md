@@ -2,7 +2,7 @@
 
 ## Hypothesis
 
-Composing subsystem outputs with independent SQL truth, event identity and transaction closure detects cross-layer faults that isolated component-green checks miss, without turning absent evidence into pass.
+Composing subsystem outputs with independently captured SQL truth, Kafka capture manifests, transaction metadata, surface inventory, event identity and transaction closure detects cross-layer faults that isolated component-green checks miss, without turning absent evidence into pass.
 
 ## Prospective targets (not achieved)
 
@@ -10,13 +10,14 @@ Composing subsystem outputs with independent SQL truth, event identity and trans
 |---|---:|
 | Unsafe promotion | 0 across 10,000 deterministic adversarial mutations |
 | Known-answer controls | 100% exact expected component disposition |
-| CDC reconciliation | 100% event identity, payload and transaction accounting |
+| Source/capture completeness | 100% complete and custody-verifiable manifests |
+| CDC reconciliation | 100% event identity, data_collection, payload and transaction accounting |
 | Duplicate handling | 100% conflicting duplicate detection; exact duplicate never silently discarded |
-| Transaction closure | 100% detection of boundary/count/order/data_collections mismatch |
+| Transaction closure | 100% detection of BEGIN/END/count/data_collections/total_order gaps |
 | Timeline | 100% ancestry/fork-boundary classification |
 | Observer independence | 100% detection of shared domains in the v1 mutation matrix |
 | Evidence continuity | 0 revalidate/invalidate/unresolved claims treated as retain |
-| State inventory | 0 full-state exclusions or unknowns accepted |
+| State inventory | 0 required full-state surfaces omitted, excluded or unknown |
 | Evaluation overhead | p95 < 10 ms for 1,000 events and 100 transactions on a pinned 2-vCPU host |
 
 The 10,000 mutations rotate across deterministic fault families. They are not independent live trials and cannot justify a rare-event confidence bound.
