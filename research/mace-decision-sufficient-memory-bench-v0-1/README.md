@@ -104,7 +104,7 @@ Each source event should retain, where available:
 - tenant, evaluation-run and purpose scope;
 - source revocation, deletion and retention state.
 
-The candidate must never receive the evaluator-private fields. The evaluator must not infer the correct answer from candidate output or trust a candidate's self-asserted evidence qualification.
+The candidate must never receive the evaluator-private fields. The evaluator must not infer the correct answer from candidate output or trust a candidate's self-asserted evidence qualification. The JSONL fixtures place both compartments in one record for review convenience; the harness must project only the candidate subtree into candidate-facing processes and files. Evaluator-private state must remain outside candidate prompts, request bodies, logs and readable artifacts, with explicit negative controls for leakage.
 
 The v0.1 seed fixtures and JSON Schema are deliberately synthetic. They illustrate the contract; they are not a validated benchmark set, representative production data, or leaderboard results.
 
