@@ -46,6 +46,7 @@ pub enum AdapterError {
     EventExpiryMismatch,
     GrantExpiryMismatch,
     EffectiveExpiryMismatch,
+    ReceiptPresentationMismatch,
     InvalidClockDomain,
     ClockRegression,
     ClockUnavailable,
@@ -107,6 +108,18 @@ impl AuthorizedSceneSubmission {
         }
         if frame.privacy_class() != permit.privacy_class() {
             return Err(AdapterError::PrivacyMismatch);
+        }
+        if authorization_receipt.event_sequence() != frame.sequence()
+            || authorization_receipt.event_kind() != frame.event_kind()
+            || authorization_receipt.form() != frame.form()
+            || authorization_receipt.channel() != permit.channel()
+            || authorization_receipt.destination() != permit.destination()
+            || authorization_receipt.motion_mode() != frame.motion_mode()
+            || authorization_receipt.privacy_class() != frame.privacy_class()
+            || (authorization_receipt.effective_intensity() - frame.effective_intensity()).abs() > f32::EPSILON
+            || authorization_receipt.semantic_key() != frame.semantic_key()
+        {
+            return Err(AdapterError::ReceiptPresentationMismatch);
         }
         if frame.event_expires_at_monotonic_ns() != permit.event_expires_at_monotonic_ns()
             || authorization_receipt.event_expires_at_monotonic_ns() != frame.event_expires_at_monotonic_ns()
