@@ -86,7 +86,7 @@
     "covariance_model_version": 2,
     "conditioning_state_id": "h1-g0-deviceA0-deviceB1",
     "conditioning_state_version": 8,
-    "common_cause_id": "reference-chain-9",
+    "common_cause_id": "shared-reference-bias-9",
     "common_cause_evidence_version": 5,
     "channels": [
       {
@@ -111,7 +111,9 @@
       }
     ],
     "measurement_action_id": "collocation-run-5",
-    "trust_boundary": "Caller-supplied identity propagation only; not authentication, digest verification, or evidence receipt."
+    "trust_boundary": "Caller-supplied identity propagation only; not authentication, digest verification, or evidence receipt.",
+    "reference_chain_id": "reference-ancestry-44",
+    "reference_chain_evidence_version": 3
   },
   "numerical_metadata": {
     "method": "conditional-bivariate-adaptive-simpson-v1",
