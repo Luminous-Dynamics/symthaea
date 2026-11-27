@@ -34,6 +34,7 @@ pub mod camera;
 pub mod checkpoint;
 pub mod encoder;
 pub mod manifold;
+pub mod observer;
 pub mod predictive;
 pub mod spectrum;
 pub mod training;
@@ -91,6 +92,7 @@ pub use manifold::{
     DelayedHorizonEvaluator, HorizonAccuracy, ObjectMemory, ObjectTrackingResult, SceneMemory,
     TrackedObject, VisionManifold, VisualSceneGraph, VisualWorkingMemory, WorkingMemorySlot,
 };
+pub use observer::ObserverOnlyVisionManifold;
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use spectrum::{
     BandProbeEvidence, BandProbeScore, MultiSpectralEncoder, MultiSpectralEncoderState,
