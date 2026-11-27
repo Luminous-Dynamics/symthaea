@@ -202,16 +202,17 @@ fn validate_probability(
 fn physical_joint_probability(
     probabilities: &ObservationStageProbabilitiesV1,
 ) -> Result<f64, QualifiedObservationRiskErrorV1> {
-    Ok(validate_probability(
-        probabilities.selection_probability,
-        "selection_probability",
-    )? * validate_probability(
-        probabilities.physical_delivery_probability_given_selection,
-        "physical_delivery_probability_given_selection",
-    )? * validate_probability(
-        probabilities.qualification_probability_given_delivery,
-        "qualification_probability_given_delivery",
-    )?)
+    Ok(
+        validate_probability(probabilities.selection_probability, "selection_probability")?
+            * validate_probability(
+                probabilities.physical_delivery_probability_given_selection,
+                "physical_delivery_probability_given_selection",
+            )?
+            * validate_probability(
+                probabilities.qualification_probability_given_delivery,
+                "qualification_probability_given_delivery",
+            )?,
+    )
 }
 
 fn online_joint_probability(
@@ -250,13 +251,21 @@ fn validate_unit(unit: &QualifiedObservationUnitV1) -> Result<(), QualifiedObser
             unit.round
         )));
     }
-    match (unit.selected_for_metrology, unit.physical_result_received, unit.qualification_status) {
+    match (
+        unit.selected_for_metrology,
+        unit.physical_result_received,
+        unit.qualification_status,
+    ) {
         (false, _, MetrologyQualificationStatusV1::NotSelected) => {}
         (true, false, MetrologyQualificationStatusV1::NotReceived) => {}
-        (true, true, MetrologyQualificationStatusV1::Qualified
+        (
+            true,
+            true,
+            MetrologyQualificationStatusV1::Qualified
             | MetrologyQualificationStatusV1::Unknown
             | MetrologyQualificationStatusV1::Blocked
-            | MetrologyQualificationStatusV1::Revoked) => {}
+            | MetrologyQualificationStatusV1::Revoked,
+        ) => {}
         _ => {
             return Err(QualifiedObservationRiskErrorV1(format!(
                 "round {} has an inconsistent selection/delivery/qualification state",
@@ -370,8 +379,7 @@ pub fn compute_qualified_observation_risk_v1(
         ));
     }
     require_text(&input.input_id, "input.input_id")?;
-    if input.population_round_count == 0
-        || input.units.len() as u64 != input.population_round_count
+    if input.population_round_count == 0 || input.units.len() as u64 != input.population_round_count
     {
         return Err(QualifiedObservationRiskErrorV1(
             "population count must equal the number of unique observation units".into(),
@@ -415,9 +423,8 @@ pub fn compute_qualified_observation_risk_v1(
 
         selected_count += usize::from(unit.selected_for_metrology);
         received_count += usize::from(unit.physical_result_received);
-        unavailable_count += usize::from(
-            unit.physical_result_received && !unit.available_by_update_frontier,
-        );
+        unavailable_count +=
+            usize::from(unit.physical_result_received && !unit.available_by_update_frontier);
         match unit.qualification_status {
             MetrologyQualificationStatusV1::Unknown => unknown_count += 1,
             MetrologyQualificationStatusV1::Blocked | MetrologyQualificationStatusV1::Revoked => {
@@ -435,7 +442,8 @@ pub fn compute_qualified_observation_risk_v1(
 
         let physical_required = [
             unit.probabilities.selection_probability,
-            unit.probabilities.physical_delivery_probability_given_selection,
+            unit.probabilities
+                .physical_delivery_probability_given_selection,
             unit.probabilities.qualification_probability_given_delivery,
         ];
         if physical_required.iter().any(Option::is_none) {
@@ -448,8 +456,10 @@ pub fn compute_qualified_observation_risk_v1(
         }
 
         let online_required = [
-            unit.probabilities.online_tracking_probability_given_selection,
-            unit.probabilities.frontier_availability_probability_given_qualified,
+            unit.probabilities
+                .online_tracking_probability_given_selection,
+            unit.probabilities
+                .frontier_availability_probability_given_qualified,
         ];
         if online_required.iter().any(Option::is_none) {
             online_probabilities_complete = false;
@@ -480,8 +490,8 @@ pub fn compute_qualified_observation_risk_v1(
         interval_width: upper_bound - lower_bound,
     };
 
-    let physical_assumptions_verified =
-        input.assumptions.conditional_probability_factorization == ObservationAssumptionStatusV1::Satisfied
+    let physical_assumptions_verified = input.assumptions.conditional_probability_factorization
+        == ObservationAssumptionStatusV1::Satisfied
         && input.assumptions.conditional_ignorability == ObservationAssumptionStatusV1::Satisfied
         && input.assumptions.positivity == ObservationAssumptionStatusV1::Satisfied
         && physical_probabilities_complete
@@ -491,8 +501,14 @@ pub fn compute_qualified_observation_risk_v1(
         && online_probabilities_complete
         && online_propensities_positive;
 
-    let (exact_population_risk, physical_observation_ipw, online_update_ipw, identification, mnar_warning, mut reason_codes) =
-        if observed_count == input.population_round_count {
+    let (
+        exact_population_risk,
+        physical_observation_ipw,
+        online_update_ipw,
+        identification,
+        mnar_warning,
+        mut reason_codes,
+    ) = if observed_count == input.population_round_count {
             (
                 Some(observed_loss_sum / population),
                 None,
@@ -502,11 +518,7 @@ pub fn compute_qualified_observation_risk_v1(
                 Vec::new(),
             )
         } else if physical_assumptions_verified {
-            let physical = horvitz_thompson(
-                &sorted_units,
-                input.population_round_count,
-                false,
-            )?;
+            let physical = horvitz_thompson(&sorted_units, input.population_round_count, false)?;
             let online = if online_count > 0 && online_assumptions_verified {
                 Some(horvitz_thompson(
                     &sorted_units,
@@ -533,7 +545,8 @@ pub fn compute_qualified_observation_risk_v1(
             if input.assumptions.conditional_probability_factorization
                 != ObservationAssumptionStatusV1::Satisfied
             {
-                reasons.push("conditional_probability_factorization_unverified_or_violated".to_string());
+                reasons
+                    .push("conditional_probability_factorization_unverified_or_violated".to_string());
             }
             if input.assumptions.conditional_ignorability
                 != ObservationAssumptionStatusV1::Satisfied
@@ -566,7 +579,8 @@ pub fn compute_qualified_observation_risk_v1(
 
     let selection_fraction = selected_count as f64 / population;
     let physical_delivery_fraction = received_count as f64 / population;
-    let not_selected_fraction = (input.population_round_count as usize - selected_count) as f64 / population;
+    let not_selected_fraction =
+        (input.population_round_count as usize - selected_count) as f64 / population;
     let not_received_fraction = (selected_count - received_count) as f64 / population;
 
     let mut report = QualifiedObservationRiskReportV1 {
@@ -659,7 +673,10 @@ mod tests {
         }
     }
 
-    fn input(units: Vec<QualifiedObservationUnitV1>, assumptions: ObservationProcessAssumptionsV1) -> ObservationRiskInputV1 {
+    fn input(
+        units: Vec<QualifiedObservationUnitV1>,
+        assumptions: ObservationProcessAssumptionsV1,
+    ) -> ObservationRiskInputV1 {
         ObservationRiskInputV1 {
             schema: QUALIFIED_OBSERVATION_RISK_SCHEMA_V1.into(),
             input_id: "observation-risk-input-1".into(),
@@ -689,8 +706,12 @@ mod tests {
             qualified_unit(2, 0.0, true),
             qualified_unit(3, 1.0, false),
         ];
-        let report = compute_qualified_observation_risk_v1(&input(units, assumptions(false))).unwrap();
-        assert_eq!(report.identification, PopulationRiskIdentificationV1::ExactAllUnitRisk);
+        let report =
+            compute_qualified_observation_risk_v1(&input(units, assumptions(false))).unwrap();
+        assert_eq!(
+            report.identification,
+            PopulationRiskIdentificationV1::ExactAllUnitRisk
+        );
         assert!((report.worst_case_bounds.lower_bound - 2.0 / 3.0).abs() < 1.0e-12);
         assert_eq!(report.worst_case_bounds.interval_width, 0.0);
         assert!((report.exact_population_risk.unwrap() - 2.0 / 3.0).abs() < 1.0e-12);
@@ -705,8 +726,12 @@ mod tests {
             missing_unit(2, MetrologyQualificationStatusV1::NotSelected, false, false),
             missing_unit(3, MetrologyQualificationStatusV1::NotSelected, false, false),
         ];
-        let report = compute_qualified_observation_risk_v1(&input(units, assumptions(false))).unwrap();
-        assert_eq!(report.identification, PopulationRiskIdentificationV1::WorstCaseBoundsOnly);
+        let report =
+            compute_qualified_observation_risk_v1(&input(units, assumptions(false))).unwrap();
+        assert_eq!(
+            report.identification,
+            PopulationRiskIdentificationV1::WorstCaseBoundsOnly
+        );
         assert!((report.worst_case_bounds.lower_bound - 1.0 / 3.0).abs() < 1.0e-12);
         assert_eq!(report.worst_case_bounds.upper_bound, 1.0);
         assert_eq!(report.worst_case_bounds.missing_or_unqualified_units, 2);
@@ -718,14 +743,18 @@ mod tests {
     fn known_mar_propensities_enable_physical_and_online_ipw() {
         let mut observed = qualified_unit(1, 1.0, true);
         observed.probabilities = probabilities(0.5, 1.0, 1.0, 0.5, 1.0);
-        let mut missing = missing_unit(2, MetrologyQualificationStatusV1::NotSelected, false, false);
+        let mut missing =
+            missing_unit(2, MetrologyQualificationStatusV1::NotSelected, false, false);
         missing.probabilities = probabilities(0.5, 1.0, 1.0, 0.5, 1.0);
         let report = compute_qualified_observation_risk_v1(&input(
             vec![observed, missing],
             assumptions(true),
         ))
         .unwrap();
-        assert_eq!(report.identification, PopulationRiskIdentificationV1::IpwIdentifiedUnderDeclaredAssumptions);
+        assert_eq!(
+            report.identification,
+            PopulationRiskIdentificationV1::IpwIdentifiedUnderDeclaredAssumptions
+        );
         assert!((report.physical_observation_ipw.unwrap().estimate - 1.0).abs() < 1.0e-12);
     }
 
@@ -733,11 +762,20 @@ mod tests {
     fn physical_ipw_does_not_require_online_tracking_propensity() {
         let mut observed = qualified_unit(1, 1.0, false);
         observed.available_by_update_frontier = false;
-        observed.probabilities.online_tracking_probability_given_selection = None;
-        observed.probabilities.frontier_availability_probability_given_qualified = None;
-        let mut missing = missing_unit(2, MetrologyQualificationStatusV1::NotSelected, false, false);
-        missing.probabilities.online_tracking_probability_given_selection = None;
-        missing.probabilities.frontier_availability_probability_given_qualified = None;
+        observed
+            .probabilities
+            .online_tracking_probability_given_selection = None;
+        observed
+            .probabilities
+            .frontier_availability_probability_given_qualified = None;
+        let mut missing =
+            missing_unit(2, MetrologyQualificationStatusV1::NotSelected, false, false);
+        missing
+            .probabilities
+            .online_tracking_probability_given_selection = None;
+        missing
+            .probabilities
+            .frontier_availability_probability_given_qualified = None;
 
         let report = compute_qualified_observation_risk_v1(&input(
             vec![observed, missing],
@@ -751,9 +789,11 @@ mod tests {
         );
         assert!(report.physical_observation_ipw.is_some());
         assert!(report.online_update_ipw.is_none());
-        assert!(report.reason_codes.contains(
-            &"online_stage_propensities_incomplete_or_invalid".to_string()
-        ));
+        assert!(
+            report
+                .reason_codes
+                .contains(&"online_stage_propensities_incomplete_or_invalid".to_string())
+        );
     }
 
     #[test]
@@ -768,19 +808,22 @@ mod tests {
         ))
         .unwrap();
         assert!(report.physical_observation_ipw.is_none());
-        assert_eq!(report.identification, PopulationRiskIdentificationV1::WorstCaseBoundsOnly);
-        assert!(report.reason_codes.contains(
-            &"conditional_ignorability_unverified_or_mnar_possible".to_string()
-        ));
+        assert_eq!(
+            report.identification,
+            PopulationRiskIdentificationV1::WorstCaseBoundsOnly
+        );
+        assert!(
+            report
+                .reason_codes
+                .contains(&"conditional_ignorability_unverified_or_mnar_possible".to_string())
+        );
     }
 
     #[test]
     fn measured_but_not_tracked_unit_still_contributes_to_offline_population_risk() {
-        let units = vec![
-            qualified_unit(1, 0.0, true),
-            qualified_unit(2, 1.0, false),
-        ];
-        let report = compute_qualified_observation_risk_v1(&input(units, assumptions(false))).unwrap();
+        let units = vec![qualified_unit(1, 0.0, true), qualified_unit(2, 1.0, false)];
+        let report =
+            compute_qualified_observation_risk_v1(&input(units, assumptions(false))).unwrap();
         assert_eq!(report.worst_case_bounds.observed_qualified_units, 2);
         assert!((report.worst_case_bounds.lower_bound - 0.5).abs() < 1.0e-12);
         assert_eq!(report.online_update_fraction, 0.5);
@@ -795,7 +838,8 @@ mod tests {
             missing_unit(3, MetrologyQualificationStatusV1::Blocked, true, true),
             missing_unit(4, MetrologyQualificationStatusV1::Revoked, true, true),
         ];
-        let report = compute_qualified_observation_risk_v1(&input(units, assumptions(false))).unwrap();
+        let report =
+            compute_qualified_observation_risk_v1(&input(units, assumptions(false))).unwrap();
         assert_eq!(report.unknown_fraction, 0.25);
         assert_eq!(report.blocked_or_revoked_fraction, 0.50);
         assert_eq!(report.worst_case_bounds.upper_bound, 0.75);
@@ -804,8 +848,11 @@ mod tests {
     #[test]
     fn zero_or_unknown_propensity_fails_closed_to_worst_case_bounds() {
         let mut observed = qualified_unit(1, 0.4, true);
-        observed.probabilities.qualification_probability_given_delivery = Some(0.0);
-        let mut missing = missing_unit(2, MetrologyQualificationStatusV1::NotSelected, false, false);
+        observed
+            .probabilities
+            .qualification_probability_given_delivery = Some(0.0);
+        let mut missing =
+            missing_unit(2, MetrologyQualificationStatusV1::NotSelected, false, false);
         missing.probabilities.selection_probability = None;
         let report = compute_qualified_observation_risk_v1(&input(
             vec![observed, missing],
@@ -820,27 +867,27 @@ mod tests {
     fn online_update_flag_requires_all_observation_stages() {
         let mut invalid = qualified_unit(1, 0.4, false);
         invalid.online_update_used = true;
-        assert!(compute_qualified_observation_risk_v1(&input(
-            vec![invalid],
-            assumptions(true)
-        ))
-        .is_err());
+        assert!(
+            compute_qualified_observation_risk_v1(&input(vec![invalid], assumptions(true)))
+                .is_err()
+        );
     }
 
     #[test]
     fn duplicate_units_and_out_of_range_losses_are_rejected() {
         let unit = qualified_unit(1, 0.4, true);
-        assert!(compute_qualified_observation_risk_v1(&input(
-            vec![unit.clone(), unit],
-            assumptions(true)
-        ))
-        .is_err());
+        assert!(
+            compute_qualified_observation_risk_v1(&input(
+                vec![unit.clone(), unit],
+                assumptions(true)
+            ))
+            .is_err()
+        );
         let invalid = qualified_unit(1, 1.2, true);
-        assert!(compute_qualified_observation_risk_v1(&input(
-            vec![invalid],
-            assumptions(true)
-        ))
-        .is_err());
+        assert!(
+            compute_qualified_observation_risk_v1(&input(vec![invalid], assumptions(true)))
+                .is_err()
+        );
     }
 
     #[test]
@@ -849,7 +896,8 @@ mod tests {
             missing_unit(1, MetrologyQualificationStatusV1::NotSelected, false, false),
             missing_unit(2, MetrologyQualificationStatusV1::Unknown, true, true),
         ];
-        let report = compute_qualified_observation_risk_v1(&input(units, assumptions(false))).unwrap();
+        let report =
+            compute_qualified_observation_risk_v1(&input(units, assumptions(false))).unwrap();
         assert_eq!(report.worst_case_bounds.lower_bound, 0.0);
         assert_eq!(report.worst_case_bounds.upper_bound, 1.0);
         assert_eq!(report.worst_case_bounds.interval_width, 1.0);
