@@ -747,9 +747,8 @@ fn compute_unitizing_profile(
         u_alpha_binary,
         observed_disagreement_cu_nominal: cu_nominal.as_ref().map(|value| value.observed),
         expected_disagreement_cu_nominal: cu_nominal.as_ref().map(|value| value.expected),
-        cu_alpha_nominal: cu_nominal.and_then(|value| {
-            alpha_from_disagreements(value.observed, value.expected)
-        }),
+        cu_alpha_nominal: cu_nominal
+            .and_then(|value| alpha_from_disagreements(value.observed, value.expected)),
         per_value,
     })
 }
