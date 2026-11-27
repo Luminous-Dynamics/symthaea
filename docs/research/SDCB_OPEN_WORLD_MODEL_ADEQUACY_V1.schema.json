@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/SDCB_OPEN_WORLD_MODEL_ADEQUACY_V1.schema.json",
+  "title": "SDCB open-world model adequacy fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation",
+    "models",
+    "robust_support_ids",
+    "minimum_acceptable_best_model_log_density"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sdcb_open_world_model_adequacy.v1"
+    },
+    "observation": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number"
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object"
+      }
+    },
+    "robust_support_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "minimum_acceptable_best_model_log_density": {
+      "type": "number"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
