@@ -2,8 +2,9 @@
 
 use symthaea_semiconductor::benchmark::{
     CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_INPUT_SCHEMA_V1,
-    CaoOcrcAdmissionV1, CaoOcrcEngineV1, CaoOcrcFeedbackInputV1,
-    CaoOcrcGuaranteeStatusV1, CaoOcrcPolicyV1, CaoOcrcPopulationScopeV1,
+    CaoOcrcAdmissionV1, CaoOcrcDelayAssumptionV1, CaoOcrcEngineV1,
+    CaoOcrcFeedbackInputV1, CaoOcrcGuaranteeStatusV1, CaoOcrcPolicyV1,
+    CaoOcrcPopulationScopeV1,
     CaoOcrcRoundInputV1, CaoOcrcTrivialSetV1, LabelConsumptionEligibilityReportV1,
     LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1, advance_ca_ocrc_round_v1,
     create_ca_ocrc_engine_v1,
@@ -24,6 +25,10 @@ fn policy(capacity: usize) -> CaoOcrcPolicyV1 {
         initial_threshold: 0.5,
         tracking_capacity: capacity,
         maximum_feedback_delay_rounds: 2,
+        maximum_proxy_delay_rounds: 2,
+        delay_assumption: CaoOcrcDelayAssumptionV1::ArbitraryBounded,
+        feedback_delay_survival: None,
+        feedback_delay_law_manifest_sha256: None,
         population_scope: CaoOcrcPopulationScopeV1::QualifiedMeasuredStreamOnly,
         proxy_survival: vec![1.0, 0.5, 0.25],
     }
@@ -205,11 +210,11 @@ fn two_feedback_arrivals_match_independent_proxy_and_ipw_oracle() {
     assert_eq!(r3.received_feedback_receipts[0].actual_delay_rounds, Some(2));
     assert_eq!(r3.received_feedback_receipts[1].actual_delay_rounds, Some(1));
     assert_eq!(
-        r3.received_feedback_receipts[0].inverse_proxy_survival_weight,
+        r3.received_feedback_receipts[0].inverse_probability_weight,
         Some(4.0)
     );
     assert_eq!(
-        r3.received_feedback_receipts[1].inverse_proxy_survival_weight,
+        r3.received_feedback_receipts[1].inverse_probability_weight,
         Some(2.0)
     );
 
