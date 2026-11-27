@@ -621,6 +621,20 @@ mod tests {
         assert_eq!(score.decision_value_vs_no_probe, None);
     }
 
+
+    #[test]
+    fn no_shared_invariant_safe_action_fails_closed() {
+        let c = contract(vec![]);
+        let worlds = vec![
+            world("w1", "f1", "c1", [("hold", 0, true), ("open", 1, false), ("close", 2, false)], &[]),
+            world("w2", "f2", "c2", [("hold", 0, false), ("open", 1, true), ("close", 2, false)], &[]),
+        ];
+        assert_eq!(
+            score_decision_value(&c, &worlds, &CandidateDecision::Unknown { fallback_action_id: "hold".into() }),
+            Err(DecisionError::NoCommonInvariantSafeAction)
+        );
+    }
+
     #[test]
     fn candidate_policy_is_observation_keyed_not_world_keyed() {
         let c = contract(vec![ProbeSpec { probe_id: "sensor".into(), cost_loss_units: 1 }]);
