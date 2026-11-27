@@ -1,8 +1,8 @@
 {
   "schema_version": "mace_dsm_pair_manifest_v0_1",
   "run_id": "mace-dsm-six-episode-fixture-v0-1",
-  "source_revision": "6bfb693dec6dd6d5694b3a90f07924d6d18b9a76",
-  "generator_sha256": "50a470f15b6393191661296a6becd8b0a079e93336f522b0de169fbe20753f8f",
+  "source_revision": "780c6d1ed1eedf9d694b88ffe13c0056d2f3adfa",
+  "generator_sha256": "7938cb0226a877133cec776052a3cf8106b4a6d056a97d41a0066e4e0579d3b8",
   "scenario_sha256": "9a5d74ac0822d213ca7dc98875bf508b23bbab89eda2fa16aec3a5ecfbef8cb2",
   "arm_manifest_sha256": "9f49875e7cf1a9c2ae280a07ed4e0f7a2b8eeaf8fd797f127e0d932cc1713ec8",
   "episodes": [
