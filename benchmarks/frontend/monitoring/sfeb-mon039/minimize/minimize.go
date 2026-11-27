@@ -99,6 +99,7 @@ func validID(s string)bool{return s!=""&&len(s)<=256&&!strings.ContainsAny(s,"
 ")}
 func validDigest(s string)bool{if len(s)!=64{return false};_,e:=hex.DecodeString(s);return e==nil&&s==strings.ToLower(s)}
 func validVerdict(v Verdict)bool{return v==Qualified||v==Blocked||v==Indeterminate}
+func validRevision(s string)bool{if len(s)!=40&&len(s)!=64{return false};_,err:=hex.DecodeString(s);return err==nil}
 func digestJSON(v any)string{b,e:=json.Marshal(v);if e!=nil{return ""};d:=sha256.Sum256(b);return hex.EncodeToString(d[:])}
 func canonicalFaults(ids []string)([]string,bool){
 	out:=append([]string(nil),ids...)
@@ -121,7 +122,7 @@ func validateInput(in Input,f *flags)map[string]Observation{
 	if in.EvaluatedAt.IsZero(){f.hold("evaluation_time_missing")}
 	if !validDigest(in.ScenarioSHA256){f.block("scenario_digest_invalid")}
 	if !validDigest(in.RecoveryBoundarySHA256){f.block("recovery_boundary_digest_invalid")}
-	if !validID(in.CodeRevision){f.block("code_revision_missing")}
+	if !validRevision(in.CodeRevision){f.block("code_revision_invalid")}
 	initial,ok:=canonicalFaults(in.InitialFaultIDs)
 	if !ok{f.block("initial_fault_ids_invalid_or_duplicated")}
 	if len(initial)>MaxFaults{f.block("fault_limit_exceeded")}
@@ -196,6 +197,7 @@ func Minimize(in Input)Result{
 	}
 	out.FullFaultSetVerdict=full.Verdict
 	out.TargetFailureSignatureSHA256=full.FailureSignatureSHA256
+	if len(out.Steps)>0{out.Steps[0].TargetFailurePreserved=true}
 	if full.Verdict==Qualified{
 		f.hold("initial_fault_set_did_not_reproduce_failure")
 		out.MinimizationKind="not_applicable"
@@ -227,7 +229,7 @@ func Minimize(in Input)Result{
 					return true
 				}
 				return false
-			},&incomplete)
+			})
 			if found{break}
 			if f.blocked||evaluations>=MaxEvaluations{break}
 		}
@@ -269,7 +271,7 @@ func Minimize(in Input)Result{
 	return out
 }
 
-func combinations(ids []string,size int,visit func([]string)bool,incomplete *bool){
+func combinations(ids []string,size int,visit func([]string)bool){
 	chosen:=make([]string,0,size)
 	var walk func(start int)bool
 	walk=func(start int)bool{
@@ -283,7 +285,6 @@ func combinations(ids []string,size int,visit func([]string)bool,incomplete *boo
 		return false
 	}
 	_ = walk(0)
-	_ = incomplete
 }
 
 func FormatEvaluationError(err error)string{return fmt.Sprint(err)}
