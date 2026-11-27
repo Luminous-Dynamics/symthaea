@@ -491,7 +491,9 @@ fn classify(
     let mut contradicting = Vec::new();
     let mut reasons = Vec::new();
 
-    let (state, recommendation) = if residual_alert && reference_alert {
+    let (state, recommendation) = if (residual_alert && reference_alert)
+        || (reference_alert && sensor_alert)
+    {
         supporting.extend([
             ShiftSignalChannelV1::VmResidual,
             ShiftSignalChannelV1::ReferenceStandardResidual,
@@ -544,6 +546,16 @@ fn classify(
         )
     } else if residual.is_some_and(|entry| entry.observations == 0) {
         reasons.push(ShiftReasonCodeV1::MissingDetectorChannel);
+        (
+            ShiftDiagnosticStateV1::InsufficientEvidence,
+            ShiftAdaptationRecommendationV1::Hold,
+        )
+    } else if residual.is_none()
+        || !residual.is_some_and(|entry| entry.stable_reference_window)
+        || !reference_stable
+        || !sensor_stable
+    {
+        reasons.push(ShiftReasonCodeV1::InsufficientIndependentEvidence);
         (
             ShiftDiagnosticStateV1::InsufficientEvidence,
             ShiftAdaptationRecommendationV1::Hold,
@@ -624,17 +636,13 @@ pub fn observe_evidence_shift_v1(
 
     let mut qualified_label_ids = Vec::new();
     if early_reasons.is_empty() {
-        if let Some(marker) = observation.process_event_marker.as_ref() {
-            if marker.event_id.trim().is_empty()
+        if let Some(marker) = observation.process_event_marker.as_ref()
+            && (marker.event_id.trim().is_empty()
                 || marker.event_kind.trim().is_empty()
                 || !valid_sha256(&marker.source_evidence_sha256)
-            {
-                early_reasons.push(ShiftReasonCodeV1::ProcessEventEvidenceMissing);
-            } else {
-                engine
-                    .process_markers
-                    .insert(observation.scope_id.clone(), marker.clone());
-            }
+                || marker.event_time_unix_seconds > observation.event_time_unix_seconds)
+        {
+            early_reasons.push(ShiftReasonCodeV1::ProcessEventEvidenceMissing);
         }
     }
 
@@ -679,6 +687,19 @@ pub fn observe_evidence_shift_v1(
                     engine.channel_states.insert(key, state);
                 }
             }
+        }
+    }
+
+    if early_reasons.is_empty()
+        && let Some(marker) = observation.process_event_marker.as_ref()
+    {
+        let current = engine.process_markers.get(&observation.scope_id);
+        if current.is_none_or(|existing| {
+            marker.event_time_unix_seconds >= existing.event_time_unix_seconds
+        }) {
+            engine
+                .process_markers
+                .insert(observation.scope_id.clone(), marker.clone());
         }
     }
 
@@ -750,7 +771,7 @@ pub fn observe_evidence_shift_v1(
         previous_assessment_sha256: engine
             .assessments_by_observation
             .values()
-            .last()
+            .max_by_key(|value| value.stream_sequence)
             .map(|value| value.assessment_sha256.clone()),
         assessment_sha256: String::new(),
         diagnostic_is_hypothesis_not_root_cause_proof: true,
@@ -937,6 +958,32 @@ mod tests {
         assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
         assert!(assessment.reason_codes.contains(&ShiftReasonCodeV1::LabelNotEligible));
         assert!(!engine.channel_states.contains_key(&("tool-a/ch-1".into(), ShiftSignalChannelV1::VmResidual)));
+    }
+
+    #[test]
+    fn missing_independent_channels_cannot_be_reported_nominal() {
+        let mut engine = engine();
+        let observation = vm_residual_observation(1, "vm-1", "tool-a/ch-1", 10, 0.0, "label-1");
+        let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
+        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert_eq!(assessment.recommendation, ShiftAdaptationRecommendationV1::Hold);
+    }
+
+    #[test]
+    fn invalid_channel_observation_does_not_commit_attached_process_marker() {
+        let mut engine = engine();
+        let mut observation = reference_observation(1, "ref-invalid", "tool-a/ch-1", 10, 2.0);
+        observation.reference_evidence_qualified = false;
+        observation.process_event_marker = Some(ProcessEventMarkerV1 {
+            event_id: "maintenance-1".into(),
+            event_kind: "maintenance".into(),
+            event_time_unix_seconds: 9,
+            source_evidence_sha256: digest('e'),
+        });
+        let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
+        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert!(!engine.process_markers.contains_key("tool-a/ch-1"));
+        assert!(engine.channel_states.is_empty());
     }
 
     #[test]
