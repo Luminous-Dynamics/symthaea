@@ -17,6 +17,7 @@ const (
 	Profile = "mon040-replay-reproducibility-input-v1"
 	Version = "1.0.0"
 	MaxRuns = 200
+	MaxFaults = 256
 )
 
 type Verdict string
@@ -156,7 +157,7 @@ func Evaluate(in Input)Result{
 	if in.EvaluatedAt.IsZero(){f.hold("evaluation_time_missing")}
 	if !validDigest(in.ScenarioSHA256)||!validDigest(in.RecoveryBoundarySHA256){f.block("scenario_or_boundary_digest_invalid")}
 	if !validRevision(in.CodeRevision){f.block("code_revision_invalid")}
-	if in.FaultIDs==nil||len(in.FaultIDs)==0{f.block("fault_ids_missing")}else{ids:=append([]string{},in.FaultIDs...);for _,id:=range ids{if !validID(id){f.block("fault_id_invalid")}};sort.Strings(ids);for i:=1;i<len(ids);i++{if ids[i]==ids[i-1]{f.block("fault_ids_duplicated")}};if digestJSON(ids)!=in.FaultSetSHA256{f.block("fault_set_digest_mismatch")}}
+	if in.FaultIDs==nil||len(in.FaultIDs)==0{f.block("fault_ids_missing")}else if len(in.FaultIDs)>MaxFaults{f.block("fault_id_limit_exceeded")}else{ids:=append([]string{},in.FaultIDs...);for _,id:=range ids{if !validID(id){f.block("fault_id_invalid")}};sort.Strings(ids);for i:=1;i<len(ids);i++{if ids[i]==ids[i-1]{f.block("fault_ids_duplicated")}};if digestJSON(ids)!=in.FaultSetSHA256{f.block("fault_set_digest_mismatch")}}
 	if !validDigest(in.FaultSetSHA256){f.block("fault_set_digest_invalid")}
 	if !validDigest(in.TargetFailureSignatureSHA256){f.block("target_failure_signature_invalid")}
 	if in.RequiredRuns<1||in.RequiredRuns>MaxRuns{f.block("required_run_count_out_of_range")}
