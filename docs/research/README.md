@@ -44,11 +44,14 @@ event contract.
 - [Presentation grant fixtures](SYMTHAEA_PRESENTATION_CONSENT_GRANT_FIXTURES_V1_2026-11-27.json)
 - [Competitive baselines and differentiation](SYMTHAEA_EMBODIMENT_COMPETITIVE_BASELINES_V0_1_2026-11-27.md)
 - [Turn-control benchmark protocol](SYMTHAEA_TURN_CONTROL_BENCHMARK_V0_1_2026-11-27.md)
+- [Causal turn decision gate](SYMTHAEA_CAUSAL_TURN_GATE_V0_1_2026-11-27.md)
+- [Turn candidate schema](SYMTHAEA_TURN_CANDIDATE_SCHEMA_V1_2026-11-27.json)
+- [Turn candidate fixtures](SYMTHAEA_TURN_CANDIDATE_FIXTURES_V1_2026-11-27.json)
 - [Event schema](SYMTHAEA_EMBODIMENT_EVENT_SCHEMA_V1_2026-11-27.json)
 - [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
 - [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
 
-The renderer-independent event, projection, policy, receipt and scene modules live under
+The renderer-independent event, projection, policy, receipt, scene and turn-control modules live under
 `crates/domains/symthaea-soma/src/`. A standalone Bevy 0.20.1 adapter has source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
 All current regression tests are authored but unexecuted, and no VideoFDB evaluation result is claimed.
