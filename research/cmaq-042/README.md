@@ -35,7 +35,7 @@ The reference bank binds:
 - alpha numerator/denominator;
 - exact monitor-build, score-definition and rank-reference digests;
 - null-simulator digest;
-- each reference path's unique trajectory ID, unique trace SHA-256 and log maximum. Duplicate IDs and duplicate trace digests are rejected; the deployed test path cannot reuse either a reference ID or trace digest.
+- each reference path's unique trajectory ID, its explicit horizon T, unique trace SHA-256 and log maximum. A path with a mismatched horizon is rejected. Duplicate IDs and duplicate trace digests are rejected; the deployed test path cannot reuse either a reference ID or trace digest.
 
 The deployed path must match the frozen horizon, calibration size, monitor build, score definition and rank reference; it must have its own trajectory ID and trace digest. It cannot be one of the reference trajectories. The gate object is one-shot in memory and rejects a second test path. A cross-process consumption ledger still has to be enforced by the external evidence authority.
 
@@ -52,7 +52,7 @@ This is a secondary decision layer. It does not change CMAQ-040's evidence path,
 
 ## Tests
 
-The 16 deterministic Rust tests cover exact order-rank arithmetic, alpha=0.05 bank sizes 18 and 19, strict ties, strict exceedance, disabled thresholds, horizon/calibration/build/score/reference mismatch, duplicate IDs and trace digests, malformed digests, non-finite/negative log maxima, test/reference overlap, one-shot consumption, and exhaustive exchangeable rank-position checks showing the exact finite-sample rejection fraction is no greater than alpha.
+The 17 deterministic Rust tests cover exact order-rank arithmetic, alpha=0.05 bank sizes 18 and 19, strict ties, strict exceedance, disabled thresholds, horizon/calibration/build/score/reference mismatch, duplicate IDs and trace digests, malformed digests, non-finite/negative log maxima, test/reference overlap, one-shot consumption, and exhaustive exchangeable rank-position checks showing the exact finite-sample rejection fraction is no greater than alpha.
 
 Run:
 
