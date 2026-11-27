@@ -1,0 +1,68 @@
+name: SDCB Block-Conformal Dependence Stress
+
+on:
+  push:
+    branches:
+      - research/sdcb-block-conformal-dependence-stress-2026-11-27
+    paths:
+      - "scripts/research/sdcb_block_conformal_dependence_stress.rs"
+      - ".github/workflows/sdcb-block-dependence-stress.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/research/sdcb_block_conformal_dependence_stress.rs"
+      - ".github/workflows/sdcb-block-dependence-stress.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependence-stress:
+    name: Rust 1.96 AR(1) block-exchangeability stress
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Generate rustfmt preview
+        run: rustfmt --edition 2024 scripts/research/sdcb_block_conformal_dependence_stress.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-block-dependence-rustfmt-preview
+          path: scripts/research/sdcb_block_conformal_dependence_stress.rs
+      - name: Restore exact committed source
+        run: git checkout -- scripts/research/sdcb_block_conformal_dependence_stress.rs
+      - name: Check formatting on exact committed source
+        run: rustfmt --edition 2024 --check scripts/research/sdcb_block_conformal_dependence_stress.rs
+      - name: Compile and run exact-source unit controls
+        run: |
+          rustc --edition=2024 --test scripts/research/sdcb_block_conformal_dependence_stress.rs -o /tmp/sdcb-block-dependence-tests
+          /tmp/sdcb-block-dependence-tests
+      - name: Run full deterministic dependence stress grid
+        run: |
+          rustc --edition=2024 scripts/research/sdcb_block_conformal_dependence_stress.rs -o /tmp/sdcb-block-dependence-stress
+          mkdir -p "$RUNNER_TEMP/sdcb-block-dependence"
+          /tmp/sdcb-block-dependence-stress > "$RUNNER_TEMP/sdcb-block-dependence/coverage.csv"
+          {
+            echo "source_commit=$(git rev-parse HEAD)"
+            rustc --version
+            echo "experiment=AR(1) stationary Gaussian; rho={0,0.5,0.8,0.9,0.95,0.99}; calibration_blocks=39; alpha=0.10; trials=5000 per grid point"
+            echo "grid=block_len:{1,8,32}; design:independent_blocks,one_serial_path; embargo_gap:{0,16,64} for serial path; 72 total conditions"
+          } > "$RUNNER_TEMP/sdcb-block-dependence/manifest.txt"
+      - name: Upload reproducible coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-block-conformal-dependence-report
+          path: ${{ runner.temp }}/sdcb-block-dependence/
+          if-no-files-found: error
+          retention-days: 30
