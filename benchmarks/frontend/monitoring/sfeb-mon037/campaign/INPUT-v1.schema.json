@@ -31,7 +31,13 @@
     "transaction_report_complete",
     "transaction_report_sha256",
     "surface_inventory_complete",
-    "surface_inventory_sha256"
+    "surface_inventory_sha256",
+    "source_events_sha256",
+    "observed_events_sha256",
+    "transaction_proofs_sha256",
+    "topic_partitions_sha256",
+    "required_surface_ids_sha256",
+    "surface_assertions_sha256"
   ],
   "properties": {
     "profile": {
@@ -270,6 +276,24 @@
       "type": "boolean"
     },
     "surface_inventory_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "source_events_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "observed_events_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "transaction_proofs_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "topic_partitions_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "required_surface_ids_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "surface_assertions_sha256": {
       "$ref": "#/$defs/digest"
     }
   },
