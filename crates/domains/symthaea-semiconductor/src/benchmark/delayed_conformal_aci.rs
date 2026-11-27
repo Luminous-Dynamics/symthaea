@@ -1245,6 +1245,7 @@ mod tests {
         let mut engine = engine();
         engine.current_alpha = 0.99;
         engine.policy.learning_rate = 1.0;
+        engine.policy_sha256 = policy_digest(&engine.policy).unwrap();
         let input = prediction("s1", "e1", 100, 102, 0.99);
         register_delayed_aci_prediction_v1(&mut engine, &input).unwrap();
         let d = delivery("s1", "e1", "l1", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy, LabelEvidenceFrontierV1::CurrentAtK1, 10.5, 110, 111, 112);
