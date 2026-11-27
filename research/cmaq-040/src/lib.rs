@@ -328,11 +328,7 @@ impl RestartedRankSpectrumMonitor {
         // Commit only after the whole update is known to be valid.
         self.rank_counts[rank_index] = next_rank_count;
         self.observations_seen = next_seen;
-        for (component, next_active) in self
-            .components
-            .iter_mut()
-            .zip(next_active_wealths)
-        {
+        for (component, next_active) in self.components.iter_mut().zip(next_active_wealths) {
             component.log_active_wealth = next_active;
         }
 
