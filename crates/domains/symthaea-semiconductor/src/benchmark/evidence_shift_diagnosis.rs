@@ -152,8 +152,8 @@ pub struct EvidenceShiftObservationV1 {
     pub clock_domain_id: String,
     pub nominal_baseline_manifest_sha256: String,
     pub channel: ShiftSignalChannelV1,
-    /// For reference-standard and sensor channels; VM residual is computed
-    /// from the qualified K1 corrected value minus prediction_value.
+    /// For reference-standard and sensor channels. VM residuals use the
+    /// verified immutable streaming prediction receipt plus a K1 label report.
     pub observation_value: Option<f64>,
     pub prediction_receipt: Option<StreamingPredictionReceiptV1>,
     pub label_report: Option<LabelConsumptionEligibilityReportV1>,
@@ -1070,6 +1070,81 @@ mod tests {
         observation.observation_value = Some(score);
         observation.sensor_projection_sha256 = Some(digest('d'));
         observation
+    }
+
+    #[test]
+    fn verified_prediction_receipt_is_required_for_vm_residual() {
+        let mut engine = engine();
+        let mut observation =
+            vm_residual_observation(1, "vm-1", "tool-a/ch-1", 10, 5.0, "label-1");
+        observation.prediction_receipt.as_mut().unwrap().prediction_value = 123.0;
+        let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
+        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert!(
+            assessment
+                .reason_codes
+                .contains(&ShiftReasonCodeV1::PredictionReceiptDigestMismatch)
+        );
+        assert!(engine.channel_states.is_empty());
+    }
+
+    #[test]
+    fn measurement_event_identity_must_match_prediction_and_label_receipts() {
+        let mut engine = engine();
+        let mut observation =
+            vm_residual_observation(1, "vm-1", "tool-a/ch-1", 10, 5.0, "label-1");
+        observation.measurement_event_id = Some("different-event".into());
+        let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
+        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert!(
+            assessment
+                .reason_codes
+                .contains(&ShiftReasonCodeV1::MeasurementEventMismatch)
+        );
+        assert!(engine.channel_states.is_empty());
+    }
+
+    #[test]
+    fn fully_observed_stable_channels_can_support_nominal_state() {
+        let mut engine = engine();
+        let mut sequence = 1;
+        for index in 0..3 {
+            let reference = reference_observation(
+                sequence,
+                &format!("ref-{index}"),
+                "tool-a/ch-1",
+                10,
+                0.0,
+            );
+            observe_evidence_shift_v1(&mut engine, &reference).unwrap();
+            sequence += 1;
+            let sensor = sensor_observation(
+                sequence,
+                &format!("sensor-{index}"),
+                "tool-a/ch-1",
+                10,
+                0.0,
+            );
+            observe_evidence_shift_v1(&mut engine, &sensor).unwrap();
+            sequence += 1;
+            let vm = vm_residual_observation(
+                sequence,
+                &format!("vm-{index}"),
+                "tool-a/ch-1",
+                10,
+                0.0,
+                &format!("label-{index}"),
+            );
+            let assessment = observe_evidence_shift_v1(&mut engine, &vm).unwrap();
+            sequence += 1;
+            if index == 2 {
+                assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::Nominal);
+                assert_eq!(
+                    assessment.recommendation,
+                    ShiftAdaptationRecommendationV1::Continue
+                );
+            }
+        }
     }
 
     #[test]
