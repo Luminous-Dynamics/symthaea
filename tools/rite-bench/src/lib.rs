@@ -369,7 +369,7 @@ fn support_origin_count(record: &TaskRecord) -> usize {
     let mut origins = HashSet::new();
     for citation in &record.citations {
         if citation.eligible_for_claim && citation.supports_expected_decision {
-            origins.insert(citation.origin_id.as_str());
+            origins.insert(citation.origin_id.trim());
         }
     }
     origins.len()
@@ -736,6 +736,28 @@ mod tests {
         ];
         let result = evaluate(&[record]).unwrap();
         assert_eq!(result.citation_precision.value(), Some(2.0 / 3.0));
+        assert_eq!(result.independent_support_adequacy.value(), Some(0.0));
+    }
+
+    #[test]
+    fn trims_origin_identity_before_deduplicating_mirrored_sources() {
+        let mut record = task("trimmed-origins", Decision::Supported, Decision::Supported);
+        record.minimum_independent_decision_origins = 2;
+        record.citations = vec![
+            CitationRecord {
+                source_id: "source-a".to_string(),
+                origin_id: " origin-a ".to_string(),
+                eligible_for_claim: true,
+                supports_expected_decision: true,
+            },
+            CitationRecord {
+                source_id: "source-b".to_string(),
+                origin_id: "origin-a".to_string(),
+                eligible_for_claim: true,
+                supports_expected_decision: true,
+            },
+        ];
+        let result = evaluate(&[record]).unwrap();
         assert_eq!(result.independent_support_adequacy.value(), Some(0.0));
     }
 
