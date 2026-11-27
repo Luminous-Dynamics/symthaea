@@ -82,6 +82,7 @@ pub struct EmbodimentSceneFrame {
     event_kind: EventKind,
     semantic_key: String,
     form: EmbodimentForm,
+    effective_intensity: f32,
     motion_mode: MotionMode,
     epistemic_status: EpistemicStatus,
     privacy_class: PrivacyClass,
@@ -106,6 +107,7 @@ impl EmbodimentSceneFrame {
     pub fn event_kind(&self) -> EventKind { self.event_kind }
     pub fn semantic_key(&self) -> &str { &self.semantic_key }
     pub fn form(&self) -> EmbodimentForm { self.form }
+    pub fn effective_intensity(&self) -> f32 { self.effective_intensity }
     pub fn motion_mode(&self) -> MotionMode { self.motion_mode }
     pub fn epistemic_status(&self) -> EpistemicStatus { self.epistemic_status }
     pub fn privacy_class(&self) -> PrivacyClass { self.privacy_class }
@@ -275,6 +277,7 @@ pub fn compile_scene(
         event_kind: cue.event_kind,
         semantic_key: cue.semantic.semantic_key().to_owned(),
         form: permit.form(),
+        effective_intensity: permit.effective_intensity(),
         motion_mode: permit.motion_mode(),
         epistemic_status: cue.epistemic_status,
         privacy_class: cue.privacy_class,
