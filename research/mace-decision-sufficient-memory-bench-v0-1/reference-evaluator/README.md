@@ -35,7 +35,7 @@ Run the six synthetic positive-control records against the six source episodes a
 - Every candidate response must resolve to a known episode and an allowed action.
 - The evidence and observation budgets are enforced before scoring. The response arm IDs must match the preregistered arm manifest; an arm cannot disappear because its output is missing.
 - Each episode has exactly one response per arm declared in a separate preregistered arm manifest. Undeclared arms, missing and duplicate episode/arm pairs are rejected; no arm can silently drop hard episodes.
-- Candidate-visible and evaluator-private inventories must match exactly. The candidate row and private record commit to a domain-separated SHA-256 digest of the exact typed candidate projection; the response must echo the same digest. Modified or mismatched candidate/response inputs are rejected. This binds the response record to the presented input and declared arm to prevent accidental cross-arm relabelling; it is not a signature, response-payload attestation or proof that the adapter reasoned from the input.
+- Candidate-visible and evaluator-private inventories must match exactly. The candidate row and private record commit to a domain-separated SHA-256 digest of the exact identity-bound typed candidate projection; the response must echo the same digest. The private stream has its own evaluator-only schema at schemas/evaluator-private-v0.1.schema.json. Modified or mismatched candidate/response inputs are rejected. This binds the response record to the presented input and declared arm to prevent accidental cross-arm relabelling; it is not a signature, response-payload attestation or proof that the adapter reasoned from the input.
 - Knowledge time is explicit: an event is not available before observed_at_ms. Valid time is half-open: valid-from is inclusive and valid-until is exclusive. A supersession/retraction only invalidates its parent once that change has itself been observed and reached its valid-from time; later observations cannot leak into earlier decisions.
 - Superseded or retracted parent records are stale at query time. A contradiction edge does not itself erase its parent; co-retrieving contradictory records is measured, and v0.1 fails decision-sufficiency closed when a conflicting pair is returned because the response protocol does not yet carry an explicit conflict-resolution receipt.
 - Untrusted and evaluator-labelled forbidden records are inadmissible. The evaluator does not interpret similarity, authority tiers or uncertainty as proof of truth.
@@ -69,7 +69,7 @@ Cost fields are candidate-reported counters. The evaluator does not independentl
 - Uncertainty ppm is preserved but not calibrated and is not used as a probability.
 - Observation requests are scored as actions and budget use; no physical or external probe is executed.
 - This version is a response scorer, not a fully autonomous memory-system runner. It does not ingest candidate events into a production store or drive a downstream action environment.
-- There is no schema-validation dependency in this package. Use a Draft 2020-12 validator on the episode, candidate-input, response and arm-manifest schemas as a separate release check.
+- There is no schema-validation dependency in this package. Use a Draft 2020-12 validator on the episode, candidate-input, evaluator-private, response and arm-manifest schemas as a separate release check.
 
 ## Tests
 
