@@ -289,7 +289,7 @@ impl ConditionalRankSpectrumMonitor {
             .collect()
     }
 
-    fn active_context_indices(&self) -> Vec<usize> {
+    pub fn active_context_indices(&self) -> Vec<usize> {
         let mut active = Vec::with_capacity(4);
         let Some(last_rank) = self.history.last_rank else {
             return active;
