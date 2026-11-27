@@ -16,7 +16,7 @@ Sign/custody the suite with MON-026/027. Distribute the same signed suite to eve
 
 ## 2. Candidate result file
 
-The system under test emits a result JSON conforming to `../RESULT-v1.schema.json`. Each assigned case/replicate must appear exactly once. A result entry contains only its observed verdict and execution state; it does not contain an expected verdict.
+The system under test emits a result JSON conforming to `../RESULT-v1.schema.json`. Each assigned case/replicate must appear exactly once. The benchmark authority first computes the digest with `go run ./cmd/suite-digest --suite ../SUITE-example.json`, then includes the suite file in a MON-027 external-signing bundle. The scoring CLI verifies that signed MON-026 bundle before loading its suite artifact. A result entry contains only its observed verdict and execution state; it does not contain an expected verdict.
 
 Every executed observation must include a SHA-256 of its result record and an evidence-bundle digest. Skipped, timed-out and infrastructure-error observations remain represented but cannot carry a verdict.
 
@@ -24,13 +24,31 @@ Every executed observation must include a SHA-256 of its result record and an ev
 
 ```sh
 go run ./cmd/score \
-  --suite ../SUITE-example.json \
+  --suite-bundle-root ./suite-bundle/artifacts \
+  --suite-manifest ./suite-bundle/manifest.signed.json \
+  --suite-artifact SUITE.json \
+  --suite-key-id benchmark-authority-2026 \
+  --suite-public-key-hex "$BENCHMARK_AUTHORITY_ED25519_PUBLIC_KEY_HEX" \
+  --suite-run-id benchmark-suite-release-001 \
+  --suite-sequence 1 \
+  --clock-domain benchmark-attestation-clock \
+  --max-age 8760h \
+  --max-clock-uncertainty 100ms \
   --result ./candidate-result.json
 
 # Optional baseline comparison. Both must use the same suite, workload,
 # fault matrix, environment, resource budget and full case/replicate set.
 go run ./cmd/score \
-  --suite ../SUITE-example.json \
+  --suite-bundle-root ./suite-bundle/artifacts \
+  --suite-manifest ./suite-bundle/manifest.signed.json \
+  --suite-artifact SUITE.json \
+  --suite-key-id benchmark-authority-2026 \
+  --suite-public-key-hex "$BENCHMARK_AUTHORITY_ED25519_PUBLIC_KEY_HEX" \
+  --suite-run-id benchmark-suite-release-001 \
+  --suite-sequence 1 \
+  --clock-domain benchmark-attestation-clock \
+  --max-age 8760h \
+  --max-clock-uncertainty 100ms \
   --result ./candidate-result.json \
   --baseline ./baseline-result.json
 ```
