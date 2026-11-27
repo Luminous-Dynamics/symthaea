@@ -30,7 +30,9 @@ where (0 \le \alpha < \beta), (d) is the declared disturbance bound, and (e_0) i
 1. the first disturbed recovery step remains inside the entry radius;
 2. repeated recovery steps reach the target radius by the declared deadline.
 
-Integer arithmetic and ceiling division make the finite witness deterministic and conservative with respect to this scalar recurrence.
+**Important mathematical boundary:** this recurrence is a discrete scalar benchmark surrogate, not a direct transcription or proof of the continuous-time contraction theorem in Berrueta et al. For a continuous certificate with contraction rate \(\gamma\), an implementation must conservatively derive the discrete contraction factor and per-step disturbance accumulation for its actual sampling interval and disturbance model (for example, from a bound involving \(e^{-\gamma\Delta t}\)). The conversion and the underlying metric/tube proof must come from the independent verifier. CMAQ-027 only checks the supplied discrete profile arithmetic.
+
+Integer arithmetic and ceiling division make the finite witness deterministic and conservative with respect to this declared discrete recurrence.
 
 ## Candidate reachable-prefix evidence
 
