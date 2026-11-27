@@ -1323,6 +1323,9 @@ mod tests {
             initial_threshold: 0.5,
             tracking_capacity: capacity,
             maximum_feedback_delay_rounds: d_max,
+            maximum_proxy_delay_rounds: d_max,
+            delay_assumption: CaoOcrcDelayAssumptionV1::ArbitraryBounded,
+            feedback_delay_survival: None,
             population_scope: CaoOcrcPopulationScopeV1::QualifiedMeasuredStreamOnly,
             proxy_survival: survival,
         }
