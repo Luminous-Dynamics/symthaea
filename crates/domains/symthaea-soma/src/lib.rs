@@ -52,6 +52,7 @@ pub use symthaea_spore::persistence;
 
 // Renderer-neutral semantic events, projections, fail-closed policy and output receipts.
 pub mod embodiment_event;
+pub mod embodiment_interaction_trace;
 pub mod embodiment_policy;
 pub mod embodiment_projection;
 pub mod embodiment_receipt;
