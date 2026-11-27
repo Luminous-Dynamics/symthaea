@@ -348,7 +348,7 @@ pub fn analyze_evidence_span_ablation_v1(
     observations: &[EvidenceSpanAblationObservationV1],
     bootstrap_seed: u64,
 ) -> Result<EvidenceSpanAblationReportV1, EvidenceSpanAblationRejectV1> {
-    if observations.len() < 4 || observations.len() % 2 != 0 {
+    if observations.len() < 4 || !observations.len().is_multiple_of(2) {
         return Err(EvidenceSpanAblationRejectV1::TooFewObservations);
     }
     for value in observations {
