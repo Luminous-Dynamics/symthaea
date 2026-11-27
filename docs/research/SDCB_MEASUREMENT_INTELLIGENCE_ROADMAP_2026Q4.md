@@ -234,3 +234,10 @@ The exact OU primitive is a bounded foundation, not a completed vector state-spa
 ## Vector continuous-time state-space follow-on — 27 November 2026
 
 The DC1 follow-on now adds `scripts/research/sdcb_vector_state_space.rs`, a bounded linear-SDE discretization reference using the Van Loan block exponential and diagonal [13/13] Padé scaling/squaring. It produces both elapsed-time transition F and full process covariance Q, and propagates Gaussian means/covariances. The state dimension is capped at eight. Frozen scalar-OU, coupled two-factor and non-normal fixtures are included; coupled/non-normal covariance values are independently checked by elementwise quadrature. This is a numerical reference, not a production filter. Ten Rust tests are authored but are not compiled or executed in this environment. Follow-on work remains interval-integrated observations, covariance-model uncertainty and dynamic adaptive planning.
+
+
+## Covariance-model uncertainty follow-on — 27 November 2026
+
+The DC3 research reference adds `scripts/research/sdcb_covariance_model_mixture.rs`: prequential Gaussian predictive-density updates for finite model weights, within-model scientific conditioning, and mixture variance with explicit between-model contribution. The caller's robust support set remains independent of Bayesian weights, including the ability to retain a zero-prior-weight scenario for worst-case evaluation. It is paired with `docs/research/SDCB_COVARIANCE_MODEL_MIXTURE_V1.md` and `docs/research/SDCB_COVARIANCE_MODEL_UNCERTAINTY_TOURNAMENT_V1.md`, plus schema/example/expected fixtures.
+
+The reference does not estimate covariance parameters or detect omitted models itself. The tournament adds those as separate evaluation dimensions, along with weight sensitivity, model-set adequacy, and generalized Bayesian robust-design comparisons. Ten Rust tests are authored, not compiled/executed here; fixtures are finite Gaussian calculations, not physical measurements.
