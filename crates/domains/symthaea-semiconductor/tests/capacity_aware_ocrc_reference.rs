@@ -209,11 +209,11 @@ fn two_feedback_arrivals_match_independent_proxy_and_ipw_oracle() {
     assert_eq!(r3.received_feedback_receipts[0].actual_delay_rounds, Some(2));
     assert_eq!(r3.received_feedback_receipts[1].actual_delay_rounds, Some(1));
     assert_eq!(
-        r3.received_feedback_receipts[0].inverse_proxy_survival_weight,
+        r3.received_feedback_receipts[0].inverse_probability_weight,
         Some(4.0)
     );
     assert_eq!(
-        r3.received_feedback_receipts[1].inverse_proxy_survival_weight,
+        r3.received_feedback_receipts[1].inverse_probability_weight,
         Some(2.0)
     );
 
