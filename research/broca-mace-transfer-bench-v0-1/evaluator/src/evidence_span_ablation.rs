@@ -132,6 +132,10 @@ pub struct EvidenceSpanAblationReportV1 {
     /// Exposed minus ablated complete lifecycle cost.
     pub mean_added_cost_micros: f64,
     pub stratum_utility_effects: BTreeMap<String, f64>,
+    pub stratum_utility_effect_ci95: BTreeMap<String, ConfidenceIntervalV1>,
+    pub stratum_regret_reduction_effects: BTreeMap<String, f64>,
+    pub stratum_regret_reduction_ci95: BTreeMap<String, ConfidenceIntervalV1>,
+    pub stratum_independent_profile_clusters: BTreeMap<String, usize>,
     pub privacy_violation_count: u64,
     pub unauthorized_action_count: u64,
     pub erasure_resurrection_count: u64,
@@ -320,6 +324,12 @@ fn mean(values: &[f64]) -> f64 {
     values.iter().sum::<f64>() / values.len() as f64
 }
 
+fn stratum_seed(base: u64, stratum: &str) -> u64 {
+    stratum.as_bytes().iter().fold(base ^ 0xcbf2_9ce4_8422_2325, |state, byte| {
+        (state ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
+}
+
 /// Estimate within-history exposure contrasts. A valid return is only a paired
 /// diagnostic: randomization and observer custody must be verified independently.
 pub fn analyze_evidence_span_ablation_v1(
@@ -453,7 +463,7 @@ pub fn analyze_evidence_span_ablation_v1(
     let mut cluster_regret = Vec::with_capacity(cluster_pairs.len());
     let mut cluster_decision_change = Vec::with_capacity(cluster_pairs.len());
     let mut cluster_cost = Vec::with_capacity(cluster_pairs.len());
-    let mut stratum_values: BTreeMap<String, Vec<f64>> = BTreeMap::new();
+    let mut stratum_values: BTreeMap<String, Vec<(f64, f64)>> = BTreeMap::new();
 
     for (cluster_id, values) in &cluster_pairs {
         let utility = selected_mean(values, |value| value.utility);
@@ -468,7 +478,7 @@ pub fn analyze_evidence_span_ablation_v1(
         stratum_values
             .entry(stratum.clone())
             .or_default()
-            .push(utility);
+            .push((utility, selected_mean(values, |value| value.regret_reduction)));
     }
 
     let utility_effect_ci95 =
@@ -477,10 +487,27 @@ pub fn analyze_evidence_span_ablation_v1(
         &cluster_regret,
         bootstrap_seed ^ 0xA11C_E5A5_0000_0001,
     );
-    let stratum_utility_effects = stratum_values
-        .into_iter()
-        .map(|(key, values)| (key, mean(&values)))
-        .collect();
+    let mut stratum_utility_effects = BTreeMap::new();
+    let mut stratum_utility_effect_ci95 = BTreeMap::new();
+    let mut stratum_regret_reduction_effects = BTreeMap::new();
+    let mut stratum_regret_reduction_ci95 = BTreeMap::new();
+    let mut stratum_independent_profile_clusters = BTreeMap::new();
+    for (key, values) in stratum_values {
+        let utilities: Vec<f64> = values.iter().map(|(utility, _)| *utility).collect();
+        let regrets: Vec<f64> = values.iter().map(|(_, regret)| *regret).collect();
+        let seed = stratum_seed(bootstrap_seed, &key);
+        stratum_utility_effects.insert(key.clone(), mean(&utilities));
+        stratum_utility_effect_ci95.insert(
+            key.clone(),
+            cluster_bootstrap_interval(&utilities, seed),
+        );
+        stratum_regret_reduction_effects.insert(key.clone(), mean(&regrets));
+        stratum_regret_reduction_ci95.insert(
+            key.clone(),
+            cluster_bootstrap_interval(&regrets, seed ^ 0xA11C_E5A5_0000_0001),
+        );
+        stratum_independent_profile_clusters.insert(key, values.len());
+    }
 
     let hard_gate_violation_count = privacy_violation_count
         .saturating_add(unauthorized_action_count)
@@ -518,6 +545,10 @@ pub fn analyze_evidence_span_ablation_v1(
         mean_decision_change_rate: mean(&cluster_decision_change),
         mean_added_cost_micros: mean(&cluster_cost),
         stratum_utility_effects,
+        stratum_utility_effect_ci95,
+        stratum_regret_reduction_effects,
+        stratum_regret_reduction_ci95,
+        stratum_independent_profile_clusters,
         privacy_violation_count,
         unauthorized_action_count,
         erasure_resurrection_count,
@@ -780,6 +811,10 @@ mod tests {
         assert_eq!(report.mean_decision_change_rate, 1.0);
         assert_eq!(report.stratum_utility_effects["standard"], 0.3);
         assert_eq!(report.stratum_utility_effects["sparse"], 0.3);
+        assert!(report.stratum_utility_effect_ci95["standard"].lower > 0.0);
+        assert!(report.stratum_regret_reduction_ci95["sparse"].lower > 0.0);
+        assert_eq!(report.stratum_independent_profile_clusters["standard"], 2);
+        assert_eq!(report.stratum_independent_profile_clusters["sparse"], 2);
         assert!(valid_sha256(&report.canonical_sha256));
     }
 }
