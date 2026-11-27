@@ -1,0 +1,74 @@
+{
+  "profile": "mon025-version-matrix-v1",
+  "reviewed_at": "2026-11-27",
+  "source_profiles": [
+    {
+      "id": "postgresql-18",
+      "component": "PostgreSQL",
+      "version": "18.7",
+      "image": "postgres:18.7-bookworm",
+      "role": "supported-baseline",
+      "notes": "Supported maintenance release; isolated source/restore lane."
+    },
+    {
+      "id": "postgresql-19",
+      "component": "PostgreSQL",
+      "version": "19.0",
+      "image": "postgres:19.0-bookworm",
+      "role": "new-major-extension",
+      "notes": "Released 2026-11-19; same-major source/restore lane."
+    }
+  ],
+  "streaming_profiles": [
+    {
+      "id": "debezium-kafka-baseline",
+      "component": "Kafka + Debezium Connect",
+      "kafka_version": "4.3.1",
+      "kafka_image": "apache/kafka:4.3.1",
+      "debezium_version": "3.7.1.Final",
+      "connect_version": "4.3.1",
+      "debezium_image": "quay.io/debezium/connect:3.7.1.Final",
+      "role": "declared-compatibility-baseline",
+      "notes": "Debezium 3.7.1 release notes explicitly state build/test against Kafka Connect and broker 4.3.1."
+    },
+    {
+      "id": "kafka-patch-extension",
+      "component": "Kafka",
+      "kafka_version": "4.3.2",
+      "kafka_image": "apache/kafka:4.3.2",
+      "role": "extension-requires-qualification",
+      "notes": "Later 4.3 patch release; not the exact Debezium release-note baseline. Re-run connector compatibility and fault matrix."
+    },
+    {
+      "id": "kafka-new-series-extension",
+      "component": "Kafka",
+      "kafka_version": "4.4.0",
+      "kafka_image": "apache/kafka:4.4.0",
+      "role": "extension-requires-qualification",
+      "notes": "Newer Kafka series; test matrix compatibility must be established before claims."
+    }
+  ],
+  "recovery_profiles": [
+    {
+      "id": "postgres-native-pitr",
+      "component": "PostgreSQL native backup",
+      "version": "same-as-server",
+      "role": "executable-reference-lane",
+      "notes": "pg_basebackup plus WAL archive and recovery.signal; no third-party backup engine."
+    },
+    {
+      "id": "pgbackrest-2.60.1",
+      "component": "pgBackRest",
+      "version": "2.60.1",
+      "role": "external-comparator",
+      "notes": "Current stable release as of 2026-11-27. Must match local and remote binaries exactly; separate adapter/config required."
+    }
+  ],
+  "pinning_policy": {
+    "compose_tags_are_not_digests": true,
+    "record_runtime_image_digest_before_each_run": true,
+    "lock_digest_file_required_for_confirmatory_runs": true,
+    "mutable_latest_tags_prohibited": true,
+    "baseline_and_extension_results_must_not_be_pooled": true
+  }
+}
