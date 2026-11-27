@@ -1813,7 +1813,7 @@ mod tests {
         let baseline = CandidateRunV1 {
             episode_id: episode.to_owned(),
             system_id: "no-memory".to_owned(),
-            downstream_policy_digest: "frozen-reader-sha256:aggregate-v1".to_owned(),
+            downstream_policy_digest: "b".repeat(64),
             decision_seed: 77,
             chosen_action: "abstain".to_owned(),
             retrieved_evidence_ids: vec![],
@@ -2210,10 +2210,12 @@ mod tests {
             run: run("no-memory", "abstain", &[]),
             cost: cost_v3(None),
         };
-        let unknown_result = score_paired_v3(&case(), &both_unknown, &CandidateRunV3 {
+        let unknown_memory = CandidateRunV3 {
             run: run("mace", "hold", &["signed-current"]),
             cost: cost_v3(None),
-        }).expect("both unknown are valid");
+        };
+        let unknown_result = score_paired_v3(&case(), &unknown_memory, &both_unknown)
+            .expect("both unknown are valid");
         assert_eq!(unknown_result.cost_delta.phases.comparison, PhaseTimingComparisonV3::Unknown);
         assert_eq!(unknown_result.cost_delta.phases.wall_ns, None);
     }
