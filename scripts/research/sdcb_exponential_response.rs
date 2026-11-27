@@ -411,6 +411,18 @@ mod tests {
     }
 
     #[test]
+    fn sensor_inlet_step_breaks_the_process_sensor_pole_ambiguity() {
+        let physical_slow = FirstOrderResponseOu::new(0.25, 9.0, 0.25).unwrap();
+        let sensor_slow = FirstOrderResponseOu::new(4.0, 144.0, 4.0).unwrap();
+        let elapsed = 0.5;
+        let fast_sensor_step = physical_slow.normalized_step_response(elapsed).unwrap();
+        let slow_sensor_step = sensor_slow.normalized_step_response(elapsed).unwrap();
+        close(fast_sensor_step, 0.8646647167633873, 2.0e-15);
+        close(slow_sensor_step, 0.11750309741540454, 2.0e-15);
+        assert!((fast_sensor_step - slow_sensor_step).abs() > 0.7);
+    }
+
+    #[test]
     fn direct_convolution_matches_state_space_across_rate_orderings() {
         let cases = [
             (1.0, 3.0, 0.5, 0.0),
