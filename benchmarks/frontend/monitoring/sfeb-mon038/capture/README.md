@@ -17,7 +17,7 @@ Each partition contributes its own half-open range [start_offset_inclusive, end_
 
 A valid v1 vector requires a complete topic/partition inventory; exactly one range for every declared partition; producer fencing before capture; read_committed isolation; stable log-start offset, Last Stable Offset (LSO), high watermark and leader epoch; end_offset_exclusive equal to LSO; stable LSO equal to high watermark for a closed capture; topic cleanup policy delete; record, partition-manifest, inventory and vector digests; and exact linkage between captured business records and MON-037 business-event envelopes.
 
-Kafka offset gaps are not automatically missing events. Aborted transactions and control records can consume offsets while being invisible to read_committed consumers. MON-038 records gaps; it does not invent missing business events from an offset sequence.
+Kafka offset gaps are not automatically missing events. Aborted transactions and control records can consume offsets while being invisible to read_committed consumers. MON-038 reports the number of offset slots in each half-open range that are not represented by a visible record: range width minus visible record count. This is an observed hole count, not a claim that every hole represents one aborted transaction or one control record.
 
 ## Ordering semantics
 
