@@ -55,7 +55,7 @@ func TestReplayOverlapQualified(t *testing.T){_,_,m:=base();n:=m;n.Events=append
 func TestReplayGapIndeterminate(t *testing.T){_,_,m:=base();n:=m;n.StartExclusiveLSN=0x150;n.TerminalLSN=0x160;want(t,ValidateReplay(m,n),Indeterminate)}
 func TestReplayConflictingEventDivergent(t *testing.T){_,_,m:=base();n:=m;n.Events=append([]DecodedEvent(nil),m.Events...);n.StartExclusiveLSN=0x120;n.TerminalLSN=0x160;n.Events[1].CommitLSN++;want(t,ValidateReplay(m,n),Divergent)}
 func TestReplayTerminalRegressionIndeterminate(t *testing.T){_,_,m:=base();n:=m;n.StartExclusiveLSN=0x120;n.TerminalLSN=0x130;n.EvidenceThroughLSN=0x130;want(t,ValidateReplay(m,n),Indeterminate)}
-func failoverFixture() (Profile,Manifest,Failover){p,_,m:=base();replay:=LSN(0x150);restart:=LSN(0x80);s:=SlotState{SlotType:"logical",DatabaseOID:p.DatabaseOID,DatabaseName:p.DatabaseName,SlotName:p.SlotName,OutputPlugin:p.OutputPlugin,WALStatus:"reserved",Failover:true,Synced:true,OnStandby:true,RestartLSN:&restart,StandbyReplayLSN:&replay};n:=p;n.SourceEpoch="epoch-2";n.TimelineID=2;f:=Failover{Prior:p,Next:n,StandbySlot:s,OldPrimaryFenced:true,TimelineHistoryDigest:"timeline-history",HandoffManifestDigest:"handoff",HandoffWitnessed:true};return p,m,f}
+func failoverFixture() (Profile,Manifest,Failover){p,_,m:=base();replay:=LSN(0x150);restart:=LSN(0x80);s:=SlotState{SlotType:"logical",DatabaseOID:p.DatabaseOID,DatabaseName:p.DatabaseName,SlotName:p.SlotName,OutputPlugin:p.OutputPlugin,WALStatus:"reserved",Failover:true,Synced:true,OnStandby:true,RestartLSN:&restart,StandbyReplayLSN:&replay};n:=p;n.SourceEpoch="epoch-2";n.TimelineID=2;f:=Failover{Prior:p,Next:n,StandbySlot:s,OldPrimaryFenced:true,TimelineHistoryDigest:"timeline-history",TimelineHistoryWitnessed:true,TimelineHistoryParent:p.TimelineID,ForkLSN:0x150,HandoffManifestDigest:"handoff",HandoffWitnessed:true};return p,m,f}
 func TestFailoverQualified(t *testing.T){_,m,f:=failoverFixture();want(t,ValidateFailover(f,m.EvidenceThroughLSN),Qualified)}
 func TestFailoverSlotNotSyncedDenied(t *testing.T){_,m,f:=failoverFixture();f.StandbySlot.Synced=false;want(t,ValidateFailover(f,m.EvidenceThroughLSN),Denied)}
 func TestFailoverStandbyBehindIndeterminate(t *testing.T){_,m,f:=failoverFixture();f.StandbySlot.StandbyReplayLSN=ptr(0x130);want(t,ValidateFailover(f,m.EvidenceThroughLSN),Indeterminate)}
@@ -115,4 +115,21 @@ func TestReplayPreparedTransactionRemainsIndeterminate(t *testing.T){
 	n.TerminalLSN=0x160
 	n.EvidenceThroughLSN=0x160
 	want(t,ValidateReplay(m,n),Indeterminate)
+}
+
+func TestFailoverDurableEvidenceBeyondForkDenied(t *testing.T){
+	_,m,f:=failoverFixture()
+	f.ForkLSN=0x130
+	f.StandbySlot.StandbyReplayLSN=ptr(0x150)
+	want(t,ValidateFailover(f,m.EvidenceThroughLSN),Denied)
+}
+func TestFailoverTimelineHistoryNotWitnessedIndeterminate(t *testing.T){
+	_,m,f:=failoverFixture()
+	f.TimelineHistoryWitnessed=false
+	want(t,ValidateFailover(f,m.EvidenceThroughLSN),Indeterminate)
+}
+func TestFailoverWrongParentTimelineIndeterminate(t *testing.T){
+	_,m,f:=failoverFixture()
+	f.TimelineHistoryParent=99
+	want(t,ValidateFailover(f,m.EvidenceThroughLSN),Indeterminate)
 }
