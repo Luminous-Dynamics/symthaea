@@ -24,7 +24,7 @@ Compare end-to-end recovery assurance on a matched fault schedule. Do not compar
 | Missing or conflicting expected event IDs | 0 |
 | Unknown/failed prerequisite followed by service enable | 0 |
 | Full-state inventory accounting | 100% |
-| Recovery point correctness | exact requested LSN on the pinned timeline; never silently move to a later timeline/position |
+| Recovery point correctness | requested LSN and pinned timeline must be recorded alongside actual replay LSN/timeline; any protocol-defined stop-position difference must be explained and the restored state must match the independent target manifest |
 | RPO measurement | report p50/p95/p99 and worst-case upper bound |
 | Database-ready RTO | p50/p95/p99 and worst case, separate from service-ready |
 | Service-ready RTO | p50/p95/p99 and worst case, separate from database-ready |
@@ -58,7 +58,7 @@ Compare end-to-end recovery assurance on a matched fault schedule. Do not compar
 - Equal row counts with altered values must fail the digest check.
 - A duplicate replay with identical payload is reported as replay; conflicting payload under the same event ID is a hard mismatch.
 - Missing and out-of-order transaction records must be identified separately.
-- A restored target is compared to source truth at the exact requested recovery point, not against source's later live state.
+- A restored target is compared to source truth captured at the requested LSN/timeline, not against source's later live state. Record both requested and actual replay LSN; state equality is mandatory.
 - A service process can be healthy while dependencies, fencing or invariants are broken; such a run must not pass service readiness.
 - Benchmark scorer and expected data must be controlled separately from the implementation under test.
 
