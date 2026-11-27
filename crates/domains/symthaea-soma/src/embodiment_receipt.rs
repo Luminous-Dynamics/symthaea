@@ -136,6 +136,7 @@ pub enum ReceiptError {
     WrongDecisionClock,
     PermitDecisionTimestampMismatch,
     ObserverChannelMismatch,
+    AdapterCallbackCannotObserveOutput,
     PermitExpired,
     DuplicateAttempt,
     AttemptNotFound,
@@ -384,6 +385,9 @@ impl PresentationReceiptLedger {
         stamp: ReceiptStamp,
         observation: OutputObservation,
     ) -> Result<PresentationReceipt, ReceiptError> {
+        if observation.source == ObservationSource::AdapterCallback {
+            return Err(ReceiptError::AdapterCallbackCannotObserveOutput);
+        }
         if observation.output_state != ObservedOutputState::Started {
             return Err(ReceiptError::UnexpectedObservation);
         }
@@ -400,6 +404,9 @@ impl PresentationReceiptLedger {
         stamp: ReceiptStamp,
         observation: OutputObservation,
     ) -> Result<PresentationReceipt, ReceiptError> {
+        if observation.source == ObservationSource::AdapterCallback {
+            return Err(ReceiptError::AdapterCallbackCannotObserveOutput);
+        }
         if observation.output_state != ObservedOutputState::Stopped {
             return Err(ReceiptError::UnexpectedObservation);
         }
@@ -597,21 +604,15 @@ fn observation_source_matches(channel: OutputChannel, source: ObservationSource)
     match channel {
         OutputChannel::Visual | OutputChannel::Spatial => matches!(
             source,
-            ObservationSource::AdapterCallback
-                | ObservationSource::Compositor
-                | ObservationSource::ExternalObserver
+            ObservationSource::Compositor | ObservationSource::ExternalObserver
         ),
         OutputChannel::Audio => matches!(
             source,
-            ObservationSource::AdapterCallback
-                | ObservationSource::AudioDeviceLoopback
-                | ObservationSource::ExternalObserver
+            ObservationSource::AudioDeviceLoopback | ObservationSource::ExternalObserver
         ),
         OutputChannel::Haptic => matches!(
             source,
-            ObservationSource::AdapterCallback
-                | ObservationSource::HapticDriverAcknowledgement
-                | ObservationSource::ExternalObserver
+            ObservationSource::HapticDriverAcknowledgement | ObservationSource::ExternalObserver
         ),
     }
 }
@@ -895,6 +896,37 @@ mod tests {
             Err(ReceiptError::ObserverChannelMismatch)
         );
         assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Submitted);
+    }
+
+    #[test]
+    fn adapter_callback_cannot_certify_displayed_or_stopped_output() {
+        let (policy, permit, mut ledger) = fixture();
+        submit(&mut ledger, &policy, &permit);
+
+        let adapter_started = OutputObservation::new(
+            "bevy-adapter",
+            "sha256:adapter-build",
+            ObservationSource::AdapterCallback,
+            ObservedOutputState::Started,
+        ).unwrap();
+        assert_eq!(
+            ledger.record_observed("attempt-1", stamp(OUTPUT_CLOCK, "12"), adapter_started),
+            Err(ReceiptError::AdapterCallbackCannotObserveOutput)
+        );
+        assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Submitted);
+
+        ledger.record_observed("attempt-1", stamp(OUTPUT_CLOCK, "13"), started()).unwrap();
+        let adapter_stopped = OutputObservation::new(
+            "bevy-adapter",
+            "sha256:adapter-build",
+            ObservationSource::AdapterCallback,
+            ObservedOutputState::Stopped,
+        ).unwrap();
+        assert_eq!(
+            ledger.record_stopped("attempt-1", stamp(OUTPUT_CLOCK, "14"), adapter_stopped),
+            Err(ReceiptError::AdapterCallbackCannotObserveOutput)
+        );
+        assert_eq!(ledger.status("attempt-1").unwrap().phase, ReceiptPhase::Observed);
     }
 
     #[test]
