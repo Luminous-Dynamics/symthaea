@@ -64,7 +64,7 @@ A run directory must contain:
 2. Run ID, selected PostgreSQL major, Kafka/Connect versions and image digests.
 3. Source system identifier, database, source epoch, timeline, publication, slot and snapshot metadata.
 4. Workload manifest: expected event IDs, transaction groups, payload digests and generation parameters.
-5. Connector configuration, task state, observed source offsets, restart count and error log digest; transaction BEGIN/END receipts, `event_count`, transaction ID joins and per-event order checks.
+5. Connector configuration, task state, observed source offsets, restart count and error log digest; transaction BEGIN/END receipts, `event_count`, transaction ID joins and per-event order checks; byte-identical replay is counted and deduplicated, while conflicting BEGIN/END payloads for the same transaction ID block.
 6. Independent Kafka readback: observed event IDs, exact payload digests, duplicate/replay groups, conflicting identities and missing events.
 7. Source SQL state manifest at the intended recovery point.
 8. Base-backup manifest, required archived WAL interval, requested recovery LSN/timeline and achieved recovery state.
