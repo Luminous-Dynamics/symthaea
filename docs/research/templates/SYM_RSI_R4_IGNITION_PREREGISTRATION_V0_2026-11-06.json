@@ -17,7 +17,7 @@
     "experiment_id": "__REQUIRED_BEFORE_PREREGISTRATION__",
     "protocol_version": "__REQUIRED_BEFORE_PREREGISTRATION__",
     "preregistered_at_utc": "__REQUIRED_BEFORE_PREREGISTRATION__",
-    "preregistration_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "protocol_contract_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
     "reviewers": [
       "__REQUIRED_BEFORE_PREREGISTRATION__"
     ],
