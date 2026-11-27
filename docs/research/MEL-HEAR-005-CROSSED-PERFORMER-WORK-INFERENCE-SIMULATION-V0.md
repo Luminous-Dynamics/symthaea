@@ -102,3 +102,25 @@ Then execute:
     python research/mel-hear-005/simulate_crossed_bootstrap.py
 
 The committed JSON output should be byte-identical with the pinned Python/NumPy pair. This Python utility is an offline research oracle only; no production Melothaea code or runtime path depends on it.
+
+
+## Performer-axis support sweep — supplementary result
+
+A second deterministic 1,000-dataset sweep varies the number of recurring performers while holding the number of works at 30 and the random-effect standard deviations at 0.18 (work), 0.30 (performer), and 0.30 (work×performer). It uses 399 bootstrap replicates per data set.
+
+| Recurring performers | Work-only coverage | Two-way pigeonhole coverage |
+|---:|---:|---:|
+| 5 | 46.6% | 89.0% |
+| 8 | 46.8% | 88.6% |
+| 10 | 51.6% | 91.6% |
+| 12 | 55.2% | 91.8% |
+| 15 | 55.4% | 93.7% |
+| 20 | 59.1% | 93.6% |
+| 30 | 67.2% | 94.7% |
+| 50 | 73.4% | 93.8% |
+
+This sweep shows that the source-work-only interval remains badly under-covering even as the performer count grows, because the shared performer axis is omitted from the resampling. The two-way interval approaches the nominal 95% target as the performer axis grows, but is materially low at 5–12 performers in this DGP. This is a warning against setting a universal minimum cluster count from work count alone.
+
+For this simulated variance structure, 15 or more performers is a useful region to investigate, not a validated universal cutoff: the 15/20/30/50 results are near 95%, but each has nontrivial Monte Carlo uncertainty and only one balanced Gaussian DGP. Other variance ratios, imbalance, leverage and missingness can change the support requirements.
+
+The supplementary source and retained output are simulate_performer_axis_sweep.py and performer-axis-sweep-v0.json. Reproduction uses the pinned Python 3.13.5 / NumPy 2.3.5 environment.
