@@ -1,6 +1,6 @@
 # SDCB causal instrument-response kernels v1
 
-**Status:** The standalone scalar OU + first-order response reference is authored in `scripts/research/sdcb_exponential_response.rs` with twenty-three Rust tests, and `scripts/research/sdcb_response_interval_bridge.rs` composes it with the existing #13940 interval-observation engine with four additional tests. The source-level bridge is authored, but neither Rust test file has been compiled or executed in this environment. No high-rate experiment, physical qualification, or SOTA result is claimed.
+**Status:** The standalone scalar OU + first-order response reference is authored in `scripts/research/sdcb_exponential_response.rs` with twenty-four Rust tests, and `scripts/research/sdcb_response_interval_bridge.rs` composes it with the existing #13940 interval-observation engine with four additional tests. The source-level bridge is authored, but neither Rust test file has been compiled or executed in this environment. No high-rate experiment, physical qualification, or SOTA result is claimed.
 
 ## 1. Motivation
 
@@ -65,7 +65,7 @@ Do not claim arbitrary nonlinear hysteresis in M0. Hysteresis must be represente
 `dz = (x-z)/tau_s dt`.
 It computes the stationary covariance, exact 2x2 transition matrix, future/past cross-covariance, filtered-sensor autocovariance, normalized step response, and first-order frequency response. It includes the repeated-root case (equal latent and sensor rates) and uses exp_m1-based rate-gap formulas near that case.
 
-Twenty-three Rust tests are authored for stationary covariance, equal-rate and distinct-rate fixtures, zero lag, near-equal-rate continuity, step response, -3 dB / phase behavior, invalid inputs and negative elapsed time. An independent authoring-runtime check using SciPy matrix exponential and continuous Lyapunov solution reproduced the distinct-rate transition/cross-covariance fixture to below 2e-15 absolute difference. This is an independent numerical calculation, not Rust execution, crate compilation, CI, or physical sensor validation.
+Twenty-four Rust tests are authored for stationary covariance, equal-rate and distinct-rate fixtures, zero lag, near-equal-rate continuity, step response, -3 dB / phase behavior, invalid inputs and negative elapsed time. An independent authoring-runtime check using SciPy matrix exponential and continuous Lyapunov solution reproduced the distinct-rate transition/cross-covariance fixture to below 2e-15 absolute difference. This is an independent numerical calculation, not Rust execution, crate compilation, CI, or physical sensor validation.
 An additional independent convolution identity is used to test the state-space covariance calculation. With q = mu*sigma^2/(lambda+mu), for h >= 0 and mu != lambda:
 `C_zz(h) = q * (mu*exp(-lambda*h) - lambda*exp(-mu*h)) / (mu-lambda)`.
 At equal rates mu=lambda, the continuous limit is
@@ -222,7 +222,7 @@ The same 50,000-case sweep also exercised the stationary filtered variance acros
 The normalized step response now evaluates `1-exp(-mu*t)` through `-expm1(-mu*t)`, adding an FMA-derived correction for the rounded rate-times-time product. This avoids cancellation to zero for small response fractions. An authored regression checks a (10^{-20}) response fraction; an independent Python check confirmed the expm1 result retains that value while direct `1-exp(-x)` rounds to zero.
 
 
-The diffusion export also avoids losing a representable (2\lambda\sigma_x^2) when the intermediate (lambda\sigma_x^2) rounds subnormal: it changes multiplication order in that regime and has a dedicated regression. The standalone response source now contains twenty-three Rust tests. The bridge contains four more authored tests. Neither file has been compiled or executed in this environment.
+The diffusion export also avoids losing a representable (2\lambda\sigma_x^2) when the intermediate (lambda\sigma_x^2) rounds subnormal: it changes multiplication order in that regime and has a dedicated regression. The standalone response source now contains twenty-four Rust tests. The bridge contains four more authored tests. Neither file has been compiled or executed in this environment.
 
 ## Composition with the existing interval-observation engine
 
