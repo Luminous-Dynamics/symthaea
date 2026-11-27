@@ -198,6 +198,9 @@ impl PresentationReceipt {
     pub fn event_id(&self) -> &str { &self.event_id }
     pub fn canonical_cue_digest(&self) -> &str { &self.canonical_cue_digest }
     pub fn grant_id(&self) -> &str { &self.grant_id }
+    pub fn event_expires_at_monotonic_ns(&self) -> &str { &self.event_expires_at_monotonic_ns }
+    pub fn grant_expires_at_monotonic_ns(&self) -> &str { &self.grant_expires_at_monotonic_ns }
+    pub fn effective_permit_expires_at_monotonic_ns(&self) -> &str { &self.effective_permit_expires_at_monotonic_ns }
     pub fn previous_digest(&self) -> Option<&str> { self.previous_digest.as_deref() }
     pub fn digest(&self) -> &str { &self.digest }
     pub fn decision_clock(&self) -> &ReceiptStamp { &self.decision_clock }
