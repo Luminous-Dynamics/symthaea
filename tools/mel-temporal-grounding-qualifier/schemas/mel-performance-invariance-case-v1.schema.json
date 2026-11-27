@@ -8,8 +8,10 @@
     "schema",
     "benchmark_id",
     "benchmark_version",
+    "split",
     "dataset_revision_sha256",
     "annotation_policy_sha256",
+    "source_permissions_manifest_sha256",
     "triads"
   ],
   "properties": {
@@ -34,6 +36,16 @@
       "items": {
         "$ref": "#/$defs/triad"
       }
+    },
+    "split": {
+      "enum": [
+        "SyntheticRendered",
+        "PublicRealRecordingEvaluationOnly",
+        "MusicianRecordedConfirmatory"
+      ]
+    },
+    "source_permissions_manifest_sha256": {
+      "$ref": "#/$defs/digest"
     }
   },
   "$defs": {
