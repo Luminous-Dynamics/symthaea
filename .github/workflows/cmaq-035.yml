@@ -1,0 +1,52 @@
+name: CMAQ-035 paired PRM benchmark
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-031/**"
+      - "research/cmaq-033/**"
+      - "research/cmaq-035/**"
+      - ".github/workflows/cmaq-035.yml"
+  push:
+    branches:
+      - "research/cmaq-035-*"
+    paths:
+      - "research/cmaq-031/**"
+      - "research/cmaq-033/**"
+      - "research/cmaq-035/**"
+      - ".github/workflows/cmaq-035.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-035-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: paired-prm-benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-035/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-035/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-035/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Run paired Monte Carlo benchmark (10,000 replications per scenario)
+        run: |
+          mkdir -p cmaq-035-results
+          cargo +1.100.0 run --release --manifest-path research/cmaq-035/Cargo.toml --locked -- 10000 500 20261127 > cmaq-035-results/results.csv 2> cmaq-035-results/run-metadata.txt
+      - name: Preserve benchmark output
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-035-paired-prm-results
+          path: cmaq-035-results/
+          if-no-files-found: error
+          retention-days: 30
