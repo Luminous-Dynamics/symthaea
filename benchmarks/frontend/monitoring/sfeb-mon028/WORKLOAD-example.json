@@ -1,0 +1,37 @@
+{
+  "profile": "mon028-workload-profile-v1",
+  "version": "1.0.0",
+  "description": "Illustrative deterministic PostgreSQL CDC/recovery workload; replace all values with an actual frozen run profile before confirmatory scoring.",
+  "source": {
+    "postgresql_major": "18",
+    "transaction_shape": "single committed batch transaction",
+    "rows_per_transaction": 100,
+    "generated_columns": true,
+    "include_sequence_probe": true,
+    "include_large_object_probe": true,
+    "include_partition_probe": true,
+    "deterministic_seed": "mon028-example-seed-v1"
+  },
+  "capture": {
+    "expected_unique_events_per_batch": 100,
+    "connector_initial_snapshot_required": true,
+    "transaction_metadata_required": true,
+    "numeric_payload_compare": "exact-string"
+  },
+  "recovery": {
+    "physical_base_backup": true,
+    "recovery_target_type": "lsn-and-timeline",
+    "writers_quiesced_at_target_capture": true,
+    "expected_state_surfaces": [
+      "row-data",
+      "schema",
+      "sequence",
+      "large-object",
+      "materialized-view",
+      "partition",
+      "unlogged",
+      "authorization"
+    ]
+  },
+  "duration_seconds": 120
+}
