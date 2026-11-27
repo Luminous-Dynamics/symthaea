@@ -1,0 +1,49 @@
+name: SDCB Dependence Envelope Contract
+
+on:
+  push:
+    branches:
+      - research/sdcb-dependence-envelope-contract-2026-11-27
+    paths:
+      - "scripts/research/sdcb_dependence_envelope_contract.rs"
+      - ".github/workflows/sdcb-dependence-envelope-contract.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/research/sdcb_dependence_envelope_contract.rs"
+      - ".github/workflows/sdcb-dependence-envelope-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependence-envelope-contract:
+    name: Rust 1.96 fail-closed qualification contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Generate rustfmt preview
+        run: rustfmt --edition 2024 scripts/research/sdcb_dependence_envelope_contract.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdcb-envelope-rustfmt-preview
+          path: scripts/research/sdcb_dependence_envelope_contract.rs
+      - name: Restore exact committed source
+        run: git checkout -- scripts/research/sdcb_dependence_envelope_contract.rs
+      - name: Check formatting on exact committed source
+        run: rustfmt --edition 2024 --check scripts/research/sdcb_dependence_envelope_contract.rs
+      - name: Compile and run exact-source negative controls
+        run: |
+          rustc --edition=2024 -D warnings --test scripts/research/sdcb_dependence_envelope_contract.rs -o /tmp/sdcb-envelope-contract-tests
+          /tmp/sdcb-envelope-contract-tests
