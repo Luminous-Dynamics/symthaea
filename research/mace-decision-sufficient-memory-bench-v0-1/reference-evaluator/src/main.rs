@@ -88,6 +88,7 @@ struct CandidateRow {
     episode_id: String,
     seed: u64,
     family: String,
+    candidate_sha256: String,
     candidate: Candidate,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -106,6 +107,7 @@ struct Response {
     schema_version: String,
     episode_id: String,
     arm_id: String,
+    candidate_sha256: String,
     action: String,
     selected_evidence_ids: Vec<String>,
     observation_requests: usize,
@@ -251,7 +253,7 @@ fn prepare(source: &str, candidate_path: &str, private_path: &str) -> Result<(),
         let binding = candidate_digest(&e.candidate)?;
         candidates.push(CandidateRow {
             schema_version: CANDIDATE_SCHEMA.into(), episode_id: e.episode_id.clone(),
-            seed: e.seed, family: e.family.clone(), candidate: e.candidate,
+            seed: e.seed, family: e.family.clone(), candidate_sha256: binding.clone(), candidate: e.candidate,
         });
         privates.push(PrivateRow {
             schema_version: PRIVATE_SCHEMA.into(), episode_id: e.episode_id,
@@ -280,8 +282,11 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
         p.episode_id != *id || p.seed != c.seed || p.family != c.family {
         return Err(format!("{id}: schema or candidate/private/response identity mismatch"));
     }
-    if candidate_digest(&c.candidate)? != p.candidate_sha256 {
-        return Err(format!("{id}: candidate/private digest mismatch"));
+    let computed_candidate_sha256 = candidate_digest(&c.candidate)?;
+    if computed_candidate_sha256 != c.candidate_sha256 ||
+        computed_candidate_sha256 != p.candidate_sha256 ||
+        computed_candidate_sha256 != r.candidate_sha256 {
+        return Err(format!("{id}: candidate/response/evaluator digest binding mismatch"));
     }
     if r.arm_id.trim().is_empty() || !c.candidate.allowed_actions.contains(&r.action) {
         return Err(format!("{id}: empty arm or disallowed action"));
@@ -542,9 +547,9 @@ mod tests {
     }
     #[test] fn bad_memory_is_measured_against_no_memory_separately_from_regret(){
         let e=generated_episode(0,77);
-        let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate:e.candidate.clone()};
+        let c=CandidateRow{schema_version:CANDIDATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.candidate).unwrap(),candidate:e.candidate.clone()};
         let p=PrivateRow{schema_version:PRIVATE_SCHEMA.into(),episode_id:e.episode_id.clone(),seed:e.seed,family:e.family.clone(),candidate_sha256:candidate_digest(&e.candidate).unwrap(),evaluator_private:e.evaluator_private.clone()};
-        let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"bad-memory".into(),action:"use_old_account".into(),selected_evidence_ids:vec!["event-000000-old".into()],observation_requests:0,cost:Cost{ingest_operations:1,query_operations:1,maintenance_operations:0,retained_bytes:10,returned_bytes:10,latency_us:None}};
+        let r=Response{schema_version:RESPONSE_SCHEMA.into(),episode_id:e.episode_id,arm_id:"bad-memory".into(),candidate_sha256:c.candidate_sha256.clone(),action:"use_old_account".into(),selected_evidence_ids:vec!["event-000000-old".into()],observation_requests:0,cost:Cost{ingest_operations:1,query_operations:1,maintenance_operations:0,retained_bytes:10,returned_bytes:10,latency_us:None}};
         let s=score_one(&c,&p,&r).unwrap();
         assert_eq!(s.regret,12.0);assert!(s.memory_induced_harm);assert_eq!(s.memory_gain_vs_no_memory,-10.0);assert_eq!(s.stale_or_superseded_evidence_count,1);
     }
