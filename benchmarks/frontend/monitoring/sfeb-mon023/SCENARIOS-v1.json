@@ -1,0 +1,388 @@
+{
+  "corpus_id": "MON-023-RESTORE-TO-SERVE",
+  "corpus_version": "1.0.0",
+  "status": "research_seed",
+  "purpose": "Synthetic recovery claim and restore-to-serve fault scenarios. Descriptive seed cases, not live recovery observations or statistical estimates.",
+  "scenarios": [
+    {
+      "id": "REST-001",
+      "family": "artifact",
+      "description": "Backup artifact identity, repository and integrity evidence all match the declared plan.",
+      "expected_decision": "qualified",
+      "reason_code": "backup_artifact_integrity",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-002",
+      "family": "artifact",
+      "description": "A backup job completed but no repository/backup digest or integrity evidence exists.",
+      "expected_decision": "indeterminate",
+      "reason_code": "backup_completion_not_integrity_proof",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-003",
+      "family": "wal",
+      "description": "Required WAL interval from backup consistency start through requested PITR target is present and verified.",
+      "expected_decision": "qualified",
+      "reason_code": "required_wal_range_verified",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-004",
+      "family": "wal",
+      "description": "A required WAL segment is missing before the requested recovery target.",
+      "expected_decision": "denied",
+      "reason_code": "required_wal_gap",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-005",
+      "family": "target",
+      "description": "Restore reaches the requested LSN on the same authenticated source lineage.",
+      "expected_decision": "qualified",
+      "reason_code": "requested_recovery_point_reached",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-006",
+      "family": "target",
+      "description": "Restore reaches end-of-available-WAL before the requested recovery target.",
+      "expected_decision": "denied",
+      "reason_code": "requested_target_not_reached",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-007",
+      "family": "target",
+      "description": "Bare LSN matches but source timeline lineage differs or is unknown.",
+      "expected_decision": "indeterminate",
+      "reason_code": "recovery_point_lineage_unproven",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-008",
+      "family": "database",
+      "description": "PostgreSQL reaches database consistency and catalog/system identity matches the intended source/restore plan.",
+      "expected_decision": "qualified",
+      "reason_code": "database_consistency_verified",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-009",
+      "family": "database",
+      "description": "PostgreSQL process starts but database recovery consistency was not observed.",
+      "expected_decision": "indeterminate",
+      "reason_code": "process_started_not_database_recovered",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-010",
+      "family": "database",
+      "description": "Recovery intentionally pauses at target for inspection and the plan has not resumed/promoted or declared validation-only database state.",
+      "expected_decision": "indeterminate",
+      "reason_code": "recovery_paused_not_ready",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-011",
+      "family": "database",
+      "description": "MON-022 full-state inventory is missing a required sequence, DDL, large-object or other state surface.",
+      "expected_decision": "indeterminate",
+      "reason_code": "database_surface_coverage_missing",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-012",
+      "family": "database",
+      "description": "The recovered database is reported as full-state when required surfaces were merely excluded by contract.",
+      "expected_decision": "denied",
+      "reason_code": "full_state_exclusions",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-013",
+      "family": "rpo",
+      "description": "Conservative RPO upper bound is below the declared maximum, including both clock uncertainties.",
+      "expected_decision": "qualified",
+      "reason_code": "rpo_within_budget",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-014",
+      "family": "rpo",
+      "description": "RPO exceeds the declared maximum despite a completed restore.",
+      "expected_decision": "denied",
+      "reason_code": "rpo_exceeded",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-015",
+      "family": "rpo",
+      "description": "RPO uses clocks from incomparable domains or unbounded clock uncertainty.",
+      "expected_decision": "indeterminate",
+      "reason_code": "rpo_clock_basis_unqualified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-016",
+      "family": "rto",
+      "description": "Independent service-ready time minus incident-start lower bound is inside declared RTO.",
+      "expected_decision": "qualified",
+      "reason_code": "rto_within_budget",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-017",
+      "family": "rto",
+      "description": "RTO is measured only to restore command completion rather than service readiness.",
+      "expected_decision": "indeterminate",
+      "reason_code": "restore_duration_not_rto",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-018",
+      "family": "rto",
+      "description": "Service-ready upper bound exceeds the declared RTO.",
+      "expected_decision": "denied",
+      "reason_code": "rto_exceeded",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-019",
+      "family": "dependency",
+      "description": "A required KMS/secret/identity dependency is unavailable after database recovery.",
+      "expected_decision": "denied",
+      "reason_code": "required_dependency_unavailable",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-020",
+      "family": "dependency",
+      "description": "All required dependencies are ready under verified identity/version and separate observation evidence.",
+      "expected_decision": "qualified",
+      "reason_code": "dependency_set_ready",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-021",
+      "family": "application",
+      "description": "A critical application invariant (ledger balance, referential count, uniqueness or outbox consistency) fails.",
+      "expected_decision": "denied",
+      "reason_code": "application_invariant_failed",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-022",
+      "family": "application",
+      "description": "Read-only probes pass but no controlled application write/readback or transaction-safety evidence exists.",
+      "expected_decision": "indeterminate",
+      "reason_code": "write_path_unverified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-023",
+      "family": "application",
+      "description": "Read/write probes and declared business invariants pass against exact recovered release and database point.",
+      "expected_decision": "qualified",
+      "reason_code": "application_semantics_verified",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-024",
+      "family": "traffic",
+      "description": "Traffic is enabled before old-primary fencing or stale endpoint control is verified.",
+      "expected_decision": "denied",
+      "reason_code": "traffic_enabled_before_fencing",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-025",
+      "family": "traffic",
+      "description": "Independent service observer records accepted/ready state after fencing and dependency/application checks.",
+      "expected_decision": "qualified",
+      "reason_code": "service_ready_independently_observed",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-026",
+      "family": "isolation",
+      "description": "Restore rehearsal uses production credentials or can write externally without isolation/rollback evidence.",
+      "expected_decision": "denied",
+      "reason_code": "restore_test_not_isolated",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-027",
+      "family": "isolation",
+      "description": "Restore is isolated, secrets are scoped/rotated and test writes cannot escape the disposable boundary.",
+      "expected_decision": "qualified",
+      "reason_code": "restore_isolation_verified",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-028",
+      "family": "cleanup",
+      "description": "Temporary restore resources are removed without preserving the validation evidence and custody receipts.",
+      "expected_decision": "indeterminate",
+      "reason_code": "cleanup_evidence_chain_incomplete",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-029",
+      "family": "lineage",
+      "description": "Recovery plan, backup, WAL interval, actual restore target and recovered database lineage bind to exact source identity.",
+      "expected_decision": "qualified",
+      "reason_code": "recovery_lineage_bound",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-030",
+      "family": "lineage",
+      "description": "Backup artifact is valid but was captured from a different source cluster/database than the plan.",
+      "expected_decision": "denied",
+      "reason_code": "backup_source_mismatch",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-031",
+      "family": "dependency",
+      "description": "Optional dependency is treated as mandatory and failure blocks service recovery without contract basis.",
+      "expected_decision": "indeterminate",
+      "reason_code": "dependency_requirement_not_scoped",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-032",
+      "family": "application",
+      "description": "Application invariant suite is stale or built for a different release/schema version.",
+      "expected_decision": "indeterminate",
+      "reason_code": "invariant_suite_version_mismatch",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-033",
+      "family": "rpo",
+      "description": "Incident time precedes recovery point time beyond uncertainty bounds, producing a negative RPO.",
+      "expected_decision": "divergent",
+      "reason_code": "recovery_point_clock_conflict",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-034",
+      "family": "rto",
+      "description": "Service-ready time precedes incident start beyond clock uncertainty.",
+      "expected_decision": "divergent",
+      "reason_code": "rto_clock_order_conflict",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-035",
+      "family": "database",
+      "description": "A full database backup is restored and required surfaces independently compare, but application dependencies remain unavailable.",
+      "expected_decision": "indeterminate",
+      "reason_code": "database_recovered_service_not_ready",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-036",
+      "family": "service",
+      "description": "The database and dependencies are ready, but traffic acceptance was not observed by an independent service monitor.",
+      "expected_decision": "indeterminate",
+      "reason_code": "service_acceptance_unobserved",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "REST-037",
+      "family": "target",
+      "description": "PostgreSQL pauses at a target, the recovery point is inspected and the run explicitly remains a validation-only database recovery, not service-ready.",
+      "expected_decision": "qualified",
+      "reason_code": "validation_only_database_recovered",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "REST-038",
+      "family": "lineage",
+      "description": "Backup restore succeeds but WAL archive history contains a fork not linked to the chosen recovery target.",
+      "expected_decision": "indeterminate",
+      "reason_code": "wal_timeline_branch_unqualified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    }
+  ]
+}
