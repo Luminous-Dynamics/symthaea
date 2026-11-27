@@ -489,3 +489,28 @@ The VideoFDB sampling findings motivate a new track described in
 Compare fixed 1, 2 and 4 FPS with a bounded event-triggered 0.5–4 FPS policy and an oracle upper bound, all matched by average frame count, pixel count, and compute budget. Report per-dynamic recall, event detection delay, false triggers/minute, TOR alignment, latency, compute, energy, and privacy behavior.
 
 This is a research hypothesis. The trigger, sampler, dataset run, and any superiority claim are not implemented or measured yet.
+
+
+## 12. New benchmark track — calibrated reciprocal turn control
+
+TurnBench is the new external event-level baseline for end-of-turn and interruption decisions. Use the protocol in
+`SYMTHAEA_TURN_CONTROL_BENCHMARK_V0_1_2026-11-27.md`.
+
+TurnBench v1 has a documented ranking vulnerability: multiple/late fallbacks and recall-only ranking allow simple VAD systems to score deceptively well. Symthaea will therefore:
+- report official v1 recall together with false-positive rate and latency, never recall-only rank;
+- use one decision per hidden event in its internal fixed-point evaluation;
+- preserve causal input timestamps and prohibit backdating;
+- report separate scores for all six conversation styles;
+- optimize a pre-registered cost-sensitive utility where false interruption is more expensive than a missed optional backchannel;
+- prepare a per-frame-probability adapter for TurnBench v2 if/when its hidden decision-point protocol is released.
+
+Proposed internal target:
+- end-of-turn recall >= 0.97;
+- interruption recall >= 0.95;
+- false-positive rate <= 0.04;
+- false interruptions <= 0.05 per conversation minute;
+- median decision latency <= 200 ms, p95 <= 500 ms;
+- duplicate/late decisions = 0;
+- per-style recall floor >= 0.92.
+
+These are targets, not results. The metric must not be combined with VideoFDB TOR alignment or avatar response latency.
