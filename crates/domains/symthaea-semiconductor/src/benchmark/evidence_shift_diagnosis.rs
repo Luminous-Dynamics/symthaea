@@ -1079,7 +1079,10 @@ mod tests {
             vm_residual_observation(1, "vm-1", "tool-a/ch-1", 10, 5.0, "label-1");
         observation.prediction_receipt.as_mut().unwrap().prediction_value = 123.0;
         let assessment = observe_evidence_shift_v1(&mut engine, &observation).unwrap();
-        assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::InsufficientEvidence);
+        assert_eq!(
+            assessment.diagnostic_state,
+            ShiftDiagnosticStateV1::InsufficientEvidence
+        );
         assert!(
             assessment
                 .reason_codes
@@ -1397,7 +1400,13 @@ mod tests {
         fn run() -> String {
             let mut engine = engine();
             for i in 0..3 {
-                let observation = reference_observation(i + 1, &format!("ref-{i}"), "tool-a/ch-1", i as i64 + 1, 2.0);
+                let observation = reference_observation(
+                    i + 1,
+                    &format!("ref-{i}"),
+                    "tool-a/ch-1",
+                    i as i64 + 1,
+                    2.0,
+                );
                 observe_evidence_shift_v1(&mut engine, &observation).unwrap();
             }
             json_sha256(&engine).unwrap()
