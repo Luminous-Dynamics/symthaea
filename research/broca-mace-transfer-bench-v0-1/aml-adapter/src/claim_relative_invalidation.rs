@@ -776,6 +776,29 @@ mod tests {
     }
 
     #[test]
+    fn assessment_commits_to_claim_source_and_transition_identity() {
+        let (ledger, receipt) = transition(StreamingInvalidationCauseV1::Correction);
+        let binding = binding(&receipt);
+        let evidence = evidence(&binding, ClaimRevalidationOutcomeV1::Pass);
+        let assessment = assess_claim_revalidation_v1(
+            &ledger, &receipt, &binding, Some(&evidence), Some(&FixtureIndependentVerifier),
+        ).unwrap();
+        assert!(assessment.verify_integrity());
+
+        let mut altered_claim = assessment.clone();
+        altered_claim.claim_sha256 = "9".repeat(64);
+        assert!(!altered_claim.verify_integrity());
+
+        let mut altered_source = assessment.clone();
+        altered_source.source_event_id = "other-source".into();
+        assert!(!altered_source.verify_integrity());
+
+        let mut altered_transition = assessment;
+        altered_transition.source_transition_receipt_sha256 = "8".repeat(64);
+        assert!(!altered_transition.verify_integrity());
+    }
+
+    #[test]
     fn independent_pass_preserves_claim_but_requires_new_projection() {
         let (ledger, transition) = transition(StreamingInvalidationCauseV1::Correction);
         let binding = binding(&transition);
