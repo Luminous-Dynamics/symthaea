@@ -24,6 +24,7 @@ on:
     branches:
       - research/mel-ground-temporal-evaluator-v1-20261103
       - research/mel-temporal-grounding-count-gated-f1-v1-20261124
+      - research/mel-music-listen-bench-v1-20261126
     paths:
       - "crates/domains/symthaea-muse/src/temporal_grounding.rs"
       - "crates/domains/symthaea-muse/src/evidence_digest.rs"
@@ -152,6 +153,36 @@ jobs:
             and .population_confidence_interval_computed == false
             and .source_work_bootstrap_computed == false
           ' "$RUNNER_TEMP/temporal-reliability-report.json" > /dev/null
+
+      - name: Replay performance-invariance triads when module is present
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/src/performance_invariance.rs') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-performance-invariance-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-performance-invariance.synthetic.json > "$RUNNER_TEMP/performance-invariance-report.json"
+          jq -e '
+            .schema == "mel-performance-invariance-report-v1"
+            and .benchmark_id == "Melothaea-Performance-Identity"
+            and .overall.triads == 6
+            and .overall.clean.accuracy == 1.0
+            and .overall.performance_stay.accuracy > 0.83
+            and .overall.performance_stay.accuracy < 0.84
+            and .overall.musical_flip.accuracy > 0.66
+            and .overall.musical_flip.accuracy < 0.67
+            and .overall.performance_false_difference_rate > 0.16
+            and .overall.performance_false_difference_rate < 0.17
+            and .overall.musical_flip_miss_rate > 0.33
+            and .overall.musical_flip_miss_rate < 0.34
+            and .overall.joint_exact_rate == 0.5
+            and (.by_target_property | length) == 6
+            and (.by_performance_factor | length) == 6
+            and (.by_musical_flip_factor | length) == 6
+            and .source_lineage_count == 6
+            and .confirmatory_lineage_floor_met == false
+            and .audio_bytes_recomputed == false
+            and .performance_and_annotation_receipts_authenticated == false
+            and .model_invoked_by_evaluator == false
+          ' "$RUNNER_TEMP/performance-invariance-report.json" > /dev/null
 
       - name: Replay MusicListenBench CLEAN-FLIP-STAY triads when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/music_listen_bench.rs') != ''
