@@ -1,6 +1,6 @@
 # Standalone EQC reference evaluator
 
-This crate is a small, independent Rust workspace for validating the public synthetic EQC v0.1 task seed. It intentionally does not depend on the Symthaea workspace, model runtime, Mycelix Health, Holochain or an EHR.
+This crate is a small, independent Rust workspace for validating the six-episode public synthetic EQC v0.1 task seed. It intentionally does not depend on the Symthaea workspace, model runtime, Mycelix Health, Holochain or an EHR.
 
 ## Reproduce
 
