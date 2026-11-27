@@ -12,6 +12,7 @@ on:
       - "crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs"
       - "crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs"
       - "tools/sym-rsi-decision-replay-contract/**"
+      - "docs/research/SYMTHAEA_SCIENTIFIC_DECISION_REPLAY_CONTRACT_2026-11-27.md"
       - ".github/workflows/sym-rsi-scientific-decision-replay.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -23,6 +24,7 @@ on:
       - "crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs"
       - "crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs"
       - "tools/sym-rsi-decision-replay-contract/**"
+      - "docs/research/SYMTHAEA_SCIENTIFIC_DECISION_REPLAY_CONTRACT_2026-11-27.md"
       - ".github/workflows/sym-rsi-scientific-decision-replay.yml"
 
 permissions:
