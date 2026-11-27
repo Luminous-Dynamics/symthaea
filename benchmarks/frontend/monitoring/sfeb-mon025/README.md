@@ -27,6 +27,7 @@ bash scripts/labctl.sh preflight
 bash scripts/labctl.sh up 18
 bash scripts/capture-run-manifest.sh 18 mon025-run-001
 bash scripts/capture-source-boundary.sh 18
+bash scripts/capture-state.sh 18 postgres18 out/source-state.json
 bash scripts/register-connector.sh 18
 bash scripts/seed-batch.sh 18 mon025-run-001 100
 bash scripts/verify-cdc-events.sh 18 mon025-run-001 100
@@ -40,11 +41,11 @@ The lab binds exposed ports to loopback only. It is single-node and non-HA. Kafk
 
 ## Recovery lane
 
-`scripts/backup.sh` creates a physical base backup on the named backup volume. The source archives WAL under its data volume. The restore profile copies the selected backup into an isolated target volume and replays archived WAL to a caller-supplied recovery target time, pausing at the target.
+`scripts/backup.sh` creates a physical base backup on the named backup volume. The source archives WAL under its data volume. The restore profile copies the selected backup into an isolated target volume and replays archived WAL to a caller-supplied recovery LSN on a pinned timeline, pausing at the target.
 
-A drill must capture an independent source-state manifest at the exact intended recovery point, then compare it to the restored target manifest. Do not compare the restored target only with the source's later state: legitimate post-target writes are supposed to be absent.
+A drill must quiesce all fixture writers, capture an independent repeatable-read source-state manifest plus its `capture_lsn` and `timeline_id`, restore to that exact LSN/timeline, then compare only the state payloads. Capture wall time separately for RPO measurement. Do not compare the restored target only with the source's later state: legitimate post-target writes are supposed to be absent.
 
-The Compose restore service starts with traffic inaccessible on loopback-only port 56418/56419. It does not configure a load balancer or activate production traffic.
+Restore with `bash scripts/labctl.sh restore 18 BACKUP_ID LSN TIMELINE_ID` using `metadata.capture_lsn` and `metadata.timeline_id` from the source-state manifest. The Compose restore service starts with traffic inaccessible on loopback-only port 56418/56419. It does not configure a load balancer or activate production traffic.
 
 ## Files
 
