@@ -658,22 +658,44 @@ mod tests {
 
     #[test]
     fn active_context_payoffs_remain_conditionally_centered() {
-        let monitor = monitor();
+        let mut monitor = monitor();
+        monitor.history = RankHistory {
+            last_rank: Some(16),
+            second_last_rank: Some(1),
+            high_run: 2,
+            low_run: 0,
+        };
+        let active = monitor.active_context_indices();
         let counts = [2u64, 0, 4, 1, 3, 0, 0, 2, 1, 0, 1, 0, 0, 0, 1, 2];
         let prefix = prefix(&counts);
         let t = 18u64;
         let denominator = 15.0 + t as f64;
 
-        for context in monitor.contexts.iter().copied() {
-            // Whether this context is active is decided before observing R_t.
-            let mut expectation = 0.0;
-            for rank in 1..=16 {
-                let mass = (1.0 + counts[rank - 1] as f64) / denominator;
-                let payoff = centered_payoff(15, &monitor.components[0].contrast, rank, t, &prefix)
+        for component in &monitor.components {
+            let indicator = if active.binary_search(&context_index(component.context)).is_ok() {
+                1.0
+            } else {
+                0.0
+            };
+            let expectation: f64 = (1..=16)
+                .map(|rank| {
+                    let mass = (1.0 + counts[rank - 1] as f64) / denominator;
+                    let payoff = centered_payoff(
+                        15,
+                        &component.contrast,
+                        rank,
+                        t,
+                        &prefix,
+                    )
                     .unwrap();
-                expectation += mass * payoff;
-            }
-            assert!(expectation.abs() < 1e-12, "context {} lost centering", context.name());
+                    mass * indicator * payoff * component.direction.sign()
+                })
+                .sum();
+            assert!(
+                expectation.abs() < 1e-12,
+                "conditional context {} lost centering",
+                context_index(component.context)
+            );
         }
     }
 
