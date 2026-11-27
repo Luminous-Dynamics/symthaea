@@ -35,7 +35,7 @@ The reference bank binds:
 - alpha numerator/denominator;
 - exact monitor-build, score-definition and rank-reference digests;
 - null-simulator digest;
-- each reference path's unique trajectory ID, trace SHA-256 and log maximum.
+- each reference path's unique trajectory ID, unique trace SHA-256 and log maximum. Duplicate IDs and duplicate trace digests are rejected; the deployed test path cannot reuse either a reference ID or trace digest.
 
 The deployed path must match the frozen horizon, calibration size, monitor build, score definition and rank reference; it must have its own trajectory ID and trace digest. It cannot be one of the reference trajectories. The gate object is one-shot in memory and rejects a second test path. A cross-process consumption ledger still has to be enforced by the external evidence authority.
 
@@ -52,12 +52,26 @@ This is a secondary decision layer. It does not change CMAQ-040's evidence path,
 
 ## Tests
 
-The deterministic Rust tests cover exact order-rank arithmetic, alpha=0.05 bank sizes 18 and 19, strict ties, strict exceedance, disabled thresholds, horizon/calibration/build/score/reference mismatch, duplicate IDs, malformed digests, non-finite/negative log maxima, test/reference overlap, and one-shot consumption.
+The 16 deterministic Rust tests cover exact order-rank arithmetic, alpha=0.05 bank sizes 18 and 19, strict ties, strict exceedance, disabled thresholds, horizon/calibration/build/score/reference mismatch, duplicate IDs and trace digests, malformed digests, non-finite/negative log maxima, test/reference overlap, one-shot consumption, and exhaustive exchangeable rank-position checks showing the exact finite-sample rejection fraction is no greater than alpha.
 
 Run:
 
     cargo +1.100.0 test --manifest-path research/cmaq-042/Cargo.toml --locked
     cargo +1.100.0 clippy --manifest-path research/cmaq-042/Cargo.toml --locked --all-targets -- -D warnings
+
+## Generic null-path smoke probe
+
+The workflow also runs:
+
+    cargo +1.100.0 run --release --manifest-path research/cmaq-042/Cargo.toml --locked --bin reference_null_probe -- 64 256 20261127 > cmaq-042-reference-null-smoke.csv
+
+This is deliberately a *generic simple-null e-process* check, not a PRM result. It uses independent deterministic pseudo-random fair-coin paths and the nonnegative martingale
+
+    M_t = product_{i<=t} (1 + 0.5 X_i),  X_i in {-1,+1} with equal probability.
+
+For each deployment trial, it builds a fresh bank of 99 reference paths, generates one separate test path, applies the finite-horizon order-statistic boundary, and compares against the Ville threshold 1/alpha on that same test path. The CSV contains per-trial test maximum, calibrated threshold and both decisions. The workflow stores the artifact.
+
+The CI sample size is only a wiring / deterministic-run smoke check. It is far too small to estimate a five-percent false-alarm probability tightly, and the SplitMix64 streams are a reproducible simulation device, not a cryptographic random source. The formal validity statement is the exchangeable-rank argument, not the observed CI count.
 
 ## Required experiment before claiming utility
 
