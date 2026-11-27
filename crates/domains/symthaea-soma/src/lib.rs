@@ -50,10 +50,11 @@ pub use symthaea_spore::engine::SporeEngine;
 pub use symthaea_spore::engine::{CycleResult, EpistemicStatus};
 pub use symthaea_spore::persistence;
 
-// Renderer-neutral semantic events, projections, and fail-closed policy.
+// Renderer-neutral semantic events, projections, fail-closed policy and output receipts.
 pub mod embodiment_event;
 pub mod embodiment_policy;
 pub mod embodiment_projection;
+pub mod embodiment_receipt;
 
 // Mobile embodiment modules (moved from spore)
 pub mod ble_mesh;
