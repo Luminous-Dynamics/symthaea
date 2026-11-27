@@ -1,6 +1,6 @@
 # SDCB Block-Conformal Dependence-Regime Shift Experiment v1
 
-**Status:** standalone Rust 1.96 executable and focused workflow authored; empirical results remain pending exact-head execution and artifact inspection. This is a diagnostic research increment stacked on #13959, not a change to the production SDCB assessor.
+**Status:** exact-head Rust 1.96 workflow passed on source `969a7344bb392ab63b98d40e43b2d673bfe640ec`: rustfmt, 4/4 unit controls and the full 36-condition × 2,500-trial grid (90,000 simulations). CSV and source/toolchain manifest were generated, downloaded and inspected ([workflow run #16](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46002051862), [artifact 15197659974](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46002051862/artifacts/15197659974)). Results are diagnostic and do not establish a general coverage guarantee. This is a research increment stacked on #13959, not a change to the production SDCB assessor.
 
 ## Research question
 
@@ -58,6 +58,38 @@ The serial arm therefore combines:
 
 The independent arm isolates item 3.
 
+## Exact-head results — 27 November 2026
+
+The exact-source run passed Rust 1.96 formatting and **4/4 unit controls** and generated 36 rows × 2,500 trials = **90,000 trials**. The manifest binds source commit `969a7344bb392ab63b98d40e43b2d673bfe640ec`, Rust 1.96.0 and the full grid. See [workflow run #16](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46002051862) and [CSV + manifest artifact](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46002051862/artifacts/15197659974).
+
+The following table shows empirical alarm percentages. The independent-block arm isolates the within-block score-distribution change; serial-path arms also contain dependence across calibration/test blocks.
+
+| Calibration rho → test rho | Block length | Independent blocks | Serial path, gap 0 | Serial path, gap 64 |
+|---|---:|---:|---:|---:|
+| 0.05 → 0.05 | 1 | 9.44% | 10.08% | 10.40% |
+| 0.05 → 0.05 | 8 | 9.76% | 9.60% | 10.16% |
+| 0.05 → 0.05 | 32 | 9.92% | 9.52% | 10.20% |
+| 0.05 → 0.95 | 1 | 10.96% | 9.56% | 9.36% |
+| 0.05 → 0.95 | 8 | **3.88%** | **3.68%** | **3.48%** |
+| 0.05 → 0.95 | 32 | **3.72%** | **2.72%** | **2.92%** |
+| 0.95 → 0.05 | 1 | 9.40% | **18.68%** | 10.00% |
+| 0.95 → 0.05 | 8 | **27.12%** | **28.92%** | **26.56%** |
+| 0.95 → 0.05 | 32 | **30.12%** | **32.12%** | **33.72%** |
+| 0.95 → 0.95 | 1 | 10.16% | **14.32%** | 9.64% |
+| 0.95 → 0.95 | 8 | 9.96% | 11.16% | 10.76% |
+| 0.95 → 0.95 | 32 | 10.08% | 10.12% | 9.72% |
+
+The most important finding is the **directional block-score shift despite identical pointwise marginals**:
+
+- Low-to-high dependence, independent blocks: alarm rate falls to 3.88% for length 8 (Wilson 95%: 3.191–4.711%) and 3.72% for length 32 (3.046–4.536%). Calibration blocks with weak correlation have more extreme maxima than highly correlated test blocks, so the nominal 10% test becomes materially conservative.
+- High-to-low dependence, independent blocks: alarm rate rises to 27.12% for length 8 (25.413–28.897%) and 30.12% for length 32 (28.353–31.948%). Calibration maxima from strongly correlated blocks are too small for weakly correlated test blocks, resulting in substantial undercoverage.
+- At block length 1, independent arms remain near nominal in both directions (10.96% and 9.40%), because the one-point marginal is unchanged. The serial-path arm can still violate nominal through dependence between sequential scores: for the `0.95 → 0.05` case it reports 18.68% with no gap.
+- Embargo reduces some serial dependence effects, but it does not repair the independent-arm change in block-score distribution. In the `0.95 → 0.05` block-length 32 condition, even gap 64 has a 33.72% alarm rate.
+
+The equal-regime arms provide controls: independent-block rates remain near 10% for the `0.05 → 0.05` and `0.95 → 0.95` settings; the serial high-correlation, block-length-1 condition remains elevated without an embargo (14.32%), consistent with the separate dependence-stress finding in #13959.
+
+**Interpretation:** pointwise marginal fit is insufficient to validate block-conformal calibration when the score aggregates multiple dependent observations. Dependence shifts can change the distribution of the block statistic in either direction; it is not accurate to describe all such shifts as simply “more conservative” or “less conservative.” These results are limited to the specified stationary Gaussian AR(1), block-max score, two rho values, sample count and fixed seeds. They are not proof of a universal detector or calibration guarantee.
+
 ## Scoring
 
 Each block score is the maximum absolute residual:
@@ -81,7 +113,7 @@ The direction is important. If test blocks are more correlated, their block maxi
 
 ## Paradigm shift: qualify the dependence envelope, not only the marginal fit
 
-The result should inform a later production-facing contract. A calibration receipt should bind at least:
+The observed result supports a later production-facing contract. A calibration receipt should bind at least:
 - source episode IDs and exact calibration/test unit custody;
 - residual score definition and block construction;
 - block length and embargo protocol;
