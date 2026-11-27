@@ -176,11 +176,7 @@ fn independent_block_means_oracle_reconstructs_paper_standard_error() {
     let model = digest('9');
     let all = (1..=40)
         .map(|sequence| {
-            let value = match sequence % 7 {
-                0 | 1 => 1.5,
-                2 => 0.9,
-                _ => 0.4,
-            };
+            let value = if sequence % 13 == 0 { 1.5 } else { 0.5 };
             observation(sequence, value, &model)
         })
         .collect::<Vec<_>>();
