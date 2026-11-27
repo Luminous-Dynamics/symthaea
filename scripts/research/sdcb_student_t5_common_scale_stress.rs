@@ -223,7 +223,7 @@ fn run_regime_experiment(
                     calibration.push(stream.block_maximum(calibration_rho, block_len, embargo_gap));
                 }
                 // The regime changes only after the calibration prefix and
-                // declared embargo. Every one-step marginal remains fixed within the selected family.
+                // declared embargo. Every one-step marginal remains fixed within the selected family (Gaussian or standardized t5).
                 test_score = stream.block_maximum(test_rho, block_len, 0);
             }
         }
@@ -404,6 +404,40 @@ mod tests {
         );
         assert!(low_to_high.empirical_alarm_rate < 0.08);
         assert!(high_to_low.empirical_alarm_rate > 0.18);
+    }
+
+    #[test]
+    fn student_t5_marginal_is_unit_variance() {
+        let mut sum = 0.0_f64;
+        let mut sum_squares = 0.0_f64;
+        let samples = 50_000_u64;
+        for index in 0..samples {
+            let mut stream = Ar1Stream::new(
+                0xB10C_C0DE_5300 ^ index.wrapping_mul(0x9E37_79B9_7F4A_7C15),
+                MarginalFamily::StandardizedStudentT5CommonScale,
+            );
+            let value = stream.next(0.0);
+            sum += value;
+            sum_squares += value * value;
+        }
+        let mean = sum / samples as f64;
+        let variance = sum_squares / samples as f64 - mean * mean;
+        assert!((variance - 1.0).abs() < 0.08, "observed variance {:.4}", variance);
+    }
+
+    #[test]
+    fn student_t5_one_point_blocks_keep_nominal_rate_when_rho_changes() {
+        let report = run_regime_experiment(
+            SamplingDesign::IndependentBlocks,
+            MarginalFamily::StandardizedStudentT5CommonScale,
+            0.05,
+            0.95,
+            1,
+            0,
+            20_000,
+            0xB10C_C0DE_5203,
+        );
+        assert!((report.empirical_alarm_rate - ALPHA).abs() <= 0.02);
     }
 
     #[test]
