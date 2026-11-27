@@ -166,6 +166,7 @@ func Evaluate(in Input)Result{
 
 	seenIDs:=map[string]struct{}{}
 	seenSeeds:=map[int64]struct{}{}
+	allObservationsComplete:=true
 	for _,o:=range in.Observations{
 		if !validID(o.ReplayID)||!validID(o.TrialID){f.block("replay_identity_invalid");continue}
 		if _,ok:=seenIDs[o.ReplayID];ok{f.block("duplicate_replay_id");continue};seenIDs[o.ReplayID]=struct{}{}
@@ -175,7 +176,8 @@ func Evaluate(in Input)Result{
 		if o.ObservedAt.IsZero()||(!in.EvaluatedAt.IsZero()&&o.ObservedAt.After(in.EvaluatedAt)){f.block("replay_time_invalid")}
 		if !validVerdict(o.Verdict)||!validDigest(o.FailureSignatureSHA256)||!validDigest(o.OutcomeReceiptSHA256){f.block("replay_outcome_invalid")}
 		if o.OutcomeReceiptSHA256!=ObservationReceiptDigest(o){f.block("replay_receipt_digest_mismatch")}
-		if !o.Complete{f.hold("replay_observation_incomplete")}
+		if !o.Complete{allObservationsComplete=false;f.hold("replay_observation_incomplete")}
+		if o.Verdict==Indeterminate{f.hold("replay_outcome_indeterminate")}
 		target:=o.Verdict==Blocked&&o.FailureSignatureSHA256==in.TargetFailureSignatureSHA256
 		out.Replays=append(out.Replays,ReplaySummary{ReplayID:o.ReplayID,Seed:o.Seed,Verdict:o.Verdict,FailureSignatureSHA256:o.FailureSignatureSHA256,TargetSignatureMatched:target,OutcomeReceiptSHA256:o.OutcomeReceiptSHA256})
 		out.ObservedRuns++
@@ -188,7 +190,7 @@ func Evaluate(in Input)Result{
 		out.ObservedRate=float64(out.TargetSignatureMatches)/float64(out.ObservedRuns)
 		out.OneSidedConfidenceLowerBound=OneSidedClopperPearsonLower(out.TargetSignatureMatches,out.ObservedRuns,in.ConfidenceLevel)
 	}
-	out.EvidenceComplete=len(in.Observations)==in.RequiredRuns&&out.ObservedRuns==in.RequiredRuns
+	out.EvidenceComplete=len(in.Observations)==in.RequiredRuns&&out.ObservedRuns==in.RequiredRuns&&allObservationsComplete
 	if !out.EvidenceComplete{f.hold("replay_evidence_incomplete")}
 	if out.EvidenceComplete&&!f.unknown{
 		if out.OneSidedConfidenceLowerBound>=in.MinimumReliability{
