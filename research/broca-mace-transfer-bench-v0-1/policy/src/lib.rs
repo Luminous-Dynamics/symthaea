@@ -744,7 +744,6 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
     let b = groups.get(&Action::B).cloned().unwrap_or_default();
     let a_ok = a.is_qualified();
     let b_ok = b.is_qualified();
-    #[cfg(test)]
     eprintln!(
         "MACE aggregate groups: A ok={a_ok} count={} families={:?} roots={} events={} one_estimand={} mixed={} digest={:?}; B ok={b_ok} count={} families={:?} roots={} events={} one_estimand={} mixed={} digest={:?}",
         a.count, a.source_families, a.source_root_digests.len(), a.source_events.len(),
