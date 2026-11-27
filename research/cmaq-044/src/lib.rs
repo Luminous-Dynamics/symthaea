@@ -549,7 +549,7 @@ fn events_per_hour_ppm(events: u128, exposure_us: u64) -> Result<Option<u128>, B
         return Ok(None);
     }
     let numerator = events
-        .checked_mul(US_PER_HOUR)
+        .checked_mul(US_PER_HOUR_PPM)
         .ok_or(BenchmarkError::ArithmeticOverflow)?;
     Ok(Some(
         numerator
