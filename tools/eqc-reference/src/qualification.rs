@@ -573,9 +573,24 @@ mod tests {
         });
 
         assert!(validator.is_valid(&receipt));
-        let mut self_qualified = receipt;
+        let mut self_qualified = receipt.clone();
         self_qualified["qualified"] = json!(true);
         assert!(!validator.is_valid(&self_qualified));
+
+        let mut false_network_claim = receipt.clone();
+        false_network_claim["measurements"]["network"]["bytes_out"] = json!(1);
+        assert!(!validator.is_valid(&false_network_claim));
+
+        let mut missing_platform_attestation = receipt.clone();
+        missing_platform_attestation["observer"]["trust_level"] =
+            json!("L2_PLATFORM_ATTESTED");
+        assert!(!validator.is_valid(&missing_platform_attestation));
+
+        let mut unknown_state_with_unqualified_hashes = receipt;
+        unknown_state_with_unqualified_hashes["measurements"]["state"]["status"] = json!("unknown");
+        unknown_state_with_unqualified_hashes["measurements"]["state"]["before_sha256"] = Value::Null;
+        unknown_state_with_unqualified_hashes["measurements"]["state"]["after_sha256"] = Value::Null;
+        assert!(validator.is_valid(&unknown_state_with_unqualified_hashes));
     }
 
     #[test]
