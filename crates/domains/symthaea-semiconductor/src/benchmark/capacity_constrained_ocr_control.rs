@@ -15,22 +15,18 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::label_consumption_guard::{
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-    LabelEvidenceFrontierV1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
 
-pub const CAPACITY_OCRC_POLICY_SCHEMA_V1: &str =
-    "luminous.semi-bench.capacity-ocrc-policy.v1";
-pub const CAPACITY_OCRC_ENGINE_SCHEMA_V1: &str =
-    "luminous.semi-bench.capacity-ocrc-engine.v1";
+pub const CAPACITY_OCRC_POLICY_SCHEMA_V1: &str = "luminous.semi-bench.capacity-ocrc-policy.v1";
+pub const CAPACITY_OCRC_ENGINE_SCHEMA_V1: &str = "luminous.semi-bench.capacity-ocrc-engine.v1";
 pub const CAPACITY_OCRC_PREDICTION_INPUT_SCHEMA_V1: &str =
     "luminous.semi-bench.capacity-ocrc-prediction-input.v1";
 pub const CAPACITY_OCRC_PREDICTION_RECEIPT_SCHEMA_V1: &str =
     "luminous.semi-bench.capacity-ocrc-prediction-receipt.v1";
 pub const CAPACITY_OCRC_ROUND_INPUT_SCHEMA_V1: &str =
     "luminous.semi-bench.capacity-ocrc-round-input.v1";
-pub const CAPACITY_OCRC_FEEDBACK_SCHEMA_V1: &str =
-    "luminous.semi-bench.capacity-ocrc-feedback.v1";
+pub const CAPACITY_OCRC_FEEDBACK_SCHEMA_V1: &str = "luminous.semi-bench.capacity-ocrc-feedback.v1";
 pub const CAPACITY_OCRC_ROUND_RECEIPT_SCHEMA_V1: &str =
     "luminous.semi-bench.capacity-ocrc-round-receipt.v1";
 
@@ -326,7 +322,9 @@ pub fn validate_capacity_ocrc_policy_v1(
     }
     require_text(&policy.policy_id, "policy.policy_id")?;
     if policy.revision == 0 {
-        return Err(CapacityOcrcErrorV1("policy revision must be positive".into()));
+        return Err(CapacityOcrcErrorV1(
+            "policy revision must be positive".into(),
+        ));
     }
     if !policy.target_miscoverage.is_finite()
         || !(0.0..1.0).contains(&policy.target_miscoverage)
@@ -354,8 +352,7 @@ pub fn validate_capacity_ocrc_policy_v1(
     for value in &policy.proxy_delay_survival {
         if !value.is_finite() || !(0.0..=1.0).contains(value) || *value > previous {
             return Err(CapacityOcrcErrorV1(
-                "proxy survival probabilities must be finite, in [0,1], and non-increasing"
-                    .into(),
+                "proxy survival probabilities must be finite, in [0,1], and non-increasing".into(),
             ));
         }
         previous = *value;
@@ -366,11 +363,7 @@ pub fn validate_capacity_ocrc_policy_v1(
             "F(d_max) must be positive for the declared CA-OCRC bound".into(),
         ));
     }
-    let load: f64 = policy
-        .proxy_delay_survival
-        .iter()
-        .skip(1)
-        .sum();
+    let load: f64 = policy.proxy_delay_survival.iter().skip(1).sum();
     if !load.is_finite() || load > policy.capacity as f64 {
         return Err(CapacityOcrcErrorV1(
             "proxy tracking load must not exceed tracking capacity".into(),
@@ -380,11 +373,7 @@ pub fn validate_capacity_ocrc_policy_v1(
 }
 
 pub fn capacity_ocrc_tracking_load_v1(policy: &CapacityOcrcPolicyV1) -> f64 {
-    policy
-        .proxy_delay_survival
-        .iter()
-        .skip(1)
-        .sum()
+    policy.proxy_delay_survival.iter().skip(1).sum()
 }
 
 pub fn create_capacity_ocrc_engine_v1(
@@ -540,20 +529,16 @@ fn validate_feedback(
     if !report.downstream_consumption_allowed {
         reasons.push(OcrcFeedbackReasonV1::DownstreamConsumptionNotAllowed);
     }
-    if feedback.label_value != report.qualified_corrected_value
-        || !feedback.label_value.is_finite()
+    if feedback.label_value != report.qualified_corrected_value || !feedback.label_value.is_finite()
     {
         reasons.push(OcrcFeedbackReasonV1::CorrectedValueMismatch);
     }
     if feedback.label_available_at_unix_seconds > feedback.delivered_at_unix_seconds
-        || feedback.label_available_at_unix_seconds
-            < tracked.prediction.event_time_unix_seconds
+        || feedback.label_available_at_unix_seconds < tracked.prediction.event_time_unix_seconds
     {
         reasons.push(OcrcFeedbackReasonV1::LabelUnavailableAtDelivery);
     }
-    if feedback.delivered_at_unix_seconds
-        < tracked.prediction.prediction_at_unix_seconds
-    {
+    if feedback.delivered_at_unix_seconds < tracked.prediction.prediction_at_unix_seconds {
         reasons.push(OcrcFeedbackReasonV1::LabelUnavailableAtDelivery);
     }
     if feedback.eligibility_report_available_at_unix_seconds > feedback.delivered_at_unix_seconds {
@@ -571,7 +556,11 @@ fn validate_feedback(
 
 fn mark_theorem_not_met(engine: &mut CapacityOcrcEngineV1, reason: &str) {
     engine.theorem_eligibility = OcrcTheoremEligibilityV1::AssumptionsNotMet;
-    if !engine.theorem_reason_codes.iter().any(|item| item == reason) {
+    if !engine
+        .theorem_reason_codes
+        .iter()
+        .any(|item| item == reason)
+    {
         engine.theorem_reason_codes.push(reason.to_string());
         engine.theorem_reason_codes.sort();
     }
@@ -582,12 +571,19 @@ pub fn advance_capacity_ocrc_round_v1(
     input: &CapacityOcrcRoundInputV1,
 ) -> Result<CapacityOcrcRoundReceiptV1, CapacityOcrcErrorV1> {
     if engine.schema != CAPACITY_OCRC_ENGINE_SCHEMA_V1 {
-        return Err(CapacityOcrcErrorV1("CA-OCRC engine schema is unsupported".into()));
+        return Err(CapacityOcrcErrorV1(
+            "CA-OCRC engine schema is unsupported".into(),
+        ));
     }
     if input.schema != CAPACITY_OCRC_ROUND_INPUT_SCHEMA_V1 {
-        return Err(CapacityOcrcErrorV1("CA-OCRC round schema is unsupported".into()));
+        return Err(CapacityOcrcErrorV1(
+            "CA-OCRC round schema is unsupported".into(),
+        ));
     }
-    require_text(&input.proxy_randomness_receipt_sha256, "proxy randomness receipt")?;
+    require_text(
+        &input.proxy_randomness_receipt_sha256,
+        "proxy randomness receipt",
+    )?;
     if !valid_sha256(&input.proxy_randomness_receipt_sha256) {
         return Err(CapacityOcrcErrorV1(
             "proxy randomness receipt must be a lowercase SHA-256 digest".into(),
@@ -671,8 +667,7 @@ pub fn advance_capacity_ocrc_round_v1(
         receipt_sha256: String::new(),
     };
 
-    if input.sampled_proxy_delay >= 0
-        && candidate.tracked_rounds.len() < candidate.policy.capacity
+    if input.sampled_proxy_delay >= 0 && candidate.tracked_rounds.len() < candidate.policy.capacity
     {
         let proxy_deadline_round = prediction
             .round
@@ -686,7 +681,8 @@ pub fn advance_capacity_ocrc_round_v1(
             },
         );
         prediction_receipt.tracking_admitted = true;
-        candidate.tracked_rounds
+        candidate
+            .tracked_rounds
             .get_mut(&prediction.round)
             .expect("just inserted")
             .prediction = prediction_receipt.clone();
@@ -711,14 +707,18 @@ pub fn advance_capacity_ocrc_round_v1(
     let mut feedback_threshold_delta = 0.0_f64;
 
     for event in feedback {
-        if event.delivered_round != prediction.round || event.source_round == 0
+        if event.delivered_round != prediction.round
+            || event.source_round == 0
             || event.source_round > prediction.round
         {
             return Err(CapacityOcrcErrorV1(
                 "feedback delivery round/source round is invalid".into(),
             ));
         }
-        if !candidate.processed_feedback_rounds.insert(event.source_round) {
+        if !candidate
+            .processed_feedback_rounds
+            .insert(event.source_round)
+        {
             return Err(CapacityOcrcErrorV1(
                 "duplicate feedback was presented for a prediction round".into(),
             ));
@@ -902,7 +902,9 @@ pub fn capacity_ocrc_risk_bound_v1(
 ) -> Result<CapacityOcrcRiskBoundV1, CapacityOcrcErrorV1> {
     validate_capacity_ocrc_policy_v1(policy)?;
     if horizon == 0 {
-        return Err(CapacityOcrcErrorV1("risk-bound horizon must be positive".into()));
+        return Err(CapacityOcrcErrorV1(
+            "risk-bound horizon must be positive".into(),
+        ));
     }
     let dmax = policy.maximum_feedback_delay as f64;
     if policy.capacity as u64 >= policy.maximum_feedback_delay.saturating_add(1) {
@@ -915,8 +917,7 @@ pub fn capacity_ocrc_risk_bound_v1(
             terminal_survival_probability: 1.0,
             tracking_load: dmax,
             saturation_term: 0.0,
-            risk_gap_upper_bound: policy.score_bound
-                / (policy.learning_rate * horizon as f64)
+            risk_gap_upper_bound: policy.score_bound / (policy.learning_rate * horizon as f64)
                 + (policy.maximum_feedback_delay as f64 + 1.0) / horizon as f64,
         });
     }
@@ -934,7 +935,10 @@ pub fn capacity_ocrc_risk_bound_v1(
                 + 1.0 / horizon as f64,
         });
     }
-    let terminal = *policy.proxy_delay_survival.last().expect("validated non-empty");
+    let terminal = *policy
+        .proxy_delay_survival
+        .last()
+        .expect("validated non-empty");
     let load = capacity_ocrc_tracking_load_v1(policy);
     let ratio = load / policy.capacity as f64;
     let h = ratio - 1.0 - ratio.ln();
@@ -959,12 +963,7 @@ pub fn capacity_ocrc_risk_bound_v1(
     })
 }
 
-fn proxy_objective(
-    p: f64,
-    capacity: usize,
-    maximum_delay: u64,
-    horizon: u64,
-) -> f64 {
+fn proxy_objective(p: f64, capacity: usize, maximum_delay: u64, horizon: u64) -> f64 {
     let k = capacity as f64;
     let d = maximum_delay as f64;
     let ratio = d * p / k;
@@ -1096,8 +1095,8 @@ mod tests {
             calibration_certificate_id: "calibration-1".into(),
             frontier: LabelEvidenceFrontierV1::CurrentAtK1,
             eligibility: report_status,
-            downstream_consumption_allowed:
-                report_status == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            downstream_consumption_allowed: report_status
+                == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             reasons: Vec::new(),
             label_sha256: payload.clone(),
             measurement_sha256: digest('e'),
@@ -1179,10 +1178,23 @@ mod tests {
         let mut engine = create_capacity_ocrc_engine_v1("ca-ocrc-zero", policy()).unwrap();
         let receipt = advance_capacity_ocrc_round_v1(
             &mut engine,
-            &round_input(1, 0, vec![feedback(1, 1, 10.0, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy)]),
-        ).unwrap();
+            &round_input(
+                1,
+                0,
+                vec![feedback(
+                    1,
+                    1,
+                    10.0,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                )],
+            ),
+        )
+        .unwrap();
         assert!(receipt.prediction.tracking_admitted);
-        assert_eq!(receipt.feedback_outcomes[0].disposition, OcrcFeedbackDispositionV1::Applied);
+        assert_eq!(
+            receipt.feedback_outcomes[0].disposition,
+            OcrcFeedbackDispositionV1::Applied
+        );
     }
 
     #[test]
@@ -1190,14 +1202,16 @@ mod tests {
         let mut p = policy();
         p.initial_threshold = p.score_bound;
         let mut engine = create_capacity_ocrc_engine_v1("ca-ocrc-full", p).unwrap();
-        let full = advance_capacity_ocrc_round_v1(&mut engine, &round_input(1, -1, vec![])).unwrap();
+        let full =
+            advance_capacity_ocrc_round_v1(&mut engine, &round_input(1, -1, vec![])).unwrap();
         assert_eq!(full.prediction.interval_kind, OcrcIntervalKindV1::Full);
         assert_eq!(full.trivial_loss, Some(0.0));
         assert_eq!(full.tracking_occupancy_after_round, 0);
         assert!(full.threshold_after < full.threshold_before);
 
         engine.threshold = -0.1;
-        let empty = advance_capacity_ocrc_round_v1(&mut engine, &round_input(2, -1, vec![])).unwrap();
+        let empty =
+            advance_capacity_ocrc_round_v1(&mut engine, &round_input(2, -1, vec![])).unwrap();
         assert_eq!(empty.prediction.interval_kind, OcrcIntervalKindV1::Empty);
         assert_eq!(empty.trivial_loss, Some(1.0));
         assert_eq!(empty.tracking_occupancy_after_round, 0);
@@ -1210,10 +1224,23 @@ mod tests {
         advance_capacity_ocrc_round_v1(&mut engine, &round_input(2, 0, vec![])).unwrap();
         let at_deadline = advance_capacity_ocrc_round_v1(
             &mut engine,
-            &round_input(3, 0, vec![feedback(1, 3, 10.0, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy)]),
-        ).unwrap();
+            &round_input(
+                3,
+                0,
+                vec![feedback(
+                    1,
+                    3,
+                    10.0,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                )],
+            ),
+        )
+        .unwrap();
         assert!(at_deadline.evicted_rounds.is_empty());
-        assert_eq!(at_deadline.feedback_outcomes[0].disposition, OcrcFeedbackDispositionV1::Applied);
+        assert_eq!(
+            at_deadline.feedback_outcomes[0].disposition,
+            OcrcFeedbackDispositionV1::Applied
+        );
     }
 
     #[test]
@@ -1223,22 +1250,45 @@ mod tests {
         let before = engine.threshold;
         let receipt = advance_capacity_ocrc_round_v1(
             &mut engine,
-            &round_input(2, 0, vec![feedback(1, 2, 10.0, LabelConsumptionEligibilityV1::Unknown)]),
-        ).unwrap();
+            &round_input(
+                2,
+                0,
+                vec![feedback(1, 2, 10.0, LabelConsumptionEligibilityV1::Unknown)],
+            ),
+        )
+        .unwrap();
         assert_eq!(engine.threshold, before);
-        assert_eq!(receipt.feedback_outcomes[0].disposition, OcrcFeedbackDispositionV1::RejectedK1);
-        assert_eq!(receipt.theorem_eligibility, OcrcTheoremEligibilityV1::AssumptionsNotMet);
+        assert_eq!(
+            receipt.feedback_outcomes[0].disposition,
+            OcrcFeedbackDispositionV1::RejectedK1
+        );
+        assert_eq!(
+            receipt.theorem_eligibility,
+            OcrcTheoremEligibilityV1::AssumptionsNotMet
+        );
     }
 
     #[test]
     fn label_revision_payload_and_value_are_bound_to_k1_report() {
         let mut engine = create_capacity_ocrc_engine_v1("ca-ocrc-bind", policy()).unwrap();
         advance_capacity_ocrc_round_v1(&mut engine, &round_input(1, 2, vec![])).unwrap();
-        let mut wrong = feedback(1, 2, 10.0, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy);
+        let mut wrong = feedback(
+            1,
+            2,
+            10.0,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+        );
         wrong.label_revision = 2;
-        let receipt = advance_capacity_ocrc_round_v1(&mut engine, &round_input(2, 0, vec![wrong])).unwrap();
-        assert_eq!(receipt.feedback_outcomes[0].disposition, OcrcFeedbackDispositionV1::RejectedIdentity);
-        assert_eq!(receipt.theorem_eligibility, OcrcTheoremEligibilityV1::AssumptionsNotMet);
+        let receipt =
+            advance_capacity_ocrc_round_v1(&mut engine, &round_input(2, 0, vec![wrong])).unwrap();
+        assert_eq!(
+            receipt.feedback_outcomes[0].disposition,
+            OcrcFeedbackDispositionV1::RejectedIdentity
+        );
+        assert_eq!(
+            receipt.theorem_eligibility,
+            OcrcTheoremEligibilityV1::AssumptionsNotMet
+        );
     }
 
     #[test]
@@ -1250,12 +1300,25 @@ mod tests {
         let before = engine.threshold;
         let receipt = advance_capacity_ocrc_round_v1(
             &mut engine,
-            &round_input(2, 0, vec![feedback(1, 2, 20.0, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy)]),
-        ).unwrap();
+            &round_input(
+                2,
+                0,
+                vec![feedback(
+                    1,
+                    2,
+                    20.0,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                )],
+            ),
+        )
+        .unwrap();
         let loss = 1.0;
         let expected = 0.2 * (loss - 0.1) / 0.75;
         assert!((engine.threshold - (before + expected)).abs() < 1.0e-12);
-        assert_eq!(receipt.feedback_outcomes[0].disposition, OcrcFeedbackDispositionV1::Applied);
+        assert_eq!(
+            receipt.feedback_outcomes[0].disposition,
+            OcrcFeedbackDispositionV1::Applied
+        );
     }
 
     #[test]
@@ -1265,9 +1328,7 @@ mod tests {
         let load = 0.75 + 0.50 + 0.25;
         let ratio = load / 2.0;
         let h = ratio - 1.0 - ratio.ln();
-        let expected = 4.0 / (0.2 * 10_000.0)
-            + 3.0 / (0.25 * 10_000.0)
-            + (-2.0 * h).exp();
+        let expected = 4.0 / (0.2 * 10_000.0) + 3.0 / (0.25 * 10_000.0) + (-2.0 * h).exp();
         assert!((bound.risk_gap_upper_bound - expected).abs() < 1.0e-12);
     }
 
@@ -1277,7 +1338,12 @@ mod tests {
         assert!(optimized.bernoulli_survival_probability > 0.0);
         assert!(optimized.bernoulli_survival_probability <= 0.25);
         assert_eq!(optimized.proxy_delay_survival[0], 1.0);
-        assert!(optimized.proxy_delay_survival.windows(2).all(|pair| pair[0] >= pair[1]));
+        assert!(
+            optimized
+                .proxy_delay_survival
+                .windows(2)
+                .all(|pair| pair[0] >= pair[1])
+        );
         let load: f64 = optimized.proxy_delay_survival.iter().skip(1).sum();
         assert!(load <= 2.0 + 1.0e-12);
     }
@@ -1289,9 +1355,7 @@ mod tests {
         let objective = optimized.objective_value;
         for neighbour in [p - 0.25 / 4096.0, p + 0.25 / 4096.0] {
             if neighbour > 0.0 && neighbour <= 0.25 {
-                assert!(
-                    objective <= proxy_objective(neighbour, 2, 8, 10_000) + 1.0e-12
-                );
+                assert!(objective <= proxy_objective(neighbour, 2, 8, 10_000) + 1.0e-12);
             }
         }
     }
@@ -1299,8 +1363,10 @@ mod tests {
     #[test]
     fn replay_of_same_proxy_and_feedback_schedule_is_identical() {
         fn run() -> Vec<String> {
-            let mut engine = create_capacity_ocrc_engine_v1("ca-ocrc-determinism", policy()).unwrap();
-            let r1 = advance_capacity_ocrc_round_v1(&mut engine, &round_input(1, 2, vec![])).unwrap();
+            let mut engine =
+                create_capacity_ocrc_engine_v1("ca-ocrc-determinism", policy()).unwrap();
+            let r1 =
+                advance_capacity_ocrc_round_v1(&mut engine, &round_input(1, 2, vec![])).unwrap();
             let r2 = advance_capacity_ocrc_round_v1(
                 &mut engine,
                 &round_input(2, 0, vec![feedback(1, 2, 10.0, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy)]),
