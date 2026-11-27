@@ -94,6 +94,7 @@ jobs:
           mkdir -p "${tmp_root}/benchmarks/plasma/measure-stability/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/kinetic-information-return/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/kresp-c-collisional/fixtures"
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/validity_horizon.rs "${crate_dir}/src/validity_horizon.rs"
           cp crates/domains/symthaea-plasma-probes/src/rbkr.rs "${crate_dir}/src/rbkr.rs"
@@ -193,6 +194,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/response-balanced/"
           cp benchmarks/plasma/response-balanced/fixtures/synthetic-kresp1-experiment-v0.1.json \
             "${tmp_root}/benchmarks/plasma/response-balanced/fixtures/"
+          cp benchmarks/plasma/response-balanced/kresp-c-collisional/kresp-c-vpd-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/kresp-c-collisional/"
+          cp benchmarks/plasma/response-balanced/kresp-c-collisional/fixtures/synthetic-vpd-drive-cohorts-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/kresp-c-collisional/fixtures/"
           cat > "${crate_dir}/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-plasma-probes"
@@ -911,6 +916,53 @@ jobs:
           print("response_balanced_kresp1_schema_validation=PASS")
           print("response_balanced_split_and_coverage_validation=PASS")
           print("response_balanced_claim_boundary_validation=PASS")
+          PY
+
+      - name: Validate separate collisional K-RESP-C contract
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-c-collisional")
+          schema = json.loads((root / "kresp-c-vpd-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-vpd-drive-cohorts-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+
+          assert fixture["equation"] == "periodic_1d1v_vlasov_poisson_dougherty"
+          assert fixture["benchmark_id"] == "KRESP-C-VPD-1D1V"
+          assert fixture["collision_model"]["invariants"] == ["mass", "momentum", "kinetic_energy"]
+          assert fixture["structure_contract"]["fallback_on_structure_failure"] == "full_order_collision_step"
+          cohorts = fixture["trajectory_cohorts"]
+          assert len({cohort["independent_initial_state_digest"] for cohort in cohorts}) == len(cohorts)
+          assert {cohort["split_role"] for cohort in cohorts} == {"training", "validation", "sealed_holdout"}
+          for cohort in cohorts:
+              assert cohort["collision_frequency"] > 0
+              assert cohort["end_time"] > 0
+              schedule = sorted(cohort["external_drive_schedule"], key=lambda segment: segment["start_time"])
+              assert schedule[0]["start_time"] == 0
+              assert schedule[-1]["end_time"] == cohort["end_time"]
+              assert all(left["end_time"] == right["start_time"] for left, right in zip(schedule, schedule[1:]))
+          drive_switch = next(item for item in cohorts if item["kind"] == "drive_switching")
+          assert [(x["start_time"], x["end_time"], x["amplitude"]) for x in drive_switch["external_drive_schedule"]] == [
+              (0, 4, 0.7), (4, 8, -0.7), (8, 12, 0)
+          ]
+          prior = fixture["published_prior_art_reference"]
+          assert prior["status"] == "literature_claim_not_reproduced_here"
+          assert prior["variables_per_cell"] == 13
+          assert prior["reported_speedup_min"] == 1.36 and prior["reported_speedup_max"] == 2.89
+          assert prior["reference_grid_transport_retained"] is True
+          assert fixture["claim_boundary"] == {
+              "physical_solver_executed": False,
+              "physical_trajectory_measured": False,
+              "entropy_guarantee_proved_for_this_implementation": False,
+              "competitive_result_reproduced": False
+          }
+          print("response_balanced_kresp_c_schema_validation=PASS")
+          print("response_balanced_kresp_c_cohort_and_structure_validation=PASS")
+          print("response_balanced_kresp_c_claim_boundary_validation=PASS")
           PY
 
       - name: Run Rust K-RESP semantic contract auditor
