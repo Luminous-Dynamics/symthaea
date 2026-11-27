@@ -86,8 +86,10 @@ type Result struct {
 	Required int
 	Covered int
 	Excluded int
+	NotApplicable int
 	Uncovered []string
 	ExcludedSurfaces []string
+	NotApplicableSurfaces []string
 	CoveredSurfaces []string
 	Checked []string
 }
@@ -178,8 +180,8 @@ func Evaluate(req Request) Result {
 			if !nonempty(a.ApplicabilityProofDigest) {
 				return finish(Indeterminate,"not-applicable classification lacks independent applicability proof: "+spec.ID,r)
 			}
-			r.Covered++
-			r.CoveredSurfaces=append(r.CoveredSurfaces,spec.ID)
+			r.NotApplicable++
+			r.NotApplicableSurfaces=append(r.NotApplicableSurfaces,spec.ID)
 		case ExcludedByContract:
 			if req.Scope==FullDatabaseState {
 				return finish(Denied,"excluded surface cannot satisfy full database state: "+spec.ID,r)
@@ -195,7 +197,7 @@ func Evaluate(req Request) Result {
 		return finish(Indeterminate,"one or more required surfaces lack qualified coverage evidence",r)
 	}
 	r.Checked=append(r.Checked,"scope-limited-completeness","explicit-exclusion-accounting","independence-control-root-check")
-	return finish(Qualified,"all required surfaces qualify within the declared claim scope; excluded surfaces are not represented as covered",r)
+	return finish(Qualified,"all required surfaces have coverage or explicit not-applicable proof within the declared claim scope; excluded surfaces are not represented as covered",r)
 }
 
 func validateCommon(req Request,s SurfaceSpec,a Attestation)(Decision,string) {
