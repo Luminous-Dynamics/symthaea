@@ -11,6 +11,7 @@ pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
 pub mod process_event_graph;
+pub mod process_subsystem_graph;
 pub mod secom_fold_preprocessor;
 pub mod secom_logistic;
 pub mod secom_missingness;
@@ -148,4 +149,16 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use process_subsystem_graph::{
+    PROCESS_CONTEXT_DIMENSION_SCHEMA_V1, PROCESS_SENSOR_CHANNEL_SCHEMA_V1,
+    PROCESS_SENSOR_MEMBERSHIP_SCHEMA_V1, PROCESS_SUBSYSTEM_GRAPH_REPORT_SCHEMA_V1,
+    PROCESS_SUBSYSTEM_GRAPH_SCHEMA_V1, PROCESS_SUBSYSTEM_NODE_SCHEMA_V1,
+    PROCESS_SUBSYSTEM_RELATION_SCHEMA_V1, ProcessContextDimensionV1, ProcessContextRoleV1,
+    ProcessSensorChannelV1, ProcessSensorMembershipV1, ProcessSubsystemGraphErrorV1,
+    ProcessSubsystemGraphManifestV1, ProcessSubsystemGraphReportV1, ProcessSubsystemGraphStatusV1,
+    ProcessSubsystemKindV1, ProcessSubsystemNodeV1, ProcessSubsystemRelationKindV1,
+    ProcessSubsystemRelationV1, seal_process_subsystem_graph_v1,
+    seal_process_subsystem_relation_v1, validate_process_subsystem_graph_v1,
 };
