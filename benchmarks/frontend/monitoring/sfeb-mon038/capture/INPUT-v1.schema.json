@@ -253,7 +253,65 @@
         "key_sha256": {
           "$ref": "#/$defs/digest"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "record_class": {
+                "enum": [
+                  "row_change",
+                  "logical_message"
+                ]
+              }
+            },
+            "required": [
+              "record_class"
+            ]
+          },
+          "then": {
+            "required": [
+              "event_id",
+              "transaction_id",
+              "data_collection"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "record_class": {
+                "const": "transaction_metadata"
+              }
+            },
+            "required": [
+              "record_class"
+            ]
+          },
+          "then": {
+            "required": [
+              "transaction_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "record_class": {
+                "const": "tombstone"
+              }
+            },
+            "required": [
+              "record_class"
+            ]
+          },
+          "then": {
+            "required": [
+              "key_sha256"
+            ]
+          }
+        }
+      ]
     },
     "partition_capture": {
       "type": "object",
