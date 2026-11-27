@@ -27,7 +27,7 @@ The signed suite uses the MON-028 domain-separated, length-prefixed binary suite
 - resource-budget digest;
 - test cases, family, expected verdict and exact replicate count.
 
-The suite file is created by the benchmark authority and should be signed/custodied separately. The SUT receives the case schedule and inputs, not an editable expected-outcome field in its result schema.
+The suite file is created by the benchmark authority and must be signed/custodied separately. The verifier requires the exact expected custody run ID, sequence and previous root (when applicable), as well as an out-of-band trusted public key. The SUT receives the case schedule and inputs, not an editable expected-outcome field in its result schema.
 
 ## 4. Candidate observations
 
