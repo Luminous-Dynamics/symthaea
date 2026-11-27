@@ -72,6 +72,26 @@ pub struct RunScoreV1 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidenceAblationV1 {
+    pub removed_evidence_id: String,
+    /// Same system and episode, re-run with exactly one evidence ID withheld.
+    pub output_without_evidence: CandidateRunV1,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidenceInfluenceV1 {
+    pub evidence_id: String,
+    pub full_decision_loss_micros: u64,
+    pub loss_without_evidence_micros: u64,
+    /// Positive means retaining the item lowered loss; negative means the item
+    /// increased loss under the frozen downstream decision policy.
+    pub contribution_micros: i128,
+    pub removal_changed_action: bool,
+    pub removal_helped: bool,
+    pub removal_harmed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PairedScoreV1 {
     pub episode_id: String,
     pub memory: RunScoreV1,
@@ -112,7 +132,7 @@ pub struct CostReceiptV1 {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CostReceiptErrorV1 {
     PhaseSumOverflow,
-    PhasesExceedWallTime,
+    PhasesDoNotReconcile,
 }
 
 impl CostReceiptV1 {
@@ -134,8 +154,8 @@ impl CostReceiptV1 {
         })
         .ok_or(CostReceiptErrorV1::PhaseSumOverflow)?;
 
-        if sum > u128::from(p.wall_ns) {
-            return Err(CostReceiptErrorV1::PhasesExceedWallTime);
+        if sum != u128::from(p.wall_ns) {
+            return Err(CostReceiptErrorV1::PhasesDoNotReconcile);
         }
         Ok(())
     }
@@ -160,6 +180,11 @@ pub enum EvaluationErrorV1 {
     DuplicateReturnedEvidenceId,
     NoMemoryArmContainsEvidence,
     NoMemoryArmActionMismatch,
+    AblationTargetMissing,
+    DuplicateAblationTarget,
+    AblationSetIncomplete,
+    AblationEvidenceSetMismatch,
+    AblationSystemMismatch,
     MissingActionLoss,
 }
 
@@ -361,6 +386,72 @@ pub fn score_paired(
     })
 }
 
+/// Attribute the decision effect of each returned memory item by rerunning
+/// the same deterministic downstream policy with exactly that one item
+/// removed. Positive contribution means the item helped; negative means it
+/// harmed. This is a leave-one-out intervention, not a Shapley value: item
+/// interactions require additional subset interventions and are reported
+/// separately by future benchmark versions.
+pub fn score_leave_one_out(
+    case: &EvaluatorCaseV1,
+    full: &CandidateRunV1,
+    ablations: &[EvidenceAblationV1],
+) -> Result<Vec<EvidenceInfluenceV1>, EvaluationErrorV1> {
+    validate_case(case)?;
+    validate_candidate(case, full)?;
+
+    if ablations.len() != full.retrieved_evidence_ids.len() {
+        return Err(EvaluationErrorV1::AblationSetIncomplete);
+    }
+
+    let full_score = score_run(case, full)?;
+    let mut seen = BTreeSet::new();
+    let mut results = Vec::with_capacity(ablations.len());
+
+    for ablation in ablations {
+        if !contains(&full.retrieved_evidence_ids, &ablation.removed_evidence_id) {
+            return Err(EvaluationErrorV1::AblationTargetMissing);
+        }
+        if !seen.insert(ablation.removed_evidence_id.as_str()) {
+            return Err(EvaluationErrorV1::DuplicateAblationTarget);
+        }
+        if ablation.output_without_evidence.system_id != full.system_id {
+            return Err(EvaluationErrorV1::AblationSystemMismatch);
+        }
+        validate_candidate(case, &ablation.output_without_evidence)?;
+
+        let expected_evidence: Vec<String> = full
+            .retrieved_evidence_ids
+            .iter()
+            .filter(|id| *id != &ablation.removed_evidence_id)
+            .cloned()
+            .collect();
+        if ablation.output_without_evidence.retrieved_evidence_ids != expected_evidence {
+            return Err(EvaluationErrorV1::AblationEvidenceSetMismatch);
+        }
+
+        let without_score = score_run(case, &ablation.output_without_evidence)?;
+        let contribution_micros = i128::from(without_score.decision_loss_micros)
+            - i128::from(full_score.decision_loss_micros);
+        let removal_changed_action = without_score.chosen_action != full_score.chosen_action;
+
+        results.push(EvidenceInfluenceV1 {
+            evidence_id: ablation.removed_evidence_id.clone(),
+            full_decision_loss_micros: full_score.decision_loss_micros,
+            loss_without_evidence_micros: without_score.decision_loss_micros,
+            contribution_micros,
+            removal_changed_action,
+            removal_helped: removal_changed_action && contribution_micros < 0,
+            removal_harmed: removal_changed_action && contribution_micros > 0,
+        });
+    }
+
+    if seen.len() != full.retrieved_evidence_ids.len() {
+        return Err(EvaluationErrorV1::AblationSetIncomplete);
+    }
+    Ok(results)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -451,6 +542,48 @@ mod tests {
     }
 
     #[test]
+    fn leave_one_out_attributes_helpful_evidence() {
+        let full = run("mace", "hold", &["signed-current"]);
+        let without = CandidateRunV1 {
+            episode_id: full.episode_id.clone(),
+            system_id: full.system_id.clone(),
+            chosen_action: "abstain".to_owned(),
+            retrieved_evidence_ids: vec![],
+        };
+        let result = score_leave_one_out(
+            &case(),
+            &full,
+            &[EvidenceAblationV1 {
+                removed_evidence_id: "signed-current".to_owned(),
+                output_without_evidence: without,
+            }],
+        )
+        .expect("valid leave-one-out intervention");
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].contribution_micros, 2_000_000);
+        assert!(result[0].removal_changed_action);
+        assert!(result[0].removal_harmed);
+    }
+
+    #[test]
+    fn leave_one_out_rejects_an_ablation_that_keeps_the_removed_item() {
+        let full = run("mace", "hold", &["signed-current"]);
+        let invalid = score_leave_one_out(
+            &case(),
+            &full,
+            &[EvidenceAblationV1 {
+                removed_evidence_id: "signed-current".to_owned(),
+                output_without_evidence: full.clone(),
+            }],
+        );
+        assert_eq!(
+            invalid,
+            Err(EvaluationErrorV1::AblationEvidenceSetMismatch)
+        );
+    }
+
+    #[test]
     fn candidate_cannot_change_episode_identity_between_arms() {
         let mut memory = run("mace", "hold", &["signed-current"]);
         memory.episode_id = "different-world".to_owned();
@@ -523,7 +656,7 @@ mod tests {
         };
         assert_eq!(
             receipt.validate(),
-            Err(CostReceiptErrorV1::PhasesExceedWallTime)
+            Err(CostReceiptErrorV1::PhasesDoNotReconcile)
         );
     }
 
