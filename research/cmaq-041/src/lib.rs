@@ -388,10 +388,9 @@ fn validate_episode(episode: &EpisodeTrace) -> Result<(), EvaluationError> {
     }
     if let (Some(start), Some(completed)) =
         (episode.fallback_started_us, episode.fallback_completed_us)
+        && completed < start
     {
-        if completed < start {
-            return Err(EvaluationError::EventOrderViolation);
-        }
+        return Err(EvaluationError::EventOrderViolation);
     }
     if let (Some(warning), Some(quarantined)) = (episode.first_warning_us, episode.quarantined_us)
         && quarantined < warning
