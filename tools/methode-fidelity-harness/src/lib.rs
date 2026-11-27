@@ -554,17 +554,6 @@ pub fn audit_method(contract: &MethodContract, receipt: &ExecutionReceipt) -> Au
         });
     }
 
-    let disposition = if flags.hard_failure
-        || flags.undeclared_mismatch
-        || flags.invalid_deviation_declaration
-    {
-        Disposition::Unresolved
-    } else if flags.declared_mismatch {
-        Disposition::ExecutedWithDeclaredDeviation
-    } else {
-        Disposition::ReferenceProtocolReproduced
-    };
-
     if receipt.execution_id.trim().is_empty() {
         flags.hard_failure = true;
         checks.push(CheckResult {
@@ -582,6 +571,17 @@ pub fn audit_method(contract: &MethodContract, receipt: &ExecutionReceipt) -> Au
             explanation: "Execution receipt contains duplicate output artifact identifiers.".to_string(),
         });
     }
+
+    let disposition = if flags.hard_failure
+        || flags.undeclared_mismatch
+        || flags.invalid_deviation_declaration
+    {
+        Disposition::Unresolved
+    } else if flags.declared_mismatch {
+        Disposition::ExecutedWithDeclaredDeviation
+    } else {
+        Disposition::ReferenceProtocolReproduced
+    };
 
     let reproduced = disposition == Disposition::ReferenceProtocolReproduced;
     AuditReport {
