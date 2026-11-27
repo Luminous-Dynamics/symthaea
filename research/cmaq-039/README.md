@@ -35,10 +35,10 @@ The closure digest is carried as an externally authenticated binding because CMA
 
 ## Tests
 
-The deterministic suite covers:
+The 13-test deterministic suite covers:
 - transitive asset/session closure and max-score preservation;
 - one score per effective block, not one per raw episode;
-- acceptance by CMAQ-031 monitor construction;
+- CMAQ-031 monitor compatibility and retention of closure provenance in the runtime wrapper;
 - missing and duplicate attestations;
 - wrong closure digest;
 - aggregate score different from the closure maximum;
@@ -46,6 +46,7 @@ The deterministic suite covers:
 - duplicate randomized tie-break keys;
 - tampered effective count;
 - source-manifest mismatch;
+- malformed member score receipts and dependence-key receipts;
 - duplicated member identity.
 
 ## Scope not yet implemented
