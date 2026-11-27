@@ -25,7 +25,7 @@ The TurnBench page currently describes:
 - a 104-hour training corpus and 7.3-hour development split;
 - end-of-turn and interruption events with event times.
 
-Its published v1 leaderboard currently includes Kuroko at 0.983 recall / 0.065 false-positive rate / 619 ms median latency, and Neosapience Nunchi v2 at 0.959 / 0.064 / 254 ms.
+Its current published v1 leaderboard includes Kuroko at 0.983 recall / 0.065 FPR / 619 ms median latency; OpenYap Turn at 0.978 / 0.077 / 298 ms; p99lab turn-1-mini at 0.975 / 0.075 / 595 ms; and Neosapience Nunchi v2 at 0.959 / 0.064 / 254 ms. The FD-VAD row has lower FPR (0.049) but only 0.826 recall and 1,025 ms latency. No single listed system simultaneously dominates recall, FPR and latency.
 
 **Important benchmark caveat:** TurnBench itself documents a v1 scoring weakness. Multiple predictions can be emitted for one pause, late fallbacks up to three seconds can still count, and the ranking is based on recall. Simple voice-activity rules can consequently rank highly without making a single timely decision. The maintainers describe a planned v2 with per-frame probabilities and fixed hidden decision points.
 
