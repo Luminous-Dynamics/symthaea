@@ -586,7 +586,7 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
                     let valid_from = json_string(&artifact, "valid_from", task, input)?;
                     if !is_canonical_utc(revoked_at)
                         || revoked_at < valid_from
-                        || revoked_at > task.request.evaluated_at
+                        || revoked_at > task.request.evaluated_at.as_str()
                     {
                         bail!(
                             "{}: revoked consent fixture '{}' has invalid revocation time",
@@ -619,7 +619,7 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
                 );
             }
             let consumed_at = json_string(&artifact, "consumed_at", task, input)?;
-            if !is_canonical_utc(consumed_at) || consumed_at > task.request.evaluated_at {
+            if !is_canonical_utc(consumed_at) || consumed_at > task.request.evaluated_at.as_str() {
                 bail!(
                     "{}: consumed challenge fixture '{}' has invalid consumption time",
                     task.task_id,
