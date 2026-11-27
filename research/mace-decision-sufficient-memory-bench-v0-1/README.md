@@ -150,7 +150,7 @@ For each episode:
 3. Submit the original decision query and declared evidence/observation budget.
 4. Accept ranked `retrieved_evidence_ids` from the memory system.
 5. Resolve every returned ID independently against canonical source records; compute admissibility, source-family/root lineage and contradiction relationships evaluator-side.
-6. Pass a selected evidence packet to the frozen downstream decision policy and record its IDs separately as `decision_support_evidence_ids`. The selected set must be a unique subset of the retrieved set. The paired-score validator also rechecks that selected counts, precision/recall ratios, lineage counts and conflict metrics remain consistent with retrieved totals before a result enters cluster aggregation. The JSON contract is [candidate-run-v0.1.schema.json](schemas/candidate-run-v0.1.schema.json); the Rust scorer enforces the cross-field subset invariant that JSON Schema cannot express. This records the policy input builder's selected IDs, not proof that a generative model attended to or cited each item; exact serialized-context exposure is a separate receipt requirement tracked by [#13722](https://github.com/Luminous-Dynamics/symthaea/issues/13722).
+6. Pass a selected evidence packet to the frozen downstream decision policy and record its IDs separately as `decision_support_evidence_ids`. The selected set must be a unique subset of the retrieved set. The paired-score validator also rechecks that selected counts, precision/recall ratios, lineage counts and conflict metrics remain consistent with retrieved totals before a result enters cluster aggregation. The JSON contract is [candidate-run-v0.1.schema.json](schemas/candidate-run-v0.1.schema.json); the Rust scorer enforces the cross-field subset invariant that JSON Schema cannot express. When detailed cost provenance is available, use the V2 wrapper schema so each arm carries its own typed resource receipt. This records the policy input builder's selected IDs, not proof that a generative model attended to or cited each item; exact serialized-context exposure is a separate receipt requirement tracked by [#13722](https://github.com/Luminous-Dynamics/symthaea/issues/13722).
 7. Score the chosen action using evaluator-private state and loss tables. Keep retrieval precision/recall distinct from decision-support precision/recall.
 
 This separates the memory subsystem's evidence contribution from the downstream model's ability to answer. A later end-to-end agent experiment may be added, but it must be reported separately.
@@ -240,7 +240,7 @@ Measure and report separately:
 
 Never label an estimate as measured cost. Cost-per-decision-gain and cost-per-valid-evidence result may be reported as derived metrics, with their components and assumptions visible.
 
-The Rust evaluator retains the existing `CostReceiptV1` contract for compatibility and adds `CostReceiptV2`, in which retained/index/network byte quantities carry an explicit `Measured`, `Estimated`, `Unknown` or `NotApplicable` state. A measured zero is `Some(0) + Measured`; unreported cost is `None + Unknown`, never numeric zero. Phase timings must still reconcile to wall time.
+The Rust evaluator retains the existing `CostReceiptV1` contract for compatibility and adds `CostReceiptV2`, in which retained/index/network byte quantities carry an explicit `Measured`, `Estimated`, `Unknown` or `NotApplicable` state. A measured zero is `Some(0) + Measured`; unreported cost is `None + Unknown`, never numeric zero. Phase timings must still reconcile to wall time. The paired scorer exposes this through `CandidateRunV2` and `score_paired_v2`, binding one cost receipt to each memory/no-memory arm while leaving V1 APIs unchanged. External systems can use [candidate-run-v0.2.schema.json](schemas/candidate-run-v0.2.schema.json); cross-field and phase-reconciliation rules are enforced by the Rust evaluator.
 
 ## Research hypotheses
 
@@ -252,7 +252,7 @@ The Rust evaluator retains the existing `CostReceiptV1` contract for compatibili
 - **H6 — governance is part of capability:** poisoning resistance, deletion and isolation should predict downstream decision safety, not be treated as unrelated operational checkboxes.
 - **H7 — evidence has measurable causal influence:** leave-one-out interventions on returned evidence identify items whose presence improves or worsens the frozen downstream decision. The signal should remain reproducible under fixed reader, seed and evidence-resolution rules.
 
-These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator now contains 29 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
+These are falsifiable hypotheses, not findings. The dependency-free Rust evaluator now contains 31 authored core tests plus nine authored LongMemEval-V2 LAFS tests. They are source-authored only and have not been executed.
 
 ## Baselines and industry comparison
 
