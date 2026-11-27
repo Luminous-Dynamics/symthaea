@@ -1,0 +1,25 @@
+name: MACE Signed Exposure Use-Time Admission
+on:
+  pull_request:
+    paths:
+      - "research/broca-mace-transfer-bench-v0-1/ingress/**"
+      - "research/broca-mace-transfer-bench-v0-1/aml-adapter/**"
+      - ".github/workflows/mace-signed-exposure-use-time-admission.yml"
+      - "docs/research/MACE_CONTEXT_EXPOSURE_CAPTURE_V0_1.md"
+  push:
+    branches:
+      - "research/mace-signed-exposure-use-time-admission-v0-1"
+jobs:
+  use-time-admission:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Parse ingress crate root
+        run: rustfmt --edition 2024 --emit stdout --config skip_children=true research/broca-mace-transfer-bench-v0-1/ingress/src/lib.rs >/dev/null
+      - name: Parse use-time admission adapter
+        run: rustfmt --edition 2024 --emit stdout --config skip_children=true research/broca-mace-transfer-bench-v0-1/aml-adapter/src/mace_ingress_use_admission.rs >/dev/null
+      - name: Test ingress revalidation and signed capture
+        run: cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress -p broca-aml-adapter
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-ingress -p broca-aml-adapter --all-targets -- -D warnings
