@@ -7,14 +7,11 @@
 use std::collections::BTreeMap;
 
 use decision_relevant_predictability::robust::{
-    evaluate_robust_probe, RobustDecisionProblem, RobustProbe, RobustProbeContext,
-    RobustProbeOutcome,
+    RobustDecisionProblem, RobustProbe, RobustProbeContext, RobustProbeOutcome,
+    evaluate_robust_probe,
 };
 
-fn loss_row(
-    states: &[&str],
-    values: &[f64],
-) -> BTreeMap<String, f64> {
+fn loss_row(states: &[&str], values: &[f64]) -> BTreeMap<String, f64> {
     states
         .iter()
         .zip(values.iter())
@@ -50,10 +47,7 @@ fn main() {
                 "recommend_fresh_attempt".to_owned(),
                 loss_row(&states, &[0.0, 0.0, 0.95, 0.95, 1.0, 1.0, 0.90, 1.0]),
             ),
-            (
-                "abstain".to_owned(),
-                loss_row(&states, &[0.45; 8]),
-            ),
+            ("abstain".to_owned(), loss_row(&states, &[0.45; 8])),
         ]),
         maximum_worst_case_loss: 0.45,
     };
@@ -149,7 +143,6 @@ fn main() {
 
     println!(
         "AERB synthetic robust probe comparison: journal + independent scope closure guaranteed loss reduction = {:.2}; weak visual probe = {:.2}; no prior probabilities used.",
-        journal.guaranteed_worst_case_loss_reduction,
-        weak.guaranteed_worst_case_loss_reduction
+        journal.guaranteed_worst_case_loss_reduction, weak.guaranteed_worst_case_loss_reduction
     );
 }
