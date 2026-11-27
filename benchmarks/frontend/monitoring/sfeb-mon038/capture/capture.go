@@ -169,19 +169,19 @@ func boundaryComplete(b RecoveryBoundary)bool{return validID(b.IncidentID)&&vali
 func boundaryDigest(b RecoveryBoundary)string{return canonicalDigest(b)}
 func topicInventoryDigest(v []TopicInventory)string{
  c:=append([]TopicInventory(nil),v...)
- sort.Slice(c,func(i,j int)bool{if c[i].ClusterID!=c[j].ClusterID{return c[i].ClusterID<c[j].ClusterID};if c[i].Topic!=c[j].Topic{return c[i].Topic<c[j].Topic};return c[i].TopicID<c[j].TopicID})
+ sort.Slice(c,func(i,j int)bool{if c[i].ClusterID!=c[j].ClusterID{return c[i].ClusterID<c[j].ClusterID};if c[i].Topic!=c[j].Topic{return c[i].Topic<c[j].Topic};return canonicalDigest(c[i])<canonicalDigest(c[j])})
  return canonicalDigest(c)
 }
 func recordsDigest(v []CapturedRecord)string{return canonicalDigest(v)}
 func businessEventsDigest(v []BusinessEvent)string{
  c:=append([]BusinessEvent(nil),v...)
- sort.Slice(c,func(i,j int)bool{a,b:=c[i],c[j];if a.Topic!=b.Topic{return a.Topic<b.Topic};if a.Partition!=b.Partition{return a.Partition<b.Partition};if a.Offset!=b.Offset{return a.Offset<b.Offset};if a.EventID!=b.EventID{return a.EventID<b.EventID};return a.PayloadSHA256<b.PayloadSHA256})
+ sort.Slice(c,func(i,j int)bool{a,b:=c[i],c[j];if a.Topic!=b.Topic{return a.Topic<b.Topic};if a.Partition!=b.Partition{return a.Partition<b.Partition};if a.Offset!=b.Offset{return a.Offset<b.Offset};return canonicalDigest(a)<canonicalDigest(b)})
  return canonicalDigest(c)
 }
 func rangeManifestDigest(p PartitionCapture)string{p.ManifestSHA256="";p.Records=nil;return canonicalDigest(p)}
 func partitionRangesDigest(v []PartitionCapture)string{
  c:=append([]PartitionCapture(nil),v...)
- sort.Slice(c,func(i,j int)bool{a,b:=c[i],c[j];if a.Topic!=b.Topic{return a.Topic<b.Topic};if a.Partition!=b.Partition{return a.Partition<b.Partition};return a.CaptureID<b.CaptureID})
+ sort.Slice(c,func(i,j int)bool{a,b:=c[i],c[j];if a.Topic!=b.Topic{return a.Topic<b.Topic};if a.Partition!=b.Partition{return a.Partition<b.Partition};if a.CaptureID!=b.CaptureID{return a.CaptureID<b.CaptureID};return canonicalDigest(a)<canonicalDigest(b)})
  for i:=range c{c[i].Records=nil}
  return canonicalDigest(c)
 }
@@ -227,18 +227,21 @@ func Evaluate(in Input)Result{
  if len(in.BusinessEvents)>MaxRecords{f.block("business_event_limit_exceeded","business event count exceeds v1 limit")}
 
  inventory:=map[string]TopicInventory{}
+ kafkaClusters:=map[string]struct{}{}
  expectedPartitions:=0
  for _,t:=range in.TopicInventory{
   if !validID(t.ClusterID)||!validID(t.Topic)||!validID(t.TopicID)||t.PartitionCount<1||t.PartitionCount>MaxPartitions{f.block("topic_inventory_entry_invalid",t.Topic);continue}
   key:=t.ClusterID+"\x00"+t.Topic
   if _,ok:=inventory[key];ok{f.block("topic_inventory_duplicate",t.Topic);continue}
   inventory[key]=t
-  expectedPartitions+=t.PartitionCount
+  kafkaClusters[t.ClusterID]=struct{}{}
+  if expectedPartitions>MaxPartitions-t.PartitionCount { expectedPartitions=MaxPartitions+1 } else { expectedPartitions+=t.PartitionCount }
   if !validDigest(t.ConfigSHA256){f.hold("topic_config_digest_missing",t.Topic)}
   if t.CleanupPolicy!="delete"{
    if strings.Contains(t.CleanupPolicy,"compact"){f.block("compaction_not_supported_v1",t.Topic)}else{f.hold("cleanup_policy_not_proven_delete",t.Topic)}
   }
  }
+ if len(kafkaClusters)>1{f.block("multiple_kafka_clusters_not_supported_v1","v1 requires one Kafka cluster per partition vector")}
  if expectedPartitions>MaxPartitions{f.block("partition_limit_exceeded","declared topic partition count exceeds v1 limit")}
 
  type position struct{topic string;partition int;offset int64}
@@ -289,7 +292,8 @@ func Evaluate(in Input)Result{
     if !validID(r.EventID)||!validID(r.TransactionID)||!validID(r.DataCollection){f.block("business_record_identity_missing",p.Topic)}
    case "transaction_metadata":
     if !validID(r.TransactionID){f.block("transaction_metadata_id_missing",p.Topic)}
-   case "heartbeat","tombstone","opaque":
+   case "tombstone":if !validDigest(r.KeySHA256){f.block("tombstone_key_digest_missing",p.Topic)}
+   case "heartbeat","opaque":
    default:f.block("record_class_invalid",p.Topic)
    }
    pos:=position{r.Topic,r.Partition,r.Offset}
@@ -298,12 +302,12 @@ func Evaluate(in Input)Result{
   }
  }
  if recordTotal>MaxRecords{f.block("captured_record_limit_exceeded","captured record count exceeds v1 limit")}
- for _,t:=range inventory{
+ if expectedPartitions<=MaxPartitions { for _,t:=range inventory{
   for part:=0;part<t.PartitionCount;part++{
    pkey:=partitionKey{topic:t.Topic,partition:part}
    if _,ok:=rangeByPartition[pkey];!ok{f.hold("partition_capture_missing",t.Topic+":"+itoa(part))}
   }
- }
+ }}
  byBusinessPosition:=map[position]struct{}{}
  for _,e:=range in.BusinessEvents{
   if !validID(e.EventID)||!validID(e.TransactionID)||!validID(e.Topic)||!validID(e.TopicID)||e.Partition<0||e.Offset<0||!validDigest(e.PayloadSHA256){f.block("business_event_malformed",e.EventID);continue}
