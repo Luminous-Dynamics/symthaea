@@ -128,10 +128,24 @@
       ],
       "properties": {
         "embedding_model": {
-          "type": "string"
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "participant_llm_model": {
-          "type": "string"
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "reranker_model": {
           "type": "string"
@@ -148,6 +162,12 @@
         "index_parameters_digest_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "uses_embeddings": {
+          "type": "boolean"
+        },
+        "uses_participant_llm": {
+          "type": "boolean"
         }
       }
     },
@@ -348,14 +368,108 @@
               "search_top_k": {
                 "maximum": 100
               }
-            }
+            },
+            "required": [
+              "uses_embeddings",
+              "uses_participant_llm"
+            ]
           },
           "evaluation": {
             "required": [
               "platform_release"
             ]
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "uses_embeddings": {
+                  "const": true
+                }
+              },
+              "required": [
+                "uses_embeddings"
+              ]
+            },
+            "then": {
+              "required": [
+                "embedding_model"
+              ],
+              "properties": {
+                "embedding_model": {
+                  "const": "text-embedding-v4"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "uses_embeddings": {
+                  "const": false
+                }
+              },
+              "required": [
+                "uses_embeddings"
+              ]
+            },
+            "then": {
+              "required": [
+                "embedding_model"
+              ],
+              "properties": {
+                "embedding_model": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "uses_participant_llm": {
+                  "const": true
+                }
+              },
+              "required": [
+                "uses_participant_llm"
+              ]
+            },
+            "then": {
+              "required": [
+                "participant_llm_model"
+              ],
+              "properties": {
+                "participant_llm_model": {
+                  "const": "gpt-4o-mini"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "uses_participant_llm": {
+                  "const": false
+                }
+              },
+              "required": [
+                "uses_participant_llm"
+              ]
+            },
+            "then": {
+              "required": [
+                "participant_llm_model"
+              ],
+              "properties": {
+                "participant_llm_model": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     {
