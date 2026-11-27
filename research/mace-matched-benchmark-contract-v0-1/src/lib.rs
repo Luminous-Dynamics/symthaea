@@ -129,6 +129,9 @@ pub enum BenchmarkContractRejectV1 {
     MixedResourceBudget,
     MixedEvaluationIsolation,
     MixedMetricDefinitions,
+    MixedCounts,
+    MixedDependenceUnit,
+    MatchedControlsDigestMismatch,
     SerializationFailure,
 }
 
@@ -176,6 +179,77 @@ fn metric_definition_set_sha256(metrics: &[MetricObservationV1]) -> Result<Strin
         .collect();
     definitions.sort_unstable();
     digest_serialized(&definitions)
+}
+
+#[derive(Serialize)]
+struct MatchedControlsProjectionV1<'a> {
+    benchmark_id: &'a str,
+    track_id: &'a str,
+    protocol_version: &'a str,
+    protocol_sha256: &'a str,
+    evaluator_sha256: &'a str,
+    dataset_id: &'a str,
+    dataset_revision_sha256: &'a str,
+    split_id: &'a str,
+    split_sha256: &'a str,
+    seed_set_sha256: &'a str,
+    scored_task_count: u64,
+    independent_cluster_count: u64,
+    dependence_unit: &'a str,
+    reader_model_id: &'a str,
+    reader_model_revision_sha256: &'a str,
+    reader_prompt_sha256: &'a str,
+    judge_model_id: &'a str,
+    judge_model_revision_sha256: &'a str,
+    tool_contract_sha256: &'a str,
+    evaluator_isolated: bool,
+    candidate_saw_evaluator_labels: bool,
+    resource_budget_sha256: &'a str,
+    context_token_budget: u64,
+    max_model_calls: u64,
+    wall_clock_budget_ms: u64,
+    cpu_budget_microseconds: Option<u64>,
+    gpu_budget_microseconds: Option<u64>,
+    energy_budget_microwatt_hours: Option<u64>,
+    metric_definition_set_sha256: String,
+}
+
+/// Compute the digest of every fixed control in a memory-method comparison.
+pub fn compute_matched_controls_sha256_v1(
+    manifest: &BenchmarkRunManifestV1,
+) -> Result<String, BenchmarkContractRejectV1> {
+    let projection = MatchedControlsProjectionV1 {
+        benchmark_id: &manifest.benchmark_id,
+        track_id: &manifest.track_id,
+        protocol_version: &manifest.protocol_version,
+        protocol_sha256: &manifest.protocol_sha256,
+        evaluator_sha256: &manifest.evaluator_sha256,
+        dataset_id: &manifest.dataset_id,
+        dataset_revision_sha256: &manifest.dataset_revision_sha256,
+        split_id: &manifest.split_id,
+        split_sha256: &manifest.split_sha256,
+        seed_set_sha256: &manifest.seed_set_sha256,
+        scored_task_count: manifest.scored_task_count,
+        independent_cluster_count: manifest.independent_cluster_count,
+        dependence_unit: &manifest.dependence_unit,
+        reader_model_id: &manifest.reader_model_id,
+        reader_model_revision_sha256: &manifest.reader_model_revision_sha256,
+        reader_prompt_sha256: &manifest.reader_prompt_sha256,
+        judge_model_id: &manifest.judge_model_id,
+        judge_model_revision_sha256: &manifest.judge_model_revision_sha256,
+        tool_contract_sha256: &manifest.tool_contract_sha256,
+        evaluator_isolated: manifest.evaluator_isolated,
+        candidate_saw_evaluator_labels: manifest.candidate_saw_evaluator_labels,
+        resource_budget_sha256: &manifest.resource_budget_sha256,
+        context_token_budget: manifest.context_token_budget,
+        max_model_calls: manifest.max_model_calls,
+        wall_clock_budget_ms: manifest.wall_clock_budget_ms,
+        cpu_budget_microseconds: manifest.cpu_budget_microseconds,
+        gpu_budget_microseconds: manifest.gpu_budget_microseconds,
+        energy_budget_microwatt_hours: manifest.energy_budget_microwatt_hours,
+        metric_definition_set_sha256: metric_definition_set_sha256(&manifest.metrics)?,
+    };
+    digest_serialized(&projection)
 }
 
 fn validate_resources(resources: &ResourceObservationV1) -> Result<(), BenchmarkContractRejectV1> {
@@ -315,8 +389,19 @@ pub fn validate_matched_comparison_v1(manifests: &[BenchmarkRunManifestV1]) -> R
         if manifest.candidate_saw_evaluator_labels||!manifest.evaluator_isolated {
             return Err(BenchmarkContractRejectV1::MixedEvaluationIsolation);
         }
+        if manifest.scored_task_count != first.scored_task_count
+            || manifest.independent_cluster_count != first.independent_cluster_count {
+            return Err(BenchmarkContractRejectV1::MixedCounts);
+        }
+        if manifest.dependence_unit != first.dependence_unit {
+            return Err(BenchmarkContractRejectV1::MixedDependenceUnit);
+        }
         if metric_definition_set_sha256(&manifest.metrics)?!=first_metric_defs {
             return Err(BenchmarkContractRejectV1::MixedMetricDefinitions);
+        }
+        let expected_controls = compute_matched_controls_sha256_v1(manifest)?;
+        if manifest.matched_controls_sha256.as_deref() != Some(expected_controls.as_str()) {
+            return Err(BenchmarkContractRejectV1::MatchedControlsDigestMismatch);
         }
     }
     let mut receipt=MatchedComparisonReceiptV1 {
@@ -377,7 +462,7 @@ mod tests {
             context_token_budget:16000,max_model_calls:3,wall_clock_budget_ms:200000,
             cpu_budget_microseconds:Some(10000000),gpu_budget_microseconds:Some(20000000),
             energy_budget_microwatt_hours:None,comparison_group_id:Some("paired-lmev2-small".into()),
-            arm_id:Some(arm.into()),matched_controls_sha256:Some(digest("controls")),
+            arm_id:Some(arm.into()),matched_controls_sha256:None,
             candidate_saw_evaluator_labels:false,evaluator_isolated:true,evidence_uri:None,
             result_artifact_sha256:Some(digest(&format!("result-{arm}"))),
             resource_receipt_sha256:Some(digest(&format!("resources-{arm}"))),metrics:metrics(),
@@ -389,7 +474,9 @@ mod tests {
                 cpu_microseconds:Some(1000000),gpu_microseconds:Some(2000000),
                 energy_microwatt_hours:None,monetary_micro_usd:Some(150000)
             }
-        }
+        };
+        value.matched_controls_sha256 = Some(compute_matched_controls_sha256_v1(&value).unwrap());
+        value
     }
 
     #[test]
@@ -496,4 +583,34 @@ mod tests {
         let mut invalid=manifest("zero-denom","zero-denom");invalid.metrics[0].denominator=Some(0);
         assert_eq!(validate_run_manifest_v1(&invalid),Err(BenchmarkContractRejectV1::InvalidMetric));
     }
+
+    #[test]
+    fn matched_controls_digest_is_recomputed_not_trusted() {
+        let mut first = manifest("bm25", "bm25");
+        let mut candidate = manifest("mace", "mace");
+        first.reader_prompt_sha256 = digest("changed-on-both-arms");
+        candidate.reader_prompt_sha256 = digest("changed-on-both-arms");
+        assert_eq!(
+            validate_matched_comparison_v1(&[first, candidate]),
+            Err(BenchmarkContractRejectV1::MatchedControlsDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn scored_task_counts_and_dependence_units_must_match() {
+        let first = manifest("bm25", "bm25");
+        let mut candidate = manifest("mace", "mace");
+        candidate.scored_task_count += 1;
+        assert_eq!(
+            validate_matched_comparison_v1(&[first.clone(), candidate]),
+            Err(BenchmarkContractRejectV1::MixedCounts)
+        );
+        let mut candidate = manifest("mace", "mace");
+        candidate.dependence_unit = "message_row".into();
+        assert_eq!(
+            validate_matched_comparison_v1(&[first, candidate]),
+            Err(BenchmarkContractRejectV1::MixedDependenceUnit)
+        );
+    }
+
 }
