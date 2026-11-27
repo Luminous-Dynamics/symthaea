@@ -545,9 +545,11 @@ pub fn deliver_delayed_aci_feedback_v1(
         return Err(DelayedAciErrorV1("label revision or payload digest is invalid".into()));
     }
 
-    let alpha_before = engine.current_alpha;
     let report = &delivery.eligibility_report;
     let prediction = engine.pending_predictions.get(&delivery.sample_id);
+    let alpha_before = prediction
+        .map(|item| item.alpha_state_used)
+        .unwrap_or(current_delayed_aci_alpha_v1(engine)?);
 
     if engine
         .accepted_label_revisions
@@ -799,6 +801,7 @@ mod tests {
             revision: 1,
             target_miscoverage: 0.05,
             learning_rate: 0.10,
+            feedback_mode: DelayedAciFeedbackModeV1::ArrivalOrder,
         }
     }
 
@@ -892,6 +895,7 @@ mod tests {
             label_available_at_unix_seconds: label_available,
             eligibility_report_available_at_unix_seconds: report_available,
             delivered_at_unix_seconds: delivered,
+            delivery_round_sequence: delivered as u64,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label_id}:{revision}"),
             eligibility_report: {
@@ -939,7 +943,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(receipt.disposition, DelayedAciDispositionV1::UpdatedCovered);
-        assert_eq!(receipt.alpha_after, 0.105);
+        assert!((receipt.alpha_after - 0.105).abs() < 1.0e-12);
         assert!(receipt.alpha_state_mutated);
         assert_eq!(engine.accepted_feedback_count, 1);
     }
@@ -958,7 +962,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(receipt.disposition, DelayedAciDispositionV1::UpdatedMissed);
-        assert_eq!(receipt.alpha_after, 0.005);
+        assert!((receipt.alpha_after - 0.005).abs() < 1.0e-12);
     }
 
     #[test]
@@ -1081,6 +1085,135 @@ mod tests {
     }
 
     #[test]
+    fn fixed_delay_uses_independent_interleaved_alpha_phases() {
+        let mut configured = policy();
+        configured.feedback_mode = DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps: 3 };
+        let mut engine = create_delayed_aci_engine_v1(
+            "aci-fixed-001",
+            "fab-clock",
+            &digest('a'),
+            &digest('b'),
+            configured,
+            0.10,
+        )
+        .unwrap();
+
+        for index in 0..3 {
+            let sample = format!("s{index}");
+            let event = format!("e{index}");
+            let alpha = current_delayed_aci_alpha_v1(&engine).unwrap();
+            assert!((alpha - 0.10).abs() < 1.0e-12);
+            register_delayed_aci_prediction_v1(
+                &mut engine,
+                &prediction(&sample, &event, 100 + index, 102 + index, alpha),
+            )
+            .unwrap();
+        }
+
+        let first = delivery(
+            "s0",
+            "e0",
+            "l0",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            10.5,
+            110,
+            111,
+            112,
+        );
+        let mut first = first;
+        first.delivery_round_sequence = 3;
+        let receipt = deliver_delayed_aci_feedback_v1(&mut engine, &first).unwrap();
+        assert_eq!(receipt.disposition, DelayedAciDispositionV1::UpdatedCovered);
+        assert!((engine.phase_alpha_states[0] - 0.105).abs() < 1.0e-12);
+        assert!((engine.phase_alpha_states[1] - 0.10).abs() < 1.0e-12);
+        assert!((engine.phase_alpha_states[2] - 0.10).abs() < 1.0e-12);
+
+        let alpha_for_sequence_three = current_delayed_aci_alpha_v1(&engine).unwrap();
+        assert!((alpha_for_sequence_three - 0.105).abs() < 1.0e-12);
+        register_delayed_aci_prediction_v1(
+            &mut engine,
+            &prediction("s3", "e3", 103, 105, alpha_for_sequence_three),
+        )
+        .unwrap();
+        assert!((engine.phase_alpha_states[0] - 0.105).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn fixed_delay_blocks_next_same_phase_prediction_until_prior_feedback_is_consumed() {
+        let mut configured = policy();
+        configured.feedback_mode = DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps: 2 };
+        let mut engine = create_delayed_aci_engine_v1(
+            "aci-fixed-002",
+            "fab-clock",
+            &digest('a'),
+            &digest('b'),
+            configured,
+            0.10,
+        )
+        .unwrap();
+        register_delayed_aci_prediction_v1(
+            &mut engine,
+            &prediction("s0", "e0", 100, 102, 0.10),
+        )
+        .unwrap();
+        register_delayed_aci_prediction_v1(
+            &mut engine,
+            &prediction("s1", "e1", 101, 103, 0.10),
+        )
+        .unwrap();
+        assert!(
+            register_delayed_aci_prediction_v1(
+                &mut engine,
+                &prediction("s2", "e2", 104, 106, 0.10),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn fixed_delay_rejects_feedback_arriving_on_wrong_stream_round() {
+        let mut configured = policy();
+        configured.feedback_mode = DelayedAciFeedbackModeV1::FixedDelayPhased { delay_steps: 2 };
+        let mut engine = create_delayed_aci_engine_v1(
+            "aci-fixed-003",
+            "fab-clock",
+            &digest('a'),
+            &digest('b'),
+            configured,
+            0.10,
+        )
+        .unwrap();
+        register_delayed_aci_prediction_v1(
+            &mut engine,
+            &prediction("s0", "e0", 100, 102, 0.10),
+        )
+        .unwrap();
+        register_delayed_aci_prediction_v1(
+            &mut engine,
+            &prediction("s1", "e1", 101, 103, 0.10),
+        )
+        .unwrap();
+        let mut d = delivery(
+            "s0",
+            "e0",
+            "l0",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            10.5,
+            110,
+            111,
+            112,
+        );
+        d.delivery_round_sequence = 99;
+        let receipt = deliver_delayed_aci_feedback_v1(&mut engine, &d).unwrap();
+        assert_eq!(receipt.disposition, DelayedAciDispositionV1::Rejected);
+        assert_eq!(engine.phase_alpha_states, vec![0.10, 0.10]);
+    }
+
+    #[test]
     fn alpha_is_projected_to_unit_interval() {
         let mut engine = engine();
         engine.current_alpha = 0.99;
@@ -1107,7 +1240,7 @@ mod tests {
         .unwrap();
         let missed = delivery("s1", "e1", "l1", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy, LabelEvidenceFrontierV1::CurrentAtK1, 12.0, 110, 111, 112);
         deliver_delayed_aci_feedback_v1(&mut engine, &missed).unwrap();
-        assert_eq!(engine.current_alpha, 0.005);
+        assert!((engine.current_alpha - 0.005).abs() < 1.0e-12);
         assert_eq!(prediction_one.interval_upper, 11.0);
         assert_eq!(prediction_two.alpha_state_used, 0.10);
         assert_eq!(prediction_two.interval_upper, 11.0);
