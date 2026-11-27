@@ -1161,6 +1161,303 @@ pub struct CaoOcrcRiskBoundV1 {
     pub corollary_one_regime_applicable: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CaoOcrcStochasticRiskBoundV1 {
+    pub horizon_rounds: u64,
+    pub score_upper_bound: f64,
+    pub learning_rate: f64,
+    pub target_risk: f64,
+    pub tracking_capacity: usize,
+    pub maximum_feedback_delay_rounds: u64,
+    pub maximum_proxy_delay_rounds: u64,
+    pub population_scope: CaoOcrcPopulationScopeV1,
+    pub q_g: f64,
+    pub stochastic_tracking_load: f64,
+    pub expected_conditional_delay: f64,
+    pub q_fg: f64,
+    pub range_term_r_fg: f64,
+    pub capacity_saturation_term: f64,
+    pub bound: f64,
+}
+
+/// Theorem 2, equations (31)-(34), for a declared IID feedback-delay survival G
+/// and proxy-delay survival F. This is a conditional theorem bound: the caller
+/// is responsible for justifying that observed feedback delays are IID with
+/// the declared G and independent of proxy randomization.
+pub fn compute_ca_ocrc_stochastic_risk_bound_v1(
+    policy: &CaoOcrcPolicyV1,
+    horizon_rounds: u64,
+) -> Result<CaoOcrcStochasticRiskBoundV1, CaoOcrcErrorV1> {
+    validate_policy(policy)?;
+    if policy.delay_assumption != CaoOcrcDelayAssumptionV1::IidStochastic {
+        return Err(CaoOcrcErrorV1(
+            "stochastic risk theorem requires IidStochastic policy mode".into(),
+        ));
+    }
+    if horizon_rounds == 0 || policy.tracking_capacity == 0 {
+        return Err(CaoOcrcErrorV1(
+            "stochastic risk bound requires positive horizon and tracking capacity".into(),
+        ));
+    }
+
+    let g = policy.feedback_delay_survival.as_ref().expect("validated IID policy has G");
+    let f = &policy.proxy_survival;
+    let dbar_max = policy.maximum_proxy_delay_rounds as usize;
+    let k = policy.tracking_capacity as f64;
+    let q_g = q_g_for_policy(policy)?;
+    if !q_g.is_finite() || q_g <= 0.0 {
+        return Err(CaoOcrcErrorV1("q_G(dbar_max) must be finite and positive".into()));
+    }
+
+    let mut stochastic_tracking_load = 0.0;
+    let mut expected_delay_numerator = 0.0;
+    let mut q_fg = 0.0;
+    for age in 0..=dbar_max {
+        let mass = g[age] - g[age + 1];
+        if mass < -1.0e-12 {
+            return Err(CaoOcrcErrorV1("G is not a valid survival profile".into()));
+        }
+        expected_delay_numerator += age as f64 * mass / q_g;
+        if mass > 0.0 && f[age] <= 0.0 {
+            return Err(CaoOcrcErrorV1(format!(
+                "F({age}) must be positive when G assigns positive feedback probability"
+            )));
+        }
+        if f[age] <= 0.0 {
+            return Err(CaoOcrcErrorV1(format!(
+                "F({age}) must be positive for the stochastic IPW variance term"
+            )));
+        }
+        q_fg += mass / (q_g * q_g * f[age]);
+        if age > 0 {
+            stochastic_tracking_load += f[age] * g[age];
+        }
+    }
+
+    if !stochastic_tracking_load.is_finite()
+        || stochastic_tracking_load > k + 1.0e-12
+    {
+        return Err(CaoOcrcErrorV1(
+            "Theorem 2 requires stochastic tracking load ell_(F,G) <= K".into(),
+        ));
+    }
+
+    let alpha_bar = policy.target_risk.max(1.0 - policy.target_risk);
+    let range_term = alpha_bar
+        * (expected_delay_numerator + 2.0
+            + (k * alpha_bar * alpha_bar / (2.0 * (1.0 - alpha_bar))) * q_fg);
+    let capacity_saturation_term = if policy.maximum_proxy_delay_rounds >= policy.tracking_capacity as u64 {
+        if stochastic_tracking_load <= 0.0 {
+            return Err(CaoOcrcErrorV1(
+                "positive stochastic tracking load is required when the capacity term is active".into(),
+            ));
+        }
+        let x = stochastic_tracking_load / k;
+        let h = x - 1.0 - x.ln();
+        (-k * h).exp()
+    } else {
+        0.0
+    };
+    let bound = policy.score_upper_bound
+        / (policy.learning_rate * horizon_rounds as f64)
+        + range_term / horizon_rounds as f64
+        + capacity_saturation_term;
+    if !q_fg.is_finite() || !range_term.is_finite()
+        || !capacity_saturation_term.is_finite() || !bound.is_finite()
+    {
+        return Err(CaoOcrcErrorV1(
+            "stochastic theorem calculation produced a non-finite term".into(),
+        ));
+    }
+
+    Ok(CaoOcrcStochasticRiskBoundV1 {
+        horizon_rounds,
+        score_upper_bound: policy.score_upper_bound,
+        learning_rate: policy.learning_rate,
+        target_risk: policy.target_risk,
+        tracking_capacity: policy.tracking_capacity,
+        maximum_feedback_delay_rounds: policy.maximum_feedback_delay_rounds,
+        maximum_proxy_delay_rounds: policy.maximum_proxy_delay_rounds,
+        population_scope: policy.population_scope,
+        q_g,
+        stochastic_tracking_load,
+        expected_conditional_delay: expected_delay_numerator,
+        q_fg,
+        range_term_r_fg: range_term,
+        capacity_saturation_term,
+        bound,
+    })
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CaoOcrcStochasticProxyOptimizerResultV1 {
+    pub capacity: usize,
+    pub horizon_rounds: u64,
+    pub maximum_feedback_delay_rounds: u64,
+    pub selected_proxy_delay_rounds: u64,
+    pub proxy_survival: Vec<f64>,
+    pub q_g: f64,
+    pub stochastic_tracking_load: f64,
+    pub theta: Option<f64>,
+    pub risk_bound: f64,
+    pub optimizer_iterations: u32,
+}
+
+/// Computes Proposition 2's kappa(a) values for a fixed proxy horizon.
+fn stochastic_proxy_kappa_v1(
+    g: &[f64],
+    dbar_max: usize,
+) -> Result<Vec<f64>, CaoOcrcErrorV1> {
+    let mut kappas = vec![0.0; dbar_max + 1];
+    for age in 1..=dbar_max {
+        let mut best_over_s = f64::INFINITY;
+        for start in 1..=age {
+            let mut prefix_sum = 0.0;
+            let mut best_over_end = 0.0_f64;
+            for end in start..=dbar_max {
+                prefix_sum += g[end];
+                if end < age {
+                    continue;
+                }
+                if prefix_sum <= 0.0 {
+                    continue;
+                }
+                let numerator = g[start] - g[end + 1];
+                let ratio = numerator / prefix_sum;
+                if !ratio.is_finite() || ratio < 0.0 {
+                    return Err(CaoOcrcErrorV1(
+                        "Proposition 2 kappa ratio is invalid".into(),
+                    ));
+                }
+                best_over_end = best_over_end.max(ratio);
+            }
+            if best_over_end <= 0.0 {
+                return Err(CaoOcrcErrorV1(
+                    "Proposition 2 kappa(a) is zero; declared G has unsupported age ranges".into(),
+                ));
+            }
+            best_over_s = best_over_s.min(best_over_end);
+        }
+        if !best_over_s.is_finite() || best_over_s <= 0.0 {
+            return Err(CaoOcrcErrorV1("Proposition 2 kappa(a) is invalid".into()));
+        }
+        kappas[age] = best_over_s;
+    }
+    Ok(kappas)
+}
+
+/// Optimizes the stochastic proxy horizon over all supported actual delay
+/// values, then optimizes theta over Proposition 2's clipped square-root
+/// family. A deterministic golden-section search is used for the scalar
+/// objective; ties between horizons retain the smaller horizon.
+pub fn optimize_ca_ocrc_stochastic_proxy_v1(
+    base_policy: &CaoOcrcPolicyV1,
+    horizon_rounds: u64,
+) -> Result<CaoOcrcStochasticProxyOptimizerResultV1, CaoOcrcErrorV1> {
+    validate_policy(base_policy)?;
+    if base_policy.delay_assumption != CaoOcrcDelayAssumptionV1::IidStochastic {
+        return Err(CaoOcrcErrorV1(
+            "stochastic proxy optimizer requires IidStochastic policy mode".into(),
+        ));
+    }
+    if horizon_rounds == 0 || base_policy.tracking_capacity == 0 {
+        return Err(CaoOcrcErrorV1(
+            "stochastic proxy optimizer requires positive horizon and capacity".into(),
+        ));
+    }
+
+    let g = base_policy.feedback_delay_survival.as_ref().expect("validated IID policy has G");
+    let k = base_policy.tracking_capacity;
+    let d_max = base_policy.maximum_feedback_delay_rounds as usize;
+    let mut best: Option<CaoOcrcStochasticProxyOptimizerResultV1> = None;
+    let mut total_iterations = 0_u32;
+
+    for dbar_max in 0..=d_max {
+        let support_mass = g[dbar_max] - g[dbar_max + 1];
+        if support_mass <= 0.0 {
+            continue;
+        }
+        let q_g = 1.0 - g[dbar_max + 1];
+        if q_g <= 0.0 {
+            continue;
+        }
+
+        let (proxy_survival, theta, iterations) = if dbar_max < k {
+            (vec![1.0; dbar_max + 1], None, 0)
+        } else {
+            let kappas = stochastic_proxy_kappa_v1(g, dbar_max)?;
+            let theta_max = (1..=dbar_max)
+                .map(|age| 1.0 / kappas[age].sqrt())
+                .fold(0.0_f64, f64::max);
+            let objective = |theta: f64| -> Result<f64, CaoOcrcErrorV1> {
+                let mut candidate = base_policy.clone();
+                candidate.maximum_proxy_delay_rounds = dbar_max as u64;
+                candidate.proxy_survival = std::iter::once(1.0)
+                    .chain((1..=dbar_max).map(|age| (theta * kappas[age].sqrt()).min(1.0)))
+                    .collect();
+                Ok(compute_ca_ocrc_stochastic_risk_bound_v1(&candidate, horizon_rounds)?.bound)
+            };
+
+            let golden = (5.0_f64.sqrt() - 1.0) / 2.0;
+            let mut low = (theta_max * 1.0e-12).max(f64::MIN_POSITIVE);
+            let mut high = theta_max;
+            let mut x1 = high - golden * (high - low);
+            let mut x2 = low + golden * (high - low);
+            let mut f1 = objective(x1)?;
+            let mut f2 = objective(x2)?;
+            let mut iterations = 0_u32;
+            while iterations < 160 && (high - low) > 1.0e-12 * theta_max.max(1.0) {
+                if f1 > f2 {
+                    low = x1;
+                    x1 = x2;
+                    f1 = f2;
+                    x2 = low + golden * (high - low);
+                    f2 = objective(x2)?;
+                } else {
+                    high = x2;
+                    x2 = x1;
+                    f2 = f1;
+                    x1 = high - golden * (high - low);
+                    f1 = objective(x1)?;
+                }
+                iterations += 1;
+            }
+            let theta = 0.5 * (low + high);
+            let survival = std::iter::once(1.0)
+                .chain((1..=dbar_max).map(|age| (theta * kappas[age].sqrt()).min(1.0)))
+                .collect::<Vec<_>>();
+            (survival, Some(theta), iterations)
+        };
+
+        let mut candidate = base_policy.clone();
+        candidate.maximum_proxy_delay_rounds = dbar_max as u64;
+        candidate.proxy_survival = proxy_survival.clone();
+        let bound = compute_ca_ocrc_stochastic_risk_bound_v1(&candidate, horizon_rounds)?;
+        let result = CaoOcrcStochasticProxyOptimizerResultV1 {
+            capacity: k,
+            horizon_rounds,
+            maximum_feedback_delay_rounds: d_max as u64,
+            selected_proxy_delay_rounds: dbar_max as u64,
+            proxy_survival,
+            q_g,
+            stochastic_tracking_load: bound.stochastic_tracking_load,
+            theta,
+            risk_bound: bound.bound,
+            optimizer_iterations: iterations,
+        };
+        total_iterations = total_iterations.saturating_add(iterations);
+        if best.as_ref().is_none_or(|current| result.risk_bound < current.risk_bound - 1.0e-12) {
+            best = Some(result);
+        }
+    }
+
+    let mut best = best.ok_or_else(|| CaoOcrcErrorV1(
+        "G has no supported proxy-horizon value with positive q_G".into()
+    ))?;
+    best.optimizer_iterations = total_iterations;
+    Ok(best)
+}
+
 /// Computes the exact displayed risk bound for the regime covered by
 /// Theorem 1 (capacity-constrained) or Lemma 2 (unlimited tracking).
 /// It refuses to silently apply either expression outside its assumptions.
