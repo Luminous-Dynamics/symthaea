@@ -614,21 +614,39 @@ impl WebResearcher {
                 }
                 Err(error) => {
                     let http_status = http_status_from_error(&error);
+                    let redirect_rejected = is_redirect_policy_rejection_anyhow(&error);
+                    let url_rejected = is_url_policy_rejection_anyhow(&error);
+                    let dns_rejected = is_dns_policy_rejection_anyhow(&error);
+                    let outcome = if http_status == Some(429) {
+                        AcquisitionOutcome::RateLimited
+                    } else if redirect_rejected {
+                        AcquisitionOutcome::RedirectRejected
+                    } else if url_rejected {
+                        AcquisitionOutcome::UrlPolicyRejected
+                    } else if dns_rejected {
+                        AcquisitionOutcome::DnsPolicyRejected
+                    } else {
+                        AcquisitionOutcome::ProviderFailed
+                    };
                     let mut receipt = make_receipt(
                         query_rank,
                         None,
                         AcquisitionStage::ArxivApi,
                         query,
-                        if http_status == Some(429) {
-                            AcquisitionOutcome::RateLimited
-                        } else {
-                            AcquisitionOutcome::ProviderFailed
-                        },
+                        outcome,
                     );
                     receipt.provider = Some("arxiv".to_string());
                     receipt.requested_url = Some(self.config.arxiv_endpoint.clone());
                     receipt.http_status = http_status;
-                    receipt.reason_code = Some("ARXIV_SEARCH_FAILED".to_string());
+                    receipt.reason_code = Some(if redirect_rejected {
+                        "REDIRECT_REJECTED".to_string()
+                    } else if url_rejected {
+                        "URL_POLICY_REJECTED".to_string()
+                    } else if dns_rejected {
+                        "DNS_POLICY_REJECTED".to_string()
+                    } else {
+                        "ARXIV_SEARCH_FAILED".to_string()
+                    });
                     receipt.reason = Some(format!("{error:#}"));
                     receipt.elapsed_ms = elapsed_ms(started);
                     receipts.push(receipt);
@@ -672,21 +690,39 @@ impl WebResearcher {
                 }
                 Err(error) => {
                     let http_status = http_status_from_error(&error);
+                    let redirect_rejected = is_redirect_policy_rejection_anyhow(&error);
+                    let url_rejected = is_url_policy_rejection_anyhow(&error);
+                    let dns_rejected = is_dns_policy_rejection_anyhow(&error);
+                    let outcome = if http_status == Some(429) {
+                        AcquisitionOutcome::RateLimited
+                    } else if redirect_rejected {
+                        AcquisitionOutcome::RedirectRejected
+                    } else if url_rejected {
+                        AcquisitionOutcome::UrlPolicyRejected
+                    } else if dns_rejected {
+                        AcquisitionOutcome::DnsPolicyRejected
+                    } else {
+                        AcquisitionOutcome::ProviderFailed
+                    };
                     let mut receipt = make_receipt(
                         query_rank,
                         None,
                         AcquisitionStage::OpenReviewApi,
                         query,
-                        if http_status == Some(429) {
-                            AcquisitionOutcome::RateLimited
-                        } else {
-                            AcquisitionOutcome::ProviderFailed
-                        },
+                        outcome,
                     );
                     receipt.provider = Some("openreview".to_string());
                     receipt.requested_url = Some(self.config.openreview_endpoint.clone());
                     receipt.http_status = http_status;
-                    receipt.reason_code = Some("OPENREVIEW_SEARCH_FAILED".to_string());
+                    receipt.reason_code = Some(if redirect_rejected {
+                        "REDIRECT_REJECTED".to_string()
+                    } else if url_rejected {
+                        "URL_POLICY_REJECTED".to_string()
+                    } else if dns_rejected {
+                        "DNS_POLICY_REJECTED".to_string()
+                    } else {
+                        "OPENREVIEW_SEARCH_FAILED".to_string()
+                    });
                     receipt.reason = Some(format!("{error:#}"));
                     receipt.elapsed_ms = elapsed_ms(started);
                     receipts.push(receipt);
