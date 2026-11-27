@@ -477,14 +477,20 @@ impl EmbodimentStreamValidator {
         })
     }
 
-    /// Accept an event against the caller-supplied monotonic clock reading.
+    /// Accept an event against a caller-supplied monotonic reading and explicit
+    /// clock identity. The caller must sample "now" from the named clock domain.
     /// This function performs no I/O and does not render or execute actions.
     pub fn accept(
         &mut self,
         event: &EmbodimentEvent,
         now_monotonic_ns: &str,
+        now_clock_domain_id: &str,
     ) -> Result<(), EventValidationError> {
         event.validate()?;
+        validate_identifier("now_clock_domain_id", now_clock_domain_id)?;
+        if now_clock_domain_id != event.clock_domain_id {
+            return Err(EventValidationError::ClockDomainMismatch);
+        }
         let now = parse_monotonic_ns(now_monotonic_ns)?;
         let observed = event.observed_at_ns()?;
         let expires = event.expires_at_ns()?;
@@ -713,16 +719,16 @@ mod tests {
     #[test]
     fn accepts_first_well_formed_event() {
         let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
-        assert_eq!(validator.accept(&listening_event(0, "event-0"), "200"), Ok(()));
+        assert_eq!(validator.accept(&listening_event(0, "event-0"), "200", "clock:dialogue-epoch-1"), Ok(()));
         assert_eq!(validator.last_sequence(), Some(0));
     }
 
     #[test]
     fn rejects_sequence_gap_without_mutating_state() {
         let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
-        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200", "clock:dialogue-epoch-1").unwrap();
         assert_eq!(
-            validator.accept(&listening_event(2, "event-2"), "300"),
+            validator.accept(&listening_event(2, "event-2"), "300", "clock:dialogue-epoch-1"),
             Err(EventValidationError::SequenceGap)
         );
         assert_eq!(validator.last_sequence(), Some(0));
@@ -731,9 +737,9 @@ mod tests {
     #[test]
     fn rejects_duplicate_event_identity() {
         let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
-        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200", "clock:dialogue-epoch-1").unwrap();
         assert_eq!(
-            validator.accept(&listening_event(1, "event-0"), "300"),
+            validator.accept(&listening_event(1, "event-0"), "300", "clock:dialogue-epoch-1"),
             Err(EventValidationError::DuplicateEventId)
         );
         assert_eq!(validator.last_sequence(), Some(0));
@@ -742,11 +748,11 @@ mod tests {
     #[test]
     fn rejects_mixed_monotonic_clock_domains_within_a_session() {
         let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
-        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200", "clock:dialogue-epoch-1").unwrap();
         let mut next = listening_event(1, "event-1");
         next.clock_domain_id = "clock:other-process-epoch".to_owned();
         assert_eq!(
-            validator.accept(&next, "300"),
+            validator.accept(&next, "300", "clock:other-process-epoch"),
             Err(EventValidationError::ClockDomainMismatch)
         );
         assert_eq!(validator.last_sequence(), Some(0));
@@ -760,7 +766,7 @@ mod tests {
     fn rejects_wrong_session() {
         let mut validator = EmbodimentStreamValidator::new("session-2").unwrap();
         assert_eq!(
-            validator.accept(&listening_event(0, "event-0"), "200"),
+            validator.accept(&listening_event(0, "event-0"), "200", "clock:dialogue-epoch-1"),
             Err(EventValidationError::SessionMismatch)
         );
     }
@@ -769,7 +775,7 @@ mod tests {
     fn rejects_expired_event() {
         let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
         assert_eq!(
-            validator.accept(&listening_event(0, "event-0"), "1000"),
+            validator.accept(&listening_event(0, "event-0"), "1000", "clock:dialogue-epoch-1"),
             Err(EventValidationError::EventExpired)
         );
     }
@@ -778,7 +784,7 @@ mod tests {
     fn rejects_future_observation() {
         let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
         assert_eq!(
-            validator.accept(&listening_event(0, "event-0"), "99"),
+            validator.accept(&listening_event(0, "event-0"), "99", "clock:dialogue-epoch-1"),
             Err(EventValidationError::EventObservedInFuture)
         );
     }
@@ -841,7 +847,7 @@ mod tests {
     #[test]
     fn cancel_control_must_reference_an_event_in_the_same_stream() {
         let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
-        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200", "clock:dialogue-epoch-1").unwrap();
         let mut cancel = listening_event(1, "event-1");
         cancel.event_kind = EventKind::UserControl;
         cancel.payload = EventPayload::UserControl(UserControlPayload {
@@ -852,7 +858,7 @@ mod tests {
             intensity: None,
         });
         assert_eq!(
-            validator.accept(&cancel, "300"),
+            validator.accept(&cancel, "300", "clock:dialogue-epoch-1"),
             Err(EventValidationError::UnknownCancelTarget)
         );
         assert_eq!(validator.last_sequence(), Some(0));
@@ -874,7 +880,7 @@ mod tests {
     #[test]
     fn accepts_cancel_for_an_already_observed_event() {
         let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
-        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200", "clock:dialogue-epoch-1").unwrap();
         let mut cancel = listening_event(1, "event-1");
         cancel.event_kind = EventKind::UserControl;
         cancel.payload = EventPayload::UserControl(UserControlPayload {
@@ -884,7 +890,7 @@ mod tests {
             enabled: None,
             intensity: None,
         });
-        assert_eq!(validator.accept(&cancel, "300"), Ok(()));
+        assert_eq!(validator.accept(&cancel, "300", "clock:dialogue-epoch-1"), Ok(()));
         assert_eq!(validator.last_sequence(), Some(1));
     }
 
@@ -908,9 +914,9 @@ mod tests {
     #[test]
     fn validator_enforces_a_bounded_session_event_budget() {
         let mut validator = EmbodimentStreamValidator::with_max_events("session-1", 1).unwrap();
-        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200", "clock:dialogue-epoch-1").unwrap();
         assert_eq!(
-            validator.accept(&listening_event(1, "event-1"), "300"),
+            validator.accept(&listening_event(1, "event-1"), "300", "clock:dialogue-epoch-1"),
             Err(EventValidationError::StreamCapacityReached)
         );
         assert_eq!(validator.accepted_event_count(), 1);
@@ -936,7 +942,7 @@ mod tests {
     #[test]
     fn accepted_cancellation_is_queryable_and_not_repeatable() {
         let mut validator = EmbodimentStreamValidator::new("session-1").unwrap();
-        validator.accept(&listening_event(0, "event-0"), "200").unwrap();
+        validator.accept(&listening_event(0, "event-0"), "200", "clock:dialogue-epoch-1").unwrap();
         let mut cancel = listening_event(1, "event-1");
         cancel.event_kind = EventKind::UserControl;
         cancel.payload = EventPayload::UserControl(UserControlPayload {
@@ -946,7 +952,7 @@ mod tests {
             enabled: None,
             intensity: None,
         });
-        validator.accept(&cancel, "300").unwrap();
+        validator.accept(&cancel, "300", "clock:dialogue-epoch-1").unwrap();
         assert!(validator.is_cancelled("event-0"));
 
         let mut repeated_cancel = listening_event(2, "event-2");
@@ -959,7 +965,7 @@ mod tests {
             intensity: None,
         });
         assert_eq!(
-            validator.accept(&repeated_cancel, "400"),
+            validator.accept(&repeated_cancel, "400", "clock:dialogue-epoch-1"),
             Err(EventValidationError::AlreadyCancelled)
         );
         assert_eq!(validator.last_sequence(), Some(1));
