@@ -101,8 +101,14 @@ impl Ar1Stream {
     }
 
     fn next(&mut self, rho: f64) -> f64 {
+        self.next_with_innovation_sign(rho, 1.0)
+    }
+
+    fn next_with_innovation_sign(&mut self, rho: f64, innovation_sign: f64) -> f64 {
+        assert!(innovation_sign == 1.0 || innovation_sign == -1.0);
         let innovation_scale = (1.0 - rho * rho).sqrt();
-        self.state = rho * self.state + innovation_scale * self.rng.standard_normal();
+        self.state = rho * self.state
+            + innovation_scale * innovation_sign * self.rng.standard_normal();
         self.state * self.marginal_scale
     }
 
@@ -441,6 +447,31 @@ mod tests {
             0xB10C_C0DE_5203,
         );
         assert!((report.empirical_alarm_rate - ALPHA).abs() <= 0.02);
+    }
+
+    #[test]
+    fn absolute_block_maximum_is_exactly_invariant_to_rho_sign_transform() {
+        for marginal in [
+            MarginalFamily::Gaussian,
+            MarginalFamily::StandardizedStudentT5CommonScale,
+        ] {
+            for rho in [0.05_f64, 0.50, 0.95] {
+                let mut positive = Ar1Stream::new(0xB10C_C0DE_5400, marginal);
+                let mut negative = Ar1Stream::new(0xB10C_C0DE_5400, marginal);
+                let mut positive_max = 0.0_f64;
+                let mut negative_max = 0.0_f64;
+                for step in 1..=32 {
+                    let positive_value = positive.next(rho);
+                    let innovation_sign = if step % 2 == 0 { 1.0 } else { -1.0 };
+                    let negative_value =
+                        negative.next_with_innovation_sign(-rho, innovation_sign);
+                    positive_max = positive_max.max(positive_value.abs());
+                    negative_max = negative_max.max(negative_value.abs());
+                    assert_eq!(positive_value.abs(), negative_value.abs());
+                }
+                assert_eq!(positive_max, negative_max);
+            }
+        }
     }
 
     #[test]
