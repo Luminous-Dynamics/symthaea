@@ -361,7 +361,7 @@ This is a research direction. It should be considered successful only after the 
 
 ## 12. Implemented v0.1 seed and exact-head evidence
 
-The first standalone reference evaluator is implemented in `research/eqc-rust/`, outside the main Symthaea Cargo workspace. Its locked dependencies, task/receipt schemas, synthetic inputs and runner are independently reproducible.
+The first standalone reference evaluator is implemented in `research/eqc-rust/`, outside the main Symthaea Cargo workspace. Its locked dependencies, task/receipt schemas, synthetic inputs and runner are independently reproducible. This PR is stacked on workspace-manifest repair PR [#13080](https://github.com/Luminous-Dynamics/symthaea/pull/13080), which excludes the examples-only `crates/core/symthaea` path from the root workspace glob and restores the repository-wide manifest checks; the evaluator itself remains a separately locked nested Cargo workspace.
 
 Exact-head run on 2026-11-27:
 - Source head: `39f0a9e2f43ba4f289d756dd3b5a40de94c0ad6a`.
