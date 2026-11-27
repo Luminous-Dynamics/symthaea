@@ -229,3 +229,8 @@ This increment bridges existing discrete Markov drift references (#13793 and #13
 - Versioned example, expected-result fixture and JSON Schema accompany the OU primitive.
 
 The exact OU primitive is a bounded foundation, not a completed vector state-space filter or adaptive laboratory planner. Eight Rust tests are authored but not compiled/executed here; no raw dataset, physical measurement, or hosted workflow pass is claimed. Follow-on increments are vector OU propagation, interval-integrated mobile-reference observations, covariance-model posterior updates, and an elapsed-time-aware adaptive policy.
+
+
+## Vector continuous-time state-space follow-on — 27 November 2026
+
+The DC1 follow-on now adds `scripts/research/sdcb_vector_state_space.rs`, a bounded linear-SDE discretization reference using the Van Loan block exponential and diagonal [13/13] Padé scaling/squaring. It produces both elapsed-time transition F and full process covariance Q, and propagates Gaussian means/covariances. The state dimension is capped at eight. Frozen scalar-OU, coupled two-factor and non-normal fixtures are included; coupled/non-normal covariance values are independently checked by elementwise quadrature. This is a numerical reference, not a production filter. Ten Rust tests are authored but are not compiled or executed in this environment. Follow-on work remains interval-integrated observations, covariance-model uncertainty and dynamic adaptive planning.
