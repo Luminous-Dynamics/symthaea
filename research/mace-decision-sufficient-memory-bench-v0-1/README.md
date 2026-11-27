@@ -340,3 +340,8 @@ A standalone Rust reference implementation now exists under [reference-evaluator
 The implementation does not create a process sandbox, sign candidate data, or independently measure resource counters. Candidate/evaluator isolation and sealed-label custody remain deployment requirements. Exact-head compilation, tests, formatting and Clippy are pending; no CI pass or MACE score is claimed.
 
 See [MACE DSM benchmark frontier, 27 November 2026](../../docs/research/MACE_DSM_BENCHMARK_FRONTIER_2026-11-27.md) for the current external comparison and preregisterable target ladder.
+
+
+## Paired-runner interoperability boundary
+
+The Rust reference evaluator now keeps the full retrieved evidence set separate from the evidence selected to support the action, and preserves nullable phase-attributed cost receipts. See [MACE DSM paired-intervention adapter contract v0.1](../../docs/research/MACE_DSM_PAIRED_INTERVENTION_ADAPTER_V0_1.md). The existing paired runner already emits retrieved IDs, decision-support IDs, per-phase timings, and measured-versus-estimated byte labels. A direct adapter is intentionally blocked until the shared generator exposes a versioned candidate-visible source-event projection with observation/validity times, authority and lifecycle ancestry; IDs alone are not enough to reconstruct those facts. Reuse #13836's cluster-aware inference rather than creating a second bootstrap implementation.
