@@ -134,6 +134,26 @@ struct CanonicalPermittedOfferListV1<'a> {
     offers: &'a [PermittedActionOfferRef],
 }
 
+#[derive(Serialize)]
+struct CanonicalCandidateDecisionContextV1<'a> {
+    domain: &'static str,
+    schema_version: u16,
+    episode_id: &'a str,
+    parent_episode_id: Option<&'a str>,
+    task_family_id: &'a str,
+    decision_index: u64,
+    decision_time_ms: u64,
+    deadline_ms: Option<u64>,
+    phase: DecisionPhase,
+    decision_objective: &'a DecisionObjectiveReference,
+    research_state_sha256: &'a str,
+    evidence_prefix_sha256: &'a str,
+    permitted_action_offer_list_sha256: &'a str,
+    evidence_available_at_decision: &'a [EvidenceReference],
+    permitted_action_offers: &'a [PermittedActionOfferRef],
+    estimated_budget: &'a ResourceVector,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CandidateDecisionContext {
     pub schema_version: u16,
@@ -160,6 +180,32 @@ pub struct CandidateDecisionContext {
     pub estimated_budget: ResourceVector,
 }
 impl CandidateDecisionContext {
+    /// Canonical domain-separated digest of every candidate-visible decision-context field.
+    /// The context_digest field itself is excluded to avoid a recursive hash.
+    pub fn canonical_context_sha256(&self) -> Result<String, String> {
+        let canonical = CanonicalCandidateDecisionContextV1 {
+            domain: "symthaea.scientific-decision-context",
+            schema_version: self.schema_version,
+            episode_id: &self.episode_id,
+            parent_episode_id: self.parent_episode_id.as_deref(),
+            task_family_id: &self.task_family_id,
+            decision_index: self.decision_index,
+            decision_time_ms: self.decision_time_ms,
+            deadline_ms: self.deadline_ms,
+            phase: self.phase,
+            decision_objective: &self.decision_objective,
+            research_state_sha256: &self.research_state_sha256,
+            evidence_prefix_sha256: &self.evidence_prefix_sha256,
+            permitted_action_offer_list_sha256: &self.permitted_action_offer_list_sha256,
+            evidence_available_at_decision: &self.evidence_available_at_decision,
+            permitted_action_offers: &self.permitted_action_offers,
+            estimated_budget: &self.estimated_budget,
+        };
+        let bytes = serde_json::to_vec(&canonical)
+            .map_err(|error| format!("serialize canonical decision context: {error}"))?;
+        Ok(encode_sha256(&Sha256::digest(bytes)))
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         require_nonempty("episode_id", &self.episode_id)?;
         require_nonempty("task_family_id", &self.task_family_id)?;
@@ -176,6 +222,10 @@ impl CandidateDecisionContext {
                 "permitted_action_offer_list_sha256 does not match the canonical ordered offer list"
                     .into(),
             );
+        }
+        let computed_context_digest = self.canonical_context_sha256()?;
+        if computed_context_digest != self.context_digest {
+            return Err("context_digest does not match the canonical candidate-visible decision context".into());
         }
         self.decision_objective.validate()?;
         if self.schema_version != SCHEMA_VERSION {
@@ -696,8 +746,7 @@ mod tests {
             evidence_prefix_sha256:
                 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
             permitted_action_offer_list_sha256: String::new(),
-            context_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-                .into(),
+            context_digest: String::new(),
             evidence_available_at_decision: vec![EvidenceReference {
                 evidence_id: "obs".into(),
                 content_digest: "3333333333333333333333333333333333333333333333333333333333333333"
@@ -722,6 +771,9 @@ mod tests {
         context.permitted_action_offer_list_sha256 = context
             .canonical_permitted_offer_list_sha256()
             .expect("test offer list serializes");
+        context.context_digest = context
+            .canonical_context_sha256()
+            .expect("test decision context serializes");
         context
     }
     fn proposal(c: &CandidateDecisionContext) -> DecisionProposal {
@@ -804,6 +856,17 @@ mod tests {
             cost_completeness: CostCompleteness::Complete,
             independent_adjudication_ref: Some("independent-review".into()),
         }
+    }
+
+    #[test]
+    fn rejects_candidate_context_substitution() {
+        let mut c = context();
+        c.decision_time_ms += 1;
+        assert!(
+            c.validate()
+                .unwrap_err()
+                .contains("context_digest does not match")
+        );
     }
 
     #[test]
