@@ -1,0 +1,54 @@
+name: SDCB Bivariate Rectangle Numerical Qualification
+
+on:
+  push:
+    branches:
+      - research/sdcb-bivariate-budget-and-metamorphic-2026-11-27
+    paths:
+      - "scripts/research/sdcb_bivariate_rectangle.rs"
+      - "scripts/research/sdcb_gaussian_bin_likelihoods.rs"
+      - "docs/research/SDCB_BIVARIATE_RECTANGLE_V1.example.json"
+      - "docs/research/SDCB_BIVARIATE_RECTANGLE_V1.expected.json"
+      - "docs/research/SDCB_BIVARIATE_RECTANGLE_V1.schema.json"
+      - ".github/workflows/sdcb-bivariate-rectangle.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/research/sdcb_bivariate_rectangle.rs"
+      - "scripts/research/sdcb_gaussian_bin_likelihoods.rs"
+      - "docs/research/SDCB_BIVARIATE_RECTANGLE_V1.example.json"
+      - "docs/research/SDCB_BIVARIATE_RECTANGLE_V1.expected.json"
+      - "docs/research/SDCB_BIVARIATE_RECTANGLE_V1.schema.json"
+      - ".github/workflows/sdcb-bivariate-rectangle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  numerical-reference:
+    name: Rust 1.96 bivariate quadrature and metamorphic controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Check formatting on exact committed sources
+        run: |
+          rustfmt --edition 2024 --check scripts/research/sdcb_bivariate_rectangle.rs
+          rustfmt --edition 2024 --check scripts/research/sdcb_gaussian_bin_likelihoods.rs
+      - name: Compile and run exact-source numerical tests
+        run: |
+          rustc --edition=2024 --test scripts/research/sdcb_bivariate_rectangle.rs -o /tmp/sdcb-bivariate-rectangle
+          /tmp/sdcb-bivariate-rectangle
+      - name: Parse frozen JSON fixtures and schema
+        run: |
+          python3 -m json.tool docs/research/SDCB_BIVARIATE_RECTANGLE_V1.example.json >/dev/null
+          python3 -m json.tool docs/research/SDCB_BIVARIATE_RECTANGLE_V1.expected.json >/dev/null
+          python3 -m json.tool docs/research/SDCB_BIVARIATE_RECTANGLE_V1.schema.json >/dev/null
