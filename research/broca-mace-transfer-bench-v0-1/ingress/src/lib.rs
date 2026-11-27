@@ -3305,6 +3305,21 @@ mod tests {
     }
 
     #[test]
+    fn use_time_revalidation_rejects_half_open_validity_expiry() {
+        let prior = ingest_as_known(&raw(), query(180, 250), &TestVerifier::default()).unwrap();
+        let context = EvidenceUseContextV1 {
+            purpose_code: "mace.dsm.eval".into(),
+            required_scope: scope(),
+            consumer_policy_sha256: "a".repeat(64),
+            require_complete_dependency_lineage: false,
+        };
+        assert_eq!(
+            revalidate_for_use_v1(&raw(), &prior, query(300, 270), &context, &TestVerifier::default()),
+            Err(EvidenceUseRejectV1::RevalidationRejected(IngestReject::NotValidAtRequestedTime))
+        );
+    }
+
+    #[test]
     fn use_time_revalidation_rejects_knowledge_time_regression() {
         let prior = ingest_as_known(&raw(), query(180, 250), &TestVerifier::default()).unwrap();
         let context = EvidenceUseContextV1 {
