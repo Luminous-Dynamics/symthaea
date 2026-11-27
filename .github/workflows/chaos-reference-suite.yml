@@ -2,6 +2,7 @@ name: Chaos Reference Suite
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "research/chaos-reference-suite/**"
       - ".github/workflows/chaos-reference-suite.yml"
@@ -23,6 +24,7 @@ concurrency:
 jobs:
   qualify:
     name: Standalone chaos reference crate
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
