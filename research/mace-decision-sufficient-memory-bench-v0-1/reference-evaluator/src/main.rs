@@ -157,6 +157,27 @@ struct DetailedCostReceipt {
 #[serde(deny_unknown_fields)]
 struct ArmManifest { schema_version: String, expected_arm_ids: Vec<String>, no_memory_arm_id: Option<String> }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PairManifest {
+    schema_version: String,
+    run_id: String,
+    source_revision: String,
+    generator_sha256: String,
+    scenario_sha256: String,
+    arm_manifest_sha256: String,
+    episodes: Vec<PairEntry>,
+}
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PairEntry {
+    episode_id: String,
+    pair_block_id: String,
+    world_cluster_id: String,
+    query_id: String,
+    candidate_sha256: String,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct ScoreRow {
     episode_id: String,
@@ -499,11 +520,17 @@ fn aggregate(key: &str, rows: &[ScoreRow]) -> serde_json::Value {
         "mean_reported_latency_us": average(latencies.into_iter())
     })
 }
-fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path: &str, report_path: &str) -> Result<(), String> {
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path: &str, pair_path: &str, report_path: &str) -> Result<(), String> {
     let candidates: Vec<CandidateRow> = read_jsonl(candidate_path)?;
     let privates: Vec<PrivateRow> = read_jsonl(private_path)?;
     let responses: Vec<Response> = read_jsonl(response_path)?;
     let arm_bytes = fs::read(arm_path).map_err(|e| format!("read arm manifest: {e}"))?;
+    let pair_bytes = fs::read(pair_path).map_err(|e| format!("read pair manifest: {e}"))?;
+    let pair_manifest: PairManifest = serde_json::from_slice(&pair_bytes)
+        .map_err(|e| format!("parse pair manifest: {e}"))?;
     let arm_manifest: ArmManifest = serde_json::from_slice(&arm_bytes).map_err(|e| format!("parse arm manifest: {e}"))?;
     if arm_manifest.schema_version != "mace_dsm_arm_manifest_v0_1" || arm_manifest.expected_arm_ids.is_empty() ||
         arm_manifest.expected_arm_ids.iter().any(|arm| arm.trim().is_empty()) {
@@ -511,6 +538,15 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
     }
     let expected_arms: BTreeSet<String> = arm_manifest.expected_arm_ids.iter().cloned().collect();
     if expected_arms.len() != arm_manifest.expected_arm_ids.len() { return Err("duplicate arm in manifest".into()); }
+    if pair_manifest.schema_version != "mace_dsm_pair_manifest_v0_1" ||
+        pair_manifest.run_id.trim().is_empty() ||
+        !(pair_manifest.source_revision.len() == 40 || pair_manifest.source_revision.len() == 64) ||
+        !pair_manifest.source_revision.bytes().all(|b| b.is_ascii_hexdigit()) ||
+        !valid_sha256(&pair_manifest.generator_sha256) ||
+        !valid_sha256(&pair_manifest.scenario_sha256) ||
+        pair_manifest.arm_manifest_sha256 != digest(&arm_bytes) {
+        return Err("invalid pair manifest identity or arm-manifest binding".into());
+    }
     if arm_manifest.no_memory_arm_id.as_ref().is_some_and(|id| !expected_arms.contains(id)) {
         return Err("declared no-memory arm is absent from expected_arm_ids".into());
     }
@@ -524,6 +560,32 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
     }
     if cm.len() != pm.len() || cm.keys().any(|id| !pm.contains_key(id)) {
         return Err("candidate/private episode inventories differ".into());
+    }
+    if pair_manifest.episodes.len() != cm.len() {
+        return Err("pair manifest episode inventory differs from candidate inventory".into());
+    }
+    let mut pair_by_episode = BTreeMap::new();
+    let mut pair_block_ids = BTreeSet::new();
+    let mut query_ids = BTreeSet::new();
+    for entry in &pair_manifest.episodes {
+        if entry.episode_id.trim().is_empty() || entry.pair_block_id.trim().is_empty() ||
+            entry.world_cluster_id.trim().is_empty() || entry.query_id.trim().is_empty() ||
+            !valid_sha256(&entry.candidate_sha256) ||
+            !pair_block_ids.insert(entry.pair_block_id.as_str()) ||
+            !query_ids.insert(entry.query_id.as_str()) {
+            return Err(format!("invalid or duplicate pair-manifest entry {}", entry.episode_id));
+        }
+        let candidate = cm.get(entry.episode_id.as_str())
+            .ok_or_else(|| format!("pair manifest references unknown episode {}", entry.episode_id))?;
+        if candidate.candidate_sha256 != entry.candidate_sha256 {
+            return Err(format!("pair manifest candidate digest mismatch for {}", entry.episode_id));
+        }
+        if pair_by_episode.insert(entry.episode_id.as_str(), entry).is_some() {
+            return Err(format!("duplicate pair manifest episode {}", entry.episode_id));
+        }
+    }
+    if cm.keys().any(|id| !pair_by_episode.contains_key(id)) {
+        return Err("pair manifest omits a candidate episode".into());
     }
     let mut pairs = BTreeMap::new();
     for r in &responses {
@@ -552,6 +614,23 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
     }
     let per_arm: Vec<_> = arm_groups.iter().map(|(k,v)| aggregate(k,v)).collect();
     let per_family_arm: Vec<_> = family_groups.iter().map(|((f,a),v)| aggregate(&format!("{f}/{a}"),v)).collect();
+    let mut cluster_groups: BTreeMap<(String, String), Vec<&ScoreRow>> = BTreeMap::new();
+    for row in &scored {
+        let pair = pair_by_episode[row.episode_id.as_str()];
+        cluster_groups.entry((pair.world_cluster_id.clone(), row.arm_id.clone())).or_default().push(row);
+    }
+    let per_cluster_arm: Vec<_> = cluster_groups.iter().map(|((cluster, arm), rows)| {
+        let n = rows.len() as f64;
+        json!({
+            "world_cluster_id": cluster,
+            "arm_id": arm,
+            "episodes": rows.len(),
+            "mean_loss": average(rows.iter().map(|row| row.loss)),
+            "mean_regret": average(rows.iter().map(|row| row.regret)),
+            "decision_sufficiency_rate": rows.iter().filter(|row| row.decision_sufficient).count() as f64 / n,
+            "worse_than_declared_reference_rate": rows.iter().filter(|row| row.worse_than_declared_no_memory_reference).count() as f64 / n
+        })
+    }).collect();
     let paired_vs_executed_no_memory = if let Some(baseline_id) = arm_manifest.no_memory_arm_id.as_ref() {
         let baseline_by_episode: BTreeMap<&str, f64> = scored.iter()
             .filter(|row| row.arm_id.as_str() == baseline_id.as_str())
@@ -566,10 +645,23 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
                 let gains: Vec<f64> = pairs.iter().map(|(row, baseline_loss)| baseline_loss - row.loss).collect();
                 let harm_count = gains.iter().filter(|gain| **gain < -1e-9).count();
                 let improved_count = gains.iter().filter(|gain| **gain > 1e-9).count();
+                let mut cluster_gains: BTreeMap<&str, Vec<f64>> = BTreeMap::new();
+                for (row, baseline_loss) in &pairs {
+                    let cluster = pair_by_episode[row.episode_id.as_str()].world_cluster_id.as_str();
+                    cluster_gains.entry(cluster).or_default().push(*baseline_loss - row.loss);
+                }
+                let cluster_means: Vec<f64> = cluster_gains.values()
+                    .filter_map(|values| average(values.iter().copied())).collect();
+                let cluster_harm_count = cluster_means.iter().filter(|gain| **gain < -1e-9).count();
+                let worst_cluster_gain = cluster_means.iter().copied().reduce(f64::min);
                 json!({
                     "arm_id": arm,
                     "episodes": pairs.len(),
-                    "mean_gain_vs_executed_no_memory": average(gains.iter().copied()),
+                    "independent_world_clusters": cluster_means.len(),
+                    "mean_episode_gain_vs_executed_no_memory": average(gains.iter().copied()),
+                    "mean_cluster_weighted_gain_vs_executed_no_memory": average(cluster_means.iter().copied()),
+                    "worst_cluster_mean_gain_vs_executed_no_memory": worst_cluster_gain,
+                    "cluster_harm_rate": if cluster_means.is_empty() { None } else { Some(cluster_harm_count as f64 / cluster_means.len() as f64) },
                     "worse_than_executed_no_memory_rate": if pairs.is_empty() { None } else { Some(harm_count as f64 / pairs.len() as f64) },
                     "harm_count": harm_count,
                     "improved_count": improved_count,
@@ -588,10 +680,19 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
         "response_input_sha256": digest(&fs::read(response_path).map_err(|e|e.to_string())?),
         "episode_count": candidates.len(), "arm_ids": expected_arms,
         "arm_manifest_sha256": digest(&arm_bytes),
+        "pair_manifest_sha256": digest(&pair_bytes),
+        "pair_manifest_run_id": pair_manifest.run_id,
+        "source_revision": pair_manifest.source_revision,
+        "generator_sha256": pair_manifest.generator_sha256,
+        "scenario_sha256": pair_manifest.scenario_sha256,
+        "independent_world_cluster_count": pair_manifest.episodes.iter().map(|entry| entry.world_cluster_id.as_str()).collect::<BTreeSet<_>>().len(),
+        "pair_block_count": pair_manifest.episodes.len(),
         "paired_response_count": scored.len(),
         "no_memory_arm_id": arm_manifest.no_memory_arm_id,
         "paired_vs_executed_no_memory": paired_vs_executed_no_memory,
-        "per_arm": per_arm, "per_family_arm": per_family_arm, "per_episode": scored,
+        "per_arm": per_arm, "per_family_arm": per_family_arm,
+        "per_cluster_arm": per_cluster_arm,
+        "per_episode": scored,
         "interpretation": {
             "regret": "Candidate action loss minus minimum evaluator-private action loss.",
             "declared_no_memory_reference_gain": "Task-authored reference action loss minus this arm loss; this is not a separately executed no-memory agent arm.",
@@ -671,8 +772,8 @@ fn run()->Result<(),String>{
         Some("generate") if a.len()==5 => generate(a[2].parse().map_err(|e|format!("seed: {e}"))?,
             a[3].parse().map_err(|e|format!("count: {e}"))?,&a[4]),
         Some("prepare") if a.len()==5 => prepare(&a[2],&a[3],&a[4]),
-        Some("score") if a.len()==7 => score(&a[2],&a[3],&a[4],&a[5],&a[6]),
-        _ => Err("usage: generate <seed> <count> <episodes.jsonl> | prepare <episodes.jsonl> <candidate.jsonl> <private.jsonl> | score <candidate.jsonl> <private.jsonl> <responses.jsonl> <arms.json> <report.json>".into())
+        Some("score") if a.len()==8 => score(&a[2],&a[3],&a[4],&a[5],&a[6],&a[7]),
+        _ => Err("usage: generate <seed> <count> <episodes.jsonl> | prepare <episodes.jsonl> <candidate.jsonl> <private.jsonl> | score <candidate.jsonl> <private.jsonl> <responses.jsonl> <arms.json> <pairs.json> <report.json>".into())
     }
 }
 fn main(){if let Err(e)=run(){eprintln!("error: {e}");std::process::exit(2);}}
