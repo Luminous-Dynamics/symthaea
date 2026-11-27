@@ -142,7 +142,7 @@ func Evaluate(req Request)Result{
 	p:=req.Plan
 	r:=Result{RequestedClaim:p.RequestedClaim,Checked:[]string{"recovery-plan","artifact-and-wal-lineage"}}
 	if p.RequestedClaim!=ArtifactValidated&&p.RequestedClaim!=DatabaseRecovered&&p.RequestedClaim!=ServiceRecovered{return done(Indeterminate,"unknown recovery claim level",r)}
-	if !present(p.ID,p.Version,p.Digest,p.SourceSystem,p.Database,p.SourceControlRoot,p.RestoreTargetSystem,p.RestoreControlRoot,p.RepositoryID,p.BackupMethodProfile,p.RequestedTarget.Mode,p.RequestedTarget.Value,p.RequestedTarget.LineageID,p.SurfaceInventoryDigestForPlan())||p.SourceSystem==p.RestoreTargetSystem||p.SourceControlRoot==p.RestoreControlRoot||p.MaxRPOUpperNanos<0||p.MaxDatabaseRTOUpperNanos<0||p.MaxServiceRTOUpperNanos<0||req.EvaluatedAt<=0{
+	if !present(p.ID,p.Version,p.Digest,p.SourceSystem,p.Database,p.SourceControlRoot,p.RestoreTargetSystem,p.RestoreControlRoot,p.RepositoryID,p.BackupMethodProfile,p.RequestedTarget.Mode,p.RequestedTarget.Value,p.RequestedTarget.LineageID,p.SurfaceInventoryDigest)||p.SourceSystem==p.RestoreTargetSystem||p.SourceControlRoot==p.RestoreControlRoot||p.MaxRPOUpperNanos<0||p.MaxDatabaseRTOUpperNanos<0||p.MaxServiceRTOUpperNanos<0||req.EvaluatedAt<=0{
 		return done(Indeterminate,"recovery plan identity, scope or objectives incomplete",r)
 	}
 	a:=req.Artifact
