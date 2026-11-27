@@ -21,7 +21,7 @@ A source document carries:
 
 A query carries `scope_id`, `as_of_ms`, free-text query and `top_k`. A record is eligible only when its scope matches, it was observed no later than the query cut, and its valid-time interval contains that cut.
 
-Crucially, BM25 corpus statistics (eligible document count, document frequency and average document length) are recomputed over the eligible scope/time cohort. Future documents and other scopes therefore do not change the score ordering through corpus statistics. The work receipt reports eligible cohort and scored-posting counts only; it does not pretend to report wall-clock or measured hardware cost.
+Crucially, the index partitions documents and term postings by `scope_id`, and orders each partition by `observed_at_ms`. Search resolves the requested scope before traversing any posting list, then uses a binary-search cutoff to exclude records learned after `as_of_ms`. Valid-time filtering follows within that bounded candidate cohort. BM25 corpus statistics (eligible document count, document frequency and average document length) are recomputed over the eligible scope/time cohort. Other tenants and future-observed records are therefore excluded before ranking work, not merely ignored after a global scan. The work receipt reports the eligible cohort, scope/knowledge-bounded posting visits and valid eligible postings actually scored; it does not pretend to report wall-clock or measured hardware cost.
 
 ## BM25 definition
 
@@ -51,7 +51,8 @@ The Rust suite covers:
 - multi-term BM25 ranking and partial matches;
 - knowledge-time and valid-time cutoffs;
 - exclusive valid-until semantics;
-- scope isolation, including invariance of in-scope scores when another scope gains documents;
+- scope isolation, including invariance of in-scope scores and bounded posting-visit counts when another scope gains documents;
+- knowledge-time partitioning, including exclusion of a large set of future-observed records before posting traversal;
 - empty queries and zero top-k;
 - deterministic tie order independent of ingest order;
 - non-ASCII tokenization examples;
