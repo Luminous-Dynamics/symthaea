@@ -1,6 +1,6 @@
 # CMAQ-030 — Recoverability-Margin Conformal Calibration
 
-**Status:** dependency-free Rust evaluator and deterministic tests authored; exact-head formatting, tests and strict Clippy pending.  
+**Status:** dependency-free Rust evaluator and 14 deterministic tests authored; exact-head formatting, tests and strict Clippy pending.  
 **Relationship:** decision-functional alternative to CMAQ-029's coordinate-wise L-infinity trajectory envelope; feeds CMAQ-027 commitment and CMAQ-028 recovery-option portfolios.  
 **Claim ceiling:** marginal finite-sample coverage of the one-sided optimism of a pre-registered recovery-margin block, conditional on exchangeability of independent cluster scores and an independently verified reference-margin pipeline. No hard physical-safety or arbitrary OOD guarantee.
 
@@ -77,8 +77,12 @@ Training, scale-validation, calibration and held-out evaluation clusters are dis
 10. Candidate and reference profile/failure-domain manifests must match.
 11. Training/calibration/evaluation leakage and duplicate cluster IDs are rejected.
 12. Evaluator reference margin receipt is bound to the exact candidate margin-block digest.
+13. Candidate and reference blocks must carry exactly the same profile IDs and failure-domain assignments.
+14. The runtime lower-bound margin is computed over every pre-registered rollout, action/query cell and prefix; one nonpositive prefix blocks the complete candidate block.
 
 ## Matched benchmark matrix
+
+See [BENCHMARK_COMPARISON_MATRIX_2026.md](BENCHMARK_COMPARISON_MATRIX_2026.md) for the full matched protocol, external comparators, environment stages, metrics, falsifiable hypotheses and proposed qualification gates.
 
 Compare at identical candidate trajectories, profile sets, independent clusters, action/query portfolio, horizon and miscoverage target:
 
