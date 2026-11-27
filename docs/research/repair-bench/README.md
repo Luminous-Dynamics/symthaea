@@ -9,6 +9,7 @@ This first slice operationalizes the two-phase evaluation in issue #13926: freez
 ## Files
 
 - REPAIR_BENCH_V0_SYNTHETIC_EVENT_FIXTURES.json — one baseline graph with byte-pinned input artifacts, 14 dependency nodes, and 12 independent change events.
+- scripts/validate_repair_bench_fixtures.py — standard-library-only consistency validator, run by .github/workflows/repair-bench-fixture-contract.yml.
 
 ## Fixture properties
 
