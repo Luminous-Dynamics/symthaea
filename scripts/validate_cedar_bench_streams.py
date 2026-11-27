@@ -124,6 +124,7 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
         baseline = group["baseline"]
         counterfactual = group["counterfactual"]
         placebo = group["placebo"]
+        removed = group["source_removed"]
         require(baseline["expected_answer"] != counterfactual["expected_answer"],
                 f"{template_id}: counterfactual did not change the answer oracle")
         require(baseline["expected_answer"] == placebo["expected_answer"],
@@ -155,7 +156,6 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
                     "CEDAR-15 counterfactual must represent conflict and track the altered source")
             require(placebo["expected_behavior"] == "SOURCE_CONFLICT_REPRESENTED_AND_PLACEBO_STABLE",
                     "CEDAR-15 placebo must represent conflict and preserve its answer")
-        removed = group["source_removed"]
         require(set(removed["citation_contract"]["allowed_citation_source_ids"])
                 <= set(removed["source_digests"]),
                 f"{template_id}: source-removal citation contract names a missing source")
