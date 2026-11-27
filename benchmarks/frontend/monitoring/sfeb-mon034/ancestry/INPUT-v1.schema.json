@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon034-postgres-timeline-ancestry-input-v1.schema.json",
+  "title": "MON-034 PostgreSQL Timeline Ancestry Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile","version","expected_system_identifier","base_backup_system_identifier","base_backup_timeline_id","base_backup_lsn","recovered_system_identifier","recovered_timeline_id","recovery_target_lsn","history_timeline_id","history_sha256","history_text"],
+  "properties": {
+    "profile": {"const":"mon034-postgres-timeline-ancestry-input-v1"},
+    "version": {"const":"1.0.0"},
+    "expected_system_identifier": {"type":"string","minLength":1,"maxLength":20,"pattern":"^[1-9][0-9]{0,19}$"},
+    "base_backup_system_identifier": {"type":"string","minLength":1,"maxLength":20,"pattern":"^[1-9][0-9]{0,19}$"},
+    "base_backup_timeline_id": {"type":"integer","minimum":1},
+    "base_backup_lsn": {"type":"string","pattern":"^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$"},
+    "recovered_system_identifier": {"type":"string","minLength":1,"maxLength":20,"pattern":"^[1-9][0-9]{0,19}$"},
+    "recovered_timeline_id": {"type":"integer","minimum":1},
+    "recovery_target_lsn": {"type":"string","pattern":"^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$"},
+    "history_timeline_id": {"type":"integer","minimum":1},
+    "history_sha256": {"type":"string"},
+    "history_text": {"type":"string"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"recovered_timeline_id": {"const": 1}},
+        "required": ["recovered_timeline_id"]
+      },
+      "then": {
+        "properties": {
+          "history_sha256": {"const": ""},
+          "history_text": {"const": ""}
+        }
+      },
+      "else": {
+        "properties": {
+          "history_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+          "history_text": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  ]
+}
