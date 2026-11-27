@@ -100,7 +100,7 @@ func validID(s string)bool{return s!=""&&len(s)<=256&&!strings.ContainsAny(s,"
 ")}
 func validDigest(s string)bool{if len(s)!=64{return false};_,e:=hex.DecodeString(s);return e==nil&&s==strings.ToLower(s)}
 func validVerdict(v Verdict)bool{return v==Qualified||v==Blocked||v==Indeterminate}
-func validRevision(s string)bool{if len(s)!=40&&len(s)!=64{return false};_,err:=hex.DecodeString(s);return err==nil}
+func validRevision(s string)bool{if len(s)!=40&&len(s)!=64{return false};if s!=strings.ToLower(s){return false};_,err:=hex.DecodeString(s);return err==nil}
 func digestJSON(v any)string{b,e:=json.Marshal(v);if e!=nil{return ""};d:=sha256.Sum256(b);return hex.EncodeToString(d[:])}
 func canonicalFaults(ids []string)([]string,bool){
 	out:=make([]string,len(ids));copy(out,ids)
@@ -208,7 +208,7 @@ func Minimize(in Input)Result{
 	if len(out.Steps)>0{out.Steps[0].TargetFailurePreserved=true}
 	if full.Verdict!=Blocked{
 		f.hold("initial_fault_set_did_not_reproduce_blocked_failure")
-		out.MinimizationKind="not_applicable"
+		out.MinimalityKind="not_applicable"
 		out.SubsetEvaluations=evaluations
 		out.EvidenceComplete=true
 		out.CampaignVerdict=Indeterminate
