@@ -102,7 +102,9 @@ pub fn build_decision_prefix(
     }
     for (index, observation) in archive.observations.iter().enumerate() {
         if observation.tick != index as u64 {
-            return Err(format!("replay archive tick discontinuity at index {index}"));
+            return Err(format!(
+                "replay archive tick discontinuity at index {index}"
+            ));
         }
     }
     let cutoff = usize::try_from(decision_tick)
@@ -121,7 +123,10 @@ pub fn build_decision_prefix(
     let prefix_json = serde_json::to_vec(&prefix)
         .map_err(|e| format!("serialize decision observation prefix: {e}"))?;
     let prefix_blake3 = blake3::hash(&prefix_json).to_hex().to_string();
-    Ok(EncodedDecisionPrefix { prefix_json, prefix_blake3 })
+    Ok(EncodedDecisionPrefix {
+        prefix_json,
+        prefix_blake3,
+    })
 }
 
 /// Evaluator-only material. Never pass this struct or its serialized bytes to candidate code.
@@ -195,8 +200,8 @@ pub fn encode_world(
 
     let replay_archive_json = serde_json::to_vec(&replay_archive)
         .map_err(|e| format!("serialize replay archive: {e}"))?;
-    let evaluator_capsule_json = serde_json::to_vec(&evaluator)
-        .map_err(|e| format!("serialize evaluator capsule: {e}"))?;
+    let evaluator_capsule_json =
+        serde_json::to_vec(&evaluator).map_err(|e| format!("serialize evaluator capsule: {e}"))?;
     let replay_digest = blake3::hash(&replay_archive_json).to_hex().to_string();
     let evaluator_digest = blake3::hash(&evaluator_capsule_json).to_hex().to_string();
 
@@ -238,7 +243,9 @@ pub fn verify_encoded_replay_artifacts(
     expected_evaluator_digest: &str,
 ) -> Result<(), String> {
     let replay_actual = blake3::hash(&set.replay_archive_json).to_hex().to_string();
-    let evaluator_actual = blake3::hash(&set.evaluator_capsule_json).to_hex().to_string();
+    let evaluator_actual = blake3::hash(&set.evaluator_capsule_json)
+        .to_hex()
+        .to_string();
     if replay_actual != expected_replay_digest || replay_actual != set.replay_digest {
         return Err("replay archive digest mismatch".into());
     }
@@ -282,21 +289,45 @@ fn validate_world(world: &common::SerializedWorld, view: ObservationView) -> Res
         return Err("world trajectory must not be empty".into());
     }
     validate_stream("census", &world.census_obs, world.trajectory.len(), false)?;
-    validate_stream("noisy_trait", &world.noisy_obs, world.trajectory.len(), true)?;
-    validate_stream("shuffled_trait", &world.shuffled_obs, world.trajectory.len(), true)?;
-    validate_stream("privileged", &world.privileged_obs, world.trajectory.len(), true)?;
+    validate_stream(
+        "noisy_trait",
+        &world.noisy_obs,
+        world.trajectory.len(),
+        true,
+    )?;
+    validate_stream(
+        "shuffled_trait",
+        &world.shuffled_obs,
+        world.trajectory.len(),
+        true,
+    )?;
+    validate_stream(
+        "privileged",
+        &world.privileged_obs,
+        world.trajectory.len(),
+        true,
+    )?;
 
-    let expected_first_extinction = world.trajectory.iter().position(|&collapsed| collapsed).map(|i| i as u64);
+    let expected_first_extinction = world
+        .trajectory
+        .iter()
+        .position(|&collapsed| collapsed)
+        .map(|i| i as u64);
     if world.first_extinction_tick != expected_first_extinction {
         return Err("first_extinction_tick disagrees with the recorded trajectory".into());
     }
-    if world.trait_level_just_before_extinction.is_some_and(|v| !v.is_finite()) {
+    if world
+        .trait_level_just_before_extinction
+        .is_some_and(|v| !v.is_finite())
+    {
         return Err("trait_level_just_before_extinction must be finite".into());
     }
     match view {
         ObservationView::Census => {}
         ObservationView::NoisyTrait => validate_trait_presence("noisy_trait", &world.noisy_obs)?,
-        ObservationView::ShuffledTraitControl => validate_trait_presence("shuffled_trait", &world.shuffled_obs)?,
+        ObservationView::ShuffledTraitControl => {
+            validate_trait_presence("shuffled_trait", &world.shuffled_obs)?
+        }
     }
     Ok(())
 }
@@ -312,7 +343,9 @@ fn validate_stream(
     }
     for (index, observation) in stream.iter().enumerate() {
         if observation.tick != index as u64 {
-            return Err(format!("{label} stream tick discontinuity at index {index}"));
+            return Err(format!(
+                "{label} stream tick discontinuity at index {index}"
+            ));
         }
         if let Some(sample) = observation.sample {
             if let Some(value) = sample.observed_mean_forage_efficiency {
@@ -320,7 +353,9 @@ fn validate_stream(
                     return Err(format!("{label} stream unexpectedly contains trait data"));
                 }
                 if !value.is_finite() {
-                    return Err(format!("{label} stream contains non-finite trait observation"));
+                    return Err(format!(
+                        "{label} stream contains non-finite trait observation"
+                    ));
                 }
             }
         }
@@ -333,8 +368,13 @@ fn validate_trait_presence(
     stream: &[EvolutionaryRescueObservation],
 ) -> Result<(), String> {
     for (index, observation) in stream.iter().enumerate() {
-        if observation.sample.is_some_and(|s| s.observed_mean_forage_efficiency.is_none()) {
-            return Err(format!("{label} stream is missing a trait value at observed index {index}"));
+        if observation
+            .sample
+            .is_some_and(|s| s.observed_mean_forage_efficiency.is_none())
+        {
+            return Err(format!(
+                "{label} stream is missing a trait value at observed index {index}"
+            ));
         }
     }
     Ok(())
@@ -370,12 +410,24 @@ mod tests {
 
     fn world() -> common::SerializedWorld {
         let census = vec![
-            EvolutionaryRescueObservation { tick: 0, sample: sample(None) },
-            EvolutionaryRescueObservation { tick: 1, sample: sample(None) },
+            EvolutionaryRescueObservation {
+                tick: 0,
+                sample: sample(None),
+            },
+            EvolutionaryRescueObservation {
+                tick: 1,
+                sample: sample(None),
+            },
         ];
         let noisy = vec![
-            EvolutionaryRescueObservation { tick: 0, sample: sample(Some(0.2)) },
-            EvolutionaryRescueObservation { tick: 1, sample: sample(Some(0.3)) },
+            EvolutionaryRescueObservation {
+                tick: 0,
+                sample: sample(Some(0.2)),
+            },
+            EvolutionaryRescueObservation {
+                tick: 1,
+                sample: sample(Some(0.3)),
+            },
         ];
         common::SerializedWorld {
             format_version: common::WORLD_FORMAT_VERSION.to_owned(),
@@ -394,13 +446,25 @@ mod tests {
     #[test]
     fn replay_archive_excludes_seed_truth_and_privileged_streams() {
         let encoded = encode_world(
-            &world(), "d5a4dfc1-7e8c-4a9b-8e57-2bd995c5ce21",
-            WorldSplit::Training, ObservationView::Census,
+            &world(),
+            "d5a4dfc1-7e8c-4a9b-8e57-2bd995c5ce21",
+            WorldSplit::Training,
+            ObservationView::Census,
             "0123456789abcdef0123456789abcdef01234567",
-        ).unwrap();
+        )
+        .unwrap();
         let json = String::from_utf8(encoded.replay_archive_json).unwrap();
-        for forbidden in ["\"seed\"", "\"trajectory_collapsed\"", "\"privileged_observations\"", "\"first_extinction_tick\"", "\"split\""] {
-            assert!(!json.contains(forbidden), "replay archive leaked {forbidden}");
+        for forbidden in [
+            "\"seed\"",
+            "\"trajectory_collapsed\"",
+            "\"privileged_observations\"",
+            "\"first_extinction_tick\"",
+            "\"split\"",
+        ] {
+            assert!(
+                !json.contains(forbidden),
+                "replay archive leaked {forbidden}"
+            );
         }
         assert!(json.contains("population_census_v1"));
     }
@@ -408,10 +472,19 @@ mod tests {
     #[test]
     fn evaluator_manifest_binds_both_capsules_without_candidate_exposure() {
         let encoded = encode_world(
-            &world(), "world-opaque-1", WorldSplit::HeldOut,
-            ObservationView::NoisyTrait, "0123456789abcdef0123456789abcdef01234567",
-        ).unwrap();
-        verify_encoded_replay_artifacts(&encoded, &encoded.replay_digest, &encoded.evaluator_digest).unwrap();
+            &world(),
+            "world-opaque-1",
+            WorldSplit::HeldOut,
+            ObservationView::NoisyTrait,
+            "0123456789abcdef0123456789abcdef01234567",
+        )
+        .unwrap();
+        verify_encoded_replay_artifacts(
+            &encoded,
+            &encoded.replay_digest,
+            &encoded.evaluator_digest,
+        )
+        .unwrap();
         let receipt = String::from_utf8(encoded.replay_receipt_json).unwrap();
         assert!(!receipt.contains("evaluator_capsule_blake3"));
         assert!(!receipt.contains("\"seed\""));
@@ -424,13 +497,18 @@ mod tests {
     #[test]
     fn decision_prefix_contains_no_future_observations() {
         let encoded = encode_world(
-            &world(), "d5a4dfc1-7e8c-4a9b-8e57-2bd995c5ce21",
-            WorldSplit::Training, ObservationView::Census,
+            &world(),
+            "d5a4dfc1-7e8c-4a9b-8e57-2bd995c5ce21",
+            WorldSplit::Training,
+            ObservationView::Census,
             "0123456789abcdef0123456789abcdef01234567",
-        ).unwrap();
-        let archive: ReplayObservationArchive = serde_json::from_slice(&encoded.replay_archive_json).unwrap();
+        )
+        .unwrap();
+        let archive: ReplayObservationArchive =
+            serde_json::from_slice(&encoded.replay_archive_json).unwrap();
         let prefix = build_decision_prefix(&archive, 0).unwrap();
-        let parsed: DecisionObservationPrefix = serde_json::from_slice(&prefix.prefix_json).unwrap();
+        let parsed: DecisionObservationPrefix =
+            serde_json::from_slice(&prefix.prefix_json).unwrap();
         assert_eq!(parsed.decision_tick, 0);
         assert_eq!(parsed.observations.len(), 1);
         assert_eq!(parsed.observations[0].tick, 0);
@@ -440,68 +518,121 @@ mod tests {
     #[test]
     fn rejects_decision_tick_beyond_available_history() {
         let encoded = encode_world(
-            &world(), "opaque",
-            WorldSplit::Training, ObservationView::Census,
+            &world(),
+            "opaque",
+            WorldSplit::Training,
+            ObservationView::Census,
             "0123456789abcdef0123456789abcdef01234567",
-        ).unwrap();
-        let archive: ReplayObservationArchive = serde_json::from_slice(&encoded.replay_archive_json).unwrap();
-        assert!(build_decision_prefix(&archive, 2).unwrap_err().contains("beyond"));
+        )
+        .unwrap();
+        let archive: ReplayObservationArchive =
+            serde_json::from_slice(&encoded.replay_archive_json).unwrap();
+        assert!(
+            build_decision_prefix(&archive, 2)
+                .unwrap_err()
+                .contains("beyond")
+        );
     }
 
     #[test]
     fn rejects_tick_discontinuity_before_materialization() {
         let mut w = world();
         w.census_obs[1].tick = 4;
-        assert!(encode_world(
-            &w, "opaque", WorldSplit::Training, ObservationView::Census,
-            "0123456789abcdef0123456789abcdef01234567",
-        ).unwrap_err().contains("tick discontinuity"));
+        assert!(
+            encode_world(
+                &w,
+                "opaque",
+                WorldSplit::Training,
+                ObservationView::Census,
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap_err()
+            .contains("tick discontinuity")
+        );
     }
 
     #[test]
     fn rejects_inconsistent_extinction_metadata() {
         let mut w = world();
         w.first_extinction_tick = None;
-        assert!(encode_world(
-            &w, "opaque", WorldSplit::Training, ObservationView::Census,
-            "0123456789abcdef0123456789abcdef01234567",
-        ).unwrap_err().contains("first_extinction_tick"));
+        assert!(
+            encode_world(
+                &w,
+                "opaque",
+                WorldSplit::Training,
+                ObservationView::Census,
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap_err()
+            .contains("first_extinction_tick")
+        );
     }
 
     #[test]
     fn rejects_census_capsule_with_trait_leakage() {
         let mut w = world();
-        w.census_obs[0].sample.as_mut().unwrap().observed_mean_forage_efficiency = Some(0.2);
-        assert!(encode_world(
-            &w, "opaque", WorldSplit::Training, ObservationView::Census,
-            "0123456789abcdef0123456789abcdef01234567",
-        ).unwrap_err().contains("unexpectedly contains trait data"));
+        w.census_obs[0]
+            .sample
+            .as_mut()
+            .unwrap()
+            .observed_mean_forage_efficiency = Some(0.2);
+        assert!(
+            encode_world(
+                &w,
+                "opaque",
+                WorldSplit::Training,
+                ObservationView::Census,
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap_err()
+            .contains("unexpectedly contains trait data")
+        );
     }
 
     #[test]
     fn rejects_receipt_or_manifest_relinking() {
         let mut encoded = encode_world(
-            &world(), "opaque", WorldSplit::Training, ObservationView::Census,
+            &world(),
+            "opaque",
+            WorldSplit::Training,
+            ObservationView::Census,
             "0123456789abcdef0123456789abcdef01234567",
-        ).unwrap();
+        )
+        .unwrap();
         let mut manifest: WorldCustodyManifest =
             serde_json::from_slice(&encoded.evaluator_manifest_json).unwrap();
         manifest.world_id = "different-world".into();
         encoded.evaluator_manifest_json = serde_json::to_vec(&manifest).unwrap();
-        assert!(verify_encoded_replay_artifacts(
-            &encoded, &encoded.replay_digest, &encoded.evaluator_digest,
-        ).unwrap_err().contains("linkage mismatch"));
+        assert!(
+            verify_encoded_replay_artifacts(
+                &encoded,
+                &encoded.replay_digest,
+                &encoded.evaluator_digest,
+            )
+            .unwrap_err()
+            .contains("linkage mismatch")
+        );
     }
 
     #[test]
     fn rejects_tampered_capsule_bytes() {
         let mut encoded = encode_world(
-            &world(), "opaque", WorldSplit::Training, ObservationView::Census,
+            &world(),
+            "opaque",
+            WorldSplit::Training,
+            ObservationView::Census,
             "0123456789abcdef0123456789abcdef01234567",
-        ).unwrap();
+        )
+        .unwrap();
         encoded.evaluator_capsule_json.push(b' ');
-        assert!(verify_encoded_replay_artifacts(
-            &encoded, &encoded.replay_digest, &encoded.evaluator_digest,
-        ).unwrap_err().contains("evaluator capsule digest mismatch"));
+        assert!(
+            verify_encoded_replay_artifacts(
+                &encoded,
+                &encoded.replay_digest,
+                &encoded.evaluator_digest,
+            )
+            .unwrap_err()
+            .contains("evaluator capsule digest mismatch")
+        );
     }
 }
