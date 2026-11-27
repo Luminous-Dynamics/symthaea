@@ -113,6 +113,11 @@ func transactionMembersConsistent(m Manifest)(Decision,string){
 	for _,tx:=range m.Transactions{
 		if !present(tx.XID){return Indeterminate,"transaction envelope missing XID"}
 		if _,ok:=txs[tx.XID];ok{return Divergent,"duplicate transaction envelope: "+tx.XID}
+		switch tx.State{
+		case "committed","aborted":
+		case "prepared","committed_prepared","rolled_back_prepared":return Indeterminate,"two-phase transaction state is not qualified: "+tx.XID
+		default:return Indeterminate,"unknown transaction terminal state: "+tx.XID
+		}
 		txs[tx.XID]=tx
 	}
 	for _,e:=range m.Events{
