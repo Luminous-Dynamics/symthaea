@@ -163,7 +163,7 @@ pub use observation_process_trace::{
     OBSERVATION_PROCESS_REPORT_SCHEMA_V1, OBSERVATION_PROCESS_ROW_SCHEMA_V1,
     OBSERVATION_PROCESS_TRACE_SCHEMA_V1, ControllerTrackingEvidenceV1,
     ControllerTrackingStateV1, IndependentAuditEvidenceV1, IndependentAuditStateV1,
-    ObservationProcessControllerDeclarationV1, ObservationProcessReportV1,
+    ObservationProcessControllerDeclarationV1,
     ObservationProcessStatusV1, ObservationProcessTraceErrorV1, ObservationProcessTraceInputV1,
     ObservationProcessTraceReportV1, ObservationProcessRowV1, OperationalAcquisitionEvidenceV1,
     OperationalAcquisitionStateV1, OperationalQualificationStateV1, OnlineControllerKindV1,
