@@ -14,7 +14,7 @@ Usage:
   scripts/labctl.sh status 18|19
   scripts/labctl.sh stop 18|19
   scripts/labctl.sh down
-  scripts/labctl.sh restore 18|19 BACKUP_ID 'YYYY-MM-DD HH:MM:SS+00'
+  scripts/labctl.sh restore 18|19 BACKUP_ID HEX/HEX TIMELINE_ID
   scripts/labctl.sh clean
 
 clean removes all MON-025 named volumes and requires MON025_ALLOW_VOLUME_DELETION=YES.
@@ -64,15 +64,18 @@ case "${1:-}" in
     ;;
   restore)
     require_major "${2:-}"
-    [ "$#" -eq 4 ] || { usage; exit 64; }
+    [ "$#" -eq 5 ] || { usage; exit 64; }
     backup_id="$3"
-    target_time="$4"
+    target_lsn="$4"
+    target_timeline="$5"
     case "$backup_id" in *[!A-Za-z0-9_-]*|'') echo "invalid backup ID" >&2; exit 64 ;; esac
-    date -u -d "$target_time" >/dev/null 2>&1 || { echo "invalid recovery target time" >&2; exit 64; }
+    [[ "$target_lsn" =~ ^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$ ]] || { echo "invalid PostgreSQL LSN" >&2; exit 64; }
+    [[ "$target_timeline" =~ ^[1-9][0-9]*$ ]] || { echo "invalid recovery timeline" >&2; exit 64; }
     preflight
     export COMPOSE_PROFILES="pg${2},restore${2}"
     export MON025_BACKUP_ID="$backup_id"
-    export MON025_RECOVERY_TARGET_TIME="$target_time"
+    export MON025_RECOVERY_TARGET_LSN="$target_lsn"
+    export MON025_RECOVERY_TARGET_TIMELINE="$target_timeline"
     "${DC[@]}" up -d "postgres${2}" "restore${2}"
     "${DC[@]}" ps
     ;;
