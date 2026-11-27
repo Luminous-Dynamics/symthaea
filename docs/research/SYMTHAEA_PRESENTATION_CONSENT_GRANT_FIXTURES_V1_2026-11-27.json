@@ -1,0 +1,133 @@
+{
+  "schema_version": "symthaea.presentation-consent-grant.v1",
+  "purpose": "JSON Schema fixtures for wire-shape checks. Session/clock binding, expiry relative to a supplied monotonic now, grant-ID uniqueness, authorization provenance, and policy outcomes require semantic Rust tests.",
+  "positive": [
+    {
+      "id": "visual_private_single_form",
+      "grant": {
+        "grant_id": "grant-v1",
+        "session_id": "session-1",
+        "clock_domain_id": "clock:dialogue-epoch-1",
+        "channel": "visual",
+        "destination": "local_private",
+        "allowed_forms": [
+          "living_constellation"
+        ],
+        "expires_at_monotonic_ns": "900000000",
+        "max_intensity": 0.6
+      }
+    },
+    {
+      "id": "audio_remote_explicit_destination",
+      "grant": {
+        "grant_id": "grant-v2",
+        "session_id": "session-1",
+        "clock_domain_id": "clock:dialogue-epoch-1",
+        "channel": "audio",
+        "destination": "remote",
+        "allowed_forms": [
+          "puppet_theatre",
+          "living_instrument"
+        ],
+        "expires_at_monotonic_ns": "900000000",
+        "max_intensity": 0.4
+      }
+    }
+  ],
+  "negative": [
+    {
+      "id": "missing_grant_id",
+      "expected": "schema_reject",
+      "grant": {
+        "session_id": "session-1",
+        "clock_domain_id": "clock:dialogue-epoch-1",
+        "channel": "visual",
+        "destination": "local_private",
+        "allowed_forms": [
+          "living_constellation"
+        ],
+        "expires_at_monotonic_ns": "900000000",
+        "max_intensity": 0.6
+      }
+    },
+    {
+      "id": "empty_form_scope",
+      "expected": "schema_reject",
+      "grant": {
+        "grant_id": "grant-v3",
+        "session_id": "session-1",
+        "clock_domain_id": "clock:dialogue-epoch-1",
+        "channel": "visual",
+        "destination": "local_private",
+        "allowed_forms": [],
+        "expires_at_monotonic_ns": "900000000",
+        "max_intensity": 0.6
+      }
+    },
+    {
+      "id": "duplicate_form_scope",
+      "expected": "schema_reject",
+      "grant": {
+        "grant_id": "grant-v4",
+        "session_id": "session-1",
+        "clock_domain_id": "clock:dialogue-epoch-1",
+        "channel": "visual",
+        "destination": "local_private",
+        "allowed_forms": [
+          "living_constellation",
+          "living_constellation"
+        ],
+        "expires_at_monotonic_ns": "900000000",
+        "max_intensity": 0.6
+      }
+    },
+    {
+      "id": "invalid_intensity",
+      "expected": "schema_reject",
+      "grant": {
+        "grant_id": "grant-v5",
+        "session_id": "session-1",
+        "clock_domain_id": "clock:dialogue-epoch-1",
+        "channel": "visual",
+        "destination": "local_private",
+        "allowed_forms": [
+          "living_constellation"
+        ],
+        "expires_at_monotonic_ns": "900000000",
+        "max_intensity": 1.5
+      }
+    },
+    {
+      "id": "non_decimal_monotonic_timestamp",
+      "expected": "schema_reject",
+      "grant": {
+        "grant_id": "grant-v6",
+        "session_id": "session-1",
+        "clock_domain_id": "clock:dialogue-epoch-1",
+        "channel": "visual",
+        "destination": "local_private",
+        "allowed_forms": [
+          "living_constellation"
+        ],
+        "expires_at_monotonic_ns": "09",
+        "max_intensity": 0.6
+      }
+    },
+    {
+      "id": "unknown_channel",
+      "expected": "schema_reject",
+      "grant": {
+        "grant_id": "grant-v7",
+        "session_id": "session-1",
+        "clock_domain_id": "clock:dialogue-epoch-1",
+        "channel": "camera",
+        "destination": "local_private",
+        "allowed_forms": [
+          "living_constellation"
+        ],
+        "expires_at_monotonic_ns": "900000000",
+        "max_intensity": 0.6
+      }
+    }
+  ]
+}
