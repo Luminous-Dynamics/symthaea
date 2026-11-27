@@ -290,8 +290,8 @@ mod tests {
     #[test]
     fn unknown_fields_and_schema_versions_are_rejected() {
         let unknown = FIXTURE.replace(
-            "\"schema_version\":\"mace_raw_trajectory_candidate_v0_1\"",
-            "\"schema_version\":\"mace_raw_trajectory_candidate_v0_1\",\"hidden_oracle\":\"hold\"",
+            "\"schema_version\": \"mace_raw_trajectory_candidate_v0_1\"",
+            "\"schema_version\": \"mace_raw_trajectory_candidate_v0_1\", \"hidden_oracle\": \"hold\"",
         );
         assert!(matches!(
             run_candidate_fixture_v1(&unknown),
