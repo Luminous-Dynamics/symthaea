@@ -194,8 +194,7 @@ fn fixed_delay_phase_updates_do_not_cross_contaminate_other_phases() {
     }
 
     let before = engine.phase_alpha_states.clone();
-    let mut outcome = delivery(2, tau + 2, 12.0);
-    outcome.delivery_round_sequence = tau + 2;
+    let outcome = delivery(2, tau + 2, 12.0);
     let receipt = deliver_delayed_aci_feedback_v1(&mut engine, &outcome).unwrap();
     assert_eq!(
         receipt.disposition,
