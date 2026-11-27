@@ -347,16 +347,16 @@ fn validate_stream(
                 "{label} stream tick discontinuity at index {index}"
             ));
         }
-        if let Some(sample) = observation.sample {
-            if let Some(value) = sample.observed_mean_forage_efficiency {
-                if !trait_allowed {
-                    return Err(format!("{label} stream unexpectedly contains trait data"));
-                }
-                if !value.is_finite() {
-                    return Err(format!(
-                        "{label} stream contains non-finite trait observation"
-                    ));
-                }
+        if let Some(sample) = observation.sample
+            && let Some(value) = sample.observed_mean_forage_efficiency
+        {
+            if !trait_allowed {
+                return Err(format!("{label} stream unexpectedly contains trait data"));
+            }
+            if !value.is_finite() {
+                return Err(format!(
+                    "{label} stream contains non-finite trait observation"
+                ));
             }
         }
     }
