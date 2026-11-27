@@ -594,8 +594,8 @@ fn lineage_cycle_components(
             }
         }
 
-        let has_self_loop = component.len() == 1
-            && adjacency[start].iter().any(|&neighbor| neighbor == start);
+        let has_self_loop =
+            component.len() == 1 && adjacency[start].iter().any(|&neighbor| neighbor == start);
         if component.len() > 1 || has_self_loop {
             component.sort();
             components.push(component);
@@ -1169,7 +1169,8 @@ mod tests {
         assert_eq!(audit.edges.len(), 3);
         assert!(audit.cycle_components.is_empty());
         assert_eq!(
-            audit.edges
+            audit
+                .edges
                 .iter()
                 .find(|edge| edge.parent_event_id == "private-parent")
                 .unwrap()
