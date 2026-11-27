@@ -2032,7 +2032,7 @@ mod tests {
         let event = &result.received_feedback_receipts[0];
         assert_eq!(event.disposition, CaoOcrcFeedbackDispositionV1::ReceivedAndApplied);
         assert_eq!(event.actual_delay_rounds, Some(1));
-        assert_eq!(event.inverse_proxy_survival_weight, Some(2.0));
+        assert_eq!(event.inverse_probability_weight, Some(2.0));
     }
 
     #[test]
