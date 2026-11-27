@@ -106,7 +106,7 @@ Compare only on matched channels, units, timestamps/windows, training support an
 
 **Standards and measurement conformance**
 - CEN/TS 17660-1:2021 for gaseous pollutants (including NO2) and CEN/TS 17660-2:2024 for PM10/PM2.5, using their published editions and licensed test procedures.
-- ISO/IEC Guide 98-3:2008 / JCGM 100 (GUM) uncertainty evaluation and reporting; JCGM 101 Monte Carlo propagation where needed.
+- JCGM 100:2008 (GUM) with Amendment 1:2026 on nonlinearity in measurement models; JCGM 101:2008 for Monte Carlo propagation where appropriate; and the 2026 GUMsuite, including GUM-5:2026 examples. Freeze the exact document/edition and amendment used for every comparison.
 - Keep device-level standard classification separate from SDCB's network-level inference. The published CEN/TS scopes focus on individual sensor systems at fixed sites; they do not by themselves validate common-cause dependence, cross-device reference ancestry, or network-wide decision integrity.
 - Do not claim standards compliance from the QUANT archive alone. Freeze the standard edition, obtain the complete normative test requirements, instrument conditions and acceptance criteria, and execute the required laboratory/field procedures.
 
@@ -150,7 +150,7 @@ The published CEN/TS specifications focus on individual sensor systems under pre
 
 Metrological traceability is a separate property: a measurement result must be related to a reference through a documented, unbroken calibration chain, with each calibration contributing to uncertainty. A digital ID/version envelope or verified software receipt is not itself a calibration certificate or proof of traceability. Report instrument identity, reference-standard certificates, calibration intervals, uncertainty contributions and ancestry separately from the statistical predictive model.
 
-The current CEN committee is reviewing successor prEN versions; use the published CEN/TS editions as the declared baseline until a successor is formally published/adopted. Do not silently mix draft criteria into a claimed standards-conformance result.
+As of 27 November 2026, public standards tracking lists successor prEN 17660-1 and prEN 17660-2 at stage 00.60 (close of review, 11 March 2026). The declared published baselines remain CEN/TS 17660-1:2021 and CEN/TS 17660-2:2024 unless/until a successor is formally published/adopted. Do not silently apply draft prEN criteria to a published-edition conformance claim. The BIPM now lists JCGM 100:2008/Amd.1:2026 (nonlinearity in measurement models) and GUM-5:2026 examples in its published GUM materials; the protocol must cite the amendment in force for each nonlinear measurement model and retain JCGM 101:2008 when using its Monte Carlo propagation guidance.
 
 ## 8. Metrics and decision outcomes
 
@@ -199,8 +199,8 @@ These are research gates. No QUANT benchmark result, dataset acquisition, physic
 - CEDA archive directory: https://data.ceda.ac.uk/badc/deposited2023/QUANT/
 - CEN/TS 17660-1:2021, Air quality — Performance evaluation of air quality sensor systems — Part 1: Gaseous pollutants in ambient air.
 - CEN/TS 17660-2:2024, Air quality — Performance evaluation of air quality sensor systems — Part 2: Particulate matter in ambient air.
-- ISO/IEC Guide 98-3:2008 / JCGM 100, Guide to the Expression of Uncertainty in Measurement (GUM).
-- ISO/IEC Guide 98-3 Supplement 1 / JCGM 101, Propagation of distributions using a Monte Carlo method.
+- JCGM 100:2008(E), Guide to the Expression of Uncertainty in Measurement, plus JCGM 100:2008/Amd.1:2026 on nonlinearity in measurement models.
+- JCGM 101:2008, Supplement 1 to the GUM, propagation of distributions using a Monte Carlo method; and JCGM GUM-5:2026, examples.
 - Kok, G. and Tabandeh, S. (2026), *Uncertainty Evaluation for Testing and Calibrating Mobile Sensors Only Using Short Collocation Periods*, Quality and Reliability Engineering International 42(7), 4298–4309. DOI: https://doi.org/10.1002/qre.70319
 - NBN catalogue entry for CEN/TS 17660-1:2021 (gaseous pollutants): https://app.nbn.be/data/r/platform/frontend/detail?p40_id=199863&p_lang=en
 - NBN catalogue entry for CEN/TS 17660-2:2024 (particulate matter): https://app.nbn.be/data/r/platform/frontend/detail?lang=en&p40_id=2670286&p40_language_code=en
@@ -233,3 +233,9 @@ The files have been identified from the source catalogue, but direct download at
 Do not upsample hourly records into one- or five-minute observations. Do not infer sensor process response or short-collocation coverage from hourly aggregates. All tier transitions require separate acquisition receipts, raw-file SHA-256 digests, parser versions and frozen cohort manifests.
 
 Source: https://zenodo.org/records/10775692 and the dataset paper https://doi.org/10.1038/s41597-024-03767-2.
+
+- BIPM JCGM publication list (including JCGM 100:2008/Amd.1:2026 and JCGM GUM-5:2026): https://www.bipm.org/en/committees/jc/jcgm/publications/
+- BIPM Guides in Metrology list: https://www.bipm.org/en/web/guest/publications/guides
+- Public status tracking for prEN 17660-1 (stage 00.60, close of review 11 March 2026): https://genorma.com/en/standards/pren-17660-1
+- Public status tracking for prEN 17660-2 (stage 00.60, close of review 11 March 2026): https://genorma.com/en/standards/pren-17660-2/amp
+- JCGM 100:2008/Amd.1:2026 DOI: https://doi.org/10.59161/PPDI3267
