@@ -540,6 +540,9 @@ mod tests {
             }
         );
         assert_eq!(assessment.selected_options_at_switch.len(), 2);
+        assert_eq!(assessment.minimum_independent_options_on_commitment, 2);
+        assert_eq!(assessment.minimum_options_after_one_domain_failure, 1);
+        assert_eq!(assessment.weakest_prefix_step, 0);
     }
 
     #[test]
