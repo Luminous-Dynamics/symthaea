@@ -10,7 +10,7 @@
 
 use symthaea_plasma_probes::{
     velocity_kick_remap::remap_distribution_after_velocity_kick,
-    pulse_map::{PhasePoint, SinusoidalVelocityKick, check_pulse_jacobians_central_difference},
+    pulse_map::{PhaseSpaceTangent, SinusoidalVelocityKick, check_pulse_jacobians_central_difference},
     EmpiricalGramian,
     rbkr::{
         FiniteHorizonGramianConfig, RbkrConfig, ResponseBalancedBasis,
@@ -39,7 +39,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         -0.4,
         0.0,
         0.0,
-        PhasePoint { x: 0.0, v: 0.0 },
+        PhaseSpaceTangent {
+            dx_dt: 0.0,
+            dv_dt: 0.0,
+        },
     )?;
     assert!(event_time.x.is_finite() && event_time.v.is_finite());
 
