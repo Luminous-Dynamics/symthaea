@@ -66,7 +66,7 @@ Deterministic positive controls cover an explicitly granted form/channel/
 destination with a live session and clock. Negative controls cover missing or
 expired grants, mismatched session/clock, ungranted forms/channels/destinations,
 LocalSensitive output to shared/remote sinks, Restricted data, cancellation,
-pause, channel revocation, and invalid intensity.
+pause, channel revocation, invalid intensity, grant-ID reuse after replacement, and grant-history capacity exhaustion.
 
 **Hard gate:** zero unauthorized permits across the complete deterministic
 negative-control corpus; 100% expected allow/deny outcomes; no semantic or
