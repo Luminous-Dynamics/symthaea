@@ -58,6 +58,8 @@ pub enum DurableAddReconciliationV1 {
 pub struct DurableMemoryRecordV1 {
     pub id: String,
     pub user_id: String,
+    pub origin_request_id: String,
+    pub source_request_payload_digest: String,
     pub content: MessageContent,
 }
 
@@ -74,6 +76,16 @@ pub enum DurableAmlServiceErrorV1 {
     AddStillInFlight,
     CommitOutcomeUnknown,
     SearchVisibilityMismatch,
+    SearchScopeViolation,
+}
+
+/// A result returned by the internal store with its tenant identity intact.
+/// The public AML response strips this field only after the coordinator has
+/// verified that every result belongs to the request user.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DurableScopedSearchItemV1 {
+    pub owner_user_id: String,
+    pub item: super::SearchItem,
 }
 
 /// Implement this trait with a durable database and a user-partitioned index.
@@ -125,7 +137,7 @@ pub trait DurableAmlStoreV1 {
         &mut self,
         track: Track,
         request: &SearchRequest,
-    ) -> Result<SearchResponse, DurableStoreErrorV1>;
+    ) -> Result<Vec<DurableScopedSearchItemV1>, DurableStoreErrorV1>;
 }
 
 pub struct DurableAmlServiceV1<S, V, C> {
@@ -228,10 +240,18 @@ where
     ) -> Result<SearchResponse, DurableAmlServiceErrorV1> {
         validate_search_request_for_track(track, request)
             .map_err(DurableAmlServiceErrorV1::Contract)?;
-        let response = self
+        let scoped = self
             .store
             .search_with_user_partition(track, request)
             .map_err(map_store_error)?;
+        let mut data = Vec::with_capacity(scoped.len());
+        for result in scoped {
+            if result.owner_user_id != request.user_id {
+                return Err(DurableAmlServiceErrorV1::SearchScopeViolation);
+            }
+            data.push(result.item);
+        }
+        let response = SearchResponse { data };
         validate_search_response_for_track(track, request, &response)
             .map_err(DurableAmlServiceErrorV1::Contract)?;
         Ok(response)
@@ -274,6 +294,8 @@ where
         verify_visible_records(
             track,
             &request.user_id,
+            &request.request_id,
+            verified.request_payload_digest(),
             verified.visible_memory_ids(),
             &records,
         )?;
@@ -299,6 +321,8 @@ fn map_store_error(error: DurableStoreErrorV1) -> DurableAmlServiceErrorV1 {
 fn verify_visible_records(
     track: Track,
     expected_user_id: &str,
+    expected_request_id: &str,
+    expected_payload_digest: &str,
     expected_ids: &[String],
     records: &[DurableMemoryRecordV1],
 ) -> Result<(), DurableAmlServiceErrorV1> {
@@ -313,7 +337,11 @@ fn verify_visible_records(
     let mut found = BTreeMap::<&str, usize>::new();
     let mut total_image_bytes = 0usize;
     for record in records {
-        if record.user_id != expected_user_id || !expected.contains(record.id.as_str()) {
+        if record.user_id != expected_user_id
+            || record.origin_request_id != expected_request_id
+            || record.source_request_payload_digest != expected_payload_digest
+            || !expected.contains(record.id.as_str())
+        {
             return Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch);
         }
         if found.insert(record.id.as_str(), 1).is_some() {
@@ -400,6 +428,7 @@ mod tests {
         lose_write_reply_after_commit: bool,
         unknown_reconcile: bool,
         hide_visibility: bool,
+        inject_cross_user_search_result: bool,
     }
 
     impl FakeDurableStore {
@@ -421,6 +450,8 @@ mod tests {
                 .map(|(index, message)| DurableMemoryRecordV1 {
                     id: format!("{}:{}:{index}", request.user_id, request.request_id),
                     user_id: request.user_id.clone(),
+                    origin_request_id: request.request_id.clone(),
+                    source_request_payload_digest: add_payload_digest(key.track, request),
                     content: message.content.clone(),
                 })
                 .collect();
@@ -558,20 +589,36 @@ mod tests {
             &mut self,
             _track: Track,
             request: &SearchRequest,
-        ) -> Result<SearchResponse, DurableStoreErrorV1> {
-            let data = self
+        ) -> Result<Vec<DurableScopedSearchItemV1>, DurableStoreErrorV1> {
+            let mut results: Vec<DurableScopedSearchItemV1> = self
                 .visible
                 .iter()
                 .filter(|record| record.user_id == request.user_id)
                 .take(request.top_k)
-                .map(|record| SearchItem {
-                    id: record.id.clone(),
-                    content: record.content.clone(),
-                    score: Some(1.0),
-                    created_at: None,
+                .map(|record| DurableScopedSearchItemV1 {
+                    owner_user_id: record.user_id.clone(),
+                    item: SearchItem {
+                        id: record.id.clone(),
+                        content: record.content.clone(),
+                        score: Some(1.0),
+                        created_at: None,
+                    },
                 })
                 .collect();
-            Ok(SearchResponse { data })
+            if self.inject_cross_user_search_result {
+                if let Some(record) = self.visible.iter().find(|record| record.user_id != request.user_id) {
+                    results.push(DurableScopedSearchItemV1 {
+                        owner_user_id: record.user_id.clone(),
+                        item: SearchItem {
+                            id: record.id.clone(),
+                            content: record.content.clone(),
+                            score: Some(1.0),
+                            created_at: None,
+                        },
+                    });
+                }
+            }
+            Ok(results)
         }
     }
 
@@ -666,6 +713,25 @@ mod tests {
             service.add(Track::Textual, &request),
             Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch)
         );
+    }
+
+    #[test]
+    fn search_rejects_cross_user_candidate_before_public_serialization() {
+        let mut store = FakeDurableStore::default();
+        let mut service = service(store);
+        service.add(Track::Textual, &add_request("user-a-2", "user-a", "alpha")).unwrap();
+        service.add(Track::Textual, &add_request("user-b-2", "user-b", "beta")).unwrap();
+        service.store.inject_cross_user_search_result = true;
+        let result = service.search(
+            Track::Textual,
+            &SearchRequest {
+                query: MessageContent::Text("query".into()),
+                options: None,
+                user_id: "user-a".into(),
+                top_k: 100,
+            },
+        );
+        assert_eq!(result, Err(DurableAmlServiceErrorV1::SearchScopeViolation));
     }
 
     #[test]
