@@ -69,7 +69,7 @@ services:
       - -c
       - archive_timeout=30s
       - -c
-      - archive_command=mkdir -p /var/lib/postgresql/18/docker/mon025-archive && if [ -f /var/lib/postgresql/18/docker/mon025-archive/%f ]; then cmp -s %p /var/lib/postgresql/18/docker/mon025-archive/%f; else cp %p /var/lib/postgresql/18/docker/mon025-archive/%f; fi
+      - archive_command=mkdir -p /wal-archive && if [ -f /wal-archive/%f ]; then cmp -s %p /wal-archive/%f; else cp %p /wal-archive/%f; fi
     environment:
       PGDATA: /var/lib/postgresql/18/docker
       POSTGRES_USER: ${MON025_DB_USER:-mon025}
@@ -81,6 +81,7 @@ services:
     volumes:
       - pg18_source_data:/var/lib/postgresql
       - pg18_backups:/backups
+      - pg18_wal_archive:/wal-archive
       - ./postgres:/lab/postgres:ro
       - ./initdb:/docker-entrypoint-initdb.d:ro
       - ./postgres/source-entrypoint.sh:/lab/source-entrypoint.sh:ro
@@ -112,7 +113,7 @@ services:
       - -c
       - archive_timeout=30s
       - -c
-      - archive_command=mkdir -p /var/lib/postgresql/19/docker/mon025-archive && if [ -f /var/lib/postgresql/19/docker/mon025-archive/%f ]; then cmp -s %p /var/lib/postgresql/19/docker/mon025-archive/%f; else cp %p /var/lib/postgresql/19/docker/mon025-archive/%f; fi
+      - archive_command=mkdir -p /wal-archive && if [ -f /wal-archive/%f ]; then cmp -s %p /wal-archive/%f; else cp %p /wal-archive/%f; fi
     environment:
       PGDATA: /var/lib/postgresql/19/docker
       POSTGRES_USER: ${MON025_DB_USER:-mon025}
@@ -124,6 +125,7 @@ services:
     volumes:
       - pg19_source_data:/var/lib/postgresql
       - pg19_backups:/backups
+      - pg19_wal_archive:/wal-archive
       - ./postgres:/lab/postgres:ro
       - ./initdb:/docker-entrypoint-initdb.d:ro
       - ./postgres/source-entrypoint.sh:/lab/source-entrypoint.sh:ro
@@ -144,7 +146,6 @@ services:
     command: ["postgres", "-c", "hot_standby=on"]
     environment:
       PGDATA: /var/lib/postgresql/18/docker
-      MON025_SOURCE_DATA_DIR: /source-data/18/docker
       POSTGRES_USER: ${MON025_DB_USER:-mon025}
       POSTGRES_PASSWORD: ${MON025_DB_PASSWORD:?Set MON025_DB_PASSWORD in .env}
       POSTGRES_DB: ${MON025_DB_NAME:-mon025}
@@ -156,6 +157,7 @@ services:
     volumes:
       - pg18_source_data:/source-data:ro
       - pg18_backups:/backups:ro
+      - pg18_wal_archive:/wal-archive:ro
       - pg18_restore_data:/var/lib/postgresql
       - ./restore/restore-entrypoint.sh:/lab/restore-entrypoint.sh:ro
       - ./postgres:/lab/postgres:ro
@@ -173,7 +175,6 @@ services:
     command: ["postgres", "-c", "hot_standby=on"]
     environment:
       PGDATA: /var/lib/postgresql/19/docker
-      MON025_SOURCE_DATA_DIR: /source-data/19/docker
       POSTGRES_USER: ${MON025_DB_USER:-mon025}
       POSTGRES_PASSWORD: ${MON025_DB_PASSWORD:?Set MON025_DB_PASSWORD in .env}
       POSTGRES_DB: ${MON025_DB_NAME:-mon025}
@@ -185,6 +186,7 @@ services:
     volumes:
       - pg19_source_data:/source-data:ro
       - pg19_backups:/backups:ro
+      - pg19_wal_archive:/wal-archive:ro
       - pg19_restore_data:/var/lib/postgresql
       - ./restore/restore-entrypoint.sh:/lab/restore-entrypoint.sh:ro
       - ./postgres:/lab/postgres:ro
@@ -196,7 +198,9 @@ services:
 volumes:
   pg18_source_data:
   pg18_backups:
+  pg18_wal_archive:
   pg18_restore_data:
   pg19_source_data:
   pg19_backups:
+  pg19_wal_archive:
   pg19_restore_data:
