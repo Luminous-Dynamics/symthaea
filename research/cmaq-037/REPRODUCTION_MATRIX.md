@@ -14,6 +14,7 @@ CMAQ-035 established an internal comparison between fixed and ONS betting. CMAQ-
 | PRM-ONS | ONS-adaptive order and dispersion predictive-rank martingale | Published adaptive PRM |
 | PRM-fixed-4 | Fixed two-sided four-component order / dispersion portfolio | Fixed-bet baseline |
 | PRM-positive-only | Fixed positive Order and Dispersion bets | Directional ablation |
+| PRM-spectrum | CMAQ-038 fixed-bet multi-resolution Haar contrasts over the complete finite rank grid | CMAQ exploratory extension; not part of the published PRM reproduction |
 | CS-risk | Anytime confidence-sequence monitor of a matched running/rolling average risk | Complementary estimand, not a like-for-like per-instance drift detector |
 
 Do not implement CCTM by multiplying repeated marginal conformal p-values or by using a rolling empirical breach rate. Implement its actual conditional calibration and martingale construction from the reference paper/code.
@@ -67,6 +68,12 @@ Any serially dependent cell must be labelled assumption-violating for PRM unless
 7. Pre-register all cell combinations, replication counts, quantiles and exclusions.
 8. Store per-replication alarm times / no-alarm indicators plus seed, configuration and source hashes. Aggregate CSVs alone are insufficient.
 9. Publish code, artifact hashes, confidence intervals and the full run command.
+
+## CMAQ-038 exploratory feature-coverage arm
+
+CMAQ-038 adds a pre-registered dyadic Haar rank-spectrum mixture with 2n directional components for n+1 rank buckets. It is evaluated against the actual CMAQ-031 fixed-four monitor on paired rank streams. Its deliberately trimodal rank-grid alternative is a diagnostic probe, not the raw-score generator used in CMAQ-035 and not a published-paper reproduction. Keep CMAQ-038 results in a separate extension table until the original PRM / CCTM reproduction is complete.
+
+The additional feature bank can increase sensitivity to shape changes but distributes the e-process mixture mass over more components. It must therefore be assessed on the full null-alarm / detection-power / delay / runtime frontier; higher feature count is not itself evidence of improvement.
 
 ## Current internal CMAQ-035 result is not SOTA evidence
 
