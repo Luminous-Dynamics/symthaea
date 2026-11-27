@@ -312,9 +312,39 @@ As of this snapshot, the work has advanced the following reference surfaces:
 - SDCB five-reference-chain validation previously passed 62/62 synthetic Rust tests on exact head in PR #13946.
 - MACE paired evaluator/LAFS helper previously passed 45/45 tests on exact head in PR #13935.
 - Scientific decision/replay contract previously passed 29 tests, rustfmt and strict Clippy in PR #13933.
-- New child PRs #13952 (bivariate quadrature budget/scaling), #13953 (temporal BM25/RRF), and #13954 (replay-capsule structural checks) are research increments, not completed system qualifications.
+- New child PRs #13952 (bivariate quadrature budget/scaling), #13953 (temporal BM25/RRF plus strict candidate adapter), #13954 (replay-capsule structural checks) and #13959 (AR(1) block-dependence stress) have now produced exact-head reference-test evidence described in Section 9; none is a completed system or scientific qualification.
 
 These are isolated reference tests. They are not real data calibration, external benchmark submissions, production retrieval integration, physical measurements, independent security audits, full workspace CI or demonstrated SOTA results. Keep that distinction in every subsequent report.
+
+## 9. New exact-head evidence since the first scorecard draft
+
+### 9.1 SDCB bivariate numerical reference
+
+The bivariate rectangle increment in #13952 passed its exact-source Rust 1.96 workflow with **23/23 tests** on head 1d00cbe17b99a87b3bf916280a2b05e30451ce37. This includes scale-relative covariance symmetry, channel permutation, positive-unit-rescaling and aggregate table-wide evaluation-budget controls. It remains a 2D conditional-integration reference; it does not validate the general multivariate solvers in #13951.
+
+### 9.2 Block-conformal dependence stress
+
+The standalone Monte Carlo experiment in #13959 passed 3/3 unit controls and completed 12 conditions × 5,000 trials on exact source head 30a508248f31d595d930224c852925e4762fc3d9. At rho=0.95 with 39 calibration blocks and nominal alpha=0.10, serial-path unit-length blocks without embargo produced a 13.54% alarm rate (Wilson 95%: 12.62–14.52%), above the 10% nominal target. Independent unit blocks produced 10.56% (9.74–11.44%). Embargoes of 16 and 64 steps returned the serial-path unit-block rate to 10.12% and 10.28%, with intervals containing 10%. At block lengths 8 and 32, all tested serial-path intervals contained 10%.
+
+This is a specific stationary Gaussian AR(1), block-maximum result, not a universally safe embargo, proof of block exchangeability, nonstationary guarantee or physical-data calibration. Full rows and manifest are retained in the workflow artifact linked from #13959.
+
+### 9.3 MACE conventional baseline and source-event adapter
+
+The temporal BM25/RRF reference in #13953 now:
+- partitions documents/postings by scope and knowledge-time before scoring;
+- computes BM25 corpus statistics over the eligible scope/time cohort;
+- preserves event ID, source ID, authority tier, uncertainty, parent relation, source family/root and bitemporal validity;
+- resolves retrieval hits to canonical source-event metadata by exact event ID.
+
+On exact head 8461d6073b9440789119b96152ba1ba5987ecd47, the dependency-free BM25 reference passed 17/17 tests and the parent MACE DSM evaluator passed 45/45 tests. A separate strict Serde adapter subsequently passed formatting, generated-lock test execution, strict Clippy and fixture/schema checks with **21/21 tests** on its adapter-validation run; the exact committed-lock workflow is being rerun after moving the generated Cargo.lock onto the feature branch. Treat the 21-test run as source/test evidence; do not yet state that the newest committed-lock revision is green until the final locked run completes.
+
+### 9.4 Scientific replay custody
+
+The structural replay-capsule child #13954 passed rustfmt, 39/39 isolated tests and strict Clippy under its nested lock on exact head 74ae6e3c7958ae7cec5a3a1cd3d22e64622a5577. The tests include deliberately re-hashed malformed artifacts, distinguishing semantic structure checks from raw byte tamper detection. Service/OS evaluator isolation and production package execution remain open.
+
+### 9.5 Workspace metadata recovery
+
+The workspace-glob/lockfile repair #13840 passed the exact-head glob checker, cargo metadata --locked and scoped root-workspace STT formatting on head 08bf1f34b7bef0b131926de0cb5339d445ca989c. This is a build-discovery/metadata gate, not full application/workspace test success. Excluded source-only directories are not thereby repaired.
 
 ## References
 
