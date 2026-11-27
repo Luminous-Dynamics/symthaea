@@ -42,7 +42,7 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
     forbidden_candidate_keys = {
         "condition", "expected_behavior", "expanded_values",
         "baseline_values", "counterfactual_values", "seed_commitment",
-        "selected_intervention_fact", "split",
+        "selected_intervention_fact", "split", "expected_answer", "citation_contract",
     }
     for task_id, candidate in candidate_by_id.items():
         audit = audit_by_id[task_id]
@@ -61,12 +61,24 @@ def validate(candidate_path: Path, audit_path: Path) -> None:
                 f"{task_id}: source-bundle digest mismatch")
         require(audit["seed_commitment"] and len(audit["seed_commitment"]) == 64,
                 f"{task_id}: invalid seed commitment")
+        require(isinstance(audit["expected_answer"], dict) and "answerable" in audit["expected_answer"],
+                f"{task_id}: missing independent answer oracle")
+        require(isinstance(audit["citation_contract"], dict)
+                and "allowed_citation_source_ids" in audit["citation_contract"]
+                and "forbidden_decoy_source_ids" in audit["citation_contract"],
+                f"{task_id}: missing citation audit contract")
+        require(set(audit["citation_contract"]["allowed_citation_source_ids"]) <= set(source_digests),
+                f"{task_id}: allowed citation source absent from candidate evidence")
+        require(set(audit["citation_contract"]["forbidden_decoy_source_ids"]) <= set(source_digests),
+                f"{task_id}: decoy citation source absent from candidate evidence")
         if audit["condition"] == "counterfactual":
             fact_id = audit["selected_intervention_fact"]
             require(audit["baseline_values"][fact_id] != audit["counterfactual_values"][fact_id],
                     f"{task_id}: counterfactual failed to change selected fact")
             require(audit["expanded_values"] == audit["counterfactual_values"],
                     f"{task_id}: counterfactual values were not used")
+            require(audit["expected_answer"].get("answerable") is True,
+                    f"{task_id}: counterfactual answer unexpectedly became unanswerable")
         elif audit["condition"] == "placebo":
             require(audit["placebo_baseline"] != audit["placebo_variant"],
                     f"{task_id}: placebo intervention did not change")
