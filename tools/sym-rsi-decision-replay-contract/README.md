@@ -3,7 +3,7 @@
 This crate compiles the production support modules directly:
 
 - scientific_decision_replay.rs: prospective decision, action payload, causal-design, evaluator-resolution and cost contracts.
-- evolutionary_rescue_custody.rs: custodian-only replay archive, evaluator capsule, digest linkage and decision-prefix construction.
+- evolutionary_rescue_custody.rs: custodian-only replay archive, evaluator capsule, exact-byte digest linkage, post-digest structural validation and decision-prefix construction.
 
 The harness is intentionally outside the root Cargo workspace. The root workspace currently fails during member enumeration because crates/core/* includes crates/core/symthaea, which has no checked-in Cargo.toml. Cargo fails before package selection or compilation. Do not fabricate a package manifest to mask that workspace defect.
 
@@ -15,3 +15,6 @@ Run:
 
     cargo test --locked --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml
     cargo clippy --locked --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml --all-targets -- -D warnings
+
+
+The custody verifier checks structure as well as digests: supported world/policy versions, canonical source-commit IDs, nonempty world identity, tick continuity, candidate/trajectory/privileged-stream length agreement, extinction metadata and finite evaluator values. Negative controls re-hash deliberately malformed candidate/evaluator artifacts to ensure that internally consistent hashes cannot bypass structural validation.
