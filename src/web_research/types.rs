@@ -416,7 +416,11 @@ impl IntegrationResult {
     }
 }
 
-/// Outcome of a verification for meta-learning tracking
+/// Outcome of a verification for meta-learning tracking.
+///
+/// `was_correct` is present only when an independent source of ground truth
+/// has adjudicated the claim. Epistemic status and confidence are predictions,
+/// not correctness labels; an unadjudicated claim must remain `None`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VerificationOutcome {
     /// The claim that was verified
@@ -425,8 +429,9 @@ pub struct VerificationOutcome {
     pub source_domain: String,
     /// Source type
     pub source_type: ResearchSource,
-    /// Whether verification was correct (ground truth)
-    pub was_correct: bool,
+    /// Adjudicated correctness; None means no independent ground-truth outcome yet.
+    #[serde(default)]
+    pub was_correct: Option<bool>,
     /// Predicted confidence at verification time
     pub predicted_confidence: f32,
     /// Topic/domain of the claim
@@ -434,7 +439,10 @@ pub struct VerificationOutcome {
 }
 
 impl VerificationOutcome {
-    /// Create a new verification outcome
+    /// Create an outcome whose correctness has already been adjudicated by the caller.
+    ///
+    /// The caller is responsible for supplying a true external/independent outcome,
+    /// not the verifier's own confidence or epistemic status.
     pub fn new(
         claim: impl Into<String>,
         source_domain: impl Into<String>,
@@ -444,7 +452,23 @@ impl VerificationOutcome {
             claim: claim.into(),
             source_domain: source_domain.into(),
             source_type: ResearchSource::Web,
-            was_correct,
+            was_correct: Some(was_correct),
+            predicted_confidence: 0.5,
+            domain: String::new(),
+        }
+    }
+
+    /// Create a verification record whose correctness has not been independently adjudicated.
+    pub fn unadjudicated(
+        claim: impl Into<String>,
+        source_domain: impl Into<String>,
+        source_type: ResearchSource,
+    ) -> Self {
+        Self {
+            claim: claim.into(),
+            source_domain: source_domain.into(),
+            source_type,
+            was_correct: None,
             predicted_confidence: 0.5,
             domain: String::new(),
         }
@@ -504,6 +528,21 @@ mod tests {
 
         assert!(claim.is_trustworthy());
         assert_eq!(claim.status, EpistemicStatus::HighConfidence);
+    }
+
+    #[test]
+    fn unadjudicated_outcome_does_not_invent_a_ground_truth_label() {
+        let outcome = VerificationOutcome::unadjudicated(
+            "The result is reproducible",
+            "example.org",
+            ResearchSource::Academic,
+        )
+        .with_domain("science")
+        .with_confidence(0.93);
+
+        assert_eq!(outcome.was_correct, None);
+        assert_eq!(outcome.predicted_confidence, 0.93);
+        assert_eq!(outcome.source_type, ResearchSource::Academic);
     }
 
     #[test]
