@@ -22,6 +22,24 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 
 ---
 
+
+## Current embodiment research (2026-11-27)
+
+The polyembodiment programme treats the digital avatar, puppets, abstract forms,
+and future physical companions as adapters for one renderer-neutral semantic
+event contract.
+
+- [Polyembodiment architecture](SYMTHAEA_POLYEMBODIMENT_ARCHITECTURE_V0_1_2026-11-27.md)
+- [Embodiment benchmark plan](SYMTHAEA_EMBODIMENT_BENCHMARK_PLAN_V0_1_2026-11-27.md)
+- [Dynamic temporal attention](SYMTHAEA_DYNAMIC_TEMPORAL_ATTENTION_V0_1_2026-11-27.md)
+- [Event schema](SYMTHAEA_EMBODIMENT_EVENT_SCHEMA_V1_2026-11-27.json)
+- [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
+
+The Rust event and projection modules live in
+`crates/domains/symthaea-soma/src/embodiment_event.rs` and
+`embodiment_projection.rs`. Their regression tests are authored but have not
+yet been executed; no renderer or VideoFDB evaluation result is claimed.
+
 ## Theoretical Foundations
 
 ### Integrated Information Theory (IIT)
