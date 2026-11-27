@@ -38,7 +38,7 @@ A digest proves byte identity, not truth, independence, access control or correc
 ## 3. Contract prototype
 
 The new support module defines:
-- CandidateDecisionContext: decision-time evidence, permitted action set, context digest, budget and deadline.
+- CandidateDecisionContext: decision-time evidence, permitted action set, context digest, budget, deadline, and a digest-bound decision objective (valuation mode, declared utility unit and loss-table reference where applicable).
 - DecisionProposal: selected action, prospective probability distribution, policy lineage, assignment mechanism and causal-design declaration.
 - EvaluatorResolution: evaluator-owned execution status, outcome-resolution state, observed-action support, evidence references and actual-cost completeness.
 
@@ -46,6 +46,7 @@ Candidate-visible types do not contain ground truth or future outcome labels. Ev
 
 Validation covers:
 - no evidence became available after decision time;
+- every decision is bound to a frozen downstream decision/loss contract; raw entropy or information gain is not substituted for decision value;
 - selected actions belong to the permitted set;
 - prospective probabilities sum exactly to one million parts per million;
 - randomized assignment records a nonzero propensity and protocol reference;
@@ -161,6 +162,22 @@ Do not pool different task units into one RSI number.
 | Algorithm/kernel discovery | KernelBench, SOL-ExecBench, ALE-Bench | Correctness-first speedup and verified discovery per total compute |
 | Meta-improver | AIDE²-style identical-start R4 | Repeated positive paired successor advantage at matched realized cost |
 
+### Provisional stretch targets from the existing decision-intelligence benchmark plan
+
+These are ambitious targets to validate and power after a variance-estimation pilot; they are not achieved Symthaea results or immediate pass/fail gates.
+
+| Benchmark | Public reference / scale | Proposed Symthaea stretch target |
+|---|---|---|
+| Autonomous Science Bench 0.1 | Six pilot campaigns, three trials each; best listed resolution rate 72.2% | At least 15/18 resolved trials (83.3%), with discovery and held-out learning gates both passing for every resolved campaign |
+| FIRE-Bench | Best published F1 46.7 on 30 tasks / three trials | At least 55 F1 on the same release, while reporting claim precision, recall, trial variance and unsupported claims |
+| SciWorkBench | Best reported mean 57.38 | At least 65 on the same official harness/scorer, with domain-specific failure rates |
+| RecurSciBench | 20 independent test tasks across four domains; evolved states show mixed mean transfer and broad per-task regressions | Mean transfer above +5%, nonnegative aggregate in every domain, and no more than 4/20 independent test tasks regressing; confirm on expanded task families |
+| TasteVal-style fixed-coder lane | Reported experimental-compute multiplier up to 2.30x; researcher inference and full lifecycle costs are not included in that multiplier | Match or exceed 2.30x compute-to-target while preserving final-quality non-inferiority and reporting a separate inclusive-cost frontier |
+| METR TH1.1 / TH2 | Long-horizon tasks with materially different lifecycle costs | At non-inferior success, reduce inclusive lifecycle cost by 30%, or extend successful task horizon by 1.5x at matched total cost |
+| SWE-bench Pro (secondary engineering lane) | HGM reported 88.3% on its evaluated subset | Exceed 88.3% only on the same pinned subset/harness, while retaining Verified/Polyglot transfer and reporting full compute/evaluation cost |
+
+The RecurSciBench regression-tail target is intentionally more demanding than merely beating its mean. The TasteVal target must not be claimed from compute-only accounting. METR cost/horizon comparisons must use matched task strata and uncertainty intervals. Never compare numerical scores across different benchmarks.
+
 ### Three non-poolable lanes
 
 - **Fast-verifiable:** deterministic tests, formal checks, simulators and numerical oracles.
@@ -171,19 +188,30 @@ Report quality, reliability, coverage, calibration, lifecycle cost and uncertain
 
 The primary success criterion is **more independently confirmed, transferable research progress per fully inclusive resource budget, with no hidden regression in protected capabilities.**
 
-## 10. Existing owners
+## 10. Compose with the existing scientific decision-intelligence programme
 
-Compose with existing work, not parallel authorities:
-- #10497: matched-start R4 and recursive improver qualification.
+This is a shared decision-episode contract, not a new scientific scheduler or decision-value engine. The existing programme already has a mature Stage-A/Stage-B split: hypothesis discrimination is not decision value; robust minimax and Bayesian expected utility are distinct modes.
+
+- #12546: finite-world decision evaluator, including Bayesian and prior-free robust decision-value modes and a typed covariance-to-robust adapter. Reuse it for loss/decision qualification.
+- #13453: joint-covariance experiment design v0.2. Keep its Stage-B hypothesis-discrimination output separate from Stage-A decision value.
+- #9817/#9821: active sensing and decision-focused evidence acquisition.
+- #5476/#5477/#5478: prospective value-of-computation calibration, realized-utility receipts and causal metareasoning ablations.
+- #11012: evidence-contingent adaptive research orchestration; this contract can supply its evidence-prefix-bound decision episode.
+- #8721: prospective scientific tool/computation allocation; do not recreate its action/tool scheduler.
+- #10877: research direction/approach/experiment/interpretation taste.
+- #10756: evaluator research and independent target judgments.
+- #9230: verifier-grounded direction-board allocation across research directions.
+- #9332: sealed oracle and adaptive benchmark generation.
+- #12407: observation-time, mask and modality semantics.
+- #12502/#12505/#12506/#12624: dynamical references and predictor baselines.
+- #10497: matched-start R4 and recursive-improver qualification.
 - #10472/#10473/#10499: evidence-bound candidate archive, evaluation and multi-parent lineage.
 - #10708/#10573: evaluator epochs and independent promotion authority.
-- #10756: evaluator research and independent target judgments.
-- #10877: question selection, research taste, experimental design and interpretation.
 - #10314/#10370/#10167: benchmark receipts, accounting, attestation and regrade.
 - #10064/#10369: execution isolation and trust roots.
 - #10630: evidence lifecycle and selective revalidation.
 
-The current futures ledger records forecast provenance and scored continuations. This contract is a decision-episode interface, not a competing ledger. Persistent writing should reference current evidence/receipt identities and be assigned to an existing owner.
+The current futures ledger records forecast provenance and scored continuations. This contract is a decision-episode interface, not a competing ledger. Persistent writing should reference existing evidence/receipt identities and be assigned to an existing owner. Adapt this contract to the decision objective and event semantics in #12546 and #12407 rather than duplicating their calculations or observation model.
 
 ## 11. External research
 
