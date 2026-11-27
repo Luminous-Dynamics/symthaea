@@ -87,7 +87,9 @@ pub struct EmbodimentSceneFrame {
     privacy_class: PrivacyClass,
     source: EventSource,
     observed_at_monotonic_ns: String,
-    expires_at_monotonic_ns: String,
+    event_expires_at_monotonic_ns: String,
+    grant_expires_at_monotonic_ns: String,
+    effective_permit_expires_at_monotonic_ns: String,
     /// Privacy-aware, non-colour-only textual equivalent of the essential cue.
     accessible_description: String,
     elements: Vec<SceneElement>,
@@ -109,7 +111,9 @@ impl EmbodimentSceneFrame {
     pub fn privacy_class(&self) -> PrivacyClass { self.privacy_class }
     pub fn source(&self) -> &EventSource { &self.source }
     pub fn observed_at_monotonic_ns(&self) -> &str { &self.observed_at_monotonic_ns }
-    pub fn expires_at_monotonic_ns(&self) -> &str { &self.expires_at_monotonic_ns }
+    pub fn event_expires_at_monotonic_ns(&self) -> &str { &self.event_expires_at_monotonic_ns }
+    pub fn grant_expires_at_monotonic_ns(&self) -> &str { &self.grant_expires_at_monotonic_ns }
+    pub fn effective_permit_expires_at_monotonic_ns(&self) -> &str { &self.effective_permit_expires_at_monotonic_ns }
     pub fn accessible_description(&self) -> &str { &self.accessible_description }
     pub fn elements(&self) -> &[SceneElement] { &self.elements }
 }
@@ -276,7 +280,9 @@ pub fn compile_scene(
         privacy_class: cue.privacy_class,
         source: cue.source.clone(),
         observed_at_monotonic_ns: cue.observed_at_monotonic_ns.clone(),
-        expires_at_monotonic_ns: cue.expires_at_monotonic_ns.clone(),
+        event_expires_at_monotonic_ns: cue.expires_at_monotonic_ns.clone(),
+        grant_expires_at_monotonic_ns: permit.grant_expires_at_monotonic_ns().to_owned(),
+        effective_permit_expires_at_monotonic_ns: permit.expires_at_monotonic_ns().to_owned(),
         accessible_description: cue.accessible_description(),
         elements,
     })
@@ -390,6 +396,19 @@ mod tests {
             CLOCK,
         ).unwrap();
         (canonical, permit)
+    }
+
+    #[test]
+    fn scene_frame_uses_effective_permission_expiry_not_only_event_expiry() {
+        let (cue, permit) = fixture(
+            EmbodimentForm::LivingConstellation,
+            PrivacyClass::Public,
+            SemanticCue::Listening { active: true },
+        );
+        let frame = compile_scene(&cue, &permit).unwrap();
+        assert_eq!(frame.event_expires_at_monotonic_ns(), "900");
+        assert_eq!(frame.grant_expires_at_monotonic_ns(), "800");
+        assert_eq!(frame.effective_permit_expires_at_monotonic_ns(), "800");
     }
 
     #[test]
