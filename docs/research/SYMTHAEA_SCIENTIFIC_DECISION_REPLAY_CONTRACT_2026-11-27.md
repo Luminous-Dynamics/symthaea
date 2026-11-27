@@ -44,7 +44,7 @@ A digest proves byte identity, not truth, independence, access control or correc
 The new support module defines:
 - CandidateDecisionContext: decision-time evidence, permitted action set, context digest, budget, deadline, and a digest-bound decision objective (valuation mode, declared utility unit and loss-table reference where applicable).
 - DecisionProposal: selected action identity, digest of the exact selected action payload (for example, the submitted design batch), prospective probability distribution, policy lineage, assignment mechanism and causal-design declaration.
-- EvaluatorResolution: evaluator-owned execution status, outcome-resolution state, observed-action support, evidence references and actual-cost completeness.
+- EvaluatorResolution: evaluator-owned execution status, outcome-resolution state, recorded action ID plus exact payload digest, evidence references and actual-cost completeness. `ActionSupport::RecordedAction` means the submitted action/payload was recorded; it does not imply that the scientific outcome has resolved.
 
 Candidate-visible types do not contain ground truth or future outcome labels. EvaluatorResolution is separate and must not be serialized into the candidate process input stream.
 
@@ -52,6 +52,7 @@ Validation covers:
 - no evidence became available after decision time;
 - every decision is bound to a frozen downstream decision/loss contract; raw entropy or information gain is not substituted for decision value;
 - selected actions belong to the permitted set;
+- the exact selected action payload digest is bound through later result resolution;
 - prospective probabilities sum exactly to one million parts per million;
 - randomized assignment records a complete probability distribution over permitted action identities and exact payload digests, with nonzero propensity for the selected action;
 - causal-design claims include identification-assumption digests;
@@ -79,16 +80,16 @@ Rules:
 
 ## 5. Separate execution status from outcome status
 
-| Execution status | Outcome status | Meaning |
-|---|---|---|
-| not_started | not_run | No action/experiment was executed |
-| not_started | unsupported_counterfactual | Candidate chose a branch with no observed outcome; no outcome is fabricated |
-| started | awaiting_observation | Execution began; evidence has not resolved the question |
-| completed | immediate_observed | Outcome observed and evidence admitted immediately |
-| completed | delayed_observed | Outcome became observable later |
-| completed | censored_at_deadline | Outcome not resolved before observation deadline |
-| completed | indeterminate | Evidence exists but does not settle the outcome |
-| failed / timed_out / aborted | invalid_execution | Execution did not produce a valid scientific result |
+| Execution status | Outcome status | Action support | Meaning |
+|---|---|---|---|
+| not_started | not_run | no recorded action | No action/experiment was executed |
+| not_started | unsupported_counterfactual | no recorded action | Candidate chose a branch with no observed outcome; no outcome is fabricated |
+| started | awaiting_observation | recorded action + payload digest | Execution began and the exact submission is known; its scientific result is still pending |
+| completed | immediate_observed | recorded action + payload digest | Outcome observed and evidence admitted immediately |
+| completed | delayed_observed | recorded action + payload digest | Outcome became observable later |
+| completed | censored_at_deadline | recorded action + payload digest | Outcome not resolved before observation deadline |
+| completed | indeterminate | recorded action + payload digest | Evidence exists but does not settle the outcome |
+| failed / timed_out / aborted | invalid_execution | recorded or absent, explicitly represented | Execution did not produce a valid scientific result |
 
 A censored result is not a failure, a pending result is not success, an invalid execution is not a scientific null, and a not-run proposal is not a negative experiment. Preserve all rows in denominators and reports.
 
