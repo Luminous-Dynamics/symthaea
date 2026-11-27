@@ -272,9 +272,7 @@ pub fn verify_encoded_replay_artifacts(
 
 fn validate_observation_policy_id(value: &str) -> Result<(), String> {
     match value {
-        "population_census_v1" | "noisy_trait_v1" | "shuffled_trait_negative_control_v1" => {
-            Ok(())
-        },
+        "population_census_v1" | "noisy_trait_v1" | "shuffled_trait_negative_control_v1" => Ok(()),
         _ => Err("unsupported observation policy ID".into()),
     }
 }
