@@ -217,17 +217,26 @@ where
     config.validate()?;
 
     let initial_midpoint = midpoint(config.lower_bound, config.upper_bound);
-    if initial_midpoint <= config.lower_bound || initial_midpoint >= config.upper_bound {
-        return Err(ChallengeSearchError::InvalidConfiguration);
-    }
-    let initial_value = evaluate_checked(&mut evaluate, initial_midpoint, &config.branch_id)?;
+    let has_interior_midpoint =
+        initial_midpoint > config.lower_bound && initial_midpoint < config.upper_bound;
+    let initial_parameter = if has_interior_midpoint {
+        initial_midpoint
+    } else {
+        config.lower_bound
+    };
+    let initial_radius = if has_interior_midpoint {
+        half_width(config.lower_bound, config.upper_bound)
+    } else {
+        config.upper_bound - config.lower_bound
+    };
+    let initial_value = evaluate_checked(&mut evaluate, initial_parameter, &config.branch_id)?;
     let initial_upper = upper_envelope(
         initial_value.upper_bound,
         config.lipschitz_constant,
-        outward_radius(half_width(config.lower_bound, config.upper_bound)),
+        outward_radius(initial_radius),
     )?;
 
-    let mut best_parameter = initial_midpoint;
+    let mut best_parameter = initial_parameter;
     let mut best_value = initial_value.estimate;
     let mut best_lower_bound = initial_value.lower_bound;
     let mut best_error_bound = initial_value.absolute_error_bound;
@@ -1099,6 +1108,32 @@ mod tests {
         );
         assert!(report.absolute_gap > config.absolute_gap_tolerance);
         assert_eq!(report.evaluations, 1);
+    }
+
+    #[test]
+    fn scalar_search_adjacent_float_interval_is_unqualified_not_invalid() {
+        let smallest_subnormal = f64::from_bits(1);
+        let config = ScalarChallengeSearchConfig::new(
+            0.0,
+            smallest_subnormal,
+            1.0,
+            0.0,
+            8,
+            "pulse_phase",
+            "stable-branch",
+            certificate(),
+        );
+        let report = search_scalar_response_challenge(&config, |_| {
+            Ok(ChallengeObjectiveSample::new(0.0, "stable-branch", true))
+        })
+        .unwrap();
+        assert_eq!(
+            report.termination,
+            ChallengeSearchTermination::FloatingPointResolutionExhausted
+        );
+        assert!(report.global_upper_bound > 0.0);
+        assert!(report.absolute_gap > 0.0);
+        assert_eq!(report.best_parameter, 0.0);
     }
 
     #[test]
