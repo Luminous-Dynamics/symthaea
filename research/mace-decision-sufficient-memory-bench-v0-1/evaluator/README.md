@@ -12,7 +12,7 @@ cargo test --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/e
 cargo clippy --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/evaluator/Cargo.toml --locked --all-targets -- -D warnings
 ~~~
 
-The crate has no external dependencies. The LAFS helper is in src/longmemeval_v2.rs and uses the official published Small/Medium operating points; re-check the official benchmark page before each evaluation. Its public API currently provides:
+The crate has no external dependencies. The LAFS helper is in src/longmemeval_v2.rs and uses the official published Small/Medium operating points; re-check the official benchmark page before each evaluation. Run manifests record the cluster-bootstrap seed/replicate count for DSM and the tier for LongMemEval-V2. Its public API currently provides:
 
 - Validation of evaluator cases and candidate outputs.
 - Exact integer action-loss and regret scoring.
@@ -21,8 +21,8 @@ The crate has no external dependencies. The LAFS helper is in src/longmemeval_v2
 - Admissible-evidence precision and necessary-evidence recall as integer ratios.
 - Leave-one-out evidence interventions. The runner must invoke the same frozen, deterministic downstream policy digest and decision seed for each intervention, withholding exactly one returned evidence ID. Positive item contribution means retaining the item lowered decision loss; negative contribution means it increased loss.
 - Cost receipt reconciliation across non-overlapping phases (their sum, including residual, must equal wall time), retained/index/network bytes, and separately marked measured versus estimated cost.
-- Deterministic whole-world cluster bootstrap with 95% percentile intervals for mean paired memory gain and memory-induced harm rate; within-world episodes are resampled together.
-- Exact LongMemEval-V2 LAFS integration over the official 1–200 second log-latency budget, including Small and Medium reference frontiers, and delta-LAFS helpers.
+- Deterministic whole-world cluster bootstrap with 95% percentile intervals for mean paired memory gain and memory-induced harm rate; within-world episodes are resampled together. Paired receipts preserve the downstream-policy SHA-256 digest and decision seed.
+- Exact LongMemEval-V2 LAFS integration over the official 1–200 second log-latency budget, including Small and Medium reference frontiers, delta-LAFS helpers and known-answer reference-score tests.
 
 ## Critical evaluator isolation
 
@@ -39,6 +39,7 @@ This is a scoring core, not yet a complete benchmark runner:
 - It does not parse JSONL or generate random worlds.
 - The LAFS helper computes the metric but does not invoke the official LongMemEval-V2 data preparation, reader, scoring package, or submission validator.
 - It does not invoke candidate systems or implement AML Add/Search.
+- The LAFS module computes the frontier score from operating points but does not invoke the official LongMemEval-V2 data preparation, fixed reader, scoring package or submission validator.
 - It does not implement process isolation, sandboxing, cryptographic provenance or a private key service.
 - The current leave-one-out method does not estimate higher-order evidence interactions or Shapley values.
 - It has not been compiled, formatted or tested on the current authoring environment because no Rust toolchain is available here.
