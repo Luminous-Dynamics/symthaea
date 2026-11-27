@@ -13,7 +13,12 @@ The receipt layer gives those outcomes separate states and timestamps. It is a r
 
 ```text
 Permitted
-   |    |  +--> NotSubmitted (terminal)
+   | \
+   |  +--> NotSubmitted (terminal)
+   v
+Authorized
+   | \
+   |  +--> Failed / NotSubmitted
    v
 Submitted
    | \
@@ -32,7 +37,8 @@ Stopped (terminal)
 Allowed transitions:
 
 - initial → Permitted
-- Permitted → Submitted or NotSubmitted
+- Permitted → Authorized or NotSubmitted
+- Authorized → Submitted, NotSubmitted or Failed
 - Submitted → Observed, OutcomeUnknown or Failed
 - OutcomeUnknown → Observed or Failed
 - Observed → Stopped or Failed
@@ -45,7 +51,8 @@ Stopped, Failed and NotSubmitted are terminal. A second terminal transition is r
 
 - `PresentationReceiptLedger`: bounded in-memory append-only transition ledger, limited to 65,536 attempts per instance.
 - `record_permitted`: stores the exact policy decision timestamp and opaque permit binding.
-- `record_submitted`: rechecks the live `PresentationPolicy` and only then appends Submitted. The caller supplies separate policy-clock and renderer-clock timestamps.
+- `record_authorized`: rechecks the live `PresentationPolicy`, appends Authorized, and returns the exact refreshed opaque permit.
+- `record_submitted`: appends Submitted only after the adapter acknowledges acceptance of that exact authorized permit. This is still not proof that output was observed.
 - `record_observed`: requires a named observer reporting Started.
 - `record_stopped`: requires a named observer reporting Stopped; a stop command alone is insufficient.
 - `record_outcome_unknown`, `record_not_submitted`, and `record_failed`: preserve unresolved and failure outcomes.
@@ -53,7 +60,7 @@ Stopped, Failed and NotSubmitted are terminal. A second terminal transition is r
 
 Observation sources distinguish adapter callbacks, compositor reports, audio-device loopback, haptic-driver acknowledgement, and external observers. The source is disclosed, not treated as proof of independence. The observer type must match the authorized output channel.
 
-Every receipt preserves session, clock domain, event and grant identity, event sequence, semantic event kind, event expiry, grant expiry, effective permit expiry, source/build provenance, epistemic status, privacy class, form, output channel/destination, intensity, motion mode, adapter build and observer metadata. Decision and renderer timestamps retain distinct clock-domain identifiers. No raw audio/video is included.
+Every receipt preserves session, clock domain, event and grant identity, event sequence, semantic event kind, event expiry, grant expiry, effective permit expiry, source/build provenance, epistemic status, privacy class, form, output channel/destination, intensity, motion mode, adapter build and observer metadata. The initial decision timestamp and every transition timestamp retain their clock-domain identifiers; an Authorized record uses the policy clock, while Submitted/Observed/Stopped use the adapter/output-observer clocks. No raw audio/video is included.
 
 ## Integrity and trust limits
 
@@ -76,15 +83,17 @@ Source decision time and renderer/output observation time may use different mono
 ## Machine-readable contracts
 
 - `SYMTHAEA_PRESENTATION_RECEIPT_SCHEMA_V1_2026-11-27.json` defines a serialized transition record.
-- `SYMTHAEA_PRESENTATION_RECEIPT_FIXTURES_V1_2026-11-27.json` contains four accepted lifecycle sequences and five negative sequence/timing controls.
+- `SYMTHAEA_PRESENTATION_RECEIPT_FIXTURES_V1_2026-11-27.json` contains five accepted lifecycle sequences and five negative sequence/timing controls.
 
 The fixture file is a research artifact; it is not yet consumed automatically by the Rust tests. JSON files have been parsed and structurally inspected, but an independent JSON Schema 2020-12 validator has not been run.
 
 ## Tests and qualification
 
-Fourteen Rust tests are authored for:
+Fifteen Rust tests are authored for:
 - permit versus submission distinction;
 - required final policy recheck;
+- rejection of submission acknowledgements carrying a stale pre-authorization permit;
+- separation between Authorized and adapter-acknowledged Submitted;
 - observed output and observed stop;
 - delayed observation resolving an unknown outcome;
 - failure resolution;
@@ -102,4 +111,4 @@ These tests have **not** been compiled or executed. The branch's GitHub workflow
 
 ## Next integration step
 
-The first Living Constellation renderer should hold the policy synchronization lock across final permit recheck, renderer submission, and recording Submitted. A compositor/frame callback then reports Observed; a separate stop callback or observer reports Stopped. A missing callback is OutcomeUnknown, never success.
+The first Living Constellation renderer should hold the policy synchronization lock across recording Authorized (which performs the final permit recheck), renderer submission, and recording the adapter's Submitted acknowledgement. A compositor/frame callback then reports Observed; a separate stop callback or observer reports Stopped. A missing callback is OutcomeUnknown, never success.
