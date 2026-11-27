@@ -235,7 +235,9 @@
         "mean_selective_loss",
         "adjusted_delta",
         "parent_fallback_certificate_sha256",
-        "decision_policy_sha256"
+        "decision_policy_sha256",
+        "sufficiency_score_definition_sha256",
+        "group_hierarchy_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -434,6 +436,12 @@
         },
         "decision_policy_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "sufficiency_score_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "group_hierarchy_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       },
       "allOf": [
@@ -530,7 +538,9 @@
         "risk_upper_bound",
         "policy_sha256",
         "group_id",
-        "threshold"
+        "threshold",
+        "sufficiency_score_definition_sha256",
+        "group_hierarchy_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -633,6 +643,12 @@
               "type": "null"
             }
           ]
+        },
+        "sufficiency_score_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "group_hierarchy_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       },
       "allOf": [
