@@ -1,4 +1,4 @@
-use anyhow::{Context, bail};
+use anyhow::{bail, Context};
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -94,13 +94,21 @@ pub fn validate_observation_schema(
         .offline()
         .should_validate_formats(true)
         .build(&schema_value)
-        .with_context(|| format!("compile offline observation schema {}", schema_path.display()))?;
+        .with_context(|| {
+            format!(
+                "compile offline observation schema {}",
+                schema_path.display()
+            )
+        })?;
     let errors = validator
         .iter_errors(observation)
         .map(|error| format!("{} at {}", error, error.instance_path()))
         .collect::<Vec<_>>();
     if !errors.is_empty() {
-        bail!("system observation schema validation failed: {}", errors.join("; "));
+        bail!(
+            "system observation schema validation failed: {}",
+            errors.join("; ")
+        );
     }
     Ok(())
 }
@@ -210,8 +218,7 @@ pub fn qualify_observation(
         task.pointer("/authority_snapshot")
             .context("frozen task authority_snapshot is missing")?,
     )?;
-    let observed_authority_sha =
-        required_str(observation, "/authority_snapshot_sha256")?;
+    let observed_authority_sha = required_str(observation, "/authority_snapshot_sha256")?;
 
     let input_integrity = observed_actor == actor_id
         && observed_subject == subject_id
@@ -244,8 +251,7 @@ pub fn qualify_observation(
 
     let replay_status = required_str(observation, "/verifier/replay")?;
     let independent = required_bool(observation, "/verifier/independent")?;
-    let replay_result_sha =
-        required_str(observation, "/verifier/replay_result_sha256")?;
+    let replay_result_sha = required_str(observation, "/verifier/replay_result_sha256")?;
     // These values are adapter claims. We can check internal consistency,
     // but the adapter's independent=true field is not proof that another
     // process actually replayed the result.
@@ -256,8 +262,7 @@ pub fn qualify_observation(
 
     let observed_mutations = required_u64(observation, "/state_mutation_count")?;
     let expected_mutations = required_u64(task, "/expected/state_mutation_count")?;
-    let state_must_remain_unchanged =
-        required_bool(task, "/expected/state_must_remain_unchanged")?;
+    let state_must_remain_unchanged = required_bool(task, "/expected/state_must_remain_unchanged")?;
     let failure_containment = observed_mutations == expected_mutations
         && (!state_must_remain_unchanged || observed_mutations == 0)
         && (expected_disposition != "deny" || observed_mutations == 0);
