@@ -1,6 +1,6 @@
 # MACE temporal BM25 and rank-fusion reference baseline v0.1
 
-**Status:** exact-head Rust 1.96 qualification on `5f7357b40114a7c340199cfd8dcfb01bc4ef354e`: temporal BM25/RRF reference **19/19 tests passed**; strict candidate adapter **26/26 tests passed**, `cargo metadata --locked` and strict Clippy passed; paired DSM evaluator **45/45 tests passed**. This is not a production Add/Search service, an external leaderboard reproduction, or a claim of superiority over current memory systems.
+**Status:** exact-head Rust 1.96 qualification on `5f94e56f63627d826c9438ed1b36de03681eb42d`: temporal BM25/RRF reference **19/19 tests passed**; strict candidate adapter **26/26 tests passed**, `cargo metadata --locked` and strict Clippy passed; paired DSM evaluator **45/45 tests passed**. The query work receipt now exposes document-filtering, corpus-statistics and posting phases. This is not a production Add/Search service, an external leaderboard reproduction, or a claim of superiority over current memory systems.
 
 ## Why this exists
 
@@ -27,7 +27,7 @@ The index exposes `resolve_source_event(document_id)`, allowing each returned BM
 
 A query carries `scope_id`, `as_of_ms`, free-text query and `top_k`. A record is eligible only when its scope matches, it was observed no later than the query cut, and its valid-time interval contains that cut.
 
-Crucially, the index partitions documents and term postings by `scope_id`, and orders each partition by `observed_at_ms`. Search resolves the requested scope before traversing any posting list, then uses a binary-search cutoff to exclude records learned after `as_of_ms`. Valid-time filtering follows within that bounded candidate cohort. BM25 corpus statistics (eligible document count, document frequency and average document length) are recomputed over the eligible scope/time cohort. Other tenants and future-observed records are therefore excluded before ranking work, not merely ignored after a global scan. The work receipt reports the eligible cohort, scope/knowledge-bounded posting visits and valid eligible postings actually scored; it does not pretend to report wall-clock or measured hardware cost.
+Crucially, the index partitions documents and term postings by `scope_id`, and orders each partition by `observed_at_ms`. Search resolves the requested scope before traversing any posting list, then uses a binary-search cutoff to exclude records learned after `as_of_ms`. Valid-time filtering follows within that bounded candidate cohort. BM25 corpus statistics (eligible document count, document frequency and average document length) are recomputed over the eligible scope/time cohort. Other tenants and future-observed records are therefore excluded before ranking work, not merely ignored after a global scan. The work receipt now reports distinct algorithmic phases: in-scope knowledge-visible documents checked for valid-time eligibility; eligible document lengths summed for BM25 average-length statistics; distinct query-term posting lookups attempted; scope/knowledge-bounded posting rows visited; eligible posting rows scored; and documents receiving a positive score. These counters make hidden corpus-statistics and eligibility passes visible, but they are operation counts—not wall-clock time, CPU cycles, memory traffic or measured hardware cost.
 
 ## Exact lineage-closure audit
 
