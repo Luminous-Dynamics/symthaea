@@ -356,6 +356,75 @@ impl EpistemicLearner {
         correct as f32 / adjudicated.len() as f32
     }
 
+    /// Mean Brier score over independently adjudicated outcomes only.
+    ///
+    /// Returns None until at least one valid adjudicated probability is available.
+    fn calculate_brier_score(&self) -> Option<f32> {
+        let mut squared_error = 0.0_f64;
+        let mut count = 0_usize;
+
+        for outcome in self.outcomes.iter().filter(|item| item.was_correct.is_some()) {
+            let probability = outcome.predicted_confidence;
+            if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+                continue;
+            }
+            let target = if outcome.was_correct == Some(true) {
+                1.0_f64
+            } else {
+                0.0_f64
+            };
+            let error = f64::from(probability) - target;
+            squared_error += error * error;
+            count += 1;
+        }
+
+        (count > 0).then_some((squared_error / count as f64) as f32)
+    }
+
+    /// Ten-bin expected calibration error over independently adjudicated outcomes.
+    ///
+    /// Each bin contributes its population weight times the absolute difference
+    /// between mean predicted confidence and empirical correctness frequency.
+    /// Pending outcomes and invalid probabilities do not enter either quantity.
+    fn calculate_expected_calibration_error(&self) -> Option<f32> {
+        const BIN_COUNT: usize = 10;
+        let mut counts = [0_usize; BIN_COUNT];
+        let mut confidence_sums = [0.0_f64; BIN_COUNT];
+        let mut correct_counts = [0_usize; BIN_COUNT];
+        let mut total = 0_usize;
+
+        for outcome in self.outcomes.iter().filter(|item| item.was_correct.is_some()) {
+            let probability = outcome.predicted_confidence;
+            if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+                continue;
+            }
+            let bin = ((probability * BIN_COUNT as f32).floor() as usize)
+                .min(BIN_COUNT - 1);
+            counts[bin] += 1;
+            confidence_sums[bin] += f64::from(probability);
+            if outcome.was_correct == Some(true) {
+                correct_counts[bin] += 1;
+            }
+            total += 1;
+        }
+
+        if total == 0 {
+            return None;
+        }
+
+        let weighted_error = (0..BIN_COUNT)
+            .filter(|&bin| counts[bin] > 0)
+            .map(|bin| {
+                let bin_count = counts[bin] as f64;
+                let mean_confidence = confidence_sums[bin] / bin_count;
+                let empirical_accuracy = correct_counts[bin] as f64 / bin_count;
+                (bin_count / total as f64) * (mean_confidence - empirical_accuracy).abs()
+            })
+            .sum::<f64>();
+
+        Some(weighted_error as f32)
+    }
+
     /// Get source credibility for a domain
     pub fn get_source_credibility(&self, domain: &str) -> Option<&SourceCredibility> {
         self.source_credibility.get(domain)
@@ -396,6 +465,8 @@ impl EpistemicLearner {
             adjudicated_outcomes,
             unadjudicated_outcomes: self.outcomes.len() - adjudicated_outcomes,
             accuracy: self.calculate_overall_accuracy(),
+            brier_score: self.calculate_brier_score(),
+            expected_calibration_error: self.calculate_expected_calibration_error(),
             source_count: self.source_credibility.len(),
             domain_count: self.domain_expertise.len(),
             strategy_count: self.strategies.len(),
@@ -456,6 +527,10 @@ pub struct LearnerStats {
     pub unadjudicated_outcomes: usize,
     /// Accuracy over adjudicated outcomes only; 0.5 is the neutral prior when none exist
     pub accuracy: f32,
+    /// Mean Brier score over adjudicated outcomes; None when no valid labels exist
+    pub brier_score: Option<f32>,
+    /// Ten-bin expected calibration error over adjudicated outcomes
+    pub expected_calibration_error: Option<f32>,
     /// Number of tracked sources
     pub source_count: usize,
     /// Number of domains with expertise
@@ -609,6 +684,56 @@ mod tests {
                 .is_some(),
             "pending records must not evict the measured source calibration"
         );
+    }
+
+    #[test]
+    fn proper_scores_use_only_independently_adjudicated_outcomes() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..10 {
+            let correct = index < 8;
+            let outcome = make_outcome("science", "calibration.example", correct)
+                .with_confidence(0.8);
+            learner.record_outcome(outcome).unwrap();
+        }
+        let baseline = learner.stats();
+        assert!((baseline.brier_score.unwrap() - 0.16).abs() < 1e-6);
+        assert!(baseline.expected_calibration_error.unwrap().abs() < 1e-6);
+
+        learner
+            .record_outcome(
+                VerificationOutcome::unadjudicated(
+                    "Pending high-confidence claim",
+                    "calibration.example",
+                    ResearchSource::Web,
+                )
+                .with_confidence(0.99),
+            )
+            .unwrap();
+        let with_pending = learner.stats();
+        assert_eq!(with_pending.brier_score, baseline.brier_score);
+        assert_eq!(
+            with_pending.expected_calibration_error,
+            baseline.expected_calibration_error
+        );
+    }
+
+    #[test]
+    fn calibration_metrics_remain_unknown_without_adjudication() {
+        let mut learner = EpistemicLearner::new();
+        learner
+            .record_outcome(
+                VerificationOutcome::unadjudicated(
+                    "Pending claim",
+                    "pending.example",
+                    ResearchSource::Web,
+                )
+                .with_confidence(0.95),
+            )
+            .unwrap();
+
+        let stats = learner.stats();
+        assert_eq!(stats.brier_score, None);
+        assert_eq!(stats.expected_calibration_error, None);
     }
 
     #[test]
