@@ -132,3 +132,53 @@ Consequently, SDCB should not claim to invent correlated measurement modelling, 
 ## 9. Reproducibility record
 
 Pin the exact dataset/source release, license evidence, raw file digest, timestamp/averaging-window interpretation, candidate action set, covariance matrices, model/policy digest, split manifest, cost budget, all outcomes and actions, exact oracle output, seeds, toolchain, hardware, resource telemetry, failures, abstentions, and receipt references.
+
+
+## 10. Additional industry and SOTA baselines (2026)
+
+### On-device uncertainty propagation: UxHw
+
+Kaparounakis and Stanley-Marbell (Communications Engineering, 13 May 2026) demonstrate processor-native, on-device dynamic uncertainty tracking for sensor outputs affected by quantized stored calibration parameters. They use two commercial FPGA/RISC-V uncertainty-tracking implementations and report 42.9x and 94.4x speedups against equal-accuracy Monte Carlo computation, with average power reported in the paper's abstract as 16.7 mW and 147.15 mW. Their work also evaluates distribution agreement using Wasserstein distance and demonstrates downstream edge-detection and calibration-memory tradeoffs.
+
+This is an important edge-computing comparator, but it solves a different subproblem from SDCB. It propagates uncertainty from calibration-parameter representation through a sensor conversion routine; it does not benchmark causal common-factor attribution or outcome-adaptive reference selection.
+
+For an apples-to-apples edge track, compare:
+- uncertainty-distribution agreement (Wasserstein distance and coverage);
+- latency and energy per sensor output;
+- memory overhead and quantization sensitivity;
+- calibration-parameter and model uncertainty propagation;
+- effect of uncertainty on downstream decisions;
+- extension from one calibrated device to a correlated network with shared/local latent factors.
+
+Use the open measurement data/code associated with the paper where licensing and access permit. Do not present the published speedups as a direct SDCB comparison without matching hardware, workload and accuracy criteria.
+
+Paper: https://doi.org/10.1038/s44172-026-00679-4  
+Article/data/code links: https://pmc.ncbi.nlm.nih.gov/articles/PMC13396527/
+
+### Digital metrological twins and self-calibrating networks
+
+Dos Reis et al. (Measurement, 30 January 2026) propose traceable self-calibrating networks for non-removable hydraulic sensors. Their conceptual architecture combines fixed and mobile standards, semi-blind in-situ calibration, edge intelligence, cloud high-fidelity models, and digital metrological twins for SI-traceable uncertainty propagation. The article states that no data were used.
+
+This is close to the system-level deployment direction. It means that a "self-calibrating sensor network" or "digital metrology twin" alone is not a defensible novelty claim. SDCB should add testable decision and assurance behavior: select which standard to deploy, identify shared ancestry, quantify what the network cannot identify, preserve the evidence chain, and qualify the resulting belief transition.
+
+Paper: https://doi.org/10.1016/j.measurement.2025.119196
+
+### Short mobile collocation and unequal averaging windows
+
+Kok and Tabandeh (Quality and Reliability Engineering International, first published 16 July 2026) analyse a fast sensor collocated briefly with a slower reference instrument while the measurand varies. They derive variance/covariance expressions for Gaussian-process averages and introduce corrected generalized distance regression (C-GDR). Their study reports that OLS can work when reference uncertainty is much smaller, while C-GDR can outperform alternatives as uncertainties become more comparable and process variation grows. The paper says supporting data are available from the corresponding author on reasonable request, so this is not automatically an open downloadable benchmark.
+
+Reproduce the published six-scenario comparison with author-provided data or a fully disclosed synthetic reconstruction clearly labelled as such. Compare OLS, GDR variants, C-GDR, and the full-covariance SDCB model on both calibration error and 95% interval coverage.
+
+Paper: https://doi.org/10.1002/qre.70319
+
+### Correlated-noise optimal design
+
+Qi and Baker (Mathematical Biosciences, February 2026) compare IID and Ornstein–Uhlenbeck-correlated observation noise for optimal observation scheduling. They use Fisher-information and Sobol-index sensitivity measures and report that noise correlation can substantially change optimal observation times.
+
+This should be an explicit design-policy reproduction track:
+- match their process model and observation schedules;
+- reproduce IID and OU covariance settings;
+- compare their sensitivity-based design objectives with A-, D-, and c-optimal Gaussian designs;
+- then test whether a common-cause/decision-aware policy improves the same declared target under identical measurement costs.
+
+Paper: https://doi.org/10.1016/j.mbs.2025.109571
