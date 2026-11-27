@@ -40,11 +40,13 @@ config="$(jq -n \
     "publication.name":"mon025_pub",
     "publication.autocreate.mode":"disabled",
     "table.include.list":"public.ledger",
+    "message.prefix.include.list":"mon025_transaction",
     "snapshot.mode":"initial",
     "tombstones.on.delete":"false",
     "provide.transaction.metadata":"true",
     "heartbeat.interval.ms":"1000",
     "decimal.handling.mode":"string",
+    "binary.handling.mode":"base64",
     "include.schema.changes":"true"
   }')"
 
@@ -54,6 +56,6 @@ curl -fsS -X PUT \
   -H 'Content-Type: application/json' \
   --data "$config" \
   "$CONNECT_URL/connectors/$CONNECTOR_NAME/config" >"$response"
-jq -e '.["connector.class"] == "io.debezium.connector.postgresql.PostgresConnector" and .["slot.name"] == "'"$SLOT_NAME"'"' "$response" >/dev/null
-echo "Registered $CONNECTOR_NAME against $PG_SERVICE. Connector task state still requires independent inspection."
+jq -e '.["connector.class"] == "io.debezium.connector.postgresql.PostgresConnector" and .["slot.name"] == "'"$SLOT_NAME"'" and .["message.prefix.include.list"] == "mon025_transaction" and .["provide.transaction.metadata"] == "true"' "$response" >/dev/null
+echo "Registered $CONNECTOR_NAME against $PG_SERVICE with transaction metadata and the bounded MON-025 logical-message prefix. Connector task state still requires independent inspection."
 curl -fsS "$CONNECT_URL/connectors/$CONNECTOR_NAME/status" | jq .
