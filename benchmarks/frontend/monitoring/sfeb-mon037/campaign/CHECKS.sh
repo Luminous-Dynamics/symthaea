@@ -14,6 +14,9 @@ jq -e '
  and .surface_inventory_complete==true
  and (.source_events|length)==(.observed_events|length)
  and (.source_events[0].data_collection|length)>0
+ and (.recovery_boundary.claim_id=="claim-cdc")
+ and (.recovery_boundary.scope_digest|length)==64
+ and (.recovery_boundary.inventory_digest|length)==64
 ' "$ROOT/INPUT-example.json" >/dev/null
 
 TMP="$(mktemp -d)"
