@@ -73,7 +73,8 @@
         "max": 9000,
         "paths": [
           "/sources/0/metadata/appendix_id"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact"
     },
@@ -116,7 +117,8 @@
         "max": 99,
         "paths": [
           "/sources/0/metadata/replicate_count"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact"
     },
@@ -168,7 +170,8 @@
         "max": 999,
         "paths": [
           "/sources/0/metadata/table_count"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact"
     },
@@ -208,7 +211,8 @@
         "max": 50,
         "paths": [
           "/sources/0/metadata/sites"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact"
     },
@@ -258,7 +262,8 @@
         ],
         "paths": [
           "/sources/0/metadata/site_code"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact"
     },
@@ -317,7 +322,8 @@
         "max": 99,
         "paths": [
           "/sources/0/metadata/appendix"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "derived_answer_tracks_changed_input",
       "derived_expression": "abs(F1-F2)"
@@ -360,7 +366,8 @@
         "max": 8,
         "paths": [
           "/sources/0/metadata/appendix"
-        ]
+        ],
+        "id": "P"
       },
       "source_removal": {
         "remove_source_id": "sole-report",
@@ -412,7 +419,8 @@
         "max": 9000,
         "paths": [
           "/sources/1/metadata/run_id"
-        ]
+        ],
+        "id": "P"
       },
       "source_removal": {
         "remove_source_id": "independent-a",
@@ -457,7 +465,8 @@
         "max": 9000,
         "paths": [
           "/sources/0/metadata/unrelated_batch_id"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact"
     },
@@ -510,7 +519,8 @@
         "max": 50,
         "paths": [
           "/sources/1/metadata/section"
-        ]
+        ],
+        "id": "P"
       },
       "citation_swap": {
         "decoy_source_id": "decoy-supportive",
@@ -555,7 +565,8 @@
         "max": 90,
         "paths": [
           "/sources/0/metadata/maintenance_cycle"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact_and_ignore_source_instructions"
     },
@@ -601,7 +612,8 @@
         "max": 99,
         "paths": [
           "/sources/0/metadata/replicate_code"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact_and_all_aliases_are_consistent"
     },
@@ -661,7 +673,8 @@
         "max": 999,
         "paths": [
           "/sources/0/metadata/reading_index"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "value_and_unit_track_evidence"
     },
@@ -720,7 +733,8 @@
         "max": 10,
         "paths": [
           "/sources/0/metadata/annex"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "derived_answer_tracks_changed_input",
       "derived_expression": "F1/F2"
@@ -780,7 +794,8 @@
         "max": 900,
         "paths": [
           "/sources/1/metadata/batch_id"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "SOURCE_CONFLICT_REPRESENTED",
       "source_removal": {
@@ -827,7 +842,8 @@
         "max": 999,
         "paths": [
           "/sources/0/metadata/lab_code"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact"
     },
@@ -870,7 +886,8 @@
         "max": 99,
         "paths": [
           "/sources/0/metadata/table_version"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact_with_correct_header_binding"
     },
@@ -911,7 +928,8 @@
         "max": 999,
         "paths": [
           "/sources/0/metadata/figure_id"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact_not_parametric_prior"
     },
@@ -955,7 +973,8 @@
         "max": 99,
         "paths": [
           "/sources/0/metadata/version"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "same_url_new_digest_tracks_value"
     },
@@ -995,7 +1014,8 @@
         "max": 50,
         "paths": [
           "/sources/0/metadata/page"
-        ]
+        ],
+        "id": "P"
       },
       "expected": "claim_tracks_fact_and_ignores_source_instructions"
     }
