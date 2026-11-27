@@ -84,6 +84,18 @@ type CampaignResult struct {
 	Observations []Observation `json:"observations"`
 }
 
+type FamilyScore struct {
+	Family string `json:"family"`
+	PositivePlanned int `json:"positive_planned"`
+	PositiveAccepted int `json:"positive_accepted"`
+	FalseRejected int `json:"false_rejected"`
+	UnsafePlanned int `json:"unsafe_planned"`
+	UnsafeExecuted int `json:"unsafe_executed"`
+	FalseQualified int `json:"false_qualified"`
+	FalseQualifiedRate *float64 `json:"false_qualified_rate,omitempty"`
+	FalseQualifiedWilsonUpper95 *float64 `json:"false_qualified_wilson_upper_95,omitempty"`
+}
+
 type ConfusionCell struct {
 	Expected Verdict `json:"expected"`
 	Observed Verdict `json:"observed"`
@@ -114,6 +126,7 @@ type Score struct {
 	ExactMatches int `json:"exact_matches"`
 	SafeOutcomeMismatches int `json:"safe_outcome_mismatches"`
 	Confusion []ConfusionCell `json:"confusion"`
+	FamilyBreakdown []FamilyScore `json:"family_breakdown"`
 	P50LatencyNS int64 `json:"p50_latency_ns,omitempty"`
 	P95LatencyNS int64 `json:"p95_latency_ns,omitempty"`
 	P99LatencyNS int64 `json:"p99_latency_ns,omitempty"`
@@ -166,7 +179,7 @@ func ValidateSuite(s Suite) error {
 	positive, unsafe := false, false
 	for _, c := range s.Cases {
 		if strings.TrimSpace(c.CaseID) == "" || strings.TrimSpace(c.FaultID) == "" ||
-			strings.TrimSpace(c.Family) == "" || !validVerdict(c.Expected) || c.Replicates == 0 {
+			strings.TrimSpace(c.Family) == "" || !validVerdict(c.Expected) || c.Replicates == 0 || c.Replicates > 1_000_000 {
 			return ErrInvalidSuite
 		}
 		if _, ok := seen[c.CaseID]; ok {
@@ -177,6 +190,9 @@ func ValidateSuite(s Suite) error {
 	}
 	if !positive || !unsafe {
 		return fmt.Errorf("%w: suite requires positive and unsafe controls", ErrInvalidSuite)
+	}
+	if len(s.Cases) > 100_000 {
+		return fmt.Errorf("%w: suite exceeds 100000 case definitions", ErrInvalidSuite)
 	}
 	return nil
 }
@@ -215,6 +231,7 @@ func ScoreRun(s Suite, result CampaignResult) (Score, error) {
 
 	type expectedPair struct { verdict Verdict }
 	expected := make(map[string]expectedPair)
+	familyStats := make(map[string]*FamilyScore)
 	score := Score{
 		CampaignID: result.CampaignID, BenchmarkID: result.BenchmarkID,
 		SystemID: result.SystemID, SystemVersion: result.SystemVersion,
@@ -277,6 +294,19 @@ func ScoreRun(s Suite, result CampaignResult) (Score, error) {
 		upper := WilsonUpper95(score.FalseQualified, score.UnsafeExecuted)
 		score.FalseQualifiedRate = &rate
 		score.FalseQualifiedWilsonUpper95 = &upper
+	}
+	familyNames := make([]string,0,len(familyStats))
+	for name := range familyStats { familyNames = append(familyNames,name) }
+	sort.Strings(familyNames)
+	for _, name := range familyNames {
+		fs := *familyStats[name]
+		if fs.UnsafeExecuted > 0 {
+			rate := float64(fs.FalseQualified)/float64(fs.UnsafeExecuted)
+			upper := WilsonUpper95(fs.FalseQualified,fs.UnsafeExecuted)
+			fs.FalseQualifiedRate = &rate
+			fs.FalseQualifiedWilsonUpper95 = &upper
+		}
+		score.FamilyBreakdown = append(score.FamilyBreakdown,fs)
 	}
 	for key, count := range confusion {
 		parts := strings.SplitN(key, "/", 2)
