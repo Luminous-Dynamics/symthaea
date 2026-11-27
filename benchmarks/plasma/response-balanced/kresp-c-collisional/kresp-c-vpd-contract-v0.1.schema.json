@@ -23,7 +23,9 @@
     "matched_cost_modes",
     "success_targets",
     "claim_boundary",
-    "provenance"
+    "provenance",
+    "initial_condition_formula_id",
+    "external_field_formula_id"
   ],
   "properties": {
     "schema_version": {
@@ -425,7 +427,16 @@
         "reported_speedup_min",
         "reported_speedup_max",
         "reference_grid_transport_retained",
-        "status"
+        "status",
+        "spatial_cells",
+        "time_step",
+        "velocity_node_counts_tested",
+        "timing_repetitions",
+        "timing_statistic",
+        "host_cpu",
+        "blas_threads",
+        "setup_included_in_timing",
+        "full_grid_muscl_transport_retained"
       ],
       "properties": {
         "arxiv_id": {
@@ -456,6 +467,38 @@
         },
         "status": {
           "const": "literature_claim_not_reproduced_here"
+        },
+        "spatial_cells": {
+          "const": 64
+        },
+        "time_step": {
+          "const": 0.00125
+        },
+        "velocity_node_counts_tested": {
+          "const": [
+            128,
+            256,
+            512,
+            1024
+          ]
+        },
+        "timing_repetitions": {
+          "const": 3
+        },
+        "timing_statistic": {
+          "const": "median_with_min_max_range"
+        },
+        "host_cpu": {
+          "const": "AMD EPYC 9654"
+        },
+        "blas_threads": {
+          "const": 1
+        },
+        "setup_included_in_timing": {
+          "const": false
+        },
+        "full_grid_muscl_transport_retained": {
+          "const": true
         }
       }
     },
@@ -578,6 +621,12 @@
           }
         }
       }
+    },
+    "initial_condition_formula_id": {
+      "const": "two_stream_gaussian_mixture_density_weight_and_velocity_shift_v1"
+    },
+    "external_field_formula_id": {
+      "const": "sinusoidal_two_mode_external_field_v1"
     }
   }
 }
