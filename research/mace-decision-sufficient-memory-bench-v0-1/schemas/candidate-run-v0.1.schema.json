@@ -61,15 +61,5 @@
         "maxLength": 256
       }
     }
-  },
-  "allOf": [
-    {
-      "properties": {
-        "decision_support_evidence_ids": {
-          "items": {}
-        }
-      },
-      "description": "Every decision-support ID must be a member of retrieved_evidence_ids; enforce this cross-field subset rule in the Rust scorer."
-    }
-  ]
+  }
 }
