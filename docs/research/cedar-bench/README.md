@@ -16,12 +16,12 @@ The benchmark is motivated by Abbas, Zia and Windridge, “Cited but Unused: Par
 
 ## Separation of duties
 
-The generator uses CEDAR_BENCH_SEED (minimum 32 bytes). Do not expose it to the candidate. It emits:
+The generator uses CEDAR_BENCH_SEED (minimum 32 bytes with high entropy). Do not expose it to the candidate. It emits:
 
 - candidate JSONL: one randomized trial per condition, with only prompt and source bundle;
 - auditor JSONL: condition labels, generated values, source digests and expected behavior.
 
-Store auditor output separately from the candidate environment. Do not upload generated auditor keys to public CI artifacts. The static CI test uses a non-secret fixture seed and verifies structure only.
+Store auditor output separately from the candidate environment. Do not upload generated auditor keys to public CI artifacts. The static CI test verifies template structure only; do not use a public fixed seed for a scored evaluation.
 
 ## Conditions
 
