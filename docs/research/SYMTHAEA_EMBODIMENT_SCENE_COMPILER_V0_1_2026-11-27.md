@@ -66,6 +66,32 @@ Essential state must be communicated through shape and text, not colour alone, a
 - Ten authored Rust regression tests cover deterministic compilation, all seven forms, reduced motion, privacy-aware accessibility and no raw-reference disclosure, uncertainty branching, evidence-status honesty, channel mismatch, and modified-payload rejection.
 - The tests are authored, not compiled or executed. No Bevy renderer, frame timing, accessibility user study, or hardware profiling is claimed.
 
+## Bevy adapter source
+
+An isolated package now lives at `renderers/symthaea-soma-bevy/`, pinned to
+Bevy `=0.20.1` with the `2d` feature. It is a separate Cargo workspace and
+does not add Bevy to Soma or upgrade the existing Bevy 0.15/0.18 applications.
+
+The adapter accepts only a scene frame, its opaque permit and a matching
+`Authorized` receipt. It verifies the event, grant, cue digest, output channel,
+form, privacy, intensity, motion, clock and expiry fields. Each update it
+requires a fresh host-supplied source clock and rechecks the live policy; a
+missing policy resource, stale clock, changed permit or expiry hides/rejects
+the scene. Unweighted primitives use the authorized global intensity, and
+zero intensity hides them.
+
+Five adapter Rust tests are authored for clock regression, exact expiry,
+cross-domain rejection, intensity clamping and zero-intensity output. The
+adapter has not been built or run, and no compositor observation has been
+integrated. The adapter acknowledgement means ECS entities were accepted and
+queued; it is not a Submitted receipt until the host records the acknowledgement,
+and it is not an Observed receipt until a qualified compositor observer reports
+the output.
+
+No `Cargo.lock` has been generated because Cargo is unavailable in the current
+environment. The exact Bevy dependency version is pinned in the manifest, but
+the transitive dependency graph still needs a reviewed committed lockfile.
+
 ## Next renderer integration
 
 The Bevy adapter should:
