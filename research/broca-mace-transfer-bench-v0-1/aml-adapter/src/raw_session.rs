@@ -12,6 +12,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+use crate::{is_lower_sha256, FORMAL_TOP_K};
+
 use super::{
     add_payload_digest, chunk_textual_messages, AddRequest, FrozenAdapterWordCounter, Message,
     MessageContent, Role, TextualChunkPlan, Track,
