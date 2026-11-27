@@ -66,25 +66,6 @@ The strict case schema is at schemas/mel-music-listen-bench-case-v1.schema.json.
 The synthetic case deliberately includes one wrong CLEAN answer and one unparseable FLIP answer, uses a reversed A/B semantic mapping in one variant, and contains two source lineages. Its metrics are adapter-plumbing checks only. Audio bytes are not fetched or rehashed, model inference is not invoked, and transformation authenticity is not established.
 
 
-## Performance-invariant musical identity
-
-The performance_invariance module extends (but does not change) the official MusicListenBench v1.0 CLEAN/FLIP/STAY protocol. Its three variants are CLEAN, Performance-STAY and Musical-FLIP. Each case declares one exact target property: chord quality, root pitch class, chord voicing, relative interval sequence, melodic contour, rhythmic ratio pattern, pulse rate or instrument family.
-
-Performance-STAY factors are task-scoped. Examples:
-- global transposition can be STAY for relative interval sequence or chord quality, but not for root pitch class;
-- chord inversion may preserve chord quality/root but changes voicing;
-- uniform tempo scaling may preserve rhythmic ratios but changes pulse rate;
-- cross-renderer is not admitted as a STAY for instrument-family identity.
-
-The adapter requires CLEAN and Musical-FLIP to share one performance-condition digest; Performance-STAY must bind a distinct performance condition. It recomputes question digests, normalizes the selected A/B option to a semantic Same/Different relation using the shared MusicListenBench helper, and reports performance-STAY false-difference rates separately from Musical-FLIP miss rates.
-
-Run the synthetic six-target audit:
-
-    cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-performance-invariance-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-performance-invariance.synthetic.json
-
-This evaluator scores supplied answers only. Performance-condition, source-work, composition and annotation digests remain self-reported metadata until verified by the owning evidence/rights systems. The six-case fixture is a plumbing test, not a model result, musician study or confirmatory statistic. Acoustic-only nuisance transforms (room, EQ, hiss) remain in the official MusicListenBench/generic acoustic-invariance programme; they are not reclassified as performance variation here.
-
-
 ## Performance-invariant musical identity (MEL-HEAR-002)
 
 The `performance_invariance` module is a separate extension to the official MusicListenBench v1.0 evaluator. It preserves the official CLEAN/FLIP/STAY contract and adds its own CLEAN / Performance-STAY / Musical-FLIP triad. Each triad names exactly one target property:
@@ -106,4 +87,6 @@ Run the synthetic six-target fixture:
 
     cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-performance-invariance-audit -- tools/mel-temporal-grounding-qualifier/fixtures/mel-performance-invariance.synthetic.json
 
-The fixture is an evaluator plumbing control, not evidence about model capability. Performance-condition, source-work, composition and annotation references are supplied metadata; this evaluator does not authenticate them, read audio bytes, or invoke a model. Real-data analysis must be performer-, composition- and source-work-disjoint and rights-approved.
+The case explicitly labels its split as SyntheticRendered, PublicRealRecordingEvaluationOnly or MusicianRecordedConfirmatory; do not pool these splits. It also binds a source-permissions manifest digest consumed from the existing rights registry. The report sets source_permission_receipts_authenticated=false: this digest is not verified by this adapter.
+
+The fixture is an evaluator plumbing control, not evidence about model capability. Performance-condition, source-work, composition, annotation and permission references are supplied metadata; this evaluator does not authenticate them, read audio bytes, or invoke a model. Real-data analysis must be performer-, composition- and source-work-disjoint and rights-approved.
