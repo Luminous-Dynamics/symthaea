@@ -516,6 +516,9 @@ pub fn deliver_delayed_aci_feedback_v1(
             reasons.push(DelayedAciReasonV1::DownstreamConsumptionNotAllowed);
         }
     }
+    if report.training_snapshot_mutated || report.equipment_control_authority {
+        reasons.push(DelayedAciReasonV1::DownstreamConsumptionNotAllowed);
+    }
     if report.label_id != delivery.label_id {
         reasons.push(DelayedAciReasonV1::LabelIdentityMismatch);
     }
@@ -533,6 +536,14 @@ pub fn deliver_delayed_aci_feedback_v1(
     }
 
     if let Some(prediction) = prediction {
+        if prediction_digest(prediction)? != prediction.prediction_receipt_sha256 {
+            reasons.push(DelayedAciReasonV1::PredictionSchemaMismatch);
+        }
+        if prediction.global_model_artifact_sha256 != engine.global_model_artifact_sha256
+            || prediction.calibration_model_sha256 != engine.calibration_model_sha256
+        {
+            reasons.push(DelayedAciReasonV1::PredictionSchemaMismatch);
+        }
         if prediction.measurement_event_id != delivery.measurement_event_id {
             reasons.push(DelayedAciReasonV1::MeasurementEventMismatch);
         }
@@ -763,7 +774,19 @@ mod tests {
             delivered_at_unix_seconds: delivered,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: format!("{label_id}:{revision}"),
-            eligibility_report: report(label_id, revision, event, &payload, status, frontier),
+            eligibility_report: {
+            let mut eligibility = report(
+                label_id,
+                revision,
+                event,
+                &payload,
+                status,
+                frontier,
+            );
+            eligibility.qualified_corrected_value = label_value;
+            eligibility.report_sha256 = report_digest(&eligibility).unwrap();
+            eligibility
+        },
         }
     }
 
@@ -941,6 +964,7 @@ mod tests {
     fn alpha_is_projected_to_unit_interval() {
         let mut engine = engine();
         engine.current_alpha = 0.99;
+        engine.policy.learning_rate = 1.0;
         let input = prediction("s1", "e1", 100, 102, 0.99);
         register_delayed_aci_prediction_v1(&mut engine, &input).unwrap();
         let d = delivery("s1", "e1", "l1", 1, LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy, LabelEvidenceFrontierV1::CurrentAtK1, 10.5, 110, 111, 112);
