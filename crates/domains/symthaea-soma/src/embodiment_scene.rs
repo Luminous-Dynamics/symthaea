@@ -10,7 +10,7 @@
 //! must not rewrite their semantic key, provenance, or accessible description.
 
 use super::embodiment_event::{EventSource, EpistemicStatus, EventKind, PrivacyClass, TurnState};
-use super::embodiment_policy::{MotionMode, OutputChannel, OutputDestination, PresentationPermit};
+use super::embodiment_policy::{canonical_cue_digest, MotionMode, OutputChannel, OutputDestination, PresentationPermit};
 use super::embodiment_projection::{CanonicalCue, EmbodimentForm, SemanticCue};
 use serde::{Deserialize, Serialize};
 
@@ -105,6 +105,7 @@ pub enum SceneCompileError {
     WrongSource,
     WrongPrivacyClass,
     WrongEventExpiry,
+    CueContentMismatch,
     RestrictedPrivacy,
     SensitiveDestinationNotPrivate,
     InvalidPermitIntensity,
@@ -139,6 +140,11 @@ pub fn compile_scene(
     }
     if cue.semantic.semantic_key() != permit.semantic_key() {
         return Err(SceneCompileError::WrongSemanticKey);
+    }
+    let cue_digest = canonical_cue_digest(cue)
+        .map_err(|_| SceneCompileError::CueContentMismatch)?;
+    if cue_digest != permit.cue_digest() {
+        return Err(SceneCompileError::CueContentMismatch);
     }
     if cue.source != *permit.source() {
         return Err(SceneCompileError::WrongSource);
@@ -447,6 +453,26 @@ mod tests {
         assert!(frame.elements.iter().any(|element| element.role == SceneRole::Evidence && element.weight.is_none()));
         assert!(frame.accessible_description.contains("Evidence status reported"));
         assert!(frame.accessible_description.contains("verifier receipt reference is present"));
+    }
+
+    #[test]
+    fn payload_mutation_with_the_same_semantic_key_is_rejected() {
+        let (canonical, permit) = fixture(
+            EmbodimentForm::LivingConstellation,
+            PrivacyClass::Public,
+            SemanticCue::AttentionFocus {
+                target: "original-target".to_owned(),
+                strength: Some(0.4),
+            },
+        );
+        let mut altered = canonical.clone();
+        if let SemanticCue::AttentionFocus { target, .. } = &mut altered.semantic {
+            *target = "tampered-target".to_owned();
+        }
+        assert_eq!(
+            compile_scene(&altered, &permit),
+            Err(SceneCompileError::CueContentMismatch)
+        );
     }
 
     #[test]
