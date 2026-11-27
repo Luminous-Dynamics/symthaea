@@ -99,6 +99,7 @@ impl MaceSerializedProviderRequestV1 {
 pub enum MaceExposureCaptureRejectV1 {
     InvalidIdentifier,
     InvalidDigest,
+    EmptyModel,
     ModelRevisionMismatch,
     EmptyMessages,
     TooManyMessages,
@@ -163,6 +164,9 @@ pub fn serialize_mace_provider_request_with_exposure_map_v1(
     request: &MaceProviderNeutralRequestV1,
     arm: MaceMemoryArmV1,
 ) -> Result<MaceSerializedProviderRequestV1, MaceExposureCaptureRejectV1> {
+    if request.model.trim().is_empty() {
+        return Err(MaceExposureCaptureRejectV1::EmptyModel);
+    }
     validate_identifier(&request.model)?;
     if request.messages.is_empty() {
         return Err(MaceExposureCaptureRejectV1::EmptyMessages);
