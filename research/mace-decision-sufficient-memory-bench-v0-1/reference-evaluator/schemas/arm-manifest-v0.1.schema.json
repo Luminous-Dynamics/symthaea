@@ -21,6 +21,11 @@
         "minLength": 1,
         "maxLength": 160
       }
+    },
+    "no_memory_arm_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
     }
   }
 }
