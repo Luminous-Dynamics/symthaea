@@ -80,6 +80,39 @@ Primary sources:
 - DISCERN evidence-to-hypothesis paper and immutable reproducibility release: https://arxiv.org/abs/2609.33357 and https://huggingface.co/datasets/discern-bench-anon/discern-benchmark
 - Terminal-Bench Science official/public results aggregation: https://www.openresearch.sh/evals
 
+### 2B. 27 November evidence-dependence and scientific-fidelity update
+
+Three additional results sharpen the design. They reinforce that the next competitive boundary is not a better prose answer: it is whether a system can preserve method fidelity, prove that it used the cited evidence, and complete a task under an independently measured outcome.
+
+| External reference | Reported result | Design implication for Symthaea | Qualification |
+|---|---|---|---|
+| Autonomous Science Bench 0.1 | Six live-lab tasks, three trials per task; GPT-6 Astra/Codex 72.2% (13/18), Opus 5.5/Claude Code 66.7% (12/18). The report gives total configuration costs of $190 and $173 respectively | Add a real closed-loop track with independent measurements, discovery and learning gates; record cost per solved task and outcome quality | Six tasks × three trials is a pilot, and the benchmark authors warn small differences are not meaningful yet. This is not a broad industry ranking |
+| SciConBench | A published preprint reports best-agent factual F1 of 0.337 for scientific conclusion synthesis. The live project page reports 185 reviews and about 9.20K samples in its October 2026 update | Measure synthesis fact-level precision/recall and completeness using fresh, human-reviewed samples; benchmark conclusions rather than code execution alone | The 0.337 figure is paper-reported for its task/harness. It is not interchangeable with DISCERN or LifeSciBench; the live set and fixed core should be reported separately |
+| ABE-Ralph experimental-fidelity audit | 30 long-horizon reproduction runs across 12 ML domains; authors report 93% robust execution and five categories of methodological failure. On 23 NatureBench discovery tasks it matched or exceeded SOTA on five | Make method fidelity a first-class score: exact dataset, preprocessing, baseline, compute budget, required component and metric; success requires that the run actually test the paper's claim | These are results reported by the paper's authors. Robust execution is not the same as validated scientific discovery |
+| Counterfactual provenance in RAG | A November 2026 study reports 1.2–15.7% of citable claims derive from parametric memory rather than retrieved context in its tested settings; its NLI verification baseline was indistinguishable from chance in that setup | Separate passage support from evidence use. This is the motivation for CEDAR-Bench's paired counterfactual, placebo and source-removal controls | One study and model families; not a universal prevalence estimate. The paper explicitly says its detector is not yet accurate enough to act as a standalone policy signal |
+| AI-scientist lifecycle survey | Review of 883 eligible works (253 deeply analysed) finds uneven maturity: repeatable gains in retrieval-grounded research and ML engineering, but open-ended ideation, end-to-end discovery and trustworthy reporting remain fragile | Prioritize evidence integrity, replay, outcome verification and correction reach rather than adding more autonomous planning layers | Survey's own coding protocol and publication cutoff matter; do not treat its aggregate taxonomy as a direct model leaderboard |
+
+Primary references:
+- Autonomous Science Bench 0.1 scope, leaderboard, task count, costs and small-sample caveat: https://asb.open-ssi.org/about
+- SciConBench overview, factual-F1 result and October 2026 update: https://sciconbench.cs.princeton.edu/
+- ABE-Ralph, *Beyond Execution: Auditing Experimental Fidelity in LLM-Driven Scientific Research*: https://arxiv.org/abs/2608.26753
+- Counterfactual RAG provenance, *Cited but Unused*: https://arxiv.org/abs/2611.17161
+- Lifecycle survey, *Large Language Model Agents for Autonomous Scientific Research*: https://www.mdpi.com/3043-0097/1/2/8
+
+### Competitive positioning and scorecard
+
+Do not claim one universal scientific-agent SOTA. Compare each capability against its native evaluation and publish an independent profile:
+
+- **Evidence retrieval and support:** native WebResearcher/claim-source relation tasks. Report claim-source precision/recall, citation swap detection, counterfactual evidence dependence and unsupported-answer rate.
+- **Scientific conclusion synthesis:** SciConBench fixed-core and rolling panels. Proposed stretch: factual F1 ≥0.40 on the same fixed core, with the lower 95% confidence bound above the matched reference; human-audited critical errors reported separately.
+- **Workflow completion:** FrontierChallenge and SCI-AGENT-EXAM. Keep full-pass and Pass@0.95 separate; a completion declaration is admissible only when every required artifact/verifier gate has a receipt.
+- **Research execution and learning:** Autonomous Science Bench. Treat the current 18-trial pool as a pilot; proposed stretch is ≥15/18 matched trial resolutions with no task below 2/3, but require a larger confirmatory task set before claiming a statistically stable lead.
+- **Method fidelity:** ABE-Ralph-style audit. Require 100% accounting for named dataset versions, preprocessing, baseline, compute, required architecture and metrics; any undeclared substitution is a hard failure even if the resulting score looks strong.
+- **Evidence lifecycle:** REPAIR-Bench and CEDAR-Bench. Target ≥98% dependency recall, ≥95% attribution precision, ≥98% placebo stability, zero silent retention of a known-invalidated sole-support conclusion, and complete event/denominator accounting.
+- **Artifact fidelity:** Scientific Artifact Intake. Require exact raw digest, parser/config digest, byte-span correctness and resource-cap receipts for every observation admitted to analysis.
+
+These are proposed stretch targets, not measured results. For confirmatory claims, freeze the official task release, model, harness, judge/verifier, trial count, prompt, tools and budgets; run at least three seeds for stochastic tasks; report all attempts, refusals, timeouts and exclusions; and use bootstrap or clustered confidence intervals at the task/source-family level. A lead is credible only when the lower confidence bound beats the matched baseline and critical-error rates do not worsen.
+
 ### Completion-calibration targets for the new workflow benchmarks
 
 These are proposed Symthaea stretch targets, not observed performance. They are meaningful only under the exact same pinned task release, model, tool permissions, judge/verifier versions, trial count and budget envelope as the reference run:
@@ -110,11 +143,11 @@ Use AutoSciBench-style task recipes to generate *new sealed variants* from vette
 
 ## Artifact-native research follow-up
 
-The WebResearcher content extractor remains HTML-oriented; its numeric-series helper is line-based and explicitly does not parse units. The acquisition receipt is an integrity record for captured content, not a typed scientific-artifact parser or a stable table/cell/page locator. [Issue #undefined](https://github.com/Luminous-Dynamics/symthaea/issues/undefined) now owns the staged artifact-intake contract: immutable raw bytes, parser/configuration receipts, typed source locations, and explicit unsupported/malformed outcomes. It composes with #13854 acquisition, #12471 method execution and #13796 claim/source relation adjudication; it does not introduce a second planner or evidence ledger.
+The WebResearcher content extractor remains HTML-oriented; its numeric-series helper is line-based and explicitly does not parse units. The acquisition receipt is an integrity record for captured content, not a typed scientific-artifact parser or a stable table/cell/page locator. [Issue #13900](https://github.com/Luminous-Dynamics/symthaea/issues/undefined) now owns the staged artifact-intake contract: immutable raw bytes, parser/configuration receipts, typed source locations, and explicit unsupported/malformed outcomes. It composes with #13854 acquisition, #12471 method execution and #13796 claim/source relation adjudication; it does not introduce a second planner or evidence ledger.
 
 ## Longitudinal evidence correction: REPAIR-Bench
 
-Static benchmark snapshots do not test whether a later source, dataset, parser or method correction reaches every dependent analysis and claim. The new [REPAIR-Bench research issue #undefined](https://github.com/Luminous-Dynamics/symthaea/issues/undefined) defines a two-phase evaluation: establish a reproducible baseline evidence graph, then inject a sealed correction/update event and measure detection, dependency closure, documented reassessment, correct changed/unchanged decisions, stale-use and collateral invalidation.
+Static benchmark snapshots do not test whether a later source, dataset, parser or method correction reaches every dependent analysis and claim. The new [REPAIR-Bench research issue #13900](https://github.com/Luminous-Dynamics/symthaea/issues/undefined) defines a two-phase evaluation: establish a reproducible baseline evidence graph, then inject a sealed correction/update event and measure detection, dependency closure, documented reassessment, correct changed/unchanged decisions, stale-use and collateral invalidation.
 
 This extends (but does not claim novelty over) the published Correction Reach construct, which measures documented reassessment of dependent assertions after correction events. Its November 2026 feasibility pilot illustrates the gap, but is small and not a prevalence estimate. REPAIR-Bench adds computational artifact, parser, analysis and method dependencies, plus replay and resource-accounting tests. It composes with #13900 artifact intake, #13792 claim provenance, #13796 relation adjudication, #12471 method execution and #13818 independent audit; it is not another evidence ledger or research engine.
 
@@ -122,6 +155,10 @@ Primary references:
 - Correction Reach (11 Nov 2026): https://doi.org/10.3390/publications14040078
 - Scientific knowledge graphs and dynamic evidence (2026): https://doi.org/10.1093/nsr/nwag140
 - Functionality–Evidence–Validation framework for agentic bioinformatics (25 Nov 2026): https://doi.org/10.1093/bib/bbag650
+
+## Counterfactual evidence dependence: CEDAR-Bench
+
+Citation support does not prove that a system used the cited source. [CEDAR-Bench issue #13993](https://github.com/Luminous-Dynamics/symthaea/issues/13993) and [draft PR #13996](https://github.com/Luminous-Dynamics/symthaea/pull/13996) add a 20-template synthetic corpus with paired baseline, counterfactual, placebo and source-removal trials. Candidate inputs and auditor keys are generated to separate files from an out-of-band seed. This track is motivated by the parametric-provenance finding above; its operational labels measure behavior under interventions, not hidden model state or world truth. Keep its scores separate from DISCERN, LifeSciBench and REPAIR-Bench.
 
 ## 3. Benchmark architecture
 
