@@ -146,6 +146,10 @@ Metrics:
 - Separate selected-stream, randomized-audit population, per-panel and FCR outcomes.
 - Capacity mode: exact implementation of the CA-OCRC algorithm and its estimator before claiming its risk bound.
 
+## Authored checks
+
+The module contains 16 unit tests covering frozen intervals, ACI update direction, K1 eligibility, revision/value/payload binding, report/label availability, duplicate feedback, monotonic arrival order, fixed-delay phase interleaving, phase barriers, exact delivery-round checks, alpha projection and deterministic replay. Two independent integration-oracle tests compare the production phase states against a separate modulo-tau recurrence over a multi-round stream and test phase isolation. All tests are authored; exact-head formatting, strict Clippy, crate tests and SEMI-BENCH-001 workflow validation are still required.
+
 ## Claim ceiling
 
 This v0.1 module is a delayed adaptive miscoverage controller around externally produced intervals. It is not a full conformal quantile/score engine, it does not solve adaptive metrology selection bias, it does not implement CA-OCRC, and its variable-delay arrival-order mode has no fixed-delay theorem claim. It does not authenticate physical source data or authorize fab process control.
