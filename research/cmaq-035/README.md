@@ -4,7 +4,7 @@ Run from the repository root:
 
     cargo +1.100.0 run --release --manifest-path research/cmaq-035/Cargo.toml --locked -- 10000 500 20261127 > cmaq-035-results.csv
 
-Arguments are replications, horizon and seed. Defaults are 10,000, 500 and 20,261,127. Output is CSV on stdout, with simulation configuration on stderr and paired win/loss/tie comment rows in stdout. The PR workflow runs only a small smoke configuration; that is not scientific benchmark evidence.
+Arguments are replications, horizon and seed. Defaults are 10,000, 500 and 20,261,127. Output is CSV on stdout, with simulation configuration on stderr and paired win/loss/tie comment rows in stdout. The dedicated PR workflow runs 10,000 replications per scenario at a 500-observation horizon and uploads the CSV plus run metadata as a 30-day artifact.
 
 ## Design
 
