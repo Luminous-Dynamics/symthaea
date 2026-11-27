@@ -18,19 +18,19 @@ A candidate adapter consumes only the candidate stream, conforming to schemas/ca
 
 Score a balanced set of candidate responses:
 
-    cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- score /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl /tmp/dsm-responses.jsonl /tmp/dsm-report.json
+    cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- score /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl /tmp/dsm-responses.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/arms-v0.1.json /tmp/dsm-report.json
 
 Run the six synthetic positive-control records against the six source episodes already in the parent fixture:
 
     cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- prepare research/mace-decision-sufficient-memory-bench-v0-1/fixtures/seed-v0.1.jsonl /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl
 
-    cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- score /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/reference-qualified-responses-v0.1.jsonl /tmp/dsm-fixture-report.json
+    cargo run --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/Cargo.toml -- score /tmp/dsm-candidate.jsonl /secure/dsm-private.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/reference-qualified-responses-v0.1.jsonl research/mace-decision-sufficient-memory-bench-v0-1/reference-evaluator/fixtures/arms-v0.1.json /tmp/dsm-fixture-report.json
 
 ## Evaluator semantics
 
 - Every candidate response must resolve to a known episode and an allowed action.
 - The evidence and observation budgets are enforced before scoring.
-- Each episode has exactly one response per declared arm. Missing and duplicate episode/arm pairs are rejected; no arm can silently drop hard episodes.
+- Each episode has exactly one response per arm declared in a separate preregistered arm manifest. Undeclared arms, missing and duplicate episode/arm pairs are rejected; no arm can silently drop hard episodes.
 - Candidate-visible and evaluator-private inventories must match exactly. The candidate row and private record commit to a domain-separated SHA-256 digest of the exact typed candidate projection; the response must echo the same digest. Modified or mismatched candidate/response inputs are rejected. This binds the response to the presented input but is not a signature or proof that the adapter reasoned from it.
 - Valid time is half-open: valid-from is inclusive and valid-until is exclusive.
 - Superseded or retracted parent records are stale at query time. A contradiction edge does not itself erase its parent; it is measured as a conflict requiring policy handling.
@@ -55,7 +55,7 @@ Cost fields are candidate-reported counters. The evaluator does not independentl
 - Uncertainty ppm is preserved but not calibrated and is not used as a probability.
 - Observation requests are scored as actions and budget use; no physical or external probe is executed.
 - This version is a response scorer, not a fully autonomous memory-system runner. It does not ingest candidate events into a production store or drive a downstream action environment.
-- There is no schema-validation dependency in this package. Use a Draft 2020-12 validator on the episode, candidate-input and response schemas as a separate release check.
+- There is no schema-validation dependency in this package. Use a Draft 2020-12 validator on the episode, candidate-input, response and arm-manifest schemas as a separate release check.
 
 ## Tests
 
