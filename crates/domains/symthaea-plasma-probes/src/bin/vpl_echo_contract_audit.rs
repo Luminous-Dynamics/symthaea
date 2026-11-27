@@ -67,7 +67,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
     if !boolean(scaling, "amplitude_is_computed_from_formula")?
         || !boolean(scaling, "p_values_are_exploratory_not_source_theorem_constants")?
     {
-        return Err("the perturbation scaling must be computed and exploratory p values labelled".to_owned());
+        return Err(
+            "the perturbation scaling must be computed and exploratory p values labelled".to_owned(),
+        );
     }
     let nu_range = array_at(scaling, "collision_parameter_nu_range")?;
     if nu_range.len() != 2 {
@@ -88,7 +90,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
         || horizon_fraction <= 0.0
         || horizon_fraction > 1.0
     {
-        return Err("the scaling domain, amplitude limit or pre-dissipation horizon is invalid".to_owned());
+        return Err(
+            "the scaling domain, amplitude limit or pre-dissipation horizon is invalid".to_owned(),
+        );
     }
 
     let c_values = numeric_array(scaling, "prefactor_c_values")?;
