@@ -459,6 +459,8 @@ pub fn score_paired(
 
     Ok(PairedScoreV1 {
         episode_id: case.episode_id.clone(),
+        downstream_policy_digest: memory.downstream_policy_digest.clone(),
+        decision_seed: memory.decision_seed,
         memory: memory_score,
         no_memory: no_memory_score,
         memory_gain_micros,
