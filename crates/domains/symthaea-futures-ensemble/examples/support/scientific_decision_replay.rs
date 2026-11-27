@@ -456,7 +456,7 @@ mod tests {
         assert!(p.validate_against(&c).unwrap_err().contains("sum to"));
     }
     #[test]
-    fn randomized_design_requires_full_positive_action_distribution() {
+    fn randomized_design_requires_full_action_distribution_and_selected_action_positivity() {
         let c = context();
         let mut p = proposal(&c);
         p.assignment_mechanism = AssignmentMechanism::Randomized {
@@ -466,6 +466,15 @@ mod tests {
             protocol_ref: "random-protocol".into(),
         };
         assert!(p.validate_against(&c).unwrap_err().contains("every permitted action"));
+
+        p.assignment_mechanism = AssignmentMechanism::Randomized {
+            action_probabilities: vec![
+                ActionProbability { action_id: "a".into(), probability_micros: 0 },
+                ActionProbability { action_id: "b".into(), probability_micros: 1_000_000 },
+            ],
+            protocol_ref: "random-protocol".into(),
+        };
+        assert!(p.validate_against(&c).unwrap_err().contains("selected action must have nonzero"));
     }
     #[test]
     fn rejects_unauthorized_action() {
