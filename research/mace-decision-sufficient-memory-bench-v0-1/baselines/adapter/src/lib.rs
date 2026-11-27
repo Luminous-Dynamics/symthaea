@@ -363,7 +363,12 @@ mod tests {
 
     #[test]
     fn required_nullable_valid_until_field_cannot_be_omitted() {
-        let missing = FIXTURE.replace("            \"valid_until_ms\": 300,\n", "");
+        let mut value: serde_json::Value = serde_json::from_str(FIXTURE).unwrap();
+        value["documents"][0]
+            .as_object_mut()
+            .expect("first source document object")
+            .remove("valid_until_ms");
+        let missing = serde_json::to_string(&value).unwrap();
         assert!(matches!(
             run_candidate_fixture_v1(&missing),
             Err(AdapterErrorV1::InvalidJson(_))
