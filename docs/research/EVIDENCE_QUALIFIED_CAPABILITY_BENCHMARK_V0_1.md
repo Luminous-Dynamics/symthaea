@@ -169,7 +169,7 @@ For mutation-capable tasks, verify the state before and after every negative-con
 - Terminal-Bench for tool-mediated terminal work.
 - MLPerf-style closed/open comparison discipline for matched systems and declared innovation.
 
-SWE-Bench Pro V2's September 2026 public release describes 642 tasks across 11 repositories, web tools disabled during the agent phase, pristine-image re-grading, and both reference and empty-patch checks. The current Scale Labs leaderboard displays a 99.40 ± 0.40 public V2 result. Treat that as a benchmark-specific frontier observation, not proof of general software engineering competence.
+SWE-Bench Pro V2's September 2026 public release describes 642 tasks across 11 repositories, web tools disabled during the agent phase, pristine-image re-grading, and both reference and empty-patch checks. Do not carry a headline score from the earlier public split into V2: the benchmark version and evaluation protocol changed. Treat leaderboard entries as benchmark-specific observations and compare only runs with the same split, harness, budget, and grading protocol.
 
 **EQC extension**
 
@@ -310,6 +310,39 @@ Use paired task-level comparisons, confidence intervals and preregistered statis
 For open-ended or agentic tasks, repeat evaluations across controlled seeds and report variance. A single best run is not a reliable estimate.
 
 MLPerf's distinction between closed and open divisions is a useful precedent: the closed division emphasizes matched model/reference setups; the open division allows model substitution or retraining. EQC should preserve both comparable baselines and an innovation track.
+
+## 7.1 Current external benchmark snapshot (2026-11-27)
+
+This section records the public evidence used to set the first comparison targets. These numbers are not directly comparable across benchmarks because task scope, scoring, attempts, tools, budgets and environments differ.
+
+| Domain | Current public reference | What it measures | Important limitation for EQC |
+|---|---|---|---|
+| Software engineering | SWE-Bench Pro V2: 642 tasks across 11 repositories | Long-horizon repository issue resolution, with hidden tests, network-restricted agent phase, reference/empty-patch admission and pristine-image re-grading | Primary metric is still resolve rate; it does not fully score authority correctness, input provenance or state mutation containment |
+| Terminal work | Terminal-Bench 2.0 | Tool-mediated terminal task completion | Vals AI marks the benchmark archived due saturation; EQC should not rely on a static saturated task set as its only agent benchmark |
+| Healthcare | HealthAgentBench V2: 75 tasks, nine categories/environments; current top displayed success 57.3%, cost $4.70/task and 14.7 minutes/task | Agent performance across imaging, EHR data quality, clinical QA, event modeling and survival | One scored attempt per task; xhigh reasoning; model API only; web tools disabled. Category success varies materially (e.g. MRI 20%, CT 20%, clinical QA 100% for the leading entry), so pooled success hides weak categories |
+| Physics | Rapier/Godot 4.7 scene benchmark: same M1 machine, release builds, rendering excluded, p50 physics-step time | Full scene-level performance for Rapier, Box2D and Jolt | These scene timings are not comparable to Symtropy's isolated GJK nanosecond microbenchmarks |
+| Simulation VVUQ | ASME V&V 20 plus VVUQ 20.1-2024 | Pointwise validation and a multivariate metric that aggregates discrepancies across variables, locations and times while accounting for uncertainty | Standards guide the validation method; they do not automatically certify a particular solver or deployment |
+| ML system performance | MLPerf Inference closed/open divisions | Closed division constrains comparison to the same model/reference setup; open division permits model substitution or retraining | Use the same separation in EQC: a closed matched-baseline track and an open innovation track |
+
+### What the snapshot says about how to compete
+
+1. **The advantage is benchmark validity plus evidence.** SWE-Bench Pro V2's changes—removing invalid tasks, correcting contradictory instructions, disabling web access, re-grading pristine patches and requiring reference-pass/empty-patch-fail—show that task and verifier quality are first-class engineering work. EQC should adopt these practices, then extend them to authority, identity, provenance and state.
+2. **Avoid static benchmark saturation.** Terminal-Bench 2.0 is now marked archived because performance saturated. EQC should rotate hidden tasks, retain a public seed for reproducibility, and version the held-out evaluation so systems cannot optimize against a frozen score.
+3. **Report category-level results.** HealthAgentBench V2's 57.3% aggregate coexists with much lower category scores. Mycelix Health should publish per-scenario wrong-patient, revocation, stale-record and unauthorized-write rates rather than treating overall task completion as a safety measure.
+4. **Measure real scene performance, not proxy microbenchmarks.** Symtropy should match Rapier/Jolt scene geometry, solver parameters, thread count, timestep and hardware before making speed claims. Keep microbenchmarks as diagnostics, not headline comparison.
+5. **Separate closed and open comparisons.** The closed EQC track must match task set, system budget, environment and allowed tools; the open track can permit architecture/model changes but must publish the changed components and a fresh independent holdout.
+6. **Keep integrity gates non-compensatory.** A better resolve rate, faster simulation or lower cost cannot offset unauthorized access, corrupted inputs, invalid receipts, or a failed independent replay.
+
+### Initial competitive target ladder
+
+- **Protocol validity:** 100% task admission must pass the two-sided reference/no-op gate and independent task review.
+- **Integrity controls:** zero observed unauthorized mutation in each published negative-control family; report exact counts and confidence intervals rather than claiming zero risk.
+- **Matched capability:** first get within 5 absolute percentage points of the strongest matched baseline on the same valid task set and budget.
+- **Demonstrated improvement:** then seek a statistically supported increase in qualified-success rate or decrease in cost per qualified success on a separately authored, held-out extension.
+- **Freshness:** rotate at least 20% of held-out episodes per major release, with an independently reviewed task-validity report; preserve previous versions to keep historical comparison possible.
+- **Cost frontier:** publish capability and qualified success against p50/p95 time, compute, energy, monetary cost and human intervention. Do not reduce this to a single weighted scalar.
+
+The five-percent and twenty-percent values are proposed research targets, not observed performance or an established external standard.
 
 ## 8. Evidence receipt and publication contract
 
