@@ -510,12 +510,23 @@ fn flip_factor_compatible(task: MusicListenTaskV1, factor: MusicListenFlipFactor
     )
 }
 
-fn score_variant(variant: &MusicListenVariantV1) -> ScoredVariantV1 {
-    let predicted = match variant.model_answer {
+/// Normalize a variant-specific A/B answer into the semantic relation.
+///
+/// Shared by the official MusicListenBench v1 adapter and independent
+/// property-scoped extensions. This intentionally returns no relation for
+/// unparseable or abstaining answers.
+pub fn predicted_relation_for_variant(
+    variant: &MusicListenVariantV1,
+) -> Option<MusicalRelationV1> {
+    match variant.model_answer {
         MusicListenAnswerV1::ChoiceA => Some(variant.option_a_relation),
         MusicListenAnswerV1::ChoiceB => Some(variant.option_b_relation),
         MusicListenAnswerV1::Unparseable | MusicListenAnswerV1::Abstain => None,
-    };
+    }
+}
+
+fn score_variant(variant: &MusicListenVariantV1) -> ScoredVariantV1 {
+    let predicted = predicted_relation_for_variant(variant);
     ScoredVariantV1 {
         predicted,
         correct: predicted == Some(variant.expected_relation),
