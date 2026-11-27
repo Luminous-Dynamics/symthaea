@@ -73,6 +73,7 @@ struct EvaluatorPrivate {
     no_memory_action: String,
     oracle_action: String,
     attack_case: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     notes: Option<String>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -107,6 +108,7 @@ struct Response {
     action: String,
     selected_evidence_ids: Vec<String>,
     observation_requests: usize,
+    observation_cost_units: f64,
     cost: Cost,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -336,6 +338,7 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
         decision_sufficient: (loss - oracle_loss).abs() <= 1e-9 && required_found == required.len() && invalid_n == 0,
         attack_case: p.evaluator_private.attack_case,
         observation_requests: r.observation_requests,
+        observation_cost_units: c.candidate.observation_cost_units,
         cost: r.cost.clone(),
     })
 }
@@ -362,6 +365,8 @@ fn aggregate(key: &str, rows: &[ScoreRow]) -> serde_json::Value {
         "forbidden_evidence_uses": rows.iter().map(|r| r.forbidden_evidence_count).sum::<usize>(),
         "unresolved_contradiction_pairs": rows.iter().map(|r| r.unresolved_contradiction_pairs).sum::<usize>(),
         "observation_requests": rows.iter().map(|r| r.observation_requests).sum::<usize>(),
+        "declared_observation_cost_units": rows.iter().map(|r| r.observation_cost_units).sum::<f64>(),
+        "mean_declared_observation_cost_units": average(rows.iter().map(|r| r.observation_cost_units)),
         "ingest_operations": rows.iter().map(|r| r.cost.ingest_operations).sum::<u64>(),
         "query_operations": rows.iter().map(|r| r.cost.query_operations).sum::<u64>(),
         "maintenance_operations": rows.iter().map(|r| r.cost.maintenance_operations).sum::<u64>(),
