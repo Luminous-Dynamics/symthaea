@@ -1,0 +1,59 @@
+{
+  "limitations": [
+    "balanced complete work-by-performer cells only",
+    "one performer identity per cell; no ensemble membership sets",
+    "paired effect is continuous Gaussian random-effects oracle, not a model score",
+    "percentile bootstrap only; not a qualification of CR2 or wild cluster bootstrap",
+    "coverage simulation does not prove real cohort exchangeability or authentication"
+  ],
+  "nominal_confidence_level": 0.95,
+  "numpy": "2.3.5",
+  "python": "3.13.5",
+  "research_only": true,
+  "scenarios": [
+    {
+      "bootstrap_replicates": 399,
+      "scenario": "work_disjoint_performer_clusters",
+      "seed": 77,
+      "simulations": 1000,
+      "within_work_repeats": 4,
+      "work_bootstrap_coverage": 0.938,
+      "work_bootstrap_mean_interval_width": 0.22612604002367898,
+      "work_bootstrap_monte_carlo_se": 0.00762600813007697,
+      "works": 30
+    },
+    {
+      "bootstrap_replicates": 499,
+      "empirical_sd_of_estimator": 0.06228950352728348,
+      "mean_interval_width_two_way": 0.23778715635984612,
+      "mean_interval_width_work_only": 0.13315711382982492,
+      "performers": 20,
+      "scenario": "balanced_crossed_30_works_x_20_performers",
+      "seed": 991,
+      "simulations": 1000,
+      "theoretical_sd_of_estimator": 0.060415229867972854,
+      "two_way_monte_carlo_se": 0.007683163410991592,
+      "two_way_pigeonhole_coverage": 0.937,
+      "work_only_coverage": 0.695,
+      "work_only_monte_carlo_se": 0.014559361249725209,
+      "works": 30
+    },
+    {
+      "bootstrap_replicates": 499,
+      "empirical_sd_of_estimator": 0.11420831248923521,
+      "mean_interval_width_two_way": 0.4138692429277683,
+      "mean_interval_width_work_only": 0.14437075172424743,
+      "performers": 8,
+      "scenario": "balanced_crossed_30_works_x_8_performers",
+      "seed": 1234,
+      "simulations": 1000,
+      "theoretical_sd_of_estimator": 0.11271645842555558,
+      "two_way_monte_carlo_se": 0.009139803061335619,
+      "two_way_pigeonhole_coverage": 0.908,
+      "work_only_coverage": 0.473,
+      "work_only_monte_carlo_se": 0.01578831846651188,
+      "works": 30
+    }
+  ],
+  "schema": "mel-hear-005-crossed-bootstrap-simulation-v0"
+}
