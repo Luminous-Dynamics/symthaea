@@ -78,9 +78,9 @@ form, privacy, intensity, motion, clock and expiry fields. Each update it
 requires a fresh host-supplied source clock and rechecks the live policy; a
 missing policy resource, stale clock, changed permit or expiry hides/rejects
 the scene. Unweighted primitives use the authorized global intensity, and
-zero intensity hides them.
+zero intensity hides them. Pulse, radiate, and flow animation are clamped to the same authorized intensity ceiling; animation cannot amplify past policy.
 
-Five adapter Rust tests are authored for clock regression, exact expiry,
+Seven adapter Rust tests are authored for clock regression, exact expiry,
 cross-domain rejection, intensity clamping and zero-intensity output. The
 adapter has not been built or run, and no compositor observation has been
 integrated. The adapter acknowledgement means ECS entities were accepted and
