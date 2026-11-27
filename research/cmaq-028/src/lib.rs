@@ -139,7 +139,7 @@ pub fn assess_recovery_portfolio(
             (
                 "prefix.state_evidence_sha256",
                 &prefix.state_evidence_sha256,
-            )
+            ),
             (
                 "prefix.reachability_evidence_sha256",
                 &prefix.reachability_evidence_sha256,
