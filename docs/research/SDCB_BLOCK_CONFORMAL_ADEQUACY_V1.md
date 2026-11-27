@@ -50,8 +50,8 @@ Recent time-series conformal theory explicitly studies dependence-adjusted cover
 
 At each adaptive stage, the scoring function and model-set digest are frozen. This reference requires:
 - a distinct calibration epoch ID at every stage;
-- no reuse of calibration-unit IDs consumed at earlier stages;
-- no reuse of the current test unit as a calibration unit;
+- no reuse of any previously consumed calibration or test unit as either calibration or test data at a later stage;
+- no overlap between the current calibration fold and current test unit;
 - no use of the test score to fit or tune the model/scoring protocol;
 - explicit propagation of the consumed epoch/unit IDs to the next stage.
 
@@ -72,7 +72,7 @@ This is a constructed rank fixture, not a sensor-data result.
 - Exact agreement with independent rank enumeration.
 - Conservative tie handling.
 - Zero calibration/test ID overlap.
-- Zero cross-stage epoch/unit reuse.
+- Zero cross-stage epoch/unit reuse, including test-to-calibration recycling.
 - Zero scoring-protocol or model-set digest mismatch acceptance.
 - Empirical false-alarm rate at or below nominal alpha on independent exchangeable held-out episodes, with binomial confidence intervals.
 - Under dependent time-series tasks, do not claim the exchangeable-block guarantee; compare against dependence-aware methods and report coverage/error bounds, block size, and drift sensitivity.
