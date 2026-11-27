@@ -132,10 +132,11 @@ pub struct EvidenceSpanAblationReportV1 {
     /// Exposed minus ablated complete lifecycle cost.
     pub mean_added_cost_micros: f64,
     pub stratum_utility_effects: BTreeMap<String, f64>,
-    pub stratum_utility_effect_ci95: BTreeMap<String, ConfidenceIntervalV1>,
+    pub stratum_utility_effect_ci95: BTreeMap<String, Option<ConfidenceIntervalV1>>,
     pub stratum_regret_reduction_effects: BTreeMap<String, f64>,
-    pub stratum_regret_reduction_ci95: BTreeMap<String, ConfidenceIntervalV1>,
+    pub stratum_regret_reduction_ci95: BTreeMap<String, Option<ConfidenceIntervalV1>>,
     pub stratum_independent_profile_clusters: BTreeMap<String, usize>,
+    pub stratum_confirmatory_cluster_floor_met: BTreeMap<String, bool>,
     pub privacy_violation_count: u64,
     pub unauthorized_action_count: u64,
     pub erasure_resurrection_count: u64,
@@ -492,6 +493,7 @@ pub fn analyze_evidence_span_ablation_v1(
     let mut stratum_regret_reduction_effects = BTreeMap::new();
     let mut stratum_regret_reduction_ci95 = BTreeMap::new();
     let mut stratum_independent_profile_clusters = BTreeMap::new();
+    let mut stratum_confirmatory_cluster_floor_met = BTreeMap::new();
     for (key, values) in stratum_values {
         let utilities: Vec<f64> = values.iter().map(|(utility, _)| *utility).collect();
         let regrets: Vec<f64> = values.iter().map(|(_, regret)| *regret).collect();
@@ -499,12 +501,18 @@ pub fn analyze_evidence_span_ablation_v1(
         stratum_utility_effects.insert(key.clone(), mean(&utilities));
         stratum_utility_effect_ci95.insert(
             key.clone(),
-            cluster_bootstrap_interval(&utilities, seed),
+            (utilities.len() >= 2).then(|| cluster_bootstrap_interval(&utilities, seed)),
         );
         stratum_regret_reduction_effects.insert(key.clone(), mean(&regrets));
         stratum_regret_reduction_ci95.insert(
             key.clone(),
-            cluster_bootstrap_interval(&regrets, seed ^ 0xA11C_E5A5_0000_0001),
+            (regrets.len() >= 2).then(|| {
+                cluster_bootstrap_interval(&regrets, seed ^ 0xA11C_E5A5_0000_0001)
+            }),
+        );
+        stratum_confirmatory_cluster_floor_met.insert(
+            key.clone(),
+            values.len() >= CONFIRMATORY_CLUSTER_FLOOR_V1,
         );
         stratum_independent_profile_clusters.insert(key, values.len());
     }
@@ -549,6 +557,7 @@ pub fn analyze_evidence_span_ablation_v1(
         stratum_regret_reduction_effects,
         stratum_regret_reduction_ci95,
         stratum_independent_profile_clusters,
+        stratum_confirmatory_cluster_floor_met,
         privacy_violation_count,
         unauthorized_action_count,
         erasure_resurrection_count,
@@ -815,6 +824,19 @@ mod tests {
         assert!(report.stratum_regret_reduction_ci95["sparse"].lower > 0.0);
         assert_eq!(report.stratum_independent_profile_clusters["standard"], 2);
         assert_eq!(report.stratum_independent_profile_clusters["sparse"], 2);
+        assert_eq!(report.stratum_confirmatory_cluster_floor_met["standard"], false);
         assert!(valid_sha256(&report.canonical_sha256));
     }
+
+    #[test]
+    fn single_cluster_stratum_does_not_receive_a_confidence_interval() {
+        let observations = paired_observations(3);
+        let report = analyze_evidence_span_ablation_v1(&observations, 101).unwrap();
+        assert_eq!(report.stratum_independent_profile_clusters["sparse"], 1);
+        assert_eq!(report.stratum_utility_effect_ci95["sparse"], None);
+        assert_eq!(report.stratum_regret_reduction_ci95["sparse"], None);
+        assert_eq!(report.stratum_confirmatory_cluster_floor_met["sparse"], false);
+        assert!(report.stratum_utility_effect_ci95["standard"].is_some());
+    }
+
 }
