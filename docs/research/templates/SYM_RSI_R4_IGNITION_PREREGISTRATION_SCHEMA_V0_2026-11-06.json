@@ -115,7 +115,8 @@
             },
             "selected_claims": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "Use none or a comma-separated list of canonical claim flag names. The Rust semantic checker requires an exact match to the enabled boolean claim flags."
             },
             "claim_ceiling": {
               "type": "string"
