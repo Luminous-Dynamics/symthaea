@@ -401,18 +401,30 @@ mod tests {
 
     #[test]
     fn bounded_three_level_grid_never_exceeds_global_alpha() {
-        let maximum = 4u64;
-        let asset_sum = bounded_weight_sum(maximum).unwrap();
-        let channel_sum = bounded_weight_sum(maximum).unwrap();
-        let deployment_sum = bounded_weight_sum(maximum).unwrap();
+        let budget_plan = plan();
+        let mut total_alpha = (0u128, 1u128);
+        for asset in 1..=4u64 {
+            for channel in 1..=4u64 {
+                for deployment in 1..=4u64 {
+                    let scope = scope(
+                        asset,
+                        channel,
+                        deployment,
+                        &format!("{asset}-{channel}-{deployment}"),
+                    );
+                    let receipt = budget_plan.allocation_for(&scope).unwrap();
+                    total_alpha = add_fractions(
+                        total_alpha,
+                        (receipt.alpha_numerator, receipt.alpha_denominator),
+                    )
+                    .unwrap();
+                }
+            }
+        }
 
-        let total_weight = (asset_sum.0 * channel_sum.0 * deployment_sum.0,
-            asset_sum.1 * channel_sum.1 * deployment_sum.1);
-        assert_eq!(total_weight, (64, 125));
-
-        let total_alpha = (total_weight.0, total_weight.1 * 20);
-        assert!(total_alpha.0 * 20 <= total_alpha.1);
+        // The finite 4×4×4 grid covers (4/5)^3 of the countable allocation.
         assert_eq!(total_alpha, (64, 2_500));
+        assert!(total_alpha.0 * 20 <= total_alpha.1);
     }
 
     #[test]
