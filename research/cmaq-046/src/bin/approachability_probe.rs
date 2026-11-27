@@ -10,9 +10,7 @@
 use std::env;
 use std::fmt::Write as _;
 
-use cmaq_046_convex_target_approachability::{
-    BoxTarget, ConvexTargetApproachabilityMonitor,
-};
+use cmaq_046_convex_target_approachability::{BoxTarget, ConvexTargetApproachabilityMonitor};
 
 const ALPHA_NUMERATOR: u32 = 1;
 const ALPHA_DENOMINATOR: u32 = 20;
@@ -80,7 +78,9 @@ struct Config {
 fn parse_config() -> Result<Config, String> {
     let values = env::args().skip(1).collect::<Vec<_>>();
     if values.len() > 4 {
-        return Err("usage: approachability_probe [replications] [horizon] [seed] [shift_after]".into());
+        return Err(
+            "usage: approachability_probe [replications] [horizon] [seed] [shift_after]".into(),
+        );
     }
     let parse = |index: usize, default: &str, name: &str| -> Result<u64, String> {
         values
@@ -98,7 +98,9 @@ fn parse_config() -> Result<Config, String> {
     let shift_after = usize::try_from(parse(3, "400", "shift_after")?)
         .map_err(|_| "shift_after exceeds usize".to_string())?;
     if replications == 0 || horizon == 0 || shift_after >= horizon {
-        return Err("replications and horizon must be positive; shift_after must be below horizon".into());
+        return Err(
+            "replications and horizon must be positive; shift_after must be below horizon".into(),
+        );
     }
     Ok(Config {
         replications,
@@ -118,10 +120,7 @@ fn dot(left: &[f64; 2], right: &[f64; 2]) -> f64 {
 }
 
 fn log_mean_exp(log_values: &[f64]) -> Result<f64, String> {
-    let maximum = log_values
-        .iter()
-        .copied()
-        .fold(f64::NEG_INFINITY, f64::max);
+    let maximum = log_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     if !maximum.is_finite() {
         return Err("fixed-direction log wealth is non-finite".into());
     }
@@ -162,8 +161,7 @@ fn update_fixed_portfolio(
         }
     }
     let log_mixture = log_mean_exp(log_wealths)?;
-    let log_threshold =
-        (f64::from(ALPHA_DENOMINATOR) / f64::from(ALPHA_NUMERATOR)).ln();
+    let log_threshold = (f64::from(ALPHA_DENOMINATOR) / f64::from(ALPHA_NUMERATOR)).ln();
     Ok(log_mixture >= log_threshold)
 }
 
@@ -218,13 +216,7 @@ fn run_replication(
     let mut fixed_alarm = None;
 
     for time in 1..=config.horizon {
-        let observation = draw_observation(
-            &mut rng,
-            scenario,
-            time,
-            config.shift_after,
-            direction,
-        );
+        let observation = draw_observation(&mut rng, scenario, time, config.shift_after, direction);
         if adaptive_alarm.is_none() {
             let update = adaptive
                 .observe(&observation)
@@ -234,12 +226,7 @@ fn run_replication(
             }
         }
         if fixed_alarm.is_none()
-            && update_fixed_portfolio(
-                &mut fixed_logs,
-                &target,
-                residual_bound,
-                &observation,
-            )?
+            && update_fixed_portfolio(&mut fixed_logs, &target, residual_bound, &observation)?
         {
             fixed_alarm = Some(time);
         }
@@ -285,7 +272,10 @@ fn main() -> Result<(), String> {
     let config = parse_config()?;
     let mut csv = String::from("scenario,replication,orientation,arm,first_alarm_time_one_based\n");
 
-    for scenario in [Scenario::ConditionalMeanNull, Scenario::UnknownDirectionShift] {
+    for scenario in [
+        Scenario::ConditionalMeanNull,
+        Scenario::UnknownDirectionShift,
+    ] {
         let mut adaptive = Vec::with_capacity(config.replications);
         let mut fixed = Vec::with_capacity(config.replications);
         for replication in 0..config.replications {
