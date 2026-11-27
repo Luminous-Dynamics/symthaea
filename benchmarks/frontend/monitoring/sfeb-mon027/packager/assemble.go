@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,6 +60,7 @@ type InputIndex struct {
 type SigningRequest struct {
 	Profile string `json:"profile"`
 	Version string `json:"version"`
+	RequestID string `json:"request_id"`
 	RunID string `json:"run_id"`
 	Sequence uint64 `json:"sequence"`
 	RootSHA256 string `json:"root_sha256"`
@@ -77,7 +79,6 @@ type SignatureEnvelope struct {
 	Algorithm string `json:"algorithm"`
 	KeyID string `json:"key_id"`
 	Value string `json:"value"`
-	SignedAt time.Time `json:"signed_at"`
 }
 
 type BuildResult struct {
@@ -146,6 +147,7 @@ func BuildManifest(rootDir string, index InputIndex) (BuildResult, error) {
 	request := SigningRequest{
 		Profile: SigningRequestProfile,
 		Version: "1.0.0",
+		RequestID: signingRequestID(index.RunID, index.Sequence, root, index.SignerKeyID),
 		RunID: index.RunID,
 		Sequence: index.Sequence,
 		RootSHA256: root,
@@ -176,6 +178,14 @@ func AttachSignature(rootDir string, manifest custody.Manifest, envelope Signatu
 	manifest.Signature.Value = envelope.Value
 	result := custody.VerifyBundle(rootDir, manifest, policy)
 	return manifest, result
+}
+
+
+func signingRequestID(runID string, sequence uint64, root, keyID string) string {
+	message := "MON027-SIGNING-REQUEST-V1\\x00" + runID + "\\x00" +
+		strconv.FormatUint(sequence, 10) + "\\x00" + strings.ToLower(root) + "\\x00" + keyID
+	sum := sha256.Sum256([]byte(message))
+	return hex.EncodeToString(sum[:])
 }
 
 func validateIndex(index InputIndex) error {
