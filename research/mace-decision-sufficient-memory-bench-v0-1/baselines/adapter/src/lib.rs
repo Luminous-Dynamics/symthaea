@@ -185,9 +185,7 @@ impl SourceDocumentWireV1 {
 fn validate_candidate_wire(fixture: &CandidateFixtureWireV1) -> Result<(), AdapterErrorV1> {
     check_max_length("query.query_text", &fixture.query.query_text, 20_000)?;
     check_max_length("query.scope_id", &fixture.query.scope_id, 256)?;
-    if fixture.query.top_k > 1_000
-        || fixture.top_k.is_some_and(|top_k| top_k > 1_000)
-    {
+    if fixture.query.top_k > 1_000 || fixture.top_k.is_some_and(|top_k| top_k > 1_000) {
         return Err(AdapterErrorV1::InvalidCandidateField("top_k".to_owned()));
     }
 
@@ -362,10 +360,7 @@ mod tests {
 
     #[test]
     fn required_nullable_valid_until_field_cannot_be_omitted() {
-        let missing = FIXTURE.replace(
-            "            \"valid_until_ms\": 300,\n",
-            "",
-        );
+        let missing = FIXTURE.replace("            \"valid_until_ms\": 300,\n", "");
         assert!(matches!(
             run_candidate_fixture_v1(&missing),
             Err(AdapterErrorV1::InvalidJson(_))
@@ -380,7 +375,9 @@ mod tests {
         );
         assert_eq!(
             run_candidate_fixture_v1(&oversized_text),
-            Err(AdapterErrorV1::InvalidCandidateField("document.text".into()))
+            Err(AdapterErrorV1::InvalidCandidateField(
+                "document.text".into()
+            ))
         );
 
         let mut value: serde_json::Value = serde_json::from_str(FIXTURE).unwrap();
