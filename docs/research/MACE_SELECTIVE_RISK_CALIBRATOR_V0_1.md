@@ -4,13 +4,13 @@
 
 ## Primary endpoint
 
-The primary endpoint is the probability that a new independent calibration cluster contains at least one accepted decision whose evaluator-only bounded loss exceeds a preregistered unacceptable-loss threshold. Each cluster contributes at most one Bernoulli unsafe indicator at a given group and threshold. Repeated turns, assertions, evidence spans and ablation rows do not inflate the number of trials.
+The primary endpoint is the probability that a new independent calibration cluster contains at least one accepted decision whose evaluator-only bounded loss exceeds a preregistered unacceptable-loss threshold. Each cluster contributes one Bernoulli observation at a given group and threshold: it is selected when at least one case passes, and unsafe when any selected case exceeds the loss limit. The fixed-sequence guarantee is applied to these independent cluster-level observations; repeated turns, assertions, evidence spans and ablation rows do not inflate the number of trials.
 
 This is deliberately stricter than per-row selective risk. Mean bounded loss and coverage are descriptive, not separately certified per-row guarantees.
 
 ## Exact bound and post-selection control
 
-For k unsafe clusters among n clusters with at least one accepted case, the one-sided Clopper-Pearson upper bound solves P_p(X <= k) = delta_adjusted for X ~ Binomial(n,p). The calibrator applies Bonferroni over every declared group × threshold hypothesis. The simultaneous family permits maximum-coverage threshold selection on the calibration split without unadjusted post-selection claims.
+For k unsafe clusters among n clusters with at least one accepted case, the one-sided Clopper-Pearson upper bound solves P_p(X <= k) = delta_adjusted for X ~ Binomial(n,p). The default calibrator uses fixed-sequence exact Clopper–Pearson tests over a preregistered descending sufficiency-score grid (equivalently, ascending uncertainty). It allocates family-wise delta across declared groups, then stops each group's threshold scan at the first uncertified prefix. This retains a finite-sample high-probability risk guarantee without a threshold-count penalty. A simultaneous Bonferroni mode remains available when recovering later safe regions in a non-monotone risk curve is more important than power.
 
 With zero unsafe clusters, a single unadjusted 95% bound is about 9.5% at 30 clusters and falls below 5% only at 59 clusters. Multiple groups and thresholds reduce adjusted delta and require more clusters. The 30-cluster floor is a minimum support gate, not a promise that a 5% risk target is certifiable.
 
@@ -51,3 +51,5 @@ cargo clippy --manifest-path research/mace-selective-risk-calibrator-v0-1/Cargo.
 ```
 
 The manifest, group-certificate and decision-assessment digests are recomputable integrity commitments, not signatures. This is an offline calibration kernel, not a production policy. Review its endpoint and assumptions before describing any MACE result as calibrated or certified.
+
+**Coverage semantics:** `coverage` is independent-cluster acceptance probability, matching the cluster-risk endpoint. `decision_coverage` is separately reported as the equal-cluster-weighted fraction of individual decisions accepted. This prevents decision rows from being mistaken for independent risk trials.
