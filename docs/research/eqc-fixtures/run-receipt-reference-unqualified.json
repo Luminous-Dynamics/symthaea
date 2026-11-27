@@ -1,0 +1,62 @@
+{
+  "schema": "luminous.eqc.run-receipt.v0.1",
+  "run_id": "synthetic-eqc-run-001",
+  "task_id": "eqc-health-read-authorized-001",
+  "task_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "source_head": "1111111111111111111111111111111111111111",
+  "system": {
+    "system_id": "synthetic-reference-system",
+    "version": "0.1.0",
+    "harness_version": "0.1.0",
+    "model_id": null
+  },
+  "environment": {
+    "image_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "runtime": "rust-1.96",
+    "network_policy": "none",
+    "host": "github-actions-ubuntu-24.04",
+    "cpu_model": null,
+    "gpu_model": null
+  },
+  "authority_snapshot_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "policy_digest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "input_digests": [
+    {
+      "input_id": "synthetic-consent-001",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  ],
+  "actions": [
+    {
+      "sequence": 0,
+      "action": "patient.read",
+      "resource_id": "patient-record-001",
+      "outcome": "allowed",
+      "mutation_applied": false,
+      "receipt_digest_sha256": null
+    }
+  ],
+  "observed_result": {
+    "disposition": "allow",
+    "state_mutation_count": 0,
+    "result_digest_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "verifier": {
+    "verifier_id": "synthetic-independent-reference",
+    "verifier_digest_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "replay": "passed",
+    "independent": false,
+    "notes": "Synthetic schema conformance sample only"
+  },
+  "dimensions": {
+    "capability": true,
+    "authority": true,
+    "input_integrity": true,
+    "provenance": true,
+    "reproducibility": true,
+    "failure_containment": true
+  },
+  "qualified": false,
+  "timestamp": "2026-11-27T05:30:00Z",
+  "expected_disposition": "allow"
+}
