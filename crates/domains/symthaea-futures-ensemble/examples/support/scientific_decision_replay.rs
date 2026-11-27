@@ -168,7 +168,10 @@ impl CandidateDecisionContext {
         let mut offer_ids = Vec::with_capacity(self.permitted_action_offers.len());
         for offer in &self.permitted_action_offers {
             require_nonempty("upstream offer_id", &offer.offer_id)?;
-            validate_sha256("upstream offer payload digest", &offer.action_payload_sha256)?;
+            validate_sha256(
+                "upstream offer payload digest",
+                &offer.action_payload_sha256,
+            )?;
             offer_ids.push(offer.offer_id.clone());
         }
         ensure_unique("permitted_action_offer_ids", &offer_ids)?;
