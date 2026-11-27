@@ -1,6 +1,6 @@
 # MON-021 — PostgreSQL CDC Continuity Assurance Contract v1
 
-**Status:** research contract and semantic prototype; PostgreSQL 18 runtime adapter pending.  
+**Status:** research contract and Go semantic reference; PostgreSQL 18/19 runtime adapters and independent qualification pending.  
 **Relationship:** connects MON-016 bounded capture and MON-017 source reconciliation to MON-013 destination-side commit/readback.
 
 ## 1. Research objective
@@ -50,7 +50,7 @@ The source profile must bind:
 - initial slot creation record, consistent point and exported snapshot ID/digest;
 - source administrative control root and its independently verified membership evidence.
 
-Slot names are cluster-wide identifiers, but a slot record is still scoped to its source cluster, database and plugin. A name alone is not a stable source identity. Recreating a slot with the same name is a new source epoch unless an authoritative continuity record proves otherwise.
+Slot names are cluster-wide identifiers, but a slot record is still scoped to its source cluster, database and plugin. A name alone is not a stable source identity. Recreating a slot with the same name is a new source epoch unless an authoritative continuity record proves otherwise. The capture manifest and slot observation must independently carry the cluster system identifier, server major, database identity and current timeline, and must match the pinned source profile.
 
 ## 4. Snapshot-to-stream continuity
 
@@ -78,7 +78,7 @@ The source adapter must reject:
 
 LSNs are positions in WAL, not consecutive application event numbers. Valid logical-decoding output may have gaps in LSN values because WAL contains records that the output plugin does not emit as row/change events. MON must not require numeric LSN adjacency.
 
-Each decoded event should carry a stable identity built from the exact source incarnation, database, slot/profile, transaction identity, commit LSN and deterministic per-transaction message ordinal, where the output plugin can provide those fields. Each transaction also needs a separately normalized envelope with XID, begin/commit/end LSN, terminal state and exact member event IDs. The exact identity profile must be versioned and must bind the full decoded message digest.
+Each decoded event should carry a stable identity built from the exact source incarnation, database, slot/profile, transaction identity, commit LSN and deterministic per-transaction message ordinal, where the output plugin can provide those fields. Each transaction also needs a separately normalized envelope with XID, begin/commit/end LSN, terminal state and exact member event IDs. The manifest's event list must be restricted to its declared exclusive-start/terminal interval; exact duplicates are permitted only when every event field and digest agrees. The exact identity profile must be versioned and must bind the full decoded message digest.
 
 Requirements:
 - LSNs are parsed and compared only within the same timeline/source lineage.
@@ -93,9 +93,11 @@ Requirements:
 
 ## 6. The critical invariant: durable evidence before acknowledgement
 
-The consumer must obey:
+The consumer must obey both requested and actual feedback bounds:
 
-`acknowledged_lsn <= durable_evidence_through_lsn`
+`acknowledgement_requested_lsn <= durable_evidence_through_lsn`
+
+`acknowledgement_sent_lsn <= durable_evidence_through_lsn`
 
 The durable evidence watermark is advanced only after:
 1. all decoded messages through the candidate boundary have been normalized and persisted;
@@ -147,9 +149,16 @@ The `synced` flag has different meaning on primary vs hot standby and must be in
 
 If timeline histories branch, LSNs after the fork on different timelines are incomparable unless a verified ancestry/handoff profile establishes their relation. v0.1 refuses to compare divergent timeline positions numerically. A future version may qualify an exact timeline-history chain and fork-point continuity relation.
 
+
+
+### 8.1 Timeline-aware promotion proof
+
+A timeline ID change creates a new WAL history after a fork point. A numeric LSN is not, by itself, a cross-timeline ordering proof. MON-021's failover reference therefore requires a witnessed timeline-history digest, an explicitly identified parent timeline and fork LSN. The old durable-evidence watermark must be at or before the authenticated fork point; if it is beyond the fork, the new standby may not contain that evidence and failover qualification is denied. The new standby replay position is compared to the fork point on the new timeline, not directly to an arbitrary old-timeline LSN. Slot restart_lsn is checked for availability and consistency with standby replay, not compared as if it were an independent global timestamp.
+
 ## 9. Capture manifest
 
 Each bounded manifest contains:
+- server major, cluster system identifier, database identity, timeline ID and source epoch;
 - source identity and CDC profile digest;
 - slot/database/output plugin/filter/schema profile;
 - timeline ID and timeline-history digest;
@@ -160,7 +169,7 @@ Each bounded manifest contains:
 - slot health/retention observations at start and end;
 - collector identity and independent control root;
 - observed dropped/overflow/retry/error counters;
-- durable evidence watermark and external witness/seal reference;
+- durable evidence watermark, requested acknowledgement, actual sent acknowledgement and external witness/seal reference;
 - PostgreSQL acknowledged/confirmed-flush LSN observed afterward;
 - capture start/end observation metadata and clock uncertainty.
 
@@ -259,28 +268,22 @@ These are research targets, not results. Finite corpus success is not a universa
 
 ## 15. Executable semantic reference
 
-A standard-library Go package is provided in `cdc-continuity/`. It implements:
-- PostgreSQL LSN parsing/formatting;
-- exact source/cluster/database/slot/output-plugin/profile binding;
-- exported snapshot and slot `consistent_point` binding;
-- slot type, temporary/invalidation, WAL retention and `restart_lsn` checks;
+A standard-library Go package is provided in cdc-continuity/. Its current source-level contract covers:
+- PostgreSQL 18/19 version and configured/effective WAL-level pinning;
+- exact system identifier, server major, database, slot, plugin and timeline binding across source profile, slot observation and capture manifest;
+- exported snapshot and slot consistent_point binding;
+- slot type, temporary/invalidation, WAL retention and restart_lsn checks;
 - bounded capture interval and decoded-message monotonicity;
-- per-transaction ordinal ordering for messages sharing an LSN;
+- complete transaction envelopes (XID, begin/commit/end LSN, terminal state and exact member event IDs);
 - exact duplicate replay acceptance and event identity/field/payload conflict detection;
 - equality of durable evidence watermark and terminal LSN;
-- consumer acknowledgement and observed `confirmed_flush_lsn` bounds;
-- replay overlap/gap reconciliation;
-- failover slot identity, `failover`, standby `synced`, standby replay position, retained range, timeline epoch and old-primary fencing checks.
+- both requested and actual sent acknowledgement bounds, plus observed confirmed_flush_lsn;
+- replay interval, event and transaction-envelope overlap reconciliation;
+- failover slot identity, failover, standby synced, retained range, authenticated parent timeline/fork point, old-primary fencing and handoff evidence.
 
-The reference intentionally does not require consecutive numeric LSNs. It also does not implement WAL decoding, replication protocol, SQL observation, actual slot synchronization, timeline history file parsing, cryptography or verifier-report transport. The `Witnessed` marker is a semantic precondition produced by an upstream MON custody adapter, not proof generated by this Go package.
+The reference deliberately does not require consecutive numeric LSNs. It does not implement WAL decoding, replication protocol, SQL observation, actual slot synchronization, timeline history file parsing, cryptography or verifier-report transport. Its Witnessed and timeline-history booleans are semantic preconditions supplied by an upstream MON custody adapter; this package does not authenticate them. The prototype currently returns indeterminate for two-phase decoding rather than treating a prepared transaction as committed.
 
-Local source-level preflight was run on a semantically equivalent local prototype:
-- `go test -race -count=5 ./...`: PASS.
-- `go vet ./...`: PASS.
-- `go test -count=1 -cover ./...`: PASS.
-- `go test -run=^$ -fuzz=FuzzParseLSN -fuzztime=2s`: PASS.
-
-The local source and public GitHub branch were not freshly cloned and replayed as an exact checkout. Treat these as local prototype results, not remote exact-head or hosted-CI qualification. The scenario corpus is 34 descriptive seeds / 11 positive controls, not yet a fully parameterized independent oracle corpus.
+Current execution status: no exact-head Go test, go vet, fuzz run or numeric benchmark is claimed for the current branch contents. GitHub API file access works, but the execution environment could not resolve GitHub for a fresh clone, so the evolving remote source could not be replayed as an exact local checkout. The Go package includes tests and benchmark harnesses, but they remain pending execution against the exact commit. The scenario corpus is 44 descriptive seeds / 15 positive controls; it is not yet a fully parameterized independent oracle corpus.
 
 ## 16. Claim ceiling
 
