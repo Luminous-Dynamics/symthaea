@@ -509,67 +509,65 @@ pub fn compute_qualified_observation_risk_v1(
         mnar_warning,
         mut reason_codes,
     ) = if observed_count == input.population_round_count {
-            (
-                Some(observed_loss_sum / population),
-                None,
-                None,
-                PopulationRiskIdentificationV1::ExactAllUnitRisk,
-                false,
-                Vec::new(),
-            )
-        } else if physical_assumptions_verified {
-            let physical = horvitz_thompson(&sorted_units, input.population_round_count, false)?;
-            let online = if online_count > 0 && online_assumptions_verified {
-                Some(horvitz_thompson(
-                    &sorted_units,
-                    input.population_round_count,
-                    true,
-                )?)
-            } else {
-                None
-            };
-            let mut reasons = Vec::new();
-            if online_count > 0 && !online_assumptions_verified {
-                reasons.push("online_tracking_or_frontier_propensity_incomplete".to_string());
-            }
-            (
-                None,
-                Some(physical),
-                online,
-                PopulationRiskIdentificationV1::IpwIdentifiedUnderDeclaredAssumptions,
-                false,
-                reasons,
-            )
-        } else {
-            let mut reasons = Vec::new();
-            if input.assumptions.conditional_probability_factorization
-                != ObservationAssumptionStatusV1::Satisfied
-            {
-                reasons
-                    .push("conditional_probability_factorization_unverified_or_violated".to_string());
-            }
-            if input.assumptions.conditional_ignorability
-                != ObservationAssumptionStatusV1::Satisfied
-            {
-                reasons.push("conditional_ignorability_unverified_or_mnar_possible".to_string());
-            }
-            if input.assumptions.positivity != ObservationAssumptionStatusV1::Satisfied
-                || !physical_propensities_positive
-            {
-                reasons.push("positivity_not_verified".to_string());
-            }
-            if !physical_probabilities_complete {
-                reasons.push("physical_stage_propensities_incomplete".to_string());
-            }
-            (
-                None,
-                None,
-                None,
-                PopulationRiskIdentificationV1::WorstCaseBoundsOnly,
+        (
+            Some(observed_loss_sum / population),
+            None,
+            None,
+            PopulationRiskIdentificationV1::ExactAllUnitRisk,
+            false,
+            Vec::new(),
+        )
+    } else if physical_assumptions_verified {
+        let physical = horvitz_thompson(&sorted_units, input.population_round_count, false)?;
+        let online = if online_count > 0 && online_assumptions_verified {
+            Some(horvitz_thompson(
+                &sorted_units,
+                input.population_round_count,
                 true,
-                reasons,
-            )
+            )?)
+        } else {
+            None
         };
+        let mut reasons = Vec::new();
+        if online_count > 0 && !online_assumptions_verified {
+            reasons.push("online_tracking_or_frontier_propensity_incomplete".to_string());
+        }
+        (
+            None,
+            Some(physical),
+            online,
+            PopulationRiskIdentificationV1::IpwIdentifiedUnderDeclaredAssumptions,
+            false,
+            reasons,
+        )
+    } else {
+        let mut reasons = Vec::new();
+        if input.assumptions.conditional_probability_factorization
+            != ObservationAssumptionStatusV1::Satisfied
+        {
+            reasons
+                .push("conditional_probability_factorization_unverified_or_violated".to_string());
+        }
+        if input.assumptions.conditional_ignorability != ObservationAssumptionStatusV1::Satisfied {
+            reasons.push("conditional_ignorability_unverified_or_mnar_possible".to_string());
+        }
+        if input.assumptions.positivity != ObservationAssumptionStatusV1::Satisfied
+            || !physical_propensities_positive
+        {
+            reasons.push("positivity_not_verified".to_string());
+        }
+        if !physical_probabilities_complete {
+            reasons.push("physical_stage_propensities_incomplete".to_string());
+        }
+        (
+            None,
+            None,
+            None,
+            PopulationRiskIdentificationV1::WorstCaseBoundsOnly,
+            true,
+            reasons,
+        )
+    };
 
     if !online_probabilities_complete || !online_propensities_positive {
         reason_codes.push("online_stage_propensities_incomplete_or_invalid".to_string());
