@@ -5,7 +5,7 @@
 
 use std::sync::OnceLock;
 
-const N: usize = 64;
+pub const GAUSS_LEGENDRE_ORDER: usize = 64;
 const CUTOFF: f64 = 12.0;
 const SUM_TOL: f64 = 1.0e-11;
 const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
@@ -70,7 +70,7 @@ fn legendre_rule(n: usize) -> Result<Vec<(f64, f64)>, Error> {
 
 fn cached_legendre_rule() -> Result<&'static [(f64, f64)], Error> {
     static RULE: OnceLock<Result<Vec<(f64, f64)>, Error>> = OnceLock::new();
-    match RULE.get_or_init(|| legendre_rule(N)) {
+    match RULE.get_or_init(|| legendre_rule(GAUSS_LEGENDRE_ORDER)) {
         Ok(rule) => Ok(rule.as_slice()),
         Err(error) => Err(error.clone()),
     }
