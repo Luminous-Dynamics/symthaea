@@ -191,5 +191,17 @@
   "transaction_proofs_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "topic_partitions_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "required_surface_ids_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "surface_assertions_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  "surface_assertions_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "recovery_boundary": {
+    "incident_id": "mon037-fixture-incident-001",
+    "claim_id": "claim-cdc",
+    "source_cluster_id": "fixture-source-cluster",
+    "database": "mon037_fixture",
+    "source_epoch": "primary-epoch-001",
+    "timeline_id": "1",
+    "snapshot_id": "snapshot-001",
+    "terminal_position": "0/200",
+    "scope_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inventory_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
 }
