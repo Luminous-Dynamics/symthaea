@@ -130,3 +130,38 @@ func BenchmarkEvaluate10000Records256Partitions(b *testing.B){
  refresh(&in);b.ReportAllocs();b.ResetTimer()
  for i:=0;i<b.N;i++{if Evaluate(in).CaptureVerdict!=Qualified{b.Fatal("benchmark fixture failed")}}
 }
+
+
+func TestMultipleKafkaClustersCannotShareOneVectorV1(t *testing.T) {
+	in := fixture()
+	second := in.TopicInventory[0]
+	second.ClusterID = "kafka-cluster-2"
+	second.Topic = "other-ledger"
+	second.TopicID = "other-ledger-id"
+	in.TopicInventory = append(in.TopicInventory, second)
+	refresh(&in)
+	expect(t, in, Blocked)
+}
+
+func TestHighWatermarkMustRemainStable(t *testing.T) {
+	in := fixture()
+	in.PartitionCaptures[0].HighWatermarkAfter++
+	refresh(&in)
+	expect(t, in, Indeterminate)
+}
+
+func TestLSOCannotExceedHighWatermark(t *testing.T) {
+	in := fixture()
+	in.PartitionCaptures[0].LastStableOffsetAfter = 105
+	in.PartitionCaptures[0].EndOffsetExclusive = 105
+	refresh(&in)
+	expect(t, in, Blocked)
+}
+
+func TestLSOBelowHighWatermarkMeansOpenTransactionRemains(t *testing.T) {
+	in := fixture()
+	in.PartitionCaptures[0].LastStableOffsetAfter = 103
+	in.PartitionCaptures[0].EndOffsetExclusive = 103
+	refresh(&in)
+	expect(t, in, Indeterminate)
+}
