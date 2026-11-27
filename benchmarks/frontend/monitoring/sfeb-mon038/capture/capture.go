@@ -129,6 +129,7 @@ type PartitionSummary struct {
  EndOffsetExclusive int64 `json:"end_offset_exclusive"`
  LSO int64 `json:"last_stable_offset"`
  Records int `json:"record_count"`
+ OffsetGapSlots int64 `json:"offset_gap_slots"`
  OffsetGapsObserved bool `json:"offset_gaps_observed"`
 }
 type Issue struct {
@@ -148,7 +149,7 @@ type Result struct {
  PartitionCount int `json:"partition_count"`
  VisibleRecordCount int `json:"visible_record_count"`
  BusinessEventCount int `json:"business_event_count"`
- OffsetGapsAccepted int `json:"offset_gaps_accepted"`
+ OffsetGapsAccepted int64 `json:"offset_gaps_accepted"`
  Partitions []PartitionSummary `json:"partitions"`
  Issues []Issue `json:"issues"`
  ReasonCodes []string `json:"reason_codes"`
@@ -331,10 +332,11 @@ func Evaluate(in Input)Result{
  out.VisibleRecordCount=recordTotal
  out.BusinessEventCount=len(in.BusinessEvents)
  for _,p:=range in.PartitionCaptures{
-  gaps:=0
-  for i:=1;i<len(p.Records);i++{if p.Records[i].Offset>p.Records[i-1].Offset+1{gaps++}}
-  out.OffsetGapsAccepted+=gaps
-  out.Partitions=append(out.Partitions,PartitionSummary{Topic:p.Topic,Partition:p.Partition,StartOffset:p.StartOffset,EndOffsetExclusive:p.EndOffsetExclusive,LSO:p.LastStableOffsetAfter,Records:p.RecordCount,OffsetGapsObserved:gaps>0})
+  width:=p.EndOffsetExclusive-p.StartOffset
+  gapSlots:=int64(0)
+  if width>=int64(p.RecordCount){gapSlots=width-int64(p.RecordCount)}
+  out.OffsetGapsAccepted+=gapSlots
+  out.Partitions=append(out.Partitions,PartitionSummary{Topic:p.Topic,Partition:p.Partition,StartOffset:p.StartOffset,EndOffsetExclusive:p.EndOffsetExclusive,LSO:p.LastStableOffsetAfter,Records:p.RecordCount,OffsetGapSlots:gapSlots,OffsetGapsObserved:gapSlots>0})
  }
  sort.Slice(out.Partitions,func(i,j int)bool{if out.Partitions[i].Topic!=out.Partitions[j].Topic{return out.Partitions[i].Topic<out.Partitions[j].Topic};return out.Partitions[i].Partition<out.Partitions[j].Partition})
  out.CaptureVerdict=f.verdict()
