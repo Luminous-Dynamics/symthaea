@@ -73,11 +73,11 @@ pub struct DecisionObjectiveReference {
 
 impl DecisionObjectiveReference {
     fn validate(&self) -> Result<(), String> {
-        require_nonempty("decision objective digest", &self.objective_digest)?;
+        validate_sha256("decision objective digest", &self.objective_digest)?;
         match self.mode {
             DecisionValueMode::BayesianExpectedUtility | DecisionValueMode::PriorFreeRobustMinimax => {
                 require_nonempty("decision utility unit", self.utility_unit.as_deref().unwrap_or_default())?;
-                require_nonempty("decision loss-table digest", self.loss_table_digest.as_deref().unwrap_or_default())?;
+                validate_sha256("decision loss-table digest", self.loss_table_digest.as_deref().unwrap_or_default())?;
             }
             DecisionValueMode::DirectOutcomeMetric => {
                 require_nonempty("decision metric unit", self.utility_unit.as_deref().unwrap_or_default())?;
@@ -120,7 +120,7 @@ impl CandidateDecisionContext {
     pub fn validate(&self) -> Result<(), String> {
         require_nonempty("episode_id", &self.episode_id)?;
         require_nonempty("task_family_id", &self.task_family_id)?;
-        require_nonempty("context_digest", &self.context_digest)?;
+        validate_sha256("context_digest", &self.context_digest)?;
         validate_sha256("research_state_sha256", &self.research_state_sha256)?;
         validate_sha256("evidence_prefix_sha256", &self.evidence_prefix_sha256)?;
         validate_sha256("permitted_action_offer_list_sha256", &self.permitted_action_offer_list_sha256)?;
@@ -133,7 +133,7 @@ impl CandidateDecisionContext {
         }
         for e in &self.evidence_available_at_decision {
             require_nonempty("evidence_id", &e.evidence_id)?;
-            require_nonempty("evidence content_digest", &e.content_digest)?;
+            validate_sha256("evidence content_digest", &e.content_digest)?;
             if e.observed_at_ms > e.available_at_ms {
                 return Err("evidence availability precedes observation".into());
             }
@@ -197,8 +197,8 @@ impl DecisionProposal {
         require_nonempty("policy_id", &self.policy_id)?;
         require_nonempty("policy_version", &self.policy_version)?;
         require_nonempty("selected_action_id", &self.selected_action_id)?;
-        require_nonempty("selected_action_payload_digest", &self.selected_action_payload_digest)?;
-        require_nonempty("rationale_digest", &self.rationale_digest)?;
+        validate_sha256("selected_action_payload_digest", &self.selected_action_payload_digest)?;
+        validate_sha256("rationale_digest", &self.rationale_digest)?;
         if self.episode_id != c.episode_id { return Err("proposal episode mismatch".into()); }
         if !c.permits(&self.selected_action_id) { return Err("selected action outside permitted set".into()); }
         if self.predicted_outcomes.is_empty() { return Err("predicted outcome distribution is empty".into()); }
@@ -223,7 +223,7 @@ impl DecisionProposal {
                 let mut selected_probability = 0_u32;
                 for entry in action_probabilities {
                     require_nonempty("randomized action_id", &entry.action_id)?;
-                    require_nonempty("randomized action_payload_digest", &entry.action_payload_digest)?;
+                    validate_sha256("randomized action_payload_digest", &entry.action_payload_digest)?;
                     if !c.permits(&entry.action_id) {
                         return Err("randomization distribution contains an action outside the permitted set".into());
                     }
@@ -246,12 +246,12 @@ impl DecisionProposal {
                     return Err("selected action must have nonzero randomized propensity".into());
                 }
             }
-            AssignmentMechanism::Deterministic { policy_digest } => require_nonempty("assignment policy digest", policy_digest)?,
+            AssignmentMechanism::Deterministic { policy_digest } => validate_sha256("assignment policy digest", policy_digest)?,
             AssignmentMechanism::Observational { selection_process_ref } => require_nonempty("selection process reference", selection_process_ref)?,
             AssignmentMechanism::Unknown => {}
         }
-        ensure_nonempty_items("assumption_digests", &self.assumption_digests)?;
-        ensure_nonempty_items("identification_assumption_digests", &self.identification_assumption_digests)?;
+        ensure_sha256_items("assumption_digests", &self.assumption_digests)?;
+        ensure_sha256_items("identification_assumption_digests", &self.identification_assumption_digests)?;
         if self.causal_design != CausalDesign::NotClaimed && self.identification_assumption_digests.is_empty() {
             return Err("causal claim requires identification-assumption digests".into());
         }
@@ -305,7 +305,7 @@ impl EvaluatorResolution {
         }
         for e in &self.evaluator_evidence {
             require_nonempty("evaluator evidence_id", &e.evidence_id)?;
-            require_nonempty("evaluator evidence digest", &e.content_digest)?;
+            validate_sha256("evaluator evidence digest", &e.content_digest)?;
             if e.observed_at_ms > e.available_at_ms { return Err("evaluator evidence availability precedes observation".into()); }
             if self.finalized_at_ms.is_some_and(|t| e.available_at_ms > t) {
                 return Err("evaluator evidence arrived after finalization".into());
@@ -410,6 +410,11 @@ fn ensure_nonempty_items(field: &str, values: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+fn ensure_sha256_items(field: &str, values: &[String]) -> Result<(), String> {
+    for value in values { validate_sha256(field, value)?; }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,17 +424,17 @@ mod tests {
             task_family_id: "pilot".into(), decision_index: 0, decision_time_ms: 100,
             deadline_ms: Some(1_000), phase: DecisionPhase::ExperimentalDesign,
             decision_objective: DecisionObjectiveReference {
-                objective_digest: "sha256:objective".into(),
+                objective_digest: "1111111111111111111111111111111111111111111111111111111111111111".into(),
                 mode: DecisionValueMode::PriorFreeRobustMinimax,
                 utility_unit: Some("normalized_loss_units".into()),
-                loss_table_digest: Some("sha256:loss-table".into()),
+                loss_table_digest: Some("2222222222222222222222222222222222222222222222222222222222222222".into()),
             },
             research_state_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             evidence_prefix_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
             permitted_action_offer_list_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
             context_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into(),
             evidence_available_at_decision: vec![EvidenceReference {
-                evidence_id: "obs".into(), content_digest: "sha256:obs".into(),
+                evidence_id: "obs".into(), content_digest: "3333333333333333333333333333333333333333333333333333333333333333".into(),
                 observed_at_ms: 80, available_at_ms: 90,
             }],
             permitted_action_ids: vec!["a".into(), "b".into()],
@@ -439,8 +444,8 @@ mod tests {
     fn proposal(c: &CandidateDecisionContext) -> DecisionProposal {
         DecisionProposal {
             episode_id: c.episode_id.clone(), policy_id: "fixed".into(), policy_version: "1".into(),
-            selected_action_id: "a".into(), selected_action_payload_digest: "sha256:payload-a".into(),
-            rationale_digest: "sha256:rationale".into(),
+            selected_action_id: "a".into(), selected_action_payload_digest: "6666666666666666666666666666666666666666666666666666666666666666".into(),
+            rationale_digest: "4444444444444444444444444444444444444444444444444444444444444444".into(),
             assumption_digests: vec![],
             predicted_outcomes: vec![
                 PredictedOutcome { outcome_label: "yes".into(), probability_micros: 400_000 },
@@ -448,13 +453,13 @@ mod tests {
             ],
             assignment_mechanism: AssignmentMechanism::Randomized {
                 action_probabilities: vec![
-                    ActionProbability { action_id: "a".into(), action_payload_digest: "sha256:payload-a".into(), probability_micros: 500_000 },
-                    ActionProbability { action_id: "b".into(), action_payload_digest: "sha256:payload-b".into(), probability_micros: 500_000 },
+                    ActionProbability { action_id: "a".into(), action_payload_digest: "6666666666666666666666666666666666666666666666666666666666666666".into(), probability_micros: 500_000 },
+                    ActionProbability { action_id: "b".into(), action_payload_digest: "7777777777777777777777777777777777777777777777777777777777777777".into(), probability_micros: 500_000 },
                 ],
                 protocol_ref: "random-protocol".into(),
             },
             causal_design: CausalDesign::RandomizedControlled,
-            identification_assumption_digests: vec!["sha256:consistency".into()],
+            identification_assumption_digests: vec!["5555555555555555555555555555555555555555555555555555555555555555".into()],
         }
     }
     fn complete_cost() -> ResourceVector {
@@ -467,10 +472,10 @@ mod tests {
         EvaluatorResolution {
             episode_id: c.episode_id.clone(), execution_status: ExecutionStatus::Completed,
             outcome_status: OutcomeStatus::DelayedObserved, action_support: ActionSupport::RecordedAction,
-            recorded_action_id: Some("a".into()), recorded_action_payload_digest: Some("sha256:payload-a".into()),
+            recorded_action_id: Some("a".into()), recorded_action_payload_digest: Some("6666666666666666666666666666666666666666666666666666666666666666".into()),
             outcome_label: Some("yes".into()),
             evaluator_evidence: vec![EvidenceReference {
-                evidence_id: "result".into(), content_digest: "sha256:result".into(),
+                evidence_id: "result".into(), content_digest: "8888888888888888888888888888888888888888888888888888888888888888".into(),
                 observed_at_ms: 900, available_at_ms: 950,
             }],
             finalized_at_ms: Some(960), actual_cost: complete_cost(),
@@ -490,6 +495,17 @@ mod tests {
         c = context();
         c.permitted_action_offer_list_sha256 = "c".repeat(63);
         assert!(c.validate().unwrap_err().contains("permitted_action_offer_list_sha256"));
+    }
+
+    #[test]
+    fn rejects_malformed_action_and_evidence_digests() {
+        let c = context();
+        let mut p = proposal(&c);
+        p.selected_action_payload_digest = "payload-not-a-sha256".into();
+        assert!(p.validate_against(&c).unwrap_err().contains("selected_action_payload_digest"));
+        let mut r = resolution(&c);
+        r.evaluator_evidence[0].content_digest = "not-a-hash".into();
+        assert!(r.validate_against(&c, &proposal(&c)).unwrap_err().contains("evaluator evidence digest"));
     }
 
     #[test]
@@ -515,7 +531,7 @@ mod tests {
         let mut p = proposal(&c);
         p.assignment_mechanism = AssignmentMechanism::Randomized {
             action_probabilities: vec![
-                ActionProbability { action_id: "a".into(), action_payload_digest: "sha256:payload-a".into(), probability_micros: 1_000_000 },
+                ActionProbability { action_id: "a".into(), action_payload_digest: "6666666666666666666666666666666666666666666666666666666666666666".into(), probability_micros: 1_000_000 },
             ],
             protocol_ref: "random-protocol".into(),
         };
@@ -523,8 +539,8 @@ mod tests {
 
         p.assignment_mechanism = AssignmentMechanism::Randomized {
             action_probabilities: vec![
-                ActionProbability { action_id: "a".into(), action_payload_digest: "sha256:payload-a".into(), probability_micros: 0 },
-                ActionProbability { action_id: "b".into(), action_payload_digest: "sha256:payload-b".into(), probability_micros: 1_000_000 },
+                ActionProbability { action_id: "a".into(), action_payload_digest: "6666666666666666666666666666666666666666666666666666666666666666".into(), probability_micros: 0 },
+                ActionProbability { action_id: "b".into(), action_payload_digest: "7777777777777777777777777777777777777777777777777777777777777777".into(), probability_micros: 1_000_000 },
             ],
             protocol_ref: "random-protocol".into(),
         };
@@ -540,7 +556,7 @@ mod tests {
         let c = context();
         let p = proposal(&c);
         let mut r = resolution(&c);
-        r.recorded_action_payload_digest = Some("sha256:different-batch".into());
+        r.recorded_action_payload_digest = Some("9999999999999999999999999999999999999999999999999999999999999999".into());
         assert!(r.validate_against(&c, &p).unwrap_err().contains("identity/payload differs"));
     }
 
