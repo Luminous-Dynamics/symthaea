@@ -1,0 +1,16 @@
+[package]
+name = "subterra-survival-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Bounded finite-horizon survival-conditioned measurement planning reference for Subterra"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+
+# Standalone research crate; intentionally outside the production workspace.
+[workspace]

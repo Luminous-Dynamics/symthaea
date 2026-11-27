@@ -1,0 +1,46 @@
+{
+  "bundle_version": "0.1",
+  "producer_repository": "Luminous-Dynamics/symtropy",
+  "producer_pull_request": 5486,
+  "source_boundary": "Git blob IDs pin the upstream schema/fixture objects used when authoring this adapter. They are provenance identifiers, not signature or authenticity proofs.",
+  "schemas": [
+    {
+      "kind": "site_evidence",
+      "path": "research/geobio-foundry/SUBTERRA_SITE_EVIDENCE_SCHEMA_v0.1.json",
+      "git_blob_sha1": "970b48703a8147cd3047cce05c5fc0631d1f03d9",
+      "schema_id": "https://luminousdynamics.io/schemas/subterra/site-evidence/v0.1",
+      "schema_version": "0.1"
+    },
+    {
+      "kind": "cave_network",
+      "path": "research/geobio-foundry/SUBTERRA_NETWORK_SCHEMA_v0.1.json",
+      "git_blob_sha1": "bfe797f741d930ffcde2ce9d33a21c75396f46c0",
+      "schema_id": "https://luminousdynamics.io/schemas/subterra/cave-network/v0.1",
+      "schema_version": "0.1"
+    },
+    {
+      "kind": "nonuniform_profile",
+      "path": "research/geobio-foundry/SUBTERRA_PROFILE_SCHEMA_v0.1.json",
+      "git_blob_sha1": "87d77b208f20227797ff59fd1f6d4c01bbb1c72c",
+      "schema_id": "https://luminousdynamics.io/schemas/subterra/profile/v0.1",
+      "schema_version": "0.1"
+    }
+  ],
+  "fixtures": [
+    {
+      "kind": "site_evidence",
+      "path": "research/geobio-foundry/fixtures/subterra-site-evidence-synthetic.json",
+      "git_blob_sha1": "31813b808d596f9ddb78c4de49a15f1773026fc9"
+    },
+    {
+      "kind": "cave_network",
+      "path": "research/geobio-foundry/fixtures/subterra-cave-network-synthetic.json",
+      "git_blob_sha1": "95fa93de34773569aa3abcb9c3f808f2f9986e97"
+    },
+    {
+      "kind": "nonuniform_profile",
+      "path": "research/geobio-foundry/fixtures/subterra-nonuniform-profile-synthetic.json",
+      "git_blob_sha1": "a8305c9881f3483a762e3bc6717b86009d583039"
+    }
+  ]
+}
