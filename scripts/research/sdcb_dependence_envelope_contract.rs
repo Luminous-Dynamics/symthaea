@@ -121,8 +121,25 @@ fn is_canonical_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn family_matches_dependence_model(
+    family: MarginalFamilyV1,
+    model: DependenceModelV1,
+) -> bool {
+    matches!(
+        (family, model),
+        (
+            MarginalFamilyV1::Gaussian,
+            DependenceModelV1::StationaryGaussianAr1
+        ) | (
+            MarginalFamilyV1::StandardizedStudentT5CommonScale,
+            DependenceModelV1::Ar1WithStudentT5CommonScale
+        )
+    )
+}
+
 fn envelope_is_well_formed(envelope: &ValidatedDependenceEnvelopeV1) -> bool {
     envelope.schema_version == CONTRACT_VERSION_V1
+        && family_matches_dependence_model(envelope.marginal_family, envelope.dependence_model)
         && is_nonempty_bounded_identifier(&envelope.envelope_id)
         && is_nonempty_bounded_identifier(&envelope.scope_id)
         && envelope.block_length > 0
@@ -407,6 +424,16 @@ mod tests {
         assert_eq!(
             classify(&envelope(), &obs).reason,
             QualificationReasonV1::InvalidObservationDigest
+        );
+    }
+
+    #[test]
+    fn marginal_family_and_dependence_model_must_form_a_supported_pair() {
+        let mut env = envelope();
+        env.marginal_family = MarginalFamilyV1::StandardizedStudentT5CommonScale;
+        assert_eq!(
+            classify(&env, &observation()).reason,
+            QualificationReasonV1::InvalidEnvelopeContract
         );
     }
 
