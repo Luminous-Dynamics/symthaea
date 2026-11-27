@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon040-replay-reproducibility-input-v1.schema.json",
+  "title": "MON-040 Replay Reproducibility Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "trial_id",
+    "mode",
+    "evaluated_at",
+    "scenario_sha256",
+    "recovery_boundary_sha256",
+    "code_revision",
+    "fault_ids",
+    "fault_set_sha256",
+    "target_failure_signature_sha256",
+    "required_runs",
+    "minimum_reliability",
+    "confidence_level",
+    "observations"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon040-replay-reproducibility-input-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "trial_id": {
+      "$ref": "#/$defs/id"
+    },
+    "mode": {
+      "enum": [
+        "offline_fixture",
+        "runtime_candidate"
+      ]
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scenario_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "recovery_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "code_revision": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "fault_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "fault_set_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "target_failure_signature_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "required_runs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200
+    },
+    "minimum_reliability": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
+    "confidence_level": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "observations": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^\\S(?:[^\\r\\n]*\\S)?$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replay_id",
+        "trial_id",
+        "seed",
+        "fault_set_sha256",
+        "scenario_sha256",
+        "recovery_boundary_sha256",
+        "code_revision",
+        "observed_at",
+        "verdict",
+        "failure_signature_sha256",
+        "outcome_receipt_sha256",
+        "complete"
+      ],
+      "properties": {
+        "replay_id": {
+          "$ref": "#/$defs/id"
+        },
+        "trial_id": {
+          "$ref": "#/$defs/id"
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fault_set_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "scenario_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "recovery_boundary_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "code_revision": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "verdict": {
+          "enum": [
+            "qualified",
+            "blocked",
+            "indeterminate"
+          ]
+        },
+        "failure_signature_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "outcome_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "complete": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+MON040 synthetic recovery boundary v1
+incident=incident-040-001
+claim=claim-cdc
+source_cluster=postgres-source-a
+database=application
+source_epoch=primary-epoch-3
+timeline=3
+snapshot=backup-040-001
+terminal_position=0/ABCDEF
+scope_sha256=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+inventory_sha256=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd

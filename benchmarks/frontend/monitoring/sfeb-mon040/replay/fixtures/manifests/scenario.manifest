@@ -1,0 +1,6 @@
+MON040 deterministic recovery replay schedule v1
+trial=trial-040-001
+fault_set=fault-a,fault-c
+expected_replay_count=29
+confidence=0.95
+minimum_target_signature_rate=0.90
