@@ -9,8 +9,14 @@ set -eu
 case "$MON025_BACKUP_ID" in
     *[!A-Za-z0-9_-]*|'') echo "invalid backup ID" >&2; exit 64 ;;
 esac
-printf '%s\n' "$MON025_RECOVERY_TARGET_LSN" | grep -Eq '^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}
-
+printf '%s\\n' "$MON025_RECOVERY_TARGET_LSN" | grep -Eq '^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$' || {
+    echo "invalid PostgreSQL LSN; expected HEX/HEX" >&2
+    exit 64
+}
+case "$MON025_RECOVERY_TARGET_TIMELINE" in
+    *[!0-9]*|'') echo "recovery timeline must be a positive integer" >&2; exit 64 ;;
+esac
+[ "$MON025_RECOVERY_TARGET_TIMELINE" -gt 0 ] || { echo "recovery timeline must be positive" >&2; exit 64; }
 BACKUP_DIR="/backups/$MON025_BACKUP_ID"
 mkdir -p "$PGDATA"
 if [ ! -s "$BACKUP_DIR/PG_VERSION" ]; then
