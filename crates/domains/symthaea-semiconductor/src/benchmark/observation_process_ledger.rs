@@ -576,7 +576,7 @@ fn validate_tracking(
                     }
                 }
                 FeedbackTrackingStateV1::UnlimitedReceived => {
-                    if tracking.actual_feedback_delay_rounds != Some(delay)
+                    if tracking.actual_feedback_delay_rounds.is_none()
                         || tracking.tracking_slot_id.is_some()
                         || tracking.tracking_end_round.is_some()
                     {
@@ -823,6 +823,21 @@ fn assumption_state(
         ObservationRiskControllerV1::None => {}
         ObservationRiskControllerV1::FixedDelayAci => {
             let fixed_delay = input.fixed_delay_rounds.unwrap_or(0);
+            if rows.iter().any(|row| {
+                row.tracking.state == FeedbackTrackingStateV1::UnlimitedReceived
+                    && row.tracking.actual_feedback_delay_rounds != Some(fixed_delay)
+            }) {
+                reasons.push("At least one ACI outcome arrived outside the declared fixed-delay schedule.".into());
+                return (ControllerAssumptionStateV1::DelayContractExceeded, reasons);
+            }
+            if rows.iter().any(|row| {
+                row.tracking.state == FeedbackTrackingStateV1::UnlimitedPending
+                    || row.acquisition.state == PhysicalAcquisitionStateV1::SelectedPending
+                    || row.qualification.state == K1QualificationStateV1::Pending
+            }) {
+                reasons.push("The closeout contains unresolved physical acquisition, K1 qualification or fixed-delay feedback.".into());
+                return (ControllerAssumptionStateV1::TraceIncomplete, reasons);
+            }
             for row in rows {
                 if row.acquisition.state != PhysicalAcquisitionStateV1::Measured {
                     reasons.push(format!("round {} has no completed physical measurement", row.round_id));
@@ -839,6 +854,28 @@ fn assumption_state(
         }
         ObservationRiskControllerV1::CapacityAwareOcrcBounded => {
             let maximum_delay = input.maximum_feedback_delay_rounds.unwrap_or(0);
+            if rows.iter().any(|row| {
+                row.tracking.actual_feedback_delay_rounds
+                    .is_some_and(|delay| delay > maximum_delay)
+            }) {
+                reasons.push("At least one physical feedback result exceeded the declared maximum delay.".into());
+                return (ControllerAssumptionStateV1::DelayContractExceeded, reasons);
+            }
+            if rows.iter().any(|row| {
+                row.acquisition.state == PhysicalAcquisitionStateV1::SelectedPending
+                    || row.qualification.state == K1QualificationStateV1::Pending
+                    || row.tracking.state == FeedbackTrackingStateV1::AdmittedPending
+            }) {
+                reasons.push("The closeout contains unresolved physical acquisition, K1 qualification or proxy-tracked feedback.".into());
+                return (ControllerAssumptionStateV1::TraceIncomplete, reasons);
+            }
+            if maximum_occupancy > input.tracking_capacity.unwrap_or(0) {
+                reasons.push(format!(
+                    "Observed peak tracking occupancy {maximum_occupancy} exceeded declared capacity {}.",
+                    input.tracking_capacity.unwrap_or(0)
+                ));
+                return (ControllerAssumptionStateV1::TrackingCapacityExceeded, reasons);
+            }
             for row in rows {
                 if row.acquisition.state != PhysicalAcquisitionStateV1::Measured {
                     reasons.push(format!("round {} has no completed physical measurement", row.round_id));
@@ -981,6 +1018,11 @@ pub fn evaluate_observation_process_v1(
         ));
     }
     let rows = canonical_rounds(&input.rounds);
+    if rows.iter().any(|row| row.round_id > input.closeout_round) {
+        return Err(ObservationProcessErrorV1(
+            "closeout round precedes one or more population prediction rounds".into(),
+        ));
+    }
     let mut round_ids = BTreeSet::new();
     let mut sample_ids = BTreeSet::new();
     let mut measurement_event_ids = BTreeSet::new();
@@ -1160,14 +1202,6 @@ pub fn evaluate_observation_process_v1(
     }
 
     let maximum_occupancy = maximum_tracking_occupancy(&rows);
-    if input.controller == ObservationRiskControllerV1::CapacityAwareOcrcBounded
-        && maximum_occupancy > input.tracking_capacity.unwrap_or(0)
-    {
-        return Err(ObservationProcessErrorV1(
-            "observed tracking occupancy exceeds the declared CA-OCRC capacity".into(),
-        ));
-    }
-
     let (controller_assumption_state, controller_assumption_reasons) =
         assumption_state(input, &rows, maximum_occupancy);
 
