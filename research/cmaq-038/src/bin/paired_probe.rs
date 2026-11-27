@@ -8,7 +8,7 @@ use std::env;
 use std::fmt::Display;
 use std::str::FromStr;
 
-use cmaq_031_anytime_calibration_monitor::{centered_rank_payoff, RankFeature};
+use cmaq_031_anytime_calibration_monitor::{RankFeature, centered_rank_payoff};
 use cmaq_038_rank_spectrum_monitor::{RankSpectrumMonitor, SpectrumUpdate};
 
 const CALIBRATION_COUNT: usize = 99;
@@ -179,9 +179,7 @@ impl FixedFourMonitor {
         }
 
         let log_mixture = log_mean_exp(&next_wealth)?;
-        let threshold = (f64::from(self.alpha_denominator)
-            / f64::from(self.alpha_numerator))
-            .ln();
+        let threshold = (f64::from(self.alpha_denominator) / f64::from(self.alpha_numerator)).ln();
         let next_count = self.rank_counts[rank_one_based - 1]
             .checked_add(1)
             .ok_or_else(|| "fixed-four rank counter overflow".to_string())?;
@@ -203,10 +201,7 @@ fn log_mean_exp(log_values: &[f64]) -> Result<f64, String> {
     }
 
     let maximum = log_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    let scaled_sum: f64 = log_values
-        .iter()
-        .map(|value| (value - maximum).exp())
-        .sum();
+    let scaled_sum: f64 = log_values.iter().map(|value| (value - maximum).exp()).sum();
     let result = maximum + (scaled_sum / log_values.len() as f64).ln();
     if !result.is_finite() {
         return Err("log mixture overflow".into());
@@ -287,17 +282,11 @@ fn run_scenario(
             ^ (replication as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
         let mut rng = SplitMix64::new(replication_seed);
         let mut generator_counts = vec![0u64; CALIBRATION_COUNT + 1];
-        let mut fixed_monitor = FixedFourMonitor::new(
-            CALIBRATION_COUNT,
-            ALPHA_NUMERATOR,
-            ALPHA_DENOMINATOR,
-        )?;
-        let mut spectrum_monitor = RankSpectrumMonitor::new(
-            CALIBRATION_COUNT,
-            ALPHA_NUMERATOR,
-            ALPHA_DENOMINATOR,
-        )
-        .map_err(|error| format!("CMAQ-038 construction error: {error:?}"))?;
+        let mut fixed_monitor =
+            FixedFourMonitor::new(CALIBRATION_COUNT, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)?;
+        let mut spectrum_monitor =
+            RankSpectrumMonitor::new(CALIBRATION_COUNT, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)
+                .map_err(|error| format!("CMAQ-038 construction error: {error:?}"))?;
         let mut fixed_delay = None;
         let mut spectrum_delay = None;
 
@@ -355,9 +344,7 @@ fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
     let z2 = Z_975 * Z_975;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let radius = Z_975
-        * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()
-        / denominator;
+    let radius = Z_975 * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt() / denominator;
     ((center - radius).max(0.0), (center + radius).min(1.0))
 }
 
