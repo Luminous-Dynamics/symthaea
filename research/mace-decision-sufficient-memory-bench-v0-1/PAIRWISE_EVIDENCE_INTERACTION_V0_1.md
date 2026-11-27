@@ -55,7 +55,7 @@ The current focused tests exercise:
 
 The implementation also rejects missing/identical pair targets, wrong episode/system/policy/seed, and changes to unrelated evidence; these additional branches should receive dedicated negative tests before promotion.
 
-The first known-answer example is deliberately simple: each single removal preserves the correct action, while removing both causes abstention. Its interaction is exactly +2,000,000 micro-loss units. This is a test fixture, not a measured system result.
+The first known-answer example is deliberately simple: each single removal preserves the correct action, while removing both causes abstention. The items are substitutes: either one is enough. Its interaction is exactly +2,000,000 micro-loss units. This is a test fixture, not a measured system result.
 
 ## Research metrics to publish
 
