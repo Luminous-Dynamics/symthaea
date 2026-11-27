@@ -496,7 +496,7 @@ fn build_stratum(
     }
     let baseline_subset: BTreeMap<&str, &MusicalIdentityTriadResultV1> = baseline_results
         .iter()
-        .filter(|(item_id, _)| selected_ids.contains(**item_id))
+        .filter(|(item_id, _)| selected_ids.contains(*item_id))
         .map(|(item_id, result)| (*item_id, *result))
         .collect();
     let candidate_subset: BTreeMap<&str, &MusicalIdentityTriadResultV1> = candidate_results
