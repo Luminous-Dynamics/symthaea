@@ -235,7 +235,21 @@
     "reported_speedup_min": 1.36,
     "reported_speedup_max": 2.89,
     "reference_grid_transport_retained": true,
-    "status": "literature_claim_not_reproduced_here"
+    "status": "literature_claim_not_reproduced_here",
+    "spatial_cells": 64,
+    "time_step": 0.00125,
+    "velocity_node_counts_tested": [
+      128,
+      256,
+      512,
+      1024
+    ],
+    "timing_repetitions": 3,
+    "timing_statistic": "median_with_min_max_range",
+    "host_cpu": "AMD EPYC 9654",
+    "blas_threads": 1,
+    "setup_included_in_timing": false,
+    "full_grid_muscl_transport_retained": true
   },
   "reference_convergence": {
     "spatial_refinement_levels": 2,
@@ -270,5 +284,7 @@
       "arxiv:2611.27904",
       "published-table-1-training-validation-and-test-trajectories"
     ]
-  }
+  },
+  "initial_condition_formula_id": "two_stream_gaussian_mixture_density_weight_and_velocity_shift_v1",
+  "external_field_formula_id": "sinusoidal_two_mode_external_field_v1"
 }
