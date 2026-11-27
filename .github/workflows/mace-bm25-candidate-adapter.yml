@@ -39,9 +39,9 @@ jobs:
           components: rustfmt, clippy
       - name: Format strict adapter and referenced baseline
         run: cargo fmt --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/baselines/adapter/Cargo.toml -- --check
-      - name: Generate isolated adapter dependency lock
-        run: cargo generate-lockfile --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/baselines/adapter/Cargo.toml
-      - name: Upload isolated adapter Cargo.lock
+      - name: Verify committed adapter lockfile resolves without changes
+        run: cargo metadata --locked --manifest-path research/mace-decision-sufficient-memory-bench-v0-1/baselines/adapter/Cargo.toml --format-version 1 > /dev/null
+      - name: Preserve exact nested dependency lock
         uses: actions/upload-artifact@v4
         with:
           name: mace-bm25-adapter-cargo-lock
