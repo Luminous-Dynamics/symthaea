@@ -195,7 +195,9 @@ jobs:
           if [[ -f tools/mel-temporal-grounding-qualifier/src/bin/mel-audio-evidence-in-toto.rs ]]; then
             cp tools/mel-temporal-grounding-qualifier/src/bin/mel-audio-evidence-in-toto.rs "$evidence/"
           fi
-          cp tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-bound-revision.synthetic.json "$evidence/"
+          if [[ -f tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-bound-revision.synthetic.json ]]; then
+            cp tools/mel-temporal-grounding-qualifier/fixtures/mel-audio-bound-revision.synthetic.json "$evidence/"
+          fi
           if [[ -f "$RUNNER_TEMP/audio-evidence-in-toto-payload.json" ]]; then
             cp "$RUNNER_TEMP/audio-evidence-in-toto-payload.json" "$evidence/"
           fi
