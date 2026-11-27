@@ -105,6 +105,32 @@ fn run_receipt_sample_is_valid_and_qualification_is_non_compensatory() {
         "qualified=true must not compensate for a failed authority dimension"
     );
 
+    let mut denied_but_allowed = sample.clone();
+    denied_but_allowed["expected_disposition"] = json!("deny");
+    denied_but_allowed["observed_result"]["disposition"] = json!("allow");
+    assert!(
+        !validator.is_valid(&denied_but_allowed),
+        "a denied task must not accept an allowed observed result"
+    );
+
+    let mut denied_with_mutation = sample.clone();
+    denied_with_mutation["expected_disposition"] = json!("deny");
+    denied_with_mutation["observed_result"]["disposition"] = json!("deny");
+    denied_with_mutation["observed_result"]["state_mutation_count"] = json!(1);
+    assert!(
+        !validator.is_valid(&denied_with_mutation),
+        "a denied task must preserve state"
+    );
+
+    let mut unresolved_qualified = sample.clone();
+    unresolved_qualified["expected_disposition"] = json!("unresolved");
+    unresolved_qualified["observed_result"]["disposition"] = json!("unresolved");
+    unresolved_qualified["qualified"] = json!(true);
+    assert!(
+        !validator.is_valid(&unresolved_qualified),
+        "an unresolved task cannot be marked qualified"
+    );
+
     let mut invalid_verifier = sample.clone();
     invalid_verifier["qualified"] = json!(true);
     invalid_verifier["verifier"]["independent"] = json!(false);
