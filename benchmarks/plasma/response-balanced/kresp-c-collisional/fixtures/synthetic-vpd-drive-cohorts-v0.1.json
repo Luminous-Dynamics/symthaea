@@ -1,0 +1,189 @@
+{
+  "schema_version": "0.1",
+  "record_status": "synthetic_benchmark_contract_only",
+  "benchmark_id": "KRESP-C-VPD-1D1V",
+  "equation": "periodic_1d1v_vlasov_poisson_dougherty",
+  "domain": {
+    "x_min": 0,
+    "x_max": 6.283185307179586,
+    "x_periodic": true,
+    "v_min": -12,
+    "v_max": 12,
+    "velocity_boundary_condition": "zero_velocity_flux",
+    "time_unit": "omega_pe^-1"
+  },
+  "collision_model": {
+    "operator": "dougherty_fokker_planck",
+    "collision_frequency": 0.35,
+    "self_consistent_temperature": true,
+    "invariants": [
+      "mass",
+      "momentum",
+      "kinetic_energy"
+    ],
+    "entropy_functional": "boltzmann_h_negative_integral_f_log_f"
+  },
+  "discretization": {
+    "splitting": "strang_collision_half_transport_full_collision_half",
+    "transport_scheme": "MUSCL",
+    "spatial_cells": 64,
+    "velocity_nodes": 128,
+    "time_step": 0.00125,
+    "transport_reference_grid_retained": true
+  },
+  "trajectory_cohorts": [
+    {
+      "cohort_id": "vpd-two-stream-relaxation-synthetic",
+      "kind": "two_stream_relaxation",
+      "end_time": 4,
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 4,
+          "amplitude": 0
+        }
+      ],
+      "split_role": "training",
+      "independent_initial_state_digest": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "cohort_id": "vpd-sustained-heating-synthetic",
+      "kind": "sustained_heating",
+      "end_time": 8,
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 8,
+          "amplitude": 0.7
+        }
+      ],
+      "split_role": "validation",
+      "independent_initial_state_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "cohort_id": "vpd-drive-switching-synthetic",
+      "kind": "drive_switching",
+      "end_time": 12,
+      "external_drive_schedule": [
+        {
+          "start_time": 0,
+          "end_time": 4,
+          "amplitude": 0.7
+        },
+        {
+          "start_time": 4,
+          "end_time": 8,
+          "amplitude": -0.7
+        },
+        {
+          "start_time": 8,
+          "end_time": 12,
+          "amplitude": 0
+        }
+      ],
+      "split_role": "sealed_holdout",
+      "independent_initial_state_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "registered_qois": [
+    "distribution_space_time_error",
+    "density_error",
+    "current_error",
+    "temperature_error",
+    "electric_field_error",
+    "third_central_moment_error",
+    "entropy_dissipation_residual",
+    "mass_drift",
+    "momentum_drift",
+    "kinetic_energy_drift",
+    "positivity_violation"
+  ],
+  "structure_contract": {
+    "positivity_required": true,
+    "local_mass_conservation_required": true,
+    "local_momentum_conservation_required": true,
+    "local_kinetic_energy_conservation_required": true,
+    "entropy_dissipation_required": true,
+    "positive_empirical_cubature_required": true,
+    "fallback_on_structure_failure": "full_order_collision_step"
+  },
+  "reduction_contract": {
+    "physical_moments_retained": [
+      "density",
+      "mean_velocity",
+      "temperature"
+    ],
+    "basis_family": "rbkr_response_augmented_entropy_family",
+    "basis_updates_allowed_on": [
+      "training",
+      "development_challenge"
+    ],
+    "cubature_weight_constraint": "strictly_positive",
+    "maximum_variables_per_cell": 13,
+    "representation_objective": "joint_rate_distortion_and_drive_response"
+  },
+  "separation_of_error": {
+    "representation_error_reported": true,
+    "evolution_error_reported": true,
+    "transport_error_reported": true,
+    "collision_hyperreduction_error_reported": true,
+    "same_grid_full_order_reference_required": true
+  },
+  "comparators": [
+    "published_entropy_vpd_rom",
+    "entropy_vpd_without_posttraining",
+    "entropy_vpd_without_positive_cubature",
+    "snapshot_pod",
+    "adaptive_hermite",
+    "micro_macro_pod",
+    "full_order_vpd"
+  ],
+  "published_prior_art_reference": {
+    "arxiv_id": "2611.27904",
+    "published_methods": [
+      "positive_exponential_moments",
+      "data_adapted_velocity_functions",
+      "dynamics_posttraining",
+      "positive_empirical_cubature"
+    ],
+    "variables_per_cell": 13,
+    "reported_distribution_error_percent_strict_upper": 0.25,
+    "reported_speedup_min": 1.36,
+    "reported_speedup_max": 2.89,
+    "reference_grid_transport_retained": true,
+    "status": "literature_claim_not_reproduced_here"
+  },
+  "reference_convergence": {
+    "spatial_refinement_levels": 2,
+    "velocity_refinement_levels": 2,
+    "time_refinement_levels": 2,
+    "velocity_domain_extension_required": true,
+    "independent_reference_confirmation_required": true
+  },
+  "matched_cost_modes": [
+    "equal_variables_per_cell",
+    "equal_total_stored_bytes",
+    "equal_end_to_end_wall_time",
+    "equal_full_order_solver_budget"
+  ],
+  "success_targets": {
+    "status": "prospective_only_not_achieved",
+    "structure_guarantees_must_match": true,
+    "distribution_error_must_be_below_published_reference": true,
+    "drive_response_improvement_required": true,
+    "all_claims_prospective": true
+  },
+  "claim_boundary": {
+    "physical_solver_executed": false,
+    "physical_trajectory_measured": false,
+    "entropy_guarantee_proved_for_this_implementation": false,
+    "competitive_result_reproduced": false
+  },
+  "provenance": {
+    "fixture_class": "synthetic_kresp_c_design_fixture_only",
+    "generator_seed": 11,
+    "source_contract_refs": [
+      "arxiv:2611.27904"
+    ]
+  }
+}
