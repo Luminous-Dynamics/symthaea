@@ -13,5 +13,5 @@ Qualification boundary: this harness tests the actual production support-module 
 
 Run:
 
-    cargo test --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml
-    cargo clippy --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml --all-targets -- -D warnings
+    cargo test --locked --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml
+    cargo clippy --locked --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml --all-targets -- -D warnings
