@@ -318,3 +318,92 @@ At inspection time, the generator and ablation source were present on main, but 
 - **Proceed to a larger confirmatory study** only if replay policy ranking shows useful held-out agreement with live evaluation, improves the cost/quality frontier against fixed and random controls, and has no material calibration or protected-capability regression.
 - A positive forecast-replay pilot is evidence for a reusable replay substrate only. The discovery-tree policy result and R4 same-start improver result remain separate claims.
 
+## 13. New scientific-transfer baseline: RecurSciBench (2026-11-24)
+
+The November 24 technical report [RecurSciBench: Benchmarking Recursive Self-Improvement in Data-Driven Scientific Research](https://arxiv.org/abs/2611.32508) is a direct new comparator for the scientific-R&D part of this programme. It should be included in the #10497 / #10877 benchmark portfolio rather than treated as another coding-only RSI result.
+
+### Reported design and results
+
+The reported RecurSciPipe pipeline uses four task-construction/review roles to profile raw datasets, design paired scientific modeling and analysis tasks, build executable task packages, and review contract, leakage, execution, scoring and scientific-validity properties.
+
+The reported benchmark contains 96 tasks from 58 task families in four scientific domains. Four RSI systems produce 24 evolved states under six source settings; frozen initial and evolved systems are then assessed on 20 independent modeling tasks with a fixed GLM-5.3-Flash backbone. The benchmark examines within-type, cross-type and cross-domain transfer.
+
+The reported Evolution Gain spans **−3.34% to +2.62%**. Half of evolved states regress overall and every evolved state regresses on at least eight individual test tasks. The report describes transfer from analysis experience to modeling tasks in cases where modeling-source evolution did not improve the source task; verification/validation practices could transfer, while overly broad simplicity rules sometimes harmed new tasks.
+
+Sources: [arXiv v1](https://arxiv.org/abs/2611.32508), [task and results summary](https://owd-ai.github.io/awesome-open-world-discovery/papers/b84573f658fe2b7e/).
+
+### Methodological limits to preserve
+
+- Only 20 independent test modeling tasks, four evaluated systems and one fixed backbone are reported in the current snapshot.
+- Systems receive different source-feedback access and evolution budgets, limiting causal comparison of the improvement procedures.
+- Scientific checks are agent-mediated rather than independent expert certification.
+- Invalid runs are excluded in the summarized protocol; Symthaea must retain failed, invalid, ungraded and not-run outcomes in its own denominators.
+- The report is a new technical preprint. A dedicated reproducible benchmark release/platform and its executable task assets were not independently verified during this review; do not claim a reproduction or assume the paper's task corpus is presently obtainable.
+- A machine-generated review raises a possible task-generator/backbone family-dependence concern because GLM-5.3 is described as both task generator and the family of the fixed evaluation backbone. Treat that as a potential confound to test, not an established flaw or an author-acknowledged result.
+
+### Symthaea's proposed scientific-transfer extension
+
+Use the paper's task-type and domain-crossing design, but raise the evidence standard:
+
+1. **Cross-generator transfer:** where licenses and task access permit, use at least two independently developed task-generation sources/backbones, plus a human/domain-expert authored or adjudicated anchor sample. Keep source-generator identity blinded to candidate improvers.
+2. **Cross-backbone transfer:** freeze one backbone for the primary causal comparison, then reproduce on a second backbone as a separate generality check. Never pool the two as if they were one experimental arm.
+3. **Per-task outcome retention:** report every gain and regression, task-family-clustered intervals, the proportion of tasks improved/tied/regressed, worst-family loss and protected-domain non-inferiority. A positive mean must not hide a broad regression tail.
+4. **Transfer matrix:** separate analysis→analysis, modeling→modeling, analysis→modeling, modeling→analysis where feasible, and every source-domain→target-domain pair. Do not call all of them simply "OOD".
+5. **Memory-mechanism ablation:** compare full evidence-qualified research memory, verification/validation-only memory, success-only memory, rejected/null/failure history, shuffled history and no memory. Measure whether each retained rule improves fresh tasks rather than whether it sounds reusable.
+6. **Scientific-validity gate:** executable success is necessary but insufficient. Use independent domain review on a preregistered sample, objective/data-generating checks where available, and explicit unsupported/indeterminate states. Keep agent-generated task construction separate from final truth adjudication.
+7. **Lifecycle-cost accounting:** include raw-data licensing/acquisition, task construction, expert/domain review, evaluator validation, monitoring, reruns and failure adjudication in addition to agent inference and task execution.
+
+This should compose with #10877 (research taste and result interpretation), #10756 (evaluator research and independent target judgments), #10497 (same-start outer-loop improver) and the existing scientific benchmark portfolio. Do not build a parallel task factory, grader, or evaluator authority merely to imitate RecurSciPipe.
+
+## 14. METR Q4 2026: the verifiability and judgment bottleneck
+
+The November 20, 2026 [METR AI R&D-relevant model capabilities update](https://metr.org/blog/2026-11-20-q4-2026-capability-update/) materially changes how Symthaea should measure progress.
+
+### What the report says
+
+- On METR's tested coding and optimization tasks, public frontier models usually match or outperform skilled human baseliners.
+- On the combined Time Horizon 1.1 and TH2 suites, measured task time horizons were doubling at roughly **3.6 months** (95% CI 2.08–4.94 months); the reported subset of TH2 verifiable tasks had a faster but noisier estimated doubling time of 1.65 months (95% CI 0.79–3.99).
+- On tasks requiring judgment without clear empirical feedback, agents appeared weaker than human experts. The report gives examples of model judges overestimating outputs from models at least as strong as themselves.
+- The report describes a lifecycle-cost effect: for a given task length, doubling estimated lifecycle cost was associated with a difficulty penalty roughly equivalent to halving the agent's time horizon. This is a model-estimated proxy, not a universal physical law.
+- In a task about generating informative evaluation tasks, agents tended to produce automatically scored optimization tasks even when instructed to focus on hard-to-verify judgments; the authors did not find the generated tasks sufficiently useful for inclusion in their suite.
+
+### Consequent paradigm shift
+
+Do not optimize only for fast, cheap, automatically scored tasks. Those are necessary engineering gates, but they are not a sufficient proxy for scientific judgment or real research productivity.
+
+Symthaea should have three separately reported evaluation lanes:
+
+1. **Fast-verifiable lane:** deterministic code, formal, numerical and simulator checks. High throughput, automated and repeatable.
+2. **Slow-verifiable lane:** outcomes require longer rollout, independent replication, held-out deployment or delayed consequence measurement. Count monitoring and lifecycle cost.
+3. **Judgment/underspecified lane:** problem selection, experimental taste, mechanism quality, interpretive discipline and decisions under incomplete feedback. Use blind expert/domain adjudication, objective anchors where possible and explicit abstention. An LLM judge is not independent merely because it is a different process.
+
+For every lane, report capability, reliability, coverage, uncertainty and fully inclusive lifecycle cost separately. A gain in the fast lane must not silently stand in for a gain in the slow or judgment lane.
+
+### New metrics and experimental factors
+
+- **Lifecycle cost vector:** task/dataset construction, rights/licensing, evaluator design, expert review, runtime/monitoring, independent confirmation and failure adjudication.
+- **Judgment calibration:** prospective predicted quality/effect and confidence versus later independent outcomes, stratified by feedback delay and observability.
+- **Evaluator overconfidence:** false-accept rates when a judge scores an artifact generated by an equally strong or stronger system.
+- **Task-construction usefulness:** proportion of agent-proposed tasks that survive blinded expert review and add discriminative information beyond existing anchors.
+- **Decision consequence:** whether an experiment or escalation changes a downstream decision correctly, not just whether it reduces entropy or improves a proxy metric.
+- **Human escalation value:** expert-hours spent, questions resolved, avoided rework and decision regret, while preserving expert disagreement instead of pretending there is one flawless human oracle.
+
+The relevant comparators and owners are METR TH2/TH1.1, RecurSciBench, Autonomous Science Bench, FIRE-Bench, #10877, #10756 and the existing decision-value/active-sensing work. This section is a design response to published findings, not a claim that Symthaea currently exceeds these benchmarks.
+
+## 15. Revised competitive thesis
+
+The most valuable competitive wedge is not a single record score. It is **transferable research efficiency under escalating verification difficulty**.
+
+A credible Symthaea result should show, in sequence:
+
+1. Faster or better performance on cheap, deterministic tasks.
+2. Retention and transfer on unseen task families without benchmark-specific patching.
+3. Correct behavior when feedback is delayed, incomplete, ambiguous or expensive.
+4. Independent domain-validity and evaluator checks that survive stronger candidate models.
+5. Better problem/experiment/interpretation judgment per fully inclusive lifecycle cost.
+6. A successor improver that beats its predecessor from identical starting state and matched realized cost, repeats, transfers and preserves protected capabilities.
+
+This aligns the R4 goal with the strongest newly visible empirical gap: agents can already optimize many well-specified objectives, while selecting valuable research directions and judging uncertain outcomes remain harder and more expensive to verify.
+
+No reported SOTA comparison should mix these six levels into a single leaderboard number.
+
