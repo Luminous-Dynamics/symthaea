@@ -23,10 +23,6 @@ use super::types::{
 };
 use super::ssrf::{
     GuardedDnsResolver, is_dns_policy_rejection, is_dns_policy_rejection_anyhow,
-    is_url_policy_rejection_anyhow, validate_request_url,
-};
-use super::ssrf::{
-    GuardedDnsResolver, is_dns_policy_rejection, is_dns_policy_rejection_anyhow,
     is_redirect_policy_rejection_anyhow, is_url_policy_rejection_anyhow,
     reject_redirect_response, validate_request_url,
 };
