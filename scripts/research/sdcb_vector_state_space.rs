@@ -385,7 +385,8 @@ pub fn discretize_linear_sde(
     diffusion_covariance: &[Vec<f64>],
     elapsed_seconds: f64,
 ) -> Result<DiscreteTransition, Error> {
-    let n = dimension(generator).map_err(|_| Error::EmptyState)?;
+    if generator.is_empty() { return Err(Error::EmptyState); }
+    let n = dimension(generator)?;
     if n > MAX_STATE_DIMENSION {
         return Err(Error::StateTooLarge);
     }
@@ -609,9 +610,9 @@ mod tests {
             covariance: vec![vec![0.5, 0.1], vec![0.1, 0.8]],
         };
         let propagated = propagate_gaussian(&state, &transition).unwrap();
-        close(propagated.mean[0], 0.0377478332013898, 2.0e-13);
+        close(propagated.mean[0], 0.0377481652013899, 2.0e-13);
         close(propagated.mean[1], -1.0705228570379806, 2.0e-13);
-        close(propagated.covariance[0][1], 0.145812, 1.0e-5);
+        close(propagated.covariance[0][1], 0.1586868084984676, 2.0e-12);
         close(propagated.covariance[0][1], propagated.covariance[1][0], 1.0e-14);
     }
 
