@@ -1,0 +1,67 @@
+{
+  "schema_version": "sdcb_ou_window_covariance.expected.v1",
+  "process": {
+    "stationary_variance": 1,
+    "correlation_time_seconds": 1
+  },
+  "window_ids": [
+    "long",
+    "short",
+    "duplicate-long",
+    "later"
+  ],
+  "ou_average_covariance": [
+    [
+      0.5676676416183064,
+      0.5676676416183064,
+      0.5676676416183064,
+      0.1005363642278503
+    ],
+    [
+      0.5676676416183064,
+      0.7357588823428847,
+      0.5676676416183064,
+      0.1469959430660808
+    ],
+    [
+      0.5676676416183064,
+      0.5676676416183064,
+      0.5676676416183064,
+      0.1005363642278503
+    ],
+    [
+      0.1005363642278503,
+      0.1469959430660808,
+      0.1005363642278503,
+      0.7357588823428847
+    ]
+  ],
+  "shared_white_noise_spectral_density": 0.2,
+  "shared_white_noise_average_covariance": [
+    [
+      0.1,
+      0.1,
+      0.1,
+      0
+    ],
+    [
+      0.1,
+      0.2,
+      0.1,
+      0
+    ],
+    [
+      0.1,
+      0.1,
+      0.1,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0.2
+    ]
+  ],
+  "claim_boundary": "Constructed analytic fixture; not physical sensor data."
+}
