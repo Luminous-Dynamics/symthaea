@@ -1,0 +1,37 @@
+name: CMAQ-046 convex-target approachability e-process
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-046/**"
+      - ".github/workflows/cmaq-046.yml"
+  push:
+    branches:
+      - "research/cmaq-046-*"
+    paths:
+      - "research/cmaq-046/**"
+      - ".github/workflows/cmaq-046.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-046-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  convex-target-approachability:
+    name: convex-target-approachability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-046/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-046/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-046/Cargo.toml --locked --all-targets -- -D warnings
