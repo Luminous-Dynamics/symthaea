@@ -53,6 +53,6 @@ curl -fsS -X PUT \
   -H 'Content-Type: application/json' \
   --data "$config" \
   "$CONNECT_URL/connectors/$CONNECTOR_NAME/config" >"$response"
-jq -e '.name == "mon025-pg-source" or type == "object"' "$response" >/dev/null
+jq -e '.["connector.class"] == "io.debezium.connector.postgresql.PostgresConnector" and .["slot.name"] == "'"$SLOT_NAME"'"' "$response" >/dev/null
 echo "Registered $CONNECTOR_NAME against $PG_SERVICE. Connector task state still requires independent inspection."
 curl -fsS "$CONNECT_URL/connectors/$CONNECTOR_NAME/status" | jq .
