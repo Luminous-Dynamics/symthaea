@@ -247,7 +247,7 @@ fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, ObservationPr
 
 fn canonical_rounds(rounds: &[ObservationProcessRoundV1]) -> Vec<ObservationProcessRoundV1> {
     let mut canonical = rounds.to_vec();
-    canonical.sort_by_key(|row| row.round_id);
+    canonical.sort_by_key(|row| row.round_id_id);
     canonical
 }
 
@@ -284,7 +284,7 @@ fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), Observati
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} randomized acquisition requires a design digest and a known inclusion probability in [0,1]",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
             if acquisition.inclusion_probability == Some(0.0)
@@ -292,7 +292,7 @@ fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), Observati
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} cannot be physically selected when its declared inclusion probability is zero",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -300,7 +300,7 @@ fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), Observati
             if acquisition.inclusion_probability.is_some() {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} must not attach a statistical inclusion probability to deterministic/adaptive selection",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -311,16 +311,16 @@ fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), Observati
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} has invalid physical acquisition cost",
-            row.round_id
+            row.round_id_id
         )));
     }
     if acquisition
         .selected_at_round
-        .is_some_and(|selected| selected > row.round_id)
+        .is_some_and(|selected| selected > row.round_id_id)
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} selection timestamp is from a future round",
-            row.round_id
+            row.round_id_id
         )));
     }
     if acquisition
@@ -329,7 +329,7 @@ fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), Observati
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} measurement time precedes the physical event",
-            row.round_id
+            row.round_id_id
         )));
     }
 
@@ -342,7 +342,7 @@ fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), Observati
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} has acquisition metadata despite NOT_SELECTED",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -353,7 +353,7 @@ fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), Observati
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} SELECTED_PENDING requires selection time and no measurement time",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -367,7 +367,7 @@ fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), Observati
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} MEASURED requires selection and measurement times",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -378,7 +378,7 @@ fn validate_acquisition(row: &ObservationProcessRoundV1) -> Result<(), Observati
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} MEASUREMENT_UNAVAILABLE requires selection time and no measurement time",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -408,7 +408,7 @@ fn validate_qualification(
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} has a zero label revision",
-            row.round_id
+            row.round_id_id
         )));
     }
 
@@ -417,14 +417,14 @@ fn validate_qualification(
             if qualification.state == K1QualificationStateV1::NotApplicable {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} is measured but has no qualification state",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
         _ if qualification.state != K1QualificationStateV1::NotApplicable => {
             return Err(ObservationProcessErrorV1(format!(
                 "round {} has a qualification state without a completed measurement",
-                row.round_id
+                row.round_id_id
             )));
         }
         _ => {}
@@ -444,7 +444,7 @@ fn validate_qualification(
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} NOT_APPLICABLE qualification contains label evidence",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -462,7 +462,7 @@ fn validate_qualification(
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} pending qualification has incomplete or premature report/loss fields",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -485,7 +485,7 @@ fn validate_qualification(
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} eligible K1 qualification requires matching event, revision, payload/report receipts and a bounded loss",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -506,7 +506,7 @@ fn validate_qualification(
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} UNKNOWN/BLOCKED qualification must carry its K1 report but no qualified loss",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -521,7 +521,7 @@ fn validate_qualification(
         {
             return Err(ObservationProcessErrorV1(format!(
                 "round {} label availability predates the measurement or physical event",
-                row.round_id
+                row.round_id_id
             )));
         }
     }
@@ -535,7 +535,7 @@ fn validate_qualification(
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} K1 report predates physical label availability",
-            row.round_id
+            row.round_id_id
         )));
     }
     Ok(())
@@ -558,7 +558,7 @@ fn validate_tracking(
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} has invalid proxy survival probability",
-            row.round_id
+            row.round_id_id
         )));
     }
 
@@ -573,7 +573,7 @@ fn validate_tracking(
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} controller receipt timestamp does not match its feedback tracking state",
-            row.round_id
+            row.round_id_id
         )));
     }
     if let Some(received_at) = tracking.controller_feedback_received_at_unix_seconds {
@@ -589,7 +589,7 @@ fn validate_tracking(
         {
             return Err(ObservationProcessErrorV1(format!(
                 "round {} controller received feedback before the prediction, physical label or K1 report was available",
-                row.round_id
+                row.round_id_id
             )));
         }
     }
@@ -605,7 +605,7 @@ fn validate_tracking(
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} controller update requires K1-eligible evidence and an action receipt",
-            row.round_id
+            row.round_id_id
         )));
     }
 
@@ -614,7 +614,7 @@ fn validate_tracking(
         if physically_measured == (tracking.state == FeedbackTrackingStateV1::NotApplicable) {
             return Err(ObservationProcessErrorV1(format!(
                 "round {} CA-OCRC tracking is NOT_APPLICABLE exactly when no physical measurement exists",
-                row.round_id
+                row.round_id_id
             )));
         }
     }
@@ -632,7 +632,7 @@ fn validate_tracking(
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} has feedback tracking metadata in a no-controller run",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
@@ -647,13 +647,13 @@ fn validate_tracking(
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} unlimited pending feedback has inconsistent tracking fields",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
-                    if row.round.saturating_add(delay) <= input.closeout_round {
+                    if row.round_id.saturating_add(delay) <= input.closeout_round {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} feedback should be due by the declared closeout",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
                 }
@@ -664,7 +664,7 @@ fn validate_tracking(
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} ACI feedback must arrive after exactly the fixed delay",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
                 }
@@ -675,14 +675,14 @@ fn validate_tracking(
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} ACI forfeiture cannot invent an actual outcome delay",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
                 }
                 _ => {
                     return Err(ObservationProcessErrorV1(format!(
                         "round {} uses a CA-OCRC tracking state in a fixed-delay ACI run",
-                        row.round_id
+                        row.round_id_id
                     )));
                 }
             }
@@ -705,7 +705,7 @@ fn validate_tracking(
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} proxy-not-tracked state must use proxy delay -1 and no slot",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
                 }
@@ -720,7 +720,7 @@ fn validate_tracking(
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} capacity-denied feedback requires a nonnegative proxy delay and no slot",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
                 }
@@ -734,14 +734,14 @@ fn validate_tracking(
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} admitted-pending tracking fields are inconsistent",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
-                    let deadline = row.round.saturating_add(proxy.unwrap_or(0) as u64);
+                    let deadline = row.round_id.saturating_add(proxy.unwrap_or(0) as u64);
                     if deadline <= input.closeout_round {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} proxy deadline elapsed before closeout but feedback remains pending",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
                 }
@@ -752,16 +752,16 @@ fn validate_tracking(
                         || !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
                         || tracking.tracking_slot_id.is_none()
                         || !ended.is_some_and(|end| {
-                            end >= row.round && end < row.round + proxy.unwrap_or(0) as u64
+                            end >= row.round_id && end < row.round_id + proxy.unwrap_or(0) as u64
                         })
                         || tracking.actual_feedback_delay_rounds.is_some_and(|actual| {
-                            ended.is_some_and(|end| actual <= end.saturating_sub(row.round))
+                            ended.is_some_and(|end| actual <= end.saturating_sub(row.round_id))
                         })
                         || tracking.proxy_survival_probability.is_some()
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} eviction must end tracking strictly before proxy expiry",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
                 }
@@ -771,7 +771,7 @@ fn validate_tracking(
                         || !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
                         || tracking.tracking_slot_id.is_none()
                         || tracking.tracking_end_round
-                            != Some(row.round.saturating_add(proxy.unwrap_or(0) as u64))
+                            != Some(row.round_id.saturating_add(proxy.unwrap_or(0) as u64))
                         || tracking
                             .actual_feedback_delay_rounds
                             .is_some_and(|actual| actual <= proxy.unwrap_or(-1) as u64)
@@ -779,7 +779,7 @@ fn validate_tracking(
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} proxy expiry must end tracking at its exact deadline",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
                 }
@@ -791,11 +791,11 @@ fn validate_tracking(
                         || actual.is_some_and(|delay| delay > proxy.unwrap_or(-1) as u64)
                         || tracking.tracking_slot_id.is_none()
                         || tracking.tracking_end_round
-                            != actual.map(|delay| row.round.saturating_add(delay))
+                            != actual.map(|delay| row.round_id.saturating_add(delay))
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} tracked feedback must arrive by the proxy horizon and release its slot at actual arrival",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
                     let actual = actual.expect("validated actual delay");
@@ -807,20 +807,20 @@ fn validate_tracking(
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} tracked feedback requires a positive inverse-survival denominator",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
-                    if row.round.saturating_add(actual) > input.closeout_round {
+                    if row.round_id.saturating_add(actual) > input.closeout_round {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} reports feedback after trace closeout",
-                            row.round_id
+                            row.round_id_id
                         )));
                     }
                 }
                 _ => {
                     return Err(ObservationProcessErrorV1(format!(
                         "round {} uses a fixed-delay ACI tracking state in a CA-OCRC run",
-                        row.round_id
+                        row.round_id_id
                     )));
                 }
             }
@@ -834,7 +834,7 @@ fn validate_tracking(
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} received feedback requires an accepted-or-withheld action receipt",
-            row.round_id
+            row.round_id_id
         )));
     }
     if tracking.controller_update_applied
@@ -845,7 +845,7 @@ fn validate_tracking(
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} K1 eligibility and controller feedback disposition disagree about whether an update was applied",
-            row.round_id
+            row.round_id_id
         )));
     }
 
@@ -859,7 +859,7 @@ fn validate_tracking(
         {
             return Err(ObservationProcessErrorV1(format!(
                 "round {} received feedback must have an action/withheld receipt",
-                row.round_id
+                row.round_id_id
             )));
         }
     }
@@ -880,7 +880,7 @@ fn maximum_tracking_occupancy(rows: &[ObservationProcessRoundV1]) -> u64 {
         if !tracked {
             continue;
         }
-        let start = row.round;
+        let start = row.round_id;
         let end = tracking.tracking_end_round.unwrap_or(u64::MAX);
         *occupancy_by_round.entry(start).or_default() += 1;
         if end < u64::MAX {
@@ -941,13 +941,13 @@ fn assumption_state(
                 if row.acquisition.state != PhysicalAcquisitionStateV1::Measured {
                     reasons.push(format!(
                         "round {} has no completed physical measurement",
-                        row.round_id
+                        row.round_id_id
                     ));
                 }
                 if row.qualification.state != K1QualificationStateV1::Eligible {
                     reasons.push(format!(
                         "round {} has no K1-qualified outcome",
-                        row.round_id
+                        row.round_id_id
                     ));
                 }
                 if row.tracking.state != FeedbackTrackingStateV1::UnlimitedReceived
@@ -955,7 +955,7 @@ fn assumption_state(
                 {
                     reasons.push(format!(
                         "round {} does not have complete fixed-delay feedback",
-                        row.round_id
+                        row.round_id_id
                     ));
                 }
             }
@@ -995,13 +995,13 @@ fn assumption_state(
                 if row.acquisition.state != PhysicalAcquisitionStateV1::Measured {
                     reasons.push(format!(
                         "round {} has no completed physical measurement",
-                        row.round_id
+                        row.round_id_id
                     ));
                 }
                 if row.qualification.state != K1QualificationStateV1::Eligible {
                     reasons.push(format!(
                         "round {} has no K1-qualified physical outcome",
-                        row.round_id
+                        row.round_id_id
                     ));
                 }
                 if !row
@@ -1011,7 +1011,7 @@ fn assumption_state(
                 {
                     reasons.push(format!(
                         "round {} has no observed delay within the bounded-delay contract",
-                        row.round_id
+                        row.round_id_id
                     ));
                 }
             }
@@ -1144,7 +1144,7 @@ pub fn evaluate_observation_process_v1(
         ));
     }
     let rows = canonical_rounds(&input.rounds);
-    if rows.iter().any(|row| row.round_id > input.closeout_round) {
+    if rows.iter().any(|row| row.round_id_id > input.closeout_round) {
         return Err(ObservationProcessErrorV1(
             "closeout round precedes one or more population prediction rounds".into(),
         ));
@@ -1196,17 +1196,17 @@ pub fn evaluate_observation_process_v1(
             if !valid_sha256(digest) {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} has malformed {field} digest",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
         }
         if row.event_time_unix_seconds > row.prediction_time_unix_seconds {
             return Err(ObservationProcessErrorV1(format!(
                 "round {} prediction precedes its event time",
-                row.round_id
+                row.round_id_id
             )));
         }
-        if !round_ids.insert(row.round_id)
+        if !round_ids.insert(row.round_id_id)
             || !sample_ids.insert(row.sample_id.as_str())
             || !measurement_event_ids.insert(row.measurement_event_id.as_str())
         {
@@ -1225,15 +1225,15 @@ pub fn evaluate_observation_process_v1(
                 if row.acquisition.inclusion_probability == Some(0.0) {
                     funnel.zero_selection_probability += 1;
                 }
-                unmeasured_round_ids.push(row.round_id);
+                unmeasured_round_ids.push(row.round_id_id);
             }
             PhysicalAcquisitionStateV1::SelectedPending => {
                 funnel.selected_pending += 1;
-                unmeasured_round_ids.push(row.round_id);
+                unmeasured_round_ids.push(row.round_id_id);
             }
             PhysicalAcquisitionStateV1::MeasurementUnavailable => {
                 funnel.measurement_unavailable += 1;
-                unmeasured_round_ids.push(row.round_id);
+                unmeasured_round_ids.push(row.round_id_id);
             }
             PhysicalAcquisitionStateV1::Measured => funnel.measured += 1,
         }
@@ -1242,19 +1242,19 @@ pub fn evaluate_observation_process_v1(
                 if row.acquisition.state == PhysicalAcquisitionStateV1::Measured {
                     return Err(ObservationProcessErrorV1(format!(
                         "round {} measured row was not classified for K1 qualification",
-                        row.round_id
+                        row.round_id_id
                     )));
                 }
             }
             K1QualificationStateV1::Pending => {
                 funnel.qualification_pending += 1;
-                unknown_round_ids.push(row.round_id);
+                unknown_round_ids.push(row.round_id_id);
             }
             K1QualificationStateV1::Eligible => {
                 funnel.k1_eligible += 1;
-                qualified_round_ids.push(row.round_id);
+                qualified_round_ids.push(row.round_id_id);
                 qualified_losses.push(super::selection_risk_bounds::QualifiedLossObservationV1 {
-                    round_id: row.round_id,
+                    round_id: row.round_id_id,
                     loss: row
                         .qualification
                         .qualified_loss
@@ -1268,11 +1268,11 @@ pub fn evaluate_observation_process_v1(
             }
             K1QualificationStateV1::Unknown => {
                 funnel.k1_unknown += 1;
-                unknown_round_ids.push(row.round_id);
+                unknown_round_ids.push(row.round_id_id);
             }
             K1QualificationStateV1::Blocked => {
                 funnel.k1_blocked += 1;
-                blocked_round_ids.push(row.round_id);
+                blocked_round_ids.push(row.round_id_id);
             }
         }
         match row.tracking.state {
@@ -1314,14 +1314,14 @@ pub fn evaluate_observation_process_v1(
                 .acquisition
                 .operational_measurement_method_sha256
                 .as_deref();
-            if audit.round_id != row.round_id
+            if audit.round_id != row.round_id_id
                 || row.qualification.state == K1QualificationStateV1::Eligible
                 || !valid_sha256(&audit.audit_measurement_receipt_sha256)
                 || operational_method == Some(design.reference_method_sha256.as_str())
             {
                 return Err(ObservationProcessErrorV1(format!(
                     "round {} audit record is misidentified, overlaps a qualified round, or has a malformed receipt",
-                    row.round_id
+                    row.round_id_id
                 )));
             }
             audit_losses.push(IndependentAuditLossObservationV1 {
@@ -1348,7 +1348,7 @@ pub fn evaluate_observation_process_v1(
         input_id: input.run_id.clone(),
         population_manifest_sha256: input.population_manifest_sha256.clone(),
         source_ledger_sha256: input.source_ledger_sha256.clone(),
-        population_round_ids: rows.iter().map(|row| row.round_id).collect(),
+        population_round_ids: rows.iter().map(|row| row.round_id_id).collect(),
         qualified_round_ids,
         unknown_round_ids,
         blocked_round_ids,
@@ -1458,7 +1458,6 @@ mod tests {
                 state: tracking,
                 proxy_delay_rounds: None,
                 actual_feedback_delay_rounds: None,
-                controller_feedback_received_at_unix_seconds: None,
                 proxy_survival_probability: None,
                 tracking_slot_id: None,
                 tracking_end_round: None,
@@ -1490,7 +1489,7 @@ mod tests {
         controller: ObservationRiskControllerV1,
         mut rounds: Vec<ObservationProcessRoundV1>,
     ) -> ObservationProcessInputV1 {
-        rounds.sort_by_key(|row| row.round_id);
+        rounds.sort_by_key(|row| row.round_id_id);
         let source_ledger_sha256 = json_sha256(&rounds).unwrap();
         let (policy, delay, max_delay, capacity, declared, delay_sha) = match controller {
             ObservationRiskControllerV1::None => (None, None, None, None, false, None),
