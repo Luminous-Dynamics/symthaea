@@ -366,6 +366,11 @@ mod tests {
                 sensor_slow.sensor_autocovariance_convolution(elapsed).unwrap(),
                 2.0e-14,
             );
+            close(
+                physical_slow.sensor_autocovariance(elapsed).unwrap(),
+                sensor_slow.sensor_autocovariance(elapsed).unwrap(),
+                2.0e-14,
+            );
         }
     }
 
