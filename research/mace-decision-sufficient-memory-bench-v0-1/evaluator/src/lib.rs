@@ -840,12 +840,17 @@ fn valid_run_score_v1(score: &RunScoreV1) -> bool {
         score.retrieved_required_evidence_recall,
         score.required_evidence_recall,
     ) {
-        (Some(retrieved), Some(selected)) => retrieved.denominator == selected.denominator,
+        (Some(retrieved), Some(selected)) => {
+            retrieved.denominator == selected.denominator
+                && selected.numerator <= retrieved.numerator
+        }
         (None, None) => true,
         _ => false,
     };
     let required_is_complete = score.required_evidence_recall
-        .map_or(true, |ratio| ratio.numerator == ratio.denominator);
+        .map_or(true, |ratio| ratio.numerator == ratio.denominator)
+        && score.retrieved_required_evidence_recall
+            .map_or(true, |ratio| ratio.numerator == ratio.denominator);
 
     if score.decision_regret_micros != score.decision_loss_micros.saturating_sub(score.oracle_loss_micros)
         || score.decision_optimal != (score.decision_regret_micros == 0)
