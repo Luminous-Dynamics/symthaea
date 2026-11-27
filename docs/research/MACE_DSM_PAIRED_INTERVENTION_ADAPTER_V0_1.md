@@ -70,6 +70,7 @@ The current paired CandidateRun receipt contains event IDs, decisions and resour
 
 The DSM candidate source-event contract needs at least:
 - stable event and source identifiers;
+- source-family identity and canonical upstream-root digest (the paired `Experience.source_family` and `Experience.source_root_digest` fields can seed this mapping, while preserving their exact semantics);
 - observation time and valid-from / valid-until timestamps;
 - authenticated source authority tier;
 - lifecycle relation (asserts, supersedes, retracts, contradicts, derived_from) and exact parent IDs;
@@ -77,7 +78,7 @@ The DSM candidate source-event contract needs at least:
 - uncertainty semantics and unit;
 - event-level scope / authorization where applicable.
 
-The paired runner's Experience has richer causal lineage such as source_root_digest, source_family, identification method, observed utility, measurement-error bound, intervention, pre-registration, outcome reconciliation, trusted/retracted state, confounder control and delayed-horizon completion. These fields are valuable and must not be collapsed into a text claim. However, the current Experience record does not expose the complete DSM bitemporal/source-event lifecycle envelope. retrieved_event_ids alone cannot reconstruct it.
+The paired runner's Experience has richer causal lineage such as source_root_digest, source_family, identification method, observed utility, measurement-error bound, intervention, pre-registration, outcome reconciliation, trusted/retracted state, confounder control and delayed-horizon completion. DSM v0.1 now has optional `source_family` and `source_root_sha256` fields and separately counts distinct source families and upstream roots; it must preserve the paired source-root digest exactly rather than hashing a display ID. These lineage values are identifiers, not proof of authenticated origin or statistical independence. However, the current Experience/candidate receipt still does not expose the complete DSM bitemporal/source-event lifecycle envelope. retrieved_event_ids alone cannot reconstruct it.
 
 **Therefore the adapter must fail closed or produce NotComparable until a versioned candidate-visible event projection exists.** It must not invent observation times, valid-time intervals, parent edges or authority attestations from event IDs or evaluator-only Truth.
 
@@ -99,7 +100,8 @@ The paired runner is itself labelled diagnostic-only because it uses public synt
 4. Implement the adapter as a pure, versioned transform with exact input/output digests and a NotComparable disposition for any missing mandatory source field.
 5. Add round-trip fixtures for all eight paired arms, including empty-memory and structural placebo.
 6. Add mutation tests for dropped retrieved IDs, selected IDs not in retrieved IDs, altered arm identity, stale/retracted event, wrong authority, scope changes, future observations, missing cost, mislabeled estimated bytes and hidden-truth leakage.
-7. Qualify independent evaluator custody and host-measured resource accounting before any external or SOTA claim.
+7. Carry paired source-family and source-root digests unchanged into the typed DSM event projection, and add an explicit source-root attestation/authority verifier before treating those roots as authentic or independent.
+8. Qualify independent evaluator custody and host-measured resource accounting before any external or SOTA claim.
 
 ## Non-goals
 
