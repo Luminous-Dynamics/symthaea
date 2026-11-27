@@ -163,6 +163,9 @@ pub struct PresentationReceipt {
     source_clock_domain_id: String,
     event_id: String,
     grant_id: String,
+    event_expires_at_monotonic_ns: String,
+    grant_expires_at_monotonic_ns: String,
+    effective_permit_expires_at_monotonic_ns: String,
     event_sequence: u64,
     event_kind: EventKind,
     source: EventSource,
@@ -286,11 +289,15 @@ impl PresentationReceiptLedger {
         }
         let now = parse_monotonic_ns(&decision_stamp.monotonic_ns)?;
         let issued = parse_monotonic_ns(permit.issued_at_monotonic_ns())?;
+        let event_expires = parse_monotonic_ns(permit.event_expires_at_monotonic_ns())?;
+        let grant_expires = parse_monotonic_ns(permit.grant_expires_at_monotonic_ns())?;
         let expires = parse_monotonic_ns(permit.expires_at_monotonic_ns())?;
         if decision_stamp.monotonic_ns != permit.issued_at_monotonic_ns() {
             return Err(ReceiptError::PermitDecisionTimestampMismatch);
         }
-        if issued > now || expires <= now {
+        if issued > now || event_expires <= now || grant_expires <= now
+            || expires != event_expires.min(grant_expires) || expires <= now
+        {
             return Err(ReceiptError::PermitExpired);
         }
 
@@ -470,6 +477,9 @@ impl PresentationReceiptLedger {
             source_clock_domain_id: permit.clock_domain_id().to_owned(),
             event_id: permit.event_id().to_owned(),
             grant_id: permit.grant_id().to_owned(),
+            event_expires_at_monotonic_ns: permit.event_expires_at_monotonic_ns().to_owned(),
+            grant_expires_at_monotonic_ns: permit.grant_expires_at_monotonic_ns().to_owned(),
+            effective_permit_expires_at_monotonic_ns: permit.expires_at_monotonic_ns().to_owned(),
             event_sequence: permit.sequence(),
             event_kind: permit.event_kind(),
             source: permit.source().clone(),
