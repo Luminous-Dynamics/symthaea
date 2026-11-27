@@ -335,7 +335,7 @@ Follow-on candidate-context integrity gate:
 - The first follow-on run passed rustfmt but reported 32/34 tests because two negative tests changed a context field while retaining the previous context digest. The digest guard correctly rejected those stale specimens before the tests reached their intended semantic assertions.
 - Those tests now recompute the canonical context digest after the mutation, ensuring they test the look-ahead and decision-objective guards rather than the earlier digest guard.
 - Duplicate evidence identifiers are now rejected before decision scoring, with a negative test that recomputes the context digest so the uniqueness guard is reached.
-- The exact current PR head is `4dafba8e5ed6b6c7567a2cb9c33d3f0f9711c893`; the previously queued run 84 predates the duplicate-evidence change, and a fresh exact-head result has not yet been observed. No 35/35 or Clippy pass is claimed for this follow-on.
+- Focused Rust 1.96 run 90 passed at PR head `0e9026e1cc6dd051e85e87a802ec4c89b66b2396`, which contains the 35-test source tree at `4dafba8e5ed6b6c7567a2cb9c33d3f0f9711c893` plus documentation-only updates: rustfmt passed, standalone harness **35/35 passed** (19 decision-contract, 9 custody/prefix, 7 AS-Bench), and strict Clippy passed. Subsequent PR-head commits `0c837cb…` and `a8e124e…` are documentation-only benchmark-note updates and do not change tested Rust sources. Run 84 predates duplicate-evidence guard and is superseded.
 
 Verification boundary (exact tested code head `bddab8d62ebd9afb1df4a8863371385d60b9a386`):
 - Focused Rust 1.96 PR and push workflow runs both succeeded after the standalone dependency lockfile was committed.
