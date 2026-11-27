@@ -23,6 +23,10 @@ pub const CAPACITY_OCRC_POLICY_SCHEMA_V1: &str =
     "luminous.semi-bench.capacity-ocrc-policy.v1";
 pub const CAPACITY_OCRC_ENGINE_SCHEMA_V1: &str =
     "luminous.semi-bench.capacity-ocrc-engine.v1";
+pub const CAPACITY_OCRC_PREDICTION_INPUT_SCHEMA_V1: &str =
+    "luminous.semi-bench.capacity-ocrc-prediction-input.v1";
+pub const CAPACITY_OCRC_PREDICTION_RECEIPT_SCHEMA_V1: &str =
+    "luminous.semi-bench.capacity-ocrc-prediction-receipt.v1";
 pub const CAPACITY_OCRC_ROUND_INPUT_SCHEMA_V1: &str =
     "luminous.semi-bench.capacity-ocrc-round-input.v1";
 pub const CAPACITY_OCRC_FEEDBACK_SCHEMA_V1: &str =
@@ -443,11 +447,9 @@ fn validate_prediction_input(
     engine: &CapacityOcrcEngineV1,
     input: &CapacityOcrcPredictionInputV1,
 ) -> Result<(), CapacityOcrcErrorV1> {
-    if input.schema != CAPACITY_OCRC_ROUND_INPUT_SCHEMA_V1 {
-        // A prediction can also be supplied directly through the round input;
-        // support its own schema in the same versioned family.
+    if input.schema != CAPACITY_OCRC_PREDICTION_INPUT_SCHEMA_V1 {
         return Err(CapacityOcrcErrorV1(
-            "prediction schema is unsupported".into(),
+            "prediction input schema is unsupported".into(),
         ));
     }
     require_text(&input.sample_id, "prediction.sample_id")?;
@@ -473,7 +475,11 @@ fn validate_prediction_input(
             "prediction chronology or numeric inputs are invalid".into(),
         ));
     }
-    if input.round != engine.current_round + 1 {
+    let expected_round = engine
+        .current_round
+        .checked_add(1)
+        .ok_or_else(|| CapacityOcrcErrorV1("round sequence overflow".into()))?;
+    if input.round != expected_round {
         return Err(CapacityOcrcErrorV1(
             "CA-OCRC rounds must be consecutive and start at one".into(),
         ));
@@ -496,7 +502,6 @@ fn validate_feedback(
     if feedback.delivered_round != current_round
         || feedback.source_round != tracked.prediction.round
         || feedback.actual_delay != current_round.saturating_sub(feedback.source_round)
-        || feedback.actual_delay > tracked.prediction.round.saturating_add(current_round)
     {
         reasons.push(OcrcFeedbackReasonV1::DelayOutOfRange);
     }
@@ -505,6 +510,12 @@ fn validate_feedback(
         || report.measurement_event_id != feedback.measurement_event_id
     {
         reasons.push(OcrcFeedbackReasonV1::MeasurementEventMismatch);
+    }
+    if feedback.label_revision == 0 {
+        reasons.push(OcrcFeedbackReasonV1::LabelRevisionMismatch);
+    }
+    if report.schema != "luminous.semi-bench.label-consumption-report.v1" {
+        reasons.push(OcrcFeedbackReasonV1::EligibilityReportDigestMismatch);
     }
     if report.label_id != feedback.label_id {
         reasons.push(OcrcFeedbackReasonV1::LabelIdentityMismatch);
@@ -534,7 +545,15 @@ fn validate_feedback(
     {
         reasons.push(OcrcFeedbackReasonV1::CorrectedValueMismatch);
     }
-    if feedback.label_available_at_unix_seconds > feedback.delivered_at_unix_seconds {
+    if feedback.label_available_at_unix_seconds > feedback.delivered_at_unix_seconds
+        || feedback.label_available_at_unix_seconds
+            < tracked.prediction.event_time_unix_seconds
+    {
+        reasons.push(OcrcFeedbackReasonV1::LabelUnavailableAtDelivery);
+    }
+    if feedback.delivered_at_unix_seconds
+        < tracked.prediction.prediction_at_unix_seconds
+    {
         reasons.push(OcrcFeedbackReasonV1::LabelUnavailableAtDelivery);
     }
     if feedback.eligibility_report_available_at_unix_seconds > feedback.delivered_at_unix_seconds {
@@ -576,10 +595,10 @@ pub fn advance_capacity_ocrc_round_v1(
     }
     validate_capacity_ocrc_policy_v1(&engine.policy)?;
     validate_prediction_input(engine, &input.prediction)?;
-    if !engine.seen_sample_ids.insert(input.prediction.sample_id.clone())
-        || !engine
+    if engine.seen_sample_ids.contains(&input.prediction.sample_id)
+        || engine
             .seen_measurement_event_ids
-            .insert(input.prediction.measurement_event_id.clone())
+            .contains(&input.prediction.measurement_event_id)
     {
         return Err(CapacityOcrcErrorV1(
             "duplicate prediction sample or measurement event".into(),
@@ -611,6 +630,12 @@ pub fn advance_capacity_ocrc_round_v1(
     }
 
     let mut candidate = engine.clone();
+    candidate
+        .seen_sample_ids
+        .insert(input.prediction.sample_id.clone());
+    candidate
+        .seen_measurement_event_ids
+        .insert(input.prediction.measurement_event_id.clone());
     let mut evicted_rounds = Vec::new();
     let expired: Vec<u64> = candidate
         .tracked_rounds
@@ -624,7 +649,7 @@ pub fn advance_capacity_ocrc_round_v1(
     }
 
     let mut prediction_receipt = CapacityOcrcPredictionReceiptV1 {
-        schema: CAPACITY_OCRC_ROUND_RECEIPT_SCHEMA_V1.into(),
+        schema: CAPACITY_OCRC_PREDICTION_RECEIPT_SCHEMA_V1.into(),
         round: prediction.round,
         sample_id: prediction.sample_id.clone(),
         measurement_event_id: prediction.measurement_event_id.clone(),
@@ -1010,14 +1035,14 @@ mod tests {
             score_bound: 4.0,
             capacity: 2,
             maximum_feedback_delay: 3,
-            proxy_delay_survival: vec![1.0, 1.0, 1.0, 1.0],
+            proxy_delay_survival: vec![1.0, 0.75, 0.50, 0.25],
             initial_threshold: 1.0,
         }
     }
 
     fn prediction(round: u64) -> CapacityOcrcPredictionInputV1 {
         CapacityOcrcPredictionInputV1 {
-            schema: CAPACITY_OCRC_ROUND_INPUT_SCHEMA_V1.into(),
+            schema: CAPACITY_OCRC_PREDICTION_INPUT_SCHEMA_V1.into(),
             round,
             sample_id: format!("sample-{round}"),
             measurement_event_id: format!("event-{round}"),
@@ -1241,10 +1266,8 @@ mod tests {
     #[test]
     fn feedback_outside_proxy_deadline_is_not_tracked_or_applied() {
         let mut p = policy();
-        p.proxy_delay_survival = vec![1.0, 0.0, 0.0, 0.0];
-        // A positive terminal survival is required by the theorem; this test
-        // instead uses a valid short-proxy distribution with K=2, d_max=3.
-        p.proxy_delay_survival = vec![1.0, 1.0, 0.0, 0.5];
+        // Proxy delay zero has positive probability; proxy delay three also
+        // has positive terminal probability to retain theorem eligibility.
         p.proxy_delay_survival = vec![1.0, 0.5, 0.5, 0.5];
         let mut engine = create_capacity_ocrc_engine_v1("ca-ocrc-evicted", p).unwrap();
         advance_capacity_ocrc_round_v1(&mut engine, &round_input(1, 0, vec![])).unwrap();
