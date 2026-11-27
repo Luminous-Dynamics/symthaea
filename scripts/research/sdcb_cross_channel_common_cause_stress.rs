@@ -227,6 +227,33 @@ mod tests {
     }
 
     #[test]
+    fn student_t5_common_scale_preserves_unit_variance_in_both_channels() {
+        let samples = 50_000_u64;
+        let mut sum_x = 0.0;
+        let mut sum_y = 0.0;
+        let mut sum_x2 = 0.0;
+        let mut sum_y2 = 0.0;
+        for index in 0..samples {
+            let seed = 0xB10C_C0DE_6600 ^ index.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+            let mut path = TwoChannelAr1::new(
+                seed,
+                MarginalFamily::StudentT5CommonScale,
+                0.95,
+            );
+            let (x, y) = path.next(CROSS_CHANNEL_RHO, 0.95);
+            sum_x += x;
+            sum_y += y;
+            sum_x2 += x * x;
+            sum_y2 += y * y;
+        }
+        let n = samples as f64;
+        let variance_x = sum_x2 / n - (sum_x / n).powi(2);
+        let variance_y = sum_y2 / n - (sum_y / n).powi(2);
+        assert!((variance_x - 1.0).abs() < 0.08, "x variance {variance_x:.4}");
+        assert!((variance_y - 1.0).abs() < 0.08, "y variance {variance_y:.4}");
+    }
+
+    #[test]
     fn observed_cross_channel_correlation_matches_declared_gamma() {
         let samples = 50_000_u64;
         for gamma in [0.05_f64, 0.95] {
