@@ -74,7 +74,6 @@ struct EvaluatorPrivate {
     oracle_action: String,
     attack_case: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(skip_serializing_if = "Option::is_none")]
     notes: Option<String>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
