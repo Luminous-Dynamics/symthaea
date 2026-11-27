@@ -6,6 +6,9 @@ publish = false
 license = "AGPL-3.0-or-later"
 description = "Paired counterfactual scoring core and fail-closed JSONL runner for MACE Decision-Sufficient Memory"
 
+[workspace]
+resolver = "3"
+
 [lib]
 path = "src/lib.rs"
 
