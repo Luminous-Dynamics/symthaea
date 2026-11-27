@@ -41,3 +41,17 @@ This is a scoring core, not yet a complete benchmark runner:
 - It has not been compiled, formatted or tested on the current authoring environment because no Rust toolchain is available here.
 
 The first exact-head local gate is format, test and strict Clippy on the commands above. A skipped workflow is not a pass.
+
+
+### CLI tests and execution status
+
+Nine local Rust unit tests are authored for:
+- candidate-record byte binding and artifact/system binding;
+- observed-at and half-open valid-time gates;
+- trusted versus untrusted supersession/retraction;
+- retrieved contradiction detection;
+- cyclic source ancestry rejection;
+- selected-evidence uniqueness and subset-of-retrieved enforcement;
+- complete phase-cost reconciliation and explicit incomplete-receipt handling.
+
+They are source additions, not executed test results. This environment did not have rustc, Cargo or rustfmt. Because the opt-in CLI adds optional serde/serde_json/sha2 dependencies, the existing evaluator Cargo.lock must first be refreshed by running Cargo without --locked; commit the new lockfile before enabling locked CI.
