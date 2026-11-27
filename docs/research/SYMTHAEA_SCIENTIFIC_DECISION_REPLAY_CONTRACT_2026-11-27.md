@@ -122,16 +122,16 @@ The actual decision-policy comparison should run through #11012 and #10921, reus
 
 Use fixed script, fixed sequential/best-of-N, static threshold, state-contingent adaptive and matched-cost random-branch controllers from #11012. Keep model, available roles, coder, API/tools, context and total cost fixed; only the orchestration policy changes. Apply the decision episode to each actual batch submission, binding the research-state/evidence prefix, selected-design payload digest, predictions, resource estimate, next-action rule and actual lab job/result identity. Keep the benchmark-owned discovery and learning gates intact.
 
-The pinned compatibility adapter currently has 38 authored tests and recorded exact-head isolated workflow evidence on its stated head, but it has not executed a campaign or reached the upstream verifier. The next bridge should use the selected-action payload digest to bind an AS-Bench submission to its exact design IDs, followed by a replay campaign—not a claim based on schema conformance.
+The pinned compatibility adapter PR #10947 has 38 authored tests. Its dedicated `Sym-RSI AS-Bench Adapter` GitHub Actions workflow passed on exact head `f23caa7b8a177f002ee25eaec34404d4e675946f`: formatting, all 38 adapter tests, strict Clippy, compatibility-manifest validation and Lab API fixture validation. Other general workflows on that head were skipped. This is offline contract qualification only; it has not executed a campaign or reached the upstream verifier. The next bridge should use the selected-action payload digest to bind an AS-Bench submission to its exact design IDs, followed by a replay campaign—not a claim based on schema conformance.
 
-Example capsule commands (replace paths and source SHA with actual campaign values):
+Example custody-archive commands (replace paths and source SHA with actual campaign values; the first output is a custodian-only archive, not candidate input):
 
 ```sh
 cargo run --release --example evolutionary_rescue_generate_worlds -p symthaea-futures-ensemble
 cargo run --release --example evolutionary_rescue_split_capsules -p symthaea-futures-ensemble -- /secure/candidate /secure/evaluator <40-or-64-hex-source-commit> census
 ```
 
-The materializer creates both roots if absent, rejects equal/nested roots, refuses to overwrite existing files, writes the manifest last, and reads all four output artifacts back before accepting the pair. It does not set filesystem ACLs, create separate OS identities or launch the candidate/evaluator processes. Those are required deployment controls, not provided by this fixture utility.
+The materializer creates both roots if absent, rejects equal/nested roots, requires both roots to be empty before starting, refuses to overwrite existing files, writes the manifest last, and reads all four output artifacts back before accepting the pair. It does not set filesystem ACLs, create separate OS identities or launch the candidate/evaluator processes. Those are required deployment controls, not provided by this fixture utility.
 
 ### Pilot 1 — compare decision policies on AS-Bench
 
@@ -277,10 +277,10 @@ Implemented in this branch:
 - outcome distribution, full randomized action propensities over action/payload identities, exact selected-payload binding and causal-design declarations;
 - evaluator-owned resolution and distinct execution/outcome states;
 - validation for look-ahead evidence, action support, unsupported counterfactuals, delayed/censored/indeterminate outcomes and cost completeness;
-- nine authored decision-contract tests;
+- eleven authored decision-contract tests;
 - custodian-only replay-archive/evaluator projection, BLAKE3 digests, opaque IDs, empty/disjoint-root checks, no-overwrite writes, manifest-last materialization and disk-readback checks;
 - decision-time observation-prefix builder with digest and out-of-range rejection;
-- nine authored custody/prefix tests, two output-root tests and a capsule materializer example.
+- nine authored custody/prefix tests, two output-root tests and a capsule materializer example (22 authored tests total across these new files).
 
 Not implemented or not yet verified:
 - the ten worlds have not been generated or split in this environment; the existing source seed split is public and is not a sealed confirmatory split;
