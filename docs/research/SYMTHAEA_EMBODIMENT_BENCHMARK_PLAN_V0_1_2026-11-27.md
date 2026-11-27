@@ -234,7 +234,7 @@ Measure:
 - identity continuity across transitions;
 - preservation of user controls and privacy settings.
 
-Hard gate: 100% exact canonical-cue digest preservation across all seven forms; zero renderer acceptance of cue-content mutations; zero raw sensitive-reference disclosure in renderer-facing frames.
+Hard gate: 100% exact canonical-cue digest preservation across all seven forms; zero renderer acceptance of cue-content mutations; zero raw sensitive-reference disclosure in renderer-facing frames. Scene frames are immutable outside the compiler and exposed through read-only accessors.
 
 Target: 100% deterministic fixture mapping; >= 95% human-rated semantic agreement between forms on held-out interactions; zero false claims of verification, certainty, consent or action.
 
