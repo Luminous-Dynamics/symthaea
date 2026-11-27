@@ -302,7 +302,7 @@ pub fn run_scenario(
         horizon: config.horizon,
     };
     let mut fixed_two = MethodSummary {
-        method: "cmaq035_fixed_two_features",
+        method: "cmaq035_fixed_positive_two_feature_ablation",
         alarm_delays: Vec::new(),
         replications: config.replications,
         horizon: config.horizon,
@@ -394,11 +394,7 @@ struct PairDelays {
     ons: Option<usize>,
 }
 
-fn run_pair(
-    seed: u64,
-    horizon: usize,
-    scenario: Scenario,
-) -> Result<PairDelays, String> {
+fn run_pair(seed: u64, horizon: usize, scenario: Scenario) -> Result<PairDelays, String> {
     // Deterministic domain separation prevents accidental stream reuse in the
     // simulation. Neither generator is cryptographic.
     let mut score_rng = SplitMix64::new(seed ^ 0x53434F52455F524E);
