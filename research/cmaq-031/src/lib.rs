@@ -126,22 +126,15 @@ impl AnytimeCalibrationMonitor {
         alpha_denominator: u32,
     ) -> Result<Self, MonitorError> {
         if !is_sha256_hex(&reference.calibration_profile_sha256) {
-            return Err(MonitorError::InvalidSha256(
-                "calibration_profile_sha256",
-            ));
+            return Err(MonitorError::InvalidSha256("calibration_profile_sha256"));
         }
         if !is_sha256_hex(&reference.calibration_manifest_sha256) {
-            return Err(MonitorError::InvalidSha256(
-                "calibration_manifest_sha256",
-            ));
+            return Err(MonitorError::InvalidSha256("calibration_manifest_sha256"));
         }
         if !is_sha256_hex(&reference.scope_sha256) {
             return Err(MonitorError::InvalidSha256("scope_sha256"));
         }
-        if alpha_denominator == 0
-            || alpha_numerator == 0
-            || alpha_numerator >= alpha_denominator
-        {
+        if alpha_denominator == 0 || alpha_numerator == 0 || alpha_numerator >= alpha_denominator {
             return Err(MonitorError::InvalidMiscoverage);
         }
         if reference.scores.is_empty() {
@@ -247,13 +240,8 @@ impl AnytimeCalibrationMonitor {
         let mut next_components = self.components.clone();
 
         for component in &mut next_components {
-            let payoff = centered_rank_payoff(
-                n,
-                &self.rank_counts,
-                t,
-                rank_one_based,
-                component.feature,
-            )?;
+            let payoff =
+                centered_rank_payoff(n, &self.rank_counts, t, rank_one_based, component.feature)?;
             let factor = 1.0 + BET_LAMBDA * payoff;
             if !factor.is_finite() || factor <= 0.0 {
                 return Err(MonitorError::InvalidPredictivePayoff);
@@ -271,8 +259,7 @@ impl AnytimeCalibrationMonitor {
                 .map(|component| component.log_wealth)
                 .collect::<Vec<_>>(),
         )?;
-        let threshold =
-            (f64::from(self.alpha_denominator) / f64::from(self.alpha_numerator)).ln();
+        let threshold = (f64::from(self.alpha_denominator) / f64::from(self.alpha_numerator)).ln();
 
         // Commit state only after all validation and arithmetic succeeds.
         self.rank_counts[rank_zero_based] = self.rank_counts[rank_zero_based]
@@ -306,12 +293,8 @@ impl AnytimeCalibrationMonitor {
         &self,
         observation: &DeploymentRankObservation,
     ) -> Result<(), MonitorError> {
-        if observation.calibration_profile_sha256
-            != self.reference.calibration_profile_sha256
-        {
-            return Err(MonitorError::ScopeMismatch(
-                "calibration_profile_sha256",
-            ));
+        if observation.calibration_profile_sha256 != self.reference.calibration_profile_sha256 {
+            return Err(MonitorError::ScopeMismatch("calibration_profile_sha256"));
         }
         if observation.scope_sha256 != self.reference.scope_sha256 {
             return Err(MonitorError::ScopeMismatch("scope_sha256"));
@@ -344,13 +327,15 @@ impl AnytimeCalibrationMonitor {
             .seen_cluster_ids
             .contains(&observation.independent_cluster_id)
         {
-            return Err(if self.reference.scores.iter().any(|reference| {
-                reference.independent_cluster_id == observation.independent_cluster_id
-            }) {
-                MonitorError::CalibrationClusterReused
-            } else {
-                MonitorError::DuplicateDeploymentCluster
-            });
+            return Err(
+                if self.reference.scores.iter().any(|reference| {
+                    reference.independent_cluster_id == observation.independent_cluster_id
+                }) {
+                    MonitorError::CalibrationClusterReused
+                } else {
+                    MonitorError::DuplicateDeploymentCluster
+                },
+            );
         }
         if self.seen_tie_keys.contains(&observation.tie_break_key) {
             return Err(MonitorError::DuplicateDeploymentTieKey);
@@ -453,8 +438,8 @@ fn feature_numerator(
     calibration_count: usize,
     feature: RankFeature,
 ) -> Result<i128, MonitorError> {
-    let index = i128::try_from(rank_index_zero_based)
-        .map_err(|_| MonitorError::ArithmeticOverflow)?;
+    let index =
+        i128::try_from(rank_index_zero_based).map_err(|_| MonitorError::ArithmeticOverflow)?;
     let n = i128::try_from(calibration_count).map_err(|_| MonitorError::ArithmeticOverflow)?;
     let order_offset = index
         .checked_mul(2)
@@ -482,14 +467,8 @@ fn log_mean_exp(log_values: &[f64]) -> Result<f64, MonitorError> {
     if log_values.is_empty() || log_values.iter().any(|value| !value.is_finite()) {
         return Err(MonitorError::ArithmeticOverflow);
     }
-    let maximum = log_values
-        .iter()
-        .copied()
-        .fold(f64::NEG_INFINITY, f64::max);
-    let sum: f64 = log_values
-        .iter()
-        .map(|value| (value - maximum).exp())
-        .sum();
+    let maximum = log_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let sum: f64 = log_values.iter().map(|value| (value - maximum).exp()).sum();
     let result = maximum + (sum / log_values.len() as f64).ln();
     if !result.is_finite() {
         return Err(MonitorError::ArithmeticOverflow);
@@ -561,8 +540,7 @@ mod tests {
             let mut expected = 0.0;
             for rank in 1..=n + 1 {
                 let pi = (1 + counts[rank - 1]) as f64 / total as f64;
-                expected +=
-                    pi * centered_rank_payoff(n, &counts, t, rank, feature).unwrap();
+                expected += pi * centered_rank_payoff(n, &counts, t, rank, feature).unwrap();
             }
             assert!(expected.abs() < 1e-12);
         }
@@ -586,13 +564,10 @@ mod tests {
         let mut reference = reference();
         reference.scores[4].score_units = 4;
         reference.scores[5].score_units = 4;
-        let mut monitor =
-            AnytimeCalibrationMonitor::new(reference, 1, 20).unwrap();
+        let mut monitor = AnytimeCalibrationMonitor::new(reference, 1, 20).unwrap();
         let result = monitor.observe(event(0, 4, 99)).unwrap();
         match result {
-            MonitorUpdate::Accepted {
-                rank_one_based, ..
-            } => assert_eq!(rank_one_based, 5),
+            MonitorUpdate::Accepted { rank_one_based, .. } => assert_eq!(rank_one_based, 5),
             other => panic!("expected accepted rank observation, got {other:?}"),
         }
     }
