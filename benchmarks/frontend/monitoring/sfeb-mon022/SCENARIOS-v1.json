@@ -1,0 +1,408 @@
+{
+  "corpus_id": "MON-022-DATABASE-SURFACE-COVERAGE",
+  "corpus_version": "1.0.0",
+  "status": "research_seed",
+  "purpose": "Synthetic database surface coverage scenarios; descriptive seeds, not live PostgreSQL observations or independent security estimates.",
+  "scenarios": [
+    {
+      "id": "SURF-001",
+      "family": "inventory",
+      "description": "All 14 default surface classes are enumerated with exact source/target scope digest.",
+      "expected_decision": "qualified",
+      "reason_code": "complete_surface_inventory",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-002",
+      "family": "inventory",
+      "description": "A required table/partition surface has no evidence record.",
+      "expected_decision": "indeterminate",
+      "reason_code": "required_surface_evidence_missing",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-003",
+      "family": "publication_filter",
+      "description": "A publication row filter narrows source rows but the claim describes all table rows.",
+      "expected_decision": "denied",
+      "reason_code": "publication_scope_overclaim",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-004",
+      "family": "publication_filter",
+      "description": "The exact publication/table/row/column filter profile is captured and bound to the row-stream claim.",
+      "expected_decision": "qualified",
+      "reason_code": "publication_filter_profile_bound",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-005",
+      "family": "schema",
+      "description": "A DDL change occurs on source but the target schema fingerprint remains at the prior migration epoch.",
+      "expected_decision": "divergent",
+      "reason_code": "schema_epoch_mismatch",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-006",
+      "family": "schema",
+      "description": "A pinned migration attestation and independent catalog fingerprints match on source and target.",
+      "expected_decision": "qualified",
+      "reason_code": "schema_migration_reconciled",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-007",
+      "family": "sequence",
+      "description": "Sequence page_lsn matches but the cached sequence's last_value differs from delivered nextval history.",
+      "expected_decision": "indeterminate",
+      "reason_code": "sequence_page_lsn_insufficient",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-008",
+      "family": "sequence",
+      "description": "Source and target sequence last_value match but is_called differs.",
+      "expected_decision": "divergent",
+      "reason_code": "sequence_called_state_mismatch",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-009",
+      "family": "sequence",
+      "description": "Sequence definition matches but cache, increment, cycle, min or max differs.",
+      "expected_decision": "divergent",
+      "reason_code": "sequence_definition_mismatch",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-010",
+      "family": "sequence",
+      "description": "PostgreSQL 19 sequence refresh is recorded but state was not read back independently.",
+      "expected_decision": "indeterminate",
+      "reason_code": "sequence_refresh_without_comparison",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-011",
+      "family": "sequence",
+      "description": "Sequence state is compared at a controlled boundary and last_value, is_called and full definition match.",
+      "expected_decision": "qualified",
+      "reason_code": "sequence_state_exact_match",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-012",
+      "family": "generated",
+      "description": "pgoutput omitted generated-column values and no independent recomputation/readback exists.",
+      "expected_decision": "indeterminate",
+      "reason_code": "generated_value_unobserved",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-013",
+      "family": "generated",
+      "description": "A generated value is recomputed using an unpinned volatile function or changed extension version.",
+      "expected_decision": "indeterminate",
+      "reason_code": "generated_expression_not_deterministic",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-014",
+      "family": "generated",
+      "description": "Pinned generated expression/dependencies and target readback produce matching canonical values.",
+      "expected_decision": "qualified",
+      "reason_code": "generated_value_recomputed_and_compared",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-015",
+      "family": "large_object",
+      "description": "An LO OID exists on target but content digest or byte length differs.",
+      "expected_decision": "divergent",
+      "reason_code": "large_object_content_mismatch",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-016",
+      "family": "large_object",
+      "description": "A large object is explicitly excluded from row CDC and the claim remains scoped to row changes.",
+      "expected_decision": "qualified",
+      "reason_code": "large_object_explicitly_excluded_from_row_claim",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-017",
+      "family": "materialized_view",
+      "description": "Base-table rows replicate but materialized view refresh epoch/content digest is stale.",
+      "expected_decision": "divergent",
+      "reason_code": "materialized_view_stale",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-018",
+      "family": "materialized_view",
+      "description": "Materialized view definition and refreshed source/target output digest match.",
+      "expected_decision": "qualified",
+      "reason_code": "materialized_view_reconciled",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-019",
+      "family": "partition",
+      "description": "A partition is attached after the inventory snapshot and omitted from the declared table set.",
+      "expected_decision": "divergent",
+      "reason_code": "partition_inventory_changed",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-020",
+      "family": "partition",
+      "description": "Partition topology fingerprints and attachment boundaries match at the same epoch.",
+      "expected_decision": "qualified",
+      "reason_code": "partition_topology_reconciled",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-021",
+      "family": "external_state",
+      "description": "A foreign table is represented as local PostgreSQL row CDC although its data is owned by a remote source.",
+      "expected_decision": "denied",
+      "reason_code": "foreign_table_source_misattributed",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-022",
+      "family": "external_state",
+      "description": "An external source has its own identified MON capture profile and independent source evidence.",
+      "expected_decision": "qualified",
+      "reason_code": "external_source_separately_qualified",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-023",
+      "family": "external_state",
+      "description": "An unlogged table is claimed as WAL-replicated database state.",
+      "expected_decision": "denied",
+      "reason_code": "unlogged_table_wal_coverage_overclaim",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-024",
+      "family": "external_state",
+      "description": "Unlogged table contents are independently snapshotted/restored and compared under a separate evidence profile.",
+      "expected_decision": "qualified",
+      "reason_code": "unlogged_table_independent_snapshot",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-025",
+      "family": "external_state",
+      "description": "An extension upgrade changes extension-owned catalog/data state without a versioned adapter evidence record.",
+      "expected_decision": "indeterminate",
+      "reason_code": "extension_state_unqualified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-026",
+      "family": "external_state",
+      "description": "A trigger/function/constraint definition differs although table rows appear equal.",
+      "expected_decision": "divergent",
+      "reason_code": "executable_schema_semantics_mismatch",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-027",
+      "family": "independence",
+      "description": "An observer shares the same cloud administrator/control root as the source.",
+      "expected_decision": "indeterminate",
+      "reason_code": "observer_common_cause",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-028",
+      "family": "independence",
+      "description": "An independent observer with a separately verified control root compares canonical source and target state.",
+      "expected_decision": "qualified",
+      "reason_code": "independent_state_comparison",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-029",
+      "family": "scope",
+      "description": "An excluded surface is accepted in a full recoverable-database-state claim.",
+      "expected_decision": "denied",
+      "reason_code": "full_state_exclusion_forbidden",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-030",
+      "family": "scope",
+      "description": "A row-stream claim explicitly lists sequences, DDL and large objects as excluded and does not advertise full state.",
+      "expected_decision": "qualified",
+      "reason_code": "row_stream_scope_with_explicit_exclusions",
+      "required_control": "continue",
+      "severity": "critical",
+      "positive_control": true
+    },
+    {
+      "id": "SURF-031",
+      "family": "schema",
+      "description": "Source/target schema fingerprints use different canonicalization profiles.",
+      "expected_decision": "indeterminate",
+      "reason_code": "schema_digest_profile_incomparable",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-032",
+      "family": "inventory",
+      "description": "Two conflicting attestations for one surface ID carry different state digests.",
+      "expected_decision": "divergent",
+      "reason_code": "surface_evidence_equivocation",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-033",
+      "family": "external_state",
+      "description": "Roles, grants or row-level security policies change but are omitted from the declared full-state inventory.",
+      "expected_decision": "indeterminate",
+      "reason_code": "security_surface_missing",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-034",
+      "family": "external_state",
+      "description": "Large-object content digest matches but object metadata/ownership is not checked.",
+      "expected_decision": "indeterminate",
+      "reason_code": "large_object_metadata_unverified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-035",
+      "family": "generated",
+      "description": "Generated value matches on one sample but dependency expression digest changes between source and target.",
+      "expected_decision": "divergent",
+      "reason_code": "generated_expression_changed",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-036",
+      "family": "scope",
+      "description": "A surface declared not applicable lacks an independent applicability proof.",
+      "expected_decision": "indeterminate",
+      "reason_code": "not_applicable_without_proof",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-037",
+      "family": "inventory",
+      "description": "An attestation was created against a prior inventory digest and is reused after a new surface was added.",
+      "expected_decision": "indeterminate",
+      "reason_code": "stale_inventory_binding",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-038",
+      "family": "independence",
+      "description": "Observer control-root differs from both endpoints but the observer identity or control-root membership proof is missing.",
+      "expected_decision": "indeterminate",
+      "reason_code": "observer_membership_unverified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-039",
+      "family": "scope",
+      "description": "A full-state claim sets a required surface to optional instead of providing coverage or a not-applicable proof.",
+      "expected_decision": "denied",
+      "reason_code": "full_state_inventory_surface_omitted",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-040",
+      "family": "inventory",
+      "description": "The same surface ID receives two attestations with incompatible source or target canonical state digests.",
+      "expected_decision": "divergent",
+      "reason_code": "surface_attestation_equivocation",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
+    }
+  ]
+}
