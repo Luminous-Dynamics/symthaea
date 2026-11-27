@@ -252,6 +252,7 @@ pub struct CaoOcrcRoundReceiptV1 {
     pub maximum_feedback_delay_rounds: u64,
     pub maximum_proxy_delay_rounds: u64,
     pub q_g: f64,
+    pub feedback_delay_law_manifest_sha256: Option<String>,
     pub trivial_loss: Option<f64>,
     pub proxy_uniform_draw: Option<f64>,
     pub selected_proxy_delay_rounds: i64,
@@ -1030,6 +1031,7 @@ pub fn advance_ca_ocrc_round_v1(
         maximum_feedback_delay_rounds: next.policy.maximum_feedback_delay_rounds,
         maximum_proxy_delay_rounds: next.policy.maximum_proxy_delay_rounds,
         q_g: q_g_for_policy(&next.policy)?,
+        feedback_delay_law_manifest_sha256: next.policy.feedback_delay_law_manifest_sha256.clone(),
         policy_sha256: next.policy_sha256.clone(),
         tracking_state_before_sha256: tracking_before,
         tracking_state_after_sha256: tracking_after,
@@ -1174,6 +1176,14 @@ pub struct CaoOcrcRiskBoundV1 {
     pub corollary_one_regime_applicable: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CaoOcrcStochasticAssumptionStatusV1 {
+    DeclaredByCallerNotIndependentlyVerified,
+    InvalidatedByObservedDependence,
+    InsufficientIndependentDelayAudit,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CaoOcrcStochasticRiskBoundV1 {
     pub horizon_rounds: u64,
@@ -1184,6 +1194,10 @@ pub struct CaoOcrcStochasticRiskBoundV1 {
     pub maximum_feedback_delay_rounds: u64,
     pub maximum_proxy_delay_rounds: u64,
     pub population_scope: CaoOcrcPopulationScopeV1,
+    pub feedback_delay_law_manifest_sha256: String,
+    /// The theorem is conditional on IID delays and proxy independence; this
+    /// engine does not prove those assumptions from censored tracked feedback.
+    pub theorem_assumption_status: CaoOcrcStochasticAssumptionStatusV1,
     pub q_g: f64,
     pub stochastic_tracking_load: f64,
     pub expected_conditional_delay: f64,
@@ -1292,6 +1306,12 @@ pub fn compute_ca_ocrc_stochastic_risk_bound_v1(
         maximum_feedback_delay_rounds: policy.maximum_feedback_delay_rounds,
         maximum_proxy_delay_rounds: policy.maximum_proxy_delay_rounds,
         population_scope: policy.population_scope,
+        feedback_delay_law_manifest_sha256: policy
+            .feedback_delay_law_manifest_sha256
+            .clone()
+            .expect("validated IID policy contains delay-law evidence digest"),
+        theorem_assumption_status:
+            CaoOcrcStochasticAssumptionStatusV1::DeclaredByCallerNotIndependentlyVerified,
         q_g,
         stochastic_tracking_load,
         expected_conditional_delay: expected_delay_numerator,
