@@ -13,6 +13,12 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
+use super::qualified_observation_risk::{
+    MetrologyQualificationStatusV1, ObservationAssumptionStatusV1,
+    ObservationProcessAssumptionsV1, ObservationRiskInputV1,
+    ObservationStageProbabilitiesV1, QualifiedObservationRiskReportV1, QualifiedObservationUnitV1,
+    QUALIFIED_OBSERVATION_RISK_SCHEMA_V1, compute_qualified_observation_risk_v1,
+};
 use super::selection_risk_bounds::{
     IndependentAuditLossObservationV1, SELECTION_RISK_INPUT_SCHEMA_V1, SelectionAuditDesignV1,
     SelectionRiskInputV1, SelectionRiskReportV1, evaluate_selection_adjusted_population_risk_v1,
@@ -54,6 +60,7 @@ pub enum K1QualificationStateV1 {
     Eligible,
     Unknown,
     Blocked,
+    Revoked,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -158,6 +165,14 @@ pub struct ObservationProcessRoundV1 {
     pub qualification: K1QualificationRecordV1,
     pub tracking: FeedbackTrackingRecordV1,
     pub independent_audit: Option<IndependentAuditObservationV1>,
+    /// Explicit P(R|S), P(Q|R,S), P(A|S), P(V|Q). Never inferred from
+    /// observed outcomes or CA-OCRC proxy survival.
+    pub physical_delivery_probability_given_selection: Option<f64>,
+    pub qualification_probability_given_delivery: Option<f64>,
+    pub online_tracking_probability_given_selection: Option<f64>,
+    pub frontier_availability_probability_given_qualified: Option<f64>,
+    /// Actual model-update frontier. Missing means the availability stage is unknown.
+    pub update_frontier_at_unix_seconds: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -177,6 +192,9 @@ pub struct ObservationProcessInputV1 {
     /// The final round represented by the sealed trace.
     pub closeout_round: u64,
     pub independent_audit_design: Option<SelectionAuditDesignV1>,
+    /// Separate assumptions for the staged physical-observation/online-update
+    /// estimator. The default fixture uses UNKNOWN, not an inferred MAR claim.
+    pub qualified_observation_assumptions: ObservationProcessAssumptionsV1,
     pub rounds: Vec<ObservationProcessRoundV1>,
 }
 
@@ -192,6 +210,7 @@ pub struct ObservationProcessFunnelV1 {
     pub k1_eligible: usize,
     pub k1_unknown: usize,
     pub k1_blocked: usize,
+    pub k1_revoked: usize,
     pub feedback_not_applicable: usize,
     pub feedback_pending: usize,
     pub feedback_received: usize,
@@ -212,7 +231,10 @@ pub struct ObservationProcessReportV1 {
     pub controller_assumption_reasons: Vec<String>,
     pub maximum_observed_tracking_occupancy: u64,
     pub funnel: ObservationProcessFunnelV1,
+    /// Legacy selection partial-identification + independent audit report.
     pub population_risk: SelectionRiskReportV1,
+    /// Separate staged physical-observation and online-update estimator.
+    pub qualified_observation_risk: QualifiedObservationRiskReportV1,
     pub input_sha256: String,
     pub report_sha256: String,
     pub equipment_control_authority: bool,
