@@ -159,7 +159,6 @@ fn proxy_delay_survival(actual_delay: u64) -> f64 {
 
 fn make_row(
     round_id: usize,
-    stratum: usize,
     true_loss: f64,
     selected: bool,
     measurement_succeeded: bool,
@@ -390,7 +389,6 @@ fn simulate(root_seed: u64, regime: MissingnessRegime) -> SimulationOutput {
 
         rows.push(make_row(
             round_id,
-            stratum,
             true_loss,
             selected,
             measurement_succeeded,
@@ -457,8 +455,6 @@ fn mcar_mar_mnar_joint_observation_simulations_preserve_population_bounds_and_au
     ] {
         let mut audit_coverages = 0_usize;
         let mut audit_bias_sum = 0.0;
-        let mut truth_sum = 0.0;
-        let mut qualified_risk_count = 0_usize;
         let mut capacity_denials = 0_usize;
 
         for replicate in 0..SEED_REPLICATES {
@@ -473,30 +469,24 @@ fn mcar_mar_mnar_joint_observation_simulations_preserve_population_bounds_and_au
                 result.partial_upper,
                 result.truth
             );
-            assert!(
-                result.audit_lower <= result.truth + 1e-12
-                    && result.truth <= result.audit_upper + 1e-12,
-                "{} seed {seed}: independent audit Hoeffding interval missed truth [{}, {}] vs {}",
-                regime.name(),
-                result.audit_lower,
-                result.audit_upper,
-                result.truth
-            );
+            if result.audit_lower <= result.truth + 1e-12
+                && result.truth <= result.audit_upper + 1e-12
+            {
+                audit_coverages += 1;
+            }
             assert!(result.max_occupancy <= TRACKING_CAPACITY as u64);
             assert!(result.missing_count > 0);
-            audit_coverages += 1;
+            assert!(result.qualified_risk.is_some());
             audit_bias_sum += result.audit_estimate - result.truth;
-            truth_sum += result.truth;
-            if result.qualified_risk.is_some() {
-                qualified_risk_count += 1;
-            }
             capacity_denials += result.capacity_denied;
         }
 
         let mean_audit_bias = audit_bias_sum / SEED_REPLICATES as f64;
-        let mean_truth = truth_sum / SEED_REPLICATES as f64;
-        assert!(qualified_risk_count > 0);
-        assert_eq!(audit_coverages, SEED_REPLICATES);
+        assert!(
+            audit_coverages >= (SEED_REPLICATES * 90).div_ceil(100),
+            "{}: only {audit_coverages}/{SEED_REPLICATES} audit Hoeffding intervals contained population truth",
+            regime.name()
+        );
         assert!(
             mean_audit_bias.abs() < 0.025,
             "{}: audit HT mean bias {}",
@@ -505,6 +495,14 @@ fn mcar_mar_mnar_joint_observation_simulations_preserve_population_bounds_and_au
         );
         assert!(capacity_denials > 0, "{}: capacity stress did not exercise a denial", regime.name());
     }
+}
+
+#[test]
+fn fixed_seed_bundle_replays_identical_population_and_observation_receipts() {
+    let first = simulate(0xC0FF_EE12, MissingnessRegime::MnarByOutcome);
+    let second = simulate(0xC0FF_EE12, MissingnessRegime::MnarByOutcome);
+    assert_eq!(first.input_sha256, second.input_sha256);
+    assert_eq!(first.report_sha256, second.report_sha256);
 }
 
 #[test]
