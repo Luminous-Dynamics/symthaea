@@ -632,6 +632,63 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn empty_scale_validation_split_is_rejected() {
+        let mut m = manifest(19);
+        m.scale_validation_cluster_ids.clear();
+        assert_eq!(
+            calibrate_cluster_trajectory_envelope(contract(), &m),
+            Err(CalibrationError::EmptySplit("scale_validation_cluster_ids"))
+        );
+    }
+
+    #[test]
+    fn malformed_calibration_manifest_digest_is_rejected() {
+        let mut m = manifest(19);
+        m.calibration_manifest_sha256 = "unsealed".into();
+        assert_eq!(
+            calibrate_cluster_trajectory_envelope(contract(), &m),
+            Err(CalibrationError::InvalidSha256("calibration_manifest_sha256"))
+        );
+    }
+
+    #[test]
+    fn action_query_inventory_mismatch_is_rejected() {
+        let mut m = manifest(19);
+        m.calibration_units[0].action_query_cell_count = 4;
+        assert_eq!(
+            calibrate_cluster_trajectory_envelope(contract(), &m),
+            Err(CalibrationError::InvalidCalibrationInventory(
+                "action_query_cell_count"
+            ))
+        );
+    }
+
+    #[test]
+    fn score_state_metric_mismatch_is_rejected() {
+        let mut m = manifest(19);
+        m.calibration_units[0].state_metric_sha256 = digest('9');
+        assert_eq!(
+            calibrate_cluster_trajectory_envelope(contract(), &m),
+            Err(CalibrationError::InvalidCalibrationInventory(
+                "state_metric_sha256"
+            ))
+        );
+    }
+
+    #[test]
+    fn changed_state_metric_invalidates_runtime_tube() {
+        let mut f = forecast();
+        f.block.state_metric_sha256 = digest('0');
+        assert_eq!(
+            apply_trajectory_envelope(&qualified(), &f),
+            Err(CalibrationError::RuntimeScopeMismatch(
+                "trajectory_block_spec"
+            ))
+        );
+    }
+
     #[test]
     fn applied_tube_binds_to_candidate_forecast_digest() {
         let tube = apply_trajectory_envelope(&qualified(), &forecast()).unwrap();
