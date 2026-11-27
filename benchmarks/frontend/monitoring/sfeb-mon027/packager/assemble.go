@@ -73,6 +73,7 @@ type SigningRequest struct {
 type SignatureEnvelope struct {
 	Profile string `json:"profile"`
 	Version string `json:"version"`
+	RequestID string `json:"request_id"`
 	RunID string `json:"run_id"`
 	Sequence uint64 `json:"sequence"`
 	RootSHA256 string `json:"root_sha256"`
@@ -163,6 +164,7 @@ func BuildManifest(rootDir string, index InputIndex) (BuildResult, error) {
 // trust and chain policy using MON-026 before returning a signed manifest.
 func AttachSignature(rootDir string, manifest custody.Manifest, envelope SignatureEnvelope, policy custody.Policy) (custody.Manifest, custody.Result) {
 	if envelope.Profile != SignatureEnvelopeProfile || envelope.Version != "1.0.0" ||
+		envelope.RequestID != signingRequestID(manifest.RunID, manifest.Sequence, manifest.RootSHA256, manifest.Signature.KeyID) ||
 		envelope.RunID != manifest.RunID || envelope.Sequence != manifest.Sequence ||
 		!strings.EqualFold(envelope.RootSHA256, manifest.RootSHA256) ||
 		envelope.Algorithm != manifest.Signature.Algorithm ||
