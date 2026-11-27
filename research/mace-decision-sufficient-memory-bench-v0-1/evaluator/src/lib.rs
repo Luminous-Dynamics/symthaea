@@ -1511,10 +1511,6 @@ pub fn score_pairwise_interactions(
         .len()
         .saturating_mul(full.retrieved_evidence_ids.len().saturating_sub(1))
         / 2;
-    if pair_ablations.len() != expected_pairs {
-        return Err(EvaluationErrorV1::PairAblationSetIncomplete);
-    }
-
     let mut seen = BTreeSet::new();
     let mut results = Vec::with_capacity(pair_ablations.len());
     for pair in pair_ablations {
@@ -1585,6 +1581,9 @@ pub fn score_pairwise_interactions(
             loss_without_pair_micros: pair_loss,
             interaction_micros,
         });
+    }
+    if seen.len() != expected_pairs {
+        return Err(EvaluationErrorV1::PairAblationSetIncomplete);
     }
     Ok(results)
 }
