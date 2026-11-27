@@ -108,7 +108,12 @@ pub struct ClusterAuditUnitOutcomeV1 {
     /// Bounded interval loss/miscoverage indicator or other predeclared loss.
     pub loss: Option<f64>,
     pub reference_qualification: ReferenceAuditQualificationV1,
+    pub reference_label_id: String,
+    pub reference_label_revision: u64,
+    pub reference_label_payload_sha256: String,
+    pub reference_measurement_event_id: String,
     pub reference_measurement_receipt_sha256: String,
+    pub reference_qualification_report_sha256: String,
     pub reference_qualification_receipt_sha256: String,
 }
 
@@ -270,6 +275,14 @@ pub fn seal_cluster_audit_record_v1(
     canonical_cluster_record_digest(record)
 }
 
+fn canonical_design_digest(
+    design: &ClusterAuditDesignV1,
+) -> Result<String, ClusterAuditErrorV1> {
+    let mut canonical = design.clone();
+    canonical.stratum_plans.sort_by(|a, b| a.stratum_id.cmp(&b.stratum_id));
+    json_sha256(&canonical)
+}
+
 fn input_digest(input: &ClusterAuditInputV1) -> Result<String, ClusterAuditErrorV1> {
     let mut canonical = input.clone();
     canonical.frame.clusters.sort_by(|a, b| {
@@ -296,12 +309,20 @@ fn seed_commitment(
     seed: &[u8; 32],
     design_id: &str,
     population_manifest_sha256: &str,
+    frame_sha256: &str,
+    randomization_algorithm: &str,
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"LUMINOUS-SEMI-CLUSTER-AUDIT-COMMIT-V1\0");
+    hasher.update(b"LUMINOUS-SEMI-CLUSTER-AUDIT-COMMIT-V2\0");
     hasher.update(seed);
+    hasher.update([0]);
     hasher.update(design_id.as_bytes());
+    hasher.update([0]);
     hasher.update(population_manifest_sha256.as_bytes());
+    hasher.update([0]);
+    hasher.update(frame_sha256.as_bytes());
+    hasher.update([0]);
+    hasher.update(randomization_algorithm.as_bytes());
     format!("{:x}", hasher.finalize())
 }
 
@@ -520,6 +541,8 @@ fn validate_design(
         &seed,
         &design.design_id,
         &design.population_manifest_sha256,
+        &design.frame_sha256,
+        &design.randomization_algorithm,
     );
     if expected_commitment != design.seed_commitment_sha256 {
         return Err(ClusterAuditErrorV1(
@@ -571,7 +594,12 @@ fn validate_cluster_record(
         require_text(&outcome.unit_id, "audit.unit_id")?;
         if !expected_units.contains(outcome.unit_id.as_str())
             || !actual_units.insert(outcome.unit_id.as_str())
+            || outcome.reference_label_revision == 0
+            || outcome.reference_measurement_event_id.trim().is_empty()
+            || outcome.reference_label_id.trim().is_empty()
+            || !valid_sha256(&outcome.reference_label_payload_sha256)
             || !valid_sha256(&outcome.reference_measurement_receipt_sha256)
+            || !valid_sha256(&outcome.reference_qualification_report_sha256)
             || !valid_sha256(&outcome.reference_qualification_receipt_sha256)
         {
             return Err(ClusterAuditErrorV1(format!(
@@ -656,13 +684,14 @@ fn empty_report(
     population_unit_count: usize,
     audited_cluster_count: usize,
     audited_unit_count: usize,
+    randomization_replay_verified: bool,
 ) -> Result<ClusterAuditReportV1, ClusterAuditErrorV1> {
     let mut report = ClusterAuditReportV1 {
         schema: CLUSTER_AUDIT_REPORT_SCHEMA_V1.into(),
         run_id: input.run_id.clone(),
         input_sha256: input_digest(input)?,
         frame_sha256: input.frame.frame_sha256.clone(),
-        design_sha256: json_sha256(&input.design)?,
+        design_sha256: canonical_design_digest(&input.design)?,
         status,
         reason_codes: vec![reason.into()],
         population_cluster_count,
@@ -682,7 +711,7 @@ fn empty_report(
         hoeffding_upper: None,
         exact_census: false,
         stratum_reports: Vec::new(),
-        randomization_replay_verified: false,
+        randomization_replay_verified,
         audit_selection_independent_of_operational_process_declared: input
             .design
             .independent_of_operational_process_declared,
@@ -776,6 +805,7 @@ pub fn evaluate_cluster_audit_v1(
             population_units,
             actual_clusters.len(),
             audited_unit_count,
+            true,
         );
     }
 
@@ -873,7 +903,7 @@ pub fn evaluate_cluster_audit_v1(
         run_id: input.run_id.clone(),
         input_sha256: input_digest(input)?,
         frame_sha256: input.frame.frame_sha256.clone(),
-        design_sha256: json_sha256(&input.design)?,
+        design_sha256: canonical_design_digest(&input.design)?,
         status: if exact_census {
             ClusterAuditStatusV1::ExactCensus
         } else if design_variance_available {
@@ -934,7 +964,12 @@ mod tests {
                 None
             },
             reference_qualification: qualification,
+            reference_label_id: format!("reference-label-{unit_id}"),
+            reference_label_revision: 1,
+            reference_label_payload_sha256: digest('c'),
+            reference_measurement_event_id: format!("reference-event-{unit_id}"),
             reference_measurement_receipt_sha256: digest('a'),
+            reference_qualification_report_sha256: digest('d'),
             reference_qualification_receipt_sha256: digest('b'),
         }
     }
@@ -996,7 +1031,13 @@ mod tests {
         let seed = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
         let seed_bytes = hex_seed(seed).unwrap();
         let design_id = "audit-design-001";
-        let commitment = seed_commitment(&seed_bytes, design_id, &frame.population_manifest_sha256);
+        let commitment = seed_commitment(
+            &seed_bytes,
+            design_id,
+            &frame.population_manifest_sha256,
+            &frame.frame_sha256,
+            CLUSTER_AUDIT_RANDOMIZATION_ALGORITHM_V1,
+        );
         let design = ClusterAuditDesignV1 {
             schema: CLUSTER_AUDIT_DESIGN_SCHEMA_V1.into(),
             design_id: design_id.into(),
