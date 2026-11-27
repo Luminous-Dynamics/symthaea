@@ -22,16 +22,18 @@ The existing evaluation landscape is useful but fragmented:
 
 - AML Cycle 2 evaluates Textual, Coding and Multimodal memory under a participant-hosted Add/Search contract. The platform controls Answer and Score, and reports capability-level results. Cycle 2's official results were published on 19 November 2026.  
   https://agentmemoryleaderboard.ai/results/cycle-2/
-- LongMemEval evaluates information extraction, multi-session reasoning, knowledge updates, temporal reasoning and abstention. Its repository now points to LongMemEval-V2 for agentic-context evaluation.  
-  https://github.com/xiaowu0162/LongMemEval
+- LongMemEval evaluates long-term conversational recall and reasoning. LongMemEval-V2 is now a direct agentic-context comparator: 451 manually curated questions, up to 500 trajectories and 115M tokens, with static state, dynamic state, workflow, gotcha and premise-awareness tasks. The published AgentRunbook-C reference is 74.9% small / 70.1% medium accuracy at 108.3s / 139.9s query latency. The V2 leaderboard measures accuracy-latency frontier gain (LAFS), so MACE must target a positive delta over the released frontier, not cherry-pick accuracy alone.  
+  https://xiaowu0162.github.io/longmemeval-v2/
 - MemBench broadens evaluation to factual and reflective memory, participation and observation settings, and effectiveness, efficiency and capacity.  
   https://aclanthology.org/2025.findings-acl.989/
+- TimlMemBench (Findings of EMNLP 2026) directly studies governed memory activation, source attribution, privacy, revocation and supersession. Its current package includes 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. DSM must not claim to invent governed memory; it should complement this work with causal decision intervention and lifecycle cost.  
+  https://aclanthology.org/2026.findings-emnlp.507/
 - MemSecBench follows memory poisoning through persistence, later execution and selective repair rather than testing only whether a detector flags a suspicious write.  
   https://arxiv.org/abs/2607.27080
 - A 2026 system-level study evaluates 12 memory systems across multiple workloads and reports that no single architecture dominates every scenario; the best choices depend on workload and module bottlenecks. It also highlights the cost difference between localized maintenance and global reorganization.  
   https://arxiv.org/abs/2606.24775
 
-DSM is not intended to replace these benchmarks or claim that they are deficient. It adds a complementary question that they do not isolate as their primary endpoint: **what is the causal contribution of the memory system to the quality and safety of a downstream decision, under a measured lifecycle budget?**
+DSM is not intended to replace these benchmarks or claim that they are deficient. LongMemEval-V2 already tests agentic experience and latency; TimlMemBench directly tests governed memory use; MemSecBench tests poisoning lifecycle. DSM's narrower contribution is **counterfactual memory utility**: measure the change in downstream decision loss when memory is available, then intervene on individual returned evidence items to estimate which items helped or harmed under a frozen downstream policy, while accounting for full lifecycle cost. This remains a research hypothesis until the evaluator and experiments are executed.
 
 A related repository capability already exists: the [Decision-Relevant Predictability Benchmark](https://github.com/Luminous-Dynamics/symthaea/tree/main/research/decision-predictability-benchmark) provides finite-world decision-value and observation-value concepts. DSM should reuse those concepts where interfaces align, not clone its probe-value evaluator.
 
@@ -104,9 +106,9 @@ Each source event should retain, where available:
 - tenant, evaluation-run and purpose scope;
 - source revocation, deletion and retention state.
 
-The candidate must never receive the evaluator-private fields. The evaluator must not infer the correct answer from candidate output or trust a candidate's self-asserted evidence qualification. The JSONL fixtures place both compartments in one record for review convenience; the harness must project only the candidate subtree into candidate-facing processes and files. Evaluator-private state must remain outside candidate prompts, request bodies, logs and readable artifacts, with explicit negative controls for leakage.
+The candidate must never receive evaluator-private fields. The public candidate JSONL schema and seed fixture contain only candidate-visible observations, query, action set and resource budgets. Evaluator loss tables, oracle actions, admissible/required evidence labels and held-out world state are not stored in the candidate fixture. The scorer's known-answer unit tests are public development checks, not hidden evaluation data. Confirmatory labels and held-out seeds must live in a separate evaluator service or private artifact store, isolated from candidate processes, prompts, requests, telemetry and logs.
 
-The v0.1 seed fixtures and JSON Schema are deliberately synthetic. They illustrate the contract; they are not a validated benchmark set, representative production data, or leaderboard results.
+The v0.1 seed fixtures and JSON Schema are synthetic protocol examples, not a validated benchmark set, representative production data, or leaderboard results. The scorer API is not a sandbox; the caller must enforce process/OS/container separation.
 
 ## Task families
 
@@ -188,6 +190,7 @@ Do not collapse these dimensions into one unqualified score.
 - **Memory-induced harm rate:** fraction of paired episodes where access to memory increases loss relative to the no-memory policy.
 - **Decision-sufficiency rate:** fraction of episodes where the returned admissible evidence is sufficient for the frozen policy to attain the best action it could take with all admissible evidence.
 - **Action-change justification:** among cases where memory changes the action, the fraction where that change is supported by valid, current evidence and reduces realised loss.
+- **Evidence-level counterfactual influence:** re-run the same frozen downstream policy with each returned evidence ID withheld in turn. Report how removing each item changes decision loss. This is leave-one-out attribution, not Shapley attribution; interacting evidence items require additional subset interventions.
 
 ### Evidence quality
 
@@ -238,6 +241,7 @@ Never label an estimate as measured cost. Cost-per-decision-gain and cost-per-va
 - **H4 — active abstention can be rational:** requesting an authorised observation can reduce expected loss when the value of information exceeds its acquisition cost.
 - **H5 — local maintenance scales better:** updating affected evidence projections should cost less than global reorganisation as corpus size grows, without lowering correction or revocation correctness.
 - **H6 — governance is part of capability:** poisoning resistance, deletion and isolation should predict downstream decision safety, not be treated as unrelated operational checkboxes.
+- **H7 — evidence has measurable causal influence:** leave-one-out interventions on returned evidence identify items whose presence improves or worsens the frozen downstream decision. The signal should remain reproducible under fixed reader, seed and evidence-resolution rules.
 
 These are falsifiable hypotheses, not findings.
 
@@ -259,6 +263,16 @@ The industry comparison must include both framework families and fixed baselines
 
 A recent preprint on memory lifecycle modelling is relevant to local merge, supersession and contradiction handling: https://arxiv.org/abs/2609.03201. A separate 2026 preprint explores fast write routing and slow consolidation: https://arxiv.org/abs/2608.22215. Treat these as research leads until independent reproduction; do not import their headline numbers as MACE baselines.
 
+### LongMemEval-V2 competitive targets
+
+The published AgentRunbook-C reference is 74.9% Small Overall at 108.3 seconds and 70.1% Medium Overall at 139.9 seconds. The V2 leaderboard computes LAFS Gain over a fixed reference frontier using 1–200 second latency budgets.
+
+MACE target sequence:
+- First qualify the exact official harness and report its reader, memory budget, latency and all five ability-family scores.
+- Match or exceed AgentRunbook-C accuracy at a lower query-latency operating point.
+- Stretch target: positive delta LAFS over the published reference frontier, with no loss of evidence traceability or governance correctness.
+- Do not compare AML scores, DSM decision-regret values and LongMemEval-V2 accuracy/LAFS as a shared scale.
+
 ## Initial gates and target setting
 
 The first gate is not a headline score. It is an honest, reproducible baseline:
@@ -278,15 +292,16 @@ For AML, keep the independent target of +3 absolute points over the published op
 ### Phase 0 — protocol and fixtures
 
 - Version the episode schema and evaluator/candidate split.
-- Publish deterministic seed fixtures for drift, contradiction, revocation, insufficient evidence and poisoning.
+- Publish deterministic candidate-visible fixtures for drift, contradiction, revocation, insufficient evidence and poisoning. Keep confirmatory evaluator labels and held-out answer keys outside the public repository.
 - Define the exact interpretation of time, authority, uncertainty, parent lineage and observation costs.
 - Add negative controls before implementing a high-scoring candidate system.
 
 ### Phase 1 — reference evaluator
 
 - Build a dependency-light Rust finite-world generator and scorer.
-- Keep latent state, loss tables, required evidence and oracle selection evaluator-private.
+- Keep latent state, loss tables, admissibility/required-evidence labels and oracle selection evaluator-private and physically separate from candidate inputs.
 - Implement paired scoring, cluster identities, deterministic replay and digest-bound receipts.
+- Add frozen-policy leave-one-out evidence interventions; treat interaction/Shapley analysis as a later extension.
 - Reject missing arms, unmatched pairs, duplicate event identities and invalid evidence references.
 
 ### Phase 2 — MACE experiments
@@ -306,8 +321,11 @@ For AML, keep the independent target of +3 absolute points over the published op
 ### Phase 4 — external comparison
 
 - Run AML-compatible Add/Search evaluations under the exact API and academic/commercial profile rules.
-- Run LongMemEval (including V2 when its official dataset and evaluation procedure are pinned), LoCoMo and MemBench with fixed answerer/judge configurations.
+- Run LongMemEval-V2 using its official data, reader, tier definitions and LAFS frontier metric; target positive delta LAFS over the published reference frontier while reporting accuracy and latency separately.
+- Run original LongMemEval, LoCoMo and MemBench with fixed answerer/judge configurations.
+- Run TimlMemBench using both canonical-pool and raw-native evaluations, reporting governed activation/provenance errors separately.
 - Run MemSecBench or a compatible lifecycle-security suite for adversarial cases.
+- Never convert scores from these separate benchmarks into one cross-benchmark ranking.
 - Report each benchmark independently. Never compare unlike tasks or judge configurations as though their scores share a scale.
 
 ## Relationship to current MACE engineering
@@ -325,10 +343,12 @@ These are authored engineering changes and proposed research work. No DSM evalua
 
 1. Agent Memory Leaderboard, Cycle 2 results (published 19 November 2026): https://agentmemoryleaderboard.ai/results/cycle-2/
 2. Agent Memory Leaderboard, Add/Search API guide: https://agentmemoryleaderboard.ai/api-guide
-3. Wu et al., LongMemEval, ICLR 2025 and LongMemEval-V2 project: https://github.com/xiaowu0162/LongMemEval
-4. Tan et al., MemBench, Findings of ACL 2025: https://aclanthology.org/2025.findings-acl.989/
-5. Chen et al., MemSecBench, 2026 preprint: https://arxiv.org/abs/2607.27080
-6. Zhou et al., Are We Ready For An Agent-Native Memory System?, 2026 preprint: https://arxiv.org/abs/2606.24775
-7. MemoryLACE, 2026 preprint: https://arxiv.org/abs/2609.03201
-8. Dual-Layer Agentic Memory, 2026 preprint: https://arxiv.org/abs/2608.22215
-9. Luminous Dynamics, Decision-Relevant Predictability Benchmark: https://github.com/Luminous-Dynamics/symthaea/tree/main/research/decision-predictability-benchmark
+3. Wu et al., LongMemEval-V2, 2026: https://xiaowu0162.github.io/longmemeval-v2/
+4. Zhou et al., TimlMemBench, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.507/
+5. Wu et al., LongMemEval, ICLR 2025: https://github.com/xiaowu0162/LongMemEval
+6. Tan et al., MemBench, Findings of ACL 2025: https://aclanthology.org/2025.findings-acl.989/
+7. Chen et al., MemSecBench, 2026 preprint: https://arxiv.org/abs/2607.27080
+8. Zhou et al., Are We Ready For An Agent-Native Memory System?, 2026 preprint: https://arxiv.org/abs/2606.24775
+9. MemoryLACE, 2026 preprint: https://arxiv.org/abs/2609.03201
+10. Dual-Layer Agentic Memory, 2026 preprint: https://arxiv.org/abs/2608.22215
+11. Luminous Dynamics, Decision-Relevant Predictability Benchmark: https://github.com/Luminous-Dynamics/symthaea/tree/main/research/decision-predictability-benchmark
