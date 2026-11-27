@@ -315,7 +315,7 @@ pub fn optimize(design: &FullCovarianceDesign) -> Result<DesignReport, Error> {
 
     for mask in 1_u64..subset_count {
         let selected: Vec<usize> = (0..design.actions.len())
-            .filter(|index| (mask & (1_u64 << index)) != 0)
+            .filter(|index| (mask & (1_u64 << *index)) != 0)
             .collect();
         let mut total_cost = 0_u64;
         let mut affordable = true;
