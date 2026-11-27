@@ -168,6 +168,7 @@ struct Field {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum CsvError {
     Malformed(String),
+    MalformedCode(&'static str, String),
     LimitExceeded(String),
 }
 
@@ -314,6 +315,17 @@ pub fn parse_delimited(raw: &[u8], receipt: &RawReceipt, config: ParseConfig) ->
                 message,
             );
         }
+        Err(CsvError::MalformedCode(reason_code, message)) => {
+            return result_with_failure(
+                Disposition::Malformed,
+                &config,
+                Some(raw_hash),
+                byte_length,
+                started.elapsed().as_millis() as u64,
+                reason_code,
+                message,
+            );
+        }
         Err(CsvError::LimitExceeded(message)) => {
             return result_with_failure(
                 Disposition::LimitExceeded,
@@ -368,22 +380,26 @@ fn parse_observations(
     let delimiter = config.delimiter.byte();
     let header_limit = usize::try_from(config.limits.max_observations.max(1)).unwrap_or(usize::MAX);
     let Some((header, mut cursor)) = parse_one_record(raw, 0, delimiter, header_limit)? else {
-        return Err(CsvError::Malformed(
+        return Err(CsvError::MalformedCode(
+            "MISSING_HEADER",
             "Delimited-text artifact is empty and has no header record.".to_string(),
         ));
     };
 
     if header.is_empty() || header.iter().any(|field| field.decoded_value.trim().is_empty()) {
-        return Err(CsvError::Malformed("Header names must be non-empty.".to_string()));
+        return Err(CsvError::MalformedCode(
+            "INVALID_HEADER",
+            "Header names must be non-empty.".to_string(),
+        ));
     }
 
     let mut seen_headers = std::collections::BTreeSet::new();
     for field in &header {
         if !seen_headers.insert(field.decoded_value.clone()) {
-            return Err(CsvError::Malformed(format!(
-                "Duplicate header name {:?}.",
-                field.decoded_value
-            )));
+            return Err(CsvError::MalformedCode(
+                "DUPLICATE_HEADER",
+                format!("Duplicate header name {:?}.", field.decoded_value),
+            ));
         }
     }
 
@@ -408,11 +424,14 @@ fn parse_observations(
             return Err(CsvError::Malformed("Parser made no forward progress.".to_string()));
         }
         if fields.len() != header.len() {
-            return Err(CsvError::Malformed(format!(
-                "Data record {record_index} has {} fields; header has {}.",
-                fields.len(),
-                header.len()
-            )));
+            return Err(CsvError::MalformedCode(
+                "ROW_WIDTH_MISMATCH",
+                format!(
+                    "Data record {record_index} has {} fields; header has {}.",
+                    fields.len(),
+                    header.len()
+                ),
+            ));
         }
 
         for (column_index, field) in fields.iter().enumerate() {
