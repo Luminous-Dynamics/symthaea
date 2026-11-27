@@ -363,6 +363,46 @@
       "required_control": "hold",
       "severity": "critical",
       "positive_control": false
+    },
+    {
+      "id": "SURF-037",
+      "family": "inventory",
+      "description": "An attestation was created against a prior inventory digest and is reused after a new surface was added.",
+      "expected_decision": "indeterminate",
+      "reason_code": "stale_inventory_binding",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-038",
+      "family": "independence",
+      "description": "Observer control-root differs from both endpoints but the observer identity or control-root membership proof is missing.",
+      "expected_decision": "indeterminate",
+      "reason_code": "observer_membership_unverified",
+      "required_control": "hold",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-039",
+      "family": "scope",
+      "description": "A full-state claim sets a required surface to optional instead of providing coverage or a not-applicable proof.",
+      "expected_decision": "denied",
+      "reason_code": "full_state_inventory_surface_omitted",
+      "required_control": "deny",
+      "severity": "critical",
+      "positive_control": false
+    },
+    {
+      "id": "SURF-040",
+      "family": "inventory",
+      "description": "The same surface ID receives two attestations with incompatible source or target canonical state digests.",
+      "expected_decision": "divergent",
+      "reason_code": "surface_attestation_equivocation",
+      "required_control": "surface",
+      "severity": "critical",
+      "positive_control": false
     }
   ]
 }
