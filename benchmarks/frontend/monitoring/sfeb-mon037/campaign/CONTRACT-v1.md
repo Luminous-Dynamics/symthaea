@@ -11,20 +11,21 @@ MON-037 composes MON-024 through MON-036; it does not replace MON-025's PostgreS
 ## Evidence inputs and completeness
 
 A trial binds:
-- complete SQL/source truth with source-truth manifest SHA-256;
-- complete observed topic capture with capture-manifest SHA-256;
-- complete transaction metadata export with report SHA-256;
-- complete required database surface inventory with inventory SHA-256;
-- optional MON-033 exact offset-boundary proof and raw offsets SHA-256;
+- complete SQL/source truth with source-truth artifact SHA-256 and canonical event-set SHA-256;
+- complete observed Kafka capture with capture-manifest SHA-256 and canonical observed-event SHA-256;
+- topic/partition inventory with its own record-set digest;
+- complete transaction metadata export with report SHA-256 and canonical transaction-proof digest;
+- complete required database-surface inventory with inventory SHA-256 and required-ID digest;
+- surface dispositions and their source/restored/N/A/exclusion digests, bound by a surface-assertion digest;
+- optional MON-033 exact offset-boundary proof and raw-offset SHA-256;
 - MON-034 timeline ancestry result;
 - MON-035 observer-independence result;
 - MON-036 event-ledger and claim-disposition result;
-- MON-024 proof-graph result;
-- source and observed event envelopes, partition inventory, transaction proofs, and restore-to-service checks.
+- MON-024 proof-graph result.
 
-Manifest hashes bind named artifacts but do not authenticate them. A trusted capture adapter and MON-026 custody verifier must authenticate the bytes, origin, authority and completeness before a runtime claim is admissible. Incomplete or unbound manifests remain indeterminate.
+Artifact digests bind external files; record-set digests bind the actual arrays presented to this evaluator. Neither digest authenticates its producer. A trusted capture adapter and MON-026 custody verifier must authenticate bytes, origin, authority and completeness before a runtime claim is admissible.
 
-Each component result retains its own profile/version. Missing evidence is never synthesized into a pass.
+A helper can derive canonical record-set digests only for `offline_fixture` input. It refuses `runtime_candidate`; production evidence must arrive already bound. Missing, mismatched or incomplete manifests never qualify.
 
 ## Event reconciliation
 
@@ -32,20 +33,20 @@ Expected and observed records are joined by event ID. The comparison tuple is tr
 
 - Missing acknowledged events, unexpected records, conflicting identity reuse and payload mismatch block.
 - Exact duplicate replay is counted separately. It remains indeterminate unless a digest-bound consumer idempotency proof is supplied. The proof digest is not authenticated by this semantic evaluator.
-- Kafka offsets must increase within each single-partition topic.
-- V1 requires one partition per topic for ordering adjudication. Multi-partition ordering is indeterminate; no cross-partition global order is guessed.
+- Kafka offsets are monotonically checked within each topic/partition.
+- V1 requires one partition per topic for ordered qualification. Multi-partition ordering is indeterminate; no cross-partition global order is guessed.
 
 ## Transaction closure
 
-For each transaction require BEGIN and END observations, the exact number of row plus logical-message records, END.event_count equality, exact Debezium data_collections label counts, and contiguous transaction total_order.
+For each transaction require BEGIN and END observations, exact member count, matching END.event_count, and contiguous transaction total_order.
 
-Row collection_order must be contiguous within each transaction and collection. Message collection_order must be present and positive, but v1 deliberately does not assume logical-message pseudo-collection labels or counters are stable across transactions. Kafka offset order is independent of transaction total_order.
+For the scoped `public.ledger` lane, row collection_order must be contiguous within each transaction and collection. Debezium END.data_collections must report the row collection count and the aggregate logical-message count. Message pseudo-collection labels are retained for audit but are not assumed stable or contiguous across transactions. Kafka offset order is independent of transaction total_order.
 
 ## Database surface coverage
 
-The required surface IDs come from an explicitly complete inventory bound by a SHA-256 manifest. Every required ID must appear exactly once.
+The required surface IDs come from an explicitly complete inventory bound by a SHA-256 manifest and a canonical required-ID digest. Every required ID must appear exactly once; extra surfaces block.
 
-For full_state, each surface must be digest-matched or proven not_applicable with a justification digest. Exclusions block. For row_stream, explicit exclusions require a digest-bound exclusion manifest. Unknown, omitted or unbound surfaces remain indeterminate.
+For `full_state`, every surface must be digest-matched or proven `not_applicable` with a justification digest. Exclusions block. For `row_stream`, explicit exclusions require a digest-bound exclusion manifest. Unknown, omitted or unbound surfaces remain indeterminate.
 
 ## Component composition
 
@@ -58,6 +59,6 @@ For full_state, each surface must be digest-matched or proven not_applicable wit
 
 ## Verdicts and limits
 
-The component verdict reports lower-layer checks. The campaign verdict additionally incorporates MON-024 and execution mode. V1 never sets traffic_activation_permitted=true. Both offline_fixture and runtime_candidate remain indeterminate absent a separately authenticated runtime verifier and custody adapter.
+The component verdict reports lower-layer checks. The campaign verdict additionally incorporates MON-024 and execution mode. V1 never sets `traffic_activation_permitted=true`. Both `offline_fixture` and `runtime_candidate` remain indeterminate absent a separately authenticated runtime verifier and custody adapter.
 
 The evaluator consumes normalized outputs. It does not authenticate signatures, fetch source truth, inspect live PostgreSQL/Kafka, validate WAL bytes or perform recovery. No live lab trial or SOTA claim follows from a passing offline case.
