@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -21,7 +22,10 @@ func readInput(path string)(independence.Input,error){
 	var input independence.Input
 	file,err:=os.Open(path); if err!=nil{return input,err}
 	defer file.Close()
-	decoder:=json.NewDecoder(io.LimitReader(file,16<<20))
+	raw, err := io.ReadAll(io.LimitReader(file, (16<<20)+1))
+	if err != nil { return input, err }
+	if len(raw) > 16<<20 { return input, errors.New("input exceeds 16 MiB limit") }
+	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err:=decoder.Decode(&input);err!=nil{return input,err}
 	var trailing any

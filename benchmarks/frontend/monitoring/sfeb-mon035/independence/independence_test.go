@@ -117,3 +117,46 @@ func TestResourceCapsFailClosed(t *testing.T){
 	for i:=range in.Nodes { in.Nodes[i].ID=fmt.Sprintf("node-%d",i) }
 	if got:=Evaluate(in); got.Verdict!=Blocked { t.Fatalf("node cap breach must block: %+v",got) }
 }
+
+
+func TestSharedFailureDomainDetectedTransitively(t *testing.T) {
+	in := fixture()
+	for i := range in.Nodes {
+		if in.Nodes[i].ID == "b-root" {
+			for j, child := range in.Nodes[i].DependsOn {
+				if child == "b-identity_provider" {
+					in.Nodes[i].DependsOn[j] = "b-intermediate"
+				}
+			}
+		}
+		if in.Nodes[i].ID == "b-identity_provider" {
+			in.Nodes[i].FailureDomainID = "a:identity_provider"
+		}
+	}
+	in.Nodes = append(in.Nodes, Node{ID: "b-intermediate", DependsOn: []string{"b-identity_provider"}})
+	got := Evaluate(in)
+	if got.Verdict != Blocked || !containsDomain(got.SharedDomains, "identity_provider", "a:identity_provider") {
+		t.Fatalf("transitive shared dependency must block: %+v", got)
+	}
+}
+
+func TestDuplicateDependencyAndNonCanonicalIdentifiersBlock(t *testing.T) {
+	in := fixture()
+	for i := range in.Nodes {
+		if in.Nodes[i].ID == "a-root" {
+			in.Nodes[i].DependsOn = append(in.Nodes[i].DependsOn, in.Nodes[i].DependsOn[0])
+		}
+	}
+	if got := Evaluate(in); got.Verdict != Blocked {
+		t.Fatalf("duplicate dependency edge must block: %+v", got)
+	}
+	in = fixture()
+	for i := range in.Nodes {
+		if in.Nodes[i].ID == "a-storage" {
+			in.Nodes[i].FailureDomainID = " a:storage"
+		}
+	}
+	if got := Evaluate(in); got.Verdict != Blocked {
+		t.Fatalf("non-canonical failure-domain identifier must block: %+v", got)
+	}
+}

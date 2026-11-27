@@ -85,7 +85,7 @@ type evalFlags struct {
 	reasons map[string]struct{}
 }
 func (f *evalFlags) block(code string) { f.blocked=true; f.reasons[code]=struct{}{} }
-func (f *evalFlags) unknown(code string) { f.unknown=true; f.reasons[code]=struct{}{} }
+func (f *evalFlags) markUnknown(code string) { f.unknown=true; f.reasons[code]=struct{}{} }
 func (f *evalFlags) output() []string {
 	out:=make([]string,0,len(f.reasons))
 	for code:=range f.reasons { out=append(out,code) }
@@ -101,6 +101,11 @@ func validSHA256(value string) bool {
 	_,err:=hex.DecodeString(value)
 	return err==nil
 }
+func validIdentifier(value string) bool {
+	return value != "" && len(value) <= MaxIdentifierBytes &&
+		strings.TrimSpace(value) == value &&
+		!strings.ContainsAny(value, " \\t\\r\\n")
+}
 
 func Evaluate(in Input) Result {
 	result:=Result{
@@ -112,16 +117,16 @@ func Evaluate(in Input) Result {
 	}
 	flags:=&evalFlags{reasons:map[string]struct{}{}}
 	if in.Profile!=Profile || in.Version!=Version { flags.block("unsupported_profile_or_version") }
-	if in.Now.IsZero() { flags.unknown("evaluation_time_missing") }
-	if len(in.Observers)<2 { flags.unknown("two_observers_required") }
+	if in.Now.IsZero() { flags.markUnknown("evaluation_time_missing") }
+	if len(in.Observers)<2 { flags.markUnknown("two_observers_required") }
 	if len(in.Observers)>2 { flags.block("unsupported_observer_count_v1") }
-	if len(in.Nodes)==0 { flags.unknown("dependency_inventory_missing") }
+	if len(in.Nodes)==0 { flags.markUnknown("dependency_inventory_missing") }
 	if len(in.Nodes)>MaxNodes { flags.block("dependency_node_limit_exceeded") }
 
 	nodeByID:=make(map[string]Node,len(in.Nodes))
 	totalEdges:=0
 	for _,node:=range in.Nodes {
-		if strings.TrimSpace(node.ID)=="" || len(node.ID)>MaxIdentifierBytes {
+		if !validIdentifier(node.ID) {
 			flags.block("invalid_dependency_node_id")
 			continue
 		}
@@ -135,7 +140,7 @@ func Evaluate(in Input) Result {
 		if node.FailureClass!="" && !supportedClass(node.FailureClass) {
 			flags.block("unsupported_failure_domain_class:"+node.ID)
 		}
-		if node.FailureDomainID!="" && (strings.TrimSpace(node.FailureDomainID)=="" || len(node.FailureDomainID)>MaxIdentifierBytes) {
+		if node.FailureDomainID!="" && !validIdentifier(node.FailureDomainID) {
 			flags.block("invalid_failure_domain_id:"+node.ID)
 		}
 		totalEdges+=len(node.DependsOn)
@@ -152,25 +157,25 @@ func Evaluate(in Input) Result {
 			Domains:[]DomainRef{},ReasonCodes:[]string{},
 		}
 		result.ObserverIDs=append(result.ObserverIDs,observer.ID)
-		if strings.TrimSpace(observer.ID)=="" || len(observer.ID)>MaxIdentifierBytes {
+		if !validIdentifier(observer.ID) {
 			local.block("invalid_observer_id")
 		} else if _,duplicate:=observerIDs[observer.ID]; duplicate {
 			local.block("duplicate_observer_id")
 		} else { observerIDs[observer.ID]=struct{}{} }
-		if observer.RootNodeID=="" { local.unknown("observer_root_missing") }
-		if !observer.InventoryComplete { local.unknown("observer_inventory_not_attested_complete") }
+		if observer.RootNodeID=="" { local.markUnknown("observer_root_missing") } else if !validIdentifier(observer.RootNodeID) { local.block("observer_root_invalid") }
+		if !observer.InventoryComplete { local.markUnknown("observer_inventory_not_attested_complete") }
 		if observer.InventoryAttestationSHA256=="" {
-			local.unknown("inventory_attestation_digest_missing")
+			local.markUnknown("inventory_attestation_digest_missing")
 		} else if !validSHA256(observer.InventoryAttestationSHA256) {
 			local.block("inventory_attestation_digest_invalid")
 		}
-		if observer.EvidenceGrade!=GradeRuntimeIndependent { local.unknown("observer_evidence_not_runtime_independent") }
+		if observer.EvidenceGrade!=GradeRuntimeIndependent { local.markUnknown("observer_evidence_not_runtime_independent") }
 		if in.Now.IsZero() || observer.ObservedAt.IsZero() || observer.ExpiresAt.IsZero() {
-			local.unknown("observer_freshness_unproven")
+			local.markUnknown("observer_freshness_unproven")
 		} else {
 			if observer.ObservedAt.After(in.Now) { local.block("observer_observation_from_future") }
 			if observer.ExpiresAt.Before(observer.ObservedAt) { local.block("observer_validity_interval_invalid") }
-			if observer.ExpiresAt.Before(in.Now) { local.unknown("observer_inventory_expired") }
+			if observer.ExpiresAt.Before(in.Now) { local.markUnknown("observer_inventory_expired") }
 		}
 		closure,dfsFlags:=dependencyClosure(observer.RootNodeID,nodeByID)
 		for code:=range dfsFlags.reasons { local.reasons[code+":"+observer.ID]=struct{}{} }
@@ -186,7 +191,7 @@ func Evaluate(in Input) Result {
 		}
 		for _,class:=range criticalDomainClasses {
 			domains:=domainSet[class]
-			if len(domains)==0 { local.unknown("critical_domain_missing:"+class); continue }
+			if len(domains)==0 { local.markUnknown("critical_domain_missing:"+class); continue }
 			for domainID:=range domains { assessment.Domains=append(assessment.Domains,DomainRef{Class:class,DomainID:domainID}) }
 		}
 		sort.Slice(assessment.Domains,func(i,j int)bool{
@@ -247,7 +252,7 @@ func dependencyClosure(root string,nodes map[string]Node)(map[string]struct{},*e
 		if state[id]==1 { flags.block("dependency_cycle_detected"); return }
 		if state[id]==2 { return }
 		node,ok:=nodes[id]
-		if !ok { flags.unknown("dependency_reference_missing"); return }
+		if !ok { flags.markUnknown("dependency_reference_missing"); return }
 		state[id]=1
 		closure[id]=struct{}{}
 		seen:=map[string]struct{}{}
@@ -258,6 +263,6 @@ func dependencyClosure(root string,nodes map[string]Node)(map[string]struct{},*e
 		}
 		state[id]=2
 	}
-	if root=="" { flags.unknown("dependency_root_missing") } else { visit(root) }
+	if root=="" { flags.markUnknown("dependency_root_missing") } else { visit(root) }
 	return closure,flags
 }
