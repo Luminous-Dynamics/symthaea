@@ -136,6 +136,29 @@ fn audit(fixture: &Value) -> Result<(), String> {
         "pulse_time_sensitivity_status",
         "synthetic_not_computed",
     )?;
+    if !boolean(linearization, "distribution_pulse_pullback_required")?
+        || !boolean(
+            linearization,
+            "distribution_pulse_remap_mass_ledger_required",
+        )?
+    {
+        return Err("distribution pulse pullback and mass ledger are mandatory".to_owned());
+    }
+    require_string(
+        linearization,
+        "distribution_pulse_pullback_status",
+        "first_order_piecewise_constant_module_only",
+    )?;
+    require_string(
+        linearization,
+        "distribution_pulse_remap_jacobian_status",
+        "not_implemented_solver_adapter_required",
+    )?;
+    require_string(
+        linearization,
+        "distribution_pulse_boundary_outflow_disposition",
+        "UNQUALIFIED_UNLESS_GRID_CONVERGENCE_OR_EXPLICIT_BOUNDARY_ERROR",
+    )?;
 
     let horizon = field(fixture, "prediction_horizon")?;
     let horizon_start = number(horizon, "start_time")?;
