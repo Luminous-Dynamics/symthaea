@@ -18,6 +18,7 @@
     "observed_result",
     "verifier",
     "dimensions",
+    "expected_disposition",
     "qualified"
   ],
   "properties": {
@@ -286,6 +287,13 @@
     "timestamp": {
       "type": "string",
       "format": "date-time"
+    },
+    "expected_disposition": {
+      "enum": [
+        "allow",
+        "deny",
+        "unresolved"
+      ]
     }
   },
   "allOf": [
@@ -337,6 +345,90 @@
               "replay",
               "independent"
             ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "expected_disposition": {
+            "const": "allow"
+          }
+        },
+        "required": [
+          "expected_disposition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "observed_result": {
+            "properties": {
+              "disposition": {
+                "const": "allow"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "expected_disposition": {
+            "const": "deny"
+          }
+        },
+        "required": [
+          "expected_disposition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "observed_result": {
+            "properties": {
+              "disposition": {
+                "const": "deny"
+              },
+              "state_mutation_count": {
+                "const": 0
+              }
+            }
+          },
+          "actions": {
+            "items": {
+              "properties": {
+                "mutation_applied": {
+                  "const": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "expected_disposition": {
+            "const": "unresolved"
+          }
+        },
+        "required": [
+          "expected_disposition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "observed_result": {
+            "properties": {
+              "disposition": {
+                "const": "unresolved"
+              }
+            }
+          },
+          "qualified": {
+            "const": false
           }
         }
       }
