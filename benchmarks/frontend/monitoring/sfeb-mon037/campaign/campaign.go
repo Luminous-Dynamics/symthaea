@@ -31,6 +31,18 @@ const (
  RuntimeCandidate Mode="runtime_candidate"
 )
 
+type RecoveryBoundary struct {
+ IncidentID string `json:"incident_id"`
+ ClaimID string `json:"claim_id"`
+ SourceClusterID string `json:"source_cluster_id"`
+ Database string `json:"database"`
+ SourceEpoch string `json:"source_epoch"`
+ TimelineID string `json:"timeline_id"`
+ SnapshotID string `json:"snapshot_id"`
+ TerminalPosition string `json:"terminal_position"`
+ ScopeDigest string `json:"scope_digest"`
+ InventoryDigest string `json:"inventory_digest"`
+}
 type Event struct {
  EventID string `json:"event_id"`
  TransactionID string `json:"transaction_id"`
@@ -62,6 +74,7 @@ type OffsetProof struct {
  TargetReached bool `json:"target_reached"`
  CapturedAt time.Time `json:"captured_at"`
  OffsetsSHA256 string `json:"offsets_sha256"`
+ BoundarySHA256 string `json:"boundary_sha256"`
  Offset struct {
   LSN string `json:"lsn"`
   LSNProc string `json:"lsn_proc"`
@@ -89,6 +102,16 @@ type Components struct {
 type Input struct {
  Profile string `json:"profile"`
  Version string `json:"version"`
+ Boundary RecoveryBoundary `json:"recovery_boundary"`
+ SourceTruthBoundarySHA256 string `json:"source_truth_boundary_sha256"`
+ ObservedCaptureBoundarySHA256 string `json:"observed_capture_boundary_sha256"`
+ TransactionReportBoundarySHA256 string `json:"transaction_report_boundary_sha256"`
+ SurfaceInventoryBoundarySHA256 string `json:"surface_inventory_boundary_sha256"`
+ Mon033BoundarySHA256 string `json:"mon033_boundary_sha256,omitempty"`
+ Mon034BoundarySHA256 string `json:"mon034_boundary_sha256"`
+ Mon035BoundarySHA256 string `json:"mon035_boundary_sha256"`
+ Mon036BoundarySHA256 string `json:"mon036_boundary_sha256"`
+ Mon024BoundarySHA256 string `json:"mon024_boundary_sha256"`
  TrialID string `json:"trial_id"`
  ScenarioID string `json:"scenario_id"`
  Mode Mode `json:"mode"`
@@ -223,6 +246,29 @@ func surfaceAssertionsDigest(values []Surface) string {
 // DeriveFixtureRecordSetDigests is an authoring helper for public offline fixtures only.
 // It must not be used by runtime adapters: runtime manifests must arrive pre-bound and
 // independently authenticated by the caller/custody verifier.
+func recoveryBoundaryDigest(b RecoveryBoundary) string { return canonicalDigest(b) }
+func recoveryBoundaryComplete(b RecoveryBoundary) bool {
+ return validID(b.IncidentID)&&validID(b.ClaimID)&&validID(b.SourceClusterID)&&validID(b.Database)&&
+  validID(b.SourceEpoch)&&validID(b.TimelineID)&&validID(b.SnapshotID)&&validID(b.TerminalPosition)&&
+  validDigest(b.ScopeDigest)&&validDigest(b.InventoryDigest)
+}
+func bindBoundary(label,actual,expected string,f *flags) {
+ if !validDigest(actual) { f.hold(label+"_boundary_binding_missing"); return }
+ if actual!=expected { f.block(label+"_recovery_boundary_mismatch") }
+}
+func checkBoundaryBindings(in Input,f *flags) {
+ if !recoveryBoundaryComplete(in.Boundary) { f.hold("recovery_boundary_incomplete"); return }
+ expected:=recoveryBoundaryDigest(in.Boundary)
+ bindBoundary("source_truth",in.SourceTruthBoundarySHA256,expected,f)
+ bindBoundary("observed_capture",in.ObservedCaptureBoundarySHA256,expected,f)
+ bindBoundary("transaction_report",in.TransactionReportBoundarySHA256,expected,f)
+ bindBoundary("surface_inventory",in.SurfaceInventoryBoundarySHA256,expected,f)
+ bindBoundary("mon034",in.Mon034BoundarySHA256,expected,f)
+ bindBoundary("mon035",in.Mon035BoundarySHA256,expected,f)
+ bindBoundary("mon036",in.Mon036BoundarySHA256,expected,f)
+ bindBoundary("mon024",in.Mon024BoundarySHA256,expected,f)
+ if in.OffsetTargetRequired { bindBoundary("mon033",in.Mon033BoundarySHA256,expected,f) }
+}
 func DeriveFixtureRecordSetDigests(in *Input) bool {
  if in==nil||in.Mode!=OfflineFixture{return false}
  in.SourceEventsSHA256=sourceEventsDigest(in.SourceEvents)
@@ -231,6 +277,10 @@ func DeriveFixtureRecordSetDigests(in *Input) bool {
  in.TopicPartitionsSHA256=topicPartitionsDigest(in.TopicPartitions)
  in.RequiredSurfaceIDsSHA256=surfaceIDsDigest(in.RequiredSurfaceIDs)
  in.SurfaceAssertionsSHA256=surfaceAssertionsDigest(in.Surfaces)
+ digest:=recoveryBoundaryDigest(in.Boundary)
+ in.SourceTruthBoundarySHA256=digest;in.ObservedCaptureBoundarySHA256=digest;in.TransactionReportBoundarySHA256=digest;in.SurfaceInventoryBoundarySHA256=digest
+ in.Mon034BoundarySHA256=digest;in.Mon035BoundarySHA256=digest;in.Mon036BoundarySHA256=digest;in.Mon024BoundarySHA256=digest
+ if in.OffsetTargetRequired { in.Mon033BoundarySHA256=digest }
  return true
 }
 func checkRecordManifest(label string,complete bool,artifactSHA,recordsSHA,expectedSHA string,f *flags) {
@@ -250,11 +300,13 @@ func checkVerdict(v,name string,f *flags){switch v{case "qualified":case "blocke
 type envelope34 struct {
  Profile string `json:"profile"`
  Version string `json:"version"`
+ BoundarySHA256 string `json:"boundary_sha256"`
  Result struct { Verdict string `json:"verdict"` } `json:"result"`
 }
 type envelope35 struct {
  Profile string `json:"profile"`
  Version string `json:"version"`
+ BoundarySHA256 string `json:"boundary_sha256"`
  Result struct {
   Verdict string `json:"verdict"`
   Independent bool `json:"independent"`
@@ -265,11 +317,12 @@ type envelope35 struct {
 type envelope36 struct {
  Profile string `json:"profile"`
  Version string `json:"version"`
+ BoundarySHA256 string `json:"boundary_sha256"`
  LedgerIntegrityValid bool `json:"ledger_integrity_valid"`
  LedgerComplete bool `json:"ledger_complete"`
  Claims []struct {ClaimID string `json:"claim_id"`;Disposition string `json:"disposition"`} `json:"claims"`
 }
-type envelope24 struct {Verdict string `json:"verdict"`;MayEnableTraffic bool `json:"may_enable_traffic"`}
+type envelope24 struct {BoundarySHA256 string `json:"boundary_sha256"`;Verdict string `json:"verdict"`;MayEnableTraffic bool `json:"may_enable_traffic"`}
 
 func Evaluate(in Input)Result{
  out:=Result{
@@ -287,11 +340,12 @@ func Evaluate(in Input)Result{
  if len(in.Transactions)>MaxTransactions||len(in.Surfaces)>MaxSurfaces{global.block("transaction_surface_limit_exceeded")}
  names:=[]string{"mon033_offset","mon034_timeline","mon035_observers","mon036_continuity","cdc_reconciliation","transaction_closure","surface_coverage","restore_readiness","mon024_proof_graph"}
  fs:=map[string]*flags{};for _,n:=range names{fs[n]=newFlags()}
+ fs["shared_recovery_boundary"]=newFlags();checkBoundaryBindings(in,fs["shared_recovery_boundary"])
  checkOffset(in,fs["mon033_offset"]);checkTimeline(in,fs["mon034_timeline"]);checkObservers(in,fs["mon035_observers"]);checkContinuity(in,fs["mon036_continuity"])
  reconcileEvents(in,&out.Reconciliation,fs["cdc_reconciliation"],fs["transaction_closure"])
  checkSurfaces(in,&out.Reconciliation,fs["surface_coverage"]);checkRestore(in,fs["restore_readiness"])
  for _,n:=range names[:8]{out.Components=append(out.Components,status(n,fs[n]))}
- domain:=newFlags();for _,n:=range names[:8]{merge(domain,fs[n],n)};out.ComponentVerdict=domain.verdict()
+ domain:=newFlags();merge(domain,fs["shared_recovery_boundary"],"shared_recovery_boundary");for _,n:=range names[:8]{merge(domain,fs[n],n)};out.ComponentVerdict=domain.verdict()
  checkProofGraph(in,out.ComponentVerdict,fs["mon024_proof_graph"]);out.Components=append(out.Components,status("mon024_proof_graph",fs["mon024_proof_graph"]))
  final:=newFlags();merge(final,global,"input");for _,n:=range names{merge(final,fs[n],n)}
  if in.Mode==OfflineFixture{final.hold("offline_fixture_cannot_qualify_live_recovery")}
@@ -304,6 +358,7 @@ func checkOffset(in Input,f *flags){
  if !in.OffsetTargetRequired{return};if in.OffsetTarget==""{f.hold("offset_target_missing");return}
  var p OffsetProof;decode(in.Components.OffsetProof,&p,"offset_proof",f)
  if p.Profile!="mon033-postgres-offset-target-v1"||p.Version!="1.0.0"{f.block("offset_profile_mismatch");return}
+ if !validDigest(p.BoundarySHA256)||p.BoundarySHA256!=recoveryBoundaryDigest(in.Boundary){f.block("offset_recovery_boundary_mismatch");return}
  if p.Target!=in.OffsetTarget{f.block("offset_target_mismatch");return};if !p.TargetReached{f.hold("exact_offset_target_not_observed");return}
  if !validDigest(p.OffsetsSHA256)||p.CapturedAt.IsZero()||p.CapturedAt.After(in.EvaluatedAt){f.block("offset_digest_or_time_invalid");return}
  if p.Offset.LSN==""||p.Offset.LSNProc==""||p.Offset.LSNCommit==""{f.hold("offset_lsn_fields_missing");return}
@@ -311,14 +366,15 @@ func checkOffset(in Input,f *flags){
  case "transactional_message":if p.Offset.MessageType!="MESSAGE"||p.Offset.TxID==""{f.block("message_offset_predicate_mismatch")}
  default:f.block("unsupported_offset_target")}
 }
-func checkTimeline(in Input,f *flags){var e envelope34;decode(in.Components.TimelineResult,&e,"timeline_result",f);if e.Profile!="mon034-postgres-timeline-ancestry-result-v1"||e.Version!="1.0.0"{f.hold("timeline_profile_mismatch");return};checkVerdict(e.Result.Verdict,"timeline",f)}
+func checkTimeline(in Input,f *flags){var e envelope34;decode(in.Components.TimelineResult,&e,"timeline_result",f);if e.Profile!="mon034-postgres-timeline-ancestry-result-v1"||e.Version!="1.0.0"{f.hold("timeline_profile_mismatch");return};bindBoundary("mon034",e.BoundarySHA256,recoveryBoundaryDigest(in.Boundary),f);checkVerdict(e.Result.Verdict,"timeline",f)}
 func checkObservers(in Input,f *flags){
  var e envelope35;decode(in.Components.ObserverResult,&e,"observer_result",f);if e.Profile!="mon035-observer-independence-result-v1"||e.Version!="1.0.0"{f.hold("observer_profile_mismatch");return}
- checkVerdict(e.Result.Verdict,"observers",f);if !e.Result.Independent{if e.Result.Verdict=="qualified"{f.block("observer_qualified_without_independence")}else{f.hold("observer_independence_unproven")}}
+ bindBoundary("mon035",e.BoundarySHA256,recoveryBoundaryDigest(in.Boundary),f);checkVerdict(e.Result.Verdict,"observers",f);if !e.Result.Independent{if e.Result.Verdict=="qualified"{f.block("observer_qualified_without_independence")}else{f.hold("observer_independence_unproven")}}
  if len(e.Result.SharedDomains)>0{f.block("shared_observer_domain")};if len(e.Result.ObserverAssessments)!=2{f.hold("observer_count_not_two")};for _,a:=range e.Result.ObserverAssessments{if !a.Eligible{f.hold("observer_inventory_ineligible:"+a.ObserverID)}}
 }
 func checkContinuity(in Input,f *flags){
  var e envelope36;decode(in.Components.ContinuityResult,&e,"continuity_result",f);if e.Profile!="mon036-recovery-evidence-continuity-result-v1"||e.Version!="1.0.0"{f.hold("continuity_profile_mismatch");return}
+ bindBoundary("mon036",e.BoundarySHA256,recoveryBoundaryDigest(in.Boundary),f)
  if !e.LedgerIntegrityValid{f.block("continuity_ledger_integrity_failed")};if !e.LedgerComplete{f.hold("continuity_ledger_incomplete")}
  claims:=map[string][]string{};for _,c:=range e.Claims{claims[c.ClaimID]=append(claims[c.ClaimID],c.Disposition)}
  required:=in.RequiredClaimIDs;if len(required)==0{for id:=range claims{required=append(required,id)};sort.Strings(required)}
@@ -386,5 +442,6 @@ func checkSurfaces(in Input,r *Reconciliation,f *flags){
 }
 var restoreKeys=[]string{"artifact_validated","database_recovered","dependencies_ready","application_read_probe","application_write_readback","write_probe_rollback","application_invariants","old_primary_fenced","stale_endpoints_fenced","independent_service_acceptance","activation_order_verified","traffic_disabled_until_ready"}
 func checkRestore(in Input,f *flags){if in.RestoreChecks==nil{f.hold("restore_checks_missing");return};for _,k:=range restoreKeys{switch in.RestoreChecks[k]{case "passed":case "failed":f.block("restore_failed:"+k);case "unknown","":f.hold("restore_unproven:"+k);default:f.block("restore_state_invalid:"+k)}}}
-func checkProofGraph(in Input,domain Verdict,f *flags){var e envelope24;decode(in.Components.ProofGraphResult,&e,"proof_graph",f);switch e.Verdict{case "qualified":if !e.MayEnableTraffic{f.hold("proof_graph_not_activation_eligible")};if domain!=Qualified{f.block("proof_graph_promoted_nonqualified_components")};if in.Mode==OfflineFixture{f.block("synthetic_proof_promoted_to_production")}
+func checkProofGraph(in Input,domain Verdict,f *flags){var e envelope24;decode(in.Components.ProofGraphResult,&e,"proof_graph",f);bindBoundary("mon024",e.BoundarySHA256,recoveryBoundaryDigest(in.Boundary),f)
+ switch e.Verdict{case "qualified":if !e.MayEnableTraffic{f.hold("proof_graph_not_activation_eligible")};if domain!=Qualified{f.block("proof_graph_promoted_nonqualified_components")};if in.Mode==OfflineFixture{f.block("synthetic_proof_promoted_to_production")}
 case "blocked":f.block("proof_graph_blocked");case "indeterminate":f.hold("proof_graph_indeterminate");default:f.hold("proof_graph_verdict_invalid")};if e.MayEnableTraffic&&e.Verdict!="qualified"{f.block("proof_graph_activation_flag_inconsistent")}}
