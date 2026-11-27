@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
+pub mod evidence_shift_diagnosis;
 pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
@@ -148,4 +149,14 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use evidence_shift_diagnosis::{
+    EVIDENCE_SHIFT_ASSESSMENT_SCHEMA_V1, EVIDENCE_SHIFT_ENGINE_SCHEMA_V1,
+    EVIDENCE_SHIFT_OBSERVATION_SCHEMA_V1, EVIDENCE_SHIFT_POLICY_SCHEMA_V1,
+    EvidenceShiftAssessmentV1, EvidenceShiftErrorV1, EvidenceShiftMonitorV1,
+    EvidenceShiftObservationV1, EvidenceShiftPolicyV1, ProcessEventMarkerV1,
+    ShiftAdaptationRecommendationV1, ShiftChannelAssessmentV1, ShiftChannelPolicyV1,
+    ShiftChannelStateV1, ShiftDiagnosticStateV1, ShiftReasonCodeV1, ShiftSignalChannelV1,
+    create_evidence_shift_monitor_v1, observe_evidence_shift_v1,
 };
