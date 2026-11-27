@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "sdcb-robust-two-covariance-scenarios-v1",
+  "latent_ids": ["science", "shared_bias"],
+  "science_index": 0,
+  "budget_units": 2,
+  "actions": [
+    {"id": "science-a", "cost_units": 1, "loadings": [1.0, 1.0]},
+    {"id": "science-b", "cost_units": 1, "loadings": [1.0, 1.0]},
+    {"id": "reference", "cost_units": 1, "loadings": [0.0, 1.0]}
+  ],
+  "scenarios": [
+    {
+      "id": "reference-chain-a-correlated",
+      "prior_covariance": [[1.0, 0.0], [0.0, 1.0]],
+      "residual_covariance": [
+        [0.01, 0.0, 0.003],
+        [0.0, 0.01, 0.0],
+        [0.003, 0.0, 0.01]
+      ]
+    },
+    {
+      "id": "reference-chain-b-correlated",
+      "prior_covariance": [[1.0, 0.0], [0.0, 1.0]],
+      "residual_covariance": [
+        [0.01, 0.0, 0.0],
+        [0.0, 0.01, 0.003],
+        [0.0, 0.003, 0.01]
+      ]
+    }
+  ]
+}

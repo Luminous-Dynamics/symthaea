@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "sdcb-robust-two-covariance-scenarios-v1",
+  "execution_kind": "independent_exhaustive_subset_matrix_enumeration",
+  "rust_compiled_or_executed": false,
+  "expected_report": {
+    "selected_action_ids": ["reference", "science-a"],
+    "selected_cost_units": 2,
+    "budget_units": 2,
+    "prior_worst_case_science_variance": 1.0,
+    "posterior_worst_case_science_variance": 0.019512668672944374,
+    "worst_case_variance_reduction_fraction": 0.9804873313270556,
+    "posterior_science_variance_by_scenario": [
+      ["reference-chain-a-correlated", 0.013759519417707996],
+      ["reference-chain-b-correlated", 0.019512668672944374]
+    ],
+    "scenarios_evaluated": 2,
+    "subsets_evaluated": 8
+  },
+  "alternative_tied_policy": {
+    "selected_action_ids": ["reference", "science-b"],
+    "worst_case_science_variance": 0.019512668672944374,
+    "tie_break": "lexical action identifier order selects science-a"
+  },
+  "claim_boundary": "Finite-scenario maximin for the supplied covariance models only; not a continuous distributionally robust guarantee."
+}

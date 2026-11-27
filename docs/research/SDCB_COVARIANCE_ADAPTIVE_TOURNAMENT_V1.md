@@ -182,3 +182,20 @@ This should be an explicit design-policy reproduction track:
 - then test whether a common-cause/decision-aware policy improves the same declared target under identical measurement costs.
 
 Paper: https://doi.org/10.1016/j.mbs.2025.109571
+
+
+## 11. Covariance-model uncertainty: finite-scenario robust selection
+
+A fixed covariance matrix is itself an assumption. Add a separate finite-scenario track where multiple defensible covariance models share the same action registry and resource budget.
+
+Compare:
+- nominal plug-in covariance design;
+- scenario-by-scenario oracle (diagnostic upper bound only; not one deployable subset);
+- one shared subset selected by finite-scenario maximin;
+- Bayesian model averaging with scenario weights where justified;
+- distributionally robust design over a justified covariance uncertainty set;
+- sensitivity analysis over correlation strength and covariance conditioning.
+
+Primary metric: worst-case target posterior variance or downstream decision regret for one common selected policy. Report all scenario-specific values, the binding scenario, budget, and regret to each scenario oracle.
+
+A finite-scenario maximin result only protects against the supplied scenario set. Do not call it distributionally robust over an unbounded or continuous family.

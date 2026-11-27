@@ -210,3 +210,10 @@ A key mathematical point: for a fixed linear-Gaussian model with known covarianc
 A new real-world track is short mobile-sensor collocation with a slower reference instrument. It must account for unequal averaging windows and process covariance; paired rows do not necessarily represent the same measurand average. See Kok & Tabandeh (2026), DOI 10.1002/qre.70319.
 
 The same evidence rules apply: exact arithmetic and schema parsing are not Rust execution; skipped hosted workflows are not passes; synthetic common-cause perturbations do not establish a physical failure mechanism.
+
+
+## Finite-scenario covariance robustness
+
+The full-covariance Gaussian reference now includes an exact finite-scenario maximin selection path. One shared action subset is evaluated under every declared prior/residual covariance scenario, and the objective minimizes the worst-case scientific posterior variance. This is not a continuous distributionally robust guarantee; the scenario envelope must be justified and its provenance retained.
+
+The frozen two-scenario control places the residual correlation on science-A/reference in one scenario and science-B/reference in the other. The same selected subset is used for both. The scenario-specific posterior variances and binding worst-case result are retained in the report.
