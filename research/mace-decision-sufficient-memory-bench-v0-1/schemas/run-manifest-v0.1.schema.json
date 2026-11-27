@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/mace-decision-sufficient-memory-bench-v0-1/schemas/run-manifest-v0.1.schema.json",
+  "title": "MACE DSM Run Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "created_at_utc",
+    "profile",
+    "system",
+    "downstream_policy",
+    "retrieval",
+    "dataset",
+    "evaluation",
+    "runtime"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_dsm_run_manifest_v0_1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "profile": {
+      "enum": [
+        "native-research",
+        "aml-academic-open-source",
+        "aml-commercial"
+      ]
+    },
+    "track": {
+      "enum": [
+        "textual",
+        "coding",
+        "multimodal"
+      ]
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit_sha",
+        "artifact_digest_sha256"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "artifact_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "adapter_version": {
+          "type": "string"
+        },
+        "build_flags_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "downstream_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_digest_sha256",
+        "reader_seed"
+      ],
+      "properties": {
+        "policy_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reader_model": {
+          "type": "string"
+        },
+        "reader_model_revision": {
+          "type": "string"
+        },
+        "prompt_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reader_seed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "retrieval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index_parameters_digest_sha256",
+        "evidence_budget"
+      ],
+      "properties": {
+        "embedding_model": {
+          "type": "string"
+        },
+        "participant_llm_model": {
+          "type": "string"
+        },
+        "reranker_model": {
+          "type": "string"
+        },
+        "search_top_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "evidence_budget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "index_parameters_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "dataset_digest_sha256",
+        "seed_manifest_digest_sha256",
+        "split"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "seed_manifest_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "split": {
+          "enum": [
+            "development",
+            "held-out",
+            "official"
+          ]
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluator_digest_sha256",
+        "metric_profile"
+      ],
+      "properties": {
+        "evaluator_digest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "metric_profile": {
+          "enum": [
+            "dsm-v0.1",
+            "aml-official",
+            "longmemeval-v2",
+            "timlmembench",
+            "memsecbench"
+          ]
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os",
+        "architecture",
+        "cpu_model",
+        "ram_bytes"
+      ],
+      "properties": {
+        "os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "architecture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpu_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ram_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "gpu_model": {
+          "type": "string"
+        },
+        "gpu_memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accelerator_runtime": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "aml-academic-open-source"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "then": {
+        "required": [
+          "track"
+        ],
+        "properties": {
+          "retrieval": {
+            "properties": {
+              "embedding_model": {
+                "const": "text-embedding-v4"
+              },
+              "participant_llm_model": {
+                "const": "gpt-4o-mini"
+              },
+              "search_top_k": {
+                "maximum": 100
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "aml-commercial"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "then": {
+        "required": [
+          "track"
+        ],
+        "properties": {
+          "retrieval": {
+            "properties": {
+              "search_top_k": {
+                "maximum": 100
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
