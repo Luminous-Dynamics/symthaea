@@ -22,6 +22,14 @@ fn one_minus_exp_neg_over_x(x: f64) -> f64 {
     }
 }
 
+/// Compute exp(-rate*time) while compensating for the rounded binary64
+/// product. FMA returns the residual of rate*time - rounded_product.
+fn exp_neg_rate_time(rate: f64, elapsed_time: f64) -> f64 {
+    let product = rate * elapsed_time;
+    let residual = rate.mul_add(elapsed_time, -product);
+    (-product).exp() * (-residual).exp()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResponseModelError {
     InvalidProcessDecayRate,
@@ -126,8 +134,8 @@ impl FirstOrderResponseOu {
         {
             return Err(ResponseModelError::NumericalFailure);
         }
-        let e_l = (-scaled_l).exp();
-        let e_m = (-scaled_m).exp();
+        let e_l = exp_neg_rate_time(l, t);
+        let e_m = exp_neg_rate_time(m, t);
         let delta = m - l;
         let gap_scaled = delta.abs() * t;
         if !gap_scaled.is_finite() {
@@ -210,7 +218,7 @@ impl FirstOrderResponseOu {
         {
             return Err(ResponseModelError::NumericalFailure);
         }
-        let factor = (-slow_scaled).exp()
+        let factor = exp_neg_rate_time(slow_rate, h)
             * (1.0 + slow_scaled * one_minus_exp_neg_over_x(gap_scaled));
         let covariance = q * factor;
 
