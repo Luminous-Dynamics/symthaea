@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -322,6 +322,12 @@ fn validate_task(task: &Task, repository_root: &Path) -> anyhow::Result<()> {
         if !is_canonical_utc(valid_until) {
             bail!(
                 "{}: valid_until must be canonical UTC RFC3339",
+                task.task_id
+            );
+        }
+        if valid_until <= task.authority_snapshot.observed_at.as_str() {
+            bail!(
+                "{}: authority validity window ends no later than its observation time",
                 task.task_id
             );
         }
@@ -799,11 +805,22 @@ mod tests {
     #[test]
     fn future_consent_start_is_rejected() {
         let mut task = seed_corpus().tasks.remove(0);
-        let root = repository_root();
-        // The fixture itself remains digest-verified; the task snapshot cannot
-        // be made to claim a different validity window without a matching input.
-        task.request.evaluated_at = "2026-11-25T23:00:00Z".into();
-        assert!(validate_task(&task, &root).is_err());
+        task.authority_snapshot.observed_at = "2026-11-25T00:00:00Z".into();
+        task.request.evaluated_at = "2026-11-25T01:00:00Z".into();
+        let mut fixture: Value = serde_json::from_str(include_str!(
+            "../../../docs/research/eqc-fixtures/consent-active-001.json"
+        ))
+        .expect("consent fixture parses");
+        fixture["valid_from"] = Value::String("2026-11-25T02:00:00Z".into());
+        let bytes = serde_json::to_vec(&fixture).expect("fixture serializes");
+        assert!(validate_synthetic_input(&task, &task.input_refs[0], &bytes).is_err());
+    }
+
+    #[test]
+    fn authority_window_must_extend_beyond_observation() {
+        let mut task = seed_corpus().tasks.remove(0);
+        task.authority_snapshot.valid_until = Some("2026-11-25T23:00:00Z".into());
+        assert!(validate_task(&task, &repository_root()).is_err());
     }
 
     #[test]
