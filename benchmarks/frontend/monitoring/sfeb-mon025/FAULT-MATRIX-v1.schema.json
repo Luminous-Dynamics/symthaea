@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon025-fault-matrix-v1.schema.json",
+  "title": "MON-025 Live Recovery Fault Matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "classification",
+    "scenarios"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon025-live-recovery-challenge-v1"
+    },
+    "version": {
+      "type": "string"
+    },
+    "classification": {
+      "const": "synthetic-descriptive-seeds"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "name",
+          "expected_outcome",
+          "injection",
+          "notes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^MON025-[PN][0-9]{3}$"
+          },
+          "class": {
+            "enum": [
+              "positive_control",
+              "negative_control",
+              "indeterminate_control"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_outcome": {
+            "enum": [
+              "qualified",
+              "blocked",
+              "indeterminate"
+            ]
+          },
+          "injection": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
