@@ -13,10 +13,8 @@ use cmaq_033_prm_ons_monitor::{OnsPredictiveRankMonitor, OnsUpdate};
 
 const BASE_SCORE: u64 = 10_000;
 const SCORE_WIDTH: u64 = 1_000;
-const PROFILE_SHA256: &str =
-    "1111111111111111111111111111111111111111111111111111111111111111";
-const SCOPE_SHA256: &str =
-    "2222222222222222222222222222222222222222222222222222222222222222";
+const PROFILE_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+const SCOPE_SHA256: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const ALPHA_NUMERATOR: u32 = 1;
 const ALPHA_DENOMINATOR: u32 = 20;
 const CALIBRATION_COUNT: usize = 99;
@@ -217,8 +215,7 @@ pub fn run_scenario(
             .seed
             .wrapping_add(scenario.stream_id())
             .wrapping_add((replication as u64).wrapping_mul(0xD1342543DE82EF95));
-        let (fixed_delay, ons_delay) =
-            run_pair(replication_seed, config.horizon, scenario)?;
+        let (fixed_delay, ons_delay) = run_pair(replication_seed, config.horizon, scenario)?;
         if let Some(delay) = fixed_delay {
             fixed_bet.alarm_delays.push(delay);
         }
@@ -308,7 +305,7 @@ fn run_pair(
                 MonitorUpdate::Quarantined { .. } => fixed_delay = Some(step),
                 MonitorUpdate::Accepted { .. } => {}
                 MonitorUpdate::BlockedUntilReconciliation | MonitorUpdate::SkippedNotExecuted => {
-                    return Err("reconciled synthetic event was unexpectedly skipped".into())
+                    return Err("reconciled synthetic event was unexpectedly skipped".into());
                 }
             }
         }
@@ -335,11 +332,9 @@ fn rank_against_fixed_reference(
     score_units: u64,
     tie_break_key: u64,
 ) -> usize {
-    sorted_reference
-        .partition_point(|reference| {
-            (reference.score_units, reference.tie_break_key) < (score_units, tie_break_key)
-        })
-        + 1
+    sorted_reference.partition_point(|reference| {
+        (reference.score_units, reference.tie_break_key) < (score_units, tie_break_key)
+    }) + 1
 }
 
 fn unique_tie_key(rng: &mut SplitMix64, seen: &mut HashSet<u64>) -> u64 {
@@ -392,9 +387,15 @@ fn format_method_row(scenario: Scenario, summary: &MethodSummary) -> String {
         summary.detection_rate(),
         low,
         high,
-        summary.median_delay().map_or_else(String::new, |value| value.to_string()),
-        summary.p90_delay().map_or_else(String::new, |value| value.to_string()),
-        summary.p95_delay().map_or_else(String::new, |value| value.to_string()),
+        summary
+            .median_delay()
+            .map_or_else(String::new, |value| value.to_string()),
+        summary
+            .p90_delay()
+            .map_or_else(String::new, |value| value.to_string()),
+        summary
+            .p95_delay()
+            .map_or_else(String::new, |value| value.to_string()),
     )
 }
 
@@ -456,20 +457,24 @@ mod tests {
 
     #[test]
     fn simulation_configuration_rejects_zero_counts() {
-        assert!(BenchmarkConfig {
-            replications: 0,
-            horizon: 100,
-            seed: 1,
-        }
-        .validate()
-        .is_err());
-        assert!(BenchmarkConfig {
-            replications: 1,
-            horizon: 0,
-            seed: 1,
-        }
-        .validate()
-        .is_err());
+        assert!(
+            BenchmarkConfig {
+                replications: 0,
+                horizon: 100,
+                seed: 1,
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            BenchmarkConfig {
+                replications: 1,
+                horizon: 0,
+                seed: 1,
+            }
+            .validate()
+            .is_err()
+        );
     }
 
     #[test]
@@ -512,7 +517,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let replications = args.first().map_or(Ok(10_000), |value| value.parse())?;
     let horizon = args.get(1).map_or(Ok(500), |value| value.parse())?;
-    let seed = args.get(2).map_or(Ok(20_261_127_u64), |value| value.parse())?;
+    let seed = args
+        .get(2)
+        .map_or(Ok(20_261_127_u64), |value| value.parse())?;
     let config = BenchmarkConfig {
         replications,
         horizon,
@@ -520,7 +527,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let results = run_benchmark(config).map_err(std::io::Error::other)?;
 
-    println!("scenario,method,replications,horizon,detection_rate,wilson95_low,wilson95_high,median_delay,p90_delay,p95_delay");
+    println!(
+        "scenario,method,replications,horizon,detection_rate,wilson95_low,wilson95_high,median_delay,p90_delay,p95_delay"
+    );
     for result in &results {
         for row in result.csv_rows() {
             println!("{row}");
