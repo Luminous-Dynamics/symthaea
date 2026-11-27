@@ -70,7 +70,8 @@ fn audit(fixture: &Value) -> Result<(), String> {
         || !boolean(scaling, "p_values_are_exploratory_not_source_theorem_constants")?
     {
         return Err(
-            "the perturbation scaling must be computed and exploratory p values labelled".to_owned(),
+            "the perturbation scaling must be computed and exploratory p values labelled"
+                .to_owned(),
         );
     }
     let nu_range = array_at(scaling, "collision_parameter_nu_range")?;
