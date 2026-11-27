@@ -1,0 +1,37 @@
+name: CMAQ-036 common-cause closure
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-036/**"
+      - ".github/workflows/cmaq-036.yml"
+  push:
+    branches:
+      - "research/cmaq-036-*"
+    paths:
+      - "research/cmaq-036/**"
+      - ".github/workflows/cmaq-036.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-036-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  closure:
+    name: common-cause-closure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-036/Cargo.toml --all -- --check
+      - name: Run closure and adversarial tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-036/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-036/Cargo.toml --locked --all-targets -- -D warnings
