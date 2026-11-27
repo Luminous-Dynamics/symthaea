@@ -18,7 +18,7 @@ This is a correlation contract, not causal proof by itself. Causal attribution r
 
 ## 2. Machine-readable trace
 
-The Draft 2020-12 schema is `docs/research/schemas/sat-memory-lifecycle-trace-v0.1.schema.json`; seven public synthetic traces are in `docs/research/fixtures/sat-memory-lifecycle-trace-v0.1.jsonl`.
+The Draft 2020-12 schema is `docs/research/schemas/sat-memory-lifecycle-trace-v0.1.schema.json`; eight public synthetic traces are in `docs/research/fixtures/sat-memory-lifecycle-trace-v0.1.jsonl`.
 
 Each trace:
 - pins SUT boundary and claim scope;
@@ -80,6 +80,10 @@ Preserve the MemPoison L1/L2/L3 depth distinctions and add evaluator-owned adapt
 
 Public fixtures support development. Confirmatory evaluations require sealed evaluator-owned variants, unseen contexts and source identities, different model/backend combinations, and adaptive attack policies that do not reveal held-out labels. Do not use public synthetic examples as a hidden-test substitute.
 
+### L2 compositional counterfactual and residual-influence example
+
+The eighth fixture, `SAT-LIFE-L2-COUNTERFACTUAL-REPAIR-001`, demonstrates two individually plausible records that are harmful when co-retrieved. It links an independently observed mock-sink effect to a clean-memory counterfactual, then records correction, derived-view invalidation, a new projection, post-repair replay, residual-influence absence and a benign task. This is an illustrative trace shape only; one synthetic pair is not causal evidence. Real attribution requires randomized repeated matched runs and uncertainty intervals.
+
 ## 6. Benchmarks and industry comparison
 
 Use each external benchmark for what it actually measures:
@@ -111,7 +115,7 @@ At 0 failures in 1,000 independent Bernoulli trials, the rough rule-of-three 95%
 
 ## 8. Validation and trust boundary
 
-- The seven JSONL rows are synthetic contract examples only.
+- The eight JSONL rows are synthetic contract examples only.
 - Event sequence and predecessor links are intended to be checked by a separate semantic verifier; the schema does not establish that they are true.
 - A source claim, signature, hash or receipt proves only the property its verifier actually checks. It does not automatically prove source authority, semantic truth, independence or an external effect.
 - No Rust harness, real SUT, adaptive attack, external sink, counterfactual trial, native benchmark, production witness or independent evaluator was run for this document.
