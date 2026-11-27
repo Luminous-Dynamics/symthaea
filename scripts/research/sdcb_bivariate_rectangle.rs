@@ -59,6 +59,11 @@ pub struct ChannelEvidenceBinding {
     pub channel_id: String,
     pub device_id: String,
     pub device_evidence_version: u64,
+    pub observation_window_id: String,
+    pub capture_start_ms: u64,
+    pub capture_end_ms: u64,
+    pub calibration_context_id: String,
+    pub calibration_epoch: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,9 +81,6 @@ pub struct ConditionalLikelihoodContext {
     pub common_cause_evidence_version: u64,
     pub channels: [ChannelEvidenceBinding; 2],
     pub measurement_action_id: String,
-    pub observation_window_id: String,
-    pub calibration_context_id: String,
-    pub calibration_epoch: u64,
 }
 
 impl ConditionalLikelihoodContext {
@@ -90,15 +92,18 @@ impl ConditionalLikelihoodContext {
             self.conditioning_state_id.as_str(),
             self.common_cause_id.as_str(),
             self.measurement_action_id.as_str(),
-            self.observation_window_id.as_str(),
-            self.calibration_context_id.as_str(),
             self.channels[0].channel_id.as_str(),
             self.channels[0].device_id.as_str(),
+            self.channels[0].observation_window_id.as_str(),
+            self.channels[0].calibration_context_id.as_str(),
             self.channels[1].channel_id.as_str(),
             self.channels[1].device_id.as_str(),
+            self.channels[1].observation_window_id.as_str(),
+            self.channels[1].calibration_context_id.as_str(),
         ];
         if required.iter().any(|value| value.trim().is_empty())
             || self.channels[0].channel_id == self.channels[1].channel_id
+            || self.channels.iter().any(|channel| channel.capture_start_ms >= channel.capture_end_ms)
             || (self.channels[0].device_id == self.channels[1].device_id
                 && self.channels[0].device_evidence_version
                     != self.channels[1].device_evidence_version)
@@ -123,6 +128,7 @@ pub struct BoundBivariateJointLikelihood {
     pub numerical_cutoff_sigma: f64,
     pub outer_relative_tolerance: f64,
     pub outer_absolute_tolerance: f64,
+    pub inner_gauss_legendre_order: usize,
     pub max_outer_integrand_evaluations: u64,
 }
 
@@ -490,6 +496,7 @@ pub fn bivariate_gaussian_joint_bins_bound(
         numerical_cutoff_sigma: CUTOFF,
         outer_relative_tolerance: REL_TOL,
         outer_absolute_tolerance: ABS_TOL,
+        inner_gauss_legendre_order: univariate::GAUSS_LEGENDRE_ORDER,
         max_outer_integrand_evaluations: MAX_OUTER_EVALUATIONS,
     })
 }
@@ -714,6 +721,9 @@ mod tests {
         assert_eq!(result.context.channels[0].device_evidence_version, 4);
         assert_eq!(result.context.channels[1].device_evidence_version, 7);
         assert_eq!(result.context.conditioning_state_version, 8);
+        assert_eq!(result.context.channels[0].observation_window_id, "mobile-window-1");
+        assert_eq!(result.context.channels[1].observation_window_id, "reference-window-4");
+        assert_ne!(result.context.channels[0].calibration_epoch, result.context.channels[1].calibration_epoch);
         assert_eq!(result.thresholds_first, vec![0.0]);
         assert_eq!(result.thresholds_second, vec![0.0]);
         close(result.joint_bins.probabilities[1][1], 0.35241638234956674, 2.0e-10);
@@ -738,6 +748,18 @@ mod tests {
         let mut context = sample_likelihood_context();
         context.channels[1].device_id = context.channels[0].device_id.clone();
         context.channels[1].device_evidence_version = 5;
+        assert_eq!(
+            bivariate_gaussian_joint_bins_bound(
+                [0.0, 0.0], [[1.0, 0.6], [0.6, 1.0]], &[0.0], &[0.0], context,
+            ),
+            Err(RectangleError::InvalidLikelihoodContext)
+        );
+    }
+
+    #[test]
+    fn bound_joint_likelihood_rejects_invalid_acquisition_window() {
+        let mut context = sample_likelihood_context();
+        context.channels[1].capture_end_ms = context.channels[1].capture_start_ms;
         assert_eq!(
             bivariate_gaussian_joint_bins_bound(
                 [0.0, 0.0], [[1.0, 0.6], [0.6, 1.0]], &[0.0], &[0.0], context,
