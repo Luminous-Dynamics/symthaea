@@ -1,0 +1,409 @@
+                } else if key == "selected_claims" {
+                    "none".to_owned()
+                } else if key == "confirmatory_seed_count" {
+                    "10".to_owned()
+                } else if key == "planned_outer_loop_steps" {
+                    "4".to_owned()
+                } else if key == "total_budget" {
+                    "10000 USD inclusive".to_owned()
+                } else if key.contains("digest") || key.contains("commitment") {
+                    let digest = format!("{:064x}", *next_digest);
+                    *next_digest += 1;
+                    digest
+                } else {
+                    format!("synthetic-{key}")
+                };
+                *raw = replacement;
+            }
+            Value::Array(items) => {
+                for item in items {
+                    fill_placeholders(item, key, next_digest);
+                }
+            }
+            Value::Object(fields) => {
+                for (child_key, child) in fields {
+                    fill_placeholders(child, child_key, next_digest);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn valid_specimen() -> Value {
+        let source = include_str!(
+            "../../../docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json"
+        );
+        let mut value: Value = serde_json::from_str(source).expect("template JSON parses");
+        let mut next_digest = 1_u64;
+        fill_placeholders(&mut value, "", &mut next_digest);
+        value["document_status"] = Value::String("PREREGISTERED".to_owned());
+        let starting_research_state =
+            value["starting_state"]["shared_inner_agent"]["memory_research_state_digest"].clone();
+        value["research_state_continuity"]["state_snapshot_digest"] = starting_research_state;
+        value["seed_and_replication_plan"]["confirmatory_seed_count"] =
+            Value::Number(10_u64.into());
+        value["rounds"]["planned_outer_loop_steps"] = Value::Number(4_u64.into());
+
+        let shared_budget =
+            canonical_budget_envelope_sha256(&value).expect("synthetic budget envelope serializes");
+        value["budget"]["shared_envelope_digest"] = Value::String(shared_budget.clone());
+        value["budget"]["arm_budget_bindings"]["evolved_outer_loop"]["envelope_digest"] =
+            Value::String(shared_budget.clone());
+        value["budget"]["arm_budget_bindings"]["reference_outer_loop"]["envelope_digest"] =
+            Value::String(shared_budget);
+
+        value
+    }
+
+    #[test]
+    fn accepts_internally_consistent_synthetic_preregistration() {
+        let report = validate_preregistration(&valid_specimen());
+        assert!(
+            report.ready_for_independent_review,
+            "unexpected issues: {:?}",
+            report.issues
+        );
+    }
+
+    #[test]
+    fn rejects_template_with_unresolved_placeholders() {
+        let template: Value =
+            serde_json::from_str(include_str!("../../../docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json")).expect("template JSON parses");
+        let report = validate_preregistration(&template);
+        assert!(!report.ready_for_independent_review);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("DOCUMENT_NOT_FROZEN"))
+        );
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("UNRESOLVED_PLACEHOLDER"))
+        );
+    }
+
+    #[test]
+    fn accepts_selected_claims_matching_enabled_boolean_profile() {
+        let mut value = valid_specimen();
+        value["experiment"]["claim_profile"]["product_improvement"] = Value::Bool(true);
+        value["experiment"]["claim_profile"]["selected_claims"] =
+            Value::String("product_improvement".to_owned());
+        let report = validate_preregistration(&value);
+        assert!(
+            report.ready_for_independent_review,
+            "unexpected issues: {:?}",
+            report.issues
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_and_duplicate_selected_claims() {
+        let mut value = valid_specimen();
+        value["experiment"]["claim_profile"]["selected_claims"] =
+            Value::String("phantom,phantom".to_owned());
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("UNKNOWN_SELECTED_CLAIM"))
+        );
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("DUPLICATE_SELECTED_CLAIM"))
+        );
+    }
+
+    #[test]
+    fn rejects_selected_claims_that_disagree_with_boolean_profile() {
+        let mut value = valid_specimen();
+        value["experiment"]["claim_profile"]["product_improvement"] = Value::Bool(true);
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("SELECTED_CLAIMS_MISMATCH"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_protocol_contract_commit() {
+        let mut value = valid_specimen();
+        value["experiment"]["protocol_contract_commit"] = Value::String(String::new());
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("PROTOCOL_CONTRACT_COMMIT_INVALID"))
+        );
+    }
+
+    #[test]
+    fn rejects_mismatched_inner_start_reference() {
+        let mut value = valid_specimen();
+        value["arms"][1]["inner_agent_start_ref"] =
+            Value::String("starting_state.other_candidate".to_owned());
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("START_REFERENCE_MISMATCH"))
+        );
+    }
+
+    #[test]
+    fn rejects_scope_router_access_to_cluster_contents() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["scope_routing"]["router_cannot_read_cluster_contents"] =
+            Value::Bool(false);
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("BOOLEAN_GUARDRAIL_MISMATCH"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_scope_routing_ablation() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["scope_routing"]["required_ablation_arms"]
+            .as_array_mut()
+            .expect("scope ablation array")
+            .retain(|item| item != "shuffled_scope_routing");
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("STATE_SCOPE_ABLATION_MISSING"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_scope_router_audit() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["scope_routing"]["router_access_audit_ref"] =
+            Value::String(String::new());
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("router_access_audit_ref"))
+        );
+    }
+
+    #[test]
+    fn rejects_research_state_snapshot_mismatch() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["state_snapshot_digest"] = Value::String("f".repeat(64));
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("STATE_SNAPSHOT_START_MISMATCH"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_cold_restart_restore_audit() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["cold_restart_restore_test_ref"] =
+            Value::String(String::new());
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("cold_restart_restore_test_ref"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_rejected_hypothesis_state_class() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["required_record_types"]
+            .as_array_mut()
+            .expect("record type array")
+            .retain(|item| item != "rejected_hypothesis");
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("STATE_RECORD_TYPE_MISSING"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_untyped_history_ablation() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["ablation_arms"]
+            .as_array_mut()
+            .expect("ablation array")
+            .retain(|item| item != "untyped_history");
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("STATE_ABLATION_MISSING"))
+        );
+    }
+
+    #[test]
+    fn rejects_identical_outer_loop_researcher_artifacts() {
+        let mut value = valid_specimen();
+        let evolved = value["starting_state"]["outer_loop_arms"]["evolved_researcher"].clone();
+        value["starting_state"]["outer_loop_arms"]["reference_researcher"] = evolved;
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("IDENTICAL_OUTER_RESEARCHERS"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_fresh_transfer_custodian() {
+        let mut value = valid_specimen();
+        value["splits"]["fresh_family_transfer"]["custodian_independent_of_candidate"] =
+            Value::String(String::new());
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("REQUIRED_STRING_MISSING"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_task_family_manifest() {
+        let mut value = valid_specimen();
+        value["task_population"]["task_family_manifest_digest"] = Value::String(String::new());
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("INVALID_SHA256"))
+        );
+    }
+
+    #[test]
+    fn rejects_unequal_arm_budget_envelopes() {
+        let mut value = valid_specimen();
+        value["budget"]["arm_budget_bindings"]["reference_outer_loop"]["envelope_digest"] =
+            Value::String("f".repeat(64));
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("UNEQUAL_ARM_BUDGET"))
+        );
+    }
+
+    #[test]
+    fn rejects_budget_cap_substitution_without_digest_update() {
+        let mut value = valid_specimen();
+        value["budget"]["per_arm_caps"]["evaluator_calls"] = Value::String("999999".to_owned());
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("BUDGET_ENVELOPE_DIGEST_MISMATCH"))
+        );
+    }
+
+    #[test]
+    fn rejects_split_identity_collision() {
+        let mut value = valid_specimen();
+        let discovery_digest = value["splits"]["discovery"]["manifest_digest"].clone();
+        value["splits"]["validation"]["manifest_digest"] = discovery_digest;
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("SPLIT_IDENTITY_COLLISION"))
+        );
+    }
+
+    #[test]
+    fn rejects_non_shared_evaluator_and_candidate_write_access() {
+        let mut value = valid_specimen();
+        value["evaluator_binding"]["shared_across_arms"] = Value::Bool(false);
+        value["evaluator_binding"]["candidate_write_access"] = Value::Bool(true);
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("BOOLEAN_GUARDRAIL_MISMATCH"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_null_control() {
+        let mut value = valid_specimen();
+        value["controls"]
+            .as_array_mut()
+            .expect("controls array")
+            .retain(|item| item["control_id"] != "noop_or_null");
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("REQUIRED_CONTROL_MISSING"))
+        );
+    }
+
+    #[test]
+    fn recursive_progress_requires_full_claim_profile() {
+        let mut value = valid_specimen();
+        value["experiment"]["claim_profile"]["recursive_progress"] = Value::Bool(true);
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("RECURSIVE_PROGRESS_CLAIM_DEPENDENCY"))
+        );
+    }
+
+    #[test]
+    fn recursive_progress_requires_two_complete_outer_cycles() {
+        let mut value = valid_specimen();
+        value["experiment"]["claim_profile"]["recursive_progress"] = Value::Bool(true);
+        value["experiment"]["claim_profile"]["accumulation"] = Value::Bool(true);
+        value["experiment"]["claim_profile"]["repeatability"] = Value::Bool(true);
+        value["experiment"]["claim_profile"]["matched_budget_better_improver"] = Value::Bool(true);
+        value["experiment"]["claim_profile"]["outer_loop_ignition"] = Value::Bool(true);
+        value["experiment"]["claim_profile"]["fresh_family_transfer"] = Value::Bool(true);
+        value["seed_and_replication_plan"]["minimum_complete_outer_cycles"] =
+            Value::Number(1.into());
+        let report = validate_preregistration(&value);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.starts_with("OUTER_CYCLE_FLOOR"))
+        );
+    }
+}
