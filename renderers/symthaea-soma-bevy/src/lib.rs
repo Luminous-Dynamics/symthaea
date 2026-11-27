@@ -550,7 +550,6 @@ fn render_pending_scene(
     }
 
     let frame = submission.frame();
-    let clock_domain_id = frame.clock_domain_id().to_owned();
     commands.spawn((
         RenderedSceneEntity,
         SceneGroupId(target_group_id),
