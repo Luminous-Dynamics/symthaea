@@ -15,6 +15,7 @@ const kafkaManifest="5bc9c15baf7d2b5704d17ac3ee2ba15f4a64805b581ca0ac45bca888ba6
 const txManifest="013f2547dc5b7fc69f763ee1fad4ba38c541e3510acf2c95533034bdcd65ca48"
 const dedupeManifest="da4afcc43078abcea80e62e0c0ca374fde9d9df429b1a8c252f1d5e8a6e1d8b8"
 const exclusionManifest="9fbb127d2f5020d96a88704e5ae6dd72b6d91b1b8b39a581654142201efedf92"
+const surfaceInventoryManifest="2c5d58ea9e058f1475e796fc0654dc51a2080f73565b9f2b95868b95c745199b"
 var now=time.Date(2026,11,27,12,0,0,0,time.UTC)
 
 func raw(v any)json.RawMessage{b,_:=json.Marshal(v);return b}
@@ -31,6 +32,7 @@ func fixture()Input{
   ObservedCaptureComplete:true,ObservedCaptureManifestSHA256:kafkaManifest,
   TransactionReportComplete:true,TransactionReportSHA256:txManifest,
   RequiredSurfaceIDs:[]string{"heap","index","large-object"},
+  SurfaceInventoryComplete:true,SurfaceInventorySHA256:surfaceInventoryManifest,
   SourceEvents:events,ObservedEvents:events,
   TopicPartitions:[]TopicPartition{{Topic:"ledger",PartitionCount:1},{Topic:"message",PartitionCount:1}},
   Transactions:[]TransactionProof{{TransactionID:"tx-1",ExpectedEventCount:2,BeginObserved:true,EndObserved:true,EndEventCount:2,DataCollections:map[string]int{"public.ledger":1,"LOGICAL_DECODING_MESSAGE":1}}},
