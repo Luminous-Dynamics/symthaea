@@ -152,7 +152,18 @@ fn audit(fixture: &Value) -> Result<(), String> {
     require_string(
         linearization,
         "distribution_pulse_remap_jacobian_status",
-        "not_implemented_solver_adapter_required",
+        "fixed_topology_piecewise_constant_analytic_module_only",
+    )?;
+    if !boolean(
+        linearization,
+        "distribution_pulse_remap_jacobian_finite_difference_required",
+    )? {
+        return Err("distribution remap Jacobian finite-difference cross-check is mandatory".to_owned());
+    }
+    require_string(
+        linearization,
+        "distribution_pulse_remap_topology_change_disposition",
+        "UNKNOWN_OR_HANDOFF",
     )?;
     require_string(
         linearization,
