@@ -14,7 +14,7 @@ These findings motivate a multi-lane Symthaea evaluation; they do not establish 
 
 ## 2. Design principle: one trace, separate scorecards
 
-Use a shared interaction trace as the unit of analysis. A trace records:
+Use a shared interaction trace as the unit of analysis. Any `unverified_claims` object in a trace is self-reported metadata only; the verifier ignores it and it must never be treated as measured benchmark outcome. A separate scorer must calculate task and quality results from frozen labels and observations. A trace records:
 - source audio/video chunk timestamps and arrival times;
 - canonical semantic event, source clock and event sequence;
 - turn candidate, confidence, decision and decision timestamp;
@@ -146,4 +146,4 @@ The CLI supports either a single trace or the full positive/negative fixture bun
 cargo run -p symthaea-soma --bin verify_interaction_trace -- docs/research/SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json
 ```
 
-This command is authored but has not been run. The verifier is not a structural JSON Schema validator and does not prove observer independence, hardware attestation, semantic correctness of grounding evidence, or task success. It rejects causally invalid samples rather than silently dropping them.
+This command is authored but has not been run. The verifier is not a structural JSON Schema validator and does not prove observer independence, hardware attestation, semantic correctness of grounding evidence, or task success. Trace-supplied `unverified_claims` are not trusted or scored by the verifier. It rejects causally invalid samples rather than silently dropping them.

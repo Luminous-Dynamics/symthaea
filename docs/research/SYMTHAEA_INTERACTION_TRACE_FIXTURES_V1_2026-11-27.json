@@ -1,6 +1,6 @@
 {
   "fixture_schema": "symthaea.interaction-trace-fixtures.v1",
-  "description": "Synthetic examples for a future structural schema run and cross-event causal trace verifier. The valid trace is a design fixture, not measured renderer evidence.",
+  "description": "Synthetic positive and adversarial examples for structural schema validation and the causal trace verifier. These fixtures are authored examples, not live renderer, observer, task-success or benchmark evidence.",
   "valid_traces": [
     {
       "schema": "symthaea.interaction-trace.v1",
@@ -149,7 +149,7 @@
           "privacy_class": "public"
         }
       ],
-      "declared_outcome": {
+      "unverified_claims": {
         "task_success": null,
         "unauthorized_actions": 0,
         "post_expiry_frames": 0,
@@ -309,7 +309,7 @@
             "privacy_class": "public"
           }
         ],
-        "declared_outcome": {
+        "unverified_claims": {
           "task_success": null,
           "unauthorized_actions": 0,
           "post_expiry_frames": 0,
@@ -468,7 +468,7 @@
             "privacy_class": "public"
           }
         ],
-        "declared_outcome": {
+        "unverified_claims": {
           "task_success": null,
           "unauthorized_actions": 0,
           "post_expiry_frames": 1,
@@ -627,7 +627,7 @@
             "privacy_class": "public"
           }
         ],
-        "declared_outcome": {
+        "unverified_claims": {
           "task_success": null,
           "unauthorized_actions": 0,
           "post_expiry_frames": 0,
@@ -768,7 +768,7 @@
             "privacy_class": "public"
           }
         ],
-        "declared_outcome": {
+        "unverified_claims": {
           "task_success": null,
           "unauthorized_actions": 0,
           "post_expiry_frames": 0,
@@ -927,7 +927,7 @@
             "privacy_class": "public"
           }
         ],
-        "declared_outcome": {
+        "unverified_claims": {
           "task_success": null,
           "unauthorized_actions": 0,
           "post_expiry_frames": 0,
@@ -1086,7 +1086,7 @@
             "privacy_class": "public"
           }
         ],
-        "declared_outcome": {
+        "unverified_claims": {
           "task_success": null,
           "unauthorized_actions": 0,
           "post_expiry_frames": 0,

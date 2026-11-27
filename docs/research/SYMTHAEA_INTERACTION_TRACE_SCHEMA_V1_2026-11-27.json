@@ -122,7 +122,7 @@
         ]
       }
     },
-    "declared_outcome": {
+    "unverified_claims": {
       "type": [
         "object",
         "null"
@@ -165,7 +165,8 @@
         "user_visible_stop_latency_ms",
         "semantic_preservation_score"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Self-reported evaluator claims only. The causal trace verifier ignores these fields; they are not measured outcomes or evidence and must not be used as benchmark scores."
     }
   },
   "required": [
