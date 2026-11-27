@@ -240,3 +240,11 @@ func BenchmarkOneMinimalSixtyFourFaults(b *testing.B) {
 	b.ReportAllocs();b.ResetTimer()
 	for i:=0;i<b.N;i++{if Minimize(in).MinimalityKind!="one_minimal"{b.Fatal("1-minimal benchmark failed")}}
 }
+
+
+func TestEmptyFaultSetUsesCanonicalJSONArrayDigest(t *testing.T) {
+	const expected = "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+	if got := FaultSetDigest([]string{}); got != expected {
+		t.Fatalf("empty fault set digest mismatch: got %s want %s", got, expected)
+	}
+}
