@@ -33,7 +33,7 @@ ACI and CA-OCRC are alternative risk controllers. A run declares exactly one con
 For every prediction round, record:
 - acquisition state: NOT_SELECTED, SELECTED_PENDING, MEASURED or MEASUREMENT_UNAVAILABLE;
 - selection mechanism: deterministic/adaptive or randomized with a known inclusion probability;
-- selection design digest and per-round probability when the design justifies it;
+- selection design digest and per-round probability when the design justifies it, including an explicit zero-probability positivity failure;
 - acquisition cost and event/measurement times;
 - full operational measurement-method identity;
 - operational measurement method identity.
@@ -166,7 +166,7 @@ It extends the public research direction toward NIST's TIDAL manufacturing archi
 
 ## Authored tests
 
-Twenty unit tests exercise the four funnel stages, capacity denial, proxy nontracking, ACI/CA-OCRC separation, fixed-delay missingness, exact tracked receipt and occupancy, capacity overrun, delay-contract violation, K1 timing, audit-method independence, loss withholding and canonical replay. Two independent integration-oracle tests recompute worst-case population bounds and check input-order-invariant report receipts. Unmeasured rounds use NOT_APPLICABLE tracking, not proxy-not-tracked/capacity-denied. The exact-head formatter, Clippy, crate tests and SEMI-BENCH-001 reference oracle are still required.
+Twenty-one unit tests exercise the four funnel stages, capacity denial, proxy nontracking, ACI/CA-OCRC separation, fixed-delay missingness, exact tracked receipt and occupancy, capacity overrun, delay-contract violation, K1 timing, audit-method independence, loss withholding, zero-probability strata, and canonical replay. Two independent integration-oracle tests recompute worst-case population bounds and check input-order-invariant report receipts. Unmeasured rounds use NOT_APPLICABLE tracking, not proxy-not-tracked/capacity-denied. The exact-head formatter, Clippy, crate tests and SEMI-BENCH-001 reference oracle are still required.
 
 ## Claim ceiling
 
