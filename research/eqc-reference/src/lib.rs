@@ -478,7 +478,7 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
     })?;
 
     match input.input_id.as_str() {
-        "synthetic-consent-001" | "synthetic-consent-revoked-001" => {
+        "synthetic-consent-001" | "synthetic-consent-revoked-001" | "synthetic-consent-expired-001" | "synthetic-consent-wrong-scope-001" => {
             if json_string(&artifact, "schema", task, input)?
                 != "luminous.eqc.synthetic-consent.v0.1"
                 || json_string(&artifact, "consent_id", task, input)? != input.input_id
@@ -722,8 +722,8 @@ mod tests {
         let report =
             validate_corpus_file(&root.join("docs/research/eqc-seed-corpus-v0.1.json"), &root)
                 .expect("seed validates");
-        assert_eq!(report.task_count, 4);
-        assert_eq!(report.reference_pass_count, 4);
+        assert_eq!(report.task_count, 6);
+        assert_eq!(report.reference_pass_count, 6);
         assert!(report.no_op_fails_positive_controls);
         assert!(report.allow_all_fails_negative_controls);
         assert_eq!(
@@ -790,6 +790,28 @@ mod tests {
         let mut task = seed_corpus().tasks.remove(0);
         task.authority_snapshot.observed_at = "2026-11-26T02:00:00Z".into();
         assert!(validate_task(&task, &repository_root()).is_err());
+    }
+
+    #[test]
+    fn expired_authority_task_is_a_valid_deny_episode() {
+        let task = seed_corpus()
+            .tasks
+            .into_iter()
+            .find(|task| task.task_id == "eqc-health-expired-authority-deny-001")
+            .expect("expiry control task exists");
+        assert!(validate_task(&task, &repository_root()).is_ok());
+        assert_eq!(reference_disposition(&task), "deny");
+    }
+
+    #[test]
+    fn wrong_scope_task_is_a_valid_deny_episode() {
+        let task = seed_corpus()
+            .tasks
+            .into_iter()
+            .find(|task| task.task_id == "eqc-health-wrong-scope-deny-001")
+            .expect("wrong-scope control task exists");
+        assert!(validate_task(&task, &repository_root()).is_ok());
+        assert_eq!(reference_disposition(&task), "deny");
     }
 
     #[test]
@@ -890,7 +912,7 @@ mod tests {
         let encoded = serde_json::to_vec(&report).expect("report serializes");
         let decoded: serde_json::Value =
             serde_json::from_slice(&encoded).expect("report JSON parses");
-        assert_eq!(decoded["task_count"], 4);
+        assert_eq!(decoded["task_count"], 6);
         assert!(decoded.get("qualified").is_none());
     }
 }
