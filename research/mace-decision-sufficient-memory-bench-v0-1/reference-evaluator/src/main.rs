@@ -268,15 +268,17 @@ fn prepare(source: &str, candidate_path: &str, private_path: &str) -> Result<(),
     write_jsonl(private_path, &privates)
 }
 fn current_at(e: &SourceEvent, at: i64) -> bool {
-    e.valid_from_ms <= at && e.valid_until_ms.is_none_or(|end| at < end)
+    e.observed_at_ms <= at && e.valid_from_ms <= at &&
+        e.valid_until_ms.is_none_or(|end| at < end)
 }
-fn invalidated(id: &str, events: &[SourceEvent]) -> bool {
+fn invalidated(id: &str, events: &[SourceEvent], at: i64) -> bool {
     events.iter().any(|event|
+        event.observed_at_ms <= at && event.valid_from_ms <= at &&
         matches!(event.relation_to_parent, Some(Relation::Supersedes | Relation::Retracts)) &&
         event.parent_event_ids.iter().any(|parent| parent == id))
 }
 fn admissible(e: &SourceEvent, c: &Candidate, forbidden: &BTreeSet<String>) -> bool {
-    current_at(e, c.query_time_ms) && !invalidated(&e.event_id, &c.source_events) &&
+    current_at(e, c.query_time_ms) && !invalidated(&e.event_id, &c.source_events, c.query_time_ms) &&
         e.authority_tier != AuthorityTier::Untrusted && !forbidden.contains(&e.event_id)
 }
 fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow, String> {
@@ -308,7 +310,7 @@ fn score_one(c: &CandidateRow, p: &PrivateRow, r: &Response) -> Result<ScoreRow,
     for event_id in &r.selected_evidence_ids {
         if !selected.insert(event_id.clone()) { return Err(format!("{id}: duplicate selected evidence {event_id}")); }
         let event = event_map.get(event_id.as_str()).ok_or_else(|| format!("{id}: unknown selected evidence {event_id}"))?;
-        if !current_at(event, c.candidate.query_time_ms) || invalidated(event_id, &c.candidate.source_events) { stale_n += 1; }
+        if !current_at(event, c.candidate.query_time_ms) || invalidated(event_id, &c.candidate.source_events, c.candidate.query_time_ms) { stale_n += 1; }
         if event.authority_tier == AuthorityTier::Untrusted { untrusted_n += 1; }
         if forbidden.contains(event_id) { forbidden_n += 1; }
         if admissible(event, &c.candidate, &forbidden) { admissible_n += 1; }
@@ -450,7 +452,7 @@ fn score(candidate_path: &str, private_path: &str, response_path: &str, arm_path
             "regret": "Candidate action loss minus minimum evaluator-private action loss.",
             "memory_gain": "No-memory baseline loss minus this arm loss; positive means improvement.",
             "memory_induced_harm": "This arm loss exceeds the matched no-memory baseline loss.",
-            "admissible_evidence": "Current at query time, not superseded/retracted, not untrusted, and not evaluator-labelled forbidden.",
+            "admissible_evidence": "Current at query time and observed no later than the query, not superseded/retracted, not untrusted, and not evaluator-labelled forbidden.",
             "decision_sufficient": "Minimum loss, all required evidence selected, and no invalid evidence selected.",
             "cost": "Counters are candidate-reported. Latency is summarized only when supplied; this evaluator does not independently measure it."
         },
@@ -534,15 +536,16 @@ fn main(){if let Err(e)=run(){eprintln!("error: {e}");std::process::exit(2);}}
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn time_interval_is_half_open(){
-        let e=event("e".into(),"s".into(),10,10,Some(20),AuthorityTier::Verified,0,"c",Relation::Asserts,vec![]);
-        assert!(!current_at(&e,9)); assert!(current_at(&e,10)); assert!(current_at(&e,19)); assert!(!current_at(&e,20));
+    #[test] fn valid_time_is_half_open_and_observation_time_prevents_future_leakage(){
+        let e=event("e".into(),"s".into(),15,10,Some(20),AuthorityTier::Verified,0,"c",Relation::Asserts,vec![]);
+        assert!(!current_at(&e,14)); assert!(current_at(&e,15)); assert!(current_at(&e,19)); assert!(!current_at(&e,20));
     }
-    #[test] fn supersession_and_retraction_invalidate_but_contradiction_does_not(){
+    #[test] fn supersession_and_retraction_apply_only_after_they_are_observed(){
         let contra=event("c".into(),"s2".into(),2,0,None,AuthorityTier::Verified,0,"c",Relation::Contradicts,vec!["p".into()]);
-        assert!(!invalidated("p",&[contra]));
+        assert!(!invalidated("p",&[contra],10));
         let sup=event("s".into(),"s1".into(),2,0,None,AuthorityTier::Verified,0,"s",Relation::Supersedes,vec!["p".into()]);
-        assert!(invalidated("p",&[sup]));
+        assert!(!invalidated("p",&[sup.clone()],1));
+        assert!(invalidated("p",&[sup],2));
     }
     #[test] fn untrusted_evidence_is_never_admissible(){
         let e=event("e".into(),"s".into(),1,0,None,AuthorityTier::Untrusted,0,"x",Relation::Asserts,vec![]);
