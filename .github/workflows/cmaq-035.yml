@@ -1,0 +1,43 @@
+name: CMAQ-035 paired PRM benchmark
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-031/**"
+      - "research/cmaq-033/**"
+      - "research/cmaq-035/**"
+      - ".github/workflows/cmaq-035.yml"
+  push:
+    branches:
+      - "research/cmaq-035-*"
+    paths:
+      - "research/cmaq-031/**"
+      - "research/cmaq-033/**"
+      - "research/cmaq-035/**"
+      - ".github/workflows/cmaq-035.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-035-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: paired-prm-benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-035/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-035/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-035/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Run paired simulation smoke test
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-035/Cargo.toml --locked -- 128 200 20261127
