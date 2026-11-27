@@ -71,6 +71,7 @@ jobs:
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/challenge_search.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/response_balanced_contract_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/vpl_echo_contract_audit.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/vpl_echo_contract_audit.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/rbkr_public_api_smoke.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/pulse_map.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-plasma-probes/src/bin/kird_point_audit.rs
@@ -100,6 +101,7 @@ jobs:
           mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/kresp-c-collisional/fixtures"
           mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures"
+          mkdir -p "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures"
           cp crates/domains/symthaea-plasma-probes/src/lib.rs "${crate_dir}/src/lib.rs"
           cp crates/domains/symthaea-plasma-probes/src/validity_horizon.rs "${crate_dir}/src/validity_horizon.rs"
           cp crates/domains/symthaea-plasma-probes/src/rbkr.rs "${crate_dir}/src/rbkr.rs"
@@ -112,6 +114,7 @@ jobs:
           cp crates/domains/symthaea-plasma-probes/src/bin/positive_mass_projection_audit.rs "${crate_dir}/src/bin/positive_mass_projection_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/small_positive_response_qp_audit.rs "${crate_dir}/src/bin/small_positive_response_qp_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/response_balanced_contract_audit.rs "${crate_dir}/src/bin/response_balanced_contract_audit.rs"
+          cp crates/domains/symthaea-plasma-probes/src/bin/vpl_echo_contract_audit.rs "${crate_dir}/src/bin/vpl_echo_contract_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/vpl_echo_contract_audit.rs "${crate_dir}/src/bin/vpl_echo_contract_audit.rs"
           cp crates/domains/symthaea-plasma-probes/src/bin/rbkr_public_api_smoke.rs "${crate_dir}/src/bin/rbkr_public_api_smoke.rs"
           cp benchmarks/plasma/adversarial-probes/fixtures/synthetic-pulse-family-v0.1.json \
@@ -206,6 +209,10 @@ jobs:
             "${tmp_root}/benchmarks/plasma/response-balanced/kresp-c-collisional/"
           cp benchmarks/plasma/response-balanced/kresp-c-collisional/fixtures/synthetic-vpd-drive-cohorts-v0.1.json \
             "${tmp_root}/benchmarks/plasma/response-balanced/kresp-c-collisional/fixtures/"
+          cp benchmarks/plasma/response-balanced/kresp-cl-coulomb/kresp-cl-vpl-contract-v0.1.schema.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/"
+          cp benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json \
+            "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/"
           cp benchmarks/plasma/response-balanced/kresp-cl-coulomb/kresp-cl-vpl-contract-v0.1.schema.json \
             "${tmp_root}/benchmarks/plasma/response-balanced/kresp-cl-coulomb/"
           cp benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json \
@@ -1027,6 +1034,98 @@ jobs:
           print("response_balanced_kresp_c_schema_validation=PASS")
           print("response_balanced_kresp_c_cohort_and_structure_validation=PASS")
           print("response_balanced_kresp_c_claim_boundary_validation=PASS")
+          PY
+
+      - name: Validate separate Coulomb Vlasov-Poisson-Landau K-RESP-CL contract
+        run: |
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("\${{ runner.temp }}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb")
+          schema = json.loads((root / "kresp-cl-vpl-contract-v0.1.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/synthetic-vpl-echo-growth-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+
+          assert fixture["equation"] == "vlasov_poisson_landau_coulomb"
+          assert fixture["collision_operator"] == "landau_coulomb"
+          assert fixture["benchmark_id"] == "KRESP-CL-VPL-1D1V"
+          assert fixture["prior_art"]["arxiv_id"] == "2611.20080"
+          assert fixture["prior_art"]["status"] == "literature_claim_not_reproduced_here"
+          scaling = fixture["perturbation_scaling"]
+          assert scaling["formula"] == "epsilon=c*nu^(1/3)*(log(1/nu))^p"
+          assert scaling["p_values_are_exploratory_not_source_theorem_constants"] is True
+          assert scaling["observation_horizon_fraction_of_nu_minus_one_third"] <= 1.0
+          assert scaling["maximum_initial_perturbation_amplitude"] == 0.1
+
+          groups = fixture["trajectory_cohorts"]
+          assert (len(groups["training"]), len(groups["validation"]), len(groups["sealed_holdout"])) == (3, 2, 3)
+          all_trajectories = groups["training"] + groups["validation"] + groups["sealed_holdout"]
+          assert len({item["trajectory_id"] for item in all_trajectories}) == len(all_trajectories)
+          assert len({item["initial_state_sha256"] for item in all_trajectories}) == len(all_trajectories)
+          assert {item["split_role"] for item in all_trajectories} == {"training", "validation", "sealed_holdout"}
+          for item in all_trajectories:
+              nu = item["collision_parameter_nu"]
+              c = item["prefactor_c"]
+              p = item["log_power_p"]
+              expected = c * nu ** (1.0 / 3.0) * math.log(1.0 / nu) ** p
+              assert math.isclose(item["computed_initial_perturbation_amplitude"], expected, rel_tol=1e-13, abs_tol=1e-15)
+              assert item["computed_initial_perturbation_amplitude"] <= scaling["maximum_initial_perturbation_amplitude"]
+              assert item["observation_horizon_fraction_of_nu_minus_one_third"] == scaling["observation_horizon_fraction_of_nu_minus_one_third"]
+              assert item["forward_initialization"] is True
+          assert fixture["reference_convergence"]["all_reference_trajectories_forward_integrated"] is True
+          assert fixture["claim_boundary"] == {
+              "physical_solver_executed": False,
+              "physical_echo_growth_measured": False,
+              "reference_converged": False,
+              "stability_theorem_proved_for_this_implementation": False,
+              "competitive_result_reproduced": False
+          }
+          print("kresp_cl_vpl_schema_validation=PASS")
+          print("kresp_cl_vpl_scaling_and_split_validation=PASS")
+          print("kresp_cl_vpl_forward_time_and_claim_boundary_validation=PASS")
+          PY
+
+      - name: Run Rust K-RESP-CL semantic contract auditor
+        run: |
+          cargo run --locked --manifest-path "\${RUNNER_TEMP}/plasma-probe-validation/crates/domains/symthaea-plasma-probes/Cargo.toml" --bin vpl_echo_contract_audit -- \
+            "\${RUNNER_TEMP}/plasma-probe-validation/benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
+
+      - name: Challenge Rust K-RESP-CL auditor with negative controls
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          root = Path("\${{ runner.temp }}/plasma-probe-validation")
+          fixture_path = root / "benchmarks/plasma/response-balanced/kresp-cl-coulomb/fixtures/synthetic-vpl-echo-growth-v0.1.json"
+          fixture = json.loads(fixture_path.read_text())
+          binaries = list(root.glob("**/debug/vpl_echo_contract_audit"))
+          assert binaries, "compiled K-RESP-CL auditor binary was not found"
+          binary = binaries[0]
+
+          def expect_rejection(name, mutate):
+              invalid = copy.deepcopy(fixture)
+              mutate(invalid)
+              with tempfile.TemporaryDirectory(prefix="kresp-cl-negative-") as directory:
+                  path = Path(directory) / (name + ".json")
+                  path.write_text(json.dumps(invalid, sort_keys=True))
+                  result = subprocess.run([str(binary), str(path)], capture_output=True, text=True)
+              assert result.returncode != 0, f"K-RESP-CL auditor accepted {name}: {result.stdout} {result.stderr}"
+              print(f"kresp_cl_negative_control_{name}=PASS")
+
+          expect_rejection("wrong-collision-operator", lambda value: value.__setitem__("collision_operator", "dougherty"))
+          expect_rejection("wrong-amplitude-scaling", lambda value: value["trajectory_cohorts"]["training"][0].__setitem__("computed_initial_perturbation_amplitude", 0.0))
+          expect_rejection("sealed-holdout-leak", lambda value: value["trajectory_cohorts"]["sealed_holdout"][0].__setitem__("split_role", "training"))
+          expect_rejection("reused-initial-state", lambda value: value["trajectory_cohorts"]["sealed_holdout"][0].__setitem__("initial_state_sha256", value["trajectory_cohorts"]["training"][0]["initial_state_sha256"]))
+          expect_rejection("backward-initialization", lambda value: value["trajectory_cohorts"]["training"][0].__setitem__("forward_initialization", False))
+          expect_rejection("physical-claim-laundering", lambda value: value["claim_boundary"].__setitem__("physical_echo_growth_measured", True))
           PY
 
       - name: Validate separate Coulomb Vlasov-Poisson-Landau K-RESP-CL contract
