@@ -96,6 +96,7 @@ pub struct PhysicalAcquisitionRecordV1 {
     pub acquisition_cost_units: Option<f64>,
     pub selected_at_round: Option<u64>,
     pub measured_at_unix_seconds: Option<i64>,
+    pub operational_measurement_method_sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -327,7 +328,8 @@ fn validate_acquisition(
 
     match acquisition.state {
         PhysicalAcquisitionStateV1::NotSelected => {
-            if acquisition.selected_at_round.is_some()
+            if acquisition.operational_measurement_method_sha256.is_some()
+                || acquisition.selected_at_round.is_some()
                 || acquisition.measured_at_unix_seconds.is_some()
                 || acquisition.acquisition_cost_units.is_some()
             {
@@ -338,7 +340,8 @@ fn validate_acquisition(
             }
         }
         PhysicalAcquisitionStateV1::SelectedPending => {
-            if acquisition.selected_at_round.is_none()
+            if acquisition.operational_measurement_method_sha256.is_some()
+                || acquisition.selected_at_round.is_none()
                 || acquisition.measured_at_unix_seconds.is_some()
             {
                 return Err(ObservationProcessErrorV1(format!(
@@ -348,7 +351,8 @@ fn validate_acquisition(
             }
         }
         PhysicalAcquisitionStateV1::Measured => {
-            if acquisition.selected_at_round.is_none()
+            if acquisition.operational_measurement_method_sha256.as_deref().is_none_or(|value| !valid_sha256(value))
+                || acquisition.selected_at_round.is_none()
                 || acquisition.measured_at_unix_seconds.is_none()
             {
                 return Err(ObservationProcessErrorV1(format!(
@@ -358,7 +362,8 @@ fn validate_acquisition(
             }
         }
         PhysicalAcquisitionStateV1::MeasurementUnavailable => {
-            if acquisition.selected_at_round.is_none()
+            if acquisition.operational_measurement_method_sha256.is_some()
+                || acquisition.selected_at_round.is_none()
                 || acquisition.measured_at_unix_seconds.is_some()
             {
                 return Err(ObservationProcessErrorV1(format!(
@@ -519,7 +524,12 @@ fn validate_tracking(
 
     if tracking.controller_update_applied
         && (row.qualification.state != K1QualificationStateV1::Eligible
-            || tracking.action_receipt_sha256.is_none())
+            || tracking.action_receipt_sha256.is_none()
+            || !matches!(
+                tracking.state,
+                FeedbackTrackingStateV1::UnlimitedReceived
+                    | FeedbackTrackingStateV1::TrackedReceived
+            ))
     {
         return Err(ObservationProcessErrorV1(format!(
             "round {} controller update requires K1-eligible evidence and an action receipt",
@@ -624,13 +634,11 @@ fn validate_tracking(
                 }
                 FeedbackTrackingStateV1::AdmittedPending => {
                     let proxy = tracking.proxy_delay_rounds;
-                    if !proxy.is_some_and(|delay| delay >= 0)
+                    if !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
                         || tracking.tracking_slot_id.is_none()
                         || tracking.tracking_end_round.is_some()
                         || tracking.proxy_survival_probability.is_some()
-                        || tracking
-                            .actual_feedback_delay_rounds
-                            .is_some_and(|delay| delay <= maximum_delay)
+                        || tracking.actual_feedback_delay_rounds.is_some()
                     {
                         return Err(ObservationProcessErrorV1(format!(
                             "round {} admitted-pending tracking fields are inconsistent",
@@ -648,9 +656,12 @@ fn validate_tracking(
                 FeedbackTrackingStateV1::Evicted => {
                     let proxy = tracking.proxy_delay_rounds;
                     let ended = tracking.tracking_end_round;
-                    if !proxy.is_some_and(|delay| delay >= 0)
+                    if !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
                         || tracking.tracking_slot_id.is_none()
-                        || !ended.is_some_and(|end| end < row.round + proxy.unwrap_or(0) as u64)
+                        || !ended.is_some_and(|end| end >= row.round && end < row.round + proxy.unwrap_or(0) as u64)
+                        || tracking.actual_feedback_delay_rounds.is_some_and(|actual| {
+                            ended.is_some_and(|end| actual <= end.saturating_sub(row.round))
+                        })
                         || tracking.proxy_survival_probability.is_some()
                     {
                         return Err(ObservationProcessErrorV1(format!(
@@ -661,10 +672,13 @@ fn validate_tracking(
                 }
                 FeedbackTrackingStateV1::ProxyExpired => {
                     let proxy = tracking.proxy_delay_rounds;
-                    if !proxy.is_some_and(|delay| delay >= 0)
+                    if !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
                         || tracking.tracking_slot_id.is_none()
                         || tracking.tracking_end_round
                             != Some(row.round.saturating_add(proxy.unwrap_or(0) as u64))
+                        || tracking.actual_feedback_delay_rounds.is_some_and(|actual| {
+                            actual <= proxy.unwrap_or(-1) as u64
+                        })
                         || tracking.proxy_survival_probability.is_some()
                     {
                         return Err(ObservationProcessErrorV1(format!(
@@ -676,7 +690,7 @@ fn validate_tracking(
                 FeedbackTrackingStateV1::TrackedReceived => {
                     let proxy = tracking.proxy_delay_rounds;
                     let actual = tracking.actual_feedback_delay_rounds;
-                    if !proxy.is_some_and(|delay| delay >= 0)
+                    if !proxy.is_some_and(|delay| delay >= 0 && delay as u64 <= maximum_delay)
                         || !actual.is_some_and(|delay| delay <= maximum_delay)
                         || actual.is_some_and(|delay| delay > proxy.unwrap_or(-1) as u64)
                         || tracking.tracking_slot_id.is_none()
@@ -712,6 +726,28 @@ fn validate_tracking(
                 }
             }
         }
+    }
+
+    if matches!(
+        tracking.state,
+        FeedbackTrackingStateV1::UnlimitedReceived | FeedbackTrackingStateV1::TrackedReceived
+    ) && tracking.action_receipt_sha256.is_none()
+    {
+        return Err(ObservationProcessErrorV1(format!(
+            "round {} received feedback requires an accepted-or-withheld action receipt",
+            row.round_id
+        )));
+    }
+    if tracking.controller_update_applied
+        != (matches!(
+            tracking.state,
+            FeedbackTrackingStateV1::UnlimitedReceived | FeedbackTrackingStateV1::TrackedReceived
+        ) && row.qualification.state == K1QualificationStateV1::Eligible)
+    {
+        return Err(ObservationProcessErrorV1(format!(
+            "round {} K1 eligibility and controller feedback disposition disagree about whether an update was applied",
+            row.round_id
+        )));
     }
 
     if !tracking.controller_update_applied
@@ -1148,6 +1184,8 @@ pub fn evaluate_observation_process_v1(
     }
     let population_risk = evaluate_selection_adjusted_population_risk_v1(&risk_input)
         .map_err(|error| ObservationProcessErrorV1(format!("population-risk evaluation failed: {error}")))?;
+    let mut canonical_input = input.clone();
+    canonical_input.rounds = rows.clone();
     let mut report = ObservationProcessReportV1 {
         schema: OBSERVATION_PROCESS_REPORT_SCHEMA_V1.into(),
         run_id: input.run_id.clone(),
@@ -1157,7 +1195,7 @@ pub fn evaluate_observation_process_v1(
         maximum_observed_tracking_occupancy: maximum_occupancy,
         funnel,
         population_risk,
-        input_sha256: json_sha256(input)?,
+        input_sha256: json_sha256(&canonical_input)?,
         report_sha256: String::new(),
         equipment_control_authority: false,
     };
@@ -1206,6 +1244,7 @@ mod tests {
                 )
                 .then_some(round_id),
                 measured_at_unix_seconds: measured.then_some(105 + round_id as i64 * 10),
+                operational_measurement_method_sha256: measured.then(|| digest('0')),
             },
             qualification: K1QualificationRecordV1 {
                 state: qualification,
