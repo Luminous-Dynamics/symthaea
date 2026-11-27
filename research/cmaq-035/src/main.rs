@@ -6,8 +6,8 @@
 use std::collections::HashSet;
 
 use cmaq_031_anytime_calibration_monitor::{
-    centered_rank_payoff, AnytimeCalibrationMonitor, CalibrationRankReference,
-    CalibrationRankScore, DeploymentRankObservation, MonitorUpdate, PreviousOutcome, RankFeature,
+    AnytimeCalibrationMonitor, CalibrationRankReference, CalibrationRankScore,
+    DeploymentRankObservation, MonitorUpdate, PreviousOutcome, RankFeature, centered_rank_payoff,
 };
 use cmaq_033_prm_ons_monitor::{OnsPredictiveRankMonitor, OnsUpdate};
 
@@ -244,9 +244,7 @@ impl MatchedFixedBetMonitor {
 
         let max_log = next_log_wealth[0].max(next_log_wealth[1]);
         let log_mixture = max_log
-            + (((next_log_wealth[0] - max_log).exp()
-                + (next_log_wealth[1] - max_log).exp())
-                / 2.0)
+            + (((next_log_wealth[0] - max_log).exp() + (next_log_wealth[1] - max_log).exp()) / 2.0)
                 .ln();
         if !log_mixture.is_finite() {
             return Err("matched fixed-bet mixture wealth overflow".into());
@@ -260,8 +258,7 @@ impl MatchedFixedBetMonitor {
         self.observations_seen = next_seen;
         self.log_wealth = next_log_wealth;
 
-        let threshold =
-            (f64::from(self.alpha_denominator) / f64::from(self.alpha_numerator)).ln();
+        let threshold = (f64::from(self.alpha_denominator) / f64::from(self.alpha_numerator)).ln();
         if log_mixture >= threshold {
             self.quarantined = true;
         }
@@ -421,11 +418,8 @@ fn run_pair(
     let mut fixed_four_monitor =
         AnytimeCalibrationMonitor::new(reference, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)
             .map_err(|error| format!("fixed four-feature monitor init: {error:?}"))?;
-    let mut fixed_two_monitor = MatchedFixedBetMonitor::new(
-        CALIBRATION_COUNT,
-        ALPHA_NUMERATOR,
-        ALPHA_DENOMINATOR,
-    )?;
+    let mut fixed_two_monitor =
+        MatchedFixedBetMonitor::new(CALIBRATION_COUNT, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)?;
     let mut ons_monitor =
         OnsPredictiveRankMonitor::new(CALIBRATION_COUNT, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)
             .map_err(|error| format!("ONS monitor init: {error:?}"))?;
