@@ -500,7 +500,10 @@ mod tests {
         let event_time = 0.5;
         let observation_time = 1.4;
         let step = 1.0e-5;
-        let explicit_reset_time_derivative = PhaseSpaceTangent { dx_dt: 0.03, dv_dt: -0.02 };
+        let explicit_reset_time_derivative = PhaseSpaceTangent {
+            dx_dt: 0.03,
+            dv_dt: -0.02,
+        };
 
         let pre_x = x0 + v0 * event_time + 0.5 * a_minus * event_time * event_time;
         let pre_v = v0 + a_minus * event_time;
@@ -526,15 +529,12 @@ mod tests {
             .unwrap();
 
         let trajectory_at_event_time = |time: f64| {
-            let x_before =
-                x0 + v0 * time + 0.5 * a_minus * time * time;
+            let x_before = x0 + v0 * time + 0.5 * a_minus * time * time;
             let v_before = v0 + a_minus * time;
             let reset = kick.apply(x_before, v_before).unwrap();
             let delta_time = time - event_time;
-            let reset_x =
-                reset.x + explicit_reset_time_derivative.x * delta_time;
-            let reset_v =
-                reset.v + explicit_reset_time_derivative.v * delta_time;
+            let reset_x = reset.x + explicit_reset_time_derivative.x * delta_time;
+            let reset_v = reset.v + explicit_reset_time_derivative.v * delta_time;
             let remaining = observation_time - time;
             PhasePoint {
                 x: reset_x + reset_v * remaining + 0.5 * a_plus * remaining * remaining,
@@ -549,8 +549,7 @@ mod tests {
 
         // Propagate the event-time sensitivity to the fixed observation time
         // through the post-event tangent [[1, dt], [0, 1]].
-        let predicted_x =
-            local_sensitivity.dx_dt + post_event_duration * local_sensitivity.dv_dt;
+        let predicted_x = local_sensitivity.dx_dt + post_event_duration * local_sensitivity.dv_dt;
         let predicted_v = local_sensitivity.dv_dt;
         assert!((fd_x - predicted_x).abs() < 1.0e-7);
         assert!((fd_v - predicted_v).abs() < 1.0e-7);
