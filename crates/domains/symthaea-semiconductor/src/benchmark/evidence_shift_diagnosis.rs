@@ -244,6 +244,26 @@ fn assessment_digest(
     json_sha256(&canonical)
 }
 
+fn reference_state_scope(reference_standard_id: &str) -> String {
+    format!("reference-standard:{reference_standard_id}")
+}
+
+fn observation_state_scope(
+    observation: &EvidenceShiftObservationV1,
+) -> Result<String, EvidenceShiftErrorV1> {
+    if observation.channel == ShiftSignalChannelV1::ReferenceStandardResidual {
+        return observation
+            .reference_standard_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .map(reference_state_scope)
+            .ok_or_else(|| EvidenceShiftErrorV1(
+                "reference-standard observation requires an explicit standard identity".into(),
+            ));
+    }
+    Ok(observation.scope_id.clone())
+}
+
 fn validate_policy(policy: &EvidenceShiftPolicyV1) -> Result<(), EvidenceShiftErrorV1> {
     if policy.schema != EVIDENCE_SHIFT_POLICY_SCHEMA_V1 {
         return Err(EvidenceShiftErrorV1("unsupported shift policy schema".into()));
@@ -629,12 +649,25 @@ pub fn observe_evidence_shift_v1(
     if observation.stream_sequence != expected_sequence {
         early_reasons.push(ShiftReasonCodeV1::EventSequenceNotContiguous);
     }
-    if engine
-        .last_scope_event_times
-        .get(&observation.scope_id)
-        .is_some_and(|previous| observation.event_time_unix_seconds < *previous)
+    let state_scope = observation_state_scope(observation)?;
+    for chronology_scope in [
+        Some(observation.scope_id.clone()),
+        observation
+            .reference_standard_id
+            .as_deref()
+            .map(reference_state_scope),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<BTreeSet<_>>()
     {
-        early_reasons.push(ShiftReasonCodeV1::EventTimeRegression);
+        if engine
+            .last_scope_event_times
+            .get(&chronology_scope)
+            .is_some_and(|previous| observation.event_time_unix_seconds < *previous)
+        {
+            early_reasons.push(ShiftReasonCodeV1::EventTimeRegression);
+        }
     }
 
     let mut qualified_label_ids = Vec::new();
@@ -684,7 +717,7 @@ pub fn observe_evidence_shift_v1(
                 {
                     early_reasons.push(ShiftReasonCodeV1::NonFiniteObservation);
                 } else {
-                    let key = (observation.scope_id.clone(), observation.channel);
+                    let key = (state_scope.clone(), observation.channel);
                     let state = update_channel_state(
                         engine.channel_states.get(&key),
                         config,
@@ -718,17 +751,26 @@ pub fn observe_evidence_shift_v1(
         ShiftSignalChannelV1::ReferenceStandardResidual,
         ShiftSignalChannelV1::SensorObservabilityScore,
     ] {
-        if let Some(config) = engine.policy.channels.get(&channel)
-            && let Some(state) = recent_state(
+        if let Some(config) = engine.policy.channels.get(&channel) {
+            let channel_scope = if channel == ShiftSignalChannelV1::ReferenceStandardResidual {
+                observation
+                    .reference_standard_id
+                    .as_deref()
+                    .map(reference_state_scope)
+                    .unwrap_or_else(|| observation.scope_id.clone())
+            } else {
+                observation.scope_id.clone()
+            };
+            if let Some(state) = recent_state(
                 &engine.channel_states,
-                &observation.scope_id,
+                &channel_scope,
                 channel,
                 assessment_time,
                 engine.policy.process_event_context_window_seconds,
                 config.minimum_observations,
-            )
-        {
-            channel_assessments.push(state);
+            ) {
+                channel_assessments.push(state);
+            }
         }
     }
     let marker = engine.process_markers.get(&observation.scope_id);
@@ -795,6 +837,12 @@ pub fn observe_evidence_shift_v1(
         engine
             .last_scope_event_times
             .insert(observation.scope_id.clone(), observation.event_time_unix_seconds);
+        if let Some(reference_id) = observation.reference_standard_id.as_deref() {
+            engine.last_scope_event_times.insert(
+                reference_state_scope(reference_id),
+                observation.event_time_unix_seconds,
+            );
+        }
         engine.seen_observation_ids.insert(observation.observation_id.clone());
     }
     engine
@@ -1041,6 +1089,43 @@ mod tests {
                 assert_eq!(assessment.diagnostic_state, ShiftDiagnosticStateV1::CommonCauseOrMixedShift);
             }
         }
+    }
+
+    #[test]
+    fn explicitly_shared_reference_standard_alert_propagates_across_tool_scopes() {
+        let mut engine = engine();
+        let shared_standard = "shared-transfer-standard-001";
+        for index in 0..3 {
+            let mut reference = reference_observation(
+                index + 1,
+                &format!("shared-ref-{index}"),
+                "tool-a/ch-1",
+                10 + index as i64,
+                5.0,
+            );
+            reference.reference_standard_id = Some(shared_standard.into());
+            observe_evidence_shift_v1(&mut engine, &reference).unwrap();
+        }
+
+        let mut vm = vm_residual_observation(
+            4,
+            "tool-b-vm",
+            "tool-b/ch-9",
+            13,
+            5.0,
+            "label-tool-b",
+        );
+        vm.reference_standard_id = Some(shared_standard.into());
+        let assessment = observe_evidence_shift_v1(&mut engine, &vm).unwrap();
+        assert_eq!(
+            assessment.diagnostic_state,
+            ShiftDiagnosticStateV1::CommonCauseOrMixedShift
+        );
+        assert!(
+            assessment
+                .supporting_channels
+                .contains(&ShiftSignalChannelV1::ReferenceStandardResidual)
+        );
     }
 
     #[test]
