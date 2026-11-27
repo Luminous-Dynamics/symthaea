@@ -415,6 +415,9 @@ impl InteractionTraceVerifier {
                     let source_clock = event_string(event, "source_clock_domain_id", index)?.to_owned();
                     validate_identifier(&source_clock, Some(index), "source_clock_domain_id")?;
                     let source_now = event_u64(event, "source_now_monotonic_ns", index)?;
+                    if source_clock == clock_domain_id && source_now < at {
+                        return Err(InteractionTraceError::ClockRegression { index });
+                    }
                     if last_source_time_by_clock
                         .get(&source_clock)
                         .is_some_and(|last| source_now < *last)
@@ -853,6 +856,16 @@ mod tests {
         assert_eq!(
             InteractionTraceVerifier::verify_value(&trace),
             Err(InteractionTraceError::AuthorizationExpired { index: 4 })
+        );
+    }
+
+    #[test]
+    fn same_domain_source_clock_cannot_be_backdated() {
+        let mut trace = valid_trace();
+        trace["events"][4]["source_now_monotonic_ns"] = json!(129);
+        assert_eq!(
+            InteractionTraceVerifier::verify_value(&trace),
+            Err(InteractionTraceError::ClockRegression { index: 4 })
         );
     }
 

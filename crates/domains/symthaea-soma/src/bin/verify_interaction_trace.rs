@@ -29,10 +29,8 @@ fn usage(program: &std::ffi::OsStr) {
 fn verify_input(input: &str) -> Result<(InteractionTraceSummary, String), String> {
     let value: Value =
         serde_json::from_str(input).map_err(|error| format!("invalid JSON: {error}"))?;
-    let mut summary = InteractionTraceSummary::default();
-
     if value.get("schema").and_then(Value::as_str) == Some(INTERACTION_TRACE_SCHEMA_V1) {
-        summary = InteractionTraceVerifier::verify_value(&value)
+        let summary = InteractionTraceVerifier::verify_value(&value)
             .map_err(|error| format!("causal verification failed: {error}"))?;
         return Ok((summary, "single trace".to_owned()));
     }
@@ -49,7 +47,9 @@ fn verify_input(input: &str) -> Result<(InteractionTraceSummary, String), String
     let invalid_cases = value
         .get("invalid_cases")
         .and_then(Value::as_array)
+        .filter(|cases| !cases.is_empty())
         .ok_or_else(|| "fixture bundle has no invalid_cases".to_owned())?;
+    let mut summary = InteractionTraceSummary::default();
 
     for (index, trace) in valid_traces.iter().enumerate() {
         let result = InteractionTraceVerifier::verify_value(trace)
