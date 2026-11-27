@@ -1,0 +1,30 @@
+{
+  "schema_version": "sdcb_interval_observation.expected.v1",
+  "observation_covariance_without_acquisition_noise": [
+    [
+      0.5676676416183064,
+      0.5676676416183064
+    ],
+    [
+      0.5676676416183064,
+      0.7357588823428847
+    ]
+  ],
+  "observation_covariance_with_acquisition_noise": [
+    [
+      0.5776676416183064,
+      0.5676676416183064
+    ],
+    [
+      0.5676676416183064,
+      0.7457588823428847
+    ]
+  ],
+  "endpoint_observation_cross_covariance": [
+    0.43233235838169365,
+    0.6321205588285577
+  ],
+  "posterior_endpoint_mean": 0.43660632952719985,
+  "posterior_endpoint_variance": 0.4478182406823277,
+  "claim_boundary": "Constructed analytical OU fixture; not physical sensor data."
+}
