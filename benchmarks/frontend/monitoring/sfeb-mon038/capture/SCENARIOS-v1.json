@@ -1,0 +1,182 @@
+{
+  "profile": "mon038-kafka-partition-capture-scenarios-v1",
+  "version": "1.0.0",
+  "classification": "public_synthetic_development_corpus",
+  "scenarios": [
+    {
+      "id": "MON038-P001",
+      "classification": "positive_control",
+      "name": "closed_multi_partition_capture",
+      "expected_capture_outcome": "qualified",
+      "mutation": "All partitions covered; LSO equals stable high watermark; read_committed; sparse offsets link to exact business events"
+    },
+    {
+      "id": "MON038-P002",
+      "classification": "positive_control",
+      "name": "transaction_spans_partitions",
+      "expected_capture_outcome": "qualified",
+      "mutation": "One transaction is represented across ledger and logical-message partitions without global order inference"
+    },
+    {
+      "id": "MON038-P003",
+      "classification": "positive_control",
+      "name": "aborted_offset_gaps",
+      "expected_capture_outcome": "qualified",
+      "mutation": "Offsets 100 and 102 remain valid in a read_committed capture; no missing event is invented at offset 101"
+    },
+    {
+      "id": "MON038-N001",
+      "classification": "negative_control",
+      "name": "partition_range_missing",
+      "expected_capture_outcome": "indeterminate",
+      "mutation": "One declared partition lacks a range receipt"
+    },
+    {
+      "id": "MON038-N002",
+      "classification": "negative_control",
+      "name": "duplicate_partition_range",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Two range receipts claim the same topic and partition"
+    },
+    {
+      "id": "MON038-N003",
+      "classification": "negative_control",
+      "name": "topic_recreated",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Captured immutable topic ID differs from topic inventory"
+    },
+    {
+      "id": "MON038-N004",
+      "classification": "negative_control",
+      "name": "read_uncommitted",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Isolation level exposes uncommitted transactional records"
+    },
+    {
+      "id": "MON038-N005",
+      "classification": "negative_control",
+      "name": "lso_unstable",
+      "expected_capture_outcome": "indeterminate",
+      "mutation": "LSO changes during capture"
+    },
+    {
+      "id": "MON038-N006",
+      "classification": "negative_control",
+      "name": "high_watermark_unstable",
+      "expected_capture_outcome": "indeterminate",
+      "mutation": "High watermark changes during capture"
+    },
+    {
+      "id": "MON038-N007",
+      "classification": "negative_control",
+      "name": "lso_beyond_high_watermark",
+      "expected_capture_outcome": "blocked",
+      "mutation": "LSO exceeds broker high watermark"
+    },
+    {
+      "id": "MON038-N008",
+      "classification": "negative_control",
+      "name": "open_transaction_at_boundary",
+      "expected_capture_outcome": "indeterminate",
+      "mutation": "LSO remains below stable high watermark"
+    },
+    {
+      "id": "MON038-N009",
+      "classification": "negative_control",
+      "name": "range_after_lso",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Exclusive range end exceeds LSO"
+    },
+    {
+      "id": "MON038-N010",
+      "classification": "negative_control",
+      "name": "retention_truncation",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Log start offset advances beyond range start"
+    },
+    {
+      "id": "MON038-N011",
+      "classification": "negative_control",
+      "name": "leader_epoch_changed",
+      "expected_capture_outcome": "indeterminate",
+      "mutation": "Leader epoch changes during capture"
+    },
+    {
+      "id": "MON038-N012",
+      "classification": "negative_control",
+      "name": "producer_not_fenced",
+      "expected_capture_outcome": "indeterminate",
+      "mutation": "Source producer fence is absent"
+    },
+    {
+      "id": "MON038-N013",
+      "classification": "negative_control",
+      "name": "producer_fence_after_capture",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Fence occurs after capture starts"
+    },
+    {
+      "id": "MON038-N014",
+      "classification": "negative_control",
+      "name": "compacted_topic",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Cleanup policy includes compaction"
+    },
+    {
+      "id": "MON038-N015",
+      "classification": "negative_control",
+      "name": "business_event_payload_mismatch",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Business event payload differs from captured record"
+    },
+    {
+      "id": "MON038-N016",
+      "classification": "negative_control",
+      "name": "captured_row_missing_from_event_set",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Captured business record is omitted from business-event envelope"
+    },
+    {
+      "id": "MON038-N017",
+      "classification": "negative_control",
+      "name": "business_event_outside_capture",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Business event points outside all captured ranges"
+    },
+    {
+      "id": "MON038-N018",
+      "classification": "negative_control",
+      "name": "invalid_partition_index",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Observed partition index exceeds declared partition count"
+    },
+    {
+      "id": "MON038-N019",
+      "classification": "negative_control",
+      "name": "multi_cluster_vector",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Two Kafka clusters are mixed in one v1 vector"
+    },
+    {
+      "id": "MON038-N020",
+      "classification": "negative_control",
+      "name": "range_digest_mismatch",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Partition record-set or range-manifest digest is changed"
+    },
+    {
+      "id": "MON038-N021",
+      "classification": "negative_control",
+      "name": "runtime_attestation_absent",
+      "expected_capture_outcome": "indeterminate",
+      "mutation": "Internally consistent runtime candidate lacks authenticated broker/capture adapters"
+    },
+    {
+      "id": "MON038-N022",
+      "classification": "negative_control",
+      "name": "boundary_changed",
+      "expected_capture_outcome": "blocked",
+      "mutation": "Partition receipts refer to a different recovery boundary"
+    }
+  ]
+}
