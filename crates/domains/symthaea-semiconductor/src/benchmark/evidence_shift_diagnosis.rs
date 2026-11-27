@@ -961,6 +961,7 @@ mod tests {
             ShiftSignalChannelV1::VmResidual,
         );
         observation.prediction_value = Some(10.0);
+        observation.reference_standard_id = Some("transfer-standard-001".into());
         observation.label_report = Some(label_report(label_id, &format!("event-{id}"), 10.0 + residual));
         observation
     }
