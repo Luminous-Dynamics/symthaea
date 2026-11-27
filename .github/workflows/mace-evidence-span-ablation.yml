@@ -1,0 +1,26 @@
+name: MACE Evidence Span Ablation
+on:
+  pull_request:
+    paths:
+      - "research/broca-mace-transfer-bench-v0-1/evaluator/src/evidence_span_ablation.rs"
+      - "research/broca-mace-transfer-bench-v0-1/evaluator/src/lib.rs"
+      - "research/broca-mace-transfer-bench-v0-1/schemas/evidence-span-ablation-v1.schema.json"
+      - "docs/research/MACE_EVIDENCE_SPAN_ABLATION_V0_1.md"
+      - ".github/workflows/mace-evidence-span-ablation.yml"
+  push:
+    branches:
+      - "research/mace-evidence-span-ablation-v0-1"
+jobs:
+  paired-ablation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Parse new evaluator module
+        run: rustfmt --edition 2024 --emit stdout --config skip_children=true research/broca-mace-transfer-bench-v0-1/evaluator/src/evidence_span_ablation.rs >/dev/null
+      - name: Test isolated evaluator library
+        run: cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --lib
+      - name: Strict Clippy for isolated evaluator library
+        run: cargo clippy --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --lib -- -D warnings
+      - name: Parse evidence span ablation schema
+        run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/evidence-span-ablation-v1.schema.json >/dev/null
