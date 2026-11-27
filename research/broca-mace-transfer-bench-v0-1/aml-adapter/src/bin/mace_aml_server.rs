@@ -102,7 +102,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|_| "127.0.0.1:3000".to_owned())
         .parse::<SocketAddr>()?;
     if !bind_address.ip().is_loopback()
-        && env::var("MACE_AML_TLS_TERMINATED").as_deref() != Ok("1")
+        && env::var("MACE_AML_TLS_TERMINATED").ok().as_deref() != Some("1")
     {
         return Err(Box::new(IoError::new(
             ErrorKind::PermissionDenied,
