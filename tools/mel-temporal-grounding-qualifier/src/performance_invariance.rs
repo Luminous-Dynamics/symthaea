@@ -7,7 +7,7 @@
 //! musical property. It does not authenticate audio bytes, performers, takes,
 //! or human annotations.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
@@ -31,7 +31,6 @@ pub enum MusicalTargetPropertyV1 {
     RhythmicRatioPattern,
     PulseRate,
     InstrumentFamily,
-    PerformanceIdentity,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -46,9 +45,6 @@ pub enum PerformanceVariationFactorV1 {
     ChordVoicing,
     UniformTempoScale,
     CrossRenderer,
-    Room,
-    Equalization,
-    Hiss,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -61,7 +57,6 @@ pub enum MusicalChangeFactorV1 {
     RhythmicRatio,
     PulseRate,
     InstrumentFamily,
-    PerformanceIdentity,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -117,7 +112,8 @@ pub struct VariantMetricV1 {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TargetPropertyMetricsV1 {
-    pub target_property: MusicalTargetPropertyV1,
+    /// None for the mixed-target descriptive overall summary.
+    pub target_property: Option<MusicalTargetPropertyV1>,
     pub triads: usize,
     pub clean: VariantMetricV1,
     pub performance_stay: VariantMetricV1,
@@ -290,7 +286,7 @@ pub fn audit_performance_invariance_case(
         });
     }
 
-    let overall = summarize(&scored);
+    let overall = summarize_indices(None, &scored, &(0..scored.len()).collect::<Vec<_>>());
     let mut by_target_property = Vec::new();
     for target_property in target_properties() {
         let indices: Vec<_> = case
@@ -303,7 +299,7 @@ pub fn audit_performance_invariance_case(
             .collect();
         if !indices.is_empty() {
             by_target_property.push(summarize_indices(
-                target_property,
+                Some(target_property),
                 &scored,
                 &indices,
             ));
@@ -460,7 +456,7 @@ fn validate_triad(triad: &PerformanceTriadV1, index: usize) -> Result<(), String
     ];
     let mut variant_ids = BTreeSet::new();
     let mut audio_digests = BTreeSet::new();
-    let mut question_digests = BTreeSet::new();
+    let canonical_question = triad.clean.answer.question.as_str();
     for (variant_name, variant, expected_relation) in variants {
         require_text(
             &variant.variant_id,
@@ -500,9 +496,10 @@ fn validate_triad(triad: &PerformanceTriadV1, index: usize) -> Result<(), String
         if !audio_digests.insert(variant.audio_sha256.as_str()) {
             return Err(format!("triads[{index}] reuses audio bytes across variants"));
         }
-        if !question_digests.insert(variant.question_sha256.as_str()) {
-            // A question can be text-identical across variants; require the scope
-            // and option semantics to match, but do not force unique question text.
+        if variant.question != canonical_question {
+            return Err(format!(
+                "triads[{index}] {variant_name} changes the target-property question within one matched triad"
+            ));
         }
     }
     Ok(())
@@ -528,9 +525,6 @@ fn performance_stay_factor_compatible(
                 | Factor::ChordVoicing
                 | Factor::UniformTempoScale
                 | Factor::CrossRenderer
-                | Factor::Room
-                | Factor::Equalization
-                | Factor::Hiss
         ),
         Target::RootPitchClass => matches!(
             factor,
@@ -543,9 +537,6 @@ fn performance_stay_factor_compatible(
                 | Factor::ChordVoicing
                 | Factor::UniformTempoScale
                 | Factor::CrossRenderer
-                | Factor::Room
-                | Factor::Equalization
-                | Factor::Hiss
         ),
         Target::ChordVoicing => matches!(
             factor,
@@ -556,9 +547,6 @@ fn performance_stay_factor_compatible(
                 | Factor::ExpressiveRubato
                 | Factor::UniformTempoScale
                 | Factor::CrossRenderer
-                | Factor::Room
-                | Factor::Equalization
-                | Factor::Hiss
         ),
         Target::RelativeIntervalSequence | Target::MelodicContour => matches!(
             factor,
@@ -570,9 +558,6 @@ fn performance_stay_factor_compatible(
                 | Factor::GlobalTransposition
                 | Factor::UniformTempoScale
                 | Factor::CrossRenderer
-                | Factor::Room
-                | Factor::Equalization
-                | Factor::Hiss
         ),
         Target::RhythmicRatioPattern => matches!(
             factor,
@@ -582,9 +567,6 @@ fn performance_stay_factor_compatible(
                 | Factor::VelocityOrDynamics
                 | Factor::UniformTempoScale
                 | Factor::CrossRenderer
-                | Factor::Room
-                | Factor::Equalization
-                | Factor::Hiss
         ),
         Target::PulseRate => matches!(
             factor,
@@ -593,9 +575,6 @@ fn performance_stay_factor_compatible(
                 | Factor::StrumOrArticulation
                 | Factor::VelocityOrDynamics
                 | Factor::CrossRenderer
-                | Factor::Room
-                | Factor::Equalization
-                | Factor::Hiss
         ),
         Target::InstrumentFamily => matches!(
             factor,
@@ -608,13 +587,6 @@ fn performance_stay_factor_compatible(
                 | Factor::ChordInversion
                 | Factor::ChordVoicing
                 | Factor::UniformTempoScale
-                | Factor::Room
-                | Factor::Equalization
-                | Factor::Hiss
-        ),
-        Target::PerformanceIdentity => matches!(
-            factor,
-            Factor::Room | Factor::Equalization | Factor::Hiss
         ),
     }
 }
@@ -649,9 +621,6 @@ fn musical_flip_factor_compatible(
         ) | (
             MusicalTargetPropertyV1::InstrumentFamily,
             MusicalChangeFactorV1::InstrumentFamily
-        ) | (
-            MusicalTargetPropertyV1::PerformanceIdentity,
-            MusicalChangeFactorV1::PerformanceIdentity
         )
     )
 }
@@ -669,13 +638,8 @@ fn score_variant(variant: &MusicListenVariantV1) -> ScoredVariantV1 {
     }
 }
 
-fn summarize(scored: &[ScoredTriadV1]) -> TargetPropertyMetricsV1 {
-    let indices: Vec<_> = (0..scored.len()).collect();
-    summarize_indices(MusicalTargetPropertyV1::ChordQuality, scored, &indices)
-}
-
 fn summarize_indices(
-    target_property: MusicalTargetPropertyV1,
+    target_property: Option<MusicalTargetPropertyV1>,
     scored: &[ScoredTriadV1],
     indices: &[usize],
 ) -> TargetPropertyMetricsV1 {
@@ -746,7 +710,7 @@ fn variant_metrics(values: impl Iterator<Item = ScoredVariantV1>) -> VariantMetr
     }
 }
 
-fn target_properties() -> [MusicalTargetPropertyV1; 9] {
+fn target_properties() -> [MusicalTargetPropertyV1; 8] {
     [
         MusicalTargetPropertyV1::ChordQuality,
         MusicalTargetPropertyV1::RootPitchClass,
@@ -756,11 +720,10 @@ fn target_properties() -> [MusicalTargetPropertyV1; 9] {
         MusicalTargetPropertyV1::RhythmicRatioPattern,
         MusicalTargetPropertyV1::PulseRate,
         MusicalTargetPropertyV1::InstrumentFamily,
-        MusicalTargetPropertyV1::PerformanceIdentity,
     ]
 }
 
-fn performance_factors() -> [PerformanceVariationFactorV1; 13] {
+fn performance_factors() -> [PerformanceVariationFactorV1; 10] {
     [
         PerformanceVariationFactorV1::DifferentPerformer,
         PerformanceVariationFactorV1::DifferentTake,
@@ -772,13 +735,10 @@ fn performance_factors() -> [PerformanceVariationFactorV1; 13] {
         PerformanceVariationFactorV1::ChordVoicing,
         PerformanceVariationFactorV1::UniformTempoScale,
         PerformanceVariationFactorV1::CrossRenderer,
-        PerformanceVariationFactorV1::Room,
-        PerformanceVariationFactorV1::Equalization,
-        PerformanceVariationFactorV1::Hiss,
     ]
 }
 
-fn musical_flip_factors() -> [MusicalChangeFactorV1; 9] {
+fn musical_flip_factors() -> [MusicalChangeFactorV1; 8] {
     [
         MusicalChangeFactorV1::ChordQuality,
         MusicalChangeFactorV1::RootPitchClass,
@@ -788,7 +748,6 @@ fn musical_flip_factors() -> [MusicalChangeFactorV1; 9] {
         MusicalChangeFactorV1::RhythmicRatio,
         MusicalChangeFactorV1::PulseRate,
         MusicalChangeFactorV1::InstrumentFamily,
-        MusicalChangeFactorV1::PerformanceIdentity,
     ]
 }
 
