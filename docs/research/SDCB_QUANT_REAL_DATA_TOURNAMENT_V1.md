@@ -32,7 +32,7 @@ The article also assumes independent identically distributed measurement errors 
 
 The paper's six-case simulation offers frozen regression/calibration controls:
 - The nominal expected sensor-performance pass percentage is 95%.
-- When process variability is ignored, reported percentages drop to 72.9% in the DU-ML-YH, DU-MH-YH, SU-ML-YH and SU-MH-YH scenarios; incorporating the process variability restores these to 95%.
+- The publisher's Table 3 reports the following pass percentages when process variability is ignored: DU-MH-YL 93.7%; DU-ML-YH 72.9%; DU-MH-YH 72.9%; SU-MH-YL 94.1%; SU-ML-YH 79.2%; SU-MH-YH 79.2%. Incorporating process variability restores all six scenarios to the nominal 95.0%.
 - In the DU-MH-YL scenario, the reported parameter-interval coverage CP(a)/CP(b) is 94.7%/94.8% for OLS and 93.8%/93.7% for C-GDR.
 - In the SU-ML-YH scenario, OLS reports 38.8%/37.4% parameter coverage, while C-GDR reports 91.7%/91.4%.
 - In the SU-MH-YH scenario, OLS reports 76.2%/74.4%, YB-GDR 95.7%/95.7%, and C-GDR 93.7%/93.5%.
@@ -106,7 +106,7 @@ Compare only on matched channels, units, timestamps/windows, training support an
 
 **Standards and measurement conformance**
 - CEN/TS 17660-1:2021 for gaseous pollutants (including NO2) and CEN/TS 17660-2:2024 for PM10/PM2.5, using their published editions and licensed test procedures.
-- ISO/IEC Guide 98-3:2008 / JCGM 100 (GUM) uncertainty evaluation and reporting; JCGM 101 Monte Carlo propagation where needed.
+- JCGM 100:2008 (GUM) with Amendment 1:2026 on nonlinearity in measurement models; JCGM 101:2008 for Monte Carlo propagation where appropriate; and the 2026 GUMsuite, including GUM-5:2026 examples. Freeze the exact document/edition and amendment used for every comparison.
 - Keep device-level standard classification separate from SDCB's network-level inference. The published CEN/TS scopes focus on individual sensor systems at fixed sites; they do not by themselves validate common-cause dependence, cross-device reference ancestry, or network-wide decision integrity.
 - Do not claim standards compliance from the QUANT archive alone. Freeze the standard edition, obtain the complete normative test requirements, instrument conditions and acceptance criteria, and execute the required laboratory/field procedures.
 
@@ -150,7 +150,7 @@ The published CEN/TS specifications focus on individual sensor systems under pre
 
 Metrological traceability is a separate property: a measurement result must be related to a reference through a documented, unbroken calibration chain, with each calibration contributing to uncertainty. A digital ID/version envelope or verified software receipt is not itself a calibration certificate or proof of traceability. Report instrument identity, reference-standard certificates, calibration intervals, uncertainty contributions and ancestry separately from the statistical predictive model.
 
-The current CEN committee is reviewing successor prEN versions; use the published CEN/TS editions as the declared baseline until a successor is formally published/adopted. Do not silently mix draft criteria into a claimed standards-conformance result.
+As of 27 November 2026, public standards tracking lists successor prEN 17660-1 and prEN 17660-2 at stage 00.60 (close of review, 11 March 2026). The declared published baselines remain CEN/TS 17660-1:2021 and CEN/TS 17660-2:2024 unless/until a successor is formally published/adopted. Do not silently apply draft prEN criteria to a published-edition conformance claim. The BIPM now lists JCGM 100:2008/Amd.1:2026 (nonlinearity in measurement models) and GUM-5:2026 examples in its published GUM materials; the protocol must cite the amendment in force for each nonlinear measurement model and retain JCGM 101:2008 when using its Monte Carlo propagation guidance.
 
 ## 8. Metrics and decision outcomes
 
@@ -199,8 +199,8 @@ These are research gates. No QUANT benchmark result, dataset acquisition, physic
 - CEDA archive directory: https://data.ceda.ac.uk/badc/deposited2023/QUANT/
 - CEN/TS 17660-1:2021, Air quality — Performance evaluation of air quality sensor systems — Part 1: Gaseous pollutants in ambient air.
 - CEN/TS 17660-2:2024, Air quality — Performance evaluation of air quality sensor systems — Part 2: Particulate matter in ambient air.
-- ISO/IEC Guide 98-3:2008 / JCGM 100, Guide to the Expression of Uncertainty in Measurement (GUM).
-- ISO/IEC Guide 98-3 Supplement 1 / JCGM 101, Propagation of distributions using a Monte Carlo method.
+- JCGM 100:2008(E), Guide to the Expression of Uncertainty in Measurement, plus JCGM 100:2008/Amd.1:2026 on nonlinearity in measurement models.
+- JCGM 101:2008, Supplement 1 to the GUM, propagation of distributions using a Monte Carlo method; and JCGM GUM-5:2026, examples.
 - Kok, G. and Tabandeh, S. (2026), *Uncertainty Evaluation for Testing and Calibrating Mobile Sensors Only Using Short Collocation Periods*, Quality and Reliability Engineering International 42(7), 4298–4309. DOI: https://doi.org/10.1002/qre.70319
 - NBN catalogue entry for CEN/TS 17660-1:2021 (gaseous pollutants): https://app.nbn.be/data/r/platform/frontend/detail?p40_id=199863&p_lang=en
 - NBN catalogue entry for CEN/TS 17660-2:2024 (particulate matter): https://app.nbn.be/data/r/platform/frontend/detail?lang=en&p40_id=2670286&p40_language_code=en
@@ -209,3 +209,71 @@ These are research gates. No QUANT benchmark result, dataset acquisition, physic
 - BIPM/OIML/ILAC/ISO joint declaration on metrological traceability: https://www.bipm.org/documents/20126/42177518/BIPM-OIML-ILAC-ISO_joint_declaration_2011.pdf
 - Terminal-Bench-Science live task set and contribution process: https://github.com/harbor-framework/terminal-bench-science/ and https://www.terminal-bench-science.ai/contribute
 - ASI-Bench task catalog: https://asibench.apexin.ai/tasks/catalog/
+
+
+## Tiered empirical data access — curated hourly QUANT release
+
+The Zenodo release provides a viable **hourly screening tier** while the raw CEDA archive and paper-specific high-rate reference access are unresolved:
+
+- Diez et al., *QUANT: A Three-Year, Multi-City Air Quality Dataset of Commercial Air Sensors and Reference Data for Performance Evaluation*, Zenodo v1, published 2 March 2024, DOI: https://doi.org/10.5281/zenodo.10775692.
+- `QUANT_DuplicateRef_hourly.csv`: 1.4 MB, MD5 `95a7adc5e12f6b67f92baadb9a18cb2a`.
+- `QUANT_Reference_hourly.csv`: 26.7 MB, MD5 `51df9e9632f21e5a8fcbed11662cab45`.
+- `QUANT_SensorSystems_hourly.csv`: 476.9 MB, MD5 `7f8665948c58014f4dde1122d5f438e6`.
+
+The release contains standardized hourly records from London, Manchester and York, including commercial sensor systems, reference monitors and duplicate reference instruments. It provides NO, NO2, O3, PM1, PM2.5, PM10 and meteorological channels. The Zenodo record identifies the sensor data as derived from CEDA under OGL v3.0; the reference series originate from public site data and have been harmonized to hourly averages; the duplicate reference data are only in the Zenodo release. The Zenodo record's top-level Rights field states CC BY 4.0, but the data components have their own provenance statements. Preserve per-file source attribution and licence metadata rather than flattening provenance into a single undifferentiated claim.
+
+
+### Duplicate-reference cohort scope discovered from the published CSV preview
+
+A web-readable preview of `QUANT_DuplicateRef_hourly.csv` exposes the row schema `time,location,instrument,serial,measurand,measurement,qc_flag`, with a total of 19,523 lines including the header. The first row is Manchester, 13 October 2020 10:00; the final row is Manchester, 19 November 2021 10:00. Searches across the indexed CSV preview returned no "London" or "York" matches, and the visible initial and terminal samples are Manchester.
+
+This is strong evidence that the duplicate-reference file is a Manchester-only subset, or at minimum that the preview exposes no duplicate-reference rows for London/York. **Do not score it as a three-site duplicate-reference control.** Before final cohort freeze, independently parse a locally acquired copy and verify unique location, instrument, serial, measurand, time coverage, all provider QC flags, duplicate pairing semantics and missingness. The preview is not local file acquisition, SHA-256 custody, or independent content-hash verification; no such claim is made.
+
+### Tiered use and limits
+
+1. **Q0 — hourly screening:** use the curated Zenodo files to qualify parsing, units, site/device mapping, missingness, duplicate-reference disagreement, hourly calibration baselines and chronological/leave-device/site holdouts. The reference data have been processed/harmonized and may have undergone later ratification. This tier is useful for cohort construction and coarse predictive evaluation, not for reconstructing sub-hourly dynamics.
+2. **Q1 — raw CEDA sensor archive:** use the richer source archive for original temporal resolution, additional pollutants and fuller sensor metadata. CEDA's sensor archive is not itself the site's full regulatory reference archive; join only with separately sourced, versioned references whose provenance is explicit.
+3. **Q2 — short-collocation paper reproduction:** obtain the exact one-minute reference series, five-minute mobile-sensor series, instrument uncertainty inputs and collocation metadata used by Kok and Tabandeh (2026) from the corresponding author as required by the paper's data availability statement. Do not treat Zenodo hourly data as a substitute.
+
+The files have been identified from the source catalogue, but direct download attempts in this environment were rate-limited/failed. **No Zenodo file bytes have been acquired, hashed locally, parsed or analyzed in this execution.** The file MD5 values above are publisher-provided catalogue metadata, not independently verified local checksums. The original CEDA archive acquisition blocker remains separate. No real-data result is claimed.
+
+Do not upsample hourly records into one- or five-minute observations. Do not infer sensor process response or short-collocation coverage from hourly aggregates. All tier transitions require separate acquisition receipts, raw-file SHA-256 digests, parser versions and frozen cohort manifests.
+
+Source: https://zenodo.org/records/10775692 and the dataset paper https://doi.org/10.1038/s41597-024-03767-2.
+
+- BIPM JCGM publication list (including JCGM 100:2008/Amd.1:2026 and JCGM GUM-5:2026): https://www.bipm.org/en/committees/jc/jcgm/publications/
+- BIPM Guides in Metrology list: https://www.bipm.org/en/web/guest/publications/guides
+- Public status tracking for prEN 17660-1 (stage 00.60, close of review 11 March 2026): https://genorma.com/en/standards/pren-17660-1
+- Public status tracking for prEN 17660-2 (stage 00.60, close of review 11 March 2026): https://genorma.com/en/standards/pren-17660-2/amp
+- JCGM 100:2008/Amd.1:2026 DOI: https://doi.org/10.59161/PPDI3267
+
+
+
+## Adjacent 2026 field-calibration comparator (not part of QUANT)
+
+Add a separate external comparator from Mercado-Velazquez et al., *How Accurate Are Low-Cost Air Quality Sensors? A 10-Month Study of Three-Tier Comparison with Three Calibration Methods and Cross-Site Transferability*, Sensors 2026, 26(20), 6441, published 12 October 2026, DOI https://doi.org/10.3390/s26206441.
+
+### Published study design and findings
+
+- Two east London sites 1.6 km apart, with low-cost metal-oxide / optical channels, mid-cost electrochemical sensors, and high-cost government reference stations.
+- The wider deployment used seven nodes, but this three-tier comparison analyzed two nodes (3 and 5) because only those carried all three cost tiers.
+- Ten months of field data. Models trained April–October 2025 were evaluated on November 2025–February 2026.
+- Machine-learning calibration reached reported R² ranges of 0.58–0.74 for PM2.5 and 0.23–0.37 for NO2 against government references in the two-site study.
+- PM2.5 cross-site transfer had limited R² loss (|ΔR²|≤0.18), while gas transfer was poor (reported R²≤0.28).
+- NO2 calibration trained on the earlier period stopped describing the later period at both sites; CO did so at one site; PM2.5 remained comparatively stable.
+- The article reports a dynamically re-estimated clean-air baseline (R0) for metal-oxide sensors using EWMA/nighttime-percentile processing, and compares manufacturer curves, linear temperature/RH calibration, and ML.
+
+### How SDCB should use this comparator
+
+This is a separate field cohort and sensor inventory; it is not a QUANT subset and should not be pooled with the CEDA/Zenodo data or treated as a matched head-to-head. Use it to motivate a distinct external transportability/regime-shift evaluation:
+
+1. **Temporal holdout:** freeze training on early months and evaluate the entire later season without random row splits.
+2. **Cross-site holdout:** train on one site, test on the other, then reverse; report actual sensor/site counts and do not call two sites independent laboratories.
+3. **Pollutant-stratified performance:** report PM2.5, NO2, CO and O3 separately. The paper shows materially different transfer behavior by measurand.
+4. **Calibration-dynamics ablation:** compare manufacturer curve, fixed linear T/RH calibration, ML, dynamic R0 correction, and SDCB temporal/full-covariance/model-mixture approaches only where raw covariates and metadata support equivalent inputs.
+5. **Metrics:** monthly bias, MAE/RMSE, proper predictive scores, calibration coverage/width, slope/intercept drift, false fault decisions, abstention, and decision loss. R² alone is insufficient.
+6. **No hidden adaptation:** distinguish frozen-model generalization from online recalibration; all calibration actions, reference costs, and data available at decision time must be recorded.
+
+The paper's two-site scope and differing pollutant behavior make it a strong adversarial temporal/site-transfer comparator, but not evidence that an SDCB model has already improved performance. Raw-data acquisition and license conditions must be checked before attempting a numerical reproduction. Cite the paper's published version and preserve its exact train/test dates and sensor tiers.
+
+Source: https://www.mdpi.com/1424-8220/26/20/6441.
