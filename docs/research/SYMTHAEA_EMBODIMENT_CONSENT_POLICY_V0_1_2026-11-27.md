@@ -112,6 +112,19 @@ Targets (not results):
 
 Use fault injection to test a stale permit, queue delay, renderer restart, process pause, and concurrent revocation. The exact policy version, consent-grant fixture, trace, renderer version, hardware, and output observation must be recorded.
 
+## Presentation outcome receipts
+
+The separate Rust module `embodiment_receipt.rs` now implements a bounded lifecycle ledger:
+Permitted → Submitted → Observed → Stopped, with explicit NotSubmitted, Failed
+and unresolved OutcomeUnknown states. The submission transition re-checks the
+policy; output cessation requires an observer to report Stopped. Receipts preserve
+separate source and renderer clock domains and carry an unkeyed BLAKE3 hash chain.
+
+The hash chain is not authentication, hardware attestation, trusted time,
+anti-fork protection or proof of an independent observer. The receipt schema and
+four positive/five negative lifecycle fixtures are published separately. See
+[Presentation Outcome Receipts](SYMTHAEA_PRESENTATION_OUTCOME_RECEIPTS_V0_1_2026-11-27.md).
+
 ## Next steps
 
 1. Validate the module with the workspace's pinned Rust toolchain and exact-head tests.
