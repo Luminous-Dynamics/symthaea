@@ -12,7 +12,8 @@ use symthaea_plasma_probes::{
     EmpiricalGramian,
     rbkr::{
         FiniteHorizonGramianConfig, RbkrConfig, ResponseBalancedBasis,
-        ResponseGramianAggregationConfig, ResponseGramianScenario, aggregate_response_gramians,
+        ResponseGramianAggregationConfig, ResponseGramianScenario, ResponseScenarioRole,
+        aggregate_response_gramians,
         build_finite_horizon_gramians, evaluate_response_scenario_residuals,
     },
 };
@@ -34,6 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let scenario = ResponseGramianScenario {
         scenario_id: "public-api-smoke",
+        role: ResponseScenarioRole::Training,
         trajectory_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         task_contract_id: "public-api-smoke-v1",
         checkpoint_id: "checkpoint-smoke",
@@ -69,6 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     rare_observability.add_direction(&[0.0, 1.0], 1.0)?;
     let rare_scenario = ResponseGramianScenario {
         scenario_id: "public-api-smoke-rare",
+        role: ResponseScenarioRole::DevelopmentChallenge,
         trajectory_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         task_contract_id: "public-api-smoke-v1",
         checkpoint_id: "checkpoint-smoke",
@@ -79,7 +82,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         observability: &rare_observability,
         scenario_weight: 0.49,
     };
-    let challenge = [scenario, rare_scenario];
+    let development_scenario = ResponseGramianScenario {
+        role: ResponseScenarioRole::DevelopmentChallenge,
+        ..scenario
+    };
+    let challenge = [development_scenario, rare_scenario];
     let receipt = basis.enrich_from_worst_scenario(&challenge, RbkrConfig::new(2))?;
     assert_eq!(receipt.scenario_id, "public-api-smoke-rare");
     assert_eq!(
