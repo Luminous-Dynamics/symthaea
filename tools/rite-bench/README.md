@@ -34,6 +34,20 @@ All metrics are emitted separately, with numerator and denominator preserved. Ra
 
 The evaluator does **not** emit an overall weighted score. High accuracy cannot compensate for failed replay, poor calibration, weak evidence independence, or budget violations. Consumers should compare systems on a Pareto profile and publish each denominator.
 
+## How RITE composes with the existing benchmark contracts
+
+RITE-Bench is a cross-suite decision/evidence qualification layer, not a replacement for domain-specific benchmark oracles.
+
+| Existing contract | What it qualifies | How to use it beside RITE |
+|---|---|---|
+| CEDAR-Bench | Whether an answer depends on admissible, independent, claim-specific sources and reacts to evidence counterfactuals/placebos | Supplies claim/source eligibility, provenance-origin groups, and expected intervention outcomes |
+| METHODE-Bench | Whether the declared scientific method, dataset, split, preprocessing, components, baselines, metrics, budgets and outputs were actually reproduced | Keep method-fidelity disposition as a separate gate; a correct final answer cannot compensate for an unresolved method deviation |
+| REPAIR-Bench | Whether corrections and invalidations propagate through dependent claims, artifacts and evidence graphs | Keep correction-propagation and stale-support rates separately visible; an initially correct result can become invalid after a source correction |
+| Artifact manifest and bounded delimited parser | Whether evidence artifacts have stable hashes, bounded parsing, typed locators, and reproducible acquisition provenance | Supplies artifact identity/locator receipts; parsing success is not a truth or citation-eligibility judgment |
+| WebResearch acquisition/security contracts | Whether acquisition is bounded, source/claim provenance is recorded, and outbound requests meet URL/DNS/redirect policy | Treat acquisition-policy violations as hard security failures, not a small penalty in the scorecard |
+
+The future top-level report should be a **qualification vector** with one result per contract and one result per RITE axis. It should not average these into an "overall research intelligence" number. An unresolved method, failed replay, forbidden network destination, or unpropagated correction remains visible even when final-answer accuracy is high.
+
 ## Record semantics
 
 A TaskRecord is constructed by the benchmark harness and independent evaluator, not by the agent being scored.
