@@ -57,6 +57,7 @@ cat >"$OUT/run-manifest.json" <<EOF
   "profile": "mon025-live-recovery-run-v1",
   "run_id": "$RUN_ID",
   "postgres_major": "$MAJOR",
+  "compose_project_name": "${COMPOSE_PROJECT_NAME:-mon025}",
   "source_revision": "$source_rev",
   "captured_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "host_kernel": "$(uname -sr)",
