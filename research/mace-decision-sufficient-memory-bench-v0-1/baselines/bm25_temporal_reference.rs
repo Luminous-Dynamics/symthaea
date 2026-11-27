@@ -21,10 +21,35 @@ impl Default for Bm25ConfigV1 {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AuthorityTierV1 {
+    Verified,
+    Authenticated,
+    UserAsserted,
+    Untrusted,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EventRelationV1 {
+    Asserts,
+    Supersedes,
+    Retracts,
+    Contradicts,
+    DerivedFrom,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SourceDocumentV1 {
+    /// Exact candidate-visible event ID; this is the join key used by MACE decision receipts.
     pub document_id: String,
+    pub source_id: String,
     pub scope_id: String,
+    pub authority_tier: AuthorityTierV1,
+    pub uncertainty_ppm: u32,
+    pub relation_to_parent: EventRelationV1,
+    pub parent_event_ids: Vec<String>,
+    pub source_family: Option<String>,
+    pub source_root_digest_sha256: Option<String>,
     /// Time the candidate learned/stored this source event (transaction time).
     pub observed_at_ms: u64,
     /// Beginning of the interval during which the claim applies (valid time).
@@ -72,7 +97,12 @@ pub struct Bm25ResultV1 {
 pub enum BaselineErrorV1 {
     EmptyDocumentId,
     DuplicateDocumentId,
+    EmptySourceId,
     EmptyDocumentScope,
+    InvalidUncertainty,
+    InvalidSourceFamily,
+    InvalidSourceRootDigest,
+    InvalidParentEvent,
     EmptyQueryScope,
     InvalidValidityInterval,
     InvalidBm25Parameters,
@@ -157,8 +187,40 @@ impl Bm25IndexV1 {
             if document.document_id.trim().is_empty() {
                 return Err(BaselineErrorV1::EmptyDocumentId);
             }
+            if document.source_id.trim().is_empty() {
+                return Err(BaselineErrorV1::EmptySourceId);
+            }
             if document.scope_id.trim().is_empty() {
                 return Err(BaselineErrorV1::EmptyDocumentScope);
+            }
+            if document.uncertainty_ppm > 1_000_000 {
+                return Err(BaselineErrorV1::InvalidUncertainty);
+            }
+            if document
+                .source_family
+                .as_ref()
+                .is_some_and(|family| family.trim().is_empty())
+            {
+                return Err(BaselineErrorV1::InvalidSourceFamily);
+            }
+            if document.source_root_digest_sha256.as_ref().is_some_and(|root| {
+                root.len() != 64
+                    || !root
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            }) || (document.source_root_digest_sha256.is_some()
+                && document.source_family.is_none())
+            {
+                return Err(BaselineErrorV1::InvalidSourceRootDigest);
+            }
+            let mut parent_ids = std::collections::BTreeSet::new();
+            for parent_id in &document.parent_event_ids {
+                if parent_id.trim().is_empty()
+                    || parent_id == &document.document_id
+                    || !parent_ids.insert(parent_id.as_str())
+                {
+                    return Err(BaselineErrorV1::InvalidParentEvent);
+                }
             }
             if document
                 .valid_until_ms
@@ -211,6 +273,15 @@ impl Bm25IndexV1 {
             postings,
             config,
         })
+    }
+
+    /// Resolve a retrieved event ID back to the exact canonical candidate-visible source record.
+    /// This lets the caller join BM25 hits to MACE provenance without text-similarity matching.
+    pub fn resolve_source_event(&self, document_id: &str) -> Option<&SourceDocumentV1> {
+        self.by_id
+            .get(document_id)
+            .and_then(|index| self.documents.get(*index))
+            .map(|prepared| &prepared.document)
     }
 
     fn is_visible(&self, document_id: &str, scope_id: &str, as_of_ms: u64) -> bool {
@@ -454,7 +525,14 @@ mod tests {
     ) -> SourceDocumentV1 {
         SourceDocumentV1 {
             document_id: id.to_owned(),
+            source_id: format!("source-{id}"),
             scope_id: scope.to_owned(),
+            authority_tier: AuthorityTierV1::Authenticated,
+            uncertainty_ppm: 0,
+            relation_to_parent: EventRelationV1::Asserts,
+            parent_event_ids: Vec::new(),
+            source_family: Some(scope.to_owned()),
+            source_root_digest_sha256: None,
             observed_at_ms,
             valid_from_ms,
             valid_until_ms,
@@ -725,6 +803,60 @@ mod tests {
                 Bm25ConfigV1::default(),
             ),
             Err(BaselineErrorV1::InvalidValidityInterval)
+        );
+    }
+
+    #[test]
+    fn retrieved_event_ids_resolve_to_exact_source_lineage_and_authority() {
+        let mut source = document("e-current", "lab-a", "calibration certificate", 10, 5, None);
+        source.source_id = "cert-41-v2".into();
+        source.authority_tier = AuthorityTierV1::Verified;
+        source.uncertainty_ppm = 500;
+        source.source_family = Some("supplier_registry".into());
+        source.source_root_digest_sha256 = Some(
+            "ad74977d718be3043ed9ae57f75765a53724767753b8933e6c81bd94f7068019".into(),
+        );
+        source.relation_to_parent = EventRelationV1::Supersedes;
+        source.parent_event_ids = vec!["e-old".into()];
+        let index = index(vec![source]);
+        let result = index.search(&query("calibration certificate", "lab-a", 20, 5)).unwrap();
+        assert_eq!(result.hits[0].document_id, "e-current");
+        let resolved = index
+            .resolve_source_event(&result.hits[0].document_id)
+            .expect("retrieved ID resolves to canonical event");
+        assert_eq!(resolved.source_id, "cert-41-v2");
+        assert_eq!(resolved.authority_tier, AuthorityTierV1::Verified);
+        assert_eq!(resolved.uncertainty_ppm, 500);
+        assert_eq!(resolved.source_family.as_deref(), Some("supplier_registry"));
+        assert_eq!(
+            resolved.source_root_digest_sha256.as_deref(),
+            Some("ad74977d718be3043ed9ae57f75765a53724767753b8933e6c81bd94f7068019")
+        );
+        assert_eq!(resolved.relation_to_parent, EventRelationV1::Supersedes);
+        assert_eq!(resolved.parent_event_ids, vec!["e-old"]);
+    }
+
+    #[test]
+    fn malformed_source_lineage_fails_closed_at_index_construction() {
+        let mut bad_root = document("e1", "lab-a", "approved", 1, 1, None);
+        bad_root.source_root_digest_sha256 = Some("not-a-digest".into());
+        assert_eq!(
+            Bm25IndexV1::build(vec![bad_root], Bm25ConfigV1::default()),
+            Err(BaselineErrorV1::InvalidSourceRootDigest)
+        );
+
+        let mut bad_parent = document("e1", "lab-a", "approved", 1, 1, None);
+        bad_parent.parent_event_ids = vec!["e1".into()];
+        assert_eq!(
+            Bm25IndexV1::build(vec![bad_parent], Bm25ConfigV1::default()),
+            Err(BaselineErrorV1::InvalidParentEvent)
+        );
+
+        let mut bad_uncertainty = document("e1", "lab-a", "approved", 1, 1, None);
+        bad_uncertainty.uncertainty_ppm = 1_000_001;
+        assert_eq!(
+            Bm25IndexV1::build(vec![bad_uncertainty], Bm25ConfigV1::default()),
+            Err(BaselineErrorV1::InvalidUncertainty)
         );
     }
 
