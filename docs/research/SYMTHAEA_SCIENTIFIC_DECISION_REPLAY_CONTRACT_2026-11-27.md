@@ -46,11 +46,20 @@ A digest proves byte identity, not truth, independence, access control or correc
 ## 3. Contract prototype
 
 The new support module defines:
-- CandidateDecisionContext: decision-time evidence, exact upstream offer IDs paired with their payload SHA-256 digests, context digest, budget, deadline, and a digest-bound decision objective (valuation mode, declared utility unit and loss-table reference where applicable). It also carries the canonical SHA-256 identities supplied by #13665/#11015: exact serialized ResearchState, evidence prefix, and permitted-action-offer list. These are upstream references, not a duplicated evidence graph or action-offer authority.
-- DecisionProposal: selected upstream offer ID, exact payload digest (which must match the upstream offer projection) (for example, the submitted design batch), prospective probability distribution, policy lineage, assignment mechanism and causal-design declaration.
+- CandidateDecisionContext: decision-time evidence, exact upstream offer IDs paired with their payload SHA-256 digests, context digest, budget, deadline, and a digest-bound decision objective (valuation mode, declared utility unit and loss-table reference where applicable). It carries exact serialized ResearchState and evidence-prefix SHA-256 values from #13665/#11015. For the offer-list SHA-256, this PR specifies a proposed canonical v1 encoding; upstream #11015 must adopt it before the field can be treated as a production AgentView digest. These are references, not a duplicated evidence graph or action-offer authority.
+- DecisionProposal: selected upstream offer ID, exact payload digest (which must match the upstream offer projection, such as the submitted design batch), prospective probability distribution, policy lineage, assignment mechanism and causal-design declaration.
 - EvaluatorResolution: evaluator-owned execution status, outcome-resolution state, recorded action ID plus exact payload digest, upstream execution/job receipt reference, evidence references and actual-cost completeness. `ActionSupport::RecordedAction` means the submitted action/payload was recorded; it does not imply that the scientific outcome has resolved. A recorded external action requires a nonempty upstream receipt reference; `not_run` and unsupported counterfactual states must not carry one.
 
 Candidate-visible types do not contain ground truth or future outcome labels. EvaluatorResolution is separate and must not be serialized into the candidate process input stream.
+
+**Cross-owner canonicalization boundary:** #11015 currently defines the policy-level obligation to use an exact permitted offer ID, and it requires admissible actions/resource costs, but its protocol document does not yet define a canonical serialized offer-list hash or a concrete AgentView offer payload schema. This PR therefore proposes PermittedActionOfferRef v1 and a concrete canonical digest for adoption by #11015; it does not claim that the upstream production offer list already emits this digest.
+
+V1 canonicalization is compact serde JSON for a fixed field-order struct containing:
+- domain tag symthaea.agentview.permitted-action-offer-list;
+- schema version 1;
+- the ordered array of { offer_id, action_payload_sha256 } pairs.
+
+The array is order-preserving. Each offer's payload digest must cover the complete immutable offer, including action parameters, resource-cost information, permission/scope and relevant risk constraints. The SHA-256 over those exact bytes is permitted_action_offer_list_sha256. #11015 must adopt this encoding or introduce a versioned compatible canonical representation before production wiring.
 
 Validation covers:
 - the canonical ResearchState, evidence-prefix, permitted-offer-list and exact action-payload bindings are well-formed lowercase SHA-256 digests;
