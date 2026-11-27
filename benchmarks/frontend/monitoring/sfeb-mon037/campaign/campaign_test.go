@@ -1,6 +1,8 @@
 package campaign
 
 import (
+ "crypto/sha256"
+ "encoding/hex"
  "encoding/json"
  "fmt"
  "testing"
@@ -10,12 +12,7 @@ import (
 const da="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 const db="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 const dc="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-const sqlManifest="c5c47db07e3a2055380c16d271acae1a1c44933a7ff244c891a65c29207a8525"
-const kafkaManifest="5bc9c15baf7d2b5704d17ac3ee2ba15f4a64805b581ca0ac45bca888ba60e49e"
-const txManifest="013f2547dc5b7fc69f763ee1fad4ba38c541e3510acf2c95533034bdcd65ca48"
-const dedupeManifest="da4afcc43078abcea80e62e0c0ca374fde9d9df429b1a8c252f1d5e8a6e1d8b8"
-const exclusionManifest="9fbb127d2f5020d96a88704e5ae6dd72b6d91b1b8b39a581654142201efedf92"
-const surfaceInventoryManifest="2c5d58ea9e058f1475e796fc0654dc51a2080f73565b9f2b95868b95c745199b"
+func fixtureDigest(s string)string{sum:=sha256.Sum256([]byte(s));return hex.EncodeToString(sum[:])}
 var now=time.Date(2026,11,27,12,0,0,0,time.UTC)
 
 func raw(v any)json.RawMessage{b,_:=json.Marshal(v);return b}
@@ -28,11 +25,11 @@ func fixture()Input{
  return Input{
   Profile:Profile,Version:Version,TrialID:"trial-001",ScenarioID:"MON037-P001",Mode:OfflineFixture,EvaluatedAt:now,
   RequiredClaimIDs:[]string{"claim-cdc","claim-backup"},
-  SourceTruthComplete:true,SourceTruthManifestSHA256:sqlManifest,
-  ObservedCaptureComplete:true,ObservedCaptureManifestSHA256:kafkaManifest,
-  TransactionReportComplete:true,TransactionReportSHA256:txManifest,
+  SourceTruthComplete:true,SourceTruthManifestSHA256:fixtureDigest("MON037 synthetic SQL source-truth manifest v1\n"),
+  ObservedCaptureComplete:true,ObservedCaptureManifestSHA256:fixtureDigest("MON037 synthetic Kafka capture manifest v1\n"),
+  TransactionReportComplete:true,TransactionReportSHA256:fixtureDigest("MON037 synthetic transaction report v1\n"),
   RequiredSurfaceIDs:[]string{"heap","index","large-object"},
-  SurfaceInventoryComplete:true,SurfaceInventorySHA256:surfaceInventoryManifest,
+  SurfaceInventoryComplete:true,SurfaceInventorySHA256:fixtureDigest("MON037 synthetic required database surface inventory v1\n"),
   SourceEvents:events,ObservedEvents:events,
   TopicPartitions:[]TopicPartition{{Topic:"ledger",PartitionCount:1},{Topic:"message",PartitionCount:1}},
   Transactions:[]TransactionProof{{TransactionID:"tx-1",ExpectedEventCount:2,BeginObserved:true,EndObserved:true,EndEventCount:2,DataCollections:map[string]int{"public.ledger":1,"LOGICAL_DECODING_MESSAGE":1}}},
@@ -69,7 +66,7 @@ func TestConflictingDuplicateIdentityBlocks(t *testing.T){in:=fixture();e:=in.Ob
 func TestExactReplayRequiresDeduplicationProof(t *testing.T){
  in:=fixture();e:=in.ObservedEvents[0];e.Offset=11;in.ObservedEvents=append(in.ObservedEvents,e)
  expect(t,in,Indeterminate)
- in.ExactReplayDeduplicationProven=true;in.DeduplicationProofSHA256=dedupeManifest;expect(t,in,Qualified)
+ in.ExactReplayDeduplicationProven=true;in.DeduplicationProofSHA256=fixtureDigest("MON037 synthetic replay-deduplication proof v1\n");expect(t,in,Qualified)
  got:=Evaluate(in);if got.Reconciliation.DuplicateReplays!=1{t.Fatalf("duplicate replay count lost: %+v",got.Reconciliation)}
 }
 func TestPayloadMismatchBlocks(t *testing.T){in:=fixture();in.ObservedEvents[0].PayloadSHA256=dc;expect(t,in,Blocked)}
@@ -112,7 +109,7 @@ func TestOffsetPredicateMismatchBlocks(t *testing.T){
 }
 func TestSurfaceDigestMismatchBlocks(t *testing.T){in:=fixture();in.Surfaces[0].RestoredSHA256=dc;expect(t,in,Blocked)}
 func TestFullStateExclusionBlocks(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");expect(t,in,Blocked)}
-func TestRowStreamAllowsExplicitExclusion(t *testing.T){in:=fixture();in.SurfaceScope="row_stream";in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded",ExclusionManifestSHA256:exclusionManifest});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");expect(t,in,Qualified)}
+func TestRowStreamAllowsExplicitExclusion(t *testing.T){in:=fixture();in.SurfaceScope="row_stream";in.Surfaces=append(in.Surfaces,Surface{ID:"generated",Disposition:"excluded",ExclusionManifestSHA256:fixtureDigest("MON037 synthetic generated-surface exclusion manifest v1\n")});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"generated");expect(t,in,Qualified)}
 func TestUnknownSurfaceIsIndeterminate(t *testing.T){in:=fixture();in.Surfaces=append(in.Surfaces,Surface{ID:"unknown",Disposition:"unknown"});in.RequiredSurfaceIDs=append(in.RequiredSurfaceIDs,"unknown");expect(t,in,Indeterminate)}
 func TestOldPrimaryUnfencedBlocks(t *testing.T){in:=fixture();in.RestoreChecks["old_primary_fenced"]="failed";expect(t,in,Blocked)}
 func TestMissingRestoreCheckIsIndeterminate(t *testing.T){in:=fixture();delete(in.RestoreChecks,"application_write_readback");expect(t,in,Indeterminate)}
