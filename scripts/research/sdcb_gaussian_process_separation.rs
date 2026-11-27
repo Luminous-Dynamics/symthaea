@@ -479,4 +479,39 @@ mod tests {
             SeparationError::DimensionMismatch
         );
     }
+    #[test]
+    fn fixed_sample_budget_interval_sweep_matches_reference() {
+        let cases = [
+            (0.1, 0.00015987065061704870, 0.00016073049160053989),
+            (0.25, 0.00023745804022036742, 0.00023853055604418077),
+            (0.5, 0.00025683365293439291, 0.00025805588272451917),
+            (1.0, 0.00009832785422176186, 0.00009866195331746466),
+            (2.0, 0.00001574373837647426, 0.00001576533784997833),
+            (4.0, 0.00000187924026148223, 0.00000188000188800182),
+        ];
+
+        let mut best_interval = 0.0;
+        let mut best_kl = f64::NEG_INFINITY;
+        for (interval, expected_ab, expected_ba) in cases {
+            let a = response_observation_covariance(
+                LAMBDA_A, MU_A, VAR_A, interval, READOUT_VARIANCE, 32
+            ).unwrap();
+            let b = response_observation_covariance(
+                LAMBDA_B_NEAR, MU_B_NEAR, VAR_B_NEAR,
+                interval, READOUT_VARIANCE, 32
+            ).unwrap();
+            let result = compare_gaussian_processes(&a, &b).unwrap();
+
+            near(result.directional_kl.a_to_b, expected_ab, 2.0e-10);
+            near(result.directional_kl.b_to_a, expected_ba, 2.0e-10);
+            if result.directional_kl.a_to_b > best_kl {
+                best_kl = result.directional_kl.a_to_b;
+                best_interval = interval;
+            }
+        }
+
+        // Best only among this declared finite candidate grid, not a global optimum.
+        assert_eq!(best_interval, 0.5);
+    }
+
 }
