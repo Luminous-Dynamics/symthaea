@@ -19,7 +19,8 @@
       "development": 5,
       "sealed_test": 5
     },
-    "sealed_test_hidden_from_candidate_during_development": true
+    "sealed_test_hidden_from_candidate_during_development": false,
+    "public_template_visibility": "Template structures and split assignment are public in this v0 PR. HMAC-generated values remain unpredictable without the per-run secret, but the family split is not a cryptographically sealed hidden benchmark. Confirmatory sealed evaluation requires the held-out templates to move to an independent private evaluator or be regenerated from a private held-out family seed."
   },
   "candidate_output_contract": [
     "answer",
