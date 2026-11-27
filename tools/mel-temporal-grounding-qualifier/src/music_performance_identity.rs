@@ -549,6 +549,19 @@ fn validate_triad(triad: &MusicalPerformanceIdentityTriadV1, index: usize) -> Re
 
     validate_performance_stay_metadata(triad, index)?;
 
+    // Musical-FLIP must change the declared property on the same underlying
+    // performance identity; otherwise performer/take/renderer changes confound
+    // the semantic contrast.
+    if clean.take_identity_sha256 != flip.take_identity_sha256
+        || clean.performance_identity_sha256 != flip.performance_identity_sha256
+        || clean.performer_identity_sha256 != flip.performer_identity_sha256
+        || clean.renderer_identity_sha256 != flip.renderer_identity_sha256
+    {
+        return Err(format!(
+            "triads[{index}] musical-FLIP must keep take, performance, performer and renderer fixed"
+        ));
+    }
+
     if triad.target_property == MusicalIdentityPropertyV1::InstrumentFamily {
         if clean.instrument_family_sha256 == flip.instrument_family_sha256 {
             return Err(format!(
@@ -1199,6 +1212,31 @@ mod tests {
         bad.performance_stay.take_identity_sha256 = digest('7');
         bad.performance_stay.performance_identity_sha256 = digest('8');
         assert!(audit_musical_performance_identity(&case(vec![bad])).is_err());
+    }
+
+    #[test]
+    fn musical_flip_rejects_performer_take_or_renderer_confounding() {
+        let item = triad(
+            MusicalIdentityPropertyV1::ChordQuality,
+            PerformanceStayFactorV1::DifferentTakeSamePerformer,
+            MusicalFlipFactorV1::ChordQualityChange,
+        );
+
+        let mut changed_performer = item.clone();
+        changed_performer.musical_flip.performer_identity_sha256 = digest('9');
+        assert!(audit_musical_performance_identity(&case(vec![changed_performer])).is_err());
+
+        let mut changed_take = item.clone();
+        changed_take.musical_flip.take_identity_sha256 = digest('8');
+        assert!(audit_musical_performance_identity(&case(vec![changed_take])).is_err());
+
+        let mut changed_performance = item.clone();
+        changed_performance.musical_flip.performance_identity_sha256 = digest('7');
+        assert!(audit_musical_performance_identity(&case(vec![changed_performance])).is_err());
+
+        let mut changed_renderer = item;
+        changed_renderer.musical_flip.renderer_identity_sha256 = digest('6');
+        assert!(audit_musical_performance_identity(&case(vec![changed_renderer])).is_err());
     }
 
     #[test]
