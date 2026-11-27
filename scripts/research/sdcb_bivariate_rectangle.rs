@@ -22,13 +22,22 @@ const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RectangleError {
-    NonFiniteMean, NonFiniteCovariance, AsymmetricCovariance,
-    NonPositiveVariance, SingularCovarianceUnsupported,
-    IllConditionedCovarianceUnsupported, InvalidBounds,
-    NonFiniteBoundIsNaN, IntegrationDidNotConverge,
-    EvaluationBudgetExceeded, ProbabilityBelowResolution,
-    NumericFailure, InvalidThresholds, TooManyJointCells,
-    JointNormalizationFailure, MarginalizationFailure,
+    NonFiniteMean,
+    NonFiniteCovariance,
+    AsymmetricCovariance,
+    NonPositiveVariance,
+    SingularCovarianceUnsupported,
+    IllConditionedCovarianceUnsupported,
+    InvalidBounds,
+    NonFiniteBoundIsNaN,
+    IntegrationDidNotConverge,
+    EvaluationBudgetExceeded,
+    ProbabilityBelowResolution,
+    NumericFailure,
+    InvalidThresholds,
+    TooManyJointCells,
+    JointNormalizationFailure,
+    MarginalizationFailure,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,6 +60,8 @@ pub struct BivariateJointBins {
     pub second_channel_marginals: Vec<f64>,
     pub probability_sum: f64,
     pub marginalization_error: f64,
+    /// Sum of inner/outer integrand evaluations across every joint cell.
+    pub total_function_evaluations: u64,
 }
 
 fn normal_pdf(x: f64) -> f64 {
@@ -62,10 +73,14 @@ fn normal_interval(lower: f64, upper: f64) -> Result<f64, RectangleError> {
     if lower.is_nan() || upper.is_nan() || upper < lower {
         return Err(RectangleError::InvalidBounds);
     }
-    if upper == lower { return Ok(0.0); }
+    if upper == lower {
+        return Ok(0.0);
+    }
     let lo = lower.max(-CUTOFF);
     let hi = upper.min(CUTOFF);
-    if hi <= lo { return Ok(0.0); }
+    if hi <= lo {
+        return Ok(0.0);
+    }
     let row = univariate::gaussian_bin_likelihoods(0.0, 1.0, &[lo, hi])
         .map_err(|_| RectangleError::NumericFailure)?;
     let mass = row.probabilities[1];
@@ -81,18 +96,34 @@ fn simpson(a: f64, b: f64, fa: f64, fm: f64, fb: f64) -> f64 {
 }
 
 fn refine<F>(
-    f: &mut F, a: f64, b: f64, fa: f64, fm: f64, fb: f64,
-    whole: f64, abs_tol: f64, depth: usize, evals: &mut u64,
+    f: &mut F,
+    a: f64,
+    b: f64,
+    fa: f64,
+    fm: f64,
+    fb: f64,
+    whole: f64,
+    abs_tol: f64,
+    depth: usize,
+    evals: &mut u64,
+    max_evals: u64,
 ) -> Result<(f64, f64), RectangleError>
-where F: FnMut(f64) -> Result<f64, RectangleError> {
-    if *evals > MAX_EVALS { return Err(RectangleError::EvaluationBudgetExceeded); }
+where
+    F: FnMut(f64) -> Result<f64, RectangleError>,
+{
+    if evals.saturating_add(2) > max_evals {
+        return Err(RectangleError::EvaluationBudgetExceeded);
+    }
     let m = 0.5 * (a + b);
     let lm = 0.5 * (a + m);
     let rm = 0.5 * (m + b);
-    if lm == a || rm == b { return Err(RectangleError::NumericFailure); }
+    if lm == a || rm == b {
+        return Err(RectangleError::NumericFailure);
+    }
     let fl = f(lm)?;
+    *evals += 1;
     let fr = f(rm)?;
-    *evals += 2;
+    *evals += 1;
     let left = simpson(a, m, fa, fl, fm);
     let right = simpson(m, b, fm, fr, fb);
     let refined = left + right;
@@ -102,34 +133,94 @@ where F: FnMut(f64) -> Result<f64, RectangleError> {
         let corrected = refined + delta / 15.0;
         return if corrected.is_finite() && corrected >= 0.0 {
             Ok((corrected, error))
-        } else { Err(RectangleError::NumericFailure) };
+        } else {
+            Err(RectangleError::NumericFailure)
+        };
     }
-    if depth == 0 { return Err(RectangleError::IntegrationDidNotConverge); }
-    let (lv, le) = refine(f, a, m, fa, fl, fm, left, abs_tol * 0.5, depth - 1, evals)?;
-    let (rv, re) = refine(f, m, b, fm, fr, fb, right, abs_tol * 0.5, depth - 1, evals)?;
+    if depth == 0 {
+        return Err(RectangleError::IntegrationDidNotConverge);
+    }
+    let (lv, le) = refine(
+        f,
+        a,
+        m,
+        fa,
+        fl,
+        fm,
+        left,
+        abs_tol * 0.5,
+        depth - 1,
+        evals,
+        max_evals,
+    )?;
+    let (rv, re) = refine(
+        f,
+        m,
+        b,
+        fm,
+        fr,
+        fb,
+        right,
+        abs_tol * 0.5,
+        depth - 1,
+        evals,
+        max_evals,
+    )?;
     Ok((lv + rv, le + re))
 }
 
 fn add_transition_points(
-    points: &mut Vec<f64>, threshold: f64, rho: f64, conditional_sd: f64,
-    lower: f64, upper: f64,
+    points: &mut Vec<f64>,
+    threshold: f64,
+    rho: f64,
+    conditional_sd: f64,
+    lower: f64,
+    upper: f64,
 ) {
-    if !threshold.is_finite() || rho.abs() < 1.0e-8 { return; }
+    if !threshold.is_finite() || rho.abs() < 1.0e-8 {
+        return;
+    }
     let center = threshold / rho;
     let width = conditional_sd / rho.abs();
     for k in [-8.0, -4.0, 0.0, 4.0, 8.0] {
         let x = center + k * width;
-        if x > lower && x < upper { points.push(x); }
+        if x > lower && x < upper {
+            points.push(x);
+        }
     }
 }
 
 /// Compute P(lower < Y <= upper) for a two-channel Gaussian.
 /// Singular/ill-conditioned covariance is rejected; no diagonal jitter is used.
 pub fn bivariate_gaussian_rectangle(
-    mean: [f64; 2], covariance: [[f64; 2]; 2],
-    lower: [f64; 2], upper: [f64; 2],
+    mean: [f64; 2],
+    covariance: [[f64; 2]; 2],
+    lower: [f64; 2],
+    upper: [f64; 2],
 ) -> Result<BivariateRectangleEstimate, RectangleError> {
-    if mean.iter().any(|x| !x.is_finite()) { return Err(RectangleError::NonFiniteMean); }
+    let mut evaluations = 0_u64;
+    bivariate_gaussian_rectangle_with_budget(
+        mean,
+        covariance,
+        lower,
+        upper,
+        &mut evaluations,
+        MAX_EVALS,
+    )
+}
+
+fn bivariate_gaussian_rectangle_with_budget(
+    mean: [f64; 2],
+    covariance: [[f64; 2]; 2],
+    lower: [f64; 2],
+    upper: [f64; 2],
+    evaluations: &mut u64,
+    max_evaluations: u64,
+) -> Result<BivariateRectangleEstimate, RectangleError> {
+    let evaluations_at_start = *evaluations;
+    if mean.iter().any(|x| !x.is_finite()) {
+        return Err(RectangleError::NonFiniteMean);
+    }
     if covariance.iter().flatten().any(|x| !x.is_finite()) {
         return Err(RectangleError::NonFiniteCovariance);
     }
@@ -139,13 +230,20 @@ pub fn bivariate_gaussian_rectangle(
     if lower[0] > upper[0] || lower[1] > upper[1] {
         return Err(RectangleError::InvalidBounds);
     }
-    let scale = covariance.iter().flatten().fold(1.0_f64, |m, x| m.max(x.abs()));
+    // Symmetry tolerance must be relative to the covariance scale. Starting
+    // at 1.0 would silently accept grossly asymmetric sub-unit matrices.
+    let scale = covariance
+        .iter()
+        .flatten()
+        .fold(0.0_f64, |m, x| m.max(x.abs()));
     if (covariance[0][1] - covariance[1][0]).abs() > 1.0e-12 * scale {
         return Err(RectangleError::AsymmetricCovariance);
     }
     let v1 = covariance[0][0];
     let v2 = covariance[1][1];
-    if v1 <= 0.0 || v2 <= 0.0 { return Err(RectangleError::NonPositiveVariance); }
+    if v1 <= 0.0 || v2 <= 0.0 {
+        return Err(RectangleError::NonPositiveVariance);
+    }
     let s1 = v1.sqrt();
     let s2 = v2.sqrt();
     if !s1.is_finite() || !s2.is_finite() || s1 <= 0.0 || s2 <= 0.0 {
@@ -153,22 +251,33 @@ pub fn bivariate_gaussian_rectangle(
     }
     let c12 = 0.5 * (covariance[0][1] + covariance[1][0]);
     let rho = (c12 / s1) / s2;
-    if !rho.is_finite() { return Err(RectangleError::NumericFailure); }
-    if rho.abs() >= 1.0 { return Err(RectangleError::SingularCovarianceUnsupported); }
+    if !rho.is_finite() {
+        return Err(RectangleError::NumericFailure);
+    }
+    if rho.abs() >= 1.0 {
+        return Err(RectangleError::SingularCovarianceUnsupported);
+    }
     let condition = (1.0 + rho.abs()) / (1.0 - rho.abs());
-    if condition > MAX_CONDITION { return Err(RectangleError::IllConditionedCovarianceUnsupported); }
+    if condition > MAX_CONDITION {
+        return Err(RectangleError::IllConditionedCovarianceUnsupported);
+    }
 
     if lower[0] == upper[0] || lower[1] == upper[1] {
         return Ok(BivariateRectangleEstimate {
-            probability: 0.0, outer_quadrature_error_indicator: 0.0,
-            truncation_error_bound: TRUNCATION_BOUND, correlation: rho,
-            correlation_condition_estimate: condition, function_evaluations: 0,
+            probability: 0.0,
+            outer_quadrature_error_indicator: 0.0,
+            truncation_error_bound: TRUNCATION_BOUND,
+            correlation: rho,
+            correlation_condition_estimate: condition,
+            function_evaluations: 0,
         });
     }
 
     let a1 = ((lower[0] - mean[0]) / s1).max(-CUTOFF);
     let b1 = ((upper[0] - mean[0]) / s1).min(CUTOFF);
-    if b1 <= a1 { return Err(RectangleError::ProbabilityBelowResolution); }
+    if b1 <= a1 {
+        return Err(RectangleError::ProbabilityBelowResolution);
+    }
     let a2 = (lower[1] - mean[1]) / s2;
     let b2 = (upper[1] - mean[1]) / s2;
     let conditional_sd = (1.0 - rho * rho).sqrt();
@@ -183,9 +292,10 @@ pub fn bivariate_gaussian_rectangle(
     points.sort_by(f64::total_cmp);
     points.dedup_by(|a, b| (*a - *b).abs() <= 8.0 * f64::EPSILON * a.abs().max(b.abs()).max(1.0));
 
-    let max_width = (2.0 * conditional_sd / rho.abs().max(0.01)).max(0.01).min(0.5);
+    let max_width = (2.0 * conditional_sd / rho.abs().max(0.01))
+        .max(0.01)
+        .min(0.5);
     let full_width = b1 - a1;
-    let mut evals = 0_u64;
     let mut probability = 0.0;
     let mut error_indicator = 0.0;
     let mut integrand = |z1: f64| -> Result<f64, RectangleError> {
@@ -202,16 +312,23 @@ pub fn bivariate_gaussian_rectangle(
     for pair in points.windows(2) {
         let start = pair[0];
         let end = pair[1];
-        if end <= start { continue; }
+        if end <= start {
+            continue;
+        }
         let count = ((end - start) / max_width).ceil().max(1.0) as usize;
         for i in 0..count {
             let a = start + (end - start) * i as f64 / count as f64;
             let b = start + (end - start) * (i + 1) as f64 / count as f64;
             let midpoint = 0.5 * (a + b);
+            if evaluations.saturating_add(3) > max_evaluations {
+                return Err(RectangleError::EvaluationBudgetExceeded);
+            }
             let fa = integrand(a)?;
+            *evaluations += 1;
             let fm = integrand(midpoint)?;
+            *evaluations += 1;
             let fb = integrand(b)?;
-            evals += 3;
+            *evaluations += 1;
             let whole = simpson(a, b, fa, fm, fb);
             rough_probability += whole;
             segments.push((a, b, fa, fm, fb, whole));
@@ -224,8 +341,17 @@ pub fn bivariate_gaussian_rectangle(
     for (a, b, fa, fm, fb, whole) in segments {
         let local_tolerance = global_tolerance * ((b - a) / full_width);
         let (value, error) = refine(
-            &mut integrand, a, b, fa, fm, fb, whole,
-            local_tolerance, MAX_DEPTH, &mut evals,
+            &mut integrand,
+            a,
+            b,
+            fa,
+            fm,
+            fb,
+            whole,
+            local_tolerance,
+            MAX_DEPTH,
+            evaluations,
+            max_evaluations,
         )?;
         probability += value;
         error_indicator += error;
@@ -243,14 +369,36 @@ pub fn bivariate_gaussian_rectangle(
         truncation_error_bound: TRUNCATION_BOUND,
         correlation: rho,
         correlation_condition_estimate: condition,
-        function_evaluations: evals,
+        function_evaluations: evaluations.saturating_sub(evaluations_at_start),
     })
 }
 
 /// Full row-major joint categorical table for two correlated Gaussian channels.
+/// The evaluation budget is shared by every cell in the table.
 pub fn bivariate_gaussian_joint_bins(
-    mean: [f64; 2], covariance: [[f64; 2]; 2],
-    thresholds_1: &[f64], thresholds_2: &[f64],
+    mean: [f64; 2],
+    covariance: [[f64; 2]; 2],
+    thresholds_1: &[f64],
+    thresholds_2: &[f64],
+) -> Result<BivariateJointBins, RectangleError> {
+    let mut evaluations = 0_u64;
+    bivariate_gaussian_joint_bins_with_budget(
+        mean,
+        covariance,
+        thresholds_1,
+        thresholds_2,
+        &mut evaluations,
+        MAX_EVALS,
+    )
+}
+
+fn bivariate_gaussian_joint_bins_with_budget(
+    mean: [f64; 2],
+    covariance: [[f64; 2]; 2],
+    thresholds_1: &[f64],
+    thresholds_2: &[f64],
+    evaluations: &mut u64,
+    max_evaluations: u64,
 ) -> Result<BivariateJointBins, RectangleError> {
     for edges in [thresholds_1, thresholds_2] {
         for (i, x) in edges.iter().enumerate() {
@@ -261,7 +409,9 @@ pub fn bivariate_gaussian_joint_bins(
     }
     let n1 = thresholds_1.len() + 1;
     let n2 = thresholds_2.len() + 1;
-    if n1.saturating_mul(n2) > MAX_CELLS { return Err(RectangleError::TooManyJointCells); }
+    if n1.saturating_mul(n2) > MAX_CELLS {
+        return Err(RectangleError::TooManyJointCells);
+    }
 
     let mut e1 = vec![f64::NEG_INFINITY];
     e1.extend_from_slice(thresholds_1);
@@ -273,24 +423,34 @@ pub fn bivariate_gaussian_joint_bins(
     let mut probabilities = vec![vec![0.0; n2]; n1];
     for i in 0..n1 {
         for j in 0..n2 {
-            probabilities[i][j] = bivariate_gaussian_rectangle(
-                mean, covariance, [e1[i], e2[j]], [e1[i + 1], e2[j + 1]],
-            )?.probability;
+            probabilities[i][j] = bivariate_gaussian_rectangle_with_budget(
+                mean,
+                covariance,
+                [e1[i], e2[j]],
+                [e1[i + 1], e2[j + 1]],
+                evaluations,
+                max_evaluations,
+            )?
+            .probability;
         }
     }
     let first_channel_marginals: Vec<f64> =
         probabilities.iter().map(|row| row.iter().sum()).collect();
     let second_channel_marginals: Vec<f64> = (0..n2)
-        .map(|j| probabilities.iter().map(|row| row[j]).sum()).collect();
+        .map(|j| probabilities.iter().map(|row| row[j]).sum())
+        .collect();
     let probability_sum: f64 = probabilities.iter().flatten().sum();
 
     let scalar_1 = univariate::gaussian_bin_likelihoods(mean[0], covariance[0][0], thresholds_1)
         .map_err(|_| RectangleError::NumericFailure)?;
     let scalar_2 = univariate::gaussian_bin_likelihoods(mean[1], covariance[1][1], thresholds_2)
         .map_err(|_| RectangleError::NumericFailure)?;
-    let marginalization_error = first_channel_marginals.iter().zip(&scalar_1.probabilities)
+    let marginalization_error = first_channel_marginals
+        .iter()
+        .zip(&scalar_1.probabilities)
         .chain(second_channel_marginals.iter().zip(&scalar_2.probabilities))
-        .map(|(a, b)| (a - b).abs()).fold(0.0_f64, f64::max);
+        .map(|(a, b)| (a - b).abs())
+        .fold(0.0_f64, f64::max);
 
     if (probability_sum - 1.0).abs() > 1.0e-9 {
         return Err(RectangleError::JointNormalizationFailure);
@@ -299,8 +459,12 @@ pub fn bivariate_gaussian_joint_bins(
         return Err(RectangleError::MarginalizationFailure);
     }
     Ok(BivariateJointBins {
-        probabilities, first_channel_marginals, second_channel_marginals,
-        probability_sum, marginalization_error,
+        probabilities,
+        first_channel_marginals,
+        second_channel_marginals,
+        probability_sum,
+        marginalization_error,
+        total_function_evaluations: *evaluations,
     })
 }
 
@@ -308,16 +472,27 @@ pub fn bivariate_gaussian_joint_bins(
 mod tests {
     use super::*;
     fn close(a: f64, b: f64, tol: f64) {
-        assert!((a - b).abs() <= tol, "actual={a:.17e}, expected={b:.17e}, tol={tol:e}");
+        assert!(
+            (a - b).abs() <= tol,
+            "actual={a:.17e}, expected={b:.17e}, tol={tol:e}"
+        );
     }
 
     #[test]
     fn independent_channels_reduce_to_product_of_marginals() {
         let r = bivariate_gaussian_rectangle(
-            [0.0, 0.0], [[1.0, 0.0], [0.0, 1.0]], [-1.0, -0.5], [1.0, 0.8],
-        ).unwrap();
-        let p1 = univariate::gaussian_bin_likelihoods(0.0, 1.0, &[-1.0, 1.0]).unwrap().probabilities[1];
-        let p2 = univariate::gaussian_bin_likelihoods(0.0, 1.0, &[-0.5, 0.8]).unwrap().probabilities[1];
+            [0.0, 0.0],
+            [[1.0, 0.0], [0.0, 1.0]],
+            [-1.0, -0.5],
+            [1.0, 0.8],
+        )
+        .unwrap();
+        let p1 = univariate::gaussian_bin_likelihoods(0.0, 1.0, &[-1.0, 1.0])
+            .unwrap()
+            .probabilities[1];
+        let p2 = univariate::gaussian_bin_likelihoods(0.0, 1.0, &[-0.5, 0.8])
+            .unwrap()
+            .probabilities[1];
         close(r.probability, p1 * p2, 2.0e-10);
     }
 
@@ -325,44 +500,65 @@ mod tests {
     fn positive_orthant_matches_arcsine_identity() {
         let rho: f64 = 0.6;
         let r = bivariate_gaussian_rectangle(
-            [0.0, 0.0], [[1.0, rho], [rho, 1.0]],
-            [0.0, 0.0], [f64::INFINITY, f64::INFINITY],
-        ).unwrap();
-        close(r.probability, 0.25 + rho.asin() / (2.0 * std::f64::consts::PI), 2.0e-10);
+            [0.0, 0.0],
+            [[1.0, rho], [rho, 1.0]],
+            [0.0, 0.0],
+            [f64::INFINITY, f64::INFINITY],
+        )
+        .unwrap();
+        close(
+            r.probability,
+            0.25 + rho.asin() / (2.0 * std::f64::consts::PI),
+            2.0e-10,
+        );
     }
 
     #[test]
     fn negative_orthant_matches_arcsine_identity() {
         let rho: f64 = -0.75;
         let r = bivariate_gaussian_rectangle(
-            [0.0, 0.0], [[1.0, rho], [rho, 1.0]],
-            [0.0, 0.0], [f64::INFINITY, f64::INFINITY],
-        ).unwrap();
-        close(r.probability, 0.25 + rho.asin() / (2.0 * std::f64::consts::PI), 2.0e-10);
+            [0.0, 0.0],
+            [[1.0, rho], [rho, 1.0]],
+            [0.0, 0.0],
+            [f64::INFINITY, f64::INFINITY],
+        )
+        .unwrap();
+        close(
+            r.probability,
+            0.25 + rho.asin() / (2.0 * std::f64::consts::PI),
+            2.0e-10,
+        );
     }
 
     #[test]
     fn asymmetric_rectangle_matches_independent_fixture() {
         let r = bivariate_gaussian_rectangle(
-            [0.3, -0.2], [[1.0, 0.65], [0.65, 1.5]], [-0.5, -1.1], [1.2, 0.7],
-        ).unwrap();
+            [0.3, -0.2],
+            [[1.0, 0.65], [0.65, 1.5]],
+            [-0.5, -1.1],
+            [1.2, 0.7],
+        )
+        .unwrap();
         close(r.probability, 0.35895496926483, 5.0e-10);
     }
 
     #[test]
     fn correlated_rare_tail_is_preserved() {
         let r = bivariate_gaussian_rectangle(
-            [0.0, 0.0], [[1.0, 0.5], [0.5, 1.0]], [8.0, 8.0], [9.0, 9.0],
-        ).unwrap();
+            [0.0, 0.0],
+            [[1.0, 0.5], [0.5, 1.0]],
+            [8.0, 8.0],
+            [9.0, 9.0],
+        )
+        .unwrap();
         close(r.probability, 1.7805614713759896e-21, 2.0e-28);
         assert!(r.probability > 0.0);
     }
 
     #[test]
     fn joint_bins_preserve_correlation_and_marginals() {
-        let r = bivariate_gaussian_joint_bins(
-            [0.0, 0.0], [[1.0, 0.6], [0.6, 1.0]], &[0.0], &[0.0],
-        ).unwrap();
+        let r = bivariate_gaussian_joint_bins([0.0, 0.0], [[1.0, 0.6], [0.6, 1.0]], &[0.0], &[0.0])
+            .unwrap();
         close(r.probabilities[1][1], 0.35241638234956674, 2.0e-10);
         close(r.probabilities[0][0], 0.35241638234956674, 2.0e-10);
         close(r.probabilities[0][1], 0.14758361765043326, 2.0e-10);
@@ -373,8 +569,12 @@ mod tests {
     #[test]
     fn exact_duplicate_channels_are_unsupported() {
         assert_eq!(
-            bivariate_gaussian_rectangle([0.0, 0.0], [[1.0, 1.0], [1.0, 1.0]],
-                [0.0, 0.0], [1.0, 1.0]),
+            bivariate_gaussian_rectangle(
+                [0.0, 0.0],
+                [[1.0, 1.0], [1.0, 1.0]],
+                [0.0, 0.0],
+                [1.0, 1.0]
+            ),
             Err(RectangleError::SingularCovarianceUnsupported)
         );
     }
@@ -382,8 +582,12 @@ mod tests {
     #[test]
     fn ill_conditioned_covariance_is_unsupported_without_jitter() {
         assert_eq!(
-            bivariate_gaussian_rectangle([0.0, 0.0], [[1.0, 0.999999999], [0.999999999, 1.0]],
-                [-1.0, -1.0], [1.0, 1.0]),
+            bivariate_gaussian_rectangle(
+                [0.0, 0.0],
+                [[1.0, 0.999999999], [0.999999999, 1.0]],
+                [-1.0, -1.0],
+                [1.0, 1.0]
+            ),
             Err(RectangleError::IllConditionedCovarianceUnsupported)
         );
     }
@@ -391,30 +595,117 @@ mod tests {
     #[test]
     fn zero_width_rectangle_has_zero_mass() {
         let r = bivariate_gaussian_rectangle(
-            [0.0, 0.0], [[1.0, 0.3], [0.3, 1.0]], [0.2, -1.0], [0.2, 1.0],
-        ).unwrap();
+            [0.0, 0.0],
+            [[1.0, 0.3], [0.3, 1.0]],
+            [0.2, -1.0],
+            [0.2, 1.0],
+        )
+        .unwrap();
         assert_eq!(r.probability, 0.0);
     }
 
     #[test]
     fn asymmetric_covariance_and_reversed_bounds_fail_closed() {
         assert_eq!(
-            bivariate_gaussian_rectangle([0.0, 0.0], [[1.0, 0.2], [0.21, 1.0]],
-                [-1.0, -1.0], [1.0, 1.0]),
+            bivariate_gaussian_rectangle(
+                [0.0, 0.0],
+                [[1.0, 0.2], [0.21, 1.0]],
+                [-1.0, -1.0],
+                [1.0, 1.0]
+            ),
             Err(RectangleError::AsymmetricCovariance)
         );
         assert_eq!(
-            bivariate_gaussian_rectangle([0.0, 0.0], [[1.0, 0.2], [0.2, 1.0]],
-                [1.0, -1.0], [0.0, 1.0]),
+            bivariate_gaussian_rectangle(
+                [0.0, 0.0],
+                [[1.0, 0.2], [0.2, 1.0]],
+                [1.0, -1.0],
+                [0.0, 1.0]
+            ),
             Err(RectangleError::InvalidBounds)
         );
     }
 
     #[test]
+    fn covariance_symmetry_tolerance_scales_with_the_covariance() {
+        let tiny_asymmetric = [[1.0e-200, 0.6e-200], [0.6002e-200, 1.0e-200]];
+        assert_eq!(
+            bivariate_gaussian_rectangle([0.0, 0.0], tiny_asymmetric, [-1.0, -1.0], [1.0, 1.0],),
+            Err(RectangleError::AsymmetricCovariance)
+        );
+    }
+
+    #[test]
+    fn probability_is_invariant_to_channel_permutation_and_positive_rescaling() {
+        let baseline = bivariate_gaussian_rectangle(
+            [0.3, -0.2],
+            [[1.0, 0.65], [0.65, 1.5]],
+            [-0.5, -1.1],
+            [1.2, 0.7],
+        )
+        .unwrap()
+        .probability;
+        let permuted = bivariate_gaussian_rectangle(
+            [-0.2, 0.3],
+            [[1.5, 0.65], [0.65, 1.0]],
+            [-1.1, -0.5],
+            [0.7, 1.2],
+        )
+        .unwrap()
+        .probability;
+        let rescaled = bivariate_gaussian_rectangle(
+            [0.9, -0.1],
+            [[9.0, 0.975], [0.975, 0.375]],
+            [-1.5, -0.55],
+            [3.6, 0.35],
+        )
+        .unwrap()
+        .probability;
+        close(permuted, baseline, 5.0e-10);
+        close(rescaled, baseline, 5.0e-10);
+    }
+
+    #[test]
+    fn high_correlation_orthant_matches_the_analytic_identity() {
+        let rho: f64 = 0.999;
+        let r = bivariate_gaussian_rectangle(
+            [0.0, 0.0],
+            [[1.0, rho], [rho, 1.0]],
+            [0.0, 0.0],
+            [f64::INFINITY, f64::INFINITY],
+        )
+        .unwrap();
+        close(
+            r.probability,
+            0.25 + rho.asin() / (2.0 * std::f64::consts::PI),
+            5.0e-10,
+        );
+    }
+
+    #[test]
+    fn joint_bin_table_has_one_shared_evaluation_budget() {
+        let mut evaluations = 0_u64;
+        let result = bivariate_gaussian_joint_bins_with_budget(
+            [0.0, 0.0],
+            [[1.0, 0.7], [0.7, 1.0]],
+            &[-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0],
+            &[-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0],
+            &mut evaluations,
+            256,
+        );
+        assert_eq!(result, Err(RectangleError::EvaluationBudgetExceeded));
+        assert!(evaluations <= 256);
+    }
+
+    #[test]
     fn integration_reports_diagnostics_and_stays_bounded() {
         let r = bivariate_gaussian_rectangle(
-            [0.0, 0.0], [[1.0, 0.4], [0.4, 1.0]], [-1.0, -1.0], [1.0, 1.0],
-        ).unwrap();
+            [0.0, 0.0],
+            [[1.0, 0.4], [0.4, 1.0]],
+            [-1.0, -1.0],
+            [1.0, 1.0],
+        )
+        .unwrap();
         assert!(r.function_evaluations <= MAX_EVALS);
         assert!(r.outer_quadrature_error_indicator.is_finite());
         assert!(r.truncation_error_bound > 0.0);
