@@ -408,7 +408,7 @@ fn threshold_stats(rows: &[&CalibrationExampleV1], threshold: f64, loss_limit: f
     let mut unsafe_clusters=0;
     let mut coverage_sum=0.0;
     let mut loss_sum=0.0;
-    for (_id,(total,accepted,unsafe_cluster,loss,count)) in &clusters {
+    for (total,accepted,unsafe_cluster,loss,count) in clusters.values() {
         if *accepted>0 {
             accepted_clusters+=1;
             unsafe_clusters+=usize::from(*unsafe_cluster);
@@ -528,8 +528,9 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
         }else{
             let mut stats=Vec::new();
             for threshold in &config.thresholds{
-                if let Some(value)=threshold_stats(&rows,*threshold,config.unacceptable_loss_threshold,adjusted_delta){
-                    if value.accepted_clusters>=config.minimum_independent_clusters{stats.push(value);}
+                if let Some(value)=threshold_stats(&rows,*threshold,config.unacceptable_loss_threshold,adjusted_delta)
+                    && value.accepted_clusters>=config.minimum_independent_clusters {
+                    stats.push(value);
                 }
             }
             if let Some(best)=stats.iter().filter(|s|s.risk_upper<=config.risk_target_alpha).max_by(|a,b|{
@@ -570,10 +571,10 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
         }
 
         if matches!(cert.status,RiskStatusV1::NotEstimableInsufficientCalibrationClusters|RiskStatusV1::NotEstimableNoCalibrationClusters)
-            &&group.allow_parent_fallback{
-            if let Some(parent_id)=group.parent_group_id.as_deref(){
-                if let Some(parent)=certificates.get(parent_id){
-                    if parent.is_usable(){
+            &&group.allow_parent_fallback
+            &&let Some(parent_id)=group.parent_group_id.as_deref()
+            &&let Some(parent)=certificates.get(parent_id)
+            &&parent.is_usable(){
                         cert.status=RiskStatusV1::ParentGroupFallback;
                         cert.threshold=parent.threshold;
                         cert.accepted_example_count=parent.accepted_example_count;
@@ -587,9 +588,6 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
                         cert.certificate_scope=CertificateScopeV1::ParentFallback;
                         cert.parent_fallback_group_id=Some(parent.group_id.clone());
                         cert.parent_fallback_certificate_sha256=Some(parent.certificate_sha256.clone());
-                    }
-                }
-            }
         }
         certificates.insert(group.group_id.clone(),finish_certificate(cert)?);
     }
