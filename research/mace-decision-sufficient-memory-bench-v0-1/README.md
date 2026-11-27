@@ -339,4 +339,4 @@ A standalone Rust reference implementation now exists under [reference-evaluator
 
 The implementation does not create a process sandbox, sign candidate data, or independently measure resource counters. Candidate/evaluator isolation and sealed-label custody remain deployment requirements. Exact-head compilation, tests, formatting and Clippy are pending; no CI pass or MACE score is claimed.
 
-See [MACE DSM benchmark frontier, 27 November 2026](../../../../docs/research/MACE_DSM_BENCHMARK_FRONTIER_2026-11-27.md) for the current external comparison and preregisterable target ladder.
+See [MACE DSM benchmark frontier, 27 November 2026](../../docs/research/MACE_DSM_BENCHMARK_FRONTIER_2026-11-27.md) for the current external comparison and preregisterable target ladder.
