@@ -100,7 +100,7 @@ Official results were released on 19 November 2026 and contain separate commerci
 - Multimodal: Khipu, **43.26 overall**.
 - Coding: InsightMem, **63.33% overall resolved**.
 
-The commercial Textual leader MemoraX reports **69.26**; commercial Multimodal MemoraX reports **53.68**; commercial Coding reports **68.00% overall resolved**. These are different tracks and metrics, not directly comparable numbers. AML also reports capability-level scores (for example temporal reasoning, governance, privacy and streaming), which are more informative than the overall rank for system diagnosis.
+The commercial Textual leader MemoraX reports **69.26**; commercial Multimodal MemoraX reports **53.68**; commercial Coding reports **68.00% overall resolved**. These are different tracks and metrics, not directly comparable numbers. AML also reports capability-level scores (for example temporal reasoning, governance, privacy and streaming), which are more informative than the overall rank for system diagnosis. The official result release records 402 full evaluation tasks, 333 completed successfully, 41 corrected after compliance/completeness review and 292 valid leaderboard records; therefore a reproduced comparison must bind to the official task/version and corrected result set, not an informal scrape.
 
 **MACE target:** implement a strict AML-compatible Add/Search adapter only after the live schema and model-use rules are rechecked. Report its official AML track score separately from native MACE causal decision utility. Aim first to reproduce an open-method baseline and its capability profile; then improve the temporal, governance, epistemic-safety and streaming dimensions without regressing the other capabilities.
 
@@ -385,6 +385,20 @@ In the independent-block arm, calibration `rho=0.05` → test `rho=0.95` reduced
 The implication is sharper than ordinary marginal drift: **an unchanged pointwise marginal does not guarantee an unchanged block-score distribution or exchangeable block scores**. Embargo addresses cross-block dependence only; it cannot repair the independent-block score-distribution shift. An evidence-qualified SDCB result therefore needs an explicit, frozen dependence/score envelope and should return `NotQualified` or `Inconclusive` when diagnostics cannot establish that the observed regime remains inside it.
 
 This is specific to two stationary Gaussian AR(1) regimes, block-max scores, 39 calibration blocks, alpha=.10, the tested grid and 2,500 trials per condition. The 36-condition report is an initial diagnostic, not a universal guarantee, production detector or physical calibration. Confirmatory work must add independent seeds, more trials, negative rho, heavy tails, latent common causes, drift and held-out regimes.
+
+### 9.8 MACE pairwise evidence interaction (implementation pending exact-head qualification)
+
+The MACE evaluator already supports paired memory/no-memory decision loss, frozen-policy leave-one-out interventions, cost receipts and world-cluster bootstrap. A new research increment adds second-order pairwise interventions to expose non-additive evidence effects that leave-one-out cannot identify.
+
+For full evidence (E), define (L(E)) as evaluator decision loss under the exact frozen downstream policy and seed. The pair interaction for items (i,j) is:
+
+`I_ij = L(E\\{i,j}) - L(E\\{i}) - L(E\\{j}) + L(E)`
+
+Positive values mean joint removal is more harmful than the sum of individual removals (complementarity); negative values mean substitution/redundancy. The implementation requires a complete single-item ablation set, every unordered pair, and exact policy/system/episode/seed identity. It uses integer micro-loss and does not expose evaluator labels to candidate memory.
+
+Code head `264d4350c373a2b5f3ddf273205da0deec647e3b` adds `score_pairwise_interactions` and a known-answer redundancy/synergy control. The spec is in `research/mace-decision-sufficient-memory-bench-v0-1/PAIRWISE_EVIDENCE_INTERACTION_V0_1.md`. Exact-head Rust 1.96 formatting, compilation and test result are pending; the earlier parent evaluator and BM25 adapter qualifications remain the evidence baseline. This extension is not a Shapley value or an estimate of interactions beyond second order.
+
+The next target is to report pair interaction distributions by evidence family, conflict type and cost, with uncertainty resampled at independent world-cluster level. Do not sum pair interactions into a single “memory value” because higher-order effects can remain and pair terms can double-count.
 
 ### 9.7 Heavy-tailed common-scale regime shift
 
