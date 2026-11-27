@@ -1,26 +1,28 @@
 # MON-028 scorer module
 
-Standard-library Go 1.23 package. No network access or third-party dependency is required.
+Go 1.23, standard-library benchmark logic plus the MON-026 verifier as a local module dependency. No network access or third-party package is needed.
 
 ## 1. Prepare and sign the independent suite
 
-The benchmark authority authors a suite JSON conforming to `../SUITE-v1.schema.json`. It fixes case identities, families, expected verdicts, replicate counts, fault-matrix digest, oracle digest, workload, environment and resource budget.
+The benchmark authority authors a suite JSON conforming to `../SUITE-v1.schema.json`. It fixes case identities, fault families, expected verdicts, replicate counts, fault-matrix/oracle/workload/environment/resource digests.
 
-Compute the suite digest:
+Compute its canonical digest:
 
 ```sh
 go run ./cmd/suite-digest --suite ../SUITE-example.json
 ```
 
-Sign/custody the suite with MON-026/027. Distribute the same signed suite to every benchmark operator. Do not let a candidate system author expected outcomes.
+Package the suite as a raw artifact through MON-027, sign it using a dedicated suite-authority key, and retain the signed MON-026 manifest separately from the exact artifact root. Distribute that same custody-verified suite to every operator.
 
-## 2. Candidate result file
+## 2. Produce and independently attest result artifacts
 
-The system under test emits a result JSON conforming to `../RESULT-v1.schema.json`. Each assigned case/replicate must appear exactly once. The benchmark authority first computes the digest with `go run ./cmd/suite-digest --suite ../SUITE-example.json`, then includes the suite file in a MON-027 external-signing bundle. The scoring CLI verifies that signed MON-026 bundle before loading its suite artifact. A result entry contains only its observed verdict and execution state; it does not contain an expected verdict.
+The SUT emits a result JSON conforming to `../RESULT-v1.schema.json`. It contains observed verdicts only; it must not contain expected outcomes. Every assigned case/replicate appears exactly once. Skipped, timed-out and infrastructure-error outcomes remain represented and do not qualify.
 
-Every executed observation must include a SHA-256 of its result record and an evidence-bundle digest. Skipped, timed-out and infrastructure-error observations remain represented but cannot carry a verdict.
+An independent benchmark observer—not the SUT—reviews the run receipts and packages the result file through MON-027 under a separate custody identity. The suite-authority and result-observer public keys must be distinct. The result bundle may also contain the baseline result as a second declared artifact.
 
 ## 3. Score and compare
+
+The scorer first verifies both custody bundles with independently supplied public keys, exact run IDs, sequences and predecessor roots. It rejects raw, unsigned suite/result JSON as scoring authority.
 
 ```sh
 go run ./cmd/score \
@@ -31,49 +33,45 @@ go run ./cmd/score \
   --suite-public-key-hex "$BENCHMARK_AUTHORITY_ED25519_PUBLIC_KEY_HEX" \
   --suite-run-id benchmark-suite-release-001 \
   --suite-sequence 1 \
-  --clock-domain benchmark-attestation-clock \
-  --max-age 8760h \
-  --max-clock-uncertainty 100ms \
-  --result ./candidate-result.json
+  --suite-clock-domain benchmark-authority-clock \
+  --suite-max-age 8760h \
+  --suite-max-clock-uncertainty 100ms \
+  --result-bundle-root ./result-bundle/artifacts \
+  --result-manifest ./result-bundle/manifest.signed.json \
+  --result-artifact candidate-result.json \
+  --result-key-id independent-benchmark-observer-2026 \
+  --result-public-key-hex "$BENCHMARK_OBSERVER_ED25519_PUBLIC_KEY_HEX" \
+  --result-run-id benchmark-observation-001 \
+  --result-sequence 1 \
+  --result-clock-domain benchmark-observer-clock \
+  --result-max-age 24h \
+  --result-max-clock-uncertainty 100ms
 
-# Optional baseline comparison. Both must use the same suite, workload,
-# fault matrix, environment, resource budget and full case/replicate set.
-go run ./cmd/score \
-  --suite-bundle-root ./suite-bundle/artifacts \
-  --suite-manifest ./suite-bundle/manifest.signed.json \
-  --suite-artifact SUITE.json \
-  --suite-key-id benchmark-authority-2026 \
-  --suite-public-key-hex "$BENCHMARK_AUTHORITY_ED25519_PUBLIC_KEY_HEX" \
-  --suite-run-id benchmark-suite-release-001 \
-  --suite-sequence 1 \
-  --clock-domain benchmark-attestation-clock \
-  --max-age 8760h \
-  --max-clock-uncertainty 100ms \
-  --result ./candidate-result.json \
-  --baseline ./baseline-result.json
+# Optional paired baseline comparison. The baseline must be another declared
+# artifact in the same signed result bundle and must use the same suite,
+# workload, fault matrix, environment, resource budget and replicate set.
+# Add:
+#   --baseline-artifact baseline-result.json
 ```
 
-Exit codes: 0 safety gate passed, 2 malformed/unsafe result or safety-gate failure, 3 campaign incomplete, 64 CLI usage error, 65 JSON parse error, 66 file access error, 70 output error.
+For sequence 2 or later, also supply `--suite-previous-root` and `--result-previous-root` with independently retained chain heads.
+
+Exit codes: 0 safety gate passed, 2 malformed/unsafe result or gate failure, 3 incomplete/indeterminate custody, 64 CLI usage error, 65 JSON parse error, 70 output error.
 
 ## 4. Verification commands
 
 ```sh
-gofmt -w .
-go vet ./...
-go test ./...
-go test -race ./...
-go test -run '^$' -fuzz FuzzPairKeyDeterministic -fuzztime=30s
-go test -run '^$' -bench BenchmarkScoreRun -benchmem -count=10
+bash ../CHECKS.sh
 ```
 
-The performance target is measured separately from the target system's recovery RTO.
+The script runs gofmt, vet, unit tests, race tests, fuzzing and the scorer benchmark. It does not run PostgreSQL/Kafka/PITR experiments.
 
 ## Statistical interpretation
 
-The aggregate and per-family false-qualified rates use the completed unsafe-case denominator. Planned unsafe observations are always reported separately. Incomplete campaigns cannot pass the safety gate. The one-sided Wilson 95% upper bound is an approximate screening interval; common-host, common-reset and common-injector clustering requires cluster-aware confirmatory analysis.
+Aggregate and per-family false-qualified rates use the completed unsafe-case denominator. Planned unsafe observations are reported separately. Incomplete campaigns cannot pass the safety gate. The one-sided Wilson 95% upper bound is an approximate screening interval; common-host, common-reset and common-injector clustering requires cluster-aware confirmatory analysis.
 
-A score file is a derived artifact. Preserve the signed suite, raw SUT outputs, per-case evidence artifacts and score report together under MON-026/027 custody.
+A score report is a derived artifact. Preserve the suite custody bundle, result custody bundle, raw SUT histories, per-case receipts and score report together under MON-026/027 custody.
 
 ## Suite identity
 
-`ComputeSuiteDigest` uses a MON-028 domain separator and a length-prefixed binary encoding with fixed field order. The case list is sorted by CaseID before hashing. The encoding is independent of JSON key order, whitespace and serializer-specific escaping. The suite still needs an external MON-026/027 custody signature to establish provenance.
+`ComputeSuiteDigest` uses a MON-028 domain separator and a length-prefixed binary encoding with fixed field order. Cases are sorted by CaseID before hashing. The encoding is independent of JSON key order, whitespace and serializer-specific escaping. The digest does not replace an external MON-026/027 custody signature.
