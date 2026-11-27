@@ -412,17 +412,6 @@ fn mode_vectors(value: &Value, key: &str) -> Result<Vec<[i64; 3]>, String> {
     Ok(vectors)
 }
 
-fn integer_array(value: &Value, key: &str) -> Result<Vec<i64>, String> {
-    array_at(value, key)?
-        .iter()
-        .map(|entry| {
-            entry
-                .as_i64()
-                .ok_or_else(|| format!("{key} entries must be integers"))
-        })
-        .collect()
-}
-
 fn string_array(value: &Value, key: &str) -> Result<Vec<String>, String> {
     array_at(value, key)?
         .iter()
