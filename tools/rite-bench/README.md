@@ -67,7 +67,7 @@ These are proposed stretch goals for Symthaea and the Luminous evaluation stack.
 |---|---|---|
 | SCI-AGENT-EXAM | The October 2026 paper reports a leading mean score of 80.9, while 26.0% of that system's runs exceed the 0.95 success threshold. | Mean >=85 and >=70% of runs above 0.95, on the same task release and evaluation protocol. Publish both, plus each task-type/domain breakdown. |
 | DeepResearch Bench II | 132 tasks and 9,430 expert-derived binary rubrics; its paper reports the strongest evaluated systems below 50% rubric satisfaction. The public leaderboard has since migrated and reports a GPT-5.5 judge change. | >=60% rubric pass under a pinned judge version; re-run all baselines after any judge migration. |
-| Autonomous Science Bench 0.1 | Six pilot tasks; ten configurations ran three trials per task. The top reported configuration resolved 72.2% of trials at $190.23 total. The benchmark authors explicitly caution that small differences with three trials are not meaningful. | >=80% resolution with lower cost per resolution than the matched baseline; expand to >=20 trials per task before a superiority claim. |
+| Autonomous Science Bench 0.1 | Six pilot tasks; ten configurations ran three trials per task. The top reported configuration resolved 72.2% of trials at $190.23 total. The benchmark authors explicitly caution that small differences with three trials are not meaningful. | >=80% resolution with lower cost per resolution than the matched baseline. Treat >=20 repetitions per task as exploratory only; require more campaigns and a pre-registered paired power analysis before claiming superiority. |
 | BrowseComp | 1,266 hard-to-find, short-answer browsing tasks; its authors note that this format is not equivalent to open-ended research reports. | Establish a same-version, same-tool baseline first; target >=5 percentage-point improvement with paired confidence intervals and no hidden increase in cost. |
 
 Internal qualification gates to trial on expert-authored, sealed tasks:
@@ -86,6 +86,15 @@ Internal qualification gates to trial on expert-authored, sealed tasks:
 | Declared resource-budget compliance | 100% |
 
 These internal thresholds are qualification gates, not averages to optimize at the expense of another axis. For example, an agent cannot compensate for an unsafe or unsupported claim by being cheaper or faster. Publish coverage and every denominator next to each rate.
+
+## Statistical reporting protocol
+
+- Match the official task split, evaluator, judge version, tools, prompts, scaffold, and resource caps before comparing scores.
+- Use all available tasks; report task-level scores and domain/task-type slices, not only pooled averages.
+- Repeat stochastic configurations across independent seeds. Three trials per task are useful as a pilot but do not support small-difference claims. Twenty repetitions per task are still exploratory unless the task set is broad enough and a power calculation supports the claim.
+- For a superiority claim, pre-register the minimum effect of interest, use paired runs on the same tasks and seeds, and report task-clustered bootstrap confidence intervals or an appropriate hierarchical model. Account for multiple comparisons when testing many configurations.
+- Report cost, latency, resource use, failure rate, abstention, and reliability alongside outcome quality. Separate best-of-N results from single-run results.
+- Do not infer broad research capability from BrowseComp alone: short-answer fact finding and long-form research artifacts are different workload distributions. Likewise, six pilot lab campaigns do not establish broad autonomous-science generalization.
 
 ## External benchmark references
 
