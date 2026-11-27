@@ -34,6 +34,8 @@ event contract.
 - [Dynamic temporal attention](SYMTHAEA_DYNAMIC_TEMPORAL_ATTENTION_V0_1_2026-11-27.md)
 - [Consent and presentation policy](SYMTHAEA_EMBODIMENT_CONSENT_POLICY_V0_1_2026-11-27.md)
 - [Deterministic scene compiler](SYMTHAEA_EMBODIMENT_SCENE_COMPILER_V0_1_2026-11-27.md)
+- [Scene frame schema](SYMTHAEA_EMBODIMENT_SCENE_SCHEMA_V1_2026-11-27.json)
+- [Scene frame fixtures](SYMTHAEA_EMBODIMENT_SCENE_FIXTURES_V1_2026-11-27.json)
 - [Presentation outcome receipts](SYMTHAEA_PRESENTATION_OUTCOME_RECEIPTS_V0_1_2026-11-27.md)
 - [Presentation receipt schema](SYMTHAEA_PRESENTATION_RECEIPT_SCHEMA_V1_2026-11-27.json)
 - [Presentation receipt fixtures](SYMTHAEA_PRESENTATION_RECEIPT_FIXTURES_V1_2026-11-27.json)
