@@ -75,6 +75,8 @@ type PartitionCapture struct {
  LogStartOffsetAtEnd int64 `json:"log_start_offset_at_end"`
  LastStableOffsetBefore int64 `json:"last_stable_offset_before"`
  LastStableOffsetAfter int64 `json:"last_stable_offset_after"`
+ HighWatermarkBefore int64 `json:"high_watermark_before"`
+ HighWatermarkAfter int64 `json:"high_watermark_after"`
  LeaderEpochBefore int32 `json:"leader_epoch_before"`
  LeaderEpochAfter int32 `json:"leader_epoch_after"`
  IsolationLevel string `json:"isolation_level"`
@@ -240,9 +242,9 @@ func Evaluate(in Input)Result{
  if expectedPartitions>MaxPartitions{f.block("partition_limit_exceeded","declared topic partition count exceeds v1 limit")}
 
  type position struct{topic string;partition int;offset int64}
+ type partitionKey struct{topic string; partition int}
  capturedByPosition:=map[position]CapturedRecord{}
  rangeByPartition:=map[partitionKey]PartitionCapture{}
- type partitionKey struct{topic string; partition int}
  recordTotal:=0
  for _,p:=range in.PartitionCaptures{
   t,ok:=inventory[p.ClusterID+"\x00"+p.Topic]
