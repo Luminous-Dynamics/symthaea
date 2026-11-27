@@ -13,6 +13,8 @@ The MON-025 fault matrix is the scenario schedule, not the sole source of expect
 - an unsafe control marked qualified;
 - workload/environment/resource profiles with the wrong profile identity.
 
+The default 30 replicates over 41 MON-025 cases produces 1,230 planned observations. The oracle has a different role from the fault matrix: it independently declares the expected verdict and family. The generator requires all matrix IDs to exist in the oracle, rejects extra oracle entries, and checks the matrix's embedded expected_outcome against the separately authored oracle.
+
 From this module directory:
 
 ```sh
