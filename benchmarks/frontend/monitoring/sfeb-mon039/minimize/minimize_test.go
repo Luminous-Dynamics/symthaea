@@ -248,3 +248,23 @@ func TestEmptyFaultSetUsesCanonicalJSONArrayDigest(t *testing.T) {
 		t.Fatalf("empty fault set digest mismatch: got %s want %s", got, expected)
 	}
 }
+
+
+func TestMissingInitialFaultArrayIsNotAnExplicitEmptySet(t *testing.T) {
+	o:=makeObservation([]string{},Qualified,testDigest("clean"),codeRevision,true)
+	in:=baseInput(nil,[]Observation{o})
+	got:=Minimize(in)
+	if got.CampaignVerdict!=Blocked {
+		t.Fatalf("omitted initial fault array must block: %+v",got)
+	}
+}
+
+func TestMissingObservationFaultArrayIsRejected(t *testing.T) {
+	o:=makeObservation([]string{},Blocked,testDigest("failure"),codeRevision,true)
+	o.FaultIDs=nil
+	in:=baseInput([]string{},[]Observation{o})
+	got:=Minimize(in)
+	if got.CampaignVerdict!=Blocked {
+		t.Fatalf("omitted observation fault array must block: %+v",got)
+	}
+}
