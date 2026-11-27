@@ -349,6 +349,16 @@ The structural replay-capsule child #13954 passed rustfmt, 39/39 isolated tests 
 
 The workspace-glob/lockfile repair #13840 passed the exact-head glob checker, cargo metadata --locked and scoped root-workspace STT formatting on head 08bf1f34b7bef0b131926de0cb5339d445ca989c. This is a build-discovery/metadata gate, not full application/workspace test success. Excluded source-only directories are not thereby repaired.
 
+### 9.6 SDCB identical-marginal dependence-regime shift
+
+The new child research increment #13986 tests calibration-to-test dependence changes while preserving the stationary one-step `N(0,1)` marginal. Its exact-source Rust 1.96 workflow passed formatting and **4/4 unit controls** and completed 36 conditions × 2,500 trials = **90,000 trials** on source head `969a7344bb392ab63b98d40e43b2d673bfe640ec` ([workflow](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46002051862), [CSV + manifest](https://github.com/Luminous-Dynamics/symthaea/actions/runs/46002051862/artifacts/15197659974)).
+
+In the independent-block arm, calibration `rho=0.05` → test `rho=0.95` reduced the nominal 10% alarm rate to **3.88%** for block length 8 (Wilson 95%: 3.191–4.711%) and **3.72%** for length 32 (3.046–4.536%). Reversing the shift (`rho=0.95` → `0.05`) raised the rate to **27.12%** for length 8 (25.413–28.897%) and **30.12%** for length 32 (28.353–31.948%). At block length 1, independent arms remain near nominal in both directions (10.96% and 9.40%), showing that the aggregate score—not the pointwise marginal—has shifted. Serial-path dependence creates an additional violation: the high-to-low, length-1, no-gap condition is 18.68%.
+
+The implication is sharper than ordinary marginal drift: **an unchanged pointwise marginal does not guarantee an unchanged block-score distribution or exchangeable block scores**. Embargo addresses cross-block dependence only; it cannot repair the independent-block score-distribution shift. An evidence-qualified SDCB result therefore needs an explicit, frozen dependence/score envelope and should return `NotQualified` or `Inconclusive` when diagnostics cannot establish that the observed regime remains inside it.
+
+This is specific to two stationary Gaussian AR(1) regimes, block-max scores, 39 calibration blocks, alpha=.10, the tested grid and 2,500 trials per condition. The 36-condition report is an initial diagnostic, not a universal guarantee, production detector or physical calibration. Confirmatory work must add independent seeds, more trials, negative rho, heavy tails, latent common causes, drift and held-out regimes.
+
 ## References
 
 - AML Cycle 2 official results (19 November 2026): https://agentmemoryleaderboard.ai/results/cycle-2/
