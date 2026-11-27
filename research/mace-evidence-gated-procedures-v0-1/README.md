@@ -63,7 +63,7 @@ A separate evaluator/verifier issues one of:
 
 The receipt binds the proposal digest, verifier identity and version, source-evidence audit, isolated replay results, negative-control results, policy checks, environment digest, validity interval, predecessor/revocation lineage and an attestation signature.
 
-The candidate/compiler does not possess the signing authority. A receipt is valid only when its signature is verified against an out-of-band trust root and the proposal digest matches exactly. The schema is a proposed contract; no signer, key service or verifier is implemented by this increment.
+The candidate/compiler does not possess the signing authority. A receipt is valid only when its signature is verified against an out-of-band trust root and the proposal digest matches exactly. The schema is a proposed contract; no signer, key service or verifier is implemented by this increment. The receipt records RFC 8785 JSON Canonicalization Scheme (JCS) as the canonicalization method and the SHA-256 digest of the signed payload. The Ed25519 signature covers the canonical receipt payload with the attestation object excluded, preventing recursive self-signing. The verifier must recompute both the payload digest and signature before honoring an admission.
 
 ### 3. Runtime-use receipt — per-invocation evidence
 
@@ -79,7 +79,7 @@ Every invocation records:
 - failure, compensation, rollback or escalation;
 - independently verified terminal outcome.
 
-A skill's past admission does not replace checking current applicability, authorization and source status at runtime.
+A skill's past admission does not replace checking current applicability, authorization and source status at runtime. The runtime-use schema fails closed: revoked/inactive dependencies, applicability mismatch, denied authorization or any failed/unknown/not-checked precondition prohibit step execution. A successful outcome requires active dependencies, matched applicability, authorization, completed steps, passing postconditions and a verified outcome other than unverified.
 
 ## Lifecycle and trust boundaries
 
@@ -159,4 +159,4 @@ Do not compare Zep's reported transfer gains with MACE results unless task sets,
 
 ## Current status and non-claims
 
-This branch contains a research specification, three JSON Schemas and one synthetic candidate proposal fixture. The fixture was read back and its JSON structure, step/source-event references and absence of self-asserted trust fields were checked. The JSON Schemas have been parsed as JSON but have not yet been run through a full JSON Schema validator. No procedure compiler, admission authority, signer/key service, replay sandbox, runtime guard, benchmark adapter, test result, transfer improvement or production feature is implemented. Vendor results are not MACE results.
+This branch contains a research specification, three JSON Schemas and one synthetic candidate proposal fixture. The fixture was read back and its JSON structure, step/source-event references and absence of self-asserted trust fields were checked. The JSON Schemas have been parsed as JSON but have not yet been run through a full Draft 2020-12 JSON Schema validator. Cross-artifact invariants such as digest/signature verification, time ordering, replay-count reconciliation and dependency invalidation still require executable validation outside JSON Schema. No procedure compiler, admission authority, signer/key service, replay sandbox, runtime guard, benchmark adapter, test result, transfer improvement or production feature is implemented. Vendor results are not MACE results.
