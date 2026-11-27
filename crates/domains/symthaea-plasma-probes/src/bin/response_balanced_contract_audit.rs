@@ -105,7 +105,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
         "independent_finite_difference_cross_check_required",
     ] {
         if !boolean(linearization, key)? {
-            return Err(format!("linearization requirement {key} cannot be disabled"));
+            return Err(format!(
+                "linearization requirement {key} cannot be disabled"
+            ));
         }
     }
     require_string(
@@ -117,7 +119,10 @@ fn audit(fixture: &Value) -> Result<(), String> {
     let horizon = field(fixture, "prediction_horizon")?;
     let horizon_start = number(horizon, "start_time")?;
     let horizon_end = number(horizon, "end_time")?;
-    if horizon_start != checkpoint_time || horizon_end <= horizon_start || horizon_end > maximum_time {
+    if horizon_start != checkpoint_time
+        || horizon_end <= horizon_start
+        || horizon_end > maximum_time
+    {
         return Err("prediction horizon is not aligned to the frozen checkpoint".to_owned());
     }
 
@@ -212,7 +217,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
                     || time > maximum_application_time
                     || time >= horizon_end
                 {
-                    return Err(format!("{split_name}/{trial_id} has a pulse outside the registered family"));
+                    return Err(format!(
+                        "{split_name}/{trial_id} has a pulse outside the registered family"
+                    ));
                 }
             }
 
@@ -253,22 +260,25 @@ fn audit(fixture: &Value) -> Result<(), String> {
     if training_second.is_empty() || held_out_second.is_empty() {
         return Err("training or held-out second-pulse cohort is empty".to_owned());
     }
-    if !held_out_second
-        .iter()
-        .any(|held| !training_second.iter().any(|train| same_number(held, train, "phase_rad")))
-    {
+    if !held_out_second.iter().any(|held| {
+        !training_second
+            .iter()
+            .any(|train| same_number(held, train, "phase_rad"))
+    }) {
         return Err("held-out second pulses do not vary phase beyond training".to_owned());
     }
-    if !held_out_second
-        .iter()
-        .any(|held| !training_second.iter().any(|train| same_number(held, train, "kick_amplitude")))
-    {
+    if !held_out_second.iter().any(|held| {
+        !training_second
+            .iter()
+            .any(|train| same_number(held, train, "kick_amplitude"))
+    }) {
         return Err("held-out second pulses do not vary amplitude beyond training".to_owned());
     }
-    if !held_out_second
-        .iter()
-        .any(|held| !training_second.iter().any(|train| same_integer(held, train, "spatial_mode")))
-    {
+    if !held_out_second.iter().any(|held| {
+        !training_second
+            .iter()
+            .any(|train| same_integer(held, train, "spatial_mode"))
+    }) {
         return Err("held-out second pulses do not vary spatial mode beyond training".to_owned());
     }
 
@@ -321,7 +331,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
     }
     for qoi in string_array(convergence, "convergence_observables")? {
         if !qoi_ids.contains(&qoi) {
-            return Err(format!("convergence observable {qoi} is not a registered QoI"));
+            return Err(format!(
+                "convergence observable {qoi} is not a registered QoI"
+            ));
         }
     }
 
@@ -331,7 +343,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
         "adaptive_symplectic_particle_vlasov_rom",
     ] {
         if !prior_art.iter().any(|value| value == method) {
-            return Err(format!("methodological prior-art entry {method} is missing"));
+            return Err(format!(
+                "methodological prior-art entry {method} is missing"
+            ));
         }
     }
     let comparators = string_array(fixture, "comparators")?;
@@ -367,10 +381,19 @@ fn audit(fixture: &Value) -> Result<(), String> {
 
     let response_qualification = field(fixture, "response_qualification")?;
     if !boolean(response_qualification, "checkpoint_state_residual_required")?
-        || !boolean(response_qualification, "future_pulse_injection_residual_required")?
-        || !boolean(response_qualification, "nonlinear_full_order_response_required")?
+        || !boolean(
+            response_qualification,
+            "future_pulse_injection_residual_required",
+        )?
+        || !boolean(
+            response_qualification,
+            "nonlinear_full_order_response_required",
+        )?
     {
-        return Err("both linearized response channels and nonlinear full-order response are mandatory".to_owned());
+        return Err(
+            "both linearized response channels and nonlinear full-order response are mandatory"
+                .to_owned(),
+        );
     }
     if number(response_qualification, "cvar_alpha")? != 0.9
         || string(response_qualification, "residual_threshold_status")?
@@ -396,7 +419,10 @@ fn audit(fixture: &Value) -> Result<(), String> {
         || boolean(scalar_search, "boundary_only_search_sufficient")?
         || !boolean(scalar_search, "full_order_confirmation_required")?
     {
-        return Err("adversarial pulse search must include interior points and full-order confirmation".to_owned());
+        return Err(
+            "adversarial pulse search must include interior points and full-order confirmation"
+                .to_owned(),
+        );
     }
     require_string(
         scalar_search,
@@ -421,7 +447,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
     let parameter_axes = string_array(scalar_search, "continuous_parameter_axes")?;
     for axis in ["pulse_phase", "kick_amplitude", "pulse_separation"] {
         if !parameter_axes.iter().any(|value| value == axis) {
-            return Err(format!("continuous adversarial search axis {axis} is missing"));
+            return Err(format!(
+                "continuous adversarial search axis {axis} is missing"
+            ));
         }
     }
 
@@ -435,7 +463,9 @@ fn audit(fixture: &Value) -> Result<(), String> {
             .iter()
             .any(|value| value == comparison)
         {
-            return Err(format!("matched-cost comparison mode {comparison} is missing"));
+            return Err(format!(
+                "matched-cost comparison mode {comparison} is missing"
+            ));
         }
     }
     if integer(resources, "maximum_reference_steps")? <= 0
@@ -473,7 +503,10 @@ fn pulse_separation(trial: &Value) -> Result<f64, String> {
 }
 
 fn same_number(left: &Value, right: &Value, key: &str) -> bool {
-    match (left.get(key).and_then(Value::as_f64), right.get(key).and_then(Value::as_f64)) {
+    match (
+        left.get(key).and_then(Value::as_f64),
+        right.get(key).and_then(Value::as_f64),
+    ) {
         (Some(a), Some(b)) => a == b,
         _ => false,
     }
@@ -490,9 +523,7 @@ fn same_integer(left: &Value, right: &Value, key: &str) -> bool {
 }
 
 fn field<'a>(value: &'a Value, key: &str) -> Result<&'a Value, String> {
-    value
-        .get(key)
-        .ok_or_else(|| format!("missing field {key}"))
+    value.get(key).ok_or_else(|| format!("missing field {key}"))
 }
 
 fn string<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
