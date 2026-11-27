@@ -53,6 +53,45 @@ impl ResourceVector {
 #[serde(rename_all = "snake_case")]
 pub enum CostCompleteness { Complete, Partial, Unknown }
 
+/// The frozen downstream decision/loss contract. This is not an information-gain score.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DecisionValueMode {
+    BayesianExpectedUtility,
+    PriorFreeRobustMinimax,
+    DirectOutcomeMetric,
+    NotQuantified,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DecisionObjectiveReference {
+    pub objective_digest: String,
+    pub mode: DecisionValueMode,
+    pub utility_unit: Option<String>,
+    pub loss_table_digest: Option<String>,
+}
+
+impl DecisionObjectiveReference {
+    fn validate(&self) -> Result<(), String> {
+        require_nonempty("decision objective digest", &self.objective_digest)?;
+        match self.mode {
+            DecisionValueMode::BayesianExpectedUtility | DecisionValueMode::PriorFreeRobustMinimax => {
+                require_nonempty("decision utility unit", self.utility_unit.as_deref().unwrap_or_default())?;
+                require_nonempty("decision loss-table digest", self.loss_table_digest.as_deref().unwrap_or_default())?;
+            }
+            DecisionValueMode::DirectOutcomeMetric => {
+                require_nonempty("decision metric unit", self.utility_unit.as_deref().unwrap_or_default())?;
+            }
+            DecisionValueMode::NotQuantified => {
+                if self.utility_unit.is_some() || self.loss_table_digest.is_some() {
+                    return Err("NotQuantified cannot carry utility units or a loss table".into());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CandidateDecisionContext {
     pub schema_version: u16,
@@ -63,6 +102,7 @@ pub struct CandidateDecisionContext {
     pub decision_time_ms: u64,
     pub deadline_ms: Option<u64>,
     pub phase: DecisionPhase,
+    pub decision_objective: DecisionObjectiveReference,
     pub context_digest: String,
     pub evidence_available_at_decision: Vec<EvidenceReference>,
     pub permitted_action_ids: Vec<String>,
@@ -73,6 +113,7 @@ impl CandidateDecisionContext {
         require_nonempty("episode_id", &self.episode_id)?;
         require_nonempty("task_family_id", &self.task_family_id)?;
         require_nonempty("context_digest", &self.context_digest)?;
+        self.decision_objective.validate()?;
         if self.schema_version != SCHEMA_VERSION { return Err("unsupported schema version".into()); }
         if self.permitted_action_ids.is_empty() { return Err("permitted action set is empty".into()); }
         ensure_unique("permitted_action_ids", &self.permitted_action_ids)?;
@@ -341,6 +382,12 @@ mod tests {
             schema_version: SCHEMA_VERSION, episode_id: "e1".into(), parent_episode_id: None,
             task_family_id: "pilot".into(), decision_index: 0, decision_time_ms: 100,
             deadline_ms: Some(1_000), phase: DecisionPhase::ExperimentalDesign,
+            decision_objective: DecisionObjectiveReference {
+                objective_digest: "sha256:objective".into(),
+                mode: DecisionValueMode::PriorFreeRobustMinimax,
+                utility_unit: Some("normalized_loss_units".into()),
+                loss_table_digest: Some("sha256:loss-table".into()),
+            },
             context_digest: "sha256:ctx".into(),
             evidence_available_at_decision: vec![EvidenceReference {
                 evidence_id: "obs".into(), content_digest: "sha256:obs".into(),
@@ -389,6 +436,13 @@ mod tests {
             cost_completeness: CostCompleteness::Complete,
             independent_adjudication_ref: Some("independent-review".into()),
         }
+    }
+
+    #[test]
+    fn rejects_unbound_decision_value_or_loss_contract() {
+        let mut c = context();
+        c.decision_objective.mode = DecisionValueMode::NotQuantified;
+        assert!(c.validate().unwrap_err().contains("NotQuantified"));
     }
 
     #[test]
