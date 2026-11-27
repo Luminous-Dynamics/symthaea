@@ -263,3 +263,10 @@ The fixed-threshold adequacy diagnostic now has an exact finite-rank calibration
 ## Gaussian-to-categorical likelihood adapter follow-on — 27 November 2026
 
 The next integration primitive is `scripts/research/sdcb_gaussian_bin_likelihoods.rs`. It converts a scalar Gaussian predictive observation (mean/variance) into a declared finite categorical outcome likelihood row using ordered instrument thresholds. It uses direct 64-point Gauss–Legendre integration of normal tail intervals to avoid cancellation of extreme probabilities. This is the adapter boundary to existing instrument-aware/common-cause finite selectors (#13762/#13793/#13804); it is not another policy planner. Thresholds must be actual instrument quantization or a preregistered benchmark partition. The current implementation does not support multivariate rectangle probabilities or full continuous posterior updates after binning. Eight Rust tests are authored but not compiled/executed here.
+
+
+## Bivariate correlated Gaussian rectangle follow-on — 27 November 2026
+
+The first M0 implementation for issue #13945 adds scripts/research/sdcb_bivariate_rectangle.rs. It evaluates a two-channel Gaussian rectangle by conditioning one variable and adaptively integrating the one-dimensional conditional interval probability. The inner normal interval masses reuse the scalar #13944 adapter. It also emits a complete two-channel joint-bin table and checks normalization plus recovery of both scalar marginals.
+
+The reference explicitly rejects singular PSD covariance, condition estimates above 1e8, and probabilities unresolved by its +/-12 sigma truncation budget. It applies no diagonal jitter. Its outer adaptive refinement difference is a diagnostic error indicator, not a certified total error bound. Eleven Rust tests are authored but not compiled/executed here. Frozen orthant fixtures use the analytic arcsine identity; other fixtures are independently cross-checked with a separate conditional integration implementation. This does not implement trivariate/Genz-QMC integration, demonstrate numerical SOTA, or validate physical sensor measurements.
