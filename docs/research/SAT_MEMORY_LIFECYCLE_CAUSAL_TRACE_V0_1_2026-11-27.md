@@ -115,10 +115,10 @@ At 0 failures in 1,000 independent Bernoulli trials, the rough rule-of-three 95%
 
 ## 8. Validation and trust boundary
 
-- The eight JSONL rows are synthetic contract examples only.
+- The eight JSONL rows are synthetic contract examples only. A standalone Rust semantic verifier and seven unit tests are now authored under `research/sat-memory-trace-verifier-v0-1/`; they have not been compiled or executed.
 - Event sequence and predecessor links are intended to be checked by a separate semantic verifier; the schema does not establish that they are true.
 - A source claim, signature, hash or receipt proves only the property its verifier actually checks. It does not automatically prove source authority, semantic truth, independence or an external effect.
-- No Rust harness, real SUT, adaptive attack, external sink, counterfactual trial, native benchmark, production witness or independent evaluator was run for this document.
+- The standalone Rust semantic verifier is source-authored but not compiled or executed. No real SUT, adaptive attack, external sink, counterfactual trial, native benchmark, production witness or independent evaluator was run for this document.
 - No benchmark score, SOTA result, security qualification, IETF compliance or production resilience is claimed.
 
 ## References
