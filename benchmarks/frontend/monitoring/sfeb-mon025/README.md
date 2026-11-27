@@ -25,8 +25,10 @@ cp .env.example .env
 # Edit .env: set MON025_DB_PASSWORD and confirm the local-only settings.
 ./scripts/labctl.sh preflight
 ./scripts/labctl.sh up 18
+./scripts/capture-run-manifest.sh 18 mon025-run-001
+./scripts/capture-source-boundary.sh 18
 ./scripts/register-connector.sh 18
-./scripts/seed-batch.sh mon025-run-001 100
+./scripts/seed-batch.sh 18 mon025-run-001 100
 ./scripts/verify-cdc-events.sh 18 mon025-run-001 100
 ```
 
