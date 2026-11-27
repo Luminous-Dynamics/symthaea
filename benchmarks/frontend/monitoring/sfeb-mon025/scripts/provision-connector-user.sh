@@ -17,7 +17,7 @@ export COMPOSE_PROFILES="pg$MAJOR"
 
 "${DC[@]}" exec -T -e PGPASSWORD="$MON025_DB_PASSWORD" -e MON025_CONNECTOR_DB_PASSWORD="$MON025_CONNECTOR_DB_PASSWORD" "postgres$MAJOR" \
   psql -X -q -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "${MON025_DB_USER:-mon025}" -d "${MON025_DB_NAME:-mon025}" \
-  -v connector_user="$MON025_CONNECTOR_DB_USER" <<'SQL'
+  -v connector_user="$MON025_CONNECTOR_DB_USER" -v database_name="${MON025_DB_NAME:-mon025}" <<'SQL'
 \getenv connector_password MON025_CONNECTOR_DB_PASSWORD
 SELECT format('CREATE ROLE %I', :'connector_user')
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'connector_user')
