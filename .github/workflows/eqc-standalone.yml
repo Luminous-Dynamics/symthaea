@@ -23,8 +23,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: eqc-standalone-${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: true
+  group: eqc-standalone-${{ github.event_name }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
 
 jobs:
   reference-seed:
