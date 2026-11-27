@@ -67,7 +67,7 @@ A run directory must contain:
 5. Connector configuration, task state, observed source offsets, restart count and error log digest.
 6. Independent Kafka readback: observed event IDs, exact payload digests, duplicate/replay groups, conflicting identities and missing events.
 7. Source SQL state manifest at the intended recovery point.
-8. Base-backup manifest, required archived WAL interval, requested recovery target and achieved recovery state.
+8. Base-backup manifest, required archived WAL interval, requested recovery LSN/timeline and achieved recovery state.
 9. Restored target identity, timeline and SQL state manifest.
 10. Separate database-ready and service-ready timestamps, clock domain and uncertainty.
 11. Dependency/application probe outcomes, write-probe rollback, old-primary fencing and stale-endpoint fencing results.
