@@ -148,6 +148,17 @@ pub struct EvidenceSpanAblationReportV1 {
     pub canonical_sha256: String,
 }
 
+impl EvidenceSpanAblationReportV1 {
+    /// Recompute the report integrity commitment. This is not a signature.
+    pub fn verify_integrity(&self) -> bool {
+        let mut unsigned = self.clone();
+        unsigned.canonical_sha256.clear();
+        serde_json::to_vec(&unsigned)
+            .map(|bytes| sha256_hex(&bytes) == self.canonical_sha256)
+            .unwrap_or(false)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct PairDelta {
     utility: f64,
@@ -679,6 +690,10 @@ mod tests {
         let right = analyze_evidence_span_ablation_v1(&observations, 123).unwrap();
         assert_eq!(left.utility_effect_ci95, right.utility_effect_ci95);
         assert_eq!(left.canonical_sha256, right.canonical_sha256);
+        assert!(left.verify_integrity());
+        let mut tampered = left.clone();
+        tampered.mean_added_cost_micros += 1.0;
+        assert!(!tampered.verify_integrity());
         assert_eq!(left.observation_set_sha256, right.observation_set_sha256);
     }
 
@@ -692,7 +707,7 @@ mod tests {
         );
 
         let mut duplicate = paired_observations(2);
-        duplicate.push(duplicate[0].clone());
+        duplicate[2].pair_block_id = duplicate[0].pair_block_id.clone();
         assert_eq!(
             analyze_evidence_span_ablation_v1(&duplicate, 1),
             Err(EvidenceSpanAblationRejectV1::DuplicatePairArm)
@@ -818,14 +833,15 @@ mod tests {
         let report = analyze_evidence_span_ablation_v1(&paired_observations(4), 99).unwrap();
         assert_eq!(report.mean_added_cost_micros, 20.0);
         assert_eq!(report.mean_decision_change_rate, 1.0);
-        assert_eq!(report.stratum_utility_effects["standard"], 0.3);
-        assert_eq!(report.stratum_utility_effects["sparse"], 0.3);
+        assert!((report.stratum_utility_effects["standard"] - 0.3).abs() < 1e-12);
+        assert!((report.stratum_utility_effects["sparse"] - 0.3).abs() < 1e-12);
         assert!(report.stratum_utility_effect_ci95["standard"].is_some_and(|ci| ci.lower > 0.0));
         assert!(report.stratum_regret_reduction_ci95["sparse"].is_some_and(|ci| ci.lower > 0.0));
         assert_eq!(report.stratum_independent_profile_clusters["standard"], 2);
         assert_eq!(report.stratum_independent_profile_clusters["sparse"], 2);
         assert_eq!(report.stratum_confirmatory_cluster_floor_met["standard"], false);
         assert!(valid_sha256(&report.canonical_sha256));
+        assert!(report.verify_integrity());
     }
 
     #[test]
