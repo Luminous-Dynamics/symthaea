@@ -20,9 +20,13 @@ The candidate must run before evaluator-only family IDs and reference responses 
 
 An aliased group is safely represented when the candidate returns Unknown, or a finite set that covers every evaluator-observed response in that group. A point forecast on an aliased group cannot be universally correct; the evaluator reports actual errors and the irreducible point-error floor.
 
-## Frozen record and custody
+## Information-flow boundary
 
-Each record binds the candidate-visible view digest, evaluator-only family and independent-cluster IDs, frozen contract/source/checkpoint digests, reference response, and candidate output. The view digest must cover state/context, realized action, query, horizon, authorized evidence, and every permitted probe result. It must exclude evaluator-only labels and reference values.
+The candidate channel is represented by CandidatePrediction: candidate-view digest plus Point, Set, or Unknown. The evaluator channel is represented separately by OracleAnnotation: candidate-view digest, family ID, independent-cluster ID, and reference response. EvaluationCustody binds one contract, source manifest, and candidate checkpoint for the complete batch.
+
+The scorer is the only join point. Candidate inference is not given the oracle annotation type. Every prediction must match at least one annotation, every annotation must match a prediction, and repeated predictions for the same view must agree. This is an API-level information-flow separation, not a proof that an external caller has implemented a secure process boundary.
+
+The candidate-view digest must cover state/context, realized action, query, horizon, authorized evidence, and every permitted probe result. It must exclude evaluator-only labels and reference values.
 
 This crate syntax-checks SHA-256 strings; it does not recompute or authenticate their underlying bytes. That remains the responsibility of the independent evidence-ingestion boundary.
 
