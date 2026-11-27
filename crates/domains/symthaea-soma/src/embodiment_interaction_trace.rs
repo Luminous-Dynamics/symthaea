@@ -285,6 +285,12 @@ impl InteractionTraceVerifier {
                             index: Some(index),
                             field: "action_scope",
                         })?;
+                    if action_scope_values.len() > 32 {
+                        return Err(InteractionTraceError::InvalidField {
+                            index: Some(index),
+                            field: "action_scope",
+                        });
+                    }
                     let mut action_scope = HashSet::new();
                     for value in action_scope_values {
                         let action = value.as_str().ok_or(InteractionTraceError::InvalidField {
@@ -292,7 +298,12 @@ impl InteractionTraceVerifier {
                             field: "action_scope",
                         })?;
                         validate_identifier(action, Some(index), "action_scope")?;
-                        action_scope.insert(action.to_owned());
+                        if !action_scope.insert(action.to_owned()) {
+                            return Err(InteractionTraceError::InvalidField {
+                                index: Some(index),
+                                field: "action_scope",
+                            });
+                        }
                     }
                     let semantic = semantic_events.get(&semantic_event_id)
                         .ok_or(InteractionTraceError::MissingAuthorization { index })?;
@@ -1044,3 +1055,16 @@ mod tests {
         );
     }
 }
+
+    #[test]
+    fn duplicate_action_scope_entries_are_rejected() {
+        let mut trace = valid_trace();
+        trace["events"][2]["action_scope"] = json!(["robot.move", "robot.move"]);
+        assert_eq!(
+            InteractionTraceVerifier::verify_value(&trace),
+            Err(InteractionTraceError::InvalidField {
+                index: Some(2),
+                field: "action_scope"
+            })
+        );
+    }
