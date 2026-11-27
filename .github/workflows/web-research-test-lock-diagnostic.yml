@@ -1,0 +1,76 @@
+name: WebResearch Test Lock Diagnostic
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/web_research/**"
+      - ".github/workflows/web-research-test-lock-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-test-lock:
+    name: Resolve and verify WebResearch test lock
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+      - name: Snapshot original lockfile
+        run: |
+          mkdir -p "$RUNNER_TEMP/web-research-test-lock"
+          cp Cargo.lock "$RUNNER_TEMP/web-research-test-lock/Cargo.lock.before"
+      - name: Resolve and compile the exact test target without lockfile enforcement
+        id: unlocked
+        shell: bash
+        run: |
+          set +e
+          cargo test --no-run --no-default-features --features web_research_module --lib web_research:: > "$RUNNER_TEMP/web-research-test-lock/test-unlocked.log" 2>&1
+          status=$?
+          cp Cargo.lock "$RUNNER_TEMP/web-research-test-lock/Cargo.lock.after"
+          diff -u "$RUNNER_TEMP/web-research-test-lock/Cargo.lock.before" "$RUNNER_TEMP/web-research-test-lock/Cargo.lock.after" > "$RUNNER_TEMP/web-research-test-lock/Cargo.lock.diff"
+          diff_status=$?
+          printf 'unlocked_test_exit=%s\nlockfile_diff_exit=%s\n' "$status" "$diff_status" > "$RUNNER_TEMP/web-research-test-lock/status.txt"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Verify the exact test target with locked resolution
+        id: locked
+        if: steps.unlocked.outputs.status == '0'
+        shell: bash
+        run: |
+          set +e
+          cargo test --no-run --locked --no-default-features --features web_research_module --lib web_research:: > "$RUNNER_TEMP/web-research-test-lock/test-locked.log" 2>&1
+          status=$?
+          echo "locked_test_exit=$status" >> "$RUNNER_TEMP/web-research-test-lock/status.txt"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+      - name: Upload before/after lockfile and compiler logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-research-test-lock-diagnostic
+          path: ${{ runner.temp }}/web-research-test-lock/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Fail if the locked test target is not reproducible
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.unlocked.outputs.status }}" != "0" ]]; then
+            echo "Unlocked focused compilation did not succeed; inspect logs and lockfile proposal."
+            exit 1
+          fi
+          if [[ "${{ steps.locked.outputs.status }}" != "0" ]]; then
+            echo "The focused test target does not build with the regenerated locked dependency graph."
+            exit 1
+          fi
