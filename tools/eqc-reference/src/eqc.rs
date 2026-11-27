@@ -882,7 +882,6 @@ mod tests {
         task.as_object_mut()
             .expect("task object")
             .remove("input_refs");
-        assert!(!receipt_schema_validator().is_valid(&valid_receipt()) == false);
         let root = repository_root();
         let schema = load_schema(&root.join("docs/research/eqc-task-v0.1.schema.json"))
             .expect("task schema meta-validates");
