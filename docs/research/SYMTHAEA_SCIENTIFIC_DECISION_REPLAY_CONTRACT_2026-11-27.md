@@ -51,6 +51,8 @@ The new support module defines:
 Candidate-visible types do not contain ground truth or future outcome labels. EvaluatorResolution is separate and must not be serialized into the candidate process input stream.
 
 Validation covers:
+- the canonical ResearchState, evidence-prefix, permitted-offer-list and exact action-payload bindings are well-formed lowercase SHA-256 digests;
+- referenced evidence artifact digests use the same explicit SHA-256 encoding;
 - no evidence became available after decision time;
 - every decision is bound to a frozen downstream decision/loss contract; raw entropy or information gain is not substituted for decision value;
 - selected actions belong to the permitted set;
@@ -277,7 +279,7 @@ Implemented in this branch:
 - outcome distribution, full randomized action propensities over action/payload identities, exact selected-payload binding and causal-design declarations;
 - evaluator-owned resolution and distinct execution/outcome states;
 - validation for look-ahead evidence, action support, unsupported counterfactuals, delayed/censored/indeterminate outcomes and cost completeness;
-- eleven authored decision-contract tests;
+- twelve authored decision-contract tests;
 - custodian-only replay-archive/evaluator projection, BLAKE3 digests, opaque IDs, empty/disjoint-root checks, no-overwrite writes, manifest-last materialization and disk-readback checks;
 - decision-time observation-prefix builder with digest and out-of-range rejection;
 - nine authored custody/prefix tests, two output-root tests and a capsule materializer example (22 authored tests total across these new files).
