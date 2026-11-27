@@ -206,6 +206,23 @@ func TestCollectionOrderMayResetAcrossTransactions(t *testing.T) {
 	expect(t, in, Qualified)
 }
 
+func TestMessagePseudoCollectionLabelCanVaryAcrossTransactions(t *testing.T) {
+ in:=fixture()
+ row2:=in.SourceEvents[0]
+ row2.EventID="row-2";row2.TransactionID="tx-2";row2.Offset=11;row2.TotalOrder=1;row2.CollectionOrder=1
+ message2:=in.SourceEvents[1]
+ message2.EventID="message-2";message2.TransactionID="tx-2";message2.Offset=8;message2.TotalOrder=2;message2.CollectionOrder=1
+ message2.DataCollection="logical-message-pseudo-v2"
+ in.SourceEvents=append(in.SourceEvents,row2,message2)
+ in.ObservedEvents=append(in.ObservedEvents,row2,message2)
+ in.Transactions=append(in.Transactions,TransactionProof{
+  TransactionID:"tx-2",ExpectedEventCount:2,BeginObserved:true,EndObserved:true,EndEventCount:2,
+  DataCollections:map[string]int{"public.ledger":1,"logical-message-pseudo-v2":1},
+ })
+ refreshRecordDigests(&in)
+ expect(t,in,Qualified)
+}
+
 func TestRowCollectionOrderGapWithinTransactionBlocks(t *testing.T) {
 	in := fixture()
 	row2 := in.SourceEvents[0]
