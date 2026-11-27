@@ -21,7 +21,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use redb::{Builder, Database, ReadableDatabase, ReadableTable, TableDefinition};
+use redb::{Builder, ConcurrencyMode, Database, ReadableDatabase, ReadableTable, TableDefinition};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -156,6 +156,7 @@ impl RedbDurableAmlStoreV1 {
     /// receipt; committed writes remain recoverable.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, DurableStoreErrorV1> {
         let mut builder = Builder::new();
+        builder.set_concurrency_mode(ConcurrencyMode::ExclusiveWriter);
         builder.set_cache_size(CACHE_BYTES);
         builder.set_check_integrity_on_open(true);
         let database = builder.create(path).map_err(backend_error)?;
@@ -357,6 +358,7 @@ impl DurableAmlStoreV1 for RedbDurableAmlStoreV1 {
                 ))?;
             let entry: StoredLedgerEntryV1 =
                 serde_json::from_slice(existing.value()).map_err(backend_error)?;
+            drop(existing);
             if entry.idempotency_digest != key.idempotency_digest {
                 return Err(DurableStoreErrorV1::RequestIdPayloadConflict);
             }
@@ -490,6 +492,7 @@ impl DurableAmlStoreV1 for RedbDurableAmlStoreV1 {
                 ))?;
             let mut entry: StoredLedgerEntryV1 =
                 serde_json::from_slice(existing.value()).map_err(backend_error)?;
+            drop(existing);
             if entry.idempotency_digest != key.idempotency_digest {
                 return Err(DurableStoreErrorV1::RequestIdPayloadConflict);
             }
@@ -529,6 +532,7 @@ impl DurableAmlStoreV1 for RedbDurableAmlStoreV1 {
             };
             let entry: StoredLedgerEntryV1 =
                 serde_json::from_slice(existing.value()).map_err(backend_error)?;
+            drop(existing);
             if entry.idempotency_digest != key.idempotency_digest
                 || entry.state != "reserved"
                 || entry.receipt.is_some()
@@ -825,6 +829,16 @@ mod tests {
             ),
             word_counter_version: Some(TestCounter.adapter_version().to_owned()),
         }
+    }
+
+    #[test]
+    fn exclusive_writer_lock_rejects_a_second_live_store_handle() {
+        let path = temp_db_path();
+        let store = RedbDurableAmlStoreV1::open(&path).unwrap();
+        assert!(RedbDurableAmlStoreV1::open(&path).is_err());
+        drop(store);
+        assert!(RedbDurableAmlStoreV1::open(&path).is_ok());
+        cleanup(&path);
     }
 
     #[test]
