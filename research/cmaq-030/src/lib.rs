@@ -835,10 +835,10 @@ mod tests {
 
     #[test]
     fn reference_must_be_bound_to_exact_candidate_margin_block() {
-        let mut p = pair(0, 2);
-        p.reference.candidate_margin_block_sha256 = digest('0');
+        let mut m = manifest(19);
+        m.calibration_units[0].reference.candidate_margin_block_sha256 = digest('0');
         assert_eq!(
-            score_calibration_unit(&p.candidate, &p.reference, &spec()),
+            calibrate_recoverability_margin(contract(), &m),
             Err(MarginCalibrationError::RuntimeScopeMismatch(
                 "candidate_margin_block_sha256"
             ))
