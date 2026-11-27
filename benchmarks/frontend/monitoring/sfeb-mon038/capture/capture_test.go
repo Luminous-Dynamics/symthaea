@@ -165,3 +165,36 @@ func TestLSOBelowHighWatermarkMeansOpenTransactionRemains(t *testing.T) {
 	refresh(&in)
 	expect(t, in, Indeterminate)
 }
+
+
+func TestTombstoneWithoutKeyDigestBlocks(t *testing.T) {
+	in := fixture()
+	tombstone := CapturedRecord{
+		Topic: "ledger", TopicID: "topic-id-ledger", Partition: 0, Offset: 103,
+		RecordClass: "tombstone", PayloadSHA256: da,
+	}
+	in.PartitionCaptures[0].Records = append(in.PartitionCaptures[0].Records, tombstone)
+	in.PartitionCaptures[0].EndOffsetExclusive = 105
+	in.PartitionCaptures[0].LastStableOffsetBefore = 105
+	in.PartitionCaptures[0].LastStableOffsetAfter = 105
+	in.PartitionCaptures[0].HighWatermarkBefore = 105
+	in.PartitionCaptures[0].HighWatermarkAfter = 105
+	refresh(&in)
+	expect(t, in, Blocked)
+}
+
+func TestTombstoneWithKeyDigestCanBeCaptured(t *testing.T) {
+	in := fixture()
+	tombstone := CapturedRecord{
+		Topic: "ledger", TopicID: "topic-id-ledger", Partition: 0, Offset: 103,
+		RecordClass: "tombstone", PayloadSHA256: da, KeySHA256: db,
+	}
+	in.PartitionCaptures[0].Records = append(in.PartitionCaptures[0].Records, tombstone)
+	in.PartitionCaptures[0].EndOffsetExclusive = 105
+	in.PartitionCaptures[0].LastStableOffsetBefore = 105
+	in.PartitionCaptures[0].LastStableOffsetAfter = 105
+	in.PartitionCaptures[0].HighWatermarkBefore = 105
+	in.PartitionCaptures[0].HighWatermarkAfter = 105
+	refresh(&in)
+	expect(t, in, Qualified)
+}
