@@ -27,6 +27,8 @@ pub enum VelocityKickRemapError {
     InvalidVelocityGrid,
     #[error("spatial position is non-finite")]
     InvalidSpatialPosition,
+    #[error("spatial quadrature weights must be finite, positive, and match spatial rows")]
+    InvalidSpatialQuadrature,
     #[error("distribution contains a negative or non-finite cell average")]
     InvalidDistribution,
     #[error("remap produced a non-finite cell average or mass ledger")]
@@ -40,7 +42,11 @@ pub enum VelocityKickRemapError {
 /// Mass ledger for one spatial cell.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SpatialMassLedger {
+    /// Positive spatial quadrature weight for this row.
+    pub spatial_weight: f64,
+    /// Velocity-integrated mass density before the kick, for this row.
     pub mass_before: f64,
+    /// Velocity-integrated mass density after the kick, for this row.
     pub mass_after: f64,
     /// Positive mass transported outside the declared finite velocity domain.
     pub boundary_outflow: f64,
@@ -55,14 +61,23 @@ pub struct VelocityKickRemapReport {
     pub distribution: Vec<Vec<f64>>,
     /// Per-spatial-cell mass accounting.
     pub spatial_mass: Vec<SpatialMassLedger>,
+    /// Spatial-quadrature-weighted mass before the kick.
+    /// The unit-weight wrapper returns a row-summed diagnostic, not a general
+    /// physical spatial integral.
     pub total_mass_before: f64,
+    /// Spatial-quadrature-weighted mass after the kick.
     pub total_mass_after: f64,
+    /// Spatial-quadrature-weighted boundary outflow.
     pub total_boundary_outflow: f64,
     pub total_mass_balance_residual: f64,
     pub relative_boundary_outflow: f64,
 }
 
 /// Apply the instantaneous characteristic pullback to a cell-average distribution.
+///
+/// This convenience entry point uses unit spatial weights. For nonuniform
+/// spatial quadrature or a physically integrated 1D1V mass, call
+/// remap_distribution_after_velocity_kick_weighted instead.
 ///
 /// Inputs:
 /// - spatial_positions: one representative x coordinate per row;
@@ -80,12 +95,38 @@ pub fn remap_distribution_after_velocity_kick(
     velocity_edges: &[f64],
     distribution: &[Vec<f64>],
 ) -> Result<VelocityKickRemapReport, VelocityKickRemapError> {
+    let unit_weights = vec![1.0; spatial_positions.len()];
+    remap_distribution_after_velocity_kick_weighted(
+        kick,
+        spatial_positions,
+        &unit_weights,
+        velocity_edges,
+        distribution,
+    )
+}
+
+/// Apply the velocity kick and integrate row ledgers with explicit spatial
+/// quadrature weights. Weights must be finite and strictly positive.
+pub fn remap_distribution_after_velocity_kick_weighted(
+    kick: &SinusoidalVelocityKick,
+    spatial_positions: &[f64],
+    spatial_weights: &[f64],
+    velocity_edges: &[f64],
+    distribution: &[Vec<f64>],
+) -> Result<VelocityKickRemapReport, VelocityKickRemapError> {
     kick.validate()?;
     if spatial_positions.is_empty()
         || velocity_edges.len() < 2
         || distribution.len() != spatial_positions.len()
     {
         return Err(VelocityKickRemapError::ShapeMismatch);
+    }
+    if spatial_weights.len() != spatial_positions.len()
+        || spatial_weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight <= 0.0)
+    {
+        return Err(VelocityKickRemapError::InvalidSpatialQuadrature);
     }
     if velocity_edges.iter().any(|edge| !edge.is_finite())
         || velocity_edges.windows(2).any(|pair| pair[1] <= pair[0])
@@ -104,7 +145,9 @@ pub fn remap_distribution_after_velocity_kick(
     let mut total_boundary_outflow = 0.0_f64;
     let mut total_mass_balance_residual = 0.0_f64;
 
-    for (row_index, &x) in spatial_positions.iter().enumerate() {
+    for (row_index, (&x, &spatial_weight)) in
+        spatial_positions.iter().zip(spatial_weights).enumerate()
+    {
         if !x.is_finite() {
             return Err(VelocityKickRemapError::InvalidSpatialPosition);
         }
@@ -197,10 +240,10 @@ pub fn remap_distribution_after_velocity_kick(
             return Err(VelocityKickRemapError::MassBalanceFailure);
         }
 
-        total_mass_before += mass_before;
-        total_mass_after += mass_after;
-        total_boundary_outflow += boundary_outflow;
-        total_mass_balance_residual += residual;
+        total_mass_before += spatial_weight * mass_before;
+        total_mass_after += spatial_weight * mass_after;
+        total_boundary_outflow += spatial_weight * boundary_outflow;
+        total_mass_balance_residual += spatial_weight * residual;
         if !total_mass_before.is_finite()
             || !total_mass_after.is_finite()
             || !total_boundary_outflow.is_finite()
@@ -209,6 +252,7 @@ pub fn remap_distribution_after_velocity_kick(
             return Err(VelocityKickRemapError::NonFiniteRemap);
         }
         spatial_mass.push(SpatialMassLedger {
+            spatial_weight,
             mass_before,
             mass_after,
             boundary_outflow,
@@ -356,6 +400,56 @@ mod tests {
                 .spatial_mass
                 .iter()
                 .all(|ledger| ledger.residual.abs() < 1.0e-12)
+        );
+    }
+
+    #[test]
+    fn explicit_spatial_quadrature_weights_produce_integrated_mass_ledger() {
+        let edges = uniform_edges(0.0, 1.0, 10);
+        let distribution = vec![vec![1.0; 10], vec![2.0; 10]];
+        let report = remap_distribution_after_velocity_kick_weighted(
+            &kick(0.1),
+            &[
+                std::f64::consts::PI / 2.0,
+                3.0 * std::f64::consts::PI / 2.0,
+            ],
+            &[0.25, 0.75],
+            &edges,
+            &distribution,
+        )
+        .unwrap();
+
+        assert!((report.total_mass_before - 1.75).abs() < 1.0e-12);
+        assert!((report.total_boundary_outflow - 0.175).abs() < 1.0e-12);
+        assert!((report.total_mass_after - 1.575).abs() < 1.0e-12);
+        assert!((report.total_mass_balance_residual).abs() < 1.0e-12);
+        assert_eq!(report.spatial_mass[0].spatial_weight, 0.25);
+        assert_eq!(report.spatial_mass[1].spatial_weight, 0.75);
+    }
+
+    #[test]
+    fn invalid_spatial_quadrature_is_rejected() {
+        let edges = uniform_edges(0.0, 1.0, 4);
+        let distribution = vec![vec![1.0; 4], vec![1.0; 4]];
+        assert_eq!(
+            remap_distribution_after_velocity_kick_weighted(
+                &kick(0.1),
+                &[0.1, 0.2],
+                &[1.0],
+                &edges,
+                &distribution,
+            ),
+            Err(VelocityKickRemapError::InvalidSpatialQuadrature)
+        );
+        assert_eq!(
+            remap_distribution_after_velocity_kick_weighted(
+                &kick(0.1),
+                &[0.1, 0.2],
+                &[1.0, 0.0],
+                &edges,
+                &distribution,
+            ),
+            Err(VelocityKickRemapError::InvalidSpatialQuadrature)
         );
     }
 
