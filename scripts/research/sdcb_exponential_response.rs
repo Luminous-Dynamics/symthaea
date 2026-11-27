@@ -10,6 +10,8 @@
 //! a calibrated sensor model, a transport-delay model, or a validated enclosure.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+const MAX_SCALED_TIME: f64 = 700.0;
+
 pub enum ResponseModelError {
     InvalidProcessDecayRate,
     InvalidProcessVariance,
@@ -101,8 +103,20 @@ impl FirstOrderResponseOu {
         let l = self.lambda;
         let m = self.mu;
         let t = elapsed_time;
-        let e_l = (-l * t).exp();
-        let e_m = (-m * t).exp();
+        let scaled_l = l * t;
+        let scaled_m = m * t;
+        // Keep both transition modes away from silent exponential underflow.
+        // The bounded oracle rejects larger dimensionless propagation rather
+        // than discarding tiny transition terms that may be magnified by P.
+        if !scaled_l.is_finite()
+            || !scaled_m.is_finite()
+            || scaled_l > MAX_SCALED_TIME
+            || scaled_m > MAX_SCALED_TIME
+        {
+            return Err(ResponseModelError::NumericalFailure);
+        }
+        let e_l = (-scaled_l).exp();
+        let e_m = (-scaled_m).exp();
         let delta = m - l;
 
         let lower_left = if delta > 0.0 {
@@ -180,10 +194,8 @@ impl FirstOrderResponseOu {
         let h = elapsed_time;
         let slow_rate = self.lambda.min(self.mu);
         let slow_scaled = slow_rate * h;
-        if !slow_scaled.is_finite() {
-            // The exponential dominates every finite binary64 variance and
-            // polynomial response factor at this scale.
-            return Ok(0.0);
+        if !slow_scaled.is_finite() || slow_scaled > MAX_SCALED_TIME {
+            return Err(ResponseModelError::NumericalFailure);
         }
         let factor = if self.mu > self.lambda {
             let gap = self.mu - self.lambda;
@@ -357,13 +369,16 @@ mod tests {
     }
 
     #[test]
-    fn extreme_elapsed_time_keeps_transition_and_covariance_finite() {
-        let model = FirstOrderResponseOu::new(1.0e308, 1.0, 1.0e-308).unwrap();
-        let transition = model.transition_matrix(1.0e308).unwrap();
-        assert!(transition.iter().flatten().all(|value| value.is_finite()));
-        let covariance = model.sensor_autocovariance_convolution(1.0e308).unwrap();
-        assert!(covariance.is_finite());
-        assert!(covariance >= 0.0);
+    fn extreme_elapsed_time_rejects_instead_of_silent_underflow() {
+        let model = FirstOrderResponseOu::new(1.0, 1.0, 1.0).unwrap();
+        assert_eq!(
+            model.transition_matrix(701.0).unwrap_err(),
+            ResponseModelError::NumericalFailure
+        );
+        assert_eq!(
+            model.sensor_autocovariance_convolution(701.0).unwrap_err(),
+            ResponseModelError::NumericalFailure
+        );
     }
 
     #[test]
