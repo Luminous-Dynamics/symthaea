@@ -1,6 +1,6 @@
 # SDCB bivariate Gaussian rectangle reference v1
 
-**Status:** bounded, two-channel numerical reference authored in Rust. Eleven tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
+**Status:** bounded, two-channel numerical reference authored in Rust. Sixteen tests are authored but have not been compiled or executed here. Fixture values are checked using the analytic bivariate orthant identity and an independent conditional-normal integration. This is not a general multivariate solver or a SOTA claim.
 
 ## 1. Why this increment
 
@@ -73,12 +73,12 @@ These are mathematical numerical fixtures, not measured sensor probabilities. Or
 
 ## 6. Tests and limits
 
-The authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, exact duplicate-channel rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, and bounded evaluation.
+The 16 authored tests cover independence, positive/negative correlation, analytic orthants, finite asymmetric bounds, a rare joint tail, joint-bin normalization/marginalization, exact duplicate support, perfect anti-correlation, one deterministic coordinate, rank-zero deterministic support, non-PSD rejection, near-singular rejection, zero-width rectangles, invalid covariance/bounds, and bounded evaluation.
 
 Not implemented:
 - trivariate or general n-variate integration;
 - randomized QMC / Genz variable-cube transformation;
-- rank-revealing singular PSD support integration;
+- general (n)-variate rank-revealing singular PSD support integration;
 - certified total numerical error bounds;
 - SDCB dynamic-state/interval-observation conditional adapter;
 - physical dataset or policy tournament.
