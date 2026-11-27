@@ -358,6 +358,26 @@
       "budget_exhaustion_disposition": "unqualified",
       "global_bound_claim_status": "conditional_on_valid_lipschitz_and_branch_evidence",
       "full_order_confirmation_required": true
+    },
+    "joint_box_oracle": {
+      "status": "design_only_not_executed",
+      "method": "anisotropic_lipschitz_branch_and_bound_nd",
+      "continuous_parameter_axes": [
+        "pulse_phase",
+        "kick_amplitude",
+        "pulse_separation"
+      ],
+      "coordinate_lipschitz_semantics": "sum_i_L_i_abs_coordinate_delta_i",
+      "subdivision_policy": "largest_Li_times_half_width",
+      "interior_search_required": true,
+      "boundary_only_search_sufficient": false,
+      "lipschitz_certificate_status": "not_issued_synthetic",
+      "branch_stability_evidence_status": "not_issued_synthetic",
+      "budget_exhaustion_disposition": "unqualified",
+      "global_bound_claim_status": "conditional_on_valid_box_lipschitz_and_branch_evidence",
+      "full_order_confirmation_required": true,
+      "objective_normalization": "declared_qoi_scale_and_fixed_positive_floor",
+      "reference_response_denominator_lower_bound_required": true
     }
   },
   "methodological_prior_art": [
