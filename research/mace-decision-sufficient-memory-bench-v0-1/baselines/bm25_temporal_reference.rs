@@ -147,6 +147,31 @@ pub struct FusedHitV1 {
     pub rank: usize,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LineageEdgeStatusV1 {
+    Resolved,
+    MissingParent,
+    CrossScopeParent,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LineageEdgeV1 {
+    pub child_event_id: String,
+    pub parent_event_id: String,
+    pub status: LineageEdgeStatusV1,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LineageAuditReportV1 {
+    pub edges: Vec<LineageEdgeV1>,
+    /// Strongly connected components containing a directed lineage cycle.
+    /// Each component is sorted by event ID; components are sorted lexicographically.
+    pub cycle_components: Vec<Vec<String>>,
+    pub resolved_edge_count: u64,
+    pub missing_parent_edge_count: u64,
+    pub cross_scope_edge_count: u64,
+}
+
 /// Whitespace/punctuation-tolerant Unicode tokenization, intentionally with no
 /// stemming, stopword list, query expansion or learned vocabulary.
 pub fn tokenize_v1(text: &str) -> Vec<String> {
@@ -286,6 +311,62 @@ impl Bm25IndexV1 {
             .get(document_id)
             .and_then(|index| self.documents.get(*index))
             .map(|prepared| &prepared.document)
+    }
+
+    /// Audit candidate-archive lineage by exact event ID.
+    ///
+    /// This is diagnostic metadata, not a trust decision: a resolved edge does not
+    /// grant the child its parent's authority, freshness, validity or admissibility.
+    /// Cross-scope references are reported rather than silently traversed.
+    pub fn audit_lineage(&self) -> LineageAuditReportV1 {
+        let mut edges = Vec::new();
+        for prepared in &self.documents {
+            let child = &prepared.document;
+            for parent_event_id in &child.parent_event_ids {
+                let status = match self.by_id.get(parent_event_id) {
+                    None => LineageEdgeStatusV1::MissingParent,
+                    Some(parent_index) => {
+                        let parent = &self.documents[*parent_index].document;
+                        if parent.scope_id == child.scope_id {
+                            LineageEdgeStatusV1::Resolved
+                        } else {
+                            LineageEdgeStatusV1::CrossScopeParent
+                        }
+                    }
+                };
+                edges.push(LineageEdgeV1 {
+                    child_event_id: child.document_id.clone(),
+                    parent_event_id: parent_event_id.clone(),
+                    status,
+                });
+            }
+        }
+        edges.sort_by(|left, right| {
+            left.child_event_id
+                .cmp(&right.child_event_id)
+                .then_with(|| left.parent_event_id.cmp(&right.parent_event_id))
+        });
+
+        let resolved_edge_count = edges
+            .iter()
+            .filter(|edge| edge.status == LineageEdgeStatusV1::Resolved)
+            .count() as u64;
+        let missing_parent_edge_count = edges
+            .iter()
+            .filter(|edge| edge.status == LineageEdgeStatusV1::MissingParent)
+            .count() as u64;
+        let cross_scope_edge_count = edges
+            .iter()
+            .filter(|edge| edge.status == LineageEdgeStatusV1::CrossScopeParent)
+            .count() as u64;
+
+        LineageAuditReportV1 {
+            edges,
+            cycle_components: lineage_cycle_components(&self.documents, &self.by_id),
+            resolved_edge_count,
+            missing_parent_edge_count,
+            cross_scope_edge_count,
+        }
     }
 
     fn is_visible(&self, document_id: &str, scope_id: &str, as_of_ms: u64) -> bool {
@@ -443,6 +524,85 @@ impl Bm25IndexV1 {
             },
         })
     }
+}
+
+/// Iterative Kosaraju pass: avoid recursion depth depending on untrusted archive size.
+fn lineage_cycle_components(
+    documents: &[PreparedDocument],
+    by_id: &BTreeMap<String, usize>,
+) -> Vec<Vec<String>> {
+    let count = documents.len();
+    let mut adjacency = vec![Vec::<usize>::new(); count];
+    let mut reverse = vec![Vec::<usize>::new(); count];
+
+    for (child_index, prepared) in documents.iter().enumerate() {
+        for parent_id in &prepared.document.parent_event_ids {
+            let Some(parent_index) = by_id.get(parent_id).copied() else {
+                continue;
+            };
+            if documents[parent_index].document.scope_id != prepared.document.scope_id {
+                continue;
+            }
+            adjacency[child_index].push(parent_index);
+            reverse[parent_index].push(child_index);
+        }
+    }
+    for neighbors in adjacency.iter_mut().chain(reverse.iter_mut()) {
+        neighbors.sort_unstable();
+        neighbors.dedup();
+    }
+
+    let mut visited = vec![false; count];
+    let mut finish_order = Vec::with_capacity(count);
+    for start in 0..count {
+        if visited[start] {
+            continue;
+        }
+        visited[start] = true;
+        let mut stack = vec![(start, 0_usize)];
+        while let Some(&(node, next_neighbor)) = stack.last() {
+            if next_neighbor < adjacency[node].len() {
+                let neighbor = adjacency[node][next_neighbor];
+                stack.last_mut().expect("DFS frame exists").1 += 1;
+                if !visited[neighbor] {
+                    visited[neighbor] = true;
+                    stack.push((neighbor, 0));
+                }
+            } else {
+                stack.pop();
+                finish_order.push(node);
+            }
+        }
+    }
+
+    let mut assigned = vec![false; count];
+    let mut components = Vec::new();
+    for start in finish_order.into_iter().rev() {
+        if assigned[start] {
+            continue;
+        }
+        assigned[start] = true;
+        let mut stack = vec![start];
+        let mut component = Vec::new();
+        while let Some(node) = stack.pop() {
+            component.push(documents[node].document.document_id.clone());
+            for &neighbor in &reverse[node] {
+                if !assigned[neighbor] {
+                    assigned[neighbor] = true;
+                    stack.push(neighbor);
+                }
+            }
+        }
+
+        let has_self_loop = component.len() == 1
+            && adjacency[start].iter().any(|&neighbor| neighbor == start);
+        if component.len() > 1 || has_self_loop {
+            component.sort();
+            components.push(component);
+        }
+    }
+    components.sort();
+    components
 }
 
 /// Weighted reciprocal-rank fusion over independently produced candidate
@@ -989,6 +1149,54 @@ mod tests {
             weighted_rrf_v1(&index, "tenant-a", 10, &[], 0, 10),
             Err(BaselineErrorV1::InvalidRrfConstant)
         );
+    }
+
+    #[test]
+    fn lineage_audit_distinguishes_resolved_missing_and_cross_scope_edges() {
+        let mut child = document("child", "tenant-a", "correction", 2, 1, None);
+        child.parent_event_ids = vec!["parent".into(), "missing".into(), "private-parent".into()];
+        child.relation_to_parent = EventRelationV1::Retracts;
+        let index = index(vec![
+            document("parent", "tenant-a", "original claim", 1, 1, None),
+            document("private-parent", "tenant-b", "separate scope", 1, 1, None),
+            child,
+        ]);
+
+        let audit = index.audit_lineage();
+        assert_eq!(audit.resolved_edge_count, 1);
+        assert_eq!(audit.missing_parent_edge_count, 1);
+        assert_eq!(audit.cross_scope_edge_count, 1);
+        assert_eq!(audit.edges.len(), 3);
+        assert!(audit.cycle_components.is_empty());
+        assert_eq!(
+            audit.edges
+                .iter()
+                .find(|edge| edge.parent_event_id == "private-parent")
+                .unwrap()
+                .status,
+            LineageEdgeStatusV1::CrossScopeParent
+        );
+    }
+
+    #[test]
+    fn lineage_audit_finds_exact_cycle_components_without_marking_downstream_nodes() {
+        let mut a = document("a", "tenant-a", "event a", 1, 1, None);
+        a.parent_event_ids = vec!["b".into()];
+        let mut b = document("b", "tenant-a", "event b", 1, 1, None);
+        b.parent_event_ids = vec!["c".into()];
+        let mut c = document("c", "tenant-a", "event c", 1, 1, None);
+        c.parent_event_ids = vec!["a".into()];
+        let mut downstream = document("downstream", "tenant-a", "derived event", 1, 1, None);
+        downstream.parent_event_ids = vec!["a".into()];
+
+        let audit = index(vec![downstream, c, a, b]).audit_lineage();
+        assert_eq!(
+            audit.cycle_components,
+            vec![vec!["a".to_owned(), "b".to_owned(), "c".to_owned()]]
+        );
+        assert_eq!(audit.resolved_edge_count, 4);
+        assert_eq!(audit.missing_parent_edge_count, 0);
+        assert_eq!(audit.cross_scope_edge_count, 0);
     }
 
     #[test]
