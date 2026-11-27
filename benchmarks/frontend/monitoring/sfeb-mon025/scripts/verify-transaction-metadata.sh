@@ -60,15 +60,20 @@ jq -n --arg batch "$BATCH_ID" --argjson expected "$EXPECTED_COUNT" --slurpfile r
   | ($raw_events | group_by(.event_id)) as $event_groups
   | [ $event_groups[] | select((map(tojson) | unique | length) > 1) | .[0].event_id ] as $conflicts
   | [ $event_groups[] | .[0] ] as $events
-  | [ $tx[0][] | .payload | select(.status? == "BEGIN") ] as $begins
-  | [ $tx[0][] | .payload | select(.status? == "END") ] as $ends
+  | [ $tx[0][] | .payload | select(.status? == "BEGIN") ] as $raw_begins
+  | ($raw_begins | group_by(.id)) as $begin_groups
+  | [ $begin_groups[] | select((map(tojson) | unique | length) > 1) | .[0].id ] as $begin_conflicts
+  | [ $begin_groups[] | .[0] ] as $begins
+  | [ $tx[0][] | .payload | select(.status? == "END") ] as $raw_ends
+  | ($raw_ends | group_by(.id)) as $end_groups
+  | [ $end_groups[] | select((map(tojson) | unique | length) > 1) | .[0].id ] as $end_conflicts
+  | [ $end_groups[] | .[0] ] as $ends
   | ($events | group_by(.transaction_id)) as $groups
   | [ $groups[]
       | . as $group
       | ($group[0].transaction_id) as $tid
-      | ($tid | if type == "string" then split(":")[0] else "" end) as $xid
       | ([$ends[] | select(.id == $tid)]) as $end
-      | ([$begins[] | select((.id | split(":")[0]) == $xid)]) as $begin
+      | ([$begins[] | select(.id == $tid)]) as $begin
       | ($group | map(.total_order) | sort) as $orders
       | ($group | map(.data_collection_order) | sort) as $collection_orders
       | {
@@ -92,12 +97,18 @@ jq -n --arg batch "$BATCH_ID" --argjson expected "$EXPECTED_COUNT" --slurpfile r
       observed_raw_messages:($raw_events | length),
       observed_unique_event_ids:($events | length),
       exact_duplicate_replays:(($raw_events | length) - ($events | length)),
+      exact_duplicate_begin_replays:(($raw_begins | length) - ($begins | length)),
+      exact_duplicate_end_replays:(($raw_ends | length) - ($ends | length)),
       conflicting_event_ids:$conflicts,
+      conflicting_begin_ids:$begin_conflicts,
+      conflicting_end_ids:$end_conflicts,
       events_without_transaction_id:([$events[] | select(.transaction_id == null)] | length),
       transaction_groups:$checks,
       complete:(
         (($events | length) == $expected)
         and (($conflicts | length) == 0)
+        and (($begin_conflicts | length) == 0)
+        and (($end_conflicts | length) == 0)
         and (all($events[]; .transaction_id != null))
         and (all($checks[]; .boundary_pair_complete and .event_count_matches and .total_order_contiguous and .collection_order_contiguous))
       )
