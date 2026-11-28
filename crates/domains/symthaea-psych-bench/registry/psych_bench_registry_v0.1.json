@@ -835,9 +835,10 @@
         "exclusions": [
           "The fixture is hand-authored and synthetic; it is not a validated psychometric instrument or human norm.",
           "The baseline policies are transparent controls, not trained Symthaea agents or external foundation-model competitors.",
-          "The initial version scores clarification requests against evaluator-known opportunities but does not yet execute multi-turn clarification exchanges.",
           "Relative action-cost units are not wall-clock latency, tokens, energy or monetary cost.",
-          "The expected-value-of-information control uses hand-authored probability estimates and a normalized decision-risk request burden; it is not calibrated empirical EVSI."
+          "The expected-value-of-information control uses hand-authored probability estimates and a normalized decision-risk request burden; it is not calibrated empirical EVSI.",
+          "The task supports only one targeted clarification and one follow-up decision per item; it is not a general multi-turn dialogue benchmark.",
+          "The optional Symthaea snapshot helper transfers CognitiveLoopService prediction_confidence as an instrumentation signal, but that global signal has not been validated as calibrated answer-specific confidence."
         ]
       },
       "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/metacognition/selective_prediction_task.rs",
@@ -1005,14 +1006,15 @@
         "status": "smoke_controls_only",
         "positive_controls": [
           "premise-and-freshness-aware policy on the fixture's false-premise, stale-source and resolvable-clarification cases",
-          "expected-value-of-information heuristic using observation-visible resolution and post-clarification estimates"
+          "expected-value-of-information heuristic using observation-visible resolution and post-clarification estimates",
+          "runtime-confidence policy adapter that consumes a caller-supplied per-item system confidence; optional Symthaea snapshot instrumentation is not a measured model result"
         ],
         "negative_controls": [
           "always-answer policy",
           "always-abstain policy",
           "evidence-only threshold policy"
         ],
-        "note": "Controls are intended to test that false-premise awareness and useful clarification matter while universal abstention is not rewarded as task success. All policies share the same fixture and manifest digest."
+        "note": "Five transparent controls share one frozen fixture; a separate RuntimeConfidencePolicy is available through the observation-only callback for model-provided confidence. Each resolvable request receives one evaluator-mediated updated observation and one follow-up decision. The fixture remains synthetic and all model/runtime comparison claims are ineligible."
       },
       "comparison_eligibility": {
         "inter_system_same_protocol": "not_eligible_until_external_adapters_multiturn_protocol_and_runner_validation",
