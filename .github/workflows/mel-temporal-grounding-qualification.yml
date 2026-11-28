@@ -430,6 +430,7 @@ jobs:
             and .observation_count == 2
             and .source_work_cluster_count == 2
             and .crossed_performer_count == 1
+            and .crossed_performance_count == 0
             and .work_cluster_bootstrap_permitted_under_declared_assumption == false
             and .crossed_inference_required == true
             and .performer_identity_authenticated == false
