@@ -417,6 +417,23 @@ jobs:
             and .transform_bytes_recomputed == false
           ' "$RUNNER_TEMP/temporal-equivariance-report.json" > /dev/null
 
+      - name: Check sampling-design schema contract
+        if: hashFiles('tools/mel-temporal-grounding-qualifier/schemas/mel-music-performance-identity-sampling-design-v1.schema.json') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema="tools/mel-temporal-grounding-qualifier/schemas/mel-music-performance-identity-sampling-design-v1.schema.json"
+          jq -e '
+            ."$schema" == "https://json-schema.org/draft/2020-12/schema"
+            and .properties.observations.minItems == 1
+            and ."$defs".arm.properties.performer_identity_sha256."$ref" == "#/$defs/digest"
+            and ."$defs".arm.properties.session_identity_sha256."$ref" == "#/$defs/digest"
+            and ."$defs".arm.properties.take_identity_sha256."$ref" == "#/$defs/digest"
+            and ."$defs".arm.properties.performance_identity_sha256."$ref" == "#/$defs/digest"
+            and ."$defs".observation.properties.source_work_lineage_sha256."$ref" == "#/$defs/digest"
+            and (.allOf | length) == 1
+          ' "$schema" > /dev/null
+
       - name: Replay crossed performer sampling-design admission when module is present
         if: hashFiles('tools/mel-temporal-grounding-qualifier/src/music_performance_identity_sampling_design.rs') != ''
         shell: bash
