@@ -94,6 +94,22 @@ pub fn mirex_beat_scoring_receipt(
     task: MirexScoringTask,
     sample_rate_hz: u32,
 ) -> MirexBeatScoringReceiptV1 {
+    mirex_beat_scoring_receipt_with_trim(
+        task,
+        sample_rate_hz,
+        if task == MirexScoringTask::BeatTracking {
+            MIREX_INITIAL_TRIM_SECONDS
+        } else {
+            0
+        },
+    )
+}
+
+pub(crate) fn mirex_beat_scoring_receipt_with_trim(
+    task: MirexScoringTask,
+    sample_rate_hz: u32,
+    initial_trim_seconds: u64,
+) -> MirexBeatScoringReceiptV1 {
     MirexBeatScoringReceiptV1 {
         schema_version: MIREX_BEAT_SCORE_SCHEMA_VERSION,
         task,
@@ -103,11 +119,7 @@ pub fn mirex_beat_scoring_receipt(
         reference_library_version: MIR_EVAL_REFERENCE_VERSION.to_string(),
         reference_library_commit: MIR_EVAL_REFERENCE_COMMIT.to_string(),
         sample_rate_hz,
-        initial_trim_seconds: if task == MirexScoringTask::BeatTracking {
-            MIREX_INITIAL_TRIM_SECONDS
-        } else {
-            0
-        },
+        initial_trim_seconds,
         event_f_measure_tolerance_ms: MIREX_BEAT_F_MEASURE_TOLERANCE_MS,
         cemgil_sigma_ms: MIREX_CEMGIL_SIGMA_MS,
         continuity_phase_threshold_ppm: MIREX_CONTINUITY_PHASE_THRESHOLD_PPM,
@@ -283,6 +295,26 @@ pub fn score_mirex_beat_track(
     sample_rate_hz: u32,
     total_frames: u64,
 ) -> Result<MirexBeatTrackReportV1, MirexBeatMetricError> {
+    score_mirex_beat_track_with_trim(
+        reference_frames,
+        estimated_frames,
+        sample_rate_hz,
+        total_frames,
+        MIREX_INITIAL_TRIM_SECONDS,
+    )
+}
+
+/// Score a source-local event list with an explicit initial-trim policy.
+///
+/// Segment adapters use this to distinguish source-global five-second trim,
+/// per-segment-local five-second trim, and no trim for the downbeat task.
+pub(crate) fn score_mirex_beat_track_with_trim(
+    reference_frames: &[u64],
+    estimated_frames: &[u64],
+    sample_rate_hz: u32,
+    total_frames: u64,
+    initial_trim_seconds: u64,
+) -> Result<MirexBeatTrackReportV1, MirexBeatMetricError> {
     validate_event_inputs(
         reference_frames,
         estimated_frames,
@@ -290,7 +322,8 @@ pub fn score_mirex_beat_track(
         total_frames,
     )?;
 
-    let trim_frame = u64::from(sample_rate_hz) * MIREX_INITIAL_TRIM_SECONDS;
+    let trim_frame =
+        u64::from(sample_rate_hz).saturating_mul(initial_trim_seconds);
     let reference: Vec<u64> = reference_frames
         .iter()
         .copied()
@@ -303,12 +336,12 @@ pub fn score_mirex_beat_track(
         .collect();
 
     let scores = score_trimmed_beat_frames(&reference, &estimated, sample_rate_hz);
-
     Ok(MirexBeatTrackReportV1 {
         schema_version: MIREX_BEAT_SCORE_SCHEMA_VERSION,
-        scoring_receipt: mirex_beat_scoring_receipt(
+        scoring_receipt: mirex_beat_scoring_receipt_with_trim(
             MirexScoringTask::BeatTracking,
             sample_rate_hz,
+            initial_trim_seconds,
         ),
         scores,
         reference_beats_input: reference_frames.len() as u64,
@@ -316,7 +349,7 @@ pub fn score_mirex_beat_track(
         reference_beats_scored: reference.len() as u64,
         estimated_beats_scored: estimated.len() as u64,
         sample_rate_hz,
-        initial_trim_seconds: MIREX_INITIAL_TRIM_SECONDS,
+        initial_trim_seconds,
     })
 }
 
