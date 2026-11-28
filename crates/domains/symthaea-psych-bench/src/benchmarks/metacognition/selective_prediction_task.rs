@@ -1367,5 +1367,12 @@ mod tests {
             validate_items(&bad_estimate),
             Err(SelectivePredictionTaskError::InvalidClarificationObservation { .. })
         ));
+
+        let mut bad_reported_confidence = fixture_items();
+        bad_reported_confidence[0].observation.reported_confidence = f64::NAN;
+        assert!(matches!(
+            validate_items(&bad_reported_confidence),
+            Err(SelectivePredictionTaskError::InvalidPolicyConfidence { index: 0 })
+        ));
     }
 }
