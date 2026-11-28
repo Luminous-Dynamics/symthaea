@@ -64,6 +64,7 @@ pub mod embodiment_scene_graph;
 pub mod embodiment_action_timeline;
 pub mod embodiment_multiparty_control;
 pub mod embodiment_stream_engagement;
+pub mod embodiment_floor_transition;
 pub mod roi_calibration;
 pub mod embodiment_turn_control;
 pub mod embodiment_transition;
