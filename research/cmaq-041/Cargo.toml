@@ -1,0 +1,9 @@
+[package]
+name = "cmaq-041-intervention-scorecard"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Operational scorecard for monitoring-to-intervention evaluation"
+
+[workspace]

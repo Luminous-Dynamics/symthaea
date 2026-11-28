@@ -1,0 +1,37 @@
+name: CMAQ-041 operational intervention scorecard
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-041/**"
+      - ".github/workflows/cmaq-041.yml"
+  push:
+    branches:
+      - "research/cmaq-041-*"
+    paths:
+      - "research/cmaq-041/**"
+      - ".github/workflows/cmaq-041.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-041-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  intervention-scorecard:
+    name: intervention-scorecard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-041/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-041/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-041/Cargo.toml --locked --all-targets -- -D warnings
