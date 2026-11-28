@@ -1,0 +1,596 @@
+// Copyright (C) 2026 Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Evidence-aware adapter contract for the official LongMemEval-V2 Memory API.
+//!
+//! The official backend interface exposes only question text and an optional
+//! image to query(), plus a run-local opaque query invocation ID. The harness
+//! calls post_query_hook() before truncating context. This crate therefore
+//! requires a second, outer-runner receipt after truncation and after the exact
+//! reader request/response are available.
+//!
+//! It never accepts question IDs, question types, gold answers or grader labels
+//! as memory-query inputs. All content is represented by digests in receipts.
+
+use std::collections::BTreeSet;
+
+use serde::{Deserialize, Serialize};
+
+pub const ADAPTER_SCHEMA_V1: &str = "mace_longmemeval_v2_adapter_receipt_v1";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LongMemEvalTierV1 { Small, Medium }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LongMemEvalDomainV1 { Web, Enterprise }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextItemKindV1 { Text, Image }
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrajectoryInsertReceiptV1 {
+    pub schema_version: String,
+    pub run_id: String,
+    pub tier: LongMemEvalTierV1,
+    pub domain: LongMemEvalDomainV1,
+    /// Monotonically increasing order supplied by the official harness.
+    pub insert_order: u64,
+    pub trajectory_sha256: String,
+    pub payload_sha256: String,
+    pub source_snapshot_sha256: String,
+    pub inserted_at_monotonic_ns: u64,
+    pub receipt_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MemoryQueryInputV1 {
+    pub schema_version: String,
+    pub run_id: String,
+    /// The official harness uses uuid.uuid4().hex; this is not a dataset question ID.
+    pub query_invocation_id: String,
+    pub question_text_sha256: String,
+    pub question_image_sha256: Option<String>,
+    /// Only query text and optional question image are represented here.
+    /// No question ID, question type, gold answer, eval function or grader label.
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreQueryContextItemV1 {
+    pub ordinal: u32,
+    pub kind: ContextItemKindV1,
+    /// SHA-256 of UTF-8 text bytes or image file bytes, not an image path.
+    pub context_item_sha256: String,
+    pub evidence_use_receipt_sha256: String,
+    pub source_lineage_receipt_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreQuerySelectionReceiptV1 {
+    pub schema_version: String,
+    pub run_id: String,
+    pub query_invocation_id: String,
+    pub query_input_sha256: String,
+    pub selection_policy_sha256: String,
+    /// Exact ordered evidence-item list returned by Memory.query before token truncation.
+    pub selected_items: Vec<PreQueryContextItemV1>,
+    pub pre_truncation_items_sha256: String,
+    pub receipt_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FinalContextItemV1 {
+    pub ordinal: u32,
+    pub kind: ContextItemKindV1,
+    /// Hash of the final text/image bytes supplied to the fixed reader.
+    pub context_item_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExposedEvidenceItemV1 {
+    pub ordinal: u32,
+    pub kind: ContextItemKindV1,
+    pub context_item_sha256: String,
+    pub evidence_use_receipt_sha256: String,
+    pub source_lineage_receipt_sha256: String,
+    /// Digest of the exact post-truncation reader request containing this item.
+    pub reader_request_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReaderExposureReceiptV1 {
+    pub schema_version: String,
+    pub run_id: String,
+    pub query_invocation_id: String,
+    pub pre_query_selection_receipt_sha256: String,
+    pub final_context_items_sha256: String,
+    pub reader_request_sha256: String,
+    pub reader_response_sha256: String,
+    pub selected_item_count: u32,
+    pub exposed_item_count: u32,
+    pub context_budget_tokens: u32,
+    pub original_context_tokens: u32,
+    pub final_context_tokens: u32,
+    pub context_was_truncated: bool,
+    pub memory_query_latency_ns: u64,
+    pub post_query_hook_latency_ns: u64,
+    pub exposed_evidence: Vec<ExposedEvidenceItemV1>,
+    pub receipt_sha256: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AdapterRejectV1 {
+    InvalidIdentity,
+    InvalidDigest,
+    InvalidInsertOrder,
+    DuplicateTrajectory,
+    RunOrDomainMismatch,
+    InvalidQueryInvocationId,
+    QueryInputMismatch,
+    InvalidContextOrdinal,
+    DuplicateContextItem,
+    PreQueryReceiptMismatch,
+    FinalContextNotPrefix,
+    FinalContextDigestMismatch,
+    InvalidTokenBudget,
+    InvalidTruncationFlag,
+    MissingReaderRequest,
+    MissingReaderResponse,
+    IntegrityMismatch,
+    SerializationFailure,
+}
+
+fn digest_bytes(bytes: &[u8]) -> String {
+    blake3::hash(bytes).to_hex().to_string()
+}
+
+fn digest_serialized<T: Serialize>(value: &T) -> Result<String, AdapterRejectV1> {
+    serde_json::to_vec(value)
+        .map(|bytes| digest_bytes(&bytes))
+        .map_err(|_| AdapterRejectV1::SerializationFailure)
+}
+
+fn valid_digest(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn nonempty(value: &str) -> bool {
+    !value.trim().is_empty() && value.len() <= 512
+}
+
+fn valid_query_invocation_id(value: &str) -> bool {
+    value.len() == 32 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn trajectory_receipt_digest(value: &TrajectoryInsertReceiptV1) -> Result<String, AdapterRejectV1> {
+    let mut unsigned = value.clone();
+    unsigned.receipt_sha256.clear();
+    digest_serialized(&unsigned)
+}
+
+impl TrajectoryInsertReceiptV1 {
+    pub fn verify_integrity(&self) -> bool {
+        trajectory_receipt_digest(self).is_ok_and(|value| value == self.receipt_sha256)
+    }
+}
+
+pub fn seal_trajectory_insert_v1(
+    mut value: TrajectoryInsertReceiptV1,
+) -> Result<TrajectoryInsertReceiptV1, AdapterRejectV1> {
+    value.schema_version = ADAPTER_SCHEMA_V1.into();
+    for hash in [
+        value.trajectory_sha256.as_str(),
+        value.payload_sha256.as_str(),
+        value.source_snapshot_sha256.as_str(),
+    ] {
+        if !valid_digest(hash) { return Err(AdapterRejectV1::InvalidDigest); }
+    }
+    if !nonempty(&value.run_id) { return Err(AdapterRejectV1::InvalidIdentity); }
+    value.receipt_sha256.clear();
+    value.receipt_sha256 = trajectory_receipt_digest(&value)?;
+    Ok(value)
+}
+
+/// Check that insert receipts follow the harness' supplied order and describe
+/// one run, tier, domain and source snapshot. It does not reorder trajectories.
+pub fn validate_trajectory_insert_sequence_v1(
+    receipts: &[TrajectoryInsertReceiptV1],
+) -> Result<(), AdapterRejectV1> {
+    if receipts.is_empty() { return Ok(()); }
+    let first = &receipts[0];
+    let mut previous_order = None;
+    let mut seen_trajectories = BTreeSet::new();
+    for receipt in receipts {
+        if !receipt.verify_integrity() || receipt.schema_version != ADAPTER_SCHEMA_V1 {
+            return Err(AdapterRejectV1::IntegrityMismatch);
+        }
+        if receipt.run_id != first.run_id || receipt.tier != first.tier
+            || receipt.domain != first.domain
+            || receipt.source_snapshot_sha256 != first.source_snapshot_sha256 {
+            return Err(AdapterRejectV1::RunOrDomainMismatch);
+        }
+        if previous_order.is_some_and(|order| receipt.insert_order <= order) {
+            return Err(AdapterRejectV1::InvalidInsertOrder);
+        }
+        if !seen_trajectories.insert(receipt.trajectory_sha256.as_str()) {
+            return Err(AdapterRejectV1::DuplicateTrajectory);
+        }
+        previous_order = Some(receipt.insert_order);
+    }
+    Ok(())
+}
+
+impl MemoryQueryInputV1 {
+    pub fn verify_contract(&self) -> Result<(), AdapterRejectV1> {
+        if self.schema_version != ADAPTER_SCHEMA_V1 || !nonempty(&self.run_id) {
+            return Err(AdapterRejectV1::InvalidIdentity);
+        }
+        if !valid_query_invocation_id(&self.query_invocation_id) {
+            return Err(AdapterRejectV1::InvalidQueryInvocationId);
+        }
+        if !valid_digest(&self.question_text_sha256)
+            || self.question_image_sha256.as_deref().is_some_and(|value| !valid_digest(value)) {
+            return Err(AdapterRejectV1::InvalidDigest);
+        }
+        Ok(())
+    }
+}
+
+fn pre_query_digest(value: &PreQuerySelectionReceiptV1) -> Result<String, AdapterRejectV1> {
+    let mut unsigned = value.clone();
+    unsigned.receipt_sha256.clear();
+    digest_serialized(&unsigned)
+}
+
+impl PreQuerySelectionReceiptV1 {
+    pub fn verify_integrity(&self) -> bool {
+        pre_query_digest(self).is_ok_and(|value| value == self.receipt_sha256)
+    }
+}
+
+pub fn seal_pre_query_selection_v1(
+    query: &MemoryQueryInputV1,
+    selection_policy_sha256: String,
+    selected_items: Vec<PreQueryContextItemV1>,
+) -> Result<PreQuerySelectionReceiptV1, AdapterRejectV1> {
+    query.verify_contract()?;
+    if !valid_digest(&selection_policy_sha256) { return Err(AdapterRejectV1::InvalidDigest); }
+    let mut seen = BTreeSet::new();
+    for (index, item) in selected_items.iter().enumerate() {
+        if item.ordinal != index as u32 { return Err(AdapterRejectV1::InvalidContextOrdinal); }
+        if !valid_digest(&item.context_item_sha256)
+            || !valid_digest(&item.evidence_use_receipt_sha256)
+            || !valid_digest(&item.source_lineage_receipt_sha256) {
+            return Err(AdapterRejectV1::InvalidDigest);
+        }
+        if !seen.insert((item.kind, item.context_item_sha256.as_str())) {
+            return Err(AdapterRejectV1::DuplicateContextItem);
+        }
+    }
+    let mut receipt = PreQuerySelectionReceiptV1 {
+        schema_version: ADAPTER_SCHEMA_V1.into(),
+        run_id: query.run_id.clone(),
+        query_invocation_id: query.query_invocation_id.clone(),
+        query_input_sha256: digest_serialized(query)?,
+        selection_policy_sha256,
+        pre_truncation_items_sha256: digest_serialized(&selected_items)?,
+        selected_items,
+        receipt_sha256: String::new(),
+    };
+    receipt.receipt_sha256 = pre_query_digest(&receipt)?;
+    Ok(receipt)
+}
+
+fn reader_exposure_digest(value: &ReaderExposureReceiptV1) -> Result<String, AdapterRejectV1> {
+    let mut unsigned = value.clone();
+    unsigned.receipt_sha256.clear();
+    digest_serialized(&unsigned)
+}
+
+impl ReaderExposureReceiptV1 {
+    pub fn verify_integrity(&self) -> bool {
+        reader_exposure_digest(self).is_ok_and(|value| value == self.receipt_sha256)
+    }
+}
+
+/// Finalize exposure only after the official harness has truncated the
+/// pre-query context, built the exact reader messages, and received the reader
+/// response. Since the official harness truncates by ordered prefix, every
+/// exposed item must equal the corresponding pre-query item at the same ordinal.
+#[allow(clippy::too_many_arguments)]
+pub fn finalize_reader_exposure_v1(
+    query: &MemoryQueryInputV1,
+    pre_query: &PreQuerySelectionReceiptV1,
+    final_items: &[FinalContextItemV1],
+    context_budget_tokens: u32,
+    original_context_tokens: u32,
+    final_context_tokens: u32,
+    context_was_truncated: bool,
+    reader_request_sha256: String,
+    reader_response_sha256: String,
+    memory_query_latency_ns: u64,
+    post_query_hook_latency_ns: u64,
+) -> Result<ReaderExposureReceiptV1, AdapterRejectV1> {
+    query.verify_contract()?;
+    if !pre_query.verify_integrity() {
+        return Err(AdapterRejectV1::PreQueryReceiptMismatch);
+    }
+    if pre_query.run_id != query.run_id
+        || pre_query.query_invocation_id != query.query_invocation_id
+        || pre_query.query_input_sha256 != digest_serialized(query)? {
+        return Err(AdapterRejectV1::QueryInputMismatch);
+    }
+    if !valid_digest(&reader_request_sha256) {
+        return Err(AdapterRejectV1::MissingReaderRequest);
+    }
+    if !valid_digest(&reader_response_sha256) {
+        return Err(AdapterRejectV1::MissingReaderResponse);
+    }
+    if context_budget_tokens == 0 || final_context_tokens > context_budget_tokens
+        || final_context_tokens > original_context_tokens {
+        return Err(AdapterRejectV1::InvalidTokenBudget);
+    }
+    if context_was_truncated != (original_context_tokens > final_context_tokens) {
+        return Err(AdapterRejectV1::InvalidTruncationFlag);
+    }
+    if final_items.len() > pre_query.selected_items.len() {
+        return Err(AdapterRejectV1::FinalContextNotPrefix);
+    }
+
+    let mut seen_final = BTreeSet::new();
+    let mut exposed_evidence = Vec::with_capacity(final_items.len());
+    for (index, item) in final_items.iter().enumerate() {
+        let selected = pre_query.selected_items.get(index).ok_or(AdapterRejectV1::FinalContextNotPrefix)?;
+        if item.ordinal != index as u32 || selected.ordinal != index as u32 {
+            return Err(AdapterRejectV1::InvalidContextOrdinal);
+        }
+        if item.kind != selected.kind || item.context_item_sha256 != selected.context_item_sha256 {
+            return Err(AdapterRejectV1::FinalContextNotPrefix);
+        }
+        if !valid_digest(&item.context_item_sha256) {
+            return Err(AdapterRejectV1::InvalidDigest);
+        }
+        if !seen_final.insert((item.kind, item.context_item_sha256.as_str())) {
+            return Err(AdapterRejectV1::DuplicateContextItem);
+        }
+        exposed_evidence.push(ExposedEvidenceItemV1 {
+            ordinal: item.ordinal,
+            kind: item.kind,
+            context_item_sha256: item.context_item_sha256.clone(),
+            evidence_use_receipt_sha256: selected.evidence_use_receipt_sha256.clone(),
+            source_lineage_receipt_sha256: selected.source_lineage_receipt_sha256.clone(),
+            reader_request_sha256: reader_request_sha256.clone(),
+        });
+    }
+
+    let mut receipt = ReaderExposureReceiptV1 {
+        schema_version: ADAPTER_SCHEMA_V1.into(),
+        run_id: query.run_id.clone(),
+        query_invocation_id: query.query_invocation_id.clone(),
+        pre_query_selection_receipt_sha256: pre_query.receipt_sha256.clone(),
+        final_context_items_sha256: digest_serialized(final_items)?,
+        reader_request_sha256,
+        reader_response_sha256,
+        selected_item_count: pre_query.selected_items.len() as u32,
+        exposed_item_count: final_items.len() as u32,
+        context_budget_tokens,
+        original_context_tokens,
+        final_context_tokens,
+        context_was_truncated,
+        memory_query_latency_ns,
+        post_query_hook_latency_ns,
+        exposed_evidence,
+        receipt_sha256: String::new(),
+    };
+    receipt.receipt_sha256 = reader_exposure_digest(&receipt)?;
+    Ok(receipt)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn digest(value: &str) -> String { digest_bytes(value.as_bytes()) }
+
+    fn query() -> MemoryQueryInputV1 {
+        MemoryQueryInputV1 {
+            schema_version: ADAPTER_SCHEMA_V1.into(),
+            run_id: "lme-small-web".into(),
+            query_invocation_id: "0123456789abcdef0123456789abcdef".into(),
+            question_text_sha256: digest("how to complete workflow"),
+            question_image_sha256: Some(digest("question-image-bytes")),
+        }
+    }
+
+    fn item(ordinal: u32, label: &str) -> PreQueryContextItemV1 {
+        PreQueryContextItemV1 {
+            ordinal,
+            kind: ContextItemKindV1::Text,
+            context_item_sha256: digest(&format!("context-{label}")),
+            evidence_use_receipt_sha256: digest(&format!("use-{label}")),
+            source_lineage_receipt_sha256: digest(&format!("lineage-{label}")),
+        }
+    }
+
+    fn selection() -> PreQuerySelectionReceiptV1 {
+        seal_pre_query_selection_v1(&query(), digest("selection-policy"), vec![item(0,"a"),item(1,"b"),item(2,"c")]).unwrap()
+    }
+
+    fn finalize(items: Vec<FinalContextItemV1>, budget: u32, original: u32, final_tokens: u32, truncated: bool) -> Result<ReaderExposureReceiptV1, AdapterRejectV1> {
+        finalize_reader_exposure_v1(
+            &query(), &selection(),
+            &items, budget, original, final_tokens, truncated,
+            digest("exact-reader-request"), digest("reader-response"),
+            120_000_000, 1_000_000,
+        )
+    }
+
+    #[test]
+    fn only_the_final_context_prefix_is_marked_exposed() {
+        let selected = selection();
+        let value = finalize(
+            vec![
+                FinalContextItemV1 { ordinal: 0, kind: ContextItemKindV1::Text, context_item_sha256: selected.selected_items[0].context_item_sha256.clone() },
+                FinalContextItemV1 { ordinal: 1, kind: ContextItemKindV1::Text, context_item_sha256: selected.selected_items[1].context_item_sha256.clone() },
+            ],
+            1000, 1400, 900, true,
+        ).unwrap();
+        assert_eq!(value.selected_item_count, 3);
+        assert_eq!(value.exposed_item_count, 2);
+        assert_eq!(value.exposed_evidence[0].evidence_use_receipt_sha256, selected.selected_items[0].evidence_use_receipt_sha256);
+        assert_eq!(value.exposed_evidence[1].evidence_use_receipt_sha256, selected.selected_items[1].evidence_use_receipt_sha256);
+        assert!(value.verify_integrity());
+    }
+
+    #[test]
+    fn no_truncation_exposes_the_full_selected_sequence() {
+        let selected = selection();
+        let items = selected.selected_items.iter().map(|value| FinalContextItemV1 {
+            ordinal: value.ordinal, kind: value.kind, context_item_sha256: value.context_item_sha256.clone()
+        }).collect();
+        let receipt = finalize(items, 2000, 1200, 1200, false).unwrap();
+        assert_eq!(receipt.exposed_item_count, 3);
+        assert!(!receipt.context_was_truncated);
+    }
+
+    #[test]
+    fn reordered_or_substituted_context_is_rejected() {
+        let selected = selection();
+        let reordered = vec![
+            FinalContextItemV1 { ordinal: 0, kind: ContextItemKindV1::Text, context_item_sha256: selected.selected_items[1].context_item_sha256.clone() }
+        ];
+        assert_eq!(finalize(reordered, 100, 80, 70, true), Err(AdapterRejectV1::FinalContextNotPrefix));
+    }
+
+    #[test]
+    fn omitted_tail_items_are_not_claimed_as_exposed() {
+        let selected = selection();
+        let first = FinalContextItemV1 {
+            ordinal: 0, kind: selected.selected_items[0].kind,
+            context_item_sha256: selected.selected_items[0].context_item_sha256.clone()
+        };
+        let receipt = finalize(vec![first], 100, 500, 80, true).unwrap();
+        assert_eq!(receipt.exposed_evidence.len(), 1);
+        assert_eq!(receipt.exposed_evidence[0].ordinal, 0);
+    }
+
+    #[test]
+    fn token_budget_and_truncation_flags_must_match_observed_counts() {
+        let selected = selection();
+        let items = vec![];
+        assert_eq!(finalize(items.clone(), 10, 100, 20, true), Err(AdapterRejectV1::InvalidTokenBudget));
+        assert_eq!(finalize(items, 100, 100, 100, true), Err(AdapterRejectV1::InvalidTruncationFlag));
+        let selected_empty = seal_pre_query_selection_v1(&query(), digest("policy"), vec![]).unwrap();
+        let result = finalize_reader_exposure_v1(
+            &query(), &selected_empty, &[], 100, 100, 100, false,
+            digest("request"), digest("response"), 1, 1
+        ).unwrap();
+        assert_eq!(result.exposed_item_count, 0);
+        assert!(result.verify_integrity());
+    }
+
+    #[test]
+    fn query_contract_contains_no_question_id_or_evaluator_labels() {
+        let encoded = serde_json::to_value(query()).unwrap();
+        let object = encoded.as_object().unwrap();
+        assert!(object.contains_key("query_invocation_id"));
+        assert!(object.contains_key("question_text_sha256"));
+        for forbidden in ["question_id","question_type","gold_answer","answer_gold","eval_function","grader_label"] {
+            assert!(!object.contains_key(forbidden));
+        }
+    }
+
+    #[test]
+    fn query_invocation_id_must_be_opaque_uuid_hex() {
+        let mut invalid = query();
+        invalid.query_invocation_id = "secret-question-id".into();
+        assert_eq!(invalid.verify_contract(), Err(AdapterRejectV1::InvalidQueryInvocationId));
+    }
+
+    #[test]
+    fn prequery_metadata_is_bound_to_the_exact_query_invocation() {
+        let mut invalid = selection();
+        invalid.query_invocation_id = "fedcba9876543210fedcba9876543210".into();
+        assert_eq!(
+            finalize_reader_exposure_v1(
+                &query(), &invalid, &[], 10, 0, 0, false,
+                digest("request"), digest("response"), 0, 0
+            ),
+            Err(AdapterRejectV1::QueryInputMismatch)
+        );
+    }
+
+    #[test]
+    fn insertion_receipts_preserve_harness_order_and_reject_duplicates() {
+        let receipt = |order, id: &str| seal_trajectory_insert_v1(TrajectoryInsertReceiptV1 {
+            schema_version: ADAPTER_SCHEMA_V1.into(),
+            run_id: "run-1".into(), tier: LongMemEvalTierV1::Small, domain: LongMemEvalDomainV1::Web,
+            insert_order: order, trajectory_sha256: digest(id), payload_sha256: digest(&format!("payload-{id}")),
+            source_snapshot_sha256: digest("snapshot"), inserted_at_monotonic_ns: order * 10,
+            receipt_sha256: String::new(),
+        }).unwrap();
+        let first = receipt(0,"a");
+        let second = receipt(1,"b");
+        assert!(validate_trajectory_insert_sequence_v1(&[first.clone(),second.clone()]).is_ok());
+        assert_eq!(validate_trajectory_insert_sequence_v1(&[second.clone(),first.clone()]),Err(AdapterRejectV1::InvalidInsertOrder));
+        let duplicate = receipt(2,"a");
+        assert_eq!(validate_trajectory_insert_sequence_v1(&[first,duplicate]),Err(AdapterRejectV1::DuplicateTrajectory));
+    }
+
+    #[test]
+    fn cross_domain_or_snapshot_insert_receipts_are_rejected() {
+        let base = seal_trajectory_insert_v1(TrajectoryInsertReceiptV1 {
+            schema_version: ADAPTER_SCHEMA_V1.into(), run_id: "run-1".into(),
+            tier: LongMemEvalTierV1::Small, domain: LongMemEvalDomainV1::Web,
+            insert_order: 0, trajectory_sha256: digest("a"), payload_sha256: digest("payload-a"),
+            source_snapshot_sha256: digest("snapshot-a"), inserted_at_monotonic_ns: 10,
+            receipt_sha256: String::new(),
+        }).unwrap();
+        let mut second = base.clone();
+        second.insert_order = 1;
+        second.domain = LongMemEvalDomainV1::Enterprise;
+        second.trajectory_sha256 = digest("b");
+        second.payload_sha256 = digest("payload-b");
+        second.receipt_sha256.clear();
+        let second = seal_trajectory_insert_v1(second).unwrap();
+        assert_eq!(validate_trajectory_insert_sequence_v1(&[base,second]),Err(AdapterRejectV1::RunOrDomainMismatch));
+    }
+
+    #[test]
+    fn missing_reader_request_or_response_is_rejected() {
+        let selected = selection();
+        let items = vec![FinalContextItemV1 {
+            ordinal: 0, kind: selected.selected_items[0].kind,
+            context_item_sha256: selected.selected_items[0].context_item_sha256.clone()
+        }];
+        assert_eq!(
+            finalize_reader_exposure_v1(&query(), &selected, &items, 100, 50, 40, true, String::new(), digest("response"), 1, 1),
+            Err(AdapterRejectV1::MissingReaderRequest)
+        );
+        assert_eq!(
+            finalize_reader_exposure_v1(&query(), &selected, &items, 100, 50, 40, true, digest("request"), String::new(), 1, 1),
+            Err(AdapterRejectV1::MissingReaderResponse)
+        );
+    }
+
+    #[test]
+    fn final_receipt_digest_detects_mutation() {
+        let selected = selection();
+        let first = FinalContextItemV1 {
+            ordinal: 0, kind: selected.selected_items[0].kind,
+            context_item_sha256: selected.selected_items[0].context_item_sha256.clone()
+        };
+        let mut receipt = finalize(vec![first], 100, 80, 70, true).unwrap();
+        receipt.reader_request_sha256 = digest("different-request");
+        assert!(!receipt.verify_integrity());
+    }
+}
