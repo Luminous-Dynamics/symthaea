@@ -6,6 +6,7 @@ on:
       - research/grid-continuous-retrieval-qualification-v0
     paths:
       - "crates/core/symthaea-core/src/hdc/grid_encoder.rs"
+      - "Cargo.toml"
       - ".github/workflows/grid-continuous-retrieval.yml"
   pull_request:
     branches: [main]
