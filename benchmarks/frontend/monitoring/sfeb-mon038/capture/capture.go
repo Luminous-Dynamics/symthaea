@@ -149,7 +149,7 @@ type Result struct {
  PartitionCount int `json:"partition_count"`
  VisibleRecordCount int `json:"visible_record_count"`
  BusinessEventCount int `json:"business_event_count"`
- OffsetGapsAccepted int64 `json:"offset_gaps_accepted"`
+ OffsetGapSlotsUnclassified int64 `json:"offset_gap_slots_unclassified"`
  Partitions []PartitionSummary `json:"partitions"`
  Issues []Issue `json:"issues"`
  ReasonCodes []string `json:"reason_codes"`
@@ -335,7 +335,8 @@ func Evaluate(in Input)Result{
   width:=p.EndOffsetExclusive-p.StartOffset
   gapSlots:=int64(0)
   if width>=int64(p.RecordCount){gapSlots=width-int64(p.RecordCount)}
-  out.OffsetGapsAccepted+=gapSlots
+  out.OffsetGapSlotsUnclassified+=gapSlots
+  if gapSlots>0{f.hold("offset_gap_slots_unclassified",p.Topic+":"+itoa(p.Partition))}
   out.Partitions=append(out.Partitions,PartitionSummary{Topic:p.Topic,Partition:p.Partition,StartOffset:p.StartOffset,EndOffsetExclusive:p.EndOffsetExclusive,LSO:p.LastStableOffsetAfter,Records:p.RecordCount,OffsetGapSlots:gapSlots,OffsetGapsObserved:gapSlots>0})
  }
  sort.Slice(out.Partitions,func(i,j int)bool{if out.Partitions[i].Topic!=out.Partitions[j].Topic{return out.Partitions[i].Topic<out.Partitions[j].Topic};return out.Partitions[i].Partition<out.Partitions[j].Partition})
