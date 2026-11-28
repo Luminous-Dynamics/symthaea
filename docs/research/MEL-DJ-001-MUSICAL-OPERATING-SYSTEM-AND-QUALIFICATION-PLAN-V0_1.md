@@ -780,3 +780,19 @@ The current review stack is:
 5. [#14327](https://github.com/Luminous-Dynamics/symthaea/issues/14327) — valid-segment/JSIR adapter remains pending.
 
 The implementation branches are reviewable and use only the existing `serde` and `serde_json` protocol dependencies. At the latest read, workflow jobs for the transition, manifest, beat-grid and metric PRs were queued; no compile/test pass was present. Local Rust formatting, compile, native/WASM tests and Clippy remain unrun because the execution environment does not have `rustc` or `cargo`. Authored tests and static source/schema read-back are not claimed as executed Rust qualification.
+
+
+## 38. MEL-DJ-011 implementation — independent valid-region scoring
+
+The valid-segment adapter is now in [PR #14330](https://github.com/Luminous-Dynamics/symthaea/pull/14330), stacked on the pinned metric scorer #14326.
+
+It accepts precomputed source-local beat/downbeat event arrays and a validated set of non-overlapping valid segments. It independently filters and scores each region, rebases events to that region's sample clock, and never creates an interval across invalid gaps. The output retains each region's metric vector and valid duration, then aggregates by either duration weighting or arithmetic mean per segment. Excluded event counts are computed once against the union of valid regions.
+
+The adapter exposes three beat-trim policies:
+- source-global five-second trim;
+- segment-local five-second trim;
+- no trim.
+
+That is deliberate: MIREX 2026's JSIR notes specify independent valid-segment scoring and duration weighting, but the precise clock origin for the beat task's five-second trim remains a separate protocol question. The chosen policy is recorded in the score report, not hidden.
+
+Downbeat scoring always uses no initial trim. The adapter requires valid-segment score evidence and its exact manifest digest, bounds event/segment resources, checks beat/downbeat source clocks and requires reference downbeats to be present in the reference beat sequence. It adds no dependencies beyond serde/serde_json. The branch contains nine authored Rust tests and a task-aware score schema; no Rust compile/test pass is claimed because the local environment lacks cargo/rustc.
