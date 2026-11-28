@@ -15,6 +15,7 @@ A threshold of 30 works does not repair a crossed sampling design. The design mu
 
 The sampling manifest binds each exact comparison item and pair to:
 - one source-work lineage digest;
+- source performance-realization identity for each arm, so a reused performance cannot be misclassified as independent merely because performer/session/take metadata differ;
 - CLEAN, Performance-STAY and Musical-FLIP arm membership;
 - the reducer-bound performer identity in each arm;
 - all declared participant identity commitments for multi-performer arms;
