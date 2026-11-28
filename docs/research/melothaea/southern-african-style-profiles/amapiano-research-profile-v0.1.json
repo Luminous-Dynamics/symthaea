@@ -1,0 +1,203 @@
+{
+  "schema_id": "org.luminousdynamics.melothaea.research-style-profile",
+  "schema_version": 1,
+  "record_kind": "research_profile_not_runtime_recipe",
+  "profile_id": "south-african-amapiano",
+  "display_name": "Amapiano",
+  "status": "research_only",
+  "current_catalog_reference": {
+    "catalog_id": 109,
+    "meaning": "existing taxonomy identity; not an executable composer route"
+  },
+  "scope": "Source-grounded research profile for a family of South African electronic dance-music practices. Not a single prescriptive formula, genre classifier, or claim of cultural authenticity.",
+  "historical_context": {
+    "summary": "Published scholarship situates Amapiano in South African township dance-music histories and discusses relationships with earlier forms including marabi, mbaqanga, bubblegum and kwaito. Accounts differ on origin dates, places, naming and influence; preserve multiple attributed histories rather than a single origin story.",
+    "claims": [
+      {
+        "id": "AMA-HIST-01",
+        "statement": "Amapiano emerged in South African township contexts around the early 2010s; one scholarly account places its emergence around 2012.",
+        "source_ids": [
+          "AMA-SRC-01"
+        ],
+        "limit": "Do not turn an approximate scholarly framing into a definitive origin date or single-place origin."
+      },
+      {
+        "id": "AMA-HIST-02",
+        "statement": "Its histories are connected to older South African township music, including marabi, mbaqanga, bubblegum and kwaito, alongside international musical influences and new production technologies.",
+        "source_ids": [
+          "AMA-SRC-01"
+        ],
+        "limit": "Influence is not a linear family tree and does not make these traditions interchangeable."
+      }
+    ]
+  },
+  "candidate_identity_axes": [
+    {
+      "id": "AMA-ARR-01",
+      "axis": "arrangement_and_form",
+      "observation": "Scholarly descriptions identify extended instrumental openings and gradual addition of musical layers in some Amapiano releases.",
+      "operational_hypothesis": "A style-conditioned composer should be able to plan and vary a long-form layer-entry/subtraction trajectory rather than defaulting to immediate verse-chorus entry.",
+      "source_ids": [
+        "AMA-SRC-02",
+        "AMA-SRC-03"
+      ],
+      "status": "literature_supported_candidate_not_universal",
+      "disconfirming_case": "Practitioner-identified Amapiano examples whose arrangement does not use extended instrumental introductions."
+    },
+    {
+      "id": "AMA-TIM-01",
+      "axis": "timbre_and_instrumentation",
+      "observation": "Accounts describe prominent keyboard/piano material, pads and bass sounds, including the distinctive log-drum bass timbre in many representative productions.",
+      "operational_hypothesis": "Represent keyboard roles, low-frequency melodic/percussive bass roles and layered pads independently; test role interaction rather than requiring a fixed instrument list.",
+      "source_ids": [
+        "AMA-SRC-01",
+        "AMA-SRC-02"
+      ],
+      "status": "literature_supported_candidate_not_universal",
+      "disconfirming_case": "Practitioner-identified examples with reduced piano/log-drum presence or alternative instrumentation."
+    },
+    {
+      "id": "AMA-RHY-01",
+      "axis": "rhythm_and_groove",
+      "observation": "Amapiano is described as dance-oriented and electronically produced, with local and global groove influences.",
+      "operational_hypothesis": "Represent the relationship between pulse, bass/log-drum phrases, percussion, syncopation and phrase-level density as separate, testable layers.",
+      "source_ids": [
+        "AMA-SRC-01",
+        "AMA-SRC-02"
+      ],
+      "status": "candidate_requires_practitioner_specification",
+      "disconfirming_case": "A single quantized pattern or one fixed BPM/meter fails to explain practitioner-selected examples."
+    },
+    {
+      "id": "AMA-HARM-01",
+      "axis": "pitch_and_harmony",
+      "observation": "Published accounts describe piano and jazz-influenced harmonic colour among Amapiano's resources.",
+      "operational_hypothesis": "Support keyboard voicings and harmonic motion as optional identity-bearing dimensions without imposing one chord loop or treating jazz influence as a sufficient genre definition.",
+      "source_ids": [
+        "AMA-SRC-02"
+      ],
+      "status": "candidate_requires_practitioner_specification",
+      "disconfirming_case": "Amapiano examples where harmony is sparse, static or not keyboard-led."
+    },
+    {
+      "id": "AMA-ROLE-01",
+      "axis": "production_and_collaboration",
+      "observation": "Scholarship discusses Amapiano as a technologically mediated, collaborative dance-music practice involving production, performance and dissemination contexts.",
+      "operational_hypothesis": "Keep producer/DJ, instrumental, vocal and performance roles representable without assuming every recording uses the same division of labour.",
+      "source_ids": [
+        "AMA-SRC-01",
+        "AMA-SRC-03"
+      ],
+      "status": "research_context_not_implementation_evidence",
+      "disconfirming_case": "Practitioner accounts that reject the proposed role decomposition for a given scene or substyle."
+    }
+  ],
+  "nearest_neighbour_questions": [
+    {
+      "comparison": "deep_house_and_soulful_house",
+      "question": "Which keyboard, bass, groove, arrangement and scene-context relationships are considered identity-bearing by practitioners, rather than merely shared electronic-dance conventions?"
+    },
+    {
+      "comparison": "kwaito",
+      "question": "Which rhythmic, arrangement and production continuities are historically related, and which traits distinguish Amapiano in particular?"
+    },
+    {
+      "comparison": "gqom",
+      "question": "How do melody/harmony prominence, low-frequency roles, rhythmic organization and arrangement trajectory differ across practitioner-selected examples?"
+    },
+    {
+      "comparison": "bacardi_and_other_local_dance_forms",
+      "question": "Which local production and rhythmic exchanges are influence, hybridization, shared practice or explicit distinction? Preserve multiple attributed accounts."
+    }
+  ],
+  "non_inferences": [
+    "Do not require every Amapiano composition to contain a log drum, piano lead, vocalist, fixed intro length, fixed BPM, fixed chord progression or identical drum grid.",
+    "Do not treat Amapiano as a single homogeneous style or erase scene, era, producer and substyle variation.",
+    "Do not infer artist, ethnicity, language, community membership or provenance from audio features.",
+    "Do not infer historical influence or cultural authenticity from musical feature similarity.",
+    "Do not use commercial recordings for training, public fixture redistribution or commercial evaluation without rights appropriate to each purpose."
+  ],
+  "implementation_readiness": {
+    "executable_composer_route": false,
+    "runtime_style_profile": false,
+    "qualified_renderer_profile": false,
+    "licensed_audio_corpus": false,
+    "practitioner_review": false,
+    "human_listening_qualification": false,
+    "allowed_now": [
+      "research",
+      "synthetic counterfactual design",
+      "source review",
+      "practitioner consultation planning"
+    ],
+    "prohibited_claims": [
+      "implemented Amapiano composer",
+      "authentic Amapiano rendering",
+      "SOTA performance",
+      "community approval"
+    ]
+  },
+  "required_next_evidence": [
+    "Practitioner-reviewed vocabulary and identity-bearing dimensions across more than one Amapiano scene/substyle.",
+    "Rights-cleared examples with composition, recording, performer, producer and usage scope kept distinct.",
+    "Contrastive examples against Kwaito, deep/soulful house, Gqom and locally nominated neighbours.",
+    "A symbolic profile contract that marks observed, inferred, inherited and unresolved fields separately.",
+    "A controlled style-identity study under performer, instrumentation and renderer variation."
+  ],
+  "source_ids": [
+    "AMA-SRC-01",
+    "AMA-SRC-02",
+    "AMA-SRC-03"
+  ],
+  "sources": [
+    {
+      "id": "AMA-SRC-01",
+      "title": "Kwaito as history: Complicating contemporary historiographies",
+      "author": "Dion Malcolm Eaby-Lomas",
+      "year": 2023,
+      "publication": "African Music, 12(1), 21–36",
+      "doi": "10.21504/amj.v12i1.2529",
+      "url": "https://doi.org/10.21504/amj.v12i1.2529",
+      "source_kind": "peer_reviewed_article",
+      "supports": [
+        "township music history",
+        "relations discussed among marabi, mbaqanga, bubblegum, kwaito and Amapiano",
+        "dance, technology and scene context"
+      ],
+      "limitations": [
+        "historical framing is multivocal; does not prove a single origin date or universal musical recipe"
+      ]
+    },
+    {
+      "id": "AMA-SRC-02",
+      "title": "Understanding amapiano and the South African city through the music videos of Big Flexa and Bhebha",
+      "year": 2024,
+      "doi": "10.1080/02533952.2024.2526251",
+      "url": "https://doi.org/10.1080/02533952.2024.2526251",
+      "source_kind": "peer_reviewed_article",
+      "supports": [
+        "discussion of common Amapiano features",
+        "keyboard/piano and log-drum descriptions",
+        "extended instrumental openings and gradual layer addition in discussed examples",
+        "language and urban-cultural context"
+      ],
+      "limitations": [
+        "examples and scope are bounded; features are not requirements for every track"
+      ]
+    },
+    {
+      "id": "AMA-SRC-03",
+      "title": "Ase trap tse ke pina tsa ko kasi — Sonics After the Struggle: Mapping Amapiano and Black Aesthetics in Post-Apartheid South Africa",
+      "year": 2026,
+      "doi": "10.1080/13696815.2026.2634896",
+      "url": "https://doi.org/10.1080/13696815.2026.2634896",
+      "source_kind": "scholarly_article",
+      "supports": [
+        "newer historical and scene context for Amapiano"
+      ],
+      "limitations": [
+        "review full text and practitioner accounts before deriving narrow production or composition rules"
+      ]
+    }
+  ]
+}
