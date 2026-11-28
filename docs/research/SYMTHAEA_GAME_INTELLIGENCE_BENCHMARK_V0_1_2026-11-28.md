@@ -479,7 +479,7 @@ The standalone Rust research crate now contains deterministic environment fixtur
 | F5 Resource chain | Scarce gatherable piles, typed recipes, workbench, acyclic recipe dependency validation, depletion and private exact planner | Zero resource pile, recipe cycle, missing station/input, depleted pile cannot be gathered |
 | F6 Hidden mechanics | Two rule variants with identical initial observations; paid lever intervention; route determined by the revealed gate state | No-probe negative control, action budget, single-use switch, hidden rule omitted from observations and debug output |
 
-The current branch contains **58 authored Rust unit tests** across F1–F6, candidate output validation, policy baselines, and the evaluator-owned F1 runner. Test count is a source inventory only: it is not a test pass. A dedicated GitHub Actions workflow is configured for formatting, tests, and strict Clippy. No local Rust toolchain is available in the current work environment, and no exact-head CI result is claimed until that workflow completes.
+The current branch contains **59 authored Rust unit tests** across F1–F6, candidate output validation, policy baselines, and the evaluator-owned F1 runner. Test count is a source inventory only: it is not a test pass. A dedicated GitHub Actions workflow is configured for formatting, tests, and strict Clippy. No local Rust toolchain is available in the current work environment, and no exact-head CI result is claimed until that workflow completes.
 
 ### 15.1 Important implementation boundary
 
@@ -545,7 +545,7 @@ The current FEP action model is intentionally simple and structured. It has not 
 
 ### 16.4 Current test inventory and qualification status
 
-The current branch contains **58 authored tests** in the environment/candidate/evaluator crate (F1–F6: 41, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 5), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **75 authored Rust tests**. These are source counts only, not observed passes.
+The current branch contains **59 authored tests** in the environment/candidate/evaluator crate (F1–F6: 41, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 6), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **75 authored Rust tests**. These are source counts only, not observed passes.
 
 Two dedicated GitHub workflows are configured:
 - `GameBench Rust v0.1`: deterministic environment, candidate contract, and policy baseline crate.
@@ -609,7 +609,7 @@ The adapter crate contains:
 - 5 spatial HDC candidate tests;
 - 5 HDC-LTC candidate tests.
 
-Total: **74 authored Rust tests**. These are not observed test executions. Both focused workflows must pass rustfmt, Cargo tests, and strict Clippy on the exact PR head. The main GameBench and adapter workspaces are isolated; adapter CI also watches changes to the sibling `symthaea-core` and `symthaea-fep` source paths because it compiles those actual components.
+Total: **75 authored Rust tests**. These are not observed test executions. Both focused workflows must pass rustfmt, Cargo tests, and strict Clippy on the exact PR head. The main GameBench and adapter workspaces are isolated; adapter CI also watches changes to the sibling `symthaea-core` and `symthaea-fep` source paths because it compiles those actual components.
 
 ### 17.5 Proposed first comparative campaign
 
@@ -621,7 +621,7 @@ For each frozen O1 F1 map/seed, run:
 - FEP ActiveInferenceAgent;
 - evaluator-only exact BFS.
 
-Record success rate, normalized path regret, action validity, episode length, action latency, CPU time, peak memory, prediction log score, and calibration status separately. Paired seeds and an independent replay are mandatory. Exact BFS is an oracle reference, never a learned-agent comparator. No result is claimed until this campaign has actually run.
+Record success rate, normalized path regret, action validity, episode length, decision latency, CPU time, peak memory, per-coordinate forecast Brier score and feature coverage, and calibration status separately. Paired seeds and an independent replay are mandatory. Exact BFS is an oracle reference, never a learned-agent comparator. No result is claimed until this campaign has actually run.
 
 Then perform:
 - held-out obstacle layouts;
@@ -657,7 +657,7 @@ The adapter workspace now includes `examples/paired_f1.rs`. It compares five pol
 4. HDC-LTC using actual `HdcLtcUnifiedNeuron`;
 5. FEP using actual `ActiveInferenceAgent`.
 
-The harness generates 16 deterministic 7×7 layouts from hidden-to-candidate map seeds, each with a carved valid route and random branches/dead ends. Every policy is evaluated on the same map cohort. Per-episode output includes task success, candidate protocol validity, actions, optimal actions, excess actions, p50/p95 candidate decision latency, and episode wall time. Aggregate output reports success and protocol-valid rates, mean actions, mean excess actions among successful episodes, and decision/episode latency summaries.
+The harness generates 16 deterministic 7×7 layouts from hidden-to-candidate map seeds, each with a carved valid route and random branches/dead ends. Every policy is evaluated on the same map cohort. Per-episode output includes task success, candidate protocol validity, actions, optimal actions, excess actions, p50/p95 candidate decision latency, and episode wall time. Aggregate output reports success and protocol-valid rates, mean actions, mean excess actions among successful episodes, forecast Brier and forecast-feature coverage, and decision/episode latency summaries.
 
 Run from the adapter workspace:
 
