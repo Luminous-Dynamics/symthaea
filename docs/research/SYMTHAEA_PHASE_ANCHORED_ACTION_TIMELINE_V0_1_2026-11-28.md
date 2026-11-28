@@ -36,10 +36,12 @@ The action timeline now includes `ActionExecutionGate`, a pure scheduling state 
 - Enforces monotonic clock progression and rejects timestamps before the event.
 - Dispatches each segment at most once, only while its time interval is live.
 - Classifies segments first observed after their window as missed; it never dispatches them late.
-- On a valid cancellation or plan expiry, returns every currently active segment as `stop_required_segment_ids` exactly once and suppresses future dispatch.
-- Separates dispatch/missed/elapsed/stop-required decisions. Elapsed schedule time is not proof of physical completion, and stop-required is not proof that the device stopped.
+- At a segment's scheduled end, emits `scheduled_stop_segment_ids` until the adapter acknowledges that it accepted the stop command.
+- On cancellation or plan expiry, returns every still-unacknowledged active segment as `stop_required_segment_ids`; requests repeat on subsequent ticks until the adapter acknowledges command acceptance.
+- `acknowledge_stop_command_accepted` only means the adapter accepted the stop command. It is not physical stop evidence; the independent output observer remains authoritative.
+- Separates dispatch, missed, scheduled-stop and cancellation/expiry-stop decisions. No segment first observed after its window is dispatched late.
 
-Eight additional source-level tests cover one-shot dispatch, late/missed segments, cancellation across active channels, future cancellation timestamps, expiry stops, clock regressions and clock mismatch. The action timeline now has twenty-two authored tests, still uncompiled and unexecuted.
+Eleven additional source-level tests cover one-shot dispatch, late/missed segments, scheduled stop emission and retry, cancellation across active channels, future cancellation timestamps, expiry-stop retry, clock regressions and clock mismatch. The action timeline now has twenty-five authored tests, still uncompiled and unexecuted.
 
 ## Next integration steps
 
