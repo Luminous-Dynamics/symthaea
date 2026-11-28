@@ -1,0 +1,345 @@
+{
+  "schema_version": "sdcb-minimax-nuisance-induction-v1",
+  "title": "Exact finite integration of maximin terminal test and composite-null induction",
+  "status": "analytic-exact-rational-known-answer;rust-authored-not-compiled-or-ci-qualified",
+  "provenance": {
+    "parent_issue": 14236,
+    "minimax_oracle_issue": 14185,
+    "finite_outcome_oracle_pr": 14218,
+    "nuisance_trajectory_issue": 14230,
+    "induced_test_prior_art_issue": 14222,
+    "base_commit": "f5d7bf4b3fbf7cdbf72083db77e88a9ac2c81820"
+  },
+  "observation_space": [
+    "00",
+    "01",
+    "10",
+    "11"
+  ],
+  "alpha": "1/10",
+  "trajectory_family": {
+    "member_count": 8,
+    "nuisance_values": [
+      "1/5",
+      "4/5"
+    ],
+    "policy_semantics": "Choose p1 first; the member's predeclared public-history map selects p2(0) after X1=0 and p2(1) after X1=1. The eight maps are fixed trajectory laws; no evaluator truth is visible.",
+    "subfamilies": [
+      "persistent shared nuisance",
+      "precommitted rectangular nuisance",
+      "history-adaptive rectangular nuisance"
+    ],
+    "members": [
+      {
+        "id": 0,
+        "p1": "1/5",
+        "p20": "1/5",
+        "p21": "1/5",
+        "joint": [
+          "16/25",
+          "4/25",
+          "4/25",
+          "1/25"
+        ],
+        "discord": "8/25",
+        "terminal_size": "1/25",
+        "g1": [
+          "1/40",
+          "1/10"
+        ],
+        "stopped": {
+          "stop0": "1/40",
+          "stop1_none": "1/25",
+          "stop1_x0": "1/25",
+          "stop1_x1": "1/40",
+          "stop1_both": "1/40"
+        }
+      },
+      {
+        "id": 1,
+        "p1": "1/5",
+        "p20": "1/5",
+        "p21": "4/5",
+        "joint": [
+          "16/25",
+          "4/25",
+          "1/25",
+          "4/25"
+        ],
+        "discord": "1/5",
+        "terminal_size": "1/40",
+        "g1": [
+          "1/40",
+          "1/40"
+        ],
+        "stopped": {
+          "stop0": "1/40",
+          "stop1_none": "1/40",
+          "stop1_x0": "1/40",
+          "stop1_x1": "1/40",
+          "stop1_both": "1/40"
+        }
+      },
+      {
+        "id": 2,
+        "p1": "1/5",
+        "p20": "4/5",
+        "p21": "1/5",
+        "joint": [
+          "4/25",
+          "16/25",
+          "4/25",
+          "1/25"
+        ],
+        "discord": "4/5",
+        "terminal_size": "1/10",
+        "g1": [
+          "1/10",
+          "1/10"
+        ],
+        "stopped": {
+          "stop0": "1/40",
+          "stop1_none": "1/10",
+          "stop1_x0": "1/25",
+          "stop1_x1": "17/200",
+          "stop1_both": "1/40"
+        }
+      },
+      {
+        "id": 3,
+        "p1": "1/5",
+        "p20": "4/5",
+        "p21": "4/5",
+        "joint": [
+          "4/25",
+          "16/25",
+          "1/25",
+          "4/25"
+        ],
+        "discord": "17/25",
+        "terminal_size": "17/200",
+        "g1": [
+          "1/10",
+          "1/40"
+        ],
+        "stopped": {
+          "stop0": "1/40",
+          "stop1_none": "17/200",
+          "stop1_x0": "1/40",
+          "stop1_x1": "17/200",
+          "stop1_both": "1/40"
+        }
+      },
+      {
+        "id": 4,
+        "p1": "4/5",
+        "p20": "1/5",
+        "p21": "1/5",
+        "joint": [
+          "4/25",
+          "1/25",
+          "16/25",
+          "4/25"
+        ],
+        "discord": "17/25",
+        "terminal_size": "17/200",
+        "g1": [
+          "1/40",
+          "1/10"
+        ],
+        "stopped": {
+          "stop0": "1/40",
+          "stop1_none": "17/200",
+          "stop1_x0": "17/200",
+          "stop1_x1": "1/40",
+          "stop1_both": "1/40"
+        }
+      },
+      {
+        "id": 5,
+        "p1": "4/5",
+        "p20": "1/5",
+        "p21": "4/5",
+        "joint": [
+          "4/25",
+          "1/25",
+          "4/25",
+          "16/25"
+        ],
+        "discord": "1/5",
+        "terminal_size": "1/40",
+        "g1": [
+          "1/40",
+          "1/40"
+        ],
+        "stopped": {
+          "stop0": "1/40",
+          "stop1_none": "1/40",
+          "stop1_x0": "1/40",
+          "stop1_x1": "1/40",
+          "stop1_both": "1/40"
+        }
+      },
+      {
+        "id": 6,
+        "p1": "4/5",
+        "p20": "4/5",
+        "p21": "1/5",
+        "joint": [
+          "1/25",
+          "4/25",
+          "16/25",
+          "4/25"
+        ],
+        "discord": "4/5",
+        "terminal_size": "1/10",
+        "g1": [
+          "1/10",
+          "1/10"
+        ],
+        "stopped": {
+          "stop0": "1/40",
+          "stop1_none": "1/10",
+          "stop1_x0": "17/200",
+          "stop1_x1": "1/25",
+          "stop1_both": "1/40"
+        }
+      },
+      {
+        "id": 7,
+        "p1": "4/5",
+        "p20": "4/5",
+        "p21": "4/5",
+        "joint": [
+          "1/25",
+          "4/25",
+          "4/25",
+          "16/25"
+        ],
+        "discord": "8/25",
+        "terminal_size": "1/25",
+        "g1": [
+          "1/10",
+          "1/40"
+        ],
+        "stopped": {
+          "stop0": "1/40",
+          "stop1_none": "1/25",
+          "stop1_x0": "1/40",
+          "stop1_x1": "1/25",
+          "stop1_both": "1/40"
+        }
+      }
+    ]
+  },
+  "alternative": {
+    "law": [
+      "0",
+      "1/2",
+      "1/2",
+      "0"
+    ],
+    "interpretation": "The alternative produces discordance with probability one."
+  },
+  "terminal_minimax_test": {
+    "phi": [
+      "0",
+      "1/8",
+      "1/8",
+      "0"
+    ],
+    "worst_null_discordance": "4/5",
+    "maximum_null_size": "1/10",
+    "alternative_power": "1/8",
+    "disposition": "EXACT_FINITE_FAMILY_MAXIMIN",
+    "proof": "The null family includes trajectory members 2 and 6. Their equal mixture is Q0=(1/10,2/5,2/5,1/10). With alternative A=(0,1/2,1/2,0), w=5/4 gives A(y)<=w*Q0(y) pointwise. The dual objective alpha*w=1/8 matches the primal power 1/8; positive-part slack is zero."
+  },
+  "dual_certificate": {
+    "alternative_weights": [
+      "1"
+    ],
+    "null_member_weights": [
+      {
+        "trajectory_id": 2,
+        "weight": "5/8"
+      },
+      {
+        "trajectory_id": 6,
+        "weight": "5/8"
+      }
+    ],
+    "unnormalized_null_weight_sum": "5/4",
+    "null_mixture": [
+      "1/10",
+      "2/5",
+      "2/5",
+      "1/10"
+    ],
+    "positive_part_slack": [
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "dual_objective": "1/8",
+    "primal_dual_gap": "0"
+  },
+  "induced_process": {
+    "member_formula": "g_n^j=E_j[phi_2|F_n]",
+    "robust_formula": "g_n=min_j g_n^j",
+    "g0": "1/40",
+    "member_g1_values": {
+      "x1_zero": [
+        "1/40",
+        "1/10"
+      ],
+      "x1_one": [
+        "1/40",
+        "1/10"
+      ]
+    },
+    "robust_g1": {
+      "x1_zero": "1/40",
+      "x1_one": "1/40"
+    },
+    "g2": [
+      "0",
+      "1/8",
+      "1/8",
+      "0"
+    ],
+    "bounded_stopping_time_claim": "For every trajectory member j and every public stopping time tau<=2, E_j[g_tau] <= E_j[phi_2] <= 1/10 by pointwise lower-envelope domination."
+  },
+  "stopping_rule_worst_null_levels": {
+    "stop_at_n0": "1/40",
+    "stop_at_n1_neither_history_continue_to_n2": "1/10",
+    "stop_at_n1_if_x1_zero_else_continue": "17/200",
+    "stop_at_n1_if_x1_one_else_continue": "17/200",
+    "stop_at_n1_on_both_histories": "1/40"
+  },
+  "alternative_induced_power": {
+    "stop_at_n0": "1/40",
+    "stop_at_n1_neither_history_continue_to_n2": "1/8",
+    "stop_at_n1_if_x1_zero_else_continue": "3/40",
+    "stop_at_n1_if_x1_one_else_continue": "3/40",
+    "stop_at_n1_on_both_histories": "1/40"
+  },
+  "caution": {
+    "lower_envelope_is_supermartingale": false,
+    "statement": "The lower envelope is not generally a memberwise supermartingale. This finite composite-null construction is prior art from Koning & van Meer (2026), not a new theorem.",
+    "prior_art": "https://doi.org/10.1093/jrsssb/qkag050"
+  },
+  "validation": {
+    "independent_python_fraction_replay": "passed; all eight complete trajectory laws, primal/dual certificate, conditional tests, five stopping rules and alternative early-stop power checked",
+    "rust_tests": {
+      "authored": 11,
+      "compiled": false,
+      "executed": false
+    },
+    "hosted_ci": "not checked for final head",
+    "physical_validation": false,
+    "decision_oracle_composition": "not implemented in this fixture; #13567 remains authoritative",
+    "continuous_nuisance_claim": false
+  },
+  "claim_boundary": "Exact finite two-step Bernoulli integration benchmark for a published composite-null induced-test construction. Does not establish a new sequential theorem, continuous nuisance robustness, physical sensor validity, or a production adaptive policy."
+}
