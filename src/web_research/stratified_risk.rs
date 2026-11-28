@@ -126,9 +126,10 @@ impl std::fmt::Display for StratifiedRiskError {
             Self::UnsupportedDesignVersion => {
                 write!(formatter, "unsupported stratified audit design version")
             }
-            Self::EmptyDesignIdentity => {
-                write!(formatter, "audit design identity or randomization manifest reference is empty")
-            }
+            Self::EmptyDesignIdentity => write!(
+                formatter,
+                "audit design identity or randomization manifest reference is empty"
+            ),
             Self::InvalidPlan(message) => {
                 write!(formatter, "invalid stratified audit plan: {message}")
             }
@@ -841,6 +842,88 @@ mod tests {
         assert_eq!(estimate.estimated_error_total_variance, Some(2.0));
         assert_eq!(estimate.estimated_risk_variance, Some(0.125));
         assert!(estimate.approximate_normal_95_interval.is_some());
+    }
+
+    #[test]
+    fn independent_stratum_variances_add_for_total_risk() {
+        let candidates = vec![
+            AuditCandidate {
+                record_id: "a1".to_owned(),
+                stratum_id: "census".to_owned(),
+                random_priority: 1,
+            },
+            AuditCandidate {
+                record_id: "a2".to_owned(),
+                stratum_id: "census".to_owned(),
+                random_priority: 2,
+            },
+            AuditCandidate {
+                record_id: "b1".to_owned(),
+                stratum_id: "sampled".to_owned(),
+                random_priority: 10,
+            },
+            AuditCandidate {
+                record_id: "b2".to_owned(),
+                stratum_id: "sampled".to_owned(),
+                random_priority: 20,
+            },
+            AuditCandidate {
+                record_id: "b3".to_owned(),
+                stratum_id: "sampled".to_owned(),
+                random_priority: 30,
+            },
+            AuditCandidate {
+                record_id: "b4".to_owned(),
+                stratum_id: "sampled".to_owned(),
+                random_priority: 40,
+            },
+        ];
+        let quotas = vec![
+            AuditStratumQuota {
+                stratum_id: "census".to_owned(),
+                sample_size: 2,
+            },
+            AuditStratumQuota {
+                stratum_id: "sampled".to_owned(),
+                sample_size: 2,
+            },
+        ];
+        let plan = build_stratified_random_audit_plan(
+            &candidates,
+            &quotas,
+            "multi-stratum-v1",
+            "custody://randomization/multi-stratum",
+        )
+        .unwrap();
+        let rows = vec![
+            prediction("a1", 0.9, true, Some(false)),
+            prediction("a2", 0.8, true, Some(true)),
+            prediction("b1", 0.7, true, Some(false)),
+            prediction("b2", 0.6, true, Some(true)),
+            prediction("b3", 0.5, true, None),
+            prediction("b4", 0.4, true, None),
+        ];
+        let report = evaluate_stratified_audit_risk(&rows, &plan, &config()).unwrap();
+        assert_eq!(report.always_answer.estimated_error_total, 3.0);
+        assert_eq!(report.always_answer.estimated_risk, Some(0.5));
+        assert_eq!(report.always_answer.estimated_error_total_variance, Some(2.0));
+        assert!((report.always_answer.estimated_risk_variance.unwrap() - 2.0 / 36.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn tampered_inclusion_probability_is_rejected_before_scoring() {
+        let mut plan = four_unit_plan();
+        plan.selections[0].inclusion_probability = 0.75;
+        let rows = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("b", 0.8, true, Some(true)),
+            prediction("c", 0.4, true, None),
+            prediction("d", 0.2, true, None),
+        ];
+        assert!(matches!(
+            evaluate_stratified_audit_risk(&rows, &plan, &config()),
+            Err(StratifiedRiskError::InvalidPlan(_))
+        ));
     }
 
     #[test]
