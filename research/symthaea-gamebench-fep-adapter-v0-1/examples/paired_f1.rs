@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use symthaea_gamebench::{
     Action, Cell, F1EpisodeReport, GreedyManhattanCandidate, GridSpec,
-    InteractiveCandidate, Observation, Position, RandomLegalCandidate, evaluate_f1,
+    ForecastValue, InteractiveCandidate, Observation, Position, RandomLegalCandidate, evaluate_f1,
 };
 use symthaea_gamebench_fep_adapter::{
     FepNavigationCandidate, HdcLtcSpatialCandidate, HdcSpatialCandidate,
@@ -28,6 +28,8 @@ struct EpisodeRecord {
     decision_latencies_ns: Vec<u128>,
     wall_time: Duration,
     candidate_error: Option<String>,
+    forecast_brier: Option<f64>,
+    forecast_feature_coverage: f64,
 }
 
 #[derive(Debug, Default)]
@@ -41,6 +43,10 @@ struct Aggregate {
     decision_latencies_ns: Vec<u128>,
     wall_times_ns: Vec<u128>,
     missing_optimum: u64,
+    forecast_brier_sum: f64,
+    scored_forecast_features: u64,
+    forecast_features: u64,
+    expected_forecast_features: u64,
 }
 
 fn make_map(seed: u64) -> GridSpec {
@@ -91,6 +97,47 @@ fn make_map(seed: u64) -> GridSpec {
         .expect("procedurally generated F1 map must be valid")
 }
 
+fn score_forecasts(report: &F1EpisodeReport) -> (Option<f64>, f64, u64, u64) {
+    let expected_features = u64::from(report.actions_attempted).saturating_mul(2);
+    let mut scored_features = 0_u64;
+    let mut brier_sum = 0.0_f64;
+
+    for (decision, event) in report.decisions.iter().zip(report.events.iter()) {
+        for forecast in &decision.forecasts {
+            let actual = match forecast.feature_id {
+                0 => i64::from(event.after.position.x),
+                1 => i64::from(event.after.position.y),
+                _ => continue,
+            };
+
+            let mut actual_was_in_support = false;
+            let mut score = 0.0_f64;
+            for outcome in &forecast.outcomes {
+                let is_actual = outcome.value == ForecastValue::Integer(actual);
+                if is_actual {
+                    actual_was_in_support = true;
+                }
+                let target = if is_actual { 1.0 } else { 0.0 };
+                score += (outcome.probability - target).powi(2);
+            }
+            if !actual_was_in_support {
+                score += 1.0;
+            }
+            brier_sum += score;
+            scored_features += 1;
+        }
+    }
+
+    let brier = (scored_features > 0)
+        .then_some(brier_sum / scored_features as f64);
+    let coverage = if expected_features == 0 {
+        0.0
+    } else {
+        scored_features as f64 / expected_features as f64
+    };
+    (brier, coverage, scored_features, expected_features)
+}
+
 fn run_policy<C>(policy_name: &str, candidate: &mut C) -> Aggregate
 where
     C: InteractiveCandidate<Observation, Action>,
@@ -104,6 +151,8 @@ where
         let report: F1EpisodeReport = evaluate_f1(spec, candidate);
         let wall_time = started.elapsed();
 
+        let (forecast_brier, forecast_feature_coverage, scored_features, expected_features) =
+            score_forecasts(&report);
         let record = EpisodeRecord {
             success: report.success,
             candidate_protocol_valid: report.candidate_protocol_valid,
@@ -113,6 +162,8 @@ where
             decision_latencies_ns: report.decision_latency_ns,
             wall_time,
             candidate_error: report.candidate_error,
+            forecast_brier,
+            forecast_feature_coverage,
         };
 
         aggregate.episodes += 1;
@@ -121,6 +172,13 @@ where
         aggregate.total_actions += u64::from(record.actions);
         aggregate.decision_latencies_ns.extend(record.decision_latencies_ns.iter().copied());
         aggregate.wall_times_ns.push(record.wall_time.as_nanos());
+        aggregate.scored_forecast_features += scored_features;
+        aggregate.expected_forecast_features += expected_features;
+        aggregate.forecast_feature_coverage += record.forecast_feature_coverage;
+        if let Some(brier) = record.forecast_brier {
+            aggregate.forecast_brier_sum += brier * scored_features as f64;
+            aggregate.forecast_features += scored_features;
+        }
         if record.success {
             aggregate.successful_episodes += 1;
             if let Some(excess) = record.excess_actions {
@@ -137,7 +195,7 @@ where
             .unwrap_or("")
             .replace('"', "\"\"");
         println!(
-            "episode,{policy_name},{map_seed},{},{},{},{},{},{},{},\"{}\"",
+            "episode,{policy_name},{map_seed},{},{},{},{},{},{},{},{:.5},{:.4},\"{}\"",
             u8::from(record.success),
             u8::from(record.candidate_protocol_valid),
             record.actions,
@@ -146,6 +204,8 @@ where
             percentile(&record.decision_latencies_ns, 0.50),
             percentile(&record.decision_latencies_ns, 0.95),
             record.wall_time.as_nanos(),
+            record.forecast_brier.unwrap_or(f64::NAN),
+            record.forecast_feature_coverage,
             candidate_error,
         );
     }
@@ -176,14 +236,26 @@ fn print_summary(name: &str, aggregate: &mut Aggregate) {
     let p50_decision_ns = percentile(&aggregate.decision_latencies_ns, 0.50);
     let p95_decision_ns = percentile(&aggregate.decision_latencies_ns, 0.95);
     let p95_episode_ns = percentile(&aggregate.wall_times_ns, 0.95);
+    let mean_forecast_brier = if aggregate.forecast_features == 0 {
+        f64::NAN
+    } else {
+        aggregate.forecast_brier_sum / aggregate.forecast_features as f64
+    };
+    let mean_forecast_coverage = if aggregate.expected_forecast_features == 0 {
+        0.0
+    } else {
+        aggregate.scored_forecast_features as f64 / aggregate.expected_forecast_features as f64
+    };
 
     println!(
-        "summary,{name},{},{:.4},{:.4},{:.2},{:.3},{},{},{}",
+        "summary,{name},{},{:.4},{:.4},{:.2},{:.3},{:.5},{:.4},{},{},{}",
         aggregate.episodes,
         success_rate,
         protocol_valid_rate,
         mean_actions,
         mean_excess,
+        mean_forecast_brier,
+        mean_forecast_coverage,
         p50_decision_ns,
         p95_decision_ns,
         p95_episode_ns
@@ -197,8 +269,8 @@ fn print_summary(name: &str, aggregate: &mut Aggregate) {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("record,policy,map_seed,success,protocol_valid,actions,optimal_actions,excess_actions,p50_decision_ns,p95_decision_ns,episode_wall_ns,candidate_error");
-    println!("summary_header,policy,episodes,success_rate,protocol_valid_rate,mean_actions,mean_excess_actions,p50_decision_ns,p95_decision_ns,p95_episode_wall_ns");
+    println!("record,policy,map_seed,success,protocol_valid,actions,optimal_actions,excess_actions,p50_decision_ns,p95_decision_ns,episode_wall_ns,forecast_brier,forecast_feature_coverage,candidate_error");
+    println!("summary_header,policy,episodes,success_rate,protocol_valid_rate,mean_actions,mean_excess_actions,mean_forecast_brier,mean_forecast_feature_coverage,p50_decision_ns,p95_decision_ns,p95_episode_wall_ns");
 
     let mut random = RandomLegalCandidate::new(0x5241_4E44_4F4D);
     let mut random_results = run_policy("random_legal", &mut random);
