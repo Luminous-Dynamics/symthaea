@@ -1,0 +1,169 @@
+{
+  "schema_version": "mel-hear-008-incidence-v0",
+  "study_id": "synthetic:mel-hear-008-panel-01",
+  "simulation_only": true,
+  "work_ids": ["synthetic:work-1", "synthetic:work-2", "synthetic:work-3"],
+  "performer_ids": ["synthetic:performer-1", "synthetic:performer-2", "synthetic:performer-3"],
+  "cells": [
+    {
+      "cell_id": "synthetic:cell-w1-p1",
+      "work_id": "synthetic:work-1",
+      "performer_membership": [{ "performer_id": "synthetic:performer-1", "weight": 1.0 }],
+      "session_ids": ["synthetic:session-a"],
+      "status": "observed",
+      "paired_effect_mean": 0.0,
+      "repeat_count": 1
+    },
+    {
+      "cell_id": "synthetic:cell-w1-p2",
+      "work_id": "synthetic:work-1",
+      "performer_membership": [{ "performer_id": "synthetic:performer-2", "weight": 1.0 }],
+      "session_ids": ["synthetic:session-b"],
+      "status": "observed",
+      "paired_effect_mean": 0.0,
+      "repeat_count": 1
+    },
+    {
+      "cell_id": "synthetic:cell-w2-p1",
+      "work_id": "synthetic:work-2",
+      "performer_membership": [{ "performer_id": "synthetic:performer-1", "weight": 1.0 }],
+      "session_ids": ["synthetic:session-c"],
+      "status": "observed",
+      "paired_effect_mean": 1.0,
+      "repeat_count": 1
+    },
+    {
+      "cell_id": "synthetic:cell-w2-p3",
+      "work_id": "synthetic:work-2",
+      "performer_membership": [{ "performer_id": "synthetic:performer-3", "weight": 1.0 }],
+      "session_ids": ["synthetic:session-d"],
+      "status": "observed",
+      "paired_effect_mean": 1.0,
+      "repeat_count": 1
+    },
+    {
+      "cell_id": "synthetic:cell-w3-p1",
+      "work_id": "synthetic:work-3",
+      "performer_membership": [{ "performer_id": "synthetic:performer-1", "weight": 1.0 }],
+      "session_ids": ["synthetic:session-e"],
+      "status": "observed",
+      "paired_effect_mean": 0.0,
+      "repeat_count": 1
+    },
+    {
+      "cell_id": "synthetic:cell-w3-p2",
+      "work_id": "synthetic:work-3",
+      "performer_membership": [{ "performer_id": "synthetic:performer-2", "weight": 1.0 }],
+      "session_ids": ["synthetic:session-f"],
+      "status": "observed",
+      "paired_effect_mean": 1.0,
+      "repeat_count": 1
+    },
+    {
+      "cell_id": "synthetic:cell-w3-p3",
+      "work_id": "synthetic:work-3",
+      "performer_membership": [{ "performer_id": "synthetic:performer-3", "weight": 1.0 }],
+      "session_ids": ["synthetic:session-g"],
+      "status": "observed",
+      "paired_effect_mean": 1.0,
+      "repeat_count": 1
+    }
+  ],
+  "estimands": [
+    {
+      "estimand_id": "observed-cell-v0",
+      "kind": "observed_cell_mean",
+      "target_population": "The seven observed eligible work-performer cells in this fixture.",
+      "weighting_rule": "Each observed cell receives weight 1/7.",
+      "support_disposition": "supported",
+      "cell_weights": [
+        { "cell_id": "synthetic:cell-w1-p1", "weight": 0.14285714285714285 },
+        { "cell_id": "synthetic:cell-w1-p2", "weight": 0.14285714285714285 },
+        { "cell_id": "synthetic:cell-w2-p1", "weight": 0.14285714285714285 },
+        { "cell_id": "synthetic:cell-w2-p3", "weight": 0.14285714285714285 },
+        { "cell_id": "synthetic:cell-w3-p1", "weight": 0.14285714285714285 },
+        { "cell_id": "synthetic:cell-w3-p2", "weight": 0.14285714285714285 },
+        { "cell_id": "synthetic:cell-w3-p3", "weight": 0.14285714285714285 }
+      ],
+      "expected_point_estimate_fraction": "4/7",
+      "expected_point_estimate_decimal": 0.5714285714285714
+    },
+    {
+      "estimand_id": "equal-work-v0",
+      "kind": "equal_work_macro_mean",
+      "target_population": "The three works represented by this fixture.",
+      "weighting_rule": "Average within each work over observed cells, then give each work weight 1/3.",
+      "support_disposition": "supported",
+      "cell_weights": [
+        { "cell_id": "synthetic:cell-w1-p1", "weight": 0.16666666666666666 },
+        { "cell_id": "synthetic:cell-w1-p2", "weight": 0.16666666666666666 },
+        { "cell_id": "synthetic:cell-w2-p1", "weight": 0.16666666666666666 },
+        { "cell_id": "synthetic:cell-w2-p3", "weight": 0.16666666666666666 },
+        { "cell_id": "synthetic:cell-w3-p1", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w3-p2", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w3-p3", "weight": 0.1111111111111111 }
+      ],
+      "expected_point_estimate_fraction": "5/9",
+      "expected_point_estimate_decimal": 0.5555555555555556
+    },
+    {
+      "estimand_id": "equal-performer-v0",
+      "kind": "equal_performer_macro_mean",
+      "target_population": "The three performers represented by this fixture.",
+      "weighting_rule": "Average within each performer over observed cells, then give each performer weight 1/3.",
+      "support_disposition": "supported",
+      "cell_weights": [
+        { "cell_id": "synthetic:cell-w1-p1", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w1-p2", "weight": 0.16666666666666666 },
+        { "cell_id": "synthetic:cell-w2-p1", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w2-p3", "weight": 0.16666666666666666 },
+        { "cell_id": "synthetic:cell-w3-p1", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w3-p2", "weight": 0.16666666666666666 },
+        { "cell_id": "synthetic:cell-w3-p3", "weight": 0.16666666666666666 }
+      ],
+      "expected_point_estimate_fraction": "11/18",
+      "expected_point_estimate_decimal": 0.6111111111111112
+    },
+    {
+      "estimand_id": "full-crossed-target-v0",
+      "kind": "declared_target_population_mean",
+      "target_population": "Uniform product distribution over all three works and all three performers.",
+      "weighting_rule": "Each of the nine possible work-performer cells has target weight 1/9; no missing-cell imputation is authorized.",
+      "support_disposition": "not_estimable",
+      "cell_weights": [
+        { "cell_id": "synthetic:cell-w1-p1", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w1-p2", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w2-p1", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w2-p3", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w3-p1", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w3-p2", "weight": 0.1111111111111111 },
+        { "cell_id": "synthetic:cell-w3-p3", "weight": 0.1111111111111111 }
+      ],
+      "target_work_weights": [
+        { "unit_id": "synthetic:work-1", "weight": 0.3333333333333333 },
+        { "unit_id": "synthetic:work-2", "weight": 0.3333333333333333 },
+        { "unit_id": "synthetic:work-3", "weight": 0.3333333333333333 }
+      ],
+      "target_performer_weights": [
+        { "unit_id": "synthetic:performer-1", "weight": 0.3333333333333333 },
+        { "unit_id": "synthetic:performer-2", "weight": 0.3333333333333333 },
+        { "unit_id": "synthetic:performer-3", "weight": 0.3333333333333333 }
+      ],
+      "expected_point_estimate_fraction": null,
+      "expected_point_estimate_decimal": null,
+      "disposition_reason": "Two of the nine target work-performer combinations are unobserved. No model-based imputation or extrapolation is authorized in this fixture."
+    }
+  ],
+  "support_audit": {
+    "work_count": 3,
+    "performer_count": 3,
+    "possible_single_performer_cells": 9,
+    "observed_cells": 7,
+    "complete_cartesian_support": false,
+    "connected_components": 1,
+    "isolated_work_ids": [],
+    "isolated_performer_ids": [],
+    "max_work_degree": 3,
+    "max_performer_degree": 3
+  }
+}
