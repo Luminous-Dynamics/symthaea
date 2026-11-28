@@ -40,7 +40,8 @@ These digests establish content identity, not source authenticity, physical inde
 The standalone Rust crate:
 - builds a canonical manifest directly from CMAQ-054 KernelExpertConfig values;
 - checks positive exact prior weights and their exact sum-to-one;
-- checks map/target dimensional consistency and zero containment;
+- checks map/target dimensional consistency and, in direct paired-equality mode, zero containment;
+- rebuilds the canonical manifest from the actual runtime expert configs before accepting a typed risk plan;
 - computes SHA-256 digests from actual frequency and target contents;
 - constructs an exact fleet alpha plan with an optional reference-failure budget;
 - verifies a legacy CMAQ-053 receipt only in reference-calibrated mode and only when all canonical digests/weights match.
