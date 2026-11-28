@@ -1,0 +1,47 @@
+name: OpenSees Recorder Parser
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "crates/bridges/symthaea-opensees-bridge/**"
+      - "crates/bridges/symthaea-sim-bridge/**"
+      - ".github/workflows/opensees-recorder-parser.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "rustfmt.toml"
+  push:
+    branches: [main, research/opensees-scalar-recorder-parser-v0-1-current-main]
+    paths:
+      - "crates/bridges/symthaea-opensees-bridge/**"
+      - "crates/bridges/symthaea-sim-bridge/**"
+      - ".github/workflows/opensees-recorder-parser.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "rustfmt.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: opensees-recorder-parser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Format check
+        run: cargo fmt --check --package symthaea-opensees-bridge
+      - name: Unit and negative-control tests
+        run: cargo test --locked -p symthaea-opensees-bridge --lib
