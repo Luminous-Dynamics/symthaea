@@ -423,15 +423,19 @@ fn split_inventory_digest(inventory: &SplitInventoryV1) -> Result<String, SplitA
 
 fn preregistration_digest(config: &CalibrationConfigV1) -> Result<String, SplitAuditRejectV1> {
     let payload = (
-        &config.run_id, &config.calibration_data_sha256,
-        &config.calibration_split_sha256, &config.evaluation_split_sha256,
-        &config.group_hierarchy_sha256, &config.sufficiency_score_definition_sha256,
-        &config.decision_loss_definition_sha256, &config.decision_policy_sha256,
-        &config.candidate_code_sha256, &config.evaluator_code_sha256,
-        &config.threshold_grid_sha256, &config.thresholds,
-        config.threshold_selection_method, config.risk_target_alpha,
-        config.familywise_delta, config.unacceptable_loss_threshold,
-        config.minimum_independent_clusters,
+        (
+            &config.run_id, &config.calibration_data_sha256,
+            &config.calibration_split_sha256, &config.evaluation_split_sha256,
+            &config.group_hierarchy_sha256, &config.sufficiency_score_definition_sha256,
+            &config.decision_loss_definition_sha256, &config.decision_policy_sha256,
+            &config.candidate_code_sha256,
+        ),
+        (
+            &config.evaluator_code_sha256, &config.threshold_grid_sha256,
+            &config.thresholds, config.threshold_selection_method,
+            config.risk_target_alpha, config.familywise_delta,
+            config.unacceptable_loss_threshold, config.minimum_independent_clusters,
+        ),
     );
     serde_json::to_vec(&payload)
         .map(|bytes| sha256_hex(&bytes))
@@ -1192,7 +1196,9 @@ mod tests{
             GroupSpecV1{group_id:"leaf".into(),parent_group_id:Some("root".into()),allow_parent_fallback:true,distribution_shift_detected:false}
         ];
         let mut rows=examples(80,"root",0.9,0.0);
-        rows.push(CalibrationExampleV1{run_id:"run-001".into(),independent_cluster_id:"leaf-one".into(),
+        rows.push(CalibrationExampleV1{run_id:"run-001".into(),independent_cluster_id:digest("leaf-one"),
+            episode_commitment_sha256:digest("leaf-episode-one"),
+            observation_commitment_sha256:digest("leaf-observation-one"),
             group_id:"leaf".into(),sufficiency_score:0.9,hard_gates_pass:true,decision_loss:0.0,
             outcome_receipt_sha256:digest("leaf-one")});
         let cfg=config(&groups,&rows,vec![0.5,0.0],30);
