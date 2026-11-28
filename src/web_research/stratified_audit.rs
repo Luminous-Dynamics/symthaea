@@ -84,11 +84,18 @@ pub enum StratifiedAuditError {
     EmptyRecordId,
     EmptyStratumId,
     DuplicateRecordId(String),
-    DuplicatePriorityWithinStratum { stratum_id: String, priority: u128 },
+    DuplicatePriorityWithinStratum {
+        stratum_id: String,
+        priority: u128,
+    },
     MissingQuota(String),
     DuplicateQuota(String),
     QuotaForUnknownStratum(String),
-    InvalidQuota { stratum_id: String, sample_size: usize, population_size: usize },
+    InvalidQuota {
+        stratum_id: String,
+        sample_size: usize,
+        population_size: usize,
+    },
 }
 
 impl std::fmt::Display for StratifiedAuditError {
@@ -96,26 +103,42 @@ impl std::fmt::Display for StratifiedAuditError {
         match self {
             Self::EmptyDesignId => write!(formatter, "audit design ID must not be empty"),
             Self::EmptyRandomizationManifestReference => {
-                write!(formatter, "randomization manifest reference must not be empty")
+                write!(
+                    formatter,
+                    "randomization manifest reference must not be empty"
+                )
             }
             Self::EmptyCohort => write!(formatter, "audit cohort must not be empty"),
             Self::EmptyRecordId => write!(formatter, "record IDs must not be empty"),
             Self::EmptyStratumId => write!(formatter, "pre-label stratum IDs must not be empty"),
             Self::DuplicateRecordId(id) => write!(formatter, "duplicate record ID: {id}"),
-            Self::DuplicatePriorityWithinStratum { stratum_id, priority } => write!(
+            Self::DuplicatePriorityWithinStratum {
+                stratum_id,
+                priority,
+            } => write!(
                 formatter,
                 "duplicate random priority {priority} in stratum {stratum_id}"
             ),
             Self::MissingQuota(stratum) => {
-                write!(formatter, "missing positive audit quota for stratum {stratum}")
+                write!(
+                    formatter,
+                    "missing positive audit quota for stratum {stratum}"
+                )
             }
             Self::DuplicateQuota(stratum) => {
                 write!(formatter, "duplicate audit quota for stratum {stratum}")
             }
             Self::QuotaForUnknownStratum(stratum) => {
-                write!(formatter, "audit quota references unknown stratum {stratum}")
+                write!(
+                    formatter,
+                    "audit quota references unknown stratum {stratum}"
+                )
             }
-            Self::InvalidQuota { stratum_id, sample_size, population_size } => write!(
+            Self::InvalidQuota {
+                stratum_id,
+                sample_size,
+                population_size,
+            } => write!(
                 formatter,
                 concat!(
                     "invalid audit quota {sample_size} for stratum {stratum_id} ",
@@ -262,7 +285,10 @@ pub fn build_stratified_random_audit_plan(
     // A quota for every nonempty stratum is mandatory; strata cannot silently
     // disappear from the probability sample.
     for stratum_id in quota_by_stratum.keys() {
-        if !strata.iter().any(|stratum| &stratum.stratum_id == stratum_id) {
+        if !strata
+            .iter()
+            .any(|stratum| &stratum.stratum_id == stratum_id)
+        {
             return Err(StratifiedAuditError::QuotaForUnknownStratum(
                 stratum_id.clone(),
             ));
@@ -370,8 +396,14 @@ mod tests {
 
     fn quotas() -> Vec<AuditStratumQuota> {
         vec![
-            AuditStratumQuota { stratum_id: "domain-a".to_owned(), sample_size: 2 },
-            AuditStratumQuota { stratum_id: "domain-b".to_owned(), sample_size: 1 },
+            AuditStratumQuota {
+                stratum_id: "domain-a".to_owned(),
+                sample_size: 2,
+            },
+            AuditStratumQuota {
+                stratum_id: "domain-b".to_owned(),
+                sample_size: 1,
+            },
         ]
     }
 
@@ -402,7 +434,11 @@ mod tests {
             .count();
         assert_eq!(selected_a, 2);
         assert_eq!(selected_b, 1);
-        assert!(plan.selections.iter().all(|row| row.inclusion_probability > 0.0));
+        assert!(
+            plan.selections
+                .iter()
+                .all(|row| row.inclusion_probability > 0.0)
+        );
         assert_eq!(
             plan.selections
                 .iter()
@@ -411,14 +447,17 @@ mod tests {
                 .inclusion_probability,
             0.5
         );
-        assert!((plan.selections
-            .iter()
-            .find(|row| row.record_id == "b1")
-            .unwrap()
-            .inclusion_probability
-            - 1.0 / 3.0)
-            .abs()
-            < 1e-12);
+        assert!(
+            (plan
+                .selections
+                .iter()
+                .find(|row| row.record_id == "b1")
+                .unwrap()
+                .inclusion_probability
+                - 1.0 / 3.0)
+                .abs()
+                < 1e-12
+        );
     }
 
     #[test]
@@ -445,10 +484,7 @@ mod tests {
             .filter(|row| row.selected_for_adjudication)
             .map(|row| row.record_id.as_str())
             .collect();
-        assert_eq!(
-            selected,
-            HashSet::from(["a2", "a4", "b2"])
-        );
+        assert_eq!(selected, HashSet::from(["a2", "a4", "b2"]));
     }
 
     #[test]
@@ -466,9 +502,11 @@ mod tests {
             "custody://randomization-manifest/census",
         )
         .unwrap();
-        assert!(plan.selections.iter().all(|row| {
-            row.selected_for_adjudication && row.inclusion_probability == 1.0
-        }));
+        assert!(
+            plan.selections
+                .iter()
+                .all(|row| { row.selected_for_adjudication && row.inclusion_probability == 1.0 })
+        );
         assert_eq!(plan.joint_inclusion_probability("b1", "b2"), Some(1.0));
     }
 
@@ -476,11 +514,12 @@ mod tests {
     fn single_sample_non_census_stratum_does_not_claim_variance_estimability() {
         let plan = build();
         assert!(!plan.supports_design_based_variance_estimation());
-        assert!(plan
-            .strata
-            .iter()
-            .find(|stratum| stratum.stratum_id == "domain-b")
-            .is_some_and(|stratum| !stratum.variance_estimable));
+        assert!(
+            plan.strata
+                .iter()
+                .find(|stratum| stratum.stratum_id == "domain-b")
+                .is_some_and(|stratum| !stratum.variance_estimable)
+        );
     }
 
     #[test]
@@ -552,7 +591,10 @@ mod tests {
     #[test]
     fn missing_duplicate_and_unknown_quotas_fail_closed() {
         let input = candidates();
-        let missing = vec![AuditStratumQuota { stratum_id: "domain-a".to_owned(), sample_size: 2 }];
+        let missing = vec![AuditStratumQuota {
+            stratum_id: "domain-a".to_owned(),
+            sample_size: 2,
+        }];
         assert_eq!(
             build_stratified_random_audit_plan(
                 &input,
@@ -565,9 +607,18 @@ mod tests {
         );
 
         let duplicate = vec![
-            AuditStratumQuota { stratum_id: "domain-a".to_owned(), sample_size: 2 },
-            AuditStratumQuota { stratum_id: "domain-a".to_owned(), sample_size: 1 },
-            AuditStratumQuota { stratum_id: "domain-b".to_owned(), sample_size: 1 },
+            AuditStratumQuota {
+                stratum_id: "domain-a".to_owned(),
+                sample_size: 2,
+            },
+            AuditStratumQuota {
+                stratum_id: "domain-a".to_owned(),
+                sample_size: 1,
+            },
+            AuditStratumQuota {
+                stratum_id: "domain-b".to_owned(),
+                sample_size: 1,
+            },
         ];
         assert!(matches!(
             build_stratified_random_audit_plan(
@@ -580,9 +631,18 @@ mod tests {
         ));
 
         let unknown = vec![
-            AuditStratumQuota { stratum_id: "domain-a".to_owned(), sample_size: 2 },
-            AuditStratumQuota { stratum_id: "domain-b".to_owned(), sample_size: 1 },
-            AuditStratumQuota { stratum_id: "unknown".to_owned(), sample_size: 1 },
+            AuditStratumQuota {
+                stratum_id: "domain-a".to_owned(),
+                sample_size: 2,
+            },
+            AuditStratumQuota {
+                stratum_id: "domain-b".to_owned(),
+                sample_size: 1,
+            },
+            AuditStratumQuota {
+                stratum_id: "unknown".to_owned(),
+                sample_size: 1,
+            },
         ];
         assert!(matches!(
             build_stratified_random_audit_plan(
@@ -599,8 +659,14 @@ mod tests {
     fn zero_and_over_population_quotas_are_rejected() {
         for sample_size in [0, 5] {
             let quota = vec![
-                AuditStratumQuota { stratum_id: "domain-a".to_owned(), sample_size },
-                AuditStratumQuota { stratum_id: "domain-b".to_owned(), sample_size: 1 },
+                AuditStratumQuota {
+                    stratum_id: "domain-a".to_owned(),
+                    sample_size,
+                },
+                AuditStratumQuota {
+                    stratum_id: "domain-b".to_owned(),
+                    sample_size: 1,
+                },
             ];
             assert!(matches!(
                 build_stratified_random_audit_plan(
@@ -627,13 +693,8 @@ mod tests {
             StratifiedAuditError::EmptyDesignId
         );
         assert_eq!(
-            build_stratified_random_audit_plan(
-                &candidates(),
-                &quotas(),
-                "audit-design-v1",
-                "",
-            )
-            .unwrap_err(),
+            build_stratified_random_audit_plan(&candidates(), &quotas(), "audit-design-v1", "",)
+                .unwrap_err(),
             StratifiedAuditError::EmptyRandomizationManifestReference
         );
         assert_eq!(
