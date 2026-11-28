@@ -221,11 +221,12 @@
       "required": [
         "source_anchor_frame",
         "target_anchor_frame",
-        "beat_ordinal_milli",
+        "transition_beat_ordinal_milli",
         "confidence_ppm",
         "source_grid_hypothesis_id",
         "target_grid_hypothesis_id",
-        "max_phase_error_milli"
+        "max_phase_error_milli",
+        "max_tempo_delta_milli_bpm"
       ],
       "properties": {
         "source_anchor_frame": {
@@ -236,11 +237,6 @@
         "target_anchor_frame": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "beat_ordinal_milli": {
-          "type": "integer",
-          "minimum": -9007199254740991,
           "maximum": 9007199254740991
         },
         "confidence_ppm": {
@@ -260,6 +256,16 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 500
+        },
+        "transition_beat_ordinal_milli": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "max_tempo_delta_milli_bpm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
         }
       }
     },
