@@ -1,0 +1,44 @@
+name: CMAQ-051 representation e-portfolio
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-051/**"
+      - "research/cmaq-050/**"
+      - "research/cmaq-049/**"
+      - "research/cmaq-048/**"
+      - "research/cmaq-046/**"
+      - ".github/workflows/cmaq-051.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-051-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  representation-eportfolio:
+    name: representation-eportfolio
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-051-representation-eportfolio-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-051/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-051/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-051/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Paired representation portfolio smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-051/Cargo.toml --locked --bin representation_portfolio_probe -- 32 200 20261128 > cmaq-051-representation-portfolio-smoke.csv
+      - name: Preserve portfolio artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-051-representation-portfolio-smoke
+          path: cmaq-051-representation-portfolio-smoke.csv
+          if-no-files-found: error
