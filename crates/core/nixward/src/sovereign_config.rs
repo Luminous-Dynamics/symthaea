@@ -1671,4 +1671,73 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn untrusted_locale_values_are_escaped_before_nix_rendering() {
+        let payload = concat!("$", "{builtins.abort \"timezone-injection\"}");
+        let mut generator = SovereignConfigGenerator::new();
+        let config = generator.generate(
+            &HardwareProfile::default(),
+            &UserChoices {
+                desktop: "none".into(),
+                timezone: payload.into(),
+                keyboard: payload.into(),
+                ..Default::default()
+            },
+            &MigrationData::default(),
+        );
+
+        assert!(
+            config.sovereign_config_nix.contains(&concat!("\\", "$", "{builtins.abort")),
+            "Nix interpolation opener must be escaped in generated string literals"
+        );
+        validate_nix_syntax(&config.sovereign_config_nix)
+            .expect("generated locale literals should remain syntactically valid");
+    }
+
+    #[test]
+    fn unsupported_locale_controls_are_omitted_with_a_warning() {
+        let mut generator = SovereignConfigGenerator::new();
+        let config = generator.generate(
+            &HardwareProfile::default(),
+            &UserChoices {
+                desktop: "none".into(),
+                timezone: "UTC\0unsafe".into(),
+                keyboard: "us".into(),
+                ..Default::default()
+            },
+            &MigrationData::default(),
+        );
+
+        assert!(!config.sovereign_config_nix.contains("time.timeZone"));
+        assert!(config.warnings.iter().any(|warning| warning.contains("Rejected timezone")));
+        validate_nix_syntax(&config.sovereign_config_nix)
+            .expect("omitting the invalid locale assignment should leave valid Nix");
+    }
+
+    #[test]
+    fn injected_migration_package_candidates_are_rejected() {
+        let malicious = "vim; builtins.abort \"package-injection\"";
+        let mut generator = SovereignConfigGenerator::new();
+        let config = generator.generate(
+            &HardwareProfile::default(),
+            &UserChoices {
+                desktop: "none".into(),
+                ..Default::default()
+            },
+            &MigrationData {
+                detected_apps: vec![malicious.into()],
+                ..Default::default()
+            },
+        );
+
+        assert!(!config.sovereign_config_nix.contains(malicious));
+        assert!(config.sovereign_config_nix.contains("    vim"));
+        assert!(config.warnings.iter().any(|warning| warning.contains("Rejected migrated package")));
+        assert!(config.warnings.iter().any(|warning| warning.contains("syntax-validated only")));
+        validate_nix_syntax(&config.sovereign_config_nix)
+            .expect("rejected package candidates must not break generated Nix syntax");
+    }
+
+
 }
