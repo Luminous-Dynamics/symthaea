@@ -806,9 +806,22 @@ mod tests {
             posterior_after_observation(
                 &prior,
                 &action,
-                "impossible-under-prior",
+                "supports-room-change",
             ),
             Err(EvsiError::ZeroProbabilityOutcome)
+        );
+    }
+
+    #[test]
+    fn committed_active_analysis_fixture_parses_and_selects_cost_efficient_measurement() {
+        let fixture: super::ActiveAnalysisRequestV1 = serde_json::from_str(include_str!(
+            "../fixtures/active-analysis-request-v0.1.json"
+        ))
+        .unwrap();
+        let report = select_next_measurement(&fixture).unwrap();
+        assert_eq!(
+            report.chosen_action_id.as_deref(),
+            Some("longer-context-window")
         );
     }
 
