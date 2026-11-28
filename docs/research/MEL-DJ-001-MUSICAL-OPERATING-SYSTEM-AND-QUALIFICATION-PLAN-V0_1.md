@@ -451,3 +451,12 @@ The resulting evidence chain is:
 5. The runtime independently checks current authority, deck state, clock conversion and device constraints before executing anything.
 
 An ambiguous report can still support a DJ-authored choice, but the contract must preserve which hypothesis the DJ selected. The validator checks that the identifiers are present; the verifier that resolves them against their manifests remains a separate evidence-binding check before a contract is treated as fully grounded. Structural validation alone does not prove musical correctness or execution authority.
+
+
+## 25. Tempo-map interpolation is part of the evidence contract
+
+The beat-grid report contract requires each hypothesis to state how tempo values between map points are interpreted:
+- `stepwise_constant`: hold the prior tempo until the next map point;
+- `linear_in_frame_time`: interpolate BPM linearly in source-frame time.
+
+A non-empty tempo map without an interpolation declaration is invalid. A report with no tempo map must use `null`. This prevents the same beat-grid points from producing different phase forecasts in the planner, transition preview and real-time clock. It does not imply that either interpolation mode accurately models the performer; the estimator's residual, calibration and out-of-domain status remain separate evidence.
