@@ -34,6 +34,53 @@ pub struct DyadicInclusionProbability {
     /// The value 2^64 represents certainty and cannot be stored in a u64.
     pub numerator: u128,
 }
+/// Frozen pre-label policy that determines each event's audit inclusion chance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PredictableAuditQPolicy {
+    /// The custodian supplies q_t from a separately audited pre-label schedule.
+    ExternallySuppliedPrelabelSchedule,
+    /// Maps a pre-label priority score into a q_t interval with positive support.
+    LinearPrelabelPriority {
+        minimum: DyadicInclusionProbability,
+        maximum: DyadicInclusionProbability,
+    },
+}
+
+impl PredictableAuditQPolicy {
+    /// Score is an integer on [0, 2^53]. q_t is quantized to exact f64 dyadics.
+    pub fn inclusion_probability(
+        self,
+        priority_score_numerator: u64,
+    ) -> Result<DyadicInclusionProbability, PredictableAuditError> {
+        match self {
+            Self::ExternallySuppliedPrelabelSchedule => {
+                Err(PredictableAuditError::QPolicyRequiresExternalSchedule)
+            }
+            Self::LinearPrelabelPriority { minimum, maximum } => {
+                minimum.validate()?;
+                maximum.validate()?;
+                if maximum.numerator < minimum.numerator {
+                    return Err(PredictableAuditError::InvalidQPolicyRange);
+                }
+                if priority_score_numerator > (1_u64 << 53) {
+                    return Err(PredictableAuditError::InvalidPriorityScore(
+                        priority_score_numerator,
+                    ));
+                }
+                let width = maximum.numerator - minimum.numerator;
+                let increment = width * priority_score_numerator as u128
+                    / (1_u128 << 53);
+                let raw = minimum.numerator + increment;
+                let step = DYADIC_NUMERATOR_STEP;
+                let numerator = raw / step * step;
+                let output = DyadicInclusionProbability { numerator };
+                output.validate()?;
+                Ok(output)
+            }
+        }
+    }
+}
 
 impl DyadicInclusionProbability {
     pub fn validate(self) -> Result<(), PredictableAuditError> {
@@ -68,6 +115,12 @@ pub struct PredictableAuditDesign {
     pub random_stream_manifest_sha256: String,
     /// Deterministic lower bound on every conditional q_t in this horizon.
     pub minimum_inclusion_probability: DyadicInclusionProbability,
+    /// Frozen machine-readable rule for eventwise q_t.
+    pub q_policy: PredictableAuditQPolicy,
+    /// Optional upper bound on sum_t q_t, represented in units of 2^-64.
+    /// This bounds expected audit workload on the realized pre-label path,
+    /// not the number of Bernoulli selections on an individual run.
+    pub maximum_expected_selection_numerator: Option<u128>,
     /// Documents how the q-policy is computed from pre-label history.
     pub q_policy_id: String,
     pub q_policy_version: String,
@@ -81,6 +134,8 @@ pub struct PredictableAuditEvent {
     pub prelabel_history_sha256: String,
     /// q_t must be chosen before the current outcome is known.
     pub inclusion_probability: DyadicInclusionProbability,
+    /// Pre-label priority score on [0, 2^53], used by LinearPrelabelPriority.
+    pub prelabel_priority_score_numerator: u64,
     /// Supplied by the external custodian's independent random stream.
     /// This value is not included in the returned selection receipt.
     pub random_word: u64,
@@ -91,6 +146,7 @@ pub struct PredictableAuditSelection {
     pub sequence_number: usize,
     pub record_id: String,
     pub prelabel_history_sha256: String,
+    pub prelabel_priority_score_numerator: u64,
     pub inclusion_probability_numerator: u128,
     pub inclusion_probability_denominator: u128,
     pub inclusion_probability_f64_bits: u64,
@@ -120,11 +176,17 @@ pub struct PredictableAuditReceipt {
     pub random_stream_manifest_sha256: String,
     pub q_policy_id: String,
     pub q_policy_version: String,
+    pub q_policy: PredictableAuditQPolicy,
     pub minimum_inclusion_probability_numerator: u128,
     pub minimum_inclusion_probability_f64_bits: u64,
     pub population_size: usize,
     pub selected_count: usize,
     pub selected_fraction: f64,
+    /// Exact sum_t q_t numerator on the shared 2^64 denominator.
+    pub predictable_expected_selection_numerator: u128,
+    /// Predictable expected number of audit selections on this realized
+    /// pre-label path. Not a hard cap on the realized selected_count.
+    pub predictable_expected_selected_count: f64,
     /// Complete cohort; nonselected records remain present.
     pub selections: Vec<PredictableAuditSelection>,
     pub limitations: Vec<String>,
@@ -145,6 +207,12 @@ pub enum PredictableAuditError {
     DuplicateRecordId(String),
     NonSequentialIndex { expected: usize, actual: usize },
     InvalidPrelabelHistoryDigest { sequence_number: usize },
+    InvalidPriorityScore(u64),
+    InvalidQPolicyRange,
+    QPolicyRequiresExternalSchedule,
+    QPolicyMismatch { sequence_number: usize },
+    ExpectedAuditBudgetExceeded { expected_numerator: u128, maximum_numerator: u128 },
+    ExpectedAuditBudgetOverflow,
     MissingSelectedAdjudication(String),
     NonSelectedRecordAdjudicated(String),
     UnknownAdjudicationRecord(String),
@@ -190,6 +258,35 @@ impl std::fmt::Display for PredictableAuditError {
                 formatter,
                 "invalid pre-label history SHA-256 at sequence {sequence_number}"
             ),
+            Self::InvalidPriorityScore(score) => {
+                write!(formatter, "pre-label priority score is outside [0, 2^53]: {score}")
+            }
+            Self::InvalidQPolicyRange => {
+                write!(formatter, "pre-label q-policy maximum is below its minimum")
+            }
+            Self::QPolicyRequiresExternalSchedule => {
+                write!(formatter, "external q-policy requires the custodian-supplied q_t schedule")
+            }
+            Self::QPolicyMismatch { sequence_number } => write!(
+                formatter,
+                concat!(
+                    "event q_t does not match the frozen pre-label q-policy ",
+                    "at sequence {sequence_number}"
+                )
+            ),
+            Self::ExpectedAuditBudgetExceeded {
+                expected_numerator,
+                maximum_numerator,
+            } => write!(
+                formatter,
+                concat!(
+                    "predictable expected audit workload {expected_numerator}/2^64 ",
+                    "exceeds budget {maximum_numerator}/2^64"
+                )
+            ),
+            Self::ExpectedAuditBudgetOverflow => {
+                write!(formatter, "predictable expected audit workload numerator overflowed")
+            }
             Self::MissingSelectedAdjudication(id) => {
                 write!(formatter, "selected audit event has no independent label: {id}")
             }
@@ -307,6 +404,15 @@ pub fn build_predictable_audit_receipt(
         return Err(PredictableAuditError::EmptyQPolicyIdentity);
     }
     design.minimum_inclusion_probability.validate()?;
+    if let PredictableAuditQPolicy::LinearPrelabelPriority { minimum, maximum } = design.q_policy {
+        minimum.validate()?;
+        maximum.validate()?;
+        if minimum.numerator != design.minimum_inclusion_probability.numerator
+            || maximum.numerator < minimum.numerator
+        {
+            return Err(PredictableAuditError::InvalidQPolicyRange);
+        }
+    }
     if events.is_empty() {
         return Err(PredictableAuditError::EmptyCohort);
     }
@@ -314,6 +420,7 @@ pub fn build_predictable_audit_receipt(
     let mut record_ids = HashSet::with_capacity(events.len());
     let mut selections = Vec::with_capacity(events.len());
     let mut selected_count = 0usize;
+    let mut predictable_expected_selection_numerator = 0_u128;
 
     for (index, event) in events.iter().enumerate() {
         if event.sequence_number != index {
@@ -335,6 +442,11 @@ pub fn build_predictable_audit_receipt(
                 sequence_number: index,
             });
         }
+        if event.prelabel_priority_score_numerator > (1_u64 << 53) {
+            return Err(PredictableAuditError::InvalidPriorityScore(
+                event.prelabel_priority_score_numerator,
+            ));
+        }
         event.inclusion_probability.validate()?;
         if event.inclusion_probability.numerator
             < design.minimum_inclusion_probability.numerator
@@ -342,6 +454,29 @@ pub fn build_predictable_audit_receipt(
             return Err(PredictableAuditError::ProbabilityBelowMinimum {
                 sequence_number: index,
             });
+        }
+
+        if let PredictableAuditQPolicy::LinearPrelabelPriority { .. } = design.q_policy {
+            let expected = design
+                .q_policy
+                .inclusion_probability(event.prelabel_priority_score_numerator)?;
+            if expected.numerator != event.inclusion_probability.numerator {
+                return Err(PredictableAuditError::QPolicyMismatch {
+                    sequence_number: index,
+                });
+            }
+        }
+
+        predictable_expected_selection_numerator = predictable_expected_selection_numerator
+            .checked_add(event.inclusion_probability.numerator)
+            .ok_or(PredictableAuditError::ExpectedAuditBudgetOverflow)?;
+        if let Some(maximum) = design.maximum_expected_selection_numerator {
+            if predictable_expected_selection_numerator > maximum {
+                return Err(PredictableAuditError::ExpectedAuditBudgetExceeded {
+                    expected_numerator: predictable_expected_selection_numerator,
+                    maximum_numerator: maximum,
+                });
+            }
         }
 
         let selected = event.inclusion_probability.selects(event.random_word);
@@ -352,6 +487,7 @@ pub fn build_predictable_audit_receipt(
             sequence_number: index,
             record_id: event.record_id.clone(),
             prelabel_history_sha256: event.prelabel_history_sha256.clone(),
+            prelabel_priority_score_numerator: event.prelabel_priority_score_numerator,
             inclusion_probability_numerator: event.inclusion_probability.numerator,
             inclusion_probability_denominator: DYADIC_DENOMINATOR,
             inclusion_probability_f64_bits: event.inclusion_probability.as_f64().to_bits(),
@@ -369,6 +505,7 @@ pub fn build_predictable_audit_receipt(
         random_stream_manifest_sha256: design.random_stream_manifest_sha256.clone(),
         q_policy_id: design.q_policy_id.clone(),
         q_policy_version: design.q_policy_version.clone(),
+        q_policy: design.q_policy,
         minimum_inclusion_probability_numerator: design
             .minimum_inclusion_probability
             .numerator,
@@ -379,6 +516,9 @@ pub fn build_predictable_audit_receipt(
         population_size: events.len(),
         selected_count,
         selected_fraction: selected_count as f64 / events.len() as f64,
+        predictable_expected_selection_numerator,
+        predictable_expected_selected_count:
+            predictable_expected_selection_numerator as f64 / DYADIC_DENOMINATOR as f64,
         selections,
         limitations: vec![
             concat!(
@@ -430,6 +570,8 @@ mod tests {
             minimum_inclusion_probability: DyadicInclusionProbability {
                 numerator: 1_u128 << 63,
             },
+            q_policy: PredictableAuditQPolicy::ExternallySuppliedPrelabelSchedule,
+            maximum_expected_selection_numerator: None,
             q_policy_id: "risk-stratum-policy".to_owned(),
             q_policy_version: "1".to_owned(),
         }
@@ -443,6 +585,7 @@ mod tests {
             inclusion_probability: DyadicInclusionProbability {
                 numerator: q_numerator,
             },
+            prelabel_priority_score_numerator: 0,
             random_word,
         }
     }
@@ -552,6 +695,147 @@ mod tests {
             build_predictable_audit_receipt(&duplicate, &design()),
             Err(PredictableAuditError::DuplicateRecordId(_))
         ));
+    }
+
+    #[test]
+    fn predictable_expected_audit_budget_is_exact_and_fails_closed() {
+        let events = vec![
+            event(0, 1_u128 << 63, 0),
+            event(1, 3_u128 << 62, u64::MAX),
+            event(2, DYADIC_DENOMINATOR, u64::MAX),
+        ];
+        let exact_budget = (1_u128 << 63) + (3_u128 << 62) + DYADIC_DENOMINATOR;
+        let within_budget = PredictableAuditDesign {
+            maximum_expected_selection_numerator: Some(exact_budget),
+            ..design()
+        };
+        let receipt = build_predictable_audit_receipt(&events, &within_budget).unwrap();
+        assert_eq!(
+            receipt.predictable_expected_selection_numerator,
+            exact_budget
+        );
+        assert_eq!(receipt.predictable_expected_selected_count, 2.25);
+
+        let too_small = PredictableAuditDesign {
+            maximum_expected_selection_numerator: Some(exact_budget - 1),
+            ..design()
+        };
+        assert_eq!(
+            build_predictable_audit_receipt(&events, &too_small).unwrap_err(),
+            PredictableAuditError::ExpectedAuditBudgetExceeded {
+                expected_numerator: exact_budget,
+                maximum_numerator: exact_budget - 1,
+            }
+        );
+    }
+
+    #[test]
+    fn linear_prelabel_priority_maps_to_exact_monotone_q_values() {
+        let policy = PredictableAuditQPolicy::LinearPrelabelPriority {
+            minimum: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+            maximum: DyadicInclusionProbability {
+                numerator: DYADIC_DENOMINATOR,
+            },
+        };
+        let scores = [
+            0_u64,
+            1_u64 << 51,
+            1_u64 << 52,
+            3_u64 << 51,
+            1_u64 << 53,
+        ];
+        let q_values = scores
+            .iter()
+            .map(|score| policy.inclusion_probability(*score).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            q_values.iter().map(|q| q.as_f64()).collect::<Vec<_>>(),
+            vec![0.25, 0.4375, 0.625, 0.8125, 1.0]
+        );
+        assert!(q_values.windows(2).all(|pair| {
+            pair[0].numerator <= pair[1].numerator
+        }));
+    }
+
+    #[test]
+    fn linear_prelabel_priority_policy_is_checked_for_each_event() {
+        let q_policy = PredictableAuditQPolicy::LinearPrelabelPriority {
+            minimum: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+            maximum: DyadicInclusionProbability {
+                numerator: DYADIC_DENOMINATOR,
+            },
+        };
+        let adaptive_design = PredictableAuditDesign {
+            minimum_inclusion_probability: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+            q_policy,
+            ..design()
+        };
+        let mut first = event(0, 1_u128 << 62, 0);
+        first.prelabel_priority_score_numerator = 0;
+        let mut second = event(1, 5_u128 << 61, 0);
+        second.prelabel_priority_score_numerator = 1_u64 << 52;
+        let mut third = event(2, DYADIC_DENOMINATOR, u64::MAX);
+        third.prelabel_priority_score_numerator = 1_u64 << 53;
+        let receipt = build_predictable_audit_receipt(
+            &[first.clone(), second.clone(), third],
+            &adaptive_design,
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.selections.iter()
+                .map(PredictableAuditSelection::inclusion_probability)
+                .collect::<Vec<_>>(),
+            vec![0.25, 0.625, 1.0]
+        );
+        assert_eq!(
+            receipt.selections.iter()
+                .map(|selection| selection.prelabel_priority_score_numerator)
+                .collect::<Vec<_>>(),
+            vec![0, 1_u64 << 52, 1_u64 << 53]
+        );
+
+        second.inclusion_probability = DyadicInclusionProbability {
+            numerator: 3_u128 << 62,
+        };
+        assert_eq!(
+            build_predictable_audit_receipt(&[first, second], &adaptive_design).unwrap_err(),
+            PredictableAuditError::QPolicyMismatch { sequence_number: 1 }
+        );
+    }
+
+    #[test]
+    fn linear_prelabel_priority_rejects_invalid_score_and_range() {
+        let bad_score_policy = PredictableAuditQPolicy::LinearPrelabelPriority {
+            minimum: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+            maximum: DyadicInclusionProbability {
+                numerator: DYADIC_DENOMINATOR,
+            },
+        };
+        assert_eq!(
+            bad_score_policy.inclusion_probability((1_u64 << 53) + 1).unwrap_err(),
+            PredictableAuditError::InvalidPriorityScore((1_u64 << 53) + 1)
+        );
+
+        let bad_range = PredictableAuditQPolicy::LinearPrelabelPriority {
+            minimum: DyadicInclusionProbability {
+                numerator: 1_u128 << 63,
+            },
+            maximum: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+        };
+        assert_eq!(
+            bad_range.inclusion_probability(0).unwrap_err(),
+            PredictableAuditError::InvalidQPolicyRange
+        );
     }
 
     #[test]
