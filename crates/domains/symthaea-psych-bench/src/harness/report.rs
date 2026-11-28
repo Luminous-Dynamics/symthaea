@@ -2552,7 +2552,7 @@ impl BenchmarkReport {
 
         for (domain, cs) in &composites {
             let label = if cs.mean_z > 1.0 {
-                "***" // far above selected reference mean
+                "***" // far above the selected reference mean (descriptive only)
             } else if cs.mean_z > 0.5 {
                 "**"
             } else if cs.mean_z > 0.0 {
@@ -2560,7 +2560,7 @@ impl BenchmarkReport {
             } else if cs.mean_z > -0.5 {
                 ""
             } else {
-                "(!)" // far below selected reference mean
+                "(!)" // far below the selected reference mean (descriptive only)
             };
             lines.push(format!(
                 "{:<14} {:>+6.2} {:>4}  {} {}",
