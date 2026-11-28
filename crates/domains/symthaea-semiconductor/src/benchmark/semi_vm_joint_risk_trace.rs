@@ -1700,3 +1700,398 @@ fn joint_report_digest(
     canonical.report_sha256.clear();
     json_sha256(&canonical)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::label_consumption_guard::{
+        LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
+        LabelEvidenceFrontierV1,
+    };
+    use super::super::delayed_aci::{
+        DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1,
+        DELAYED_ACI_PREDICTION_SCHEMA_V1, DelayedAciPredictionInputV1,
+        begin_delayed_aci_round_v1, close_delayed_aci_stream_v1,
+        create_delayed_aci_engine_v1, deliver_delayed_aci_label_v1,
+        issue_delayed_aci_prediction_v1, resolve_degenerate_aci_interval_v1,
+    };
+    use super::super::selection_risk_bounds::{
+        IndependentAuditLossObservationV1, QualifiedLossObservationV1,
+        SELECTION_AUDIT_DESIGN_SCHEMA_V1, SELECTION_RISK_INPUT_SCHEMA_V1,
+        SelectionAuditDesignV1,
+    };
+
+    fn digest(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
+
+    fn eligibility_report(
+        label_id: &str,
+        revision: u64,
+        event_id: &str,
+        payload: &str,
+        value: f64,
+        eligibility: LabelConsumptionEligibilityV1,
+    ) -> LabelConsumptionEligibilityReportV1 {
+        let mut report = LabelConsumptionEligibilityReportV1 {
+            schema: "luminous.semi-bench.label-consumption-report.v1".into(),
+            label_id: label_id.into(),
+            label_revision: revision,
+            measurement_event_id: event_id.into(),
+            calibration_certificate_id: "joint-cal-cert-001".into(),
+            frontier: LabelEvidenceFrontierV1::CurrentAtK1,
+            eligibility,
+            downstream_consumption_allowed:
+                eligibility == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            reasons: Vec::new(),
+            label_sha256: payload.into(),
+            measurement_sha256: digest('b'),
+            qualified_corrected_value: value,
+            qualified_standard_uncertainty_upper_bound: Some(0.05),
+            qualification_report_sha256: digest('c'),
+            requalification_report_sha256: digest('d'),
+            requalification_frontier_sha256: digest('e'),
+            source_authenticity_proven: false,
+            training_snapshot_mutated: false,
+            equipment_control_authority: false,
+            report_sha256: String::new(),
+        };
+        report.report_sha256 = eligibility_report_digest(&report).unwrap();
+        report
+    }
+
+    fn selection_input(
+        population_manifest_sha256: &str,
+        source_ledger_sha256: &str,
+        evidence_sha256: &str,
+        audit_loss: f64,
+    ) -> SelectionRiskInputV1 {
+        SelectionRiskInputV1 {
+            schema: SELECTION_RISK_INPUT_SCHEMA_V1.into(),
+            input_id: "joint-risk-selection-input-v1".into(),
+            population_manifest_sha256: population_manifest_sha256.into(),
+            source_ledger_sha256: source_ledger_sha256.into(),
+            population_round_ids: vec![1, 2],
+            qualified_round_ids: vec![1],
+            unknown_round_ids: Vec::new(),
+            blocked_round_ids: Vec::new(),
+            unmeasured_round_ids: vec![2],
+            qualified_losses: vec![QualifiedLossObservationV1 {
+                round_id: 1,
+                loss: 1.0,
+                evidence_receipt_sha256: evidence_sha256.into(),
+            }],
+            audit_design: Some(SelectionAuditDesignV1 {
+                schema: SELECTION_AUDIT_DESIGN_SCHEMA_V1.into(),
+                design_sha256: digest('f'),
+                randomization_provenance_sha256: digest('1'),
+                reference_method_sha256: digest('2'),
+                minimum_inclusion_probability: 1.0,
+                confidence_delta: 0.05,
+                independent_of_operational_qualification: true,
+            }),
+            independent_audit_losses: vec![IndependentAuditLossObservationV1 {
+                round_id: 2,
+                loss: audit_loss,
+                inclusion_probability: 1.0,
+                audit_measurement_receipt_sha256: digest('3'),
+            }],
+        }
+    }
+
+    fn aci_evidence(
+        engine_id: &str,
+        policy: DelayedAciPolicyV1,
+    ) -> JointTauAciArmEvidenceV1 {
+        let mut engine = create_delayed_aci_engine_v1(
+            engine_id,
+            "fab-clock",
+            policy.clone(),
+        )
+        .unwrap();
+
+        begin_delayed_aci_round_v1(&mut engine, 1).unwrap();
+        let first_prediction = issue_delayed_aci_prediction_v1(
+            &mut engine,
+            &DelayedAciPredictionInputV1 {
+                schema: DELAYED_ACI_PREDICTION_SCHEMA_V1.into(),
+                sample_id: "wafer-001".into(),
+                measurement_event_id: "meas-001".into(),
+                round: 1,
+                event_time_unix_seconds: 1_900_000_000,
+                prediction_time_unix_seconds: 1_900_000_001,
+                clock_domain_id: "fab-clock".into(),
+                model_artifact_sha256: digest('4'),
+                point_prediction: 10.0,
+                interval: AciPredictionIntervalV1::bounded(9.0, 11.0),
+            },
+        )
+        .unwrap();
+
+        begin_delayed_aci_round_v1(&mut engine, 2).unwrap();
+        let payload = digest('5');
+        let first_delivery = DelayedAciLabelDeliveryV1 {
+            schema: DELAYED_ACI_DELIVERY_SCHEMA_V1.into(),
+            sample_id: "wafer-001".into(),
+            label_id: "label-001".into(),
+            label_revision: 1,
+            measurement_event_id: "meas-001".into(),
+            label_payload_sha256: payload.clone(),
+            label_value: 12.0,
+            label_available_at_unix_seconds: 1_900_000_010,
+            eligibility_report_available_at_unix_seconds: 1_900_000_015,
+            delivered_at_unix_seconds: 1_900_000_020,
+            delivered_round: 2,
+            clock_domain_id: "fab-clock".into(),
+            idempotency_key: "label-001:1".into(),
+            eligibility_report: eligibility_report(
+                "label-001",
+                1,
+                "meas-001",
+                &payload,
+                12.0,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            ),
+        };
+        let first_update =
+            deliver_delayed_aci_label_v1(&mut engine, &first_delivery).unwrap();
+
+        let second_prediction = issue_delayed_aci_prediction_v1(
+            &mut engine,
+            &DelayedAciPredictionInputV1 {
+                schema: DELAYED_ACI_PREDICTION_SCHEMA_V1.into(),
+                sample_id: "wafer-002".into(),
+                measurement_event_id: "meas-002".into(),
+                round: 2,
+                event_time_unix_seconds: 1_900_000_030,
+                prediction_time_unix_seconds: 1_900_000_031,
+                clock_domain_id: "fab-clock".into(),
+                model_artifact_sha256: digest('4'),
+                point_prediction: 10.0,
+                interval: AciPredictionIntervalV1::full_real_line(),
+            },
+        )
+        .unwrap();
+
+        begin_delayed_aci_round_v1(&mut engine, 3).unwrap();
+        let degenerate = resolve_degenerate_aci_interval_v1(&mut engine, "wafer-002").unwrap();
+        let missing = close_delayed_aci_stream_v1(&mut engine).unwrap();
+        assert!(missing.is_empty());
+
+        JointTauAciArmEvidenceV1 {
+            policy: policy.clone(),
+            interval_method_sha256: digest('6'),
+            prediction_stream_closed: true,
+            predictions: vec![first_prediction, second_prediction],
+            deliveries: vec![first_delivery],
+            updates: vec![first_update],
+            missing_feedback: missing,
+            degenerate_resolutions: vec![degenerate],
+            guarantee_state: engine.guarantee_state,
+        }
+    }
+
+    fn paired_fixture() -> JointRiskTraceInputV1 {
+        let policy = DelayedAciPolicyV1 {
+            schema: DELAYED_ACI_POLICY_SCHEMA_V1.into(),
+            policy_id: "joint-fixture-tau-aci-v1".into(),
+            target_miscoverage: 0.10,
+            learning_rate: 0.20,
+            delay_rounds: 1,
+            initial_phase_alpha: 0.10,
+        };
+        let evidence = aci_evidence("joint-aci-engine", policy.clone());
+        let mut report_for_row = evidence.deliveries[0].eligibility_report.clone();
+
+        let population_manifest = digest('7');
+        let source_ledger = digest('8');
+        let selection = selection_input(
+            &population_manifest,
+            &source_ledger,
+            &evidence.updates[0].receipt_sha256,
+            0.0,
+        );
+        let arm = |arm_id: &str| JointBenchmarkArmV1 {
+            arm_id: arm_id.into(),
+            method: JointControllerMethodV1::FixedDelayTauAci,
+            global_model_artifact_sha256: digest('4'),
+            interval_method_sha256: digest('6'),
+            controller_policy_sha256: json_sha256(&policy).unwrap(),
+            acquisition_policy_sha256: digest('9'),
+            physical_metrology_budget_units: 1.0,
+            selection_risk_input: selection.clone(),
+            controller_evidence: JointControllerEvidenceV1::FixedDelayTauAci(evidence.clone()),
+        };
+        report_for_row.report_sha256.clear();
+
+        let mut input = JointRiskTraceInputV1 {
+            schema: JOINT_RISK_TRACE_SCHEMA_V1.into(),
+            trace_id: "paired-joint-fixture-v1".into(),
+            mode: JointBenchmarkModeV1::PairedSharedAcquisition,
+            population_manifest_sha256: population_manifest,
+            source_ledger_sha256: source_ledger,
+            population: vec![
+                JointPopulationRowV1 {
+                    round_id: 1,
+                    sample_id: "wafer-001".into(),
+                    measurement_event_id: "meas-001".into(),
+                    context_key: "eqp-01/ch-01".into(),
+                    physical_measurement_selected: true,
+                    physical_metrology_cost_units: 1.0,
+                    outcome_state: PopulationOutcomeStateV1::Qualified,
+                    label_id: Some("label-001".into()),
+                    label_revision: Some(1),
+                    label_payload_sha256: Some(digest('5')),
+                    k1_report_sha256: Some(evidence.deliveries[0].eligibility_report.report_sha256.clone()),
+                    label_value: Some(12.0),
+                    label_available_at_unix_seconds: Some(1_900_000_010),
+                    eligibility_report_available_at_unix_seconds: Some(1_900_000_015),
+                    label_delivered_at_unix_seconds: Some(1_900_000_020),
+                },
+                JointPopulationRowV1 {
+                    round_id: 2,
+                    sample_id: "wafer-002".into(),
+                    measurement_event_id: "meas-002".into(),
+                    context_key: "eqp-01/ch-01".into(),
+                    physical_measurement_selected: false,
+                    physical_metrology_cost_units: 0.0,
+                    outcome_state: PopulationOutcomeStateV1::Unmeasured,
+                    label_id: None,
+                    label_revision: None,
+                    label_payload_sha256: None,
+                    k1_report_sha256: None,
+                    label_value: None,
+                    label_available_at_unix_seconds: None,
+                    eligibility_report_available_at_unix_seconds: None,
+                    label_delivered_at_unix_seconds: None,
+                },
+            ],
+            arms: vec![arm("tau-aci-a"), arm("tau-aci-b")],
+            trace_sha256: String::new(),
+        };
+        input.trace_sha256 = seal_joint_risk_trace_v1(&input).unwrap();
+        input
+    }
+
+    #[test]
+    fn paired_shared_acquisition_trace_replays_aci_and_population_audit() {
+        let input = paired_fixture();
+        let report = evaluate_joint_risk_trace_v1(&input).unwrap();
+        assert_eq!(report.status, JointTraceStatusV1::Complete);
+        assert_eq!(report.population_count, 2);
+        assert_eq!(report.physical_measurement_count, 1);
+        assert_eq!(report.qualified_count, 1);
+        assert_eq!(report.unmeasured_count, 1);
+        assert_eq!(report.independent_audit_count, 1);
+        assert_eq!(report.arm_summaries.len(), 2);
+        for summary in &report.arm_summaries {
+            assert_eq!(summary.observed_miscoverage_count, Some(1));
+            assert_eq!(summary.observed_miscoverage_count_denominator, Some(2));
+            assert_eq!(summary.aci_degenerate_resolution_count, Some(1));
+            assert_eq!(summary.aci_missing_feedback_count, Some(0));
+            assert!(summary.independent_audit_population_estimate.is_some());
+            assert!(summary.partial_identification_upper >= summary.partial_identification_lower);
+        }
+    }
+
+    #[test]
+    fn paired_trace_rejects_numeric_or_k1_row_mismatch() {
+        let mut input = paired_fixture();
+        input.population[0].label_value = Some(11.5);
+        input.trace_sha256 = seal_joint_risk_trace_v1(&input).unwrap();
+        assert!(evaluate_joint_risk_trace_v1(&input).is_err());
+    }
+
+    #[test]
+    fn paired_trace_rejects_audit_loss_difference_between_arms() {
+        let mut input = paired_fixture();
+        input.arms[1].selection_risk_input.independent_audit_losses[0].loss = 1.0;
+        input.trace_sha256 = seal_joint_risk_trace_v1(&input).unwrap();
+        assert!(evaluate_joint_risk_trace_v1(&input).is_err());
+    }
+
+    #[test]
+    fn paired_trace_rejects_selection_budget_overrun() {
+        let mut input = paired_fixture();
+        input.arms[0].physical_metrology_budget_units = 0.5;
+        input.arms[1].physical_metrology_budget_units = 0.5;
+        input.trace_sha256 = seal_joint_risk_trace_v1(&input).unwrap();
+        assert!(evaluate_joint_risk_trace_v1(&input).is_err());
+    }
+
+    #[test]
+    fn trace_digest_is_invariant_to_population_and_arm_order() {
+        let input = paired_fixture();
+        let first = seal_joint_risk_trace_v1(&input).unwrap();
+        let mut permuted = input;
+        permuted.population.reverse();
+        permuted.arms.reverse();
+        assert_eq!(first, seal_joint_risk_trace_v1(&permuted).unwrap());
+    }
+
+    #[test]
+    fn unmeasured_row_cannot_carry_label_or_report_time() {
+        let mut input = paired_fixture();
+        input.population[1].label_delivered_at_unix_seconds = Some(1_900_000_099);
+        assert!(validate_population(&input).is_err());
+    }
+
+    #[test]
+    fn ca_feedback_input_binds_unknown_and_blocked_states_without_promoting_them() {
+        let unknown = JointPopulationRowV1 {
+            round_id: 3,
+            sample_id: "wafer-003".into(),
+            measurement_event_id: "meas-003".into(),
+            context_key: "eqp-02/ch-01".into(),
+            physical_measurement_selected: true,
+            physical_metrology_cost_units: 1.0,
+            outcome_state: PopulationOutcomeStateV1::Unknown,
+            label_id: Some("label-003".into()),
+            label_revision: Some(2),
+            label_payload_sha256: Some(digest('a')),
+            k1_report_sha256: None,
+            label_value: None,
+            label_available_at_unix_seconds: Some(1_900_000_100),
+            eligibility_report_available_at_unix_seconds: Some(1_900_000_105),
+            label_delivered_at_unix_seconds: Some(1_900_000_110),
+        };
+        let mut report = eligibility_report(
+            "label-003",
+            2,
+            "meas-003",
+            &digest('a'),
+            13.0,
+            LabelConsumptionEligibilityV1::Unknown,
+        );
+        report.report_sha256 = eligibility_report_digest(&report).unwrap();
+        let feedback = CaOcrcLabelFeedbackV1 {
+            schema: super::super::ca_ocrc_bounded::CA_OCRC_FEEDBACK_SCHEMA_V1.into(),
+            feedback_round: 4,
+            sample_id: "wafer-003".into(),
+            label_id: "label-003".into(),
+            label_revision: 2,
+            measurement_event_id: "meas-003".into(),
+            measurand_id: "cd".into(),
+            unit: "nm".into(),
+            label_payload_sha256: digest('a'),
+            label_value: 13.0,
+            label_available_at_unix_seconds: 1_900_000_100,
+            eligibility_report_available_at_unix_seconds: 1_900_000_105,
+            delivered_at_unix_seconds: 1_900_000_110,
+            clock_domain_id: "fab-clock".into(),
+            eligibility_report: report,
+        };
+        assert!(validate_ca_feedback_input(&feedback, 4, &unknown).is_ok());
+
+        let mut blocked = unknown;
+        blocked.outcome_state = PopulationOutcomeStateV1::Blocked;
+        let mut blocked_feedback = feedback;
+        blocked_feedback.eligibility_report.eligibility = LabelConsumptionEligibilityV1::Blocked;
+        blocked_feedback.eligibility_report.downstream_consumption_allowed = false;
+        blocked_feedback.eligibility_report.report_sha256 =
+            eligibility_report_digest(&blocked_feedback.eligibility_report).unwrap();
+        blocked.k1_report_sha256 = Some(blocked_feedback.eligibility_report.report_sha256.clone());
+        assert!(validate_ca_feedback_input(&blocked_feedback, 4, &blocked).is_ok());
+    }
+}
