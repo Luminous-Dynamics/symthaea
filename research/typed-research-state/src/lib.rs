@@ -230,7 +230,9 @@ fn validate_evidence(
         );
     }
     for key in ["published_at", "captured_at"] {
-        if let Some(time) = string(map, key, &path, issues) && !valid_time(time) {
+        if let Some(time) = string(map, key, &path, issues)
+            && !valid_time(time)
+        {
             issue(issues, format!("{path}.{key}"), "invalid RFC3339 timestamp");
         }
     }
@@ -316,7 +318,9 @@ fn validate_evidence(
             "unknown retrieval state",
         );
     }
-    if let Some(id) = id && ids.insert(id.clone(), family).is_some() {
+    if let Some(id) = id
+        && ids.insert(id.clone(), family).is_some()
+    {
         issue(
             issues,
             format!("{path}.evidence_id"),
@@ -354,7 +358,9 @@ fn validate_classifier(
             "classifier confidence must be finite and in [0,1]",
         );
     }
-    if let Some(time) = string(map, "emitted_at", path, issues) && !valid_time(time) {
+    if let Some(time) = string(map, "emitted_at", path, issues)
+        && !valid_time(time)
+    {
         issue(
             issues,
             format!("{path}.emitted_at"),
@@ -471,10 +477,14 @@ fn validate_relation(
                 .as_ref()
                 .map(|id| format!("unknown-origin:{id}"))
         });
-        if relation == "SUPPORTS" && let Some(origin) = origin.as_ref() {
+        if relation == "SUPPORTS"
+            && let Some(origin) = origin.as_ref()
+        {
             context.supports.insert(origin.clone());
         }
-        if relation == "REFUTES" && let Some(origin) = origin.as_ref() {
+        if relation == "REFUTES"
+            && let Some(origin) = origin.as_ref()
+        {
             context.refutes.insert(origin.clone());
         }
     }
@@ -575,7 +585,9 @@ fn validate_adjudication(
                 );
             }
             string(map, "evidence_reference", path, issues);
-            if let Some(time) = string(map, "adjudicated_at", path, issues) && !valid_time(time) {
+            if let Some(time) = string(map, "adjudicated_at", path, issues)
+                && !valid_time(time)
+            {
                 issue(
                     issues,
                     format!("{path}.adjudicated_at"),
