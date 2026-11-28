@@ -3,9 +3,11 @@
 //! Context-blocked paired Fourier-kernel discrepancy with anytime-valid evidence.
 //!
 //! Each pair shares a pre-registered context/covariate stratum c. With a fixed
-//! Fourier feature map phi, the bounded observation is
+//! Fourier feature map phi, the bounded observation is:
 //!
-//!     r_t = 0.5 * e_c ⊗ (phi(Y_t) - phi(X_t)).
+//! ```text
+//! r_t = 0.5 * e_c tensor (phi(Y_t) - phi(X_t))
+//! ```
 //!
 //! Since ||phi(x)||=1, ||r_t||<=1. Under conditional distribution equality
 //! within every context, E[r_t | history, context]=0. One-hot context blocks
