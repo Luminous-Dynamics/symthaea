@@ -122,6 +122,11 @@ pub enum ActionTimelineError {
     CancellationOutsideLifetime,
     MissingReplacementPlan,
     UnexpectedReplacementPlan,
+    WrongExecutionClockDomain,
+    ExecutionClockRegression,
+    ExecutionBeforeTimeline,
+    CancellationTimestampInFuture,
+    InvalidExecutionTimeline(ActionTimelineError),
 }
 
 /// Sorts a schedule deterministically, computes its domain-separated digest,
@@ -267,6 +272,190 @@ pub fn verify_action_cancellation_v1(
         _ => {}
     }
     Ok(())
+}
+
+
+/// One deterministic scheduling decision. `stop_required_segment_ids` means
+/// the caller must request an actuator stop; it does not prove that the
+/// physical/audio output has stopped. Only a device observer can establish
+/// that fact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionExecutionTick {
+    pub dispatch_segment_ids: Vec<String>,
+    pub missed_segment_ids: Vec<String>,
+    /// Scheduled intervals that elapsed. This is not physical completion proof.
+    pub elapsed_segment_ids: Vec<String>,
+    /// Active segments whose actuators should be stopped immediately.
+    pub stop_required_segment_ids: Vec<String>,
+    pub cancelled: bool,
+    pub expired: bool,
+}
+
+/// Deterministic runtime gate over a previously compiled and verified plan.
+///
+/// It does not send commands to an output device. It makes one-shot dispatch,
+/// stale-segment suppression, monotonic-clock checks, and cancellation/expiry
+/// decisions that an audio/visual/haptic adapter can consume.
+#[derive(Debug, Clone)]
+pub struct ActionExecutionGate {
+    timeline: ActionTimelineV1,
+    clock_domain_id: String,
+    last_now_monotonic_ns: Option<u64>,
+    seen_segment_ids: HashSet<String>,
+    active_segment_ids: HashSet<String>,
+    cancelled: bool,
+    expired: bool,
+}
+
+impl ActionExecutionGate {
+    pub fn new(
+        timeline: ActionTimelineV1,
+        clock_domain_id: impl Into<String>,
+    ) -> Result<Self, ActionExecutionError> {
+        verify_action_timeline_v1(&timeline)
+            .map_err(ActionExecutionError::InvalidExecutionTimeline)?;
+        let clock_domain_id = clock_domain_id.into();
+        validate_identifier(&clock_domain_id)
+            .map_err(|_| ActionExecutionError::WrongExecutionClockDomain)?;
+        if timeline.clock_domain_id != clock_domain_id {
+            return Err(ActionExecutionError::WrongExecutionClockDomain);
+        }
+        Ok(Self {
+            timeline,
+            clock_domain_id,
+            last_now_monotonic_ns: None,
+            seen_segment_ids: HashSet::new(),
+            active_segment_ids: HashSet::new(),
+            cancelled: false,
+            expired: false,
+        })
+    }
+
+    pub fn timeline_digest(&self) -> &str {
+        &self.timeline.timeline_digest
+    }
+
+    pub fn is_cancelled(&self) -> bool { self.cancelled }
+    pub fn is_expired(&self) -> bool { self.expired }
+
+    /// Advance the schedule at a timestamp from the timeline's source clock.
+    ///
+    /// A segment is dispatched at most once and only while its scheduled
+    /// interval is live. A segment first noticed after its end is classified
+    /// as missed and is never sent late. Cancellation and expiry suppress all
+    /// future dispatch; every currently active segment is returned as
+    /// stop-required exactly once.
+    pub fn advance(
+        &mut self,
+        now_monotonic_ns: u64,
+        clock_domain_id: &str,
+        cancellation: Option<&ActionCancellationV1>,
+    ) -> Result<ActionExecutionTick, ActionExecutionError> {
+        if clock_domain_id != self.clock_domain_id {
+            return Err(ActionExecutionError::WrongExecutionClockDomain);
+        }
+        if let Some(previous) = self.last_now_monotonic_ns {
+            if now_monotonic_ns < previous {
+                return Err(ActionExecutionError::ExecutionClockRegression);
+            }
+        }
+        if now_monotonic_ns < self.timeline.source_timestamp_monotonic_ns {
+            return Err(ActionExecutionError::ExecutionBeforeTimeline);
+        }
+        self.last_now_monotonic_ns = Some(now_monotonic_ns);
+
+        if self.cancelled || self.expired {
+            return Ok(empty_execution_tick(self.cancelled, self.expired));
+        }
+
+        if now_monotonic_ns >= self.timeline.expires_at_monotonic_ns {
+            self.expired = true;
+            let mut stop_required_segment_ids: Vec<_> =
+                self.active_segment_ids.drain().collect();
+            stop_required_segment_ids.sort();
+            return Ok(ActionExecutionTick {
+                dispatch_segment_ids: Vec::new(),
+                missed_segment_ids: Vec::new(),
+                elapsed_segment_ids: Vec::new(),
+                stop_required_segment_ids,
+                cancelled: false,
+                expired: true,
+            });
+        }
+
+        if let Some(cancellation) = cancellation {
+            verify_action_cancellation_v1(&self.timeline, cancellation)
+                .map_err(ActionExecutionError::InvalidExecutionTimeline)?;
+            if cancellation.cancelled_at_monotonic_ns > now_monotonic_ns {
+                return Err(ActionExecutionError::CancellationTimestampInFuture);
+            }
+            self.cancelled = true;
+            let mut stop_required_segment_ids: Vec<_> =
+                self.active_segment_ids.drain().collect();
+            stop_required_segment_ids.sort();
+            return Ok(ActionExecutionTick {
+                dispatch_segment_ids: Vec::new(),
+                missed_segment_ids: Vec::new(),
+                elapsed_segment_ids: Vec::new(),
+                stop_required_segment_ids,
+                cancelled: true,
+                expired: false,
+            });
+        }
+
+        let mut elapsed_segment_ids = Vec::new();
+        self.active_segment_ids.retain(|id| {
+            let still_active = self.timeline.segments.iter().any(|segment| {
+                segment.segment_id == *id
+                    && segment.ends_at_monotonic_ns > now_monotonic_ns
+            });
+            if !still_active {
+                elapsed_segment_ids.push(id.clone());
+            }
+            still_active
+        });
+
+        let mut dispatch_segment_ids = Vec::new();
+        let mut missed_segment_ids = Vec::new();
+        for segment in &self.timeline.segments {
+            if self.seen_segment_ids.contains(&segment.segment_id) {
+                continue;
+            }
+            if segment.starts_at_monotonic_ns <= now_monotonic_ns
+                && now_monotonic_ns < segment.ends_at_monotonic_ns
+            {
+                self.seen_segment_ids.insert(segment.segment_id.clone());
+                self.active_segment_ids.insert(segment.segment_id.clone());
+                dispatch_segment_ids.push(segment.segment_id.clone());
+            } else if segment.ends_at_monotonic_ns <= now_monotonic_ns {
+                self.seen_segment_ids.insert(segment.segment_id.clone());
+                missed_segment_ids.push(segment.segment_id.clone());
+            }
+        }
+        dispatch_segment_ids.sort();
+        missed_segment_ids.sort();
+        elapsed_segment_ids.sort();
+
+        Ok(ActionExecutionTick {
+            dispatch_segment_ids,
+            missed_segment_ids,
+            elapsed_segment_ids,
+            stop_required_segment_ids: Vec::new(),
+            cancelled: false,
+            expired: false,
+        })
+    }
+}
+
+fn empty_execution_tick(cancelled: bool, expired: bool) -> ActionExecutionTick {
+    ActionExecutionTick {
+        dispatch_segment_ids: Vec::new(),
+        missed_segment_ids: Vec::new(),
+        elapsed_segment_ids: Vec::new(),
+        stop_required_segment_ids: Vec::new(),
+        cancelled,
+        expired,
+    }
 }
 
 fn action_matches_channel(kind: ActionKind, channel: ActionChannel) -> bool {
@@ -475,6 +664,126 @@ mod tests {
         assert_eq!(
             compile_action_timeline_v1(value),
             Err(ActionTimelineError::InvalidSynchronizationGroup)
+        );
+    }
+
+
+    #[test]
+    fn execution_gate_dispatches_each_live_segment_once() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        let mut gate = ActionExecutionGate::new(compiled, "clock:source-1").unwrap();
+        let early = gate.advance(1_999, "clock:source-1", None).unwrap();
+        assert!(early.dispatch_segment_ids.is_empty());
+        let due = gate.advance(2_000, "clock:source-1", None).unwrap();
+        assert_eq!(due.dispatch_segment_ids, vec!["gesture-1", "speech-1", "viseme-1"]);
+        let repeated = gate.advance(2_001, "clock:source-1", None).unwrap();
+        assert!(repeated.dispatch_segment_ids.is_empty());
+    }
+
+    #[test]
+    fn execution_gate_never_dispatches_a_segment_after_its_window() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        let mut gate = ActionExecutionGate::new(compiled, "clock:source-1").unwrap();
+        let tick = gate.advance(6_000, "clock:source-1", None).unwrap();
+        assert!(tick.dispatch_segment_ids.is_empty());
+        assert_eq!(tick.missed_segment_ids, vec!["gesture-1", "speech-1", "viseme-1"]);
+    }
+
+    #[test]
+    fn cancellation_stops_every_active_channel_and_blocks_future_dispatch() {
+        let mut value = timeline();
+        value.segments.push(segment(
+            "late-gesture",
+            ActionChannel::Gesture,
+            ActionKind::Gesture,
+            6_000,
+            7_000,
+            None,
+        ));
+        let compiled = compile_action_timeline_v1(value).unwrap();
+        let mut gate = ActionExecutionGate::new(compiled.clone(), "clock:source-1").unwrap();
+        let started = gate.advance(2_000, "clock:source-1", None).unwrap();
+        assert_eq!(started.dispatch_segment_ids.len(), 3);
+        let cancellation = ActionCancellationV1 {
+            plan_id: compiled.plan_id.clone(),
+            clock_domain_id: compiled.clock_domain_id.clone(),
+            cancelled_at_monotonic_ns: 3_000,
+            cause_event_id: "barge-in-1".to_owned(),
+            reason: ActionCancellationReason::UserBargeIn,
+            replacement_plan_id: None,
+            timeline_digest: compiled.timeline_digest.clone(),
+        };
+        let stopped = gate.advance(3_000, "clock:source-1", Some(&cancellation)).unwrap();
+        assert_eq!(stopped.stop_required_segment_ids, vec!["gesture-1", "speech-1", "viseme-1"]);
+        assert!(stopped.cancelled);
+        let after = gate.advance(6_000, "clock:source-1", None).unwrap();
+        assert!(after.dispatch_segment_ids.is_empty());
+        assert!(after.stop_required_segment_ids.is_empty());
+    }
+
+    #[test]
+    fn cancellation_cannot_be_applied_before_its_source_timestamp() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        let mut gate = ActionExecutionGate::new(compiled.clone(), "clock:source-1").unwrap();
+        let cancellation = ActionCancellationV1 {
+            plan_id: compiled.plan_id.clone(),
+            clock_domain_id: compiled.clock_domain_id.clone(),
+            cancelled_at_monotonic_ns: 3_000,
+            cause_event_id: "barge-in-2".to_owned(),
+            reason: ActionCancellationReason::UserBargeIn,
+            replacement_plan_id: None,
+            timeline_digest: compiled.timeline_digest.clone(),
+        };
+        assert_eq!(
+            gate.advance(2_500, "clock:source-1", Some(&cancellation)),
+            Err(ActionExecutionError::CancellationTimestampInFuture)
+        );
+    }
+
+    #[test]
+    fn expiry_requests_stop_for_active_segments_once() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        let mut gate = ActionExecutionGate::new(compiled, "clock:source-1").unwrap();
+        gate.advance(2_000, "clock:source-1", None).unwrap();
+        let expired = gate.advance(10_000, "clock:source-1", None).unwrap();
+        assert_eq!(expired.stop_required_segment_ids, vec!["gesture-1", "speech-1", "viseme-1"]);
+        assert!(expired.expired);
+        let repeated = gate.advance(10_001, "clock:source-1", None).unwrap();
+        assert!(repeated.stop_required_segment_ids.is_empty());
+        assert!(repeated.expired);
+    }
+
+    #[test]
+    fn execution_gate_rejects_clock_regression_and_clock_mismatch() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        let mut gate = ActionExecutionGate::new(compiled, "clock:source-1").unwrap();
+        gate.advance(2_000, "clock:source-1", None).unwrap();
+        assert_eq!(
+            gate.advance(1_999, "clock:source-1", None),
+            Err(ActionExecutionError::ExecutionClockRegression)
+        );
+        assert_eq!(
+            gate.advance(2_001, "clock:other", None),
+            Err(ActionExecutionError::WrongExecutionClockDomain)
+        );
+    }
+
+    #[test]
+    fn execution_gate_requires_timestamp_inside_or_after_source_event() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        let mut gate = ActionExecutionGate::new(compiled, "clock:source-1").unwrap();
+        assert_eq!(
+            gate.advance(999, "clock:source-1", None),
+            Err(ActionExecutionError::ExecutionBeforeTimeline)
+        );
+    }
+
+    #[test]
+    fn execution_gate_rejects_timeline_bound_to_another_clock() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        assert_eq!(
+            ActionExecutionGate::new(compiled, "clock:other"),
+            Err(ActionExecutionError::WrongExecutionClockDomain)
         );
     }
 
