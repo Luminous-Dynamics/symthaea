@@ -4,7 +4,7 @@ Status: benchmark protocol specification. No benchmark suite, live trial, compet
 
 ## Objective
 
-Create a reproducible, version-pinned, independently adjudicated benchmark for end-to-end recovery assurance. The benchmark must test whether MON-037–MON-042 detect unsafe recovery states that component-native checks and simpler reconciliation strategies miss, while quantifying false blocks, indeterminate decisions, operational cost and runtime overhead.
+Create a reproducible, version-pinned, independently adjudicated benchmark for end-to-end recovery assurance. The benchmark must test whether MON-037–MON-045 detect unsafe recovery states that component-native checks and simpler reconciliation strategies miss, while quantifying false blocks, indeterminate decisions, operational cost and runtime overhead.
 
 The benchmark evaluates assurance quality, not whether MON replaces PostgreSQL, pgBackRest, Debezium, Kafka, Jepsen, Chaos Mesh, or cloud fault-injection products.
 
@@ -30,11 +30,12 @@ All arms receive the same source workload, backup snapshot, database version, br
 | A3 | A2 + row-count reconciliation | Aggregate reconciliation baseline |
 | A4 | A2 + event-ID reconciliation | Identity reconciliation baseline |
 | A5 | A4 + transaction closure and partition-vector capture | MON semantic subset |
-| A6 | A5 + MON-037–040 | Integrated offline assurance |
-| A7 | A6 + MON-041 authenticated capture/custody | Runtime evidence admission |
-| A8 | A7 + MON-044 capability/negative-space qualification | Required-state observability and scope closure |
-| A9 | A8 + MON-045 typed dependency graph and scoped invalidation | Claim freshness, revocation propagation and blast-radius precision |
-| A10 | Independent SRE/maintainer adjudication using sealed source truth | External adjudication reference |
+| A6 | A5 + MON-037–040 | Per-replay semantic and recovery reproducibility |
+| A7 | A6 + MON-042 dependency-aware sampling | Independent failure-domain estimand |
+| A8 | A7 + MON-041 authenticated capture/custody | Evidence authenticity and admission |
+| A9 | A8 + MON-044 capability/negative-space qualification | Required-state observability and scope closure |
+| A10 | A9 + MON-045 typed dependency graph and scoped invalidation | Claim freshness, revocation propagation and blast-radius precision |
+| A11 | Independent SRE/maintainer adjudication using sealed source truth | External adjudication reference |
 
 Where a product does not expose a comparable capability, mark it not applicable rather than silently substituting a different check. Report both native and augmented variants when augmentation is technically fair.
 
