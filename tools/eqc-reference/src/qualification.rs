@@ -448,6 +448,106 @@ mod tests {
     }
 
     #[test]
+    fn observation_schema_rejects_each_missing_required_field() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repository root resolves");
+        let schema_path = root.join("docs/research/eqc-system-observation-v0.1.schema.json");
+        let schema = load_schema(&schema_path).expect("observation schema meta-validates");
+        let validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("observation schema compiles offline");
+        let required = [
+            "schema",
+            "task_id",
+            "system",
+            "actor_id",
+            "subject_id",
+            "authorization_decision",
+            "task_success",
+            "input_digests",
+            "authority_snapshot_sha256",
+            "state_mutation_count",
+            "action_log_sha256",
+            "result_digest_sha256",
+            "verifier",
+            "resource_usage",
+        ];
+
+        for field in required {
+            let task = task();
+            let mut observation = valid_observation(&task);
+            observation
+                .as_object_mut()
+                .expect("observation object")
+                .remove(field);
+            assert!(
+                !validator.is_valid(&observation),
+                "observation schema must reject missing '{field}'"
+            );
+        }
+    }
+
+    #[test]
+    fn observation_schema_rejects_nested_meter_and_verifier_mutations() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repository root resolves");
+        let schema_path = root.join("docs/research/eqc-system-observation-v0.1.schema.json");
+        let schema = load_schema(&schema_path).expect("observation schema meta-validates");
+        let validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("observation schema compiles offline");
+        let task = task();
+
+        for field in [
+            "elapsed_ms",
+            "cpu_time_ms",
+            "peak_memory_bytes",
+            "tool_calls",
+            "network_bytes",
+            "network_endpoints",
+            "human_interventions",
+            "energy_millijoules",
+            "cost_microusd",
+        ] {
+            let mut observation = valid_observation(&task);
+            observation["resource_usage"]
+                .as_object_mut()
+                .expect("resource usage object")
+                .remove(field);
+            assert!(
+                !validator.is_valid(&observation),
+                "observation schema must reject missing resource meter '{field}'"
+            );
+        }
+
+        for field in [
+            "verifier_id",
+            "verifier_sha256",
+            "replay",
+            "independent",
+            "replay_result_sha256",
+        ] {
+            let mut observation = valid_observation(&task);
+            observation["verifier"]
+                .as_object_mut()
+                .expect("verifier object")
+                .remove(field);
+            assert!(
+                !validator.is_valid(&observation),
+                "observation schema must reject missing verifier field '{field}'"
+            );
+        }
+    }
+
+    #[test]
     fn observation_schema_rejects_unknown_fields_and_missing_digests() {
         let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
