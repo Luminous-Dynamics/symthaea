@@ -26,5 +26,7 @@
   "code_revision": "0123456789abcdef0123456789abcdef01234567",
   "required_seeds": [
     1000
-  ]
+  ],
+  "sampling_frame_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "selection_protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 }
