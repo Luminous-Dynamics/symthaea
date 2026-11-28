@@ -919,6 +919,9 @@ mod tests {
         CaOcrcFeedbackV1 {
             schema: CA_OCRC_FEEDBACK_SCHEMA_V1.into(), current_round: current,
             origin_round: origin, actual_delay: current - origin,
+            prediction_id: format!("pred-{origin}"),
+            sample_id: format!("sample-{origin}"),
+            measurement_event_id: format!("event-{origin}"),
             label_id: format!("label-{origin}"), label_revision: 1,
             label_payload_sha256: payload.clone(), label_value: value,
             label_available_at_unix_seconds: 1_800_000_120 + origin as i64 * 60,
