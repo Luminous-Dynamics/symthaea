@@ -12,6 +12,29 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+/// Versioned benchmark-internal cost units. These are task costs, not joules,
+/// wall-clock latency, API tokens, or monetary cost.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CostModel {
+    pub inspect: u32,
+    pub move_between_sites: u32,
+    pub interaction: u32,
+    pub wait: u32,
+    pub invalid_action_surcharge: u32,
+}
+
+impl Default for CostModel {
+    fn default() -> Self {
+        Self {
+            inspect: 2,
+            move_between_sites: 1,
+            interaction: 1,
+            wait: 1,
+            invalid_action_surcharge: 1,
+        }
+    }
+}
+
 /// Versioned scenario and execution limits.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScenarioManifest {
@@ -22,6 +45,7 @@ pub struct ScenarioManifest {
     pub seed: u64,
     pub max_steps: u32,
     pub observation_budget: u32,
+    pub cost_model: CostModel,
 }
 
 impl Default for ScenarioManifest {
@@ -33,6 +57,7 @@ impl Default for ScenarioManifest {
             seed: 42,
             max_steps: 64,
             observation_budget: 12,
+            cost_model: CostModel::default(),
         }
     }
 }
@@ -502,6 +527,10 @@ pub struct ScenarioScore {
     pub optimal_agent_steps: u32,
     /// 0 when the goal is incomplete; otherwise optimal steps / actual agent attempts, capped at 1.
     pub action_efficiency: f64,
+    /// Sum of benchmark-defined cost units across agent actions and rejected attempts.
+    pub resource_cost_units: u64,
+    /// 0 when incomplete; otherwise completed goal per benchmark-defined cost unit.
+    pub goal_completion_per_cost_unit: f64,
 }
 
 /// Auditable output of a deterministic trace evaluation.
@@ -557,8 +586,35 @@ fn score_replayed_state(
     } else {
         9
     };
+    let resource_cost_units = state.event_log.iter().map(|event| {
+        let model = manifest.cost_model;
+        match &event.kind {
+            EventKind::Inspected(_) => model.inspect as u64,
+            EventKind::Moved { .. } => model.move_between_sites as u64,
+            EventKind::Collected(_) | EventKind::GateOpened | EventKind::Delivered => {
+                model.interaction as u64
+            }
+            EventKind::Waited => model.wait as u64,
+            EventKind::ActionRejected { action, .. } => {
+                let action_cost = match action {
+                    Action::Inspect => model.inspect,
+                    Action::Move(_) => model.move_between_sites,
+                    Action::Collect(_) | Action::UseValveKey | Action::Deliver => model.interaction,
+                    Action::Wait => model.wait,
+                };
+                action_cost.saturating_add(model.invalid_action_surcharge) as u64
+            }
+            EventKind::Perturbed(_) => 0,
+        }
+    }).sum::<u64>();
+
     let action_efficiency = if state.delivered && agent_attempts > 0 {
         (optimal_agent_steps as f64 / agent_attempts as f64).min(1.0)
+    } else {
+        0.0
+    };
+    let goal_completion_per_cost_unit = if state.delivered && resource_cost_units > 0 {
+        1.0 / resource_cost_units as f64
     } else {
         0.0
     };
@@ -573,6 +629,8 @@ fn score_replayed_state(
         successful_recoveries,
         optimal_agent_steps,
         action_efficiency,
+        resource_cost_units,
+        goal_completion_per_cost_unit,
     }
 }
 
