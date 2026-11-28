@@ -157,7 +157,7 @@ func RequiredScopeDigest(v []RequiredItem)string{
 }
 func ManifestDigest(v Manifest)string{
  c:=v
- c.Items=append([]CapabilityItem(nil),v.Items...)
+ c.Items=make([]CapabilityItem,len(v.Items));copy(c.Items,v.Items)
  for i:=range c.Items{
   c.Items[i].RequiredPrerequisites=append([]string(nil),v.Items[i].RequiredPrerequisites...)
   sort.Strings(c.Items[i].RequiredPrerequisites)
