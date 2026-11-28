@@ -542,7 +542,7 @@ The current FEP action model is intentionally simple and structured. It has not 
 
 ### 16.4 Current test inventory and qualification status
 
-The current branch contains **52 authored tests** in the environment/candidate crate (F1–F6: 41, candidate-output contract: 7, random/greedy policy baselines: 4), plus **6 authored FEP-adapter tests**. These are source counts only, not observed passes.
+The current branch contains **58 authored tests** in the environment/candidate/evaluator crate (F1–F6: 41, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 5), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **74 authored Rust tests**. These are source counts only, not observed passes.
 
 Two dedicated GitHub workflows are configured:
 - `GameBench Rust v0.1`: deterministic environment, candidate contract, and policy baseline crate.
@@ -606,7 +606,7 @@ The adapter crate contains:
 - 5 spatial HDC candidate tests;
 - 5 HDC-LTC candidate tests.
 
-Total: **69 authored Rust tests**. These are not observed test executions. Both focused workflows must pass rustfmt, Cargo tests, and strict Clippy on the exact PR head. The main GameBench and adapter workspaces are isolated; adapter CI also watches changes to the sibling `symthaea-core` and `symthaea-fep` source paths because it compiles those actual components.
+Total: **74 authored Rust tests**. These are not observed test executions. Both focused workflows must pass rustfmt, Cargo tests, and strict Clippy on the exact PR head. The main GameBench and adapter workspaces are isolated; adapter CI also watches changes to the sibling `symthaea-core` and `symthaea-fep` source paths because it compiles those actual components.
 
 ### 17.5 Proposed first comparative campaign
 
