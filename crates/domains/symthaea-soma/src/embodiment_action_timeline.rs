@@ -748,7 +748,10 @@ mod tests {
         assert!(stopped.cancelled);
         let after = gate.advance(6_000, "clock:source-1", None).unwrap();
         assert!(after.dispatch_segment_ids.is_empty());
-        assert!(after.stop_required_segment_ids.is_empty());
+        assert_eq!(after.stop_required_segment_ids.len(), 3);
+        assert!(gate.acknowledge_stop_command_accepted("speech-1"));
+        let retried = gate.advance(6_001, "clock:source-1", None).unwrap();
+        assert_eq!(retried.stop_required_segment_ids.len(), 2);
     }
 
     #[test]
@@ -779,8 +782,11 @@ mod tests {
         assert_eq!(expired.stop_required_segment_ids, vec!["gesture-1", "speech-1", "viseme-1"]);
         assert!(expired.expired);
         let repeated = gate.advance(10_001, "clock:source-1", None).unwrap();
-        assert!(repeated.stop_required_segment_ids.is_empty());
+        assert_eq!(repeated.stop_required_segment_ids.len(), 3);
         assert!(repeated.expired);
+        assert!(gate.acknowledge_stop_command_accepted("gesture-1"));
+        let after_ack = gate.advance(10_002, "clock:source-1", None).unwrap();
+        assert_eq!(after_ack.stop_required_segment_ids.len(), 2);
     }
 
     #[test]
