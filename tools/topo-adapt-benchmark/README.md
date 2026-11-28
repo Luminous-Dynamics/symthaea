@@ -13,8 +13,13 @@ From the repository root:
 The crate uses the workspace's existing serde, serde_json and blake3 dependencies.
 The JSON fixture is embedded at build time from the fixtures directory.
 
-The CLI prints the fixture BLAKE3 digest and an optional GITHUB_SHA. When the
-source SHA is unavailable it emits null; such a run is not a source-bound
+The CLI prints every no-edit/candidate evaluation and a separate
+`one_step_candidate_sweep_oracle_upper_bound` decision. The oracle maximizes
+served flow, then minimizes declared edit plus one-step maintenance cost; it
+has complete candidate visibility and is not a distributed or learned policy.
+
+The CLI also prints the fixture BLAKE3 digest and an optional GITHUB_SHA. When
+the source SHA is unavailable it emits null; such a run is not a source-bound
 qualification receipt.
 
 ## Contract
