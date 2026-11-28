@@ -771,7 +771,7 @@ mod tests {
     #[test]
     fn rejects_alignment_ordinal_above_exact_json_integer_range() {
         let mut contract = valid_contract();
-        contract.alignment.as_mut().unwrap().beat_ordinal_milli =
+        contract.alignment.as_mut().unwrap().transition_beat_ordinal_milli =
             (MAX_SAFE_JSON_INTEGER as i64) + 1;
         assert!(codes(&contract)
             .contains(&TransitionViolationCode::AlignmentBeatOrdinalExceedsJsonSafeInteger));
