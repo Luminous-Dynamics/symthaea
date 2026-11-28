@@ -14,7 +14,7 @@ use crate::types::{ManifoldState, VisionConfig, VisionTelemetry, VisualModality}
 /// Stable observer profile identifier for this wire-contract revision.
 pub const TEMPORAL_OBSERVER_PROFILE_ID_V0_1: &str = "symthaea-spacecraft-temporal-observer-v0.1";
 /// Current serialized temporal observer checkpoint schema.
-pub const TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1: u32 = 3;
+pub const TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1: u32 = 4;
 /// Current emitted temporal witness schema.
 pub const TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1: u32 = 3;
 const Q16_16_SCALE: f32 = 65_536.0;
@@ -1180,6 +1180,12 @@ mod tests {
                     && patch.value_q16_16 > 0
             })
         );
+        assert!(
+            witness.metrics.patch_surprise_top_k.windows(2).all(|pair| {
+                pair[0].value_q16_16 >= pair[1].value_q16_16
+            }),
+            "patch surprise top-k must be sorted in descending quantized value"
+        );
         assert_eq!(
             witness.metrics.patch_surprise_top_k[0].row,
             0,
@@ -1198,23 +1204,13 @@ mod tests {
     }
 
     #[test]
-    fn patch_grid_budget_rejects_large_geometry_before_frame_admission() {
-        let mut observer = observer();
-        let oversized_width = 8192;
-        let oversized_height = 8192;
-        let bytes = vec![0_u8; (oversized_width * oversized_height) as usize];
-        assert!(
-            observer
-                .observe_frame(
-                    identity(0, 1_000_000),
-                    &bytes,
-                    oversized_width,
-                    oversized_height,
-                    1,
-                )
-                .is_err()
+    fn patch_grid_budget_rejects_large_geometry_before_manifold_allocation() {
+        let result = ObserverOnlyVisionManifold::try_new(
+            VisionConfig::default(),
+            8192,
+            8200,
         );
-        assert_eq!(observer.frame_count(), 0);
+        assert!(result.is_err());
     }
 
     #[test]
