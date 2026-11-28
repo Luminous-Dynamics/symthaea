@@ -248,6 +248,28 @@ mod tests {
     }
 
     #[test]
+    fn next_version_update_is_pair_order_invariant() {
+        let encoder = encoder();
+        let forward = encoder.prepare_next_version(
+            1, &[0.2, 0.4], &[0.7, -0.1], 0.01, 0.001
+        ).unwrap();
+        let reverse = encoder.prepare_next_version(
+            1, &[0.7, -0.1], &[0.2, 0.4], 0.01, 0.001
+        ).unwrap();
+        assert_eq!(forward.next_digest, reverse.next_digest);
+    }
+
+    #[test]
+    fn pair_difference_changes_sign_when_pair_order_is_swapped() {
+        let encoder = encoder();
+        let forward = encoder.encode_pair(1, &[0.2, 0.4], &[0.7, -0.1]).unwrap();
+        let reverse = encoder.encode_pair(1, &[0.7, -0.1], &[0.2, 0.4]).unwrap();
+        for (a, b) in forward.difference.iter().zip(&reverse.difference) {
+            assert!((a + b).abs() < 1e-12);
+        }
+    }
+
+    #[test]
     fn only_commit_advances_version_and_rejects_replay() {
         let mut encoder = encoder();
         let staged = encoder.prepare_next_version(1, &[0.2, 0.4], &[0.7, -0.1], 0.01, 0.001).unwrap();
