@@ -79,6 +79,7 @@ pub struct CgrbActionAttemptV1 {
     pub action_digest: String,
     pub precondition_state_version: String,
     pub precondition_state_digest: String,
+    pub postcondition_digest: String,
     pub idempotency: CgrbIdempotencyV1,
     pub idempotency_key: Option<String>,
     pub dispatched_at_tick: Option<u64>,
@@ -108,6 +109,9 @@ pub struct CgrbStateObservationV1 {
     pub actor_token: String,
     pub action_type: String,
     pub target: String,
+    pub base_state_version: String,
+    pub base_state_digest: String,
+    pub postcondition_digest: String,
     pub policy_version: u64,
     pub clock_id: String,
     pub observed_at_tick: u64,
@@ -146,6 +150,7 @@ pub enum CgrbRejectionReasonV1 {
     AuthorityScopeMismatch,
     DispatchOutsideGrant,
     MissingIdempotencyKey,
+    InvalidAttemptContract,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -189,9 +194,22 @@ pub fn assess_task_outcome_v1(
     attempt: &CgrbActionAttemptV1,
     oracle_profile: &CgrbOracleProfileV1,
     observation: Option<&CgrbStateObservationV1>,
+    now_clock_id: &str,
     now_tick: u64,
     max_observation_age_ticks: u64,
 ) -> CgrbTaskOutcomeV1 {
+    if attempt.operation_id.trim().is_empty()
+        || attempt.clock_id.trim().is_empty()
+        || attempt.action_digest.trim().is_empty()
+        || attempt.precondition_state_version.trim().is_empty()
+        || attempt.precondition_state_digest.trim().is_empty()
+        || attempt.postcondition_digest.trim().is_empty()
+        || attempt.authority.policy_digest.trim().is_empty()
+        || attempt.authority.effective_until_tick < attempt.authority.effective_from_tick
+    {
+        return CgrbTaskOutcomeV1::Rejected(CgrbRejectionReasonV1::InvalidAttemptContract);
+    }
+
     if !attempt.authority.granted {
         return CgrbTaskOutcomeV1::Rejected(CgrbRejectionReasonV1::AuthorityDenied);
     }
@@ -248,6 +266,10 @@ pub fn assess_task_outcome_v1(
         return CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::UntrustedOracle);
     }
 
+    if now_clock_id != attempt.clock_id || oracle_profile.clock_id != attempt.clock_id {
+        return CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::ClockMismatchOrRegression);
+    }
+
     if observation.oracle_id != oracle_profile.oracle_id
         || observation.oracle_build_digest != oracle_profile.oracle_build_digest
         || observation.state_model_digest != oracle_profile.state_model_digest
@@ -263,6 +285,9 @@ pub fn assess_task_outcome_v1(
         || observation.actor_token != attempt.actor_token
         || observation.action_type != attempt.action_type
         || observation.target != attempt.target
+        || observation.base_state_version != attempt.precondition_state_version
+        || observation.base_state_digest != attempt.precondition_state_digest
+        || observation.postcondition_digest != attempt.postcondition_digest
         || observation.policy_version != attempt.authority.policy_version
     {
         return CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::OperationBindingMismatch);
@@ -310,7 +335,7 @@ pub fn assess_task_outcome_v1(
                 }
             };
 
-            if applied_tick < dispatch_tick {
+            if applied_tick < dispatch_tick || observation.observed_at_tick < applied_tick {
                 return CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::EffectBeforeDispatch);
             }
             if applied_tick > attempt.authority.effective_until_tick {
@@ -373,6 +398,7 @@ mod tests {
             action_digest: digest('a'),
             precondition_state_version: "v1".into(),
             precondition_state_digest: digest('b'),
+            postcondition_digest: digest('2'),
             idempotency: CgrbIdempotencyV1::KeyedIdempotent,
             idempotency_key: Some("idem-1".into()),
             dispatched_at_tick: Some(10),
@@ -415,6 +441,9 @@ mod tests {
             actor_token: "actor-1".into(),
             action_type: "record.update".into(),
             target: "record-1".into(),
+            base_state_version: "v1".into(),
+            base_state_digest: digest('b'),
+            postcondition_digest: digest('2'),
             policy_version: 3,
             clock_id: "world-clock".into(),
             observed_at_tick: 20,
@@ -431,7 +460,7 @@ mod tests {
 
     #[test]
     fn independent_observation_commits_even_when_acknowledgement_was_lost() {
-        let result = assess_task_outcome_v1(&attempt(), &profile(), Some(&observation()), 21, 5);
+        let result = assess_task_outcome_v1(&attempt(), &profile(), Some(&observation()), "world-clock", 21, 5);
         assert_eq!(result, CgrbTaskOutcomeV1::Committed);
     }
 
@@ -439,7 +468,7 @@ mod tests {
     fn adapter_acknowledgement_without_oracle_observation_is_unknown() {
         let mut value = attempt();
         value.acknowledged_at_tick = Some(15);
-        let result = assess_task_outcome_v1(&value, &profile(), None, 21, 5);
+        let result = assess_task_outcome_v1(&value, &profile(), None, "world-clock", 21, 5);
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::NoObservation)
@@ -450,7 +479,7 @@ mod tests {
     fn agent_self_report_cannot_qualify_external_state() {
         let mut oracle = profile();
         oracle.independence = CgrbOracleIndependenceV1::AgentSelfReport;
-        let result = assess_task_outcome_v1(&attempt(), &oracle, Some(&observation()), 21, 5);
+        let result = assess_task_outcome_v1(&attempt(), &oracle, Some(&observation()), "world-clock", 21, 5);
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::UntrustedOracle)
@@ -481,7 +510,7 @@ mod tests {
     fn post_revocation_application_is_a_violation() {
         let mut value = attempt();
         value.authority.revoked_at_tick = Some(18);
-        let result = assess_task_outcome_v1(&value, &profile(), Some(&observation()), 21, 5);
+        let result = assess_task_outcome_v1(&value, &profile(), Some(&observation()), "world-clock", 21, 5);
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::EffectAfterRevocation)
@@ -492,7 +521,7 @@ mod tests {
     fn dispatch_after_revocation_is_rejected() {
         let mut value = attempt();
         value.authority.revoked_at_tick = Some(9);
-        let result = assess_task_outcome_v1(&value, &profile(), Some(&observation()), 21, 5);
+        let result = assess_task_outcome_v1(&value, &profile(), Some(&observation()), "world-clock", 21, 5);
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::Rejected(CgrbRejectionReasonV1::DispatchOutsideGrant)
