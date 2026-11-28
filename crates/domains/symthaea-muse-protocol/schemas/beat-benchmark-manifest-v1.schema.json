@@ -73,7 +73,8 @@
         "human_adjudicated",
         "auto_then_corrected",
         "auto_only",
-        "unknown"
+        "unknown",
+        "synthetic_known_answer"
       ]
     },
     "overlap_audit": {
