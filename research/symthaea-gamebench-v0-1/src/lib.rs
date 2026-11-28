@@ -213,7 +213,7 @@ impl Display for GameError {
 
 impl Error for GameError {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Game {
     spec: GridSpec,
     state: State,
