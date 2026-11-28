@@ -131,6 +131,19 @@ func TestRequiredInventoryNeedsIndependentSourceProvenance(t *testing.T){
  in:=validInput();in.RequiredScopeSourceID="";if got:=Evaluate(in);got.CoverageVerdict!=Blocked{t.Fatalf("missing scope source identity must block: %+v",got)}
  in=validInput();in.RequiredScopeProvenanceSHA256="";if got:=Evaluate(in);got.CoverageVerdict!=Indeterminate{t.Fatalf("missing scope source receipt must hold: %+v",got)}
 }
+
+func TestUnknownOptionalItemDoesNotBlockRequiredCoverage(t *testing.T){
+ in:=validInput()
+ req:=testRequired("optional-sequence-capture","sequence","public.ledger_id","sequence_value",false)
+ in.RequiredItems=append(in.RequiredItems,req)
+ in.RequiredScopeSHA256=RequiredScopeDigest(in.RequiredItems)
+ in.Manifest.Items=append(in.Manifest.Items,CapabilityItem{ItemID:req.ItemID,ScopeSHA256:req.ScopeSHA256,Status:Unknown})
+ in.CapabilityManifestSHA256=ManifestDigest(in.Manifest)
+ got:=Evaluate(in)
+ if got.CoverageVerdict!=Qualified{t.Fatalf("unknown optional item must not invalidate complete required scope: %+v",got)}
+ if got.CapabilityVerdict!=Indeterminate||len(got.OptionalNegativeSpace)!=1{t.Fatalf("optional blind spot must remain visible: %+v",got)}
+}
+
 func TestOutOfScopeCapabilityDeclarationsRemainVisible(t *testing.T){
  in:=validInput();extra:=supportedItem("optional-sequence-capture",sha("optional-scope"),in.CapabilityIdentitySHA256)
  in.Manifest.Items=append(in.Manifest.Items,extra);in.CapabilityManifestSHA256=ManifestDigest(in.Manifest)
