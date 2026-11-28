@@ -931,12 +931,12 @@ mod tests {
         let runtime = EpisodeRuntimeState::new(&episode, &semantics).unwrap();
         let events = vec![
             ExogenousEvent {
-                event_id: "edge-change".to_string(),
+                event_id: "edge-change-a".to_string(),
                 kind: ExogenousEventKind::EdgeCapacityChange { from: 1, to: 3, capacity_after: 0 },
             },
             ExogenousEvent {
-                event_id: "sink-demand".to_string(),
-                kind: ExogenousEventKind::SinkDemandChange { node: 3, demand_after: 2 },
+                event_id: "edge-change-b".to_string(),
+                kind: ExogenousEventKind::EdgeCapacityChange { from: 0, to: 2, capacity_after: 3 },
             },
         ];
         let mut reversed = events.clone();
@@ -1036,7 +1036,9 @@ mod tests {
             .apply_tick(1, &demand_change, Some(change_action))
             .unwrap();
         assert_eq!(changed.flow_after_action.requested_flow, 2);
-        assert_eq!(runtime.current_demands(), &[SinkDemand { node: 3, demand: 2 }]);
+        assert_eq!(runtime.current_demands().len(), 1);
+        assert_eq!(runtime.current_demands()[0].node, 3);
+        assert_eq!(runtime.current_demands()[0].demand, 2);
 
         let next_empty: Vec<ExogenousEvent> = Vec::new();
         let next_action = PolicyAction::NoOp {
@@ -1045,7 +1047,9 @@ mod tests {
         };
         let next = runtime.apply_tick(2, &next_empty, Some(next_action)).unwrap();
         assert_eq!(next.flow_after_action.requested_flow, 2);
-        assert_eq!(runtime.current_demands(), &[SinkDemand { node: 3, demand: 2 }]);
+        assert_eq!(runtime.current_demands().len(), 1);
+        assert_eq!(runtime.current_demands()[0].node, 3);
+        assert_eq!(runtime.current_demands()[0].demand, 2);
     }
 
     #[test]
@@ -1076,10 +1080,11 @@ mod tests {
                 },
             },
             ExogenousEvent {
-                event_id: "change-demand".to_string(),
-                kind: ExogenousEventKind::SinkDemandChange {
-                    node: 3,
-                    demand_after: 3,
+                event_id: "change-route-b-source".to_string(),
+                kind: ExogenousEventKind::EdgeCapacityChange {
+                    from: 0,
+                    to: 2,
+                    capacity_after: 3,
                 },
             },
         ];
