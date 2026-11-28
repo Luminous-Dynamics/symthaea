@@ -252,6 +252,7 @@ pub fn evaluate_episode(
     time: u64,
     accepted_candidate_ids: &[&str],
 ) -> Result<FlowResult, String> {
+    validate_episode(case, semantics)?;
     if accepted_candidate_ids.len() > semantics.edit_budget {
         return Err(format!("{}: graph edit budget exceeded", case.id));
     }
@@ -277,9 +278,15 @@ pub fn evaluate_episode(
     for intervention in case.interventions.iter().filter(|i| i.time <= time) {
         match intervention.kind.as_str() {
             "edge_capacity_failure" => {
-                let from = intervention.from.expect("validated intervention");
-                let to = intervention.to.expect("validated intervention");
-                let capacity_after = intervention.capacity_after.expect("validated intervention");
+                let from = intervention
+                    .from
+                    .ok_or_else(|| format!("{}: intervention source endpoint missing", case.id))?;
+                let to = intervention
+                    .to
+                    .ok_or_else(|| format!("{}: intervention target endpoint missing", case.id))?;
+                let capacity_after = intervention
+                    .capacity_after
+                    .ok_or_else(|| format!("{}: intervention capacity missing", case.id))?;
                 let edge = active_edges
                     .iter_mut()
                     .find(|e| e.from == from && e.to == to)
