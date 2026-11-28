@@ -145,10 +145,16 @@ impl MetricValue {
         }
     }
 
-    /// Compute from a slice of samples.
+    /// Compute from a slice of samples with an interval appropriate to the
+    /// observed support.
     ///
-    /// Uses proper t-distribution critical values for the 95% CI when n < 30,
-    /// falling back to z = 1.96 for larger samples.
+    /// - Bernoulli samples (all values exactly 0 or 1) use a 95% Wilson score
+    ///   interval, which remains within [0, 1] and behaves better than a
+    ///   symmetric t interval for small samples and rates near 0 or 1.
+    /// - Other bounded samples in [0, 1] use a deterministic BCa bootstrap
+    ///   interval, which cannot extend beyond the resampled support.
+    /// - Unbounded continuous samples use a t interval for n < 30 and a
+    ///   normal approximation thereafter.
     pub fn from_samples(samples: &[f64]) -> Self {
         let n = samples.len();
         if n == 0 {
@@ -167,16 +173,51 @@ impl MetricValue {
             0.0
         };
         let std_dev = variance.sqrt();
-        let se = std_dev / (n as f64).sqrt();
-        let t = t_critical_95(n);
+
+        let all_binary = samples.iter().all(|&x| x == 0.0 || x == 1.0);
+        let all_unit_bounded = samples.iter().all(|&x| (0.0..=1.0).contains(&x));
+        let (ci_lower, ci_upper) = if all_binary {
+            wilson_score_interval(mean, n)
+        } else if all_unit_bounded {
+            // Derive the bootstrap seed from the observations so this API
+            // remains deterministic without requiring an additional config arg.
+            let mut seed = 0xcbf29ce484222325_u64;
+            for sample in samples {
+                seed ^= sample.to_bits();
+                seed = seed.wrapping_mul(0x100000001b3);
+            }
+            super::analysis::bootstrap_ci_bca(samples, 2_000, 0.05, seed)
+        } else {
+            let se = std_dev / (n as f64).sqrt();
+            let critical = t_critical_95(n);
+            (mean - critical * se, mean + critical * se)
+        };
+
         Self {
             mean,
             std_dev,
             n,
-            ci_lower: mean - t * se,
-            ci_upper: mean + t * se,
+            ci_lower,
+            ci_upper,
         }
     }
+}
+
+
+/// Wilson score interval for a binomial proportion (95% confidence).
+fn wilson_score_interval(proportion: f64, n: usize) -> (f64, f64) {
+    if n == 0 {
+        return (0.0, 0.0);
+    }
+    let z = 1.959_963_984_540_054_f64;
+    let nf = n as f64;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / nf;
+    let center = (proportion + z2 / (2.0 * nf)) / denominator;
+    let half_width = z
+        * ((proportion * (1.0 - proportion) / nf + z2 / (4.0 * nf * nf)).sqrt())
+        / denominator;
+    ((center - half_width).max(0.0), (center + half_width).min(1.0))
 }
 
 /// Two-tailed t critical value for 95% CI (alpha=0.05) given sample size n.
@@ -2772,6 +2813,25 @@ pub fn provenance_table(benchmarks: &[&dyn crate::harness::PsychBenchmark]) -> S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_binary_sample_ci_uses_bounded_wilson_interval() {
+        let samples = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0];
+        let metric = MetricValue::from_samples(&samples);
+        assert!((metric.mean - 0.9).abs() < 1e-12);
+        assert!(metric.ci_lower >= 0.0);
+        assert!(metric.ci_upper <= 1.0);
+        assert!(metric.ci_lower < metric.mean && metric.ci_upper > metric.mean);
+    }
+
+    #[test]
+    fn test_bounded_continuous_sample_ci_stays_within_support() {
+        let samples = [0.70, 0.80, 0.90, 1.00, 0.85, 0.95];
+        let metric = MetricValue::from_samples(&samples);
+        assert!(metric.ci_lower >= 0.70 - 1e-12);
+        assert!(metric.ci_upper <= 1.00 + 1e-12);
+        assert!(metric.ci_lower <= metric.mean && metric.ci_upper >= metric.mean);
+    }
 
     #[test]
     fn test_metric_from_samples() {
