@@ -239,7 +239,7 @@ Build and qualify the environment kernel before adding a natural-language wrappe
 
 **Remaining protocol limits:**
 - The seed currently selects only two layouts. This is a minimal deterministic variation, not a rich procedural world generator.
-- The scripted reference policy is optimal only for this hand-authored two-layout task; it is not a general oracle planner.
+- The scripted reference policy is optimal only for this hand-authored two-layout task. A BFS oracle now computes a shortest valid action plan for the current state space, but it is still an evaluator ceiling for this small fully specified environment, not a general agent or search over hidden/incomplete world models.
 - The random policy is a floor baseline, not a representative distribution of capable agents.
 - Invalid attempts consume action ticks. An over-budget inspection is charged as an invalid action and does not consume additional observation budget. The first `CostModel` uses benchmark-defined relative units (inspect=2, move=1, interaction=1, wait=1, invalid surcharge=1); these are not joules, latency, API tokens or dollars. External wrappers must add measured wall-clock, memory, token, energy and monetary costs. Per-action resource budgets and rate limits remain to be formalized.
 - JSONL export exists as a string serializer, but durable artifact writing, an external independent verifier binary, distractors, delayed transfer, and held-out topologies remain pending.
@@ -247,7 +247,7 @@ Build and qualify the environment kernel before adding a natural-language wrappe
 **Next implementation sequence:**
 1. Expand the seeded generator to multiple topology/rule families with independently derived sub-seeds.
 2. Add distractor/interruption, delayed retention and structural transfer stages.
-3. Add a search-based oracle/planner and matched action/observation/compute budgets.
+3. Extend the BFS oracle to larger procedurally generated topologies, then add a planner operating only on agent-visible observations so the comparison distinguishes full-information ceiling from feasible agent planning; match action/observation/compute budgets.
 4. Add positive/negative/sham and unrelated-module mechanism controls.
 5. Finalize versioned trial/scorer metadata and CI validity gates.
 6. Add LLM and human adapters only after the environment and scorer are stable.
