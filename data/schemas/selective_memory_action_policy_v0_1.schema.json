@@ -54,7 +54,10 @@
         "verify",
         "clarify",
         "abstain",
-        "probe"
+        "probe",
+        "ignore_preference",
+        "support_preference",
+        "dominate_preference"
       ]
     },
     "actual_tool_action": {
