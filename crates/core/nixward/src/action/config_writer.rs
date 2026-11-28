@@ -417,8 +417,31 @@ impl ConfigWriter {
             });
         }
 
-        // Structural validation (always runs, even in dry-run)
+        // Structural validation (always runs, even in dry-run).
         Self::validate_content_structure(&patch.original, &patch.modified)?;
+
+        let expected_target = self.config_root.join("configuration.nix");
+        if patch.target != expected_target {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Patch target does not match this ConfigWriter's configuration root",
+            ));
+        }
+
+        // Bind the preview to the exact on-disk pre-state. A stale diff must
+        // never overwrite a concurrent edit.
+        let current = std::fs::read_to_string(&patch.target)?;
+        if current != patch.original {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Configuration changed after this patch was created; rebuild and review the patch",
+            ));
+        }
+
+        // Validate syntax before either previewing or writing.
+        if self.validate {
+            Self::validate_nix_syntax(&patch.modified)?;
+        }
 
         if self.dry_run {
             return Ok(WriteResult {
@@ -427,11 +450,6 @@ impl ConfigWriter {
                 changed: true,
                 diff: patch.diff(),
             });
-        }
-
-        // Validate syntax
-        if self.validate {
-            Self::validate_nix_syntax(&patch.modified)?;
         }
 
         // Create git backup
@@ -444,7 +462,23 @@ impl ConfigWriter {
         // Atomic write: write to temp file, then rename
         let temp_path = patch.target.with_extension("nix.tmp");
         std::fs::write(&temp_path, &patch.modified)?;
-        std::fs::rename(&temp_path, &patch.target)?;
+
+        // Re-check immediately before rename to narrow the read/modify/write
+        // race. This is not a substitute for a cross-process file lock, but it
+        // prevents overwriting a target that changed during validation/backup.
+        let latest = std::fs::read_to_string(&patch.target)?;
+        if latest != patch.original {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Configuration changed while the patch was being prepared; no write was performed",
+            ));
+        }
+
+        if let Err(error) = std::fs::rename(&temp_path, &patch.target) {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(error);
+        }
 
         Ok(WriteResult {
             path: patch.target.clone(),
