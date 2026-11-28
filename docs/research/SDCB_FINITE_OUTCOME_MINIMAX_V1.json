@@ -1,0 +1,513 @@
+{
+  "schema_version": "sdcb-finite-outcome-minimax-v1",
+  "title": "Exact finite-outcome minimax test oracle",
+  "status": "rust-authored-not-compiled-or-ci-qualified; independent-python-fraction-replay",
+  "provenance": {
+    "parent_issue": 14185,
+    "robust_test_issue": 14136,
+    "co_design_issue": 14161,
+    "convex_hull_fixture_pr": 14188,
+    "base_commit": "3f7b6274403ff375032fa776c1702a97fb228619"
+  },
+  "optimization": {
+    "observation_space": "finite Y with K outcomes",
+    "primal": "maximize beta subject to E_Ai[phi]>=beta for every alternative, E_Bj[phi]<=alpha for every null, and 0<=phi<=1",
+    "dual": "minimize alpha*sum_j w_j + sum_k z_k subject to lambda>=0, sum_i lambda_i=1, w>=0, z>=0, and sum_i lambda_i*A_i[k]-sum_j w_j*B_j[k]<=z_k",
+    "randomization": "phi(y_k) may take any value in [0,1]",
+    "optimality_certificate": "exact rational primal feasible test and exact rational dual feasible weights with identical objective"
+  },
+  "solver": {
+    "implementation": "scripts/research/sdcb_finite_outcome_minimax.rs",
+    "algorithm": "exact i128 rational vertex enumeration of independently formulated primal and dual LPs",
+    "enumeration_limit_per_lp": 2000000,
+    "fail_closed": [
+      "arithmetic overflow",
+      "invalid probability mass",
+      "no feasible vertex",
+      "basis enumeration limit",
+      "nonzero primal-dual gap"
+    ],
+    "scale_scope": "small finite outcome/family counts; exponential basis enumeration is a reference oracle, not a production solver"
+  },
+  "fixtures": [
+    {
+      "id": "convex-hull-overlap",
+      "outcome_space": [
+        "y1",
+        "y2"
+      ],
+      "alpha": {
+        "numerator": 1,
+        "denominator": 10
+      },
+      "alternatives": [
+        {
+          "id": "A1",
+          "probabilities": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "id": "A2",
+          "probabilities": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ]
+        }
+      ],
+      "nulls": [
+        {
+          "id": "B1",
+          "probabilities": [
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        }
+      ],
+      "expected": {
+        "primal_test": [
+          [
+            1,
+            10
+          ],
+          [
+            1,
+            10
+          ]
+        ],
+        "worst_case_power": [
+          1,
+          10
+        ],
+        "dual_lambda": [
+          [
+            1,
+            3
+          ],
+          [
+            2,
+            3
+          ]
+        ],
+        "dual_null_weights": [
+          [
+            1,
+            1
+          ]
+        ],
+        "dual_slack": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "dual_upper_bound": [
+          1,
+          10
+        ],
+        "primal_dual_gap": [
+          0,
+          1
+        ]
+      },
+      "interpretation": "Pairwise disjoint members but exact convex-hull intersection; robust power is exactly alpha."
+    },
+    {
+      "id": "partial-separation",
+      "outcome_space": [
+        "y1",
+        "y2",
+        "y3"
+      ],
+      "alpha": {
+        "numerator": 1,
+        "denominator": 10
+      },
+      "alternatives": [
+        {
+          "id": "A1",
+          "probabilities": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "id": "A2",
+          "probabilities": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      ],
+      "nulls": [
+        {
+          "id": "B1",
+          "probabilities": [
+            [
+              1,
+              10
+            ],
+            [
+              1,
+              10
+            ],
+            [
+              8,
+              10
+            ]
+          ]
+        }
+      ],
+      "expected": {
+        "primal_test": [
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "worst_case_power": [
+          1,
+          2
+        ],
+        "dual_lambda": [
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            2
+          ]
+        ],
+        "dual_null_weights": [
+          [
+            5,
+            1
+          ]
+        ],
+        "dual_slack": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "dual_upper_bound": [
+          1,
+          2
+        ],
+        "primal_dual_gap": [
+          0,
+          1
+        ]
+      },
+      "interpretation": "Positive separation with a nontrivial exact maximin power of 1/2 at alpha=1/10."
+    },
+    {
+      "id": "complete-separation",
+      "outcome_space": [
+        "y1",
+        "y2",
+        "y3"
+      ],
+      "alpha": {
+        "numerator": 1,
+        "denominator": 10
+      },
+      "alternatives": [
+        {
+          "id": "A1",
+          "probabilities": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "id": "A2",
+          "probabilities": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      ],
+      "nulls": [
+        {
+          "id": "B1",
+          "probabilities": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ]
+        }
+      ],
+      "expected": {
+        "primal_test": [
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "worst_case_power": [
+          1,
+          1
+        ],
+        "dual_lambda": [
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            2
+          ]
+        ],
+        "dual_null_weights": [
+          [
+            0,
+            1
+          ]
+        ],
+        "dual_slack": [
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "dual_upper_bound": [
+          1,
+          1
+        ],
+        "primal_dual_gap": [
+          0,
+          1
+        ]
+      },
+      "interpretation": "Disjoint support; exact maximin power reaches 1."
+    }
+  ],
+  "mutation_controls": {
+    "null_family_expansion": {
+      "source_fixture": "partial-separation",
+      "added_null": {
+        "id": "B2",
+        "probabilities": [
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      },
+      "expected_worst_case_power": [
+        1,
+        10
+      ],
+      "invariant": "Adding a null member cannot increase maximin power."
+    },
+    "alternative_family_expansion": {
+      "source_fixture": "partial-separation",
+      "added_alternative": {
+        "id": "A3",
+        "probabilities": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            1
+          ]
+        ]
+      },
+      "expected_worst_case_power": [
+        1,
+        10
+      ],
+      "invariant": "Adding an alternative member cannot increase worst-case power."
+    },
+    "family_permutation": "Reordering members preserves the exact optimum.",
+    "invalid_probability_mass": "Reject non-normalized or negative probability vectors.",
+    "enumeration_budget": "Return unresolved when basis enumeration exceeds its declared limit."
+  },
+  "validation": {
+    "python_fraction_replay": {
+      "status": "passed-in-analysis-runtime",
+      "results": {
+        "convex_hull_overlap": {
+          "primal": [
+            1,
+            10
+          ],
+          "dual": [
+            1,
+            10
+          ]
+        },
+        "partial_separation": {
+          "primal": [
+            1,
+            2
+          ],
+          "dual": [
+            1,
+            2
+          ]
+        },
+        "complete_separation": {
+          "primal": [
+            1,
+            1
+          ],
+          "dual": [
+            1,
+            1
+          ]
+        },
+        "null_expansion": {
+          "primal": [
+            1,
+            10
+          ],
+          "dual": [
+            1,
+            10
+          ]
+        },
+        "alternative_expansion": {
+          "primal": [
+            1,
+            10
+          ],
+          "dual": [
+            1,
+            10
+          ]
+        }
+      }
+    },
+    "rust_tests": {
+      "authored": 8,
+      "compiled": false,
+      "executed": false
+    },
+    "hosted_ci": "not yet checked for this branch head",
+    "physical_validation": false,
+    "continuous_family_claim": false,
+    "industry_superiority_claim": false
+  },
+  "claim_boundary": "Exact finite-discrete observation laws only. The oracle is a small-instance evaluator based on basis enumeration and exact i128 arithmetic. It does not solve continuous Gaussian families, prove continuous nuisance-family robustness, qualify physical sensors, or establish SOTA superiority."
+}
