@@ -68,6 +68,7 @@ pub enum CaOcrcReasonV1 {
     FeedbackDelayExceedsBound,
     FeedbackRoundMismatch,
     FeedbackNotInTrackingSet,
+    DuplicateAcceptedRevision,
     LabelNotCurrentK1,
     LabelNotEligible,
     DownstreamConsumptionNotAllowed,
@@ -419,8 +420,13 @@ pub fn start_ca_ocrc_round_v1(
     require_text(&input.sample_id, "sample_id")?;
     require_text(&input.measurement_event_id, "measurement_event_id")?;
     require_text(&input.clock_domain_id, "clock_domain_id")?;
-    if input.clock_domain_id != engine.clock_domain_id || input.round_index != engine.next_round {
-        return Err(CaOcrcErrorV1("round order or clock domain mismatch".into()));
+    if input.clock_domain_id != engine.clock_domain_id
+        || input.round_index != engine.next_round
+        || input.event_time_unix_seconds > input.prediction_at_unix_seconds
+    {
+        return Err(CaOcrcErrorV1(
+            "round order, clock domain or prediction chronology mismatch".into(),
+        ));
     }
     if engine.guarantee_state != CaOcrcGuaranteeStateV1::ActiveUnderBoundedDelayAndUnderload {
         return Err(CaOcrcErrorV1("CA-OCRC guarantee is suspended; explicit reset/restart required".into()));
@@ -541,7 +547,7 @@ pub fn receive_ca_ocrc_feedback_v1(
             label_id: feedback.label_id.clone(),
             label_revision: feedback.label_revision,
             disposition: CaOcrcTrackingDispositionV1::Duplicate,
-            reasons: Vec::new(),
+            reasons: vec![CaOcrcReasonV1::DuplicateAcceptedRevision],
             observed_loss: None,
             proxy_survival_probability: None,
             inverse_probability_weight: None,
@@ -563,14 +569,33 @@ pub fn receive_ca_ocrc_feedback_v1(
 
     if feedback.current_round != current
         || feedback.origin_round.checked_add(feedback.actual_delay) != Some(feedback.current_round)
-        || feedback.actual_delay > engine.policy.maximum_feedback_delay
     {
         reasons.push(CaOcrcReasonV1::FeedbackRoundMismatch);
+    }
+    if feedback.actual_delay > engine.policy.maximum_feedback_delay {
+        reasons.push(CaOcrcReasonV1::FeedbackDelayExceedsBound);
     }
     require_text(&feedback.prediction_id, "feedback.prediction_id")?;
     require_text(&feedback.sample_id, "feedback.sample_id")?;
     require_text(&feedback.measurement_event_id, "feedback.measurement_event_id")?;
     let Some(tracked) = tracked else {
+        let guarantee_after = if reasons.contains(&CaOcrcReasonV1::FeedbackDelayExceedsBound)
+            || reasons.contains(&CaOcrcReasonV1::FeedbackRoundMismatch)
+        {
+            suspend(
+                engine,
+                "observed feedback violated the declared delay/round contract",
+                CaOcrcGuaranteeStateV1::SuspendedByDelayAssumptionViolation,
+            );
+            engine.guarantee_state
+        } else {
+            engine.guarantee_state
+        };
+        let disposition = if guarantee_after != guarantee_before {
+            CaOcrcTrackingDispositionV1::GuaranteeSuspended
+        } else {
+            CaOcrcTrackingDispositionV1::FeedbackNotTracked
+        };
         let mut receipt = CaOcrcFeedbackReceiptV1 {
             schema: CA_OCRC_UPDATE_RECEIPT_SCHEMA_V1.into(),
             engine_id: engine.engine_id.clone(),
@@ -578,7 +603,7 @@ pub fn receive_ca_ocrc_feedback_v1(
             current_round: feedback.current_round,
             label_id: feedback.label_id.clone(),
             label_revision: feedback.label_revision,
-            disposition: CaOcrcTrackingDispositionV1::FeedbackNotTracked,
+            disposition,
             reasons: if reasons.is_empty() { vec![CaOcrcReasonV1::FeedbackNotInTrackingSet] } else { reasons },
             observed_loss: None,
             proxy_survival_probability: None,
@@ -587,7 +612,7 @@ pub fn receive_ca_ocrc_feedback_v1(
             threshold_after: before,
             active_tracking_count: engine.tracked_rounds.len(),
             guarantee_state_before: guarantee_before,
-            guarantee_state_after: guarantee_before,
+            guarantee_state_after: guarantee_after,
             threshold_mutated: false,
             physical_source_authenticity_proven: false,
             equipment_control_authority: false,
@@ -609,6 +634,9 @@ pub fn receive_ca_ocrc_feedback_v1(
     }
     if feedback.clock_domain_id != tracked.clock_domain_id || feedback.clock_domain_id != engine.clock_domain_id {
         reasons.push(CaOcrcReasonV1::ClockDomainMismatch);
+    }
+    if report.schema != "luminous.semi-bench.label-consumption-report.v1" {
+        reasons.push(CaOcrcReasonV1::EligibilityReportDigestMismatch);
     }
     if feedback.label_available_at_unix_seconds < tracked.prediction_at_unix_seconds {
         reasons.push(CaOcrcReasonV1::LabelAvailabilityBeforePrediction);
@@ -1012,6 +1040,60 @@ mod tests {
         assert_eq!(result.disposition, CaOcrcTrackingDispositionV1::Blocked);
         assert_eq!(engine.threshold, before);
         assert_eq!(engine.guarantee_state, CaOcrcGuaranteeStateV1::SuspendedByUnqualifiedFeedback);
+    }
+
+    #[test]
+    fn accepted_revision_replay_is_explicitly_duplicate() {
+        let mut engine = create_ca_ocrc_engine_v1("e", "fab-clock", policy(2, 4, 0.50)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(0, 0.9)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(1, 0.1)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(2, 0.1)).unwrap();
+        let input = feedback(0, 2, 0.5);
+        assert_eq!(
+            receive_ca_ocrc_feedback_v1(&mut engine, &input).unwrap().disposition,
+            CaOcrcTrackingDispositionV1::FeedbackUpdated
+        );
+        let before = engine.threshold;
+        let duplicate = receive_ca_ocrc_feedback_v1(&mut engine, &input).unwrap();
+        assert_eq!(duplicate.disposition, CaOcrcTrackingDispositionV1::Duplicate);
+        assert!(!duplicate.threshold_mutated);
+        assert_eq!(engine.threshold, before);
+    }
+
+    #[test]
+    fn prediction_identity_mismatch_is_rejected_without_threshold_update() {
+        let mut engine = create_ca_ocrc_engine_v1("e", "fab-clock", policy(2, 4, 0.50)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(0, 0.9)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(1, 0.1)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(2, 0.1)).unwrap();
+        let mut input = feedback(0, 2, 0.5);
+        input.measurement_event_id = "another-event".into();
+        let before = engine.threshold;
+        let receipt = receive_ca_ocrc_feedback_v1(&mut engine, &input).unwrap();
+        assert_eq!(receipt.disposition, CaOcrcTrackingDispositionV1::Rejected);
+        assert!(!receipt.threshold_mutated);
+        assert_eq!(engine.threshold, before);
+        assert_eq!(
+            engine.guarantee_state,
+            CaOcrcGuaranteeStateV1::SuspendedByUnqualifiedFeedback
+        );
+    }
+
+    #[test]
+    fn observed_delay_beyond_declared_bound_suspends_even_when_outcome_was_not_tracked() {
+        let mut engine = create_ca_ocrc_engine_v1("e", "fab-clock", policy(2, 4, 0.50)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(0, 0.1)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(1, 0.1)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(2, 0.1)).unwrap();
+        let mut input = feedback(0, 6, 0.5);
+        input.current_round = 6;
+        input.actual_delay = 6;
+        let receipt = receive_ca_ocrc_feedback_v1(&mut engine, &input).unwrap();
+        assert_eq!(receipt.disposition, CaOcrcTrackingDispositionV1::GuaranteeSuspended);
+        assert_eq!(
+            engine.guarantee_state,
+            CaOcrcGuaranteeStateV1::SuspendedByDelayAssumptionViolation
+        );
     }
 
     #[test]
