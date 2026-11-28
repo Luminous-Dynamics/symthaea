@@ -1,0 +1,8 @@
+{
+  "schema": "luminous.eqc.synthetic-challenge.v0.1",
+  "challenge_id": "synthetic-challenge-001",
+  "issuer_id": "synthetic-issuer-01",
+  "subject_id": "synthetic-subject-001",
+  "state": "consumed",
+  "consumed_at": "2026-11-25T18:00:00Z"
+}
