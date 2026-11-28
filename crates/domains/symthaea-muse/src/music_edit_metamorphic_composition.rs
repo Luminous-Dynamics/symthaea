@@ -389,17 +389,20 @@ fn mappings_have_same_semantics(
                 MusicEditMetamorphicPropertyRuleV1::NumericAffine {
                     scale: sa,
                     offset: oa,
+                    tolerance: ta,
                     unit: ua,
-                    ..
                 },
                 MusicEditMetamorphicPropertyRuleV1::NumericAffine {
                     scale: sb,
                     offset: ob,
+                    tolerance: tb,
                     unit: ub,
-                    ..
                 },
             ) => {
-                ua == ub && approximately_equal(*sa, *sb) && approximately_equal(*oa, *ob)
+                ua == ub
+                    && approximately_equal(*sa, *sb)
+                    && approximately_equal(*oa, *ob)
+                    && approximately_equal(*ta, *tb)
             }
             (
                 MusicEditMetamorphicPropertyRuleV1::CategoryMap { values: a },
@@ -931,6 +934,48 @@ mod tests {
         let mut case = preregistered_case("tamper-control", &left, &right, true);
         case.expected_to_commute = false;
         assert!(compare_music_edit_metamorphic_paths_v1(&case, &left, &right).is_err());
+    }
+
+    #[test]
+    fn different_propagated_uncertainty_bounds_do_not_commute() {
+        let start_audio = d(2);
+        let start_instruction = d(3);
+        let start_envelope = d(4);
+        let end_instruction = d(9);
+        let end_envelope = d(10);
+        let left_step = step(
+            "tolerance-left",
+            "origin",
+            "left-end",
+            &start_audio,
+            &d(5),
+            &start_instruction,
+            &end_instruction,
+            &start_envelope,
+            &end_envelope,
+            MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+            mapping(1.0, 2.0, 0.1, 1.0, 0.0, 0.0),
+        );
+        let right_step = step(
+            "tolerance-right",
+            "origin",
+            "right-end",
+            &start_audio,
+            &d(6),
+            &start_instruction,
+            &end_instruction,
+            &start_envelope,
+            &end_envelope,
+            MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+            mapping(1.0, 2.0, 0.2, 1.0, 0.0, 0.0),
+        );
+        let left = path("tolerance-left", vec![left_step]);
+        let right = path("tolerance-right", vec![right_step]);
+        let case = preregistered_case("tolerance-noncommute", &left, &right, false);
+        let result = compare_music_edit_metamorphic_paths_v1(&case, &left, &right).unwrap();
+        assert!(!result.mapping_commutes);
+        assert!(!result.observed_commutation);
+        assert!(result.passed);
     }
 
     #[test]
