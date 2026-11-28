@@ -1,0 +1,98 @@
+# MACE GroupMemBench Adapter V0.1
+
+## Purpose
+
+This standalone Rust adapter makes the official GroupMemBench retrieval boundary available to MACE without reimplementing the benchmark's reader or judge. The host injects a real MACE memory runtime through GroupMemoryRuntimeV1. The adapter owns protocol validation, the label-blind input projection, exact query construction, passage formatting, and deterministic run/receipt commitments.
+
+Pinned upstream: [UCSB-NLP-Chang/GroupMemBench](https://github.com/UCSB-NLP-Chang/GroupMemBench), commit 461f00c3e8a1a4a3a2ed5814b729014502c4702f.
+
+This is a protocol kernel, not a completed benchmark integration or benchmark score. The upstream data, reader, judge and runner must still be checked out at the pinned revision and invoked by an outer harness.
+
+## Upstream license
+
+The pinned upstream README states that benchmark code is MIT-licensed and conversation data is CC BY 4.0; the repository includes the MIT license file. Preserve attribution and the applicable CC BY 4.0 terms when using benchmark conversation data. Recheck the upstream release and any linked underlying assets before each evaluation; the benchmark license does not grant rights to private customer data or third-party materials included in imported traces.
+
+## Official benchmark surface
+
+The repository contains two precisely identifiable question inventories. The paper/evaluation release pinned by this adapter is commit `461f00c3e8a1a4a3a2ed5814b729014502c4702f` (715 questions). Its ancestor `e2682e01ff490acfe4fac2940159dce60307dfc9` is the initial 745-question release used by the Kijito benchmark run. A Git comparison shows the paper release is two commits ahead and removes 15 Healthcare abstention questions and 15 Manufacturing abstention questions; the other question files are unchanged. Both contain four domains and six task types (multi-hop, knowledge update, temporal, user-implicit, term ambiguity and abstention). Keep these as separate dataset/split digests and never mix per-question results across them. The Kijito benchmark README pins the 745-question ancestor commit `e2682e01ff490acfe4fac2940159dce60307dfc9`. Its public benchmark page reports 49.0% on the 745-question default run and 60.3% after keyword search is switched on. These are vendor-reported results on the 745-question inventory, not results on the 715-question paper release and not an official matched result. Reproduce the exact `e2682e…` inventory and reader/judge conditions before comparing. Kijito's own category breakdown on its 745-question `e2682e…` inventory is also important: keyword mode reports dates rising from 66/162 to 108/162, multi-hop 85/182 to 97/182, knowledge updates 39/107 to 53/107, term ambiguity 27/106 to 45/106, and user-implicit 30/49 to 33/49—but abstention falls from 118/139 to 113/139. This is vendor-reported on that exact 745-question inventory. It motivates query-dependent routing and separate abstention metrics, not universal keyword activation.
+
+Upstream retrieval behavior deliberately indexes message content only. At answer time, it formats each retrieved message with its speaker, role, channel, phase, topic, timestamp, reply target and message ID. When asking_user_id is present, the query passed to retrieval is exactly asking_user_id followed by one space and question_text; otherwise it is question_text. This adapter reproduces that projection and header ordering.
+
+The upstream shared conversation loader collects channel messages and sorts by (channel, timestamp, msg_node). Input is validated against that order. Optional author, role, timestamp, reply target, phase and topic fields may be absent; the reader header emits only fields that are present. Timestamps are compared as strings, with an absent timestamp treated as the empty string and omitted from the reader header, matching the upstream loader; the adapter does not reinterpret timezone or calendar semantics.
+
+## Candidate / evaluator boundary
+
+Candidate-visible request fields are limited to:
+- opaque run ID, pinned benchmark revision, dataset snapshot, public domain and retrieval configuration;
+- the public domain;
+- raw message text and normal message attribution/context metadata;
+- opaque query invocation ID, asking-user ID, question text and top-k.
+
+The candidate DTO intentionally rejects unknown message fields. In particular it excludes is_noise, is_decision_point, question ID, question type, gold answer, judge reasoning and judgment. The outer harness must strip upstream generator/scorer-only fields before constructing the candidate DTO. It must not pass question labels through an untyped metadata map.
+
+The candidate binding deliberately excludes the split manifest, reader/judge model and prompt hashes, and randomization seed. The outer evaluator must retain these in a separate experiment manifest and bind that manifest to the final outcome receipt. They are not passed through the runtime reset interface. The candidate adapter returns ranked source message IDs and the exact official-style formatted passages. Answer generation, judge calls, gold-answer comparison and category aggregation remain outside the candidate process. The opaque invocation ID must be randomly generated by the outer harness and must not encode question identity or task category.
+
+For an exact BM25/dense reproduction, the injected runtime must index GroupMessageV1::index_text only; the metadata-bearing DTO is retained by the adapter for the official reader passage header. Metadata-aware retrieval is a separate MACE arm and must be labeled as such rather than represented as a reproduction of the upstream retriever.
+
+## Lifecycle
+
+1. reset: verify the sealed run binding and reset the injected memory runtime.
+2. ingest: ingest all candidate-visible messages once, in the upstream canonical order. The receipt hashes the exact projection and ordered message IDs.
+3. query: construct the official asker-prefixed query, invoke the runtime, reject duplicate or unknown IDs, then format the exact ranked passages.
+4. close: close the runtime and clear the run-local state.
+
+A repeated query invocation ID is rejected. Unknown retrieval IDs, duplicate IDs, query-before-ingest and out-of-order messages fail closed. Empty retrieval is permitted; the upstream reader/judge decides whether abstention was correct.
+
+## What the adapter does not prove
+
+- A SHA-256 digest is an integrity commitment, not an issuer signature, authority credential or proof of source truth.
+- The adapter does not independently prove that the injected runtime persisted all messages, that the actual reader received every returned passage, or that the declared model/prompt configuration was used.
+- The GroupMemBench asking-user field is an identity cue for the task, not a universal authorization grant. The official benchmark does not supply real-world consent/ACL ground truth. MACE's permission-aware sharing and no-cross-audience disclosure properties require a separate adversarial extension, not invented labels or modified official scores.
+- The release uses synthetic conversations. Results on it do not establish performance on real workplace or family group chats.
+- GroupAssistBench is a separate, real-chat research-only lane. Its dataset is licensed CC BY-NC 4.0, and its upstream reference code is separately licensed for academic purposes only and expressly excludes commercial or production use. Do not port, copy, or depend on those upstream scripts in commercial MACE products. This PR's Rust GroupMemBench adapter is independently authored and does not embed GroupAssistBench assets or code.
+- GroupAssistBench main was inspected at commit `851911b391ac1e91a929ca709cd48da3e3576bf7`; the versioned run protocol and license terms must be pinned again before any evaluation. Keep the real-chat corpus out of public fixtures, production, commercial training, and product demonstrations absent separate written permission.
+
+## Companion benchmark: GroupAssistBench
+
+GroupMemBench should be paired with, not substituted for, GroupAssistBench's real-world group-assistance lane. The latter has 50 group chats, 80,299 messages and 2,395 evaluation instances, divided into 1,374 memory-recall (L1) and 1,021 memory-use (L2) tasks. It distinguishes single-anchor, distributed and conflicting memory dependencies (M1-M3).
+
+Its reported table exposes a key failure mode: with GPT-5.6-terra as the task agent, the best external memory system (EverMemOS) reaches 0.621 L1 atom recall but only 0.247 L2 assistance score. The same backbone with full context scores 0.570 L1 and 0.431 L2. BM25 reaches 0.370 L2, ahead of all evaluated external memory systems. The paper's Relational Evidence Refinement and Assistance Constraint Binding interventions improve L2 for tested systems. These are published external measurements, not MACE results.
+
+The GroupAssistBench Hugging Face card declares CC BY-NC 4.0. Treat it as a non-commercial research-only evaluation unless the rights holder grants broader permission; do not fold its data into commercial training, product demos or redistributable fixtures by assumption. Keep its real-chat data isolated and access-controlled.
+
+## Matched evaluation plan
+
+Run the official reader and judge unmodified. Keep the following lanes distinct:
+1. Official GroupMemBench reproduction using official splits and scoring.
+2. Retrieval-only diagnostics, with fixed reader/prompt/top-k and exact source message IDs.
+3. GroupAssistBench L1 and L2 as a separate benchmark, only within its permitted license and release protocol.
+4. MACE assurance extension: attribution flips, speaker-belief versus world-fact minimal pairs, stale correction propagation, cross-audience non-disclosure, tenant isolation, and false-consensus controls. Report these as MACE extension results, never as official benchmark scores.
+
+Required GroupMemBench baseline arms:
+- upstream BM25 baseline;
+- upstream text-embedding-3-large baseline;
+- full-context reader, when the benchmark's official budget permits;
+- no-memory;
+- MACE raw-message hybrid (BM25 + dense + metadata/entity/date features);
+- MACE state/claim graph with source attribution and bitemporal updates;
+- MACE governed retrieval with use-time revalidation and evidence-set constraints.
+
+For GroupAssistBench, compare full context, official BM25/dense retrieval, hierarchical external memory, MACE relational evidence completion, and MACE assistance-constraint binding. Pin the same task model, judge, language, history cutoff and context budgets. Keep L1 recall and L2 assistance score separate; report M1/M2/M3 separately.
+
+Do not claim superiority from comparing a MACE answerer against a different reader or from using a different judge. Pin reader, judge, prompts, model parameters, dataset commit, split, top-k, context limit, seeds, token accounting and all-in cost.
+
+## Prospective targets
+
+These are research targets, not current measurements:
+- First reproduce upstream GroupMemBench BM25 within 1 percentage point on each domain × question type cell with the same reader/judge.
+- On the pinned 715-question paper evaluation, target at least 51.1% overall: approximately 5 percentage points above the published strongest 46.0% result (Hindsight) and 7.9 points above BM25's 43.22%, while separately improving knowledge-update and term-ambiguity results.
+- On the separate 745-question Kijito inventory, first obtain the exact corpus and scoring manifest, then reproduce the vendor-reported 60.3% keyword-assisted result under the same reader/judge and resource budget. A prospective stretch target is ≥62% on that exact inventory; no cross-inventory comparison is valid.
+- On GroupAssistBench, target L2 above the best published retrieval baseline (0.370) and close at least half the gap to same-backbone full context (0.431), with no hidden trade-off in M1/M2/M3. These targets are aspirational, not MACE measurements.
+- Zero stale-known correction use, zero wrong-speaker attribution on deterministic adversarial fixtures, zero candidate access to evaluator labels, and zero unauthorized cross-audience disclosure in the separate assurance suite.
+- Report macro accuracy by question type and domain, abstention precision/recall, stale-answer rate, wrong-attribution rate, retrieval recall at k, L1 atom recall, L2 rubric score, M1/M2/M3 results, context/token cost, p50/p95/p99 latency and total ingestion + retrieval + verifier cost. Do not collapse security failures into a weighted score.
+
+The 43.22% BM25 reference and 46.0% strongest reported GroupMemBench result are external references, not local MACE measurements. GroupAssistBench's reported results are a separate benchmark and score.
+
+## Validation boundary
+
+The focused workflow tests this isolated Rust crate, strict Clippy and both JSON schemas. No local Rust toolchain was available when this adapter was authored, so validation must come from the exact-head workflow. A queued, skipped or stale workflow is not a pass. This PR does not claim GroupMemBench score reproduction, real-world deployment or production qualification.
