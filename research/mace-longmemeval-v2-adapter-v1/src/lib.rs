@@ -464,7 +464,6 @@ pub fn finalize_reader_exposure_v1(
     }
     if pre_query.run_id != query.run_id
         || pre_query.run_binding_sha256 != query.run_binding_sha256
-        || pre_query.run_binding_sha256 != query.run_binding_sha256
         || pre_query.query_invocation_id != query.query_invocation_id
         || pre_query.query_input_sha256 != digest_serialized(query)? {
         return Err(AdapterRejectV1::QueryInputMismatch);
@@ -815,6 +814,10 @@ mod tests {
         assert_ne!(
             receipt.exposed_evidence[0].source_lineage_receipt_sha256,
             receipt.exposed_evidence[1].source_lineage_receipt_sha256
+        );
+        assert_ne!(
+            receipt.exposed_evidence[0].decision_evidence_use_link_sha256,
+            receipt.exposed_evidence[1].decision_evidence_use_link_sha256
         );
     }
 
