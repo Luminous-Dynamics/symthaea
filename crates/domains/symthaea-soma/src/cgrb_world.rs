@@ -333,13 +333,16 @@ impl CgrbWorldV1 {
             }
         };
 
+        // Apply to a candidate copy first. If any mutation validation or digest
+        // operation fails, the committed world and audit ledger remain unchanged.
+        let mut next_cells = self.cells.clone();
         match &action.mutation {
             CgrbWorldMutationV1::Set {
                 subject,
                 attribute,
                 value,
             } => {
-                self.cells
+                next_cells
                     .entry(subject.clone())
                     .or_default()
                     .insert(attribute.clone(), value.clone());
@@ -349,8 +352,7 @@ impl CgrbWorldV1 {
                 attribute,
                 value,
             } => {
-                let cell = self
-                    .cells
+                let cell = next_cells
                     .entry(subject.clone())
                     .or_default()
                     .entry(attribute.clone())
@@ -365,7 +367,7 @@ impl CgrbWorldV1 {
                 }
             }
             CgrbWorldMutationV1::Remove { subject, attribute } => {
-                let Some(row) = self.cells.get_mut(subject) else {
+                let Some(row) = next_cells.get_mut(subject) else {
                     return CgrbWorldApplyResultV1::Rejected(
                         CgrbWorldRejectV1::RemoveTargetAbsent,
                     );
@@ -376,22 +378,18 @@ impl CgrbWorldV1 {
                     );
                 }
                 if row.is_empty() {
-                    self.cells.remove(subject);
+                    next_cells.remove(subject);
                 }
             }
         }
 
         let state_version_before = self.state_version;
-        self.state_version = next_version;
-        let state_digest_after = match self.state_digest() {
+        let state_digest_after = match Self::state_digest_for(&next_cells, next_version) {
             Ok(digest) => digest,
-            Err(error) => {
-                // The mutation is already in memory. This branch can only arise
-                // if deterministic serialization fails; roll back is required.
-                self.state_version = state_version_before;
-                return CgrbWorldApplyResultV1::Rejected(error);
-            }
+            Err(error) => return CgrbWorldApplyResultV1::Rejected(error),
         };
+        self.cells = next_cells;
+        self.state_version = next_version;
 
         let receipt = CgrbWorldReceiptV1 {
             operation_id: action.operation_id.clone(),
@@ -432,10 +430,17 @@ impl CgrbWorldV1 {
     }
 
     fn state_digest(&self) -> Result<String, CgrbWorldRejectV1> {
+        Self::state_digest_for(&self.cells, self.state_version)
+    }
+
+    fn state_digest_for(
+        cells: &BTreeMap<String, BTreeMap<String, CgrbWorldValueV1>>,
+        state_version: u64,
+    ) -> Result<String, CgrbWorldRejectV1> {
         let payload = CgrbWorldDigestPayloadV1 {
             schema: CGRB_WORLD_STATE_V1,
-            state_version: self.state_version,
-            cells: &self.cells,
+            state_version,
+            cells,
         };
         let bytes = serde_json::to_vec(&payload)
             .map_err(|_| CgrbWorldRejectV1::SerializationFailure)?;
