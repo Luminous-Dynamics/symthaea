@@ -491,10 +491,16 @@ pub fn score_candidate_claim(
         false
     };
 
-    let common_optimal_action_ids: Vec<String> = common_optimal
-        .unwrap_or_default()
-        .into_iter()
-        .collect();
+    let common_optimal_action_ids: Vec<String> = if out_of_family_possible {
+        // A sampled OOD representative cannot close the unknown mechanism set.
+        // Do not publish an apparent common optimum as a robust conclusion.
+        Vec::new()
+    } else {
+        common_optimal
+            .unwrap_or_default()
+            .into_iter()
+            .collect()
+    };
     let action_equivalence = if out_of_family_possible {
         ActionEquivalence::Unresolved
     } else if common_optimal_action_ids.is_empty() {
@@ -943,7 +949,7 @@ mod tests {
     #[test]
     fn out_of_family_support_forces_unresolved() {
         let mut manifest = manifest(true);
-        manifest.worlds.push(world("world-other", None, 0.0, 0.0));
+        manifest.worlds.push(world("world-other", None, 0.0, 1.0));
         let score = score_candidate_claim(
             &manifest,
             &ids(&["world-north", "world-other"]),
@@ -956,6 +962,7 @@ mod tests {
         assert_eq!(score.action_equivalence, ActionEquivalence::Unresolved);
         assert!(score.false_unique_claim);
         assert_eq!(score.selected_action_is_common_optimal, None);
+        assert!(score.common_optimal_action_ids.is_empty());
         assert_eq!(score.worst_case_action_regret, None);
     }
 
