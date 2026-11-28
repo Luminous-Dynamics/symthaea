@@ -1,0 +1,41 @@
+name: Financial Agent Semantic Verifier
+
+on:
+  pull_request:
+    branches:
+      - research/sym-fin-eval-002-benchmark-protocol
+    paths:
+      - "benchmarks/financial-agent-verifier/**"
+      - "benchmarks/financial-agent-v1/**"
+      - ".github/workflows/financial-agent-verifier.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "benchmarks/financial-agent-verifier/**"
+      - "benchmarks/financial-agent-v1/**"
+      - ".github/workflows/financial-agent-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: financial-agent-verifier-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semantic-verifier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d596a0326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Format check
+        run: cargo fmt --manifest-path benchmarks/financial-agent-verifier/Cargo.toml --check
+      - name: Schema, byte-binding and semantic negative-control tests
+        run: cargo test --manifest-path benchmarks/financial-agent-verifier/Cargo.toml
