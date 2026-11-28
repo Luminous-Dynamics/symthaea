@@ -168,6 +168,91 @@ fn p_sup(outcome_one: bool) -> Q {
     component_tail(NULL_LOW, observed_score).max(component_tail(NULL_HIGH, observed_score))
 }
 
+fn positive(x: Q) -> Q {
+    if x.cmp(Q::zero()) == Ordering::Greater { x } else { Q::zero() }
+}
+
+fn tv_alt_interval(epsilon: Q) -> (Q, Q) {
+    (
+        ALT_NOMINAL.sub(epsilon).max(Q::zero()),
+        ALT_NOMINAL.add(epsilon).min(Q::one())
+    )
+}
+
+fn tv_null_interval(epsilon: Q) -> (Q, Q) {
+    (
+        NULL_NOMINAL.sub(epsilon).max(Q::zero()),
+        NULL_NOMINAL.add(epsilon).min(Q::one())
+    )
+}
+
+/// Exact Bernoulli TV-ball maximin value for the full radius frontier.
+/// When the intervals overlap, the common-law witness caps robust power at alpha.
+/// When separated, the least-favourable endpoints give alpha*p_low/q_high.
+fn robust_tv_ball_value(epsilon_a: Q, epsilon_b: Q) -> Q {
+    let (a_low, _) = tv_alt_interval(epsilon_a);
+    let (_, b_high) = tv_null_interval(epsilon_b);
+    if a_low.cmp(b_high) == Ordering::Greater {
+        ALPHA.mul(a_low).div(b_high)
+    } else {
+        ALPHA
+    }
+}
+
+fn robust_tv_ball_test(epsilon_a: Q, epsilon_b: Q) -> [Q; 2] {
+    let (a_low, _) = tv_alt_interval(epsilon_a);
+    let (_, b_high) = tv_null_interval(epsilon_b);
+    if a_low.cmp(b_high) == Ordering::Greater {
+        [Q::zero(), ALPHA.div(b_high)]
+    } else {
+        [ALPHA, ALPHA]
+    }
+}
+
+fn tv_ball_overlap_witness(epsilon_a: Q, epsilon_b: Q) -> Option<Q> {
+    let (a_low, a_high) = tv_alt_interval(epsilon_a);
+    let (b_low, b_high) = tv_null_interval(epsilon_b);
+    let common_low = a_low.max(b_low);
+    let common_high = a_high.min(b_high);
+    if common_low.is_le(common_high) { Some(common_low) } else { None }
+}
+
+fn rejection_probability_for_test(p: Q, phi: [Q; 2]) -> Q {
+    let law = bernoulli_law(p);
+    law[0].mul(phi[0]).add(law[1].mul(phi[1]))
+}
+
+fn robust_tv_ball_worst_size(epsilon_a: Q, epsilon_b: Q) -> Q {
+    let (_, b_high) = tv_null_interval(epsilon_b);
+    let (b_low, _) = tv_null_interval(epsilon_b);
+    let phi = robust_tv_ball_test(epsilon_a, epsilon_b);
+    rejection_probability_for_test(b_low, phi)
+        .max(rejection_probability_for_test(b_high, phi))
+}
+
+fn robust_tv_ball_worst_power(epsilon_a: Q, epsilon_b: Q) -> Q {
+    let (a_low, a_high) = tv_alt_interval(epsilon_a);
+    let phi = robust_tv_ball_test(epsilon_a, epsilon_b);
+    rejection_probability_for_test(a_low, phi)
+        .min(rejection_probability_for_test(a_high, phi))
+}
+
+fn robust_tv_ball_dual_objective(epsilon_a: Q, epsilon_b: Q) -> Q {
+    let (a_low, _) = tv_alt_interval(epsilon_a);
+    let (_, b_high) = tv_null_interval(epsilon_b);
+    if a_low.cmp(b_high) == Ordering::Greater {
+        let w = a_low.div(b_high);
+        let alt = bernoulli_law(a_low);
+        let null = bernoulli_law(b_high);
+        ALPHA.mul(w)
+            .add(positive(alt[0].sub(w.mul(null[0]))))
+            .add(positive(alt[1].sub(w.mul(null[1]))))
+    } else {
+        // Pairwise overlap: lambda=1 on the common law, w=1 on the same law.
+        ALPHA
+    }
+}
+
 fn run_fixture() {
     let alt_low_tv = total_variation(bernoulli_law(ALT_LOW), bernoulli_law(ALT_NOMINAL));
     let alt_high_tv = total_variation(bernoulli_law(ALT_HIGH), bernoulli_law(ALT_NOMINAL));
@@ -199,6 +284,24 @@ fn run_fixture() {
     println!("dual_objective={}", dual_objective());
     println!("p_sup_y1={}", p_sup(true));
     println!("p_sup_y0={}", p_sup(false));
+
+    for (epsilon_a, epsilon_b) in [
+        (Q::new(0, 1), Q::new(0, 1)),
+        (Q::new(1, 10), Q::new(1, 10)),
+        (Q::new(3, 20), Q::new(1, 20)),
+        (Q::new(3, 10), Q::new(1, 5)),
+        (Q::new(2, 5), Q::new(1, 5)),
+        (Q::new(9, 20), Q::new(1, 5)),
+    ] {
+        println!(
+            "radius_sweep=({epsilon_a},{epsilon_b});value={};size={};power={};dual={};overlap={:?}",
+            robust_tv_ball_value(epsilon_a, epsilon_b),
+            robust_tv_ball_worst_size(epsilon_a, epsilon_b),
+            robust_tv_ball_worst_power(epsilon_a, epsilon_b),
+            robust_tv_ball_dual_objective(epsilon_a, epsilon_b),
+            tv_ball_overlap_witness(epsilon_a, epsilon_b)
+        );
+    }
 }
 
 fn main() { run_fixture(); }
@@ -269,5 +372,59 @@ mod tests {
         assert_eq!(PHI_ONE, Q::new(2, 5));
         assert_eq!(NULL_HIGH.mul(PHI_ONE), ALPHA);
         assert_eq!(ALT_LOW.mul(PHI_ONE), Q::new(13, 50));
+    }
+
+    #[test]
+    fn robust_power_radius_frontier_matches_exact_primal_and_dual() {
+        let radii = [
+            (Q::new(0, 1), Q::new(0, 1), Q::new(2, 5)),
+            (Q::new(1, 10), Q::new(1, 10), Q::new(7, 30)),
+            (Q::new(3, 20), Q::new(1, 20), Q::new(13, 50)),
+            (Q::new(3, 10), Q::new(1, 5), Q::new(1, 8)),
+            (Q::new(2, 5), Q::new(1, 5), ALPHA),
+            (Q::new(9, 20), Q::new(1, 5), ALPHA),
+        ];
+        for (epsilon_a, epsilon_b, expected) in radii {
+            assert_eq!(robust_tv_ball_value(epsilon_a, epsilon_b), expected);
+            assert_eq!(robust_tv_ball_worst_size(epsilon_a, epsilon_b), ALPHA);
+            assert_eq!(robust_tv_ball_worst_power(epsilon_a, epsilon_b), expected);
+            assert_eq!(robust_tv_ball_dual_objective(epsilon_a, epsilon_b), expected);
+        }
+    }
+
+    #[test]
+    fn overlap_boundary_has_an_exact_common_law_witness() {
+        let epsilon_a = Q::new(2, 5);
+        let epsilon_b = Q::new(1, 5);
+        assert_eq!(tv_ball_overlap_witness(epsilon_a, epsilon_b), Some(Q::new(2, 5)));
+        assert_eq!(robust_tv_ball_value(epsilon_a, epsilon_b), ALPHA);
+        assert_eq!(robust_tv_ball_test(epsilon_a, epsilon_b), [ALPHA, ALPHA]);
+    }
+
+    #[test]
+    fn separated_tv_balls_use_the_least_favourable_endpoints() {
+        let epsilon_a = Q::new(3, 20);
+        let epsilon_b = Q::new(1, 20);
+        assert_eq!(tv_ball_overlap_witness(epsilon_a, epsilon_b), None);
+        assert_eq!(robust_tv_ball_test(epsilon_a, epsilon_b), [Q::zero(), Q::new(2, 5)]);
+        assert_eq!(robust_tv_ball_value(epsilon_a, epsilon_b), Q::new(13, 50));
+    }
+
+    #[test]
+    fn increasing_uncertainty_radii_cannot_increase_robust_power() {
+        let points = [
+            (Q::new(0, 1), Q::new(0, 1)),
+            (Q::new(1, 10), Q::new(1, 10)),
+            (Q::new(3, 20), Q::new(1, 20)),
+            (Q::new(3, 10), Q::new(1, 5)),
+            (Q::new(2, 5), Q::new(1, 5)),
+            (Q::new(9, 20), Q::new(1, 5)),
+        ];
+        let mut previous = Q::one();
+        for (epsilon_a, epsilon_b) in points {
+            let value = robust_tv_ball_value(epsilon_a, epsilon_b);
+            assert!(value.is_le(previous));
+            previous = value;
+        }
     }
 }
