@@ -12,6 +12,8 @@ use sha2::{Digest, Sha256};
 use statrs::distribution::{Beta, ContinuousCDF};
 
 /// Schema version for all metrics emitted by this crate.
+pub mod scenarios;
+
 pub const METRICS_SCHEMA_VERSION: &str = "CMAQ-059-METRICS-V1";
 /// Domain separator for reproducible paired-stream seeds.
 pub const SEED_SCHEMA_VERSION: &str = "CMAQ-059-PAIRED-STREAM-SEED-V1";
