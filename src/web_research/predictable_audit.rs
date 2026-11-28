@@ -195,6 +195,10 @@ pub enum PredictableAuditError {
     DuplicateRecordId(String),
     NonSequentialIndex { expected: usize, actual: usize },
     InvalidPrelabelHistoryDigest { sequence_number: usize },
+    InvalidPriorityScore(u64),
+    InvalidQPolicyRange,
+    QPolicyRequiresExternalSchedule,
+    QPolicyMismatch { sequence_number: usize },
     MissingSelectedAdjudication(String),
     NonSelectedRecordAdjudicated(String),
     UnknownAdjudicationRecord(String),
@@ -239,6 +243,19 @@ impl std::fmt::Display for PredictableAuditError {
             Self::InvalidPrelabelHistoryDigest { sequence_number } => write!(
                 formatter,
                 "invalid pre-label history SHA-256 at sequence {sequence_number}"
+            ),
+            Self::InvalidPriorityScore(score) => {
+                write!(formatter, "pre-label priority score is outside [0, 2^53]: {score}")
+            }
+            Self::InvalidQPolicyRange => {
+                write!(formatter, "pre-label q-policy maximum is below its minimum")
+            }
+            Self::QPolicyRequiresExternalSchedule => {
+                write!(formatter, "external q-policy requires the custodian-supplied q_t schedule")
+            }
+            Self::QPolicyMismatch { sequence_number } => write!(
+                formatter,
+                "event q_t does not match the frozen pre-label q-policy at sequence {sequence_number}"
             ),
             Self::MissingSelectedAdjudication(id) => {
                 write!(formatter, "selected audit event has no independent label: {id}")
@@ -357,6 +374,15 @@ pub fn build_predictable_audit_receipt(
         return Err(PredictableAuditError::EmptyQPolicyIdentity);
     }
     design.minimum_inclusion_probability.validate()?;
+    if let PredictableAuditQPolicy::LinearPrelabelPriority { minimum, maximum } = design.q_policy {
+        minimum.validate()?;
+        maximum.validate()?;
+        if minimum.numerator != design.minimum_inclusion_probability.numerator
+            || maximum.numerator < minimum.numerator
+        {
+            return Err(PredictableAuditError::InvalidQPolicyRange);
+        }
+    }
     if events.is_empty() {
         return Err(PredictableAuditError::EmptyCohort);
     }
@@ -394,6 +420,17 @@ pub fn build_predictable_audit_receipt(
             });
         }
 
+        if let PredictableAuditQPolicy::LinearPrelabelPriority { .. } = design.q_policy {
+            let expected = design
+                .q_policy
+                .inclusion_probability(event.prelabel_priority_score_numerator)?;
+            if expected.numerator != event.inclusion_probability.numerator {
+                return Err(PredictableAuditError::QPolicyMismatch {
+                    sequence_number: index,
+                });
+            }
+        }
+
         let selected = event.inclusion_probability.selects(event.random_word);
         if selected {
             selected_count += 1;
@@ -419,6 +456,7 @@ pub fn build_predictable_audit_receipt(
         random_stream_manifest_sha256: design.random_stream_manifest_sha256.clone(),
         q_policy_id: design.q_policy_id.clone(),
         q_policy_version: design.q_policy_version.clone(),
+        q_policy: design.q_policy,
         minimum_inclusion_probability_numerator: design
             .minimum_inclusion_probability
             .numerator,
@@ -480,6 +518,7 @@ mod tests {
             minimum_inclusion_probability: DyadicInclusionProbability {
                 numerator: 1_u128 << 63,
             },
+            q_policy: PredictableAuditQPolicy::ExternallySuppliedPrelabelSchedule,
             q_policy_id: "risk-stratum-policy".to_owned(),
             q_policy_version: "1".to_owned(),
         }
@@ -493,6 +532,7 @@ mod tests {
             inclusion_probability: DyadicInclusionProbability {
                 numerator: q_numerator,
             },
+            prelabel_priority_score_numerator: 0,
             random_word,
         }
     }
