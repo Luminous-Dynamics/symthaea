@@ -356,8 +356,9 @@ mod tests {
         assert_eq!(plan.step_count(), 3);
 
         let result = plan.execute(&mut nix_executor).await;
-        assert!(result.success);
-        assert_eq!(result.completed_count, 3);
+        assert!(!result.success, "preview-only plans are not successful mutations");
+        assert_eq!(result.completed_count, 0);
+        assert_eq!(result.previewed_count, 3);
         assert_eq!(result.rolled_back_count, 0);
         assert_eq!(result.steps.len(), 3);
 
@@ -413,7 +414,7 @@ mod tests {
         // Step 0: previewed; no process was spawned and no rollback is valid.
         assert_eq!(result.steps[0].0.status, StepStatus::Previewed);
         assert!(matches!(
-            result.steps[0].1,
+            &result.steps[0].1,
             Some(ExecutionResult::PreviewOnly { .. })
         ));
         // Step 1: failed (PendingConfirmation)
