@@ -389,7 +389,15 @@ pub fn perturb(
     if state.tick >= manifest.max_steps {
         return Err(TransitionError::StepLimitReached);
     }
-    let before_state_digest = state.digest().map_err(|_| TransitionError::StepLimitReached)?;
+    let manifest_digest = manifest
+        .digest()
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
+    if manifest_digest != state.manifest_digest {
+        return Err(TransitionError::ManifestMismatch);
+    }
+    let before_state_digest = state
+        .digest()
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
     let mut next = state.clone();
     next.tick += 1;
     match perturbation {
@@ -403,7 +411,9 @@ pub fn perturb(
         kind: EventKind::Perturbed(perturbation),
     };
     next.event_log.push(event.clone());
-    let after_state_digest = next.digest().map_err(|_| TransitionError::StepLimitReached)?;
+    let after_state_digest = next
+        .digest()
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
     let receipt = StepReceipt {
         manifest_digest: next.manifest_digest.clone(),
         step_index: next.tick,
