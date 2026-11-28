@@ -186,6 +186,7 @@ impl PrerequisiteSpec {
 pub struct PrerequisiteState {
     pub player: Position,
     pub key_inventory: u64,
+    pub collected_keys: u64,
     pub unlocked_doors: u64,
     pub elapsed_actions: u32,
 }
@@ -228,6 +229,7 @@ impl PrerequisiteGame {
         let state = PrerequisiteState {
             player: spec.player_start,
             key_inventory: 0,
+            collected_keys: 0,
             unlocked_doors: 0,
             elapsed_actions: 0,
         };
@@ -303,7 +305,8 @@ fn simulate(
                 moved = true;
                 if let Some(key_id) = spec.keys.get(&destination).copied() {
                     let key_bit = 1_u64 << key_id;
-                    if next.key_inventory & key_bit == 0 {
+                    if next.collected_keys & key_bit == 0 {
+                        next.collected_keys |= key_bit;
                         next.key_inventory |= key_bit;
                         collected_key = Some(key_id);
                     }
@@ -340,6 +343,7 @@ pub(crate) fn optimal_prerequisite_path(
     let start = PrerequisiteState {
         player: spec.player_start,
         key_inventory: 0,
+        collected_keys: 0,
         unlocked_doors: 0,
         elapsed_actions: 0,
     };
@@ -454,6 +458,33 @@ mod tests {
             optimal_prerequisite_path(&fixture()),
             Some(vec![Action::East, Action::East, Action::East])
         );
+    }
+
+
+    #[test]
+    fn consumed_key_cannot_be_recollected_by_revisiting_its_tile() {
+        let mut game = PrerequisiteGame::new(fixture());
+        game.step(Action::East).expect("collect key");
+        game.step(Action::East).expect("consume key to unlock door");
+        assert_eq!(game.state().key_inventory, 0);
+        game.step(Action::West).expect("return to key tile");
+        assert_eq!(game.state().collected_keys, 1);
+        assert_eq!(game.state().key_inventory, 0);
+    }
+
+    #[test]
+    fn rejects_key_and_door_sharing_a_position() {
+        let result = PrerequisiteSpec::new(
+            3,
+            1,
+            Vec::new(),
+            vec![KeySpec { id: 0, position: Position::new(1, 0) }],
+            vec![DoorSpec { id: 0, position: Position::new(1, 0), key_id: 0 }],
+            Position::new(0, 0),
+            Position::new(2, 0),
+            5,
+        );
+        assert_eq!(result, Err(PrerequisiteSpecError::KeyDoorPositionOverlap));
     }
 
     #[test]
