@@ -43,6 +43,9 @@ pub mod app_database;
 /// Sovereign NixOS configuration generator — hardware-aware, consciousness-coupled
 pub mod sovereign_config;
 
+/// Typed, injection-resistant construction of NixOS module expressions.
+pub mod typed_nix;
+
 /// Conversational NixOS installer — dialogue-driven config generation
 pub mod sovereign_conversation;
 
