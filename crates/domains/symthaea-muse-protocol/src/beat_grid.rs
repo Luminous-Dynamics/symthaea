@@ -57,6 +57,16 @@ pub struct DownbeatAnchor {
     pub confidence_ppm: u32,
 }
 
+/// Semantics for values between successive tempo-map points.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TempoInterpolation {
+    /// Hold the previous BPM value until the next point.
+    StepwiseConstant,
+    /// Interpolate BPM linearly in source-frame time between points.
+    LinearInFrameTime,
+}
+
 /// A point in a piecewise tempo map. Tempo is in milli-BPM, avoiding floating
 /// point serialization and making boundary comparisons deterministic.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -93,6 +103,7 @@ pub struct BeatGridHypothesis {
     pub confidence_ppm: u32,
     pub pulse_anchors: Vec<PulseAnchor>,
     pub downbeat_anchors: Vec<DownbeatAnchor>,
+    pub tempo_interpolation: Option<TempoInterpolation>,
     pub tempo_map: Vec<TempoMapPoint>,
     pub meter_map: Vec<MeterMapSegment>,
 }
@@ -145,6 +156,7 @@ pub enum BeatGridViolationCode {
     TempoPointConfidenceOutOfRange,
     TempoValueMustBePositive,
     TempoFramesNotStrictlyIncreasing,
+    TempoInterpolationMismatch,
     MeterSegmentConfidenceOutOfRange,
     MeterStartBeatNotInPulseMap,
     MeterSegmentsNotStrictlyIncreasing,
@@ -379,6 +391,14 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
             previous_bar_index = Some(anchor.bar_index);
         }
 
+        if hypothesis.tempo_map.is_empty() != hypothesis.tempo_interpolation.is_none() {
+            push(
+                &mut violations,
+                BeatGridViolationCode::TempoInterpolationMismatch,
+                format!("{base}.tempo_interpolation"),
+            );
+        }
+
         let mut previous_tempo_frame = None;
         for (point_index, point) in hypothesis.tempo_map.iter().enumerate() {
             let path = format!("{base}.tempo_map[{point_index}]");
@@ -540,6 +560,7 @@ mod tests {
                 bar_index: 0,
                 confidence_ppm: 800_000,
             }],
+            tempo_interpolation: Some(TempoInterpolation::LinearInFrameTime),
             tempo_map: vec![
                 TempoMapPoint { frame: 0, bpm_milli: 120_000, confidence_ppm: 880_000 },
                 TempoMapPoint { frame: 48_000, bpm_milli: 121_000, confidence_ppm: 810_000 },
@@ -621,6 +642,13 @@ mod tests {
         assert!(found.contains(&BeatGridViolationCode::TempoFramesNotStrictlyIncreasing));
         assert!(found.contains(&BeatGridViolationCode::TempoValueMustBePositive));
         assert!(found.contains(&BeatGridViolationCode::TempoPointConfidenceOutOfRange));
+    }
+
+    #[test]
+    fn rejects_tempo_map_without_interpolation_semantics() {
+        let mut report = report();
+        report.hypotheses[0].tempo_interpolation = None;
+        assert!(codes(&report).contains(&BeatGridViolationCode::TempoInterpolationMismatch));
     }
 
     #[test]
