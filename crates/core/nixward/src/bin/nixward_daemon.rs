@@ -16,6 +16,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nixward::NixParser;
+use nixward::typed_nix::NixExpr;
 use nixward::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
 use nixward::ipc::{
     AlertEntry, AlertSeverity, AnomalyEntry, CausalEdgeEntry, ConcernEntry, DaemonConfig,
@@ -245,7 +246,7 @@ impl DaemonState {
     /// logic. Kept here: the AST-based already-configured check, which is
     /// more accurate than `set_option()`'s own naive substring search and
     /// has no equivalent inside `ConfigWriter` itself.
-    fn generate_nixos_hardening_patch(&mut self, unit: &str) -> Option<(String, String, String)> {
+    fn generate_nixos_hardening_patch(&mut self, unit: &str) -> Option<(String, String, NixExpr)> {
         let path = std::path::Path::new("/etc/nixos/configuration.nix");
         let content = if path.exists() {
             std::fs::read_to_string(path).ok()?
@@ -264,15 +265,15 @@ impl DaemonState {
         let (path_str, value_str) = match unit_clean.as_str() {
             "clickhouse-server" | "clickhouse" => (
                 "services.clickhouse.extraConfig".to_string(),
-                "<max_server_memory_usage>80%</max_server_memory_usage>".to_string(),
+                NixExpr::String("<max_server_memory_usage>80%</max_server_memory_usage>".to_string()),
             ),
             "postgresql" | "postgres" => (
                 "services.postgresql.settings.shared_buffers".to_string(),
-                "\"512MB\"".to_string(),
+                NixExpr::String("512MB".to_string()),
             ),
             _ => (
                 format!("systemd.services.{}.serviceConfig.RestartSec", unit_clean),
-                "5".to_string(),
+                NixExpr::Int(5),
             ),
         };
 
@@ -282,8 +283,9 @@ impl DaemonState {
             return None;
         }
 
-        let hardened_line = format!("{} = {}", path_str, value_str);
-        Some((hardened_line, path_str, value_str))
+        let value_text = value.as_nix().ok()?;
+        let hardened_line = format!("{path_str} = {value_text}");
+        Some((hardened_line, path_str, value))
     }
 
     /// Sync causal graphs and learned resolutions with other local daemons (Proposal 4)
@@ -1107,7 +1109,7 @@ impl DaemonState {
                                     if path.exists() {
                                         let writer = ConfigWriter::new();
                                         let apply_result = writer
-                                            .set_option(option_path, value)
+                                            .set_option_expr(option_path, value)
                                             .and_then(|patch| {
                                                 let modified = patch.modified.clone();
                                                 writer.apply_patch(&patch)?;
