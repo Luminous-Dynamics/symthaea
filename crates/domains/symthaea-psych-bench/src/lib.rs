@@ -58,6 +58,7 @@
 pub mod adapter;
 pub mod benchmarks;
 pub mod harness;
+pub mod registry;
 pub mod substrate_transfer;
 pub mod wm;
 
