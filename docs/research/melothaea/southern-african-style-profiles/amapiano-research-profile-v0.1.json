@@ -149,5 +149,56 @@
     "AMA-SRC-01",
     "AMA-SRC-02",
     "AMA-SRC-03"
+  ],
+  "sources": [
+    {
+      "id": "AMA-SRC-01",
+      "title": "Kwaito as history: Complicating contemporary historiographies",
+      "author": "Dion Malcolm Eaby-Lomas",
+      "year": 2023,
+      "publication": "African Music, 12(1), 21–36",
+      "doi": "10.21504/amj.v12i1.2529",
+      "url": "https://doi.org/10.21504/amj.v12i1.2529",
+      "source_kind": "peer_reviewed_article",
+      "supports": [
+        "township music history",
+        "relations discussed among marabi, mbaqanga, bubblegum, kwaito and Amapiano",
+        "dance, technology and scene context"
+      ],
+      "limitations": [
+        "historical framing is multivocal; does not prove a single origin date or universal musical recipe"
+      ]
+    },
+    {
+      "id": "AMA-SRC-02",
+      "title": "Understanding amapiano and the South African city through the music videos of Big Flexa and Bhebha",
+      "year": 2024,
+      "doi": "10.1080/02533952.2024.2526251",
+      "url": "https://doi.org/10.1080/02533952.2024.2526251",
+      "source_kind": "peer_reviewed_article",
+      "supports": [
+        "discussion of common Amapiano features",
+        "keyboard/piano and log-drum descriptions",
+        "extended instrumental openings and gradual layer addition in discussed examples",
+        "language and urban-cultural context"
+      ],
+      "limitations": [
+        "examples and scope are bounded; features are not requirements for every track"
+      ]
+    },
+    {
+      "id": "AMA-SRC-03",
+      "title": "Ase trap tse ke pina tsa ko kasi — Sonics After the Struggle: Mapping Amapiano and Black Aesthetics in Post-Apartheid South Africa",
+      "year": 2026,
+      "doi": "10.1080/13696815.2026.2634896",
+      "url": "https://doi.org/10.1080/13696815.2026.2634896",
+      "source_kind": "scholarly_article",
+      "supports": [
+        "newer historical and scene context for Amapiano"
+      ],
+      "limitations": [
+        "review full text and practitioner accounts before deriving narrow production or composition rules"
+      ]
+    }
   ]
 }
