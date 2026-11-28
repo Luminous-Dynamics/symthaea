@@ -1,0 +1,557 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/mel-hear-011-auditory-evidence-v0-1.schema.json",
+  "title": "Melothaea multi-view auditory evidence record v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "evidence_status",
+    "source",
+    "analysis",
+    "views",
+    "event_hypotheses",
+    "scene_hypotheses",
+    "query_claims",
+    "causal_factor_assessment",
+    "identifiability",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-hear-011-auditory-evidence-v0.1"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_status": {
+      "enum": [
+        "metadata_fixture_only",
+        "partially_materialized",
+        "materialized"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "analysis": {
+      "$ref": "#/$defs/analysis"
+    },
+    "views": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/view"
+      }
+    },
+    "event_hypotheses": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/eventHypothesis"
+      }
+    },
+    "scene_hypotheses": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sceneHypothesis"
+      }
+    },
+    "query_claims": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/queryClaim"
+      }
+    },
+    "causal_factor_assessment": {
+      "$ref": "#/$defs/causalFactors"
+    },
+    "identifiability": {
+      "$ref": "#/$defs/identifiability"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generator",
+        "generator_version"
+      ],
+      "properties": {
+        "generator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generator_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_locator",
+        "artifact_sha256",
+        "sample_format",
+        "sample_rate_hz",
+        "channel_count",
+        "frame_count",
+        "calibration_state",
+        "amplitude_unit"
+      ],
+      "properties": {
+        "asset_locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sample_format": {
+          "enum": [
+            "f32le_hex_ascii_v1",
+            "pcm_s16le",
+            "pcm_f32le",
+            "wav_pcm"
+          ]
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "channel_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "frame_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "calibration_state": {
+          "enum": [
+            "uncalibrated_digital",
+            "pressure_calibrated",
+            "unknown"
+          ]
+        },
+        "amplitude_unit": {
+          "enum": [
+            "digital_full_scale_ratio",
+            "relative_amplitude",
+            "pascals",
+            "dB_SPL",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analysis_id",
+        "analysis_version",
+        "sample_rate_hz",
+        "window_samples",
+        "hop_samples",
+        "fft_size",
+        "window_function",
+        "centered"
+      ],
+      "properties": {
+        "analysis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analysis_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "window_samples": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "hop_samples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fft_size": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "window_function": {
+          "type": "string",
+          "minLength": 1
+        },
+        "centered": {
+          "type": "boolean"
+        }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "view_id",
+        "kind",
+        "status",
+        "units",
+        "frequency_scale",
+        "phase_policy"
+      ],
+      "properties": {
+        "view_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "waveform",
+            "complex_stft",
+            "erb_band_energy",
+            "constant_q",
+            "modulation_spectrum",
+            "spectrotemporal_scattering",
+            "spatial"
+          ]
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "materialized",
+            "not_estimable"
+          ]
+        },
+        "units": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frequency_scale": {
+          "enum": [
+            "linear",
+            "erb",
+            "log_frequency",
+            "not_applicable"
+          ]
+        },
+        "phase_policy": {
+          "enum": [
+            "complex_retained",
+            "artifact_reference_only",
+            "magnitude_only",
+            "not_applicable"
+          ]
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "shape": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "artifact_locator": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "planned"
+            }
+          },
+          "not": {
+            "required": [
+              "artifact_sha256"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "materialized"
+            }
+          },
+          "required": [
+            "artifact_sha256",
+            "shape",
+            "artifact_locator"
+          ]
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "not_estimable"
+            }
+          },
+          "not": {
+            "required": [
+              "artifact_sha256"
+            ]
+          }
+        }
+      ]
+    },
+    "sampleSupport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_sample",
+        "end_sample"
+      ],
+      "properties": {
+        "start_sample": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_sample": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "eventHypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "event_kind",
+        "support",
+        "confidence"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_kind": {
+          "enum": [
+            "pitched",
+            "percussive",
+            "sustained",
+            "transient",
+            "unknown"
+          ]
+        },
+        "support": {
+          "$ref": "#/$defs/sampleSupport"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "source_candidate_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "feature_view_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "sceneHypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "grouped_event_ids",
+        "cue_evidence",
+        "confidence"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grouped_event_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cue_evidence": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "harmonicity",
+              "onset_synchrony",
+              "comodulation",
+              "spectral_continuity",
+              "spatial_coherence",
+              "common_fate"
+            ]
+          }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "alternatives_retained": {
+          "type": "boolean"
+        }
+      }
+    },
+    "queryClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "property_id",
+        "relation",
+        "evidence_view_ids",
+        "support",
+        "confidence"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "property_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation": {
+          "enum": [
+            "preserved",
+            "changed",
+            "ambiguous",
+            "not_estimable",
+            "abstain"
+          ]
+        },
+        "evidence_view_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "support": {
+          "$ref": "#/$defs/sampleSupport"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "causalFactors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "factors",
+        "residual"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_assessed",
+            "partially_identified",
+            "identified",
+            "out_of_domain"
+          ]
+        },
+        "factors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "factor",
+              "status"
+            ],
+            "properties": {
+              "factor": {
+                "enum": [
+                  "musical_content",
+                  "performance",
+                  "instrument_source",
+                  "room_channel",
+                  "production_processing",
+                  "noise_corruption"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "supported",
+                  "rejected",
+                  "ambiguous",
+                  "not_estimable"
+                ]
+              },
+              "evidence_view_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "residual": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "identifiability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "alternative_explanations"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_assessed",
+            "identifiable",
+            "underdetermined",
+            "out_of_domain"
+          ]
+        },
+        "alternative_explanations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
