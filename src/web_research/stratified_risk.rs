@@ -57,6 +57,7 @@ pub struct DesignBasedRiskEstimate {
     pub approximate_normal_95_interval: Option<ApproximateRiskInterval>,
     pub variance_estimable: bool,
     pub variance_unavailable_strata: Vec<String>,
+    pub uncertainty_unavailable_reason: Option<String>,
     pub strata: Vec<StratumRiskEstimate>,
 }
 
@@ -116,6 +117,7 @@ pub enum StratifiedRiskError {
     NoAuditSample,
     InvalidCoverageTarget,
     InvalidConfidenceThreshold,
+    ZeroMinimumSampleSize,
 }
 
 impl std::fmt::Display for StratifiedRiskError {
@@ -134,7 +136,12 @@ impl std::fmt::Display for StratifiedRiskError {
             Self::NonSelectedRecordHasAdjudication(id) => write!(formatter, "non-selected record has an audit label: {id}"),
             Self::NoAuditSample => write!(formatter, "audit plan contains no selected records"),
             Self::InvalidCoverageTarget => write!(formatter, "coverage targets must be finite and in (0, 1]"),
-            Self::InvalidConfidenceThreshold => write!(formatter, "confidence thresholds must be finite and in [0, 1]"),
+            Self::InvalidConfidenceThreshold => {
+                write!(formatter, "confidence thresholds must be finite and in [0, 1]")
+            }
+            Self::ZeroMinimumSampleSize => {
+                write!(formatter, "minimum audit sample size must be positive")
+            }
         }
     }
 }
@@ -266,6 +273,9 @@ pub fn evaluate_stratified_audit_risk(
     config: &RiskCoverageConfig,
 ) -> Result<StratifiedRiskReport, StratifiedRiskError> {
     validate_plan(plan)?;
+    if config.minimum_sample_size == 0 {
+        return Err(StratifiedRiskError::ZeroMinimumSampleSize);
+    }
     if config
         .target_coverages
         .iter()
@@ -354,6 +364,7 @@ pub fn evaluate_stratified_audit_risk(
         &all_ids,
         predictions,
         plan,
+        config.minimum_sample_size,
     );
     let observed_ids: HashSet<&str> = sorted
         .iter()
@@ -365,6 +376,7 @@ pub fn evaluate_stratified_audit_risk(
         &observed_ids,
         predictions,
         plan,
+        config.minimum_sample_size,
     );
 
     let mut curve = Vec::new();
@@ -384,6 +396,7 @@ pub fn evaluate_stratified_audit_risk(
             &accepted_ids,
             predictions,
             plan,
+            config.minimum_sample_size,
         );
         if let Some(risk) = estimate.estimated_risk {
             let previous_end = index;
@@ -450,6 +463,7 @@ pub fn evaluate_stratified_audit_risk(
                     &accepted_ids,
                     predictions,
                     plan,
+                    config.minimum_sample_size,
                 ),
             }
         })
@@ -489,6 +503,7 @@ fn estimate_for_acceptance(
     accepted_ids: &HashSet<&str>,
     predictions: &[SelectivePredictionRecord],
     plan: &StratifiedAuditPlan,
+    minimum_sample_size: usize,
 ) -> DesignBasedRiskEstimate {
     let prediction_by_id: HashMap<&str, &SelectivePredictionRecord> = predictions
         .iter()
@@ -600,7 +615,12 @@ fn estimate_for_acceptance(
         (accepted_population_count > 0)
             .then_some(variance / (accepted_population_count as f64).powi(2))
     });
-    let standard_error = estimated_risk_variance.map(f64::sqrt);
+    let enough_audit_labels = accepted_audit_count >= minimum_sample_size;
+    let standard_error = if enough_audit_labels {
+        estimated_risk_variance.map(f64::sqrt)
+    } else {
+        None
+    };
     let approximate_normal_95_interval = estimated_risk.zip(standard_error).map(|(risk, se)| {
         ApproximateRiskInterval {
             lower: risk - NORMAL_95_Z * se,
@@ -625,7 +645,16 @@ fn estimate_for_acceptance(
         standard_error,
         approximate_normal_95_interval,
         variance_estimable,
-        variance_unavailable_strata,
+        variance_unavailable_strata: variance_unavailable_strata.clone(),
+        uncertainty_unavailable_reason: if !variance_estimable {
+            Some("at least one non-census stratum has fewer than two selected audit labels".to_owned())
+        } else if !enough_audit_labels {
+            Some(format!(
+                "accepted audit label count {accepted_audit_count} is below the configured minimum {minimum_sample_size}"
+            ))
+        } else {
+            None
+        },
         strata,
     }
 }
@@ -639,10 +668,26 @@ mod tests {
 
     fn four_unit_plan() -> StratifiedAuditPlan {
         let candidates = vec![
-            AuditCandidate { record_id: "a".to_owned(), stratum_id: "all".to_owned(), random_priority: 10 },
-            AuditCandidate { record_id: "b".to_owned(), stratum_id: "all".to_owned(), random_priority: 20 },
-            AuditCandidate { record_id: "c".to_owned(), stratum_id: "all".to_owned(), random_priority: 30 },
-            AuditCandidate { record_id: "d".to_owned(), stratum_id: "all".to_owned(), random_priority: 40 },
+            AuditCandidate {
+                record_id: "a".to_owned(),
+                stratum_id: "all".to_owned(),
+                random_priority: 10,
+            },
+            AuditCandidate {
+                record_id: "b".to_owned(),
+                stratum_id: "all".to_owned(),
+                random_priority: 20,
+            },
+            AuditCandidate {
+                record_id: "c".to_owned(),
+                stratum_id: "all".to_owned(),
+                random_priority: 30,
+            },
+            AuditCandidate {
+                record_id: "d".to_owned(),
+                stratum_id: "all".to_owned(),
+                random_priority: 40,
+            },
         ];
         let quotas = vec![AuditStratumQuota { stratum_id: "all".to_owned(), sample_size: 2 }];
         build_stratified_random_audit_plan(
@@ -654,7 +699,12 @@ mod tests {
         .unwrap()
     }
 
-    fn prediction(id: &str, confidence: f64, label: bool, truth: Option<bool>) -> SelectivePredictionRecord {
+    fn prediction(
+        id: &str,
+        confidence: f64,
+        label: bool,
+        truth: Option<bool>,
+    ) -> SelectivePredictionRecord {
         SelectivePredictionRecord {
             id: id.to_owned(),
             predicted_label: label,
@@ -702,8 +752,16 @@ mod tests {
     #[test]
     fn census_has_zero_design_variance() {
         let candidates = vec![
-            AuditCandidate { record_id: "a".to_owned(), stratum_id: "all".to_owned(), random_priority: 10 },
-            AuditCandidate { record_id: "b".to_owned(), stratum_id: "all".to_owned(), random_priority: 20 },
+            AuditCandidate {
+                record_id: "a".to_owned(),
+                stratum_id: "all".to_owned(),
+                random_priority: 10,
+            },
+            AuditCandidate {
+                record_id: "b".to_owned(),
+                stratum_id: "all".to_owned(),
+                random_priority: 20,
+            },
         ];
         let quotas = vec![AuditStratumQuota { stratum_id: "all".to_owned(), sample_size: 2 }];
         let plan = build_stratified_random_audit_plan(
@@ -726,8 +784,16 @@ mod tests {
     #[test]
     fn singleton_non_census_stratum_withholds_variance_not_point_estimate() {
         let candidates = vec![
-            AuditCandidate { record_id: "a".to_owned(), stratum_id: "single".to_owned(), random_priority: 10 },
-            AuditCandidate { record_id: "b".to_owned(), stratum_id: "single".to_owned(), random_priority: 20 },
+            AuditCandidate {
+                record_id: "a".to_owned(),
+                stratum_id: "single".to_owned(),
+                random_priority: 10,
+            },
+            AuditCandidate {
+                record_id: "b".to_owned(),
+                stratum_id: "single".to_owned(),
+                random_priority: 20,
+            },
         ];
         let quotas = vec![AuditStratumQuota { stratum_id: "single".to_owned(), sample_size: 1 }];
         let plan = build_stratified_random_audit_plan(
