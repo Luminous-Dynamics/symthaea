@@ -1,0 +1,236 @@
+{
+  "schema_version": "sdcb-finite-alphabet-tv-ball-minimax-v1",
+  "title": "Exact asymmetric total-variation-ball robust testing fixture",
+  "status": "analytic-exact-rational-fixture;rust-authored-not-compiled-or-ci-qualified",
+  "provenance": {
+    "parent_issue": 14224,
+    "finite_family_oracle_pr": 14218,
+    "general_minimax_issue": 14185,
+    "literature": [
+      "https://arxiv.org/abs/2602.19803",
+      "https://arxiv.org/abs/2605.24741"
+    ],
+    "base_commit": "f5d7bf4b3fbf7cdbf72083db77e88a9ac2c81820"
+  },
+  "observation_space": [
+    "0",
+    "1"
+  ],
+  "uncertainty_sets": {
+    "total_variation_convention": "TV(P,Q)=0.5*sum_y |P(y)-Q(y)|",
+    "bernoulli_identity": "TV(Bernoulli(p),Bernoulli(p0))=|p-p0|",
+    "alternative": {
+      "nominal_p": {
+        "numerator": 4,
+        "denominator": 5
+      },
+      "radius": {
+        "numerator": 3,
+        "denominator": 20
+      },
+      "interval": [
+        {
+          "numerator": 13,
+          "denominator": 20
+        },
+        {
+          "numerator": 19,
+          "denominator": 20
+        }
+      ],
+      "boundary_laws": [
+        {
+          "id": "A_low",
+          "probabilities": [
+            {
+              "numerator": 7,
+              "denominator": 20
+            },
+            {
+              "numerator": 13,
+              "denominator": 20
+            }
+          ]
+        },
+        {
+          "id": "A_high",
+          "probabilities": [
+            {
+              "numerator": 1,
+              "denominator": 20
+            },
+            {
+              "numerator": 19,
+              "denominator": 20
+            }
+          ]
+        }
+      ]
+    },
+    "null": {
+      "nominal_q": {
+        "numerator": 1,
+        "denominator": 5
+      },
+      "radius": {
+        "numerator": 1,
+        "denominator": 20
+      },
+      "interval": [
+        {
+          "numerator": 3,
+          "denominator": 20
+        },
+        {
+          "numerator": 1,
+          "denominator": 4
+        }
+      ],
+      "boundary_laws": [
+        {
+          "id": "B_low",
+          "probabilities": [
+            {
+              "numerator": 17,
+              "denominator": 20
+            },
+            {
+              "numerator": 3,
+              "denominator": 20
+            }
+          ]
+        },
+        {
+          "id": "B_high",
+          "probabilities": [
+            {
+              "numerator": 3,
+              "denominator": 4
+            },
+            {
+              "numerator": 1,
+              "denominator": 4
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "alpha": {
+    "numerator": 1,
+    "denominator": 10
+  },
+  "primal_certificate": {
+    "randomized_test": {
+      "phi_0": {
+        "numerator": 0,
+        "denominator": 1
+      },
+      "phi_1": {
+        "numerator": 2,
+        "denominator": 5
+      }
+    },
+    "worst_null_size": {
+      "numerator": 1,
+      "denominator": 10
+    },
+    "worst_null_member": "B_high",
+    "alternative_powers": [
+      {
+        "member": "A_low",
+        "power": {
+          "numerator": 13,
+          "denominator": 50
+        }
+      },
+      {
+        "member": "A_high",
+        "power": {
+          "numerator": 19,
+          "denominator": 50
+        }
+      }
+    ],
+    "worst_case_power": {
+      "numerator": 13,
+      "denominator": 50
+    }
+  },
+  "dual_certificate": {
+    "least_favourable_alternative": "A_low",
+    "alternative_weights": [
+      {
+        "numerator": 1,
+        "denominator": 1
+      }
+    ],
+    "least_favourable_null": "B_high",
+    "unnormalized_null_weights": [
+      {
+        "numerator": 13,
+        "denominator": 5
+      }
+    ],
+    "positive_part_slack": [
+      {
+        "numerator": 0,
+        "denominator": 1
+      },
+      {
+        "numerator": 0,
+        "denominator": 1
+      }
+    ],
+    "objective": {
+      "numerator": 13,
+      "denominator": 50
+    },
+    "primal_dual_gap": {
+      "numerator": 0,
+      "denominator": 1
+    }
+  },
+  "glrt_p_sup_comparator": {
+    "statistic_order": {
+      "score_y0": {
+        "ratio_numerator": 7,
+        "ratio_denominator": 17
+      },
+      "score_y1": {
+        "ratio_numerator": 19,
+        "ratio_denominator": 5
+      },
+      "order": "T(y1)>T(y0)"
+    },
+    "p_sup_y0": {
+      "numerator": 1,
+      "denominator": 1
+    },
+    "p_sup_y1": {
+      "numerator": 1,
+      "denominator": 4
+    },
+    "alpha": {
+      "numerator": 1,
+      "denominator": 10
+    },
+    "rejection": "neither outcome is rejected; worst-case power is zero",
+    "interpretation": "Valid conservative p_sup comparator loses power due discrete tail resolution; the exact randomized minimax test uses boundary randomization."
+  },
+  "validation": {
+    "independent_python_fraction_replay": "passed",
+    "rust_tests": {
+      "authored": 8,
+      "compiled": false,
+      "executed": false
+    },
+    "hosted_ci": "not yet inspected for final branch head",
+    "finite_alphabet_scope": true,
+    "generic_tv_polytope_solver": false,
+    "huber_contamination_equivalence": false,
+    "physical_validation": false,
+    "sota_claim": false
+  },
+  "claim_boundary": "Exact result for a two-outcome Bernoulli TV-ball problem under the stated half-L1 convention and asymmetric radii. Does not solve general finite-alphabet TV-polytope vertex enumeration, continuous-density TV/band uncertainty, Huber contamination, or physical sensor qualification."
+}
