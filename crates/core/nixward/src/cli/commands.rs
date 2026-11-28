@@ -312,11 +312,11 @@ pub enum ConfigCommand {
         #[arg(long)]
         apply: bool,
     },
-    /// Set a NixOS option to a value.
+    /// Set a NixOS option to a restricted literal value.
     SetOption {
         /// Option path (e.g. `services.openssh.enable`).
         option_path: String,
-        /// Value expression (e.g. `true`, `"my-hostname"`).
+        /// Boolean, integer, null, or JSON-quoted string. Arbitrary Nix source is rejected (e.g. `true`, `512`, or `"\\"my-hostname\\"`).
         value: String,
         #[arg(long)]
         staging: Option<String>,
