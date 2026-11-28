@@ -171,8 +171,12 @@ func MinimizeTournament(in Input, orders [][]string)TournamentResult{
  if f.blocked{out.TournamentVerdict=Blocked;out.ReasonCodes=f.codes();return out}
 
  allComplete:=true
+ seenOrders:=map[string]struct{}{}
  for index,order:=range orders{
   if !sameSetOrder(order,initial){f.block("reduction_order_not_exact_fault_permutation");continue}
+  orderSHA:=orderDigest(order)
+  if _,duplicate:=seenOrders[orderSHA];duplicate{f.block("reduction_order_duplicated");continue}
+  seenOrders[orderSHA]=struct{}{}
   result:=MinimizeInOrder(in,order)
   out.TotalSubsetEvaluations+=result.SubsetEvaluations
   allComplete=allComplete&&result.EvidenceComplete
@@ -210,14 +214,16 @@ func MinimizeTournament(in Input, orders [][]string)TournamentResult{
 
 func SortedReductionOrders(initial []string)[][]string{
  ids,ok:=canonicalFaults(initial);if !ok{return nil}
- reverse:=defaultDeletionOrder(ids)
- ascending:=append([]string(nil),ids...)
- orders:=[][]string{reverse,ascending}
+ orders:=[][]string{}
+ seen:=map[string]struct{}{}
+ add:=func(order []string){key:=orderDigest(order);if _,exists:=seen[key];exists{return};seen[key]=struct{}{};orders=append(orders,order)}
+ add(defaultDeletionOrder(ids))
+ add(append([]string(nil),ids...))
  // Deterministic rotations add alternative deletion schedules without random state.
  for shift:=1;shift<len(ids)&&len(orders)<MaxReductionOrders;shift++{
   rotated:=append([]string(nil),ids[shift:]...)
   rotated=append(rotated,ids[:shift]...)
-  orders=append(orders,rotated)
+  add(rotated)
  }
  return orders
 }
