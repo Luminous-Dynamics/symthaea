@@ -54,6 +54,14 @@
       "units": "relative_log_frequency_energy",
       "frequency_scale": "log_frequency",
       "phase_policy": "not_applicable"
+    },
+    {
+      "view_id": "gammatone-band-energy",
+      "kind": "gammatone_band_energy",
+      "status": "planned",
+      "units": "relative_band_power",
+      "frequency_scale": "erb",
+      "phase_policy": "complex_retained"
     }
   ],
   "event_hypotheses": [],

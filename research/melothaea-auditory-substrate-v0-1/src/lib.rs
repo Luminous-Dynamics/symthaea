@@ -6,6 +6,7 @@
 //! sample metadata, representation declarations and claim-state boundaries.
 
 pub mod dsp;
+pub mod gammatone;
 
 use serde::Serialize;
 use serde_json::Value;
@@ -156,6 +157,15 @@ fn validate_views(record: &Value) -> Result<(usize, usize), String> {
             "erb_band_energy" if string(view, "frequency_scale")? != "erb" => {
                 return Err("ERB energy view must declare its ERB frequency scale".to_owned());
             }
+            "gammatone_band_energy"
+                if string(view, "frequency_scale")? != "erb"
+                    || string(view, "phase_policy")? != "complex_retained" =>
+            {
+                return Err(
+                    "gammatone band view must declare ERB scale and complex-envelope retention"
+                        .to_owned(),
+                );
+            }
             "constant_q" | "log_frequency_energy"
                 if string(view, "frequency_scale")? != "log_frequency" =>
             {
@@ -165,7 +175,7 @@ fn validate_views(record: &Value) -> Result<(usize, usize), String> {
         }
     }
 
-    for required in ["waveform", "complex_stft", "erb_band_energy", "log_frequency_energy"] {
+    for required in ["waveform", "complex_stft", "erb_band_energy", "gammatone_band_energy", "log_frequency_energy"] {
         if !kinds.contains(required) {
             return Err(format!(
                 "required representation view is absent: {required}"
