@@ -1,0 +1,82 @@
+{
+  "profile": "mon046-unified-recovery-claim-v1",
+  "version": "1.0.0",
+  "claim_id": "fixture-postgres-recovery-claim-001",
+  "subject": {
+    "system_id": "fixture-ledger-db",
+    "environment_id": "isolated-recovery-lab",
+    "recovery_boundary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "predicate": {
+    "type": "recovery_assurance",
+    "verdict": "indeterminate",
+    "evaluated_at": "2026-11-28T12:00:00Z",
+    "policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "reason_codes": [
+      "fixture_only",
+      "trust_bootstrap_not_attested"
+    ]
+  },
+  "scope": {
+    "inventory_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "inventory_appraisal_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "required_item_ids": [
+      "postgres.base_backup",
+      "postgres.schema_history",
+      "postgres.sequences"
+    ],
+    "covered_item_ids": [
+      "postgres.base_backup"
+    ],
+    "unknown_item_ids": [
+      "postgres.schema_history",
+      "postgres.sequences"
+    ],
+    "unsupported_item_ids": [],
+    "excluded_item_ids": [],
+    "completeness": "incomplete"
+  },
+  "evidence": [
+    {
+      "evidence_id": "fixture-backup-receipt-001",
+      "evidence_class": "postgres_base_backup",
+      "source_id": "fixture-source-primary",
+      "artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "artifact_bytes": 1024,
+      "media_type": "application/octet-stream",
+      "receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "appraisal_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "captured_from": "2026-11-28T11:00:00Z",
+      "captured_through": "2026-11-28T11:01:00Z",
+      "clock_uncertainty_ms": 1000
+    }
+  ],
+  "appraisal": {
+    "custody_verdict": "indeterminate",
+    "verifier_id": "fixture-verifier",
+    "verifier_binary_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "trust_anchor_set_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "trust_snapshot_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "trust_epoch": 0,
+    "revocation_checkpoint_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "revocation_checkpoint_at": "2026-11-28T11:59:00Z",
+    "nonce_ledger_checkpoint_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "artifact_bytes_rehashed": false
+  },
+  "dependencies": [],
+  "freshness": {
+    "evaluated_at": "2026-11-28T12:00:00Z",
+    "valid_until": "2026-11-28T12:05:00Z",
+    "clock_uncertainty_ms": 1000,
+    "revocation_checkpoint_max_age_seconds": 60,
+    "revocation_checkpoint_age_seconds": 60,
+    "state": "unknown"
+  },
+  "provenance": {
+    "evaluator_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "evaluator_source_revision": "fixture-only-not-a-release",
+    "build_provenance_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "oracle_version": "mon046-fixture-oracle-v1",
+    "independent_adjudication": "not_performed"
+  }
+}
