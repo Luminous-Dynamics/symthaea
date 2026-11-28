@@ -77,13 +77,13 @@ Candidate policy baselines in the core crate:
 
 ## Authored test inventory and validation
 
-- F1–F6 deterministic environment fixtures: 41 tests.
+- F1–F6 deterministic environment fixtures: 46 tests.
 - Candidate-output contract: 7 tests.
 - Random and greedy policy baselines: 5 tests.
 - Evaluator-owned F1 runner: **6 tests**.
-- Core crate total: **59 authored tests**.
+- Core crate total: **64 authored tests**.
 - Separate candidate-adapter workspace: 6 FEP tests, 5 spatial HDC tests, 5 HDC-LTC tests (**16 authored tests**).
-- Combined source inventory: **75 authored Rust tests**.
+- Combined source inventory: **80 authored Rust tests**.
 
 These are authored counts, not observed execution results. Dedicated workflows run formatting, Cargo tests, and strict Clippy for each workspace. No pass is claimed until each exact-head workflow completes successfully.
 
@@ -103,3 +103,15 @@ The core crate exposes `evaluate_f1(spec, candidate)`. It calls only the observa
 Task completion and candidate-protocol validity remain separate: a task can be completed even if the candidate subsequently fails while consuming transition feedback.
 
 The paired comparison example lives in the separate adapter workspace at `examples/paired_f1.rs`. It compares random, greedy, spatial HDC, HDC-LTC, and FEP across 16 seeded 7×7 layouts. This is a small smoke/pilot cohort, not a statistical SOTA campaign. The exact BFS result is returned only as a regret metric; the route itself is never passed to a candidate.
+
+
+## Candidate-side partial-map memory primitive
+
+F4 now includes `ExploreMemory`, a candidate-owned stateful map store:
+- merges only cells returned in candidate-visible observations;
+- preserves unknown cells as unknown rather than assuming floor;
+- rejects inconsistent re-observations and geometry mismatches;
+- tracks visited positions, observation count, and observed-cell coverage;
+- exposes frontier positions (known traversable cells adjacent to unknown cells).
+
+The environment still returns only the current view. The memory primitive lives on the candidate side and can be ablated in future F4 policies. It is not yet a full exploration policy or proof that Symthaea's production episodic memory is using it.
