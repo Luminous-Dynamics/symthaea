@@ -1088,7 +1088,10 @@ impl VisionManifold {
         // object/working memory, avoiding representation-family switching.
         let mut saved_hypotheses: Vec<crate::types::ObjectHypothesis> = Vec::new();
 
-        let bound_frame_hv = if !self.observer_only && self.config.enable_object_binding && patch_hvs.len() >= 2 {
+        let bound_frame_hv = if !self.observer_only
+            && self.config.enable_object_binding
+            && patch_hvs.len() >= 2
+        {
             let grid = self.encoder.grid_for(width, height);
             let hypotheses = if scene_changed || self.last_object_hypotheses.is_empty() {
                 Self::cluster_patches(&patch_hvs, &grid)
@@ -8728,7 +8731,10 @@ mod tests {
             assert_eq!(telemetry.last_fep_action, "OBSERVER_ONLY_DISABLED");
         }
 
-        assert_eq!(manifold.encoder().feature_weights(), before_weights.as_slice());
+        assert_eq!(
+            manifold.encoder().feature_weights(),
+            before_weights.as_slice()
+        );
         assert!((manifold.current_tau() - before_tau).abs() < 1e-6);
         assert_eq!(manifold.save_state().fep_belief_mean, before_fep_belief);
 
@@ -8746,8 +8752,7 @@ mod tests {
 
     #[test]
     fn observer_only_cannot_be_disabled_by_learning_memory_or_simulation_apis() {
-        let mut manifold =
-            VisionManifold::try_new(VisionConfig::default(), 32, 32).unwrap();
+        let mut manifold = VisionManifold::try_new(VisionConfig::default(), 32, 32).unwrap();
         manifold.enable_observer_only().unwrap();
 
         manifold.freeze_learning(false);
@@ -8776,7 +8781,9 @@ mod tests {
         let mut source = VisionManifold::try_new(config.clone(), 32, 32).unwrap();
         source.enable_observer_only().unwrap();
         let frame = solid_gray_frame(32, 32, 120);
-        source.observe_frame_checked(&frame, 32, 32, 1, 0.033).unwrap();
+        source
+            .observe_frame_checked(&frame, 32, 32, 1, 0.033)
+            .unwrap();
 
         let saved = source.save_state();
         let mut restored = VisionManifold::try_new(config.clone(), 32, 32).unwrap();
@@ -8793,8 +8800,7 @@ mod tests {
 
     #[test]
     fn observer_only_cannot_be_enabled_after_observation_has_started() {
-        let mut manifold =
-            VisionManifold::try_new(VisionConfig::default(), 32, 32).unwrap();
+        let mut manifold = VisionManifold::try_new(VisionConfig::default(), 32, 32).unwrap();
         let frame = solid_gray_frame(32, 32, 60);
         manifold
             .observe_frame_checked(&frame, 32, 32, 1, 0.033)
@@ -8806,8 +8812,7 @@ mod tests {
 
     #[test]
     fn observer_only_rejects_hdc_dilation_and_transition_model_replacement() {
-        let mut manifold =
-            VisionManifold::try_new(VisionConfig::default(), 32, 32).unwrap();
+        let mut manifold = VisionManifold::try_new(VisionConfig::default(), 32, 32).unwrap();
         manifold.enable_observer_only().unwrap();
 
         assert!(
