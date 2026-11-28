@@ -170,6 +170,9 @@ impl TemporalFoveationBudget {
         if !trigger.urgency.is_finite() || !(0.0..=1.0).contains(&trigger.urgency) {
             return Err(TemporalFoveationError::InvalidUrgency);
         }
+        if trigger.timestamp_us < self.last_refill_us {
+            return Err(TemporalFoveationError::ClockRegression);
+        }
         if let Some(previous) = self.last_trigger_us {
             if trigger.timestamp_us < previous {
                 return Err(TemporalFoveationError::ClockRegression);
