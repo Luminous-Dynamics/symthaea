@@ -763,8 +763,7 @@ fn estimate_from_stratum_counts(
                     "accepted audit label count {} is below ",
                     "the configured minimum {}"
                 ),
-                accepted_audit_count,
-                minimum_sample_size
+                accepted_audit_count, minimum_sample_size
             ))
         } else {
             None
