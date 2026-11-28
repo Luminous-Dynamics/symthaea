@@ -20,6 +20,7 @@ pub enum HdcCandidateError {
     MissingGoal,
     IncompleteMap,
     EmptyActionSet,
+    NoRemainingBudget,
     InvalidDecision,
 }
 
@@ -30,6 +31,7 @@ impl Display for HdcCandidateError {
             Self::MissingGoal => write!(f, "HDC spatial candidate requires a visible goal"),
             Self::IncompleteMap => write!(f, "HDC greedy baseline requires a complete map"),
             Self::EmptyActionSet => write!(f, "HDC candidate received no offered actions"),
+            Self::NoRemainingBudget => write!(f, "HDC candidate received no remaining action budget"),
             Self::InvalidDecision => write!(f, "HDC candidate produced an invalid decision"),
         }
     }
@@ -165,6 +167,9 @@ impl InteractiveCandidate<Observation, Action> for HdcSpatialCandidate {
         &mut self,
         input: CandidateInput<'_, Observation, Action>,
     ) -> Result<CandidateDecision<Action>, Self::Error> {
+        if input.remaining_actions == 0 {
+            return Err(HdcCandidateError::NoRemainingBudget);
+        }
         let observation = input.observation;
         let goal = observation.known_goal.ok_or(HdcCandidateError::MissingGoal)?;
         let expected_cells = usize::from(observation.width)
@@ -297,6 +302,22 @@ mod tests {
             .expect("decision");
         assert!(matches!(decision.action, Action::East | Action::South));
         assert_eq!(decision.confidence, None);
+    }
+
+    #[test]
+    fn hdc_candidate_rejects_zero_action_budget() {
+        let observation = fixture();
+        let actions = [Action::North, Action::East, Action::South, Action::West];
+        let mut candidate = HdcSpatialCandidate::new(3, 3, 6).expect("candidate");
+        assert_eq!(
+            candidate.decide(CandidateInput {
+                observation: &observation,
+                legal_actions: &actions,
+                remaining_actions: 0,
+                episode_step: 0,
+            }),
+            Err(HdcCandidateError::NoRemainingBudget)
+        );
     }
 
     #[test]
