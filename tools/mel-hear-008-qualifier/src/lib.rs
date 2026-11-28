@@ -163,14 +163,22 @@ fn approximately_equal(left: f64, right: f64) -> bool {
 }
 
 fn validate_locator(value: &str, label: &str) -> Result<(), String> {
-    let synthetic = value.strip_prefix("synthetic:").is_some_and(|suffix| !suffix.is_empty());
+    let synthetic = value.strip_prefix("synthetic:").is_some_and(|suffix| {
+        !suffix.is_empty()
+            && suffix.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')
+            })
+    });
     let digest = value.strip_prefix("sha256:").is_some_and(|suffix| {
-        suffix.len() == 64 && suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
+        suffix.len() == 64
+            && suffix
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     });
     if synthetic || digest {
         Ok(())
     } else {
-        Err(format!("{label} must be a synthetic or SHA-256 locator"))
+        Err(format!("{label} must be a synthetic or lowercase SHA-256 locator"))
     }
 }
 
