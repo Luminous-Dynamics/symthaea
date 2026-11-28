@@ -34,6 +34,14 @@ use symthaea_core::hdc::BinaryHV;
 /// Intervention Effect benchmark: do-operator in HDC space.
 pub struct InterventionEffectBenchmark;
 
+fn metric_with_bounds(samples: &[f64], lower: f64, upper: Option<f64>) -> MetricValue {
+    MetricValue::from_samples_with_bounds(
+        samples,
+        crate::registry::MetricBounds { lower, upper },
+    )
+    .expect("causal intervention metric observations must satisfy declared support")
+}
+
 struct TrialResult {
     /// Whether intervention unbinding yields different residual than conditioning
     intervention_discrimination: f64,
@@ -236,17 +244,17 @@ impl PsychBenchmark for InterventionEffectBenchmark {
 
         result.insert(
             "intervention_discrimination",
-            MetricValue::from_samples(&intervention_vals),
+            metric_with_bounds(&intervention_vals, 0.0, Some(2.0)),
         );
         result.insert(
             "backdoor_accuracy",
-            MetricValue::from_samples(&backdoor_vals),
+            metric_with_bounds(&backdoor_vals, 0.0, Some(1.0)),
         );
         result.insert(
             "frontdoor_accuracy",
-            MetricValue::from_samples(&frontdoor_vals),
+            metric_with_bounds(&frontdoor_vals, -1.0, Some(1.0)),
         );
-        result.insert("causal_score", MetricValue::from_samples(&causal_vals));
+        result.insert("causal_score", metric_with_bounds(&causal_vals, -0.3, Some(1.4)));
 
         result.conditions = 4;
         result.trials_per_condition = config.trials_per_condition;
