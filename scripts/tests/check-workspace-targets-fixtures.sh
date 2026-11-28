@@ -53,7 +53,7 @@ name = "good"
 version = "0.1.0"
 edition = "2024"
 EOF
-printf '%s\\n' 'pub fn fixture() {}' > "$tmp/crates/core/good/src/lib.rs"
+printf '%s\n' 'pub fn fixture() {}' > "$tmp/crates/core/good/src/lib.rs"
 
 # Positive control: a real package is admitted, all nine staging directories
 # are explicitly excluded, and the seven pre-existing exclusions remain mirrored.
