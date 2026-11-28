@@ -54,6 +54,9 @@ pub struct SowrcConfig {
     pub betting_fractions: Vec<f64>,
     /// Fixed positive mixture weights summing to one.
     pub mixture_weights: Vec<f64>,
+    /// Reference to the frozen calibration configuration (alpha, delta, grid,
+    /// betting fractions and mixture weights), committed before audit labels.
+    pub calibration_protocol_manifest_ref: String,
     /// Reference to the custodian-controlled predictable inclusion design.
     pub design_manifest_ref: String,
     /// Reference to frozen pre-label class probabilities / prediction outputs.
@@ -66,6 +69,7 @@ impl SowrcConfig {
     /// before labels are inspected.
     pub fn for_audit_floor(
         q_min: f64,
+        calibration_protocol_manifest_ref: impl Into<String>,
         design_manifest_ref: impl Into<String>,
         prediction_manifest_ref: impl Into<String>,
     ) -> Self {
@@ -82,6 +86,7 @@ impl SowrcConfig {
             threshold_grid: (0..=10).map(|index| index as f64 / 10.0).collect(),
             betting_fractions,
             mixture_weights,
+            calibration_protocol_manifest_ref: calibration_protocol_manifest_ref.into(),
             design_manifest_ref: design_manifest_ref.into(),
             prediction_manifest_ref: prediction_manifest_ref.into(),
         }
@@ -119,6 +124,7 @@ pub struct SowrcReport {
     pub target_risk: f64,
     pub total_delta: f64,
     pub per_threshold_delta: f64,
+    pub calibration_protocol_manifest_ref: String,
     pub design_manifest_ref: String,
     pub prediction_manifest_ref: String,
     pub threshold_bounds: Vec<SowrcThresholdBound>,
@@ -151,6 +157,7 @@ pub enum SowrcError {
     InvalidDelta,
     InvalidThresholdGrid,
     InvalidBettingMixture,
+    InvalidCalibrationProtocolManifest,
     InvalidDesignManifest,
     InvalidPredictionManifest,
     InvalidMixtureNumerics,
@@ -194,6 +201,9 @@ impl std::fmt::Display for SowrcError {
             ),
             Self::InvalidBettingMixture => {
                 write!(formatter, "betting fractions and mixture weights are invalid")
+            }
+            Self::InvalidCalibrationProtocolManifest => {
+                write!(formatter, "calibration protocol manifest reference must not be empty")
             }
             Self::InvalidDesignManifest => {
                 write!(formatter, "design manifest reference must not be empty")
@@ -342,6 +352,7 @@ pub fn evaluate_sowrc(
         target_risk: config.target_risk,
         total_delta: config.delta,
         per_threshold_delta,
+        calibration_protocol_manifest_ref: config.calibration_protocol_manifest_ref.clone(),
         design_manifest_ref: config.design_manifest_ref.clone(),
         prediction_manifest_ref: config.prediction_manifest_ref.clone(),
         threshold_bounds,
@@ -463,6 +474,9 @@ fn validate_config(config: &SowrcConfig) -> Result<(), SowrcError> {
     }
     if !weight_sum.is_finite() || (weight_sum - 1.0).abs() > SUM_TOLERANCE {
         return Err(SowrcError::InvalidBettingMixture);
+    }
+    if config.calibration_protocol_manifest_ref.trim().is_empty() {
+        return Err(SowrcError::InvalidCalibrationProtocolManifest);
     }
     if config.design_manifest_ref.trim().is_empty() {
         return Err(SowrcError::InvalidDesignManifest);
@@ -589,6 +603,7 @@ mod tests {
     fn config(q_min: f64) -> SowrcConfig {
         SowrcConfig::for_audit_floor(
             q_min,
+            "artifact://frozen-sowrc-protocol/v1",
             "custody://frozen-randomized-audit/v1",
             "artifact://frozen-predictions/v1",
         )
