@@ -213,6 +213,9 @@ pub struct ObservationProcessTraceReportV1 {
     pub audit_not_selected_count: usize,
     pub audit_selected_pending_count: usize,
     pub audit_measured_count: usize,
+    pub audit_online_only_count: usize,
+    pub audit_offline_archive_count: usize,
+    pub audit_both_retained_count: usize,
     pub audit_unavailable_count: usize,
     pub operational_measurement_cost_total: f64,
     pub independent_audit_cost_total: f64,
@@ -1044,7 +1047,13 @@ pub fn evaluate_observation_process_trace_v1(
     let independent_audit_losses: Vec<IndependentAuditLossObservationV1> = canonical
         .rounds
         .iter()
-        .filter(|row| row.independent_audit.state == IndependentAuditStateV1::AuditMeasured)
+        .filter(|row| {
+            row.independent_audit.state == IndependentAuditStateV1::AuditMeasured
+                && matches!(
+                    row.independent_audit.retention,
+                    AuditRetentionStateV1::OfflineArchive | AuditRetentionStateV1::Both
+                )
+        })
         .map(|row| IndependentAuditLossObservationV1 {
             round_id: row.round_id,
             loss: row.independent_audit.audit_loss.expect("audit loss validated"),
@@ -1152,6 +1161,18 @@ pub fn evaluate_observation_process_trace_v1(
         audit_not_selected_count: count(&|row| row.independent_audit.state == IndependentAuditStateV1::NotSelected),
         audit_selected_pending_count: count(&|row| row.independent_audit.state == IndependentAuditStateV1::SelectedPending),
         audit_measured_count: count(&|row| row.independent_audit.state == IndependentAuditStateV1::AuditMeasured),
+        audit_online_only_count: count(&|row| {
+            row.independent_audit.state == IndependentAuditStateV1::AuditMeasured
+                && row.independent_audit.retention == AuditRetentionStateV1::OnlineAuditStore
+        }),
+        audit_offline_archive_count: count(&|row| {
+            row.independent_audit.state == IndependentAuditStateV1::AuditMeasured
+                && row.independent_audit.retention == AuditRetentionStateV1::OfflineArchive
+        }),
+        audit_both_retained_count: count(&|row| {
+            row.independent_audit.state == IndependentAuditStateV1::AuditMeasured
+                && row.independent_audit.retention == AuditRetentionStateV1::Both
+        }),
         audit_unavailable_count: count(&|row| row.independent_audit.state == IndependentAuditStateV1::AuditUnavailable),
         operational_measurement_cost_total,
         independent_audit_cost_total,
@@ -1425,6 +1446,68 @@ mod tests {
             confidence_delta: 0.05,
             independent_of_operational_qualification: true,
         });
+        assert!(evaluate_observation_process_trace_v1(&data).is_err());
+    }
+
+    #[test]
+    fn online_only_audit_is_not_silently_used_by_offline_population_estimator() {
+        let mut trace = row(1);
+        trace.independent_audit = IndependentAuditEvidenceV1 {
+            state: IndependentAuditStateV1::AuditMeasured,
+            retention: AuditRetentionStateV1::OnlineAuditStore,
+            inclusion_probability: Some(0.5),
+            audit_selected_at_unix_seconds: Some(1010),
+            audit_measured_at_unix_seconds: Some(1012),
+            audit_measurement_cost: Some(8.0),
+            audit_measurement_receipt_sha256: Some(digest('b')),
+            audit_loss: Some(1.0),
+            unavailable_reason: None,
+        };
+        let mut data = input(vec![trace]);
+        data.audit_design = Some(SelectionAuditDesignV1 {
+            schema: super::super::selection_risk_bounds::SELECTION_AUDIT_DESIGN_SCHEMA_V1.into(),
+            design_sha256: digest('c'),
+            randomization_provenance_sha256: digest('d'),
+            reference_method_sha256: digest('e'),
+            minimum_inclusion_probability: 0.5,
+            confidence_delta: 0.05,
+            independent_of_operational_qualification: true,
+        });
+        let report = evaluate_observation_process_trace_v1(&data).unwrap();
+        assert_eq!(report.audit_measured_count, 1);
+        assert_eq!(report.audit_online_only_count, 1);
+        assert_eq!(report.audit_offline_archive_count, 0);
+        assert_eq!(
+            report.selection_risk_report.independent_audit_estimate.unwrap().audit_sample_count,
+            0
+        );
+    }
+
+    #[test]
+    fn expected_population_inventory_rejects_missing_round() {
+        let mut data = input(vec![row(1), row(2)]);
+        data.expected_population_round_ids = vec![1, 2, 3];
+        assert!(evaluate_observation_process_trace_v1(&data).is_err());
+    }
+
+    #[test]
+    fn operational_and_audit_budgets_are_enforced_separately() {
+        let mut measured = row(1);
+        measured.operational.state = OperationalAcquisitionStateV1::Measured;
+        measured.operational.measured_at_unix_seconds = Some(1010);
+        measured.operational.measurement_system_sha256 = Some(digest('f'));
+        measured.operational.physical_measurement_cost = Some(1.0);
+        measured.k1.state = K1QualificationStateV1::Unknown;
+        measured.k1.label_id = Some("label-1".into());
+        measured.k1.label_revision = Some(1);
+        measured.k1.label_payload_sha256 = Some(digest('1'));
+        measured.k1.qualification_report_sha256 = Some(digest('2'));
+        measured.k1.measurement_event_id = Some("event-1".into());
+        measured.k1.label_available_at_unix_seconds = Some(1011);
+        measured.k1.report_available_at_unix_seconds = Some(1012);
+        measured.operational.inclusion_probability = Some(0.5);
+        let mut data = input(vec![measured]);
+        data.operational_measurement_budget = 0;
         assert!(evaluate_observation_process_trace_v1(&data).is_err());
     }
 
