@@ -29,8 +29,14 @@ pub const DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1: &str =
 #[serde(rename_all = "snake_case")]
 pub enum AciIntervalKindV1 {
     Bounded,
+    LowerUnbounded,
+    UpperUnbounded,
+    /// Full-real-line ACI degeneracy caused by alpha <= 0.
     FullRealLine,
+    /// Empty ACI degeneracy caused by alpha > 1.
     Empty,
+    /// Finite-sample calibration window cannot supply either endpoint at alpha > 0.
+    CalibrationUnbounded,
 }
 
 /// Infinite endpoints are explicit variants, not non-finite serialized floats.
@@ -50,6 +56,22 @@ impl AciPredictionIntervalV1 {
         }
     }
 
+    pub fn lower_unbounded(upper: f64) -> Self {
+        Self {
+            kind: AciIntervalKindV1::LowerUnbounded,
+            lower: None,
+            upper: Some(upper),
+        }
+    }
+
+    pub fn upper_unbounded(lower: f64) -> Self {
+        Self {
+            kind: AciIntervalKindV1::UpperUnbounded,
+            lower: Some(lower),
+            upper: None,
+        }
+    }
+
     pub fn full_real_line() -> Self {
         Self {
             kind: AciIntervalKindV1::FullRealLine,
@@ -61,6 +83,14 @@ impl AciPredictionIntervalV1 {
     pub fn empty() -> Self {
         Self {
             kind: AciIntervalKindV1::Empty,
+            lower: None,
+            upper: None,
+        }
+    }
+
+    pub fn calibration_unbounded() -> Self {
+        Self {
+            kind: AciIntervalKindV1::CalibrationUnbounded,
             lower: None,
             upper: None,
         }
@@ -85,6 +115,30 @@ impl AciPredictionIntervalV1 {
                     ));
                 }
             }
+            AciIntervalKindV1::LowerUnbounded => {
+                let Some(upper) = self.upper else {
+                    return Err(DelayedAciErrorV1(
+                        "lower-unbounded interval requires a finite upper endpoint".into(),
+                    ));
+                };
+                if self.lower.is_some() || !upper.is_finite() || alpha <= 0.0 || alpha > 1.0 {
+                    return Err(DelayedAciErrorV1(
+                        "lower-unbounded interval or alpha is invalid".into(),
+                    ));
+                }
+            }
+            AciIntervalKindV1::UpperUnbounded => {
+                let Some(lower) = self.lower else {
+                    return Err(DelayedAciErrorV1(
+                        "upper-unbounded interval requires a finite lower endpoint".into(),
+                    ));
+                };
+                if self.upper.is_some() || !lower.is_finite() || alpha <= 0.0 || alpha > 1.0 {
+                    return Err(DelayedAciErrorV1(
+                        "upper-unbounded interval or alpha is invalid".into(),
+                    ));
+                }
+            }
             AciIntervalKindV1::FullRealLine => {
                 if self.lower.is_some() || self.upper.is_some() || alpha > 0.0 {
                     return Err(DelayedAciErrorV1(
@@ -99,14 +153,27 @@ impl AciPredictionIntervalV1 {
                     ));
                 }
             }
+            AciIntervalKindV1::CalibrationUnbounded => {
+                if self.lower.is_some()
+                    || self.upper.is_some()
+                    || alpha <= 0.0
+                    || alpha > 1.0
+                {
+                    return Err(DelayedAciErrorV1(
+                        "calibration-unbounded interval requires 0 < alpha <= 1".into(),
+                    ));
+                }
+            }
         }
         Ok(())
     }
 
     fn misses(&self, value: f64) -> bool {
         match self.kind {
-            AciIntervalKindV1::FullRealLine => false,
+            AciIntervalKindV1::FullRealLine | AciIntervalKindV1::CalibrationUnbounded => false,
             AciIntervalKindV1::Empty => true,
+            AciIntervalKindV1::LowerUnbounded => value > self.upper.expect("validated interval"),
+            AciIntervalKindV1::UpperUnbounded => value < self.lower.expect("validated interval"),
             AciIntervalKindV1::Bounded => {
                 let lower = self.lower.expect("validated interval");
                 let upper = self.upper.expect("validated interval");
@@ -343,6 +410,88 @@ fn update_digest(value: &DelayedAciUpdateReceiptV1) -> Result<String, DelayedAci
     let mut canonical = value.clone();
     canonical.receipt_sha256.clear();
     json_sha256(&canonical)
+}
+
+/// Verifies prediction receipt integrity and the invariant that issue-time
+/// calibration state is unchanged by prediction.
+pub fn verify_delayed_aci_prediction_receipt_v1(
+    receipt: &DelayedAciPredictionReceiptV1,
+) -> Result<(), DelayedAciErrorV1> {
+    if receipt.schema != DELAYED_ACI_PREDICTION_RECEIPT_SCHEMA_V1
+        || !valid_sha256(&receipt.model_artifact_sha256)
+        || !valid_sha256(&receipt.policy_sha256)
+        || !valid_sha256(&receipt.calibration_state_before_sha256)
+        || !valid_sha256(&receipt.calibration_state_after_sha256)
+        || receipt.calibration_state_before_sha256 != receipt.calibration_state_after_sha256
+        || receipt.expected_delivery_round != receipt.round.saturating_add(receipt.delay_rounds)
+        || receipt.phase != receipt.round % receipt.delay_rounds
+        || !receipt.point_prediction.is_finite()
+        || !receipt.alpha_at_issue.is_finite()
+    {
+        return Err(DelayedAciErrorV1(
+            "delayed ACI prediction receipt identity or read-only invariant is invalid".into(),
+        ));
+    }
+    receipt.interval.validate_for_alpha(receipt.alpha_at_issue)?;
+    if prediction_digest(receipt)? != receipt.receipt_sha256 {
+        return Err(DelayedAciErrorV1(
+            "delayed ACI prediction receipt digest mismatch".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Verifies an ACI update receipt and its no-mutation / mutation disposition.
+pub fn verify_delayed_aci_update_receipt_v1(
+    receipt: &DelayedAciUpdateReceiptV1,
+) -> Result<(), DelayedAciErrorV1> {
+    if receipt.schema != DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1
+        || !valid_sha256(&receipt.calibration_state_before_sha256)
+        || !valid_sha256(&receipt.calibration_state_after_sha256)
+        || !valid_sha256(&receipt.label_payload_sha256)
+        || receipt
+            .eligibility_report_sha256
+            .as_deref()
+            .is_some_and(|digest| !valid_sha256(digest))
+        || receipt
+            .prediction_receipt_sha256
+            .as_deref()
+            .is_some_and(|digest| !valid_sha256(digest))
+    {
+        return Err(DelayedAciErrorV1(
+            "delayed ACI update receipt contains malformed identity/digests".into(),
+        ));
+    }
+    let updated = receipt.disposition == AciUpdateDispositionV1::Updated;
+    if receipt.phase_state_mutated != updated
+        || receipt.update_sequence.is_some() != updated
+        || (!updated
+            && receipt.calibration_state_before_sha256
+                != receipt.calibration_state_after_sha256)
+        || receipt.equipment_control_authority
+    {
+        return Err(DelayedAciErrorV1(
+            "delayed ACI update receipt mutation/authority invariant failed".into(),
+        ));
+    }
+    if updated
+        && (receipt.miscoverage_observed.is_none()
+            || receipt.alpha_before.is_none()
+            || receipt.alpha_after.is_none()
+            || receipt.phase.is_none()
+            || receipt.prediction_receipt_sha256.is_none()
+            || receipt.eligibility_report_sha256.is_none())
+    {
+        return Err(DelayedAciErrorV1(
+            "updated ACI receipt is missing required update lineage".into(),
+        ));
+    }
+    if update_digest(receipt)? != receipt.receipt_sha256 {
+        return Err(DelayedAciErrorV1(
+            "delayed ACI update receipt digest mismatch".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn degenerate_resolution_digest(
@@ -698,9 +847,11 @@ pub fn resolve_degenerate_aci_interval_v1(
         ));
     }
     let misses = match prediction.interval.kind {
-        AciIntervalKindV1::FullRealLine => false,
+        AciIntervalKindV1::FullRealLine | AciIntervalKindV1::CalibrationUnbounded => false,
         AciIntervalKindV1::Empty => true,
-        AciIntervalKindV1::Bounded => {
+        AciIntervalKindV1::Bounded
+        | AciIntervalKindV1::LowerUnbounded
+        | AciIntervalKindV1::UpperUnbounded => {
             return Err(DelayedAciErrorV1(
                 "bounded interval requires a qualified physical label".into(),
             ));
