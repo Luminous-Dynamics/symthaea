@@ -111,6 +111,7 @@ All values below are **targets, not results**. Targets should be frozen before a
 | Action interruption | Reported as separate timing/turn-taking metrics across public work | p95 audio stop <=150 ms; p95 visual stop <=100 ms; zero post-revocation submissions |
 | ROI value | No direct comparable leaderboard | >=5 pp decision-quality lift over surprise-only at matched pixels; <=10% regret versus oracle; include energy and latency |
 | Calibration | ECE alone is insufficient | ECE <=0.05 per preregistered task family; Brier, calibration slope/intercept, risk-coverage and cluster-bootstrap intervals reported |
+| ROI lower-bound calibration | Caller-supplied LCBs are not sufficient evidence | 95% Wilson lower coverage bound >= nominal LCB confidence on >=100 independent held-out speaker/session clusters per task family |
 | Output evidence | Usually not a first-class public avatar metric | 100% of Observed/Stopped claims independently sourced; zero fabricated completion receipts |
 
 For public benchmark claims, use the official leaderboard's exact task definition and licensed evaluation route. Do not compare a cascaded model's generation score to a full-duplex model's perception score, and do not compare a score that includes customization bonus to an unbonused quality metric.
@@ -160,7 +161,7 @@ Ablations may exist only in isolated evaluation harnesses. Do not weaken product
 1. Complete exact-head build/test of existing contracts once a Rust runner is available; do not rebase onto moving main until changes are understood.
 2. Wire SceneGraphV2 geometry into an Authorized ECS submission, keeping the v1 path intact.
 3. Add runtime action scheduler and independent audio/device stop receipts.
-4. Produce a consented, licensed, speaker/session-disjoint AV dataset and calibration report.
+4. Produce consented, licensed, speaker/session-disjoint AV and multi-party challenge sets ([#14160](https://github.com/Luminous-Dynamics/symthaea/issues/14160)) plus verified calibration reports.
 5. Integrate calibration-verified EVI into ROI candidate selection behind a disabled-by-default experiment flag.
 6. Run matched-budget ablations and issue a benchmark passport with commits, configs, model digests, data licenses, metrics and raw denominator counts.
 
