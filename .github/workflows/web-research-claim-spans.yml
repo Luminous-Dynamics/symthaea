@@ -1,0 +1,39 @@
+name: Web Research Claim Span Contract
+
+on:
+  push:
+    branches:
+      - feat/web-research-claim-byte-spans-2026-11-28
+    paths:
+      - "src/web_research/extractor.rs"
+      - "src/web_research/mod.rs"
+      - ".github/workflows/web-research-claim-spans.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "src/web_research/extractor.rs"
+      - "src/web_research/mod.rs"
+      - ".github/workflows/web-research-claim-spans.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  claim-spans:
+    name: Rust 1.96 claim byte-span tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Check touched source formatting
+        run: rustfmt --edition 2024 --check src/web_research/extractor.rs src/web_research/mod.rs
+      - name: Run exact claim-span tests from production extractor
+        run: cargo test --locked -p symthaea --lib web_research::extractor::tests
