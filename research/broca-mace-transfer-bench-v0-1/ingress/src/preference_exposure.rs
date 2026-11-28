@@ -582,6 +582,12 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
     {
         return Err(PreferenceExposureRejectV1::SelectionManifestMismatch);
     }
+    if manifest.exposure_observed_at_ms < selection.valid_at_ms
+        || selection.valid_until_ms.is_some_and(|end| manifest.exposure_observed_at_ms >= end)
+        || selection.known_until_ms.is_some_and(|end| manifest.exposure_observed_at_ms >= end)
+    {
+        return Err(PreferenceExposureRejectV1::InvalidSnapshot);
+    }
     if model_context_bytes.len() > MAX_CONTEXT_BYTES_V1
         || provider_request_bytes.len() > MAX_CONTEXT_BYTES_V1
     {
