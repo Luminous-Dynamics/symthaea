@@ -24,7 +24,7 @@ Every traversed edge must:
 - carry source-relation, lineage and authority receipt commitments;
 - pass the injected RelationEdgeVerifierV1.
 
-The closure is bounded by explicit maximum hops and nodes. If the node limit is exceeded, it returns no partial receipt. Contradictory edges are preserved in the receipt as conflicts; the kernel never resolves them by relevance score, recency, majority, or LLM preference.
+The closure is bound to the exact audience, scope, purpose, policy and bitemporal snapshot later used by the response. It is bounded by explicit maximum hops and nodes. If the node limit is exceeded, it returns no partial receipt. Contradictory edges are preserved in the receipt as conflicts; the kernel never resolves them by relevance score, recency, majority, or LLM preference. A constraint sourced from a node in a recorded contradiction cannot be emitted as an unqualified assertion.
 
 ### Response constraint binding
 
@@ -37,7 +37,7 @@ A response constraint links one proposition to:
 
 The verifier checks that every constraint is current and matches the request's scope/audience/purpose; that the trusted host accepts its evidence receipts; and that every declared response claim use is linked to the exact constraint and response byte span.
 
-A required attribution constraint cannot be used to state a speaker's claim as an unqualified world fact. A required qualification constraint needs the matching qualification digest. A must-not-assert constraint cannot be used as supporting authority. A must-abstain constraint blocks an answer. Required answer constraints cannot silently disappear from the structured claim-use set.
+A required attribution constraint cannot be used to state a speaker's claim as an unqualified world fact. Direct quotations and speaker assertions cannot be represented as unqualified MayAssert constraints; derived inferences and contested claims require qualification, prohibition or abstention. A required qualification constraint needs the matching qualification digest. A must-not-assert constraint cannot be used as supporting authority. A must-abstain constraint requires abstention rather than either an answer or a clarification. Required answer constraints cannot silently disappear from the structured claim-use set. Multiple independently qualified sources may bind to the same exact response span; ambiguous partial-overlap spans are rejected.
 
 ## What is not proven
 
@@ -50,6 +50,6 @@ A required attribution constraint cannot be used to state a speaker's claim as a
 
 ## Tests
 
-The deterministic Rust tests cover bounded closure, cycle/deduplication, contradiction preservation, scope and authority rejection, stale/future-known relations, node-budget failure, exact byte spans, UTF-8 boundary enforcement, speaker attribution, required qualification, missing required constraints, must-abstain, must-not-assert, audience isolation, stale constraints and non-answer dispositions.
+The 18 deterministic Rust tests cover bounded closure, cycle/deduplication, contradiction preservation, scope and authority rejection, stale/future-known relations, node-budget failure, closure/audience replay, exact byte spans, UTF-8 boundary enforcement, speaker attribution, provenance-sensitive assertion rules, required qualification, evidence membership in the closure, multi-source exact-span support, missing required constraints, must-abstain, must-not-assert, audience isolation, stale constraints and non-answer dispositions.
 
 No GroupAssistBench score, causal effect, production integration or external source authentication is claimed by this contract.
