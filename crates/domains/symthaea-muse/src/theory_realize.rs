@@ -649,12 +649,13 @@ impl Timeline {
 /// the pitched voices — a straight-clock drum grid under rubato'd melody
 /// and harmony would drift audibly out of sync within one ritardando.
 ///
-/// `percussion.rs` (full kick/snare/hat synthesis + humanization) was wired
-/// only into the streaming path; the theory path had no pulse at all —
-/// conspicuous for the rhythmic styles. Style honesty: Classical and Waltz
-/// get NO drums (a chamber ensemble has no kit — the waltz's rhythm lives in
-/// its oom-pah accompaniment); Folk gets a light kick + brushed-hat pulse;
-/// Cinematic a sparse low pulse on each barline; Playful a full backbeat.
+/// Percussion is kept as a separate rhythmic layer on the same performed
+/// timeline as pitched voices. Chamber styles can remain kit-free; Folk uses
+/// a light pulse, Cinematic a sparse bar pulse, and Playful a full backbeat.
+/// Afro-Cuban, Flamenco and Bossa Nova use dedicated world-percussion policies
+/// aligned to their existing Montuno, CompasGait and BossaComp grammar cells.
+/// New procedural voices are deliberately stylized placeholders pending
+/// sample-backed and qualified listener evaluation.
 fn drum_hits(
     score: &TheoryScore,
     policy: symthaea_music_theory::DrumPolicy,
@@ -699,6 +700,68 @@ fn drum_hits(
                 for k in 0..(meter * 2.0) as i64 {
                     let vel = if k % 2 == 0 { 0.40 } else { 0.25 };
                     push(&mut hits, DrumType::HiHat, b0 + k as f64 * 0.5, vel);
+                }
+            }
+        }
+        P::AfroCuban => {
+            // Son 3-2 clave: the three-side occupies the first 4/4 bar
+            // (1, 2&, 4); the two-side answers in the next bar (2, 3).
+            // bar is absolute over the complete score, so phrase/section
+            // boundaries cannot silently restart the two-bar cycle.
+            if (meter - 4.0).abs() < 1e-9 {
+                for bar in 0..total_bars {
+                    let b0 = bar as f64 * meter;
+                    if bar % 2 == 0 {
+                        for (beat, velocity) in [(0.0, 0.72), (1.5, 0.58), (3.0, 0.66)] {
+                            push(&mut hits, DrumType::Clave, b0 + beat, velocity);
+                        }
+                    } else {
+                        for (beat, velocity) in [(1.0, 0.60), (2.0, 0.68)] {
+                            push(&mut hits, DrumType::Clave, b0 + beat, velocity);
+                        }
+                    }
+                    // Conga and bongo answer around the clave rather than
+                    // simply doubling its strokes.
+                    push(&mut hits, DrumType::Conga, b0 + 0.5, 0.34);
+                    push(&mut hits, DrumType::Conga, b0 + 2.5, 0.42);
+                    if bar % 2 == 1 {
+                        push(&mut hits, DrumType::Bongo, b0 + 3.5, 0.26);
+                        push(&mut hits, DrumType::Cowbell, b0 + 2.5, 0.22);
+                    }
+                }
+            }
+        }
+        P::FlamencoPalmas => {
+            // Accent anchors of the 12-count compas. Strongest at the
+            // cycle close (12) and its midpoint (6); positions are local
+            // to the 12-beat measure and repeat on each global barline.
+            if (meter - 12.0).abs() < 1e-9 {
+                for bar in 0..total_bars {
+                    let b0 = bar as f64 * meter;
+                    for (beat, velocity) in [
+                        (2.0, 0.52),
+                        (5.0, 0.66),
+                        (7.0, 0.42),
+                        (9.0, 0.48),
+                        (11.0, 0.78),
+                    ] {
+                        push(&mut hits, DrumType::HandClap, b0 + beat, velocity);
+                    }
+                }
+            }
+        }
+        P::BossaNova => {
+            // Light, continuous cabasa eighths; sparse conga answers leave
+            // the syncopated, continuously-held BossaComp chords in front.
+            if (meter - 4.0).abs() < 1e-9 {
+                for bar in 0..total_bars {
+                    let b0 = bar as f64 * meter;
+                    for k in 0..8 {
+                        let velocity = if k % 2 == 0 { 0.19 } else { 0.13 };
+                        push(&mut hits, DrumType::Cabasa, b0 + k as f64 * 0.5, velocity);
+                    }
+                    push(&mut hits, DrumType::Conga, b0 + 1.5, 0.28);
+                    push(&mut hits, DrumType::Conga, b0 + 3.5, 0.24);
                 }
             }
         }
@@ -2379,6 +2442,9 @@ mod tests {
             (Style::Folk, true),
             (Style::Cinematic, true),
             (Style::Playful, true),
+            (Style::AfroCuban, true),
+            (Style::Flamenco, true),
+            (Style::BossaNova, true),
         ] {
             let score = symthaea_music_theory::compose_styled(&MusicalIntent::default(), style);
             let timeline = Timeline {
@@ -2441,6 +2507,83 @@ mod tests {
         );
         assert_eq!(hits.len(), again.len());
         assert!(hits.iter().zip(&again).all(|(a, b)| a.time == b.time));
+    }
+
+    #[test]
+    fn afro_cuban_percussion_keeps_the_two_bar_son_clave_cycle() {
+        let state = MusicalState::default();
+        let style = Style::AfroCuban;
+        let spec = style.spec();
+        let score = symthaea_music_theory::compose_with_spec(&MusicalIntent::default(), &spec);
+        assert_eq!(score.meter, 4, "Afro-Cuban first-wave policy is 4/4 only");
+        let timeline = Timeline {
+            rubato: Rubato::from_score(&score),
+            swing: spec.texture.swing as f64,
+        };
+        let hits = drum_hits(&score, spec.texture.drums, &timeline, &state, 11);
+        let clave: Vec<_> = hits.iter().filter(|h| h.drum == DrumType::Clave).collect();
+        let bars = (score.total_beats.beats() / 4.0).ceil() as usize;
+        assert_eq!(clave.len(), bars.div_ceil(2) * 3 + (bars / 2) * 2);
+
+        // First two bars are the canonical son 3-2 pattern: 1, 2&, 4 | 2, 3.
+        let expected_beats = [0.0, 1.5, 3.0, 5.0, 6.0];
+        for (hit, beat) in clave.iter().take(5).zip(expected_beats) {
+            let expected = timeline.seconds(beat);
+            assert!(
+                (hit.time - expected).abs() < 0.02,
+                "clave onset {} should map to beat {beat} at {expected}",
+                hit.time
+            );
+        }
+        assert!(hits.iter().any(|h| h.drum == DrumType::Conga));
+        assert!(hits.iter().any(|h| h.drum == DrumType::Bongo));
+        assert!(hits.iter().any(|h| h.drum == DrumType::Cowbell));
+    }
+
+    #[test]
+    fn flamenco_palmas_follow_the_twelve_count_compas_anchors() {
+        let state = MusicalState::default();
+        let style = Style::Flamenco;
+        let spec = style.spec();
+        let score = symthaea_music_theory::compose_with_spec(&MusicalIntent::default(), &spec);
+        assert_eq!(score.meter, 12);
+        let timeline = Timeline {
+            rubato: Rubato::from_score(&score),
+            swing: spec.texture.swing as f64,
+        };
+        let hits = drum_hits(&score, spec.texture.drums, &timeline, &state, 12);
+        let palmas: Vec<_> = hits.iter().filter(|h| h.drum == DrumType::HandClap).collect();
+        let bars = (score.total_beats.beats() / 12.0).ceil() as usize;
+        assert_eq!(palmas.len(), bars * 5);
+        for (hit, beat) in palmas.iter().take(5).zip([2.0, 5.0, 7.0, 9.0, 11.0]) {
+            let expected = timeline.seconds(beat);
+            assert!(
+                (hit.time - expected).abs() < 0.02,
+                "palmas onset {} should map to compas beat {beat} at {expected}",
+                hit.time
+            );
+        }
+    }
+
+    #[test]
+    fn bossa_percussion_is_subordinate_and_uses_cabasa_subdivision() {
+        let state = MusicalState::default();
+        let style = Style::BossaNova;
+        let spec = style.spec();
+        let score = symthaea_music_theory::compose_with_spec(&MusicalIntent::default(), &spec);
+        assert_eq!(score.meter, 4);
+        let timeline = Timeline {
+            rubato: Rubato::from_score(&score),
+            swing: spec.texture.swing as f64,
+        };
+        let hits = drum_hits(&score, spec.texture.drums, &timeline, &state, 13);
+        let bars = (score.total_beats.beats() / 4.0).ceil() as usize;
+        let count = |drum| hits.iter().filter(|h| h.drum == drum).count();
+        assert_eq!(count(DrumType::Cabasa), bars * 8);
+        assert_eq!(count(DrumType::Conga), bars * 2);
+        assert_eq!(count(DrumType::Kick), 0);
+        assert_eq!(count(DrumType::Snare), 0);
+        assert_eq!(count(DrumType::Bongo), 0);
     }
 
     #[test]

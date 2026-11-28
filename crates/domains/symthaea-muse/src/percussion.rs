@@ -11,7 +11,9 @@
 //! - Puckette, M. (2007). *The Theory and Technique of Electronic Music*
 //! - Smith, J. O. (2010). *Physical Audio Signal Processing*
 
-/// Percussion hit type.
+/// Percussion hit type. The first three variants preserve the original kit;
+/// the additional voices are deliberately stylized procedural models pending
+/// sample-backed and listener qualification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DrumType {
     /// Kick drum: sine sweep + sub-bass punch + noise transient.
@@ -20,15 +22,38 @@ pub enum DrumType {
     Snare,
     /// Hi-hat: metallic noise, high-pass filtered.
     HiHat,
+    /// Short, hard wooden clave strike.
+    Clave,
+    /// Metallic cowbell with inharmonic partials.
+    Cowbell,
+    /// Low conga-like membrane resonance.
+    Conga,
+    /// Higher, shorter bongo-like membrane resonance.
+    Bongo,
+    /// Clustered broadband hand-clap transient (palmas-style placeholder).
+    HandClap,
+    /// Shaken-bead / cabasa-like broadband rattle.
+    Cabasa,
+    /// Metallic jingles over a broadband tambourine transient.
+    Tambourine,
 }
 
 impl DrumType {
     /// General MIDI percussion key (channel 10) for this drum voice.
+    /// These are note-number mappings; a SoundFont's actual patch quality
+    /// remains renderer- and bank-specific.
     pub fn gm_note(&self) -> u8 {
         match self {
-            Self::Kick => 36,  // Bass Drum 1
-            Self::Snare => 38, // Acoustic Snare
-            Self::HiHat => 42, // Closed Hi-Hat
+            Self::Kick => 36,       // Bass Drum 1
+            Self::Snare => 38,      // Acoustic Snare
+            Self::HiHat => 42,      // Closed Hi-Hat
+            Self::Clave => 75,      // Claves
+            Self::Cowbell => 56,    // Cowbell
+            Self::Conga => 64,      // Low Conga
+            Self::Bongo => 60,      // High Bongo
+            Self::HandClap => 39,   // Hand Clap
+            Self::Cabasa => 69,     // Cabasa
+            Self::Tambourine => 54, // Tambourine
         }
     }
 }
@@ -71,11 +96,40 @@ pub fn render_drum(hit: &DrumHit, sample_rate: u32) -> Vec<f32> {
 
 /// Render a drum hit with emotional coloring.
 pub fn render_drum_colored(hit: &DrumHit, sample_rate: u32, color: &DrumColor) -> Vec<f32> {
+    // The lowest modal voice uses a 25 Hz lower clamp and the highest mode
+    // is bounded below Nyquist. Refuse sample rates that cannot provide that
+    // valid interval rather than passing min > max to f32::clamp or dividing
+    // by zero in the time/envelope calculations.
+    if sample_rate < 56 {
+        return Vec::new();
+    }
     let sr = sample_rate as f32;
     match hit.drum {
         DrumType::Kick => render_kick(sr, hit.velocity, color),
         DrumType::Snare => render_snare(sr, hit.velocity, color),
         DrumType::HiHat => render_hihat(sr, hit.velocity, color),
+        DrumType::Clave => render_modal_percussion(
+            sr, hit.velocity, color, 0.12,
+            [2_350.0, 3_450.0, 4_650.0], [1.0, 0.42, 0.18], 42.0, 0.12, 0xC1A7,
+        ),
+        DrumType::Cowbell => render_modal_percussion(
+            sr, hit.velocity, color, 0.42,
+            [545.0, 815.0, 1_170.0], [1.0, 0.72, 0.38], 7.0, 0.035, 0xC0B3,
+        ),
+        DrumType::Conga => render_modal_percussion(
+            sr, hit.velocity, color, 0.28,
+            [158.0, 312.0, 487.0], [1.0, 0.46, 0.22], 13.0, 0.18, 0xC06A,
+        ),
+        DrumType::Bongo => render_modal_percussion(
+            sr, hit.velocity, color, 0.19,
+            [238.0, 472.0, 735.0], [1.0, 0.43, 0.19], 18.0, 0.12, 0xB060,
+        ),
+        DrumType::HandClap => render_hand_clap(sr, hit.velocity, color),
+        DrumType::Cabasa => render_cabasa(sr, hit.velocity, color),
+        DrumType::Tambourine => render_modal_percussion(
+            sr, hit.velocity, color, 0.34,
+            [4_200.0, 5_850.0, 7_600.0], [0.34, 0.25, 0.16], 11.0, 0.72, 0x7A6B,
+        ),
     }
 }
 
@@ -258,6 +312,104 @@ fn render_hihat(sr: f32, velocity: f32, color: &DrumColor) -> Vec<f32> {
     buf
 }
 
+// ─── Stylized World-Percussion Voices ─────────────────────────────────────────
+
+/// Small modal-resonator model for the new pitched / metallic percussion
+/// voices. The parameters are intentional synthesis approximations; they are
+/// not a substitute for instrument-specific recordings or expert listening.
+fn render_modal_percussion(
+    sr: f32,
+    velocity: f32,
+    color: &DrumColor,
+    duration: f32,
+    frequencies: [f32; 3],
+    weights: [f32; 3],
+    decay_rate: f32,
+    noise_mix: f32,
+    noise_seed: u32,
+) -> Vec<f32> {
+    let vel = velocity.clamp(0.0, 1.0);
+    let n = (duration * sr).max(1.0) as usize;
+    let mut buf = Vec::with_capacity(n);
+    let mut phases = [0.0f32; 3];
+    let warmth = color.warmth.clamp(-1.0, 1.0);
+    let brightness = color.brightness.clamp(0.0, 1.0);
+    let damping = (decay_rate + color.tightness.clamp(0.0, 1.0) * 3.0).max(0.1);
+
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let envelope = (-t * damping).exp();
+        let attack = 1.0 - (-t * (160.0 + vel * 220.0)).exp();
+        let mut resonant = 0.0f32;
+        for k in 0..3 {
+            let frequency = (frequencies[k] * (1.0 + warmth * 0.012 + (vel - 0.5) * 0.025))
+                .clamp(25.0, sr * 0.45);
+            phases[k] += std::f32::consts::TAU * frequency / sr;
+            let brightness_weight = if k == 0 { 1.0 } else { 0.65 + brightness * 0.35 };
+            resonant += phases[k].sin() * weights[k] * brightness_weight;
+        }
+        let noise = lcg_noise(noise_seed.wrapping_add(i as u32))
+            * noise_mix
+            * (-t * (55.0 + brightness * 35.0)).exp();
+        let sample = (resonant * attack + noise) * envelope * vel * 0.28;
+        buf.push(sample);
+    }
+    buf
+}
+
+/// Three tightly spaced noise bursts approximate the clustered onset of a
+/// hand clap. This is a procedural placeholder, not a sampled palmas technique.
+fn render_hand_clap(sr: f32, velocity: f32, color: &DrumColor) -> Vec<f32> {
+    let vel = velocity.clamp(0.0, 1.0);
+    let duration = 0.14;
+    let n = (duration * sr).max(1.0) as usize;
+    let starts = [0.0f32, 0.009, 0.019];
+    let mut buf = Vec::with_capacity(n);
+    let mut low_state = 0.0f32;
+    let cutoff = 0.12 + color.brightness.clamp(0.0, 1.0) * 0.14;
+
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let white = lcg_noise(i as u32 + 0xC1A9);
+        low_state += cutoff * (white - low_state);
+        let high = white - low_state;
+        let mut burst = 0.0f32;
+        for (index, start) in starts.iter().enumerate() {
+            if t >= *start {
+                let local = t - *start;
+                burst += (-local * (170.0 + index as f32 * 25.0)).exp();
+            }
+        }
+        let envelope = (-t * (12.0 + color.tightness.clamp(0.0, 1.0) * 8.0)).exp();
+        buf.push(high * burst * envelope * vel * 0.23);
+    }
+    buf
+}
+
+/// Granular high-frequency rattle for cabasa-like subdivision. A deterministic
+/// noise stream is used so identical inputs produce bit-identical buffers.
+fn render_cabasa(sr: f32, velocity: f32, color: &DrumColor) -> Vec<f32> {
+    let vel = velocity.clamp(0.0, 1.0);
+    let duration = 0.16 + vel * 0.07;
+    let n = (duration * sr).max(1.0) as usize;
+    let grain_samples = (sr * 0.012).max(1.0) as usize;
+    let mut buf = Vec::with_capacity(n);
+    let mut low_state = 0.0f32;
+    let cutoff = 0.08 + color.brightness.clamp(0.0, 1.0) * 0.12;
+
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let white = lcg_noise(i as u32 + 0xCA8A);
+        low_state += cutoff * (white - low_state);
+        let high = white - low_state;
+        let phase = (i % grain_samples) as f32 / grain_samples as f32;
+        let grain = if phase < 0.72 { 1.0 } else { 0.35 };
+        let envelope = (-t * (13.0 + color.tightness.clamp(0.0, 1.0) * 6.0)).exp();
+        buf.push(high * grain * envelope * vel * 0.34);
+    }
+    buf
+}
+
 // ─── Noise Generator ─────────────────────────────────────────────────────────
 
 /// Fast deterministic noise via LCG. Returns [-1, 1].
@@ -401,6 +553,93 @@ pub fn humanize_hits(hits: &mut [DrumHit], consciousness: f32, seed: u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn world_percussion_voices_render_finite_non_silent_buffers() {
+        for drum in [
+            DrumType::Clave,
+            DrumType::Cowbell,
+            DrumType::Conga,
+            DrumType::Bongo,
+            DrumType::HandClap,
+            DrumType::Cabasa,
+            DrumType::Tambourine,
+        ] {
+            let hit = DrumHit { drum, time: 0.0, velocity: 0.8 };
+            let buf = render_drum(&hit, 44_100);
+            assert!(!buf.is_empty(), "{drum:?} produced an empty buffer");
+            assert!(buf.iter().all(|sample| sample.is_finite()), "{drum:?} produced non-finite audio");
+            assert!(buf.iter().any(|sample| sample.abs() > 1e-5), "{drum:?} produced silence");
+        }
+    }
+
+    #[test]
+    fn renderer_rejects_sample_rates_below_the_modal_nyquist_floor() {
+        for drum in [
+            DrumType::Kick,
+            DrumType::Snare,
+            DrumType::HiHat,
+            DrumType::Clave,
+            DrumType::Cowbell,
+            DrumType::Conga,
+            DrumType::Bongo,
+            DrumType::HandClap,
+            DrumType::Cabasa,
+            DrumType::Tambourine,
+        ] {
+            let hit = DrumHit {
+                drum,
+                time: 0.0,
+                velocity: 0.8,
+            };
+            assert!(
+                render_drum(&hit, 0).is_empty(),
+                "{drum:?} must reject a zero sample rate"
+            );
+            assert!(
+                render_drum(&hit, 55).is_empty(),
+                "{drum:?} must reject a rate with no valid 25 Hz-to-Nyquist interval"
+            );
+        }
+    }
+
+    #[test]
+    fn world_percussion_voices_are_deterministic() {
+        for drum in [
+            DrumType::Clave,
+            DrumType::Cowbell,
+            DrumType::Conga,
+            DrumType::Bongo,
+            DrumType::HandClap,
+            DrumType::Cabasa,
+            DrumType::Tambourine,
+        ] {
+            let hit = DrumHit { drum, time: 0.0, velocity: 0.73 };
+            assert_eq!(
+                render_drum(&hit, 22_050),
+                render_drum(&hit, 22_050),
+                "{drum:?} should be deterministic"
+            );
+        }
+    }
+
+    #[test]
+    fn world_percussion_gm_notes_are_distinct() {
+        use std::collections::HashSet;
+        let notes: HashSet<_> = [
+            DrumType::Clave,
+            DrumType::Cowbell,
+            DrumType::Conga,
+            DrumType::Bongo,
+            DrumType::HandClap,
+            DrumType::Cabasa,
+            DrumType::Tambourine,
+        ]
+        .iter()
+        .map(DrumType::gm_note)
+        .collect();
+        assert_eq!(notes.len(), 7);
+    }
 
     #[test]
     fn kick_renders() {
