@@ -99,10 +99,20 @@ baselines, not evidence of general cognitive capability or a state-of-the-art
 comparison. The PCE unit tests and Rust build have not yet been run on this
 research branch.
 
-Research specifications:
+Research specifications and external comparisons:
 - `docs/research/PSYCHBENCH_COGNITIVE_ECOLOGY_SPEC_v0.1.md`
 - `docs/research/PSYCHBENCH_VNEXT_RESEARCH_AND_EXECUTION_PLAN_2026-11.md`
 - `docs/research/PSYCHBENCH_AWARENESSBENCH_CROSSWALK_2026-11.md`
+
+Benchmark targets include CogBench, AwarenessBench, HumanBaseline, ToMBench/BigToM,
+ARC-AGI-2/3 and GAIA. Each is a distinct task family, not a single interchangeable
+measure of cognition. Human comparisons require matched task versions, response
+modes, metric units, population metadata and uncertainty; do not interpret
+leaderboard rank or a synthetic-mechanism score as human cognitive superiority.
+
+For a review-ready branch, GitHub Actions should execute format, crate tests,
+clippy and the repository's applicable workflow checks. A skipped or absent
+workflow is not validation.
 
 ## Dependencies
 
