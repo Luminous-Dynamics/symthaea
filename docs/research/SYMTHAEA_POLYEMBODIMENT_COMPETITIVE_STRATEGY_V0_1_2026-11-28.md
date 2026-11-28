@@ -32,11 +32,23 @@ The official NVIDIA/David AI board was updated November 25, 2026. It separates P
 
 These are not like-for-like architecture comparisons. MAUI configurations include an unreleased external controller; one timing result is offline simulation and excludes generation latency. Preserve track, architecture, sample count, modality and latency methodology in every comparison. A stronger overall score does not automatically mean a better interactive system.
 
+### InteractionBench — same-input task, timing, paralinguistic and grounding evaluation
+
+InteractionBench (November 2, 2026) evaluates 221 items across 13 scenarios and seven systems (1,519 graded runs) using the same recorded user audio. It jointly measures conversational timing, spoken-task accuracy, whisper/volume control, and groundedness over conversations longer than twenty turns. In the reported setup, a turn-based cascade reached 38/50 spoken tasks; hosted systems passed 67–88% of groundedness probes, compared with 14–35% for open full-duplex systems. Client-heard timing includes network effects, and the paper documents a roughly 1.5-second server/client timing difference for one hosted system.
+
+This gives Symthaea a valuable multi-axis external baseline. Reproduce the protocol and its exact system/transport boundary before comparing numbers; do not mix server-reported latency with client-heard latency.
+
+### Duplex-MPE — multi-party floor control
+
+Duplex-MPE (September 25, 2026) contains 2,000 three- or four-person interaction scenarios, paired with explicit and implicit addressing. Its four measures distinguish fresh response initiation, answer accuracy, silence preservation, and stopping when a human resolves a request. It reports that systems can be overly eager: frequent speech does not necessarily mean correct response or appropriate silence. This is a critical gap in dyadic benchmarks, where the system may not need to identify who was addressed.
+
+**New Symthaea challenge:** require the agent to identify speaker/addressee scope, avoid responding to implicit requests not directed to it, preserve silence, and stop when another human resolves the question. Track false activation and silence preservation separately from response recall.
+
 ### TurnBench — turn transfer and interruption
 
 The official TurnBench v1 page shows Kuroko at 0.983 end-of-turn recall / 0.065 FPR / 619 ms median and OpenYap Turn at 0.978 / 0.077 / 298 ms. But the benchmark authors explicitly document a v1 scoring flaw: repeated late predictions can obtain high recall, a prediction can be detected after the other speaker begins, late fallbacks up to three seconds are accepted, and ranking uses recall rather than a joint latency/false-positive objective. They are preparing a v2 with fixed hidden decision points and threshold-free metrics.
 
-Do not optimize against v1 recall alone. Use v1 only as a legacy reference; publish the full recall/FPR/latency surface and build an internal v2-style replay protocol.
+Do not optimize against v1 recall alone. Use v1 only as a legacy reference; publish the full recall/FPR/latency surface and build an internal v2-style replay protocol. Include Duplex-MPE-style three-/four-speaker explicit-versus-implicit addressing and stop-on-human-resolution conditions.
 
 ### StreamEval — streaming avatar performance
 
@@ -92,7 +104,8 @@ All values below are **targets, not results**. Targets should be frozen before a
 | VideoFDB generation | 4.44/5 cascaded; 4.20/5 full-duplex | >=4.35/5, TOR >=60%, median <=900 ms; compare same architecture/track |
 | Turn transfer | TurnBench v1 0.983 recall at 0.065 FPR, but v1 is known flawed | On fixed hidden decision points: EOT and interruption recall >=0.98 at FPR <=0.05; median <=200 ms; p95 <=500 ms |
 | Streaming avatar following | StreamEval leader following 36.90; sync 99.60 | Following >=45; sync/stability >=98; show quality-only and following separately |
-| Spoken task execution | InteractionBench public work reports the best cascade at 38/50 tasks in its evaluated setup | >=45/50 under the same licensed protocol, with latency and groundedness reported independently |
+| Spoken task execution | InteractionBench cascade: 38/50 in its evaluated setup | >=45/50 under the same licensed protocol, with latency and groundedness reported independently |
+| Multi-party control | Duplex-MPE: 2,000 three-/four-speaker scenarios; scores response initiation, answer accuracy, silence preservation and stopping | >=95% silence preservation; >=98% stop-on-human-resolution; <=2% false activation on implicit/unaddressed requests; report answer accuracy separately |
 | AV causal grounding | Existing public leaderboards mostly score perception/generation rubrics | Visual causal contribution >=+10 pp over audio-only on visual-required items; counterfactual sensitivity >=95%; irrelevant visual invariance >=98%; captioning collapse <=3% |
 | Cross-form semantics | No directly equivalent public benchmark | 100% cue digest preservation; >=95% human agreement on meaning across all seven forms |
 | Action interruption | Reported as separate timing/turn-taking metrics across public work | p95 audio stop <=150 ms; p95 visual stop <=100 ms; zero post-revocation submissions |
@@ -110,6 +123,7 @@ For each task family, include:
 - audio-only or text-only baseline;
 - best available full-duplex baseline;
 - best available cascaded baseline;
+- multi-party speech baseline evaluated on explicit versus implicit addressing (Duplex-MPE);
 - sparse visual baseline (1 FPS);
 - fixed-rate visual baseline (2 FPS and 4 FPS where affordable);
 - surprise-only ROI;
@@ -153,3 +167,14 @@ Ablations may exist only in isolated evaluation harnesses. Do not weaken product
 ## Current evidence boundary
 
 Source contracts, docs and authored tests exist on the research branch. They are not yet compiled or executed in this environment; no runtime rendering, audio actuation, calibrated dataset, energy profile or benchmark score has been produced. The competitive targets are an evaluation plan, not performance claims.
+
+
+## New benchmark protocol connections (2026-11-28 refresh)
+
+- [VideoFDB v1.4 leaderboard](https://research.nvidia.com/labs/amri/projects/video-fdb/leaderboard.html) — latest November 25 table; retain separate perception/generation tracks and full-duplex/cascaded strata.
+- [StreamEval leaderboard](https://streameval.ai/) and [paper](https://arxiv.org/abs/2610.28402) — preserve component scores for following, synchronization, stability, identity and quality; exclude the custom-avatar bonus when comparing content quality.
+- [InteractionBench paper](https://arxiv.org/abs/2611.02430) and [site](https://avera-labs.github.io/InteractionBench/) — same-input timing, spoken-task, whisper/volume and long-context grounding protocol.
+- [Duplex-MPE paper](https://arxiv.org/abs/2609.31948) — multi-party interaction, explicit/implicit addressee and silence/stopping conditions.
+- [TurnBench paper](https://arxiv.org/abs/2608.25218) — dyadic turn-taking reference; interpret the currently documented v1 ranking limitation conservatively.
+
+The InteractionBench and Duplex-MPE data/code usage rights must be checked through the benchmark provenance/license gate before inclusion in any commercial model training or derived-media workflow. External evaluation rights do not imply training or redistribution rights.
