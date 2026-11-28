@@ -407,6 +407,26 @@ Accordingly, v0.1 emits:
 
 This is intentional fail-closed behavior, not a benchmark failure. A subsequent version must define an independently provisioned trust root, authenticated resource-meter receipts, state-before/state-after evidence, and a replay executor that receives only the frozen task and submitted artifact. The adapter must not be allowed to choose its own trusted key, verifier, or attestation policy.
 
+## 8.2 Qualification is a scoped, expiring capability lease
+
+Avoid a permanent, system-wide `qualified=true` badge. A qualification claim must be scoped to a capability, action set, subject/data class, operating envelope and exact system fingerprint.
+
+At minimum, a future capability manifest should bind:
+
+- capability identifier and task-family/profile version;
+- exact SUT source commit, model weights/endpoint identity, agent/harness/tool versions and dependency lock digest;
+- runtime/container/OS/hardware identity, relevant sensor calibration and measurement method;
+- authority/policy version and permitted actor/action/resource scopes;
+- allowed input distributions, operating ranges, known exclusions and unsupported states;
+- evidence receipt set, verifier version, replay status and risk/coverage results;
+- issuance time, expiry time, requalification conditions and revocation status.
+
+A capability qualification should be considered invalid or require delta qualification when any material binding changes: source or dependency lock, model/agent/harness, tool API, policy/authority, runtime image, hardware/sensor calibration, input distribution, measurement method, verifier, or the declared action scope. Security incidents, unexplained state divergence, failed replay, newly observed catastrophic failure modes or material drift also invalidate the relevant scope.
+
+The default transition on expiry or evidence mismatch is **unqualified**, not “use the previous score.” A narrowly scoped delta test can preserve unaffected capabilities only when the change-impact analysis and independent verifier justify that scope. A new model version or a higher task-success score must never inherit the previous model's qualification automatically.
+
+This turns qualification into an auditable, revocable capability lease. It makes the claim useful operationally: a system can be qualified for one bounded read-only workflow while remaining unqualified for writes, a different patient population, an unseen physics regime or a new software release.
+
 ## 9. Implementation roadmap
 
 ### Stage 0 — Protocol and task validity
