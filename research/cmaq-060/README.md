@@ -1,108 +1,51 @@
 # CMAQ-060 — Compute-sparse predictable expert selection
 
-Status: research design / theorem-obligation draft. No implementation or performance result is claimed.
+Status: first executable scalar e-process implementation and deterministic probe. No Monte Carlo qualification or SOTA claim is made.
 
-## 1. Motivation
+## Implemented architecture
 
-CMAQ-057's full-information adaptive policy emits a factor for every registered Fourier expert per observation. This enables C058's kernel × restart portfolio, but feature transformation work is O(KD) per pair for K candidate experts and product-feature dimension D.
+CMAQ-060 now contains a Rust monitor that:
+- verifies the direct conditional paired-equality typed null plan and the canonical expert manifest;
+- samples one expert before current response transformations using a predeclared ChaCha20 selector seed;
+- uses EXP3-style exponential weights with an explicit uniform exploration floor and bounded normalized log-factor rewards;
+- evaluates only the selected expert's response/covariate Fourier maps;
+- forms the selected expert's direction from its selected-subsequence history only;
+- computes one positive factor (F_t=1+\lambda\langle u_{J_t,t},r_{J_t,t}\rangle);
+- updates one global log e-process with one alpha threshold;
+- stages the random-number generator, selector weights, selected-expert state, replay ID and evidence trace, then commits them transactionally;
+- records feature-coordinate evaluations per pair as a direct compute metric.
 
-CMAQ-060 investigates a different architecture: choose one expert before seeing the current response pair, calculate only that expert's factor, and update one global e-process. If the selected factor is itself conditionally mean-one, predictable selection among experts does not require a per-expert alpha split.
+The EXP3 selector is an optimization policy, not the source of statistical validity. The single e-factor is conditionally mean-one when the chosen expert is selected using only the past and independent pre-pair randomness, and its bounded direction is based on that expert's pre-pair history.
 
-The desired compute point is O(D) selected feature work plus O(K) selector state. It is not guaranteed to be more powerful than the full-information K-expert portfolio.
+## Mathematical boundary
 
-## 2. Information filtration and timing
+Let (J_t) be selected from the past and independent pre-pair randomness. The current covariate may also be used if it is available before (X_t,Y_t). Under direct conditional paired equality, every registered expert has a conditionally centered paired feature difference. Conditioning on (J_t) preserves that centering.
 
-At observation t, the permitted order is:
+With feature norm and direction norm at most one, the selected factor is positive for (0<\lambda<1), so the product of selected factors is one global e-process. The selector may adapt based on past log-factor rewards without a second alpha allocation.
 
-1. Receive the current covariate Z_t, which is guaranteed available before X_t and Y_t.
-2. Use only F_(t-1), Z_t, and optional fresh selection randomness independent of the current response pair to choose J_t.
-3. Read the selected expert's past-only direction u_(J_t,t).
-4. Evaluate only that expert's response and covariate maps on the current pair.
-5. Form its factor and append it to the one global evidence process.
-6. Update the selected expert's history and the selector using the observed factor.
-7. Commit sequence, pair identity, policy state, and evidence atomically.
+This is not the same strategy as CMAQ-057:
+- C057 evaluates all experts and maintains full-information history for each.
+- C060 evaluates only the selected expert and maintains its state only on selected observations.
+- C057/C058 are full-information performance comparators, not the regret comparator for C060.
+- EXP3 regret is meaningful only against counterfactual rewards defined under the same selected-subsequence state semantics. Report paired power/delay gaps against C057/C058 separately from any bandit regret statement.
 
-No decision in steps 1–3 may depend on X_t or Y_t. The selection RNG and policy version must be frozen and recorded. A feature map, target or norm bound must be part of the content-addressed inventory before use.
+C060 currently uses an EXP3-style importance-weighted update with explicit exploration. It does not claim an adversarial regret theorem in the crate; the theoretical regret bound, exact constants and comparator should be independently reviewed before making such a claim.
 
-## 3. Conditional validity sketch
+## Compute target
 
-For each fixed expert k, assume:
-- its response/covariate feature maps are content-addressed and fixed before monitoring;
-- its predictable direction u_(k,t) is measurable from the full past and selected-expert history before the current pair;
-- the current covariate Z_t is observed before J_t;
-- under H0, Law(X_t | Z_t,F_(t-1)) = Law(Y_t | Z_t,F_(t-1));
-- the paired feature difference r_(k,t) is conditionally centered and bounded in norm by one.
+For K experts and per-expert product feature dimension D:
+- C057/C058 factor production evaluates O(KD) feature coordinates per observation.
+- C060 evaluates one expert's maps, approximately O(D), plus O(K) selector-state bookkeeping.
+- The update receipt records feature-coordinate count so this can be measured rather than inferred.
 
-Choose J_t using F_(t-1), Z_t, and randomness conditionally independent of the current pair. Then, conditional on the selected index,
+Prospective target: at least 4× fewer feature-map evaluations than C057/C058, with no more than 2 percentage points of worst-family power regression at matched alpha. This is a target only.
 
-    E[ r_(J_t,t) | F_(t-1), Z_t, J_t ] = 0.
+## Integrity and validation
 
-For fixed 0 < lambda < 1, define
+- Selector randomness is seeded before the stream and is independent of current pair values.
+- Selection probabilities and direction are computed before current response feature transforms.
+- Selected feature state is updated only after the factor is prepared.
+- Prepare/commit is non-mutating until a complete staged update is accepted.
+- The probe uses CMAQ-059 common seeded streams and writes stream digests, selected expert, probability, factor, reward, evidence and trace receipts.
 
-    F_t = 1 + lambda * <u_(J_t,t), r_(J_t,t)>.
-
-The norm bound gives F_t >= 1-lambda > 0, and conditional centering gives
-
-    E[ F_t | F_(t-1), Z_t, J_t ] = 1.
-
-Therefore M_t = product_(s<=t) F_s is a nonnegative martingale (or supermartingale if factors are conservative), relative to the filtration that includes the selector's randomness and decisions. Ville's inequality then supplies the single global anytime threshold 1/alpha.
-
-This is a proof sketch and a list of obligations, not an implementation proof. In particular, the filtration must include the exact timing of covariate availability and selector randomization. If selection randomness or the current covariate leaks future response information, the argument fails.
-
-## 4. Bandit selector
-
-The proposed reward is the observed bounded log-factor:
-
-    g_t = log(F_t) in [log(1-lambda), log(1+lambda)].
-
-Candidate policies include:
-- EXP3-IX as an initial robust bandit baseline;
-- Tsallis-INF as an alternative exploration/regret baseline;
-- deterministic greedy selection with a declared exploration floor;
-- round-robin and fixed-expert controls.
-
-The bandit selector is an efficiency/power optimization policy. The e-process guarantee comes from the factor's conditional validity, not from EXP3 or a regret theorem.
-
-Because per-expert state is updated only on selected observations, formal regret must be defined against the same selected-subsequence state semantics. It must not be presented as regret against C057's full-information per-expert state. C057/C058 remain direct full-information performance comparators; report paired power/delay gaps separately.
-
-## 5. Scalar capital restart
-
-A single selected factor can be consumed by a dyadic all-start capital restart:
-
-    R_t = F_t * (R_(t-1) + nu_t)
-    E_t = U_t + R_t.
-
-This is O(1) numeric restart bookkeeping per observation, in addition to selected feature work and O(K) selector state. It is a separate scalar adaptive strategy, not C058's per-kernel posterior mixture.
-
-A scalar restart can also be run without a restart layer as an ablation. Compare restart and no-restart arms on identical source streams.
-
-## 6. Integrity and failure behavior
-
-- Selection, factor calculation, selector update and restart update are transactional.
-- Invalid maps, nonfinite features, norm violations, stale prepared state, duplicate IDs and out-of-order observations fail closed.
-- Selection probability floors and numerical clipping are part of the policy manifest.
-- No post-hoc expert maximum, best-arm-on-current-pair selection, or unaccounted hyperparameter choice is allowed.
-- Hashes bind content but do not authenticate source truth or establish stochastic assumptions.
-- A deterministic negative control deliberately selects from current-pair outcomes; it must be rejected or demonstrate the expected failure in an isolated invalid-control track.
-
-## 7. Decision metrics
-
-Report:
-- Full-horizon null ever-alarm with exact pointwise and simultaneous confidence bounds.
-- Unconditional power, early-alarm rate and restricted delay with misses at H+1.
-- Paired detection-delay and power differences against C057 and C058.
-- Bandit regret only under matched selected-subsequence state semantics.
-- Number of selected map evaluations, feature coordinates computed, bytes per pair, p50/p99 feature latency, selector latency and peak memory.
-- Performance by sparse/local, high-frequency, late, oscillating and explicit blind-spot alternatives.
-- Posterior or selection-probability concentration, exploration counts and cold-start cost.
-
-## 8. Claim boundary
-
-The project tests whether the compute saved by sparse expert evaluation is worth the exploration cost. It does not assume:
-- zero selection penalty;
-- domination of C057/C058;
-- a new general theorem for adaptive testing;
-- statistical Type-I calibration from deterministic tests;
-- SOTA or deployment superiority.
-
-Primary external comparison is SCPT on the same direct conditional paired null. SKCI (conditional independence) and Online RFF-MMD (unconditional two-sample change detection) must remain adjacent-task tables.
+The deterministic probe is a wiring check, not a Type-I study. Full confirmation still requires the CMAQ-059 preregistered null/alternative grid, exact confidence intervals, worst-family results and faithful SCPT comparison. No SOTA, deployment or safety claim is made.
