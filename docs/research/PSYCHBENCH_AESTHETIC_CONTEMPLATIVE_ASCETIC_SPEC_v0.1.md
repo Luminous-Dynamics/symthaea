@@ -122,7 +122,7 @@ Create `benchmarks/aesthetic/` with separate task families; do not require every
 | Family | Required construct coverage | Initial external grounding |
 |---|---|---|
 | Visual | composition, colour, balance, symmetry, texture, style, scene semantics, visual ambiguity | MSC 2026; AVA/AADB where protocol and licence permit |
-| Auditory/music | rhythm, timbre, harmony, tension/release, temporal form, emotional expression, silence | use a dataset only when it contains actual preference or affect labels appropriate to the claimed construct; do not relabel genre or caption datasets as beauty norms |
+| Auditory/music | rhythm, timbre, harmony, tension/release, temporal form, emotional expression, performance and production craft | MADB 2026 for professional multi-dimensional music assessment; MUSIN-G only for familiarity/enjoyment/affective response, not aesthetic quality |
 | Linguistic/literary | metaphor, sound, rhythm, ambiguity, narrative form, humour, emotional resonance | blinded human preference and expert assessment; preserve genre/language strata |
 | Movement/performance | timing, gesture, fluency, expressiveness, synchronisation, intentional deviation | motion/performance datasets with task-matched annotator outcomes |
 | Spatial/architectural | proportion, legibility, atmosphere, material fit, accessibility, context | human study with rendered/physical environment context; do not reduce architecture to geometric ratios |
@@ -191,11 +191,17 @@ Use metric-specific estimands; never infer bounds from field names.
 
 This is a strong literary/affective aesthetics anchor, not a universal measure of poetry quality, general creativity, cross-cultural taste, or contemplative attainment. It is a single language/cultural sample and a finite set of short text forms. It does not cover spoken performance, music, visual art, architecture, or direct sensory taste.
 
+**MADB: A Large-Scale Music Aesthetics Dataset with Professional and Multi-Dimensional Annotations (2026 preprint)** is the first substantial music-evaluation anchor. Its paper reports 9,999 tracks, 30 trained/professional annotators, roughly 9–11 ratings per track, ten fine-grained assessment dimensions plus an overall score, and short explanatory comments/tags. The dimensions span melody, rhythm, structure, arrangement, performance/singing emotion and skill, enunciation, and sound effects. Reported audio-model baselines include MuQ, MERT and CLAP-family systems; the paper reports a MuQ overall-score LCC around 0.718, SRCC around 0.714, and KRCC around 0.528 under its own split/protocol. Treat these as published within-protocol comparison points, not as a verified cross-source state-of-the-art result. The paper's random train/validation split is not an artist-, source-, or generator-held-out test; PsychBench should improve this by grouping by original source/artist/generation system and testing unseen-source transfer. Keep audio-only, metadata/tag, text-comment, and audio+text conditions separate. Comment/tag conditions are annotation-assisted and cannot be described as audio-only perception. The dataset card reports CC-BY-NC-4.0 for dataset material; track-level audio may have different source rights, and research use does not grant redistribution or commercial use. Preserve individual ratings and comments, not just mean scores. Note that the corpus is genre-skewed, includes AI-generated tracks, and its authors report no temporal annotations or causal identification among score dimensions.
+
+**PAM∃LA (2026 dataset/preprint)** is a strong personalization benchmark for visual aesthetics. Its dataset card reports 69,904 ratings over 5,077 AI-generated images from 199 participants spanning 23 nationalities, with continuous 1–5 ratings and rich image/prompt/user metadata. The published split design distinguishes validation/test on unseen users from known users evaluating unseen images. The dataset's low single-rater/inter-rater agreement (reported Krippendorff alpha about 0.206 and single-rater ICC about 0.245, versus higher mean-rater aggregation reliability) is not simply annotation failure: it is an important signal that individual taste is heterogeneous and personalization matters. Benchmark two different questions: population-level prediction for a new person, and personalization for a known person on unseen images. Report per-user calibration, coverage and improvement over a population prior; do not turn the average score into an objective beauty label. The dataset is a convenience sample, not a representative sample of 23 nationalities. The annotations/data structure are stated as CC-BY-4.0, but image outputs generated with Flux2 and Gemini 2.5 Flash Image remain subject to the underlying model/provider terms; verify those separately before redistribution or commercial use. As a 2026 submission/dataset release, pin the exact revision and preserve its under-review status in publications.
+
+**MUSIN-G (NEMAR on003774 / OpenNeuro ds003774)** is an optional complementary EEG resource with 20 participants, 12 music tracks, 128-channel EEG, and familiarity/enjoyment ratings. It may help study music-evoked affect and preference signals, but it is not a professional music-quality dataset and must not be used as ground truth for technical musical craft or universal aesthetic quality.
+
 **Human Creativity Benchmark (2026 preprint)** is a process/evaluation precedent: its reported 15,000 professional judgements cover five creative domains and separate verifiable convergence from taste-driven divergence. Treat it as a comparator/protocol reference until dataset access, licence, task protocol, and replication conditions are confirmed.
 
 **Existing visual aesthetic datasets** (e.g. AVA/AADB) may be added only after confirming licence, annotation semantics, rater provenance, overlap/duplicate contamination, and comparability with MSC. A dataset's popularity does not make its labels a universal aesthetic truth.
 
-For other non-visual modalities, start with new small preregistered panels rather than inventing external ground truth from datasets whose labels measure emotion, genre, engagement, or caption quality rather than aesthetic preference.
+For music, use MADB as the primary audio-evaluation anchor, but respect its annotation and split limits. MUSIN-G is a secondary EEG/enjoyment dataset, not a music-quality or beauty dataset. For other non-visual modalities, start with new small preregistered panels rather than inventing external ground truth from datasets whose labels measure emotion, genre, engagement, or caption quality rather than aesthetic preference.
 
 ## 4. Domain B: Contemplative Practice & Ascetic Self-Regulation (CPASR)
 
@@ -316,6 +322,9 @@ Use the following comparator roles:
 | AESTHEMOS / aesthetic emotion scales | Vocabulary and construct-development support | One-dimensional "beauty" ground truth |
 | NEMAR/OpenNeuro ds001787 | Participant-held-out self-reported concentration/mind-wandering EEG pilot, after event-label alignment | Meditation depth, enlightenment, consciousness, clinical prediction |
 | NEMAR on006648 / ds006648 | 47-participant poetry preference, affect, creativity, EEG and trait-measure anchor | General aesthetics, cross-cultural norms, or meditation-state validation |
+| MADB 2026 | 9,999-track professional multi-dimensional music assessment; audio-only baselines include MuQ/MERT/CLAP/Qwen2-Audio conditions | Universal music taste, artist/source generalization from random-split results, or unbiased global preference |
+| PAM∃LA (2026 dataset/preprint) | Personalized visual taste prediction with seen-user/unseen-image and unseen-user splits | Population-representative beauty norms; image-output licensing beyond the dataset annotations |
+| MUSIN-G / NEMAR on003774 | Music familiarity/enjoyment self-report and EEG pilot | Professional aesthetic-quality labels or a universal music-quality score |
 | CogBench / AwarenessBench / HumanBaseline | Adjacent cognitive, affective, awareness, and human-reference comparisons | Interchangeable global psychology scores |
 | Classical signal baselines | Establish whether the architecture adds value beyond simple features | State-of-the-art neural comparison |
 | Contemporary multimodal models | Matched input/output and budget comparison on compatible tasks | Apples-to-apples where modalities, context, or tools differ |
@@ -387,9 +396,12 @@ These are proposed internal release gates, not claims about universal psychometr
 ### P1 — build the external adapters
 1. NEMAR `on006648` poetry rating adapter first: 47 participants × 210 items, five ordinal ratings; preserve participant-item rows, pin files and stimuli, and test participant/text/crossed holdouts.
 2. MSC visual preference adapter with base-scene-grouped splits and raw rating distributions.
-3. NEMAR/OpenNeuro `on001787` concentration/mind-wandering adapter with label alignment to interruptions and participant-held-out splits.
-4. Human Creativity Benchmark access/protocol audit; no dependency until access and licence are confirmed.
-5. Dataset manifests, hash pinning, licence/attribution, and frozen test splits.
+3. MADB music-aesthetics adapter with audio-only and annotation-conditioned tracks, source/artist/generator-held-out splits, rater distributions, and licence audit.
+4. PAM∃LA personalized visual preference adapter with unseen-user and known-user/unseen-image tracks; verify image-generation output terms separately from annotation licence.
+5. NEMAR/OpenNeuro `on001787` concentration/mind-wandering adapter with label alignment to interruptions and participant-held-out splits.
+6. MUSIN-G optional music-enjoyment EEG adapter, strictly separated from music-aesthetic-quality labels.
+7. Human Creativity Benchmark access/protocol audit; no dependency until access and licence are confirmed.
+8. Dataset manifests, hash pinning, licence/attribution, and frozen test splits.
 
 ### P2 — connect existing Symthaea subsystems
 1. Evaluate outputs of `symthaea-aesthetic` as a candidate predictor; keep its internal score out of the evaluator's ground truth.
@@ -430,6 +442,9 @@ These are proposed internal release gates, not claims about universal psychometr
 - Hopkins, A. et al. (2026). *The Human Creativity Benchmark*. arXiv:2606.30561. https://arxiv.org/abs/2606.30561. Treat as a preprint and confirm data access before direct replication.
 - Delorme, A. & Brandmeyer, T. (2026). *EEG meditation study*, NEMAR dataset on001787, DOI: https://doi.org/10.82901/nemar.on001787. Derived from OpenNeuro ds001787: https://doi.org/10.18112/openneuro.ds001787.v1.1.1.
 - Chaudhuri, S., & Bhattacharya, J. (2026). *Poetry Assessment EEG Dataset 1* (Version v1.0.0) [Data set]. NEMAR. https://doi.org/10.82901/nemar.on006648 (47-participant primary EEG cohort; associated OpenNeuro ds006648 v1.0.0).
+- *MADB: A Large-Scale Music Aesthetics Dataset with Professional and Multi-Dimensional Annotations* (2026). arXiv:2607.06929. https://arxiv.org/abs/2607.06929. Dataset: https://huggingface.co/datasets/sirui1/MADB-Dataset. Treat reported random-split baselines as within-distribution references; audit audio availability, source rights, and train/test leakage before replication. Dataset annotations are research-only under CC-BY-NC-4.0 per dataset card; source-audio rights may differ.
+- *PAM∃LA: Personalized Aesthetic Evaluation* (2026 submission/dataset card). https://huggingface.co/datasets (PAM∃LA dataset record; verify exact repository revision, data split, and image-output terms before use). Use the dataset's annotations only under their stated CC-BY-4.0 terms; do not infer rights to underlying Flux2/Gemini-generated image outputs from the annotation licence.
+- MUSIN-G, NEMAR on003774 / OpenNeuro ds003774 (music listening EEG and familiarity/enjoyment ratings). https://doi.org/10.82901/nemar.on003774. Treat as affect/enjoyment data, not aesthetic-quality ground truth.
 - Delorme, A., & Brandmeyer, T. (2026). *EEG meditation study* (Version v1.0.0) [Data set]. NEMAR. https://doi.org/10.82901/nemar.on001787 (24 participants; interruption-triggered concentration and mind-wandering self-ratings).
 - *Psychological, psychiatric, and behavioral sciences measurement scales: best practice guidelines for their development and validation* (2024). https://pmc.ncbi.nlm.nih.gov/articles/PMC11798685/
 - Bean, A. M. et al. (2025). *Measuring what Matters: Construct Validity in Large Language Model Benchmarks*. NeurIPS 2025 Datasets and Benchmarks Track. https://proceedings.neurips.cc/paper_files/paper/2025/hash/1967e0fc3aa6cbbace562f5cb8e3954e-Abstract-Datasets_and_Benchmarks_Track.html
