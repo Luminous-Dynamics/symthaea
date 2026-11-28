@@ -230,8 +230,12 @@ impl KernelFamilyManifest {
 
             // Under direct conditional paired equality, the expected product
             // feature difference is zero. A target excluding zero would
-            // reject under the null; dimension validation alone is not enough.
-            if config
+            // reject under that null. Reference-calibrated bounded-mean mode
+            // may describe a nonzero target and is governed by CMAQ-052.
+            if matches!(
+                calibration,
+                NullCalibration::DirectConditionalPairedEquality { .. }
+            ) && config
                 .target
                 .lower()
                 .iter()
@@ -337,6 +341,7 @@ pub struct TypedRiskPlan {
     alpha_test: Rational,
     calibration: NullCalibration,
     manifest_digests: ManifestDigests,
+    representation_weights: Vec<RepresentationWeight>,
 }
 
 impl TypedRiskPlan {
@@ -373,6 +378,7 @@ impl TypedRiskPlan {
             alpha_test,
             calibration: manifest.calibration().clone(),
             manifest_digests: manifest.digests().clone(),
+            representation_weights: manifest.representation_weights().to_vec(),
         })
     }
 
@@ -440,10 +446,8 @@ impl TypedRiskPlan {
             return Err(ManifestError::LegacyReceiptMismatch("calibration-contract"));
         }
 
-        if receipt.representation_weights != self_manifest_weights_placeholder() {
-            // The legacy receipt does not carry map/target contents, so its
-            // inventory digest is the authoritative binding. Exact prior
-            // order is checked by the inventory manifest digest itself.
+        if receipt.representation_weights != self.representation_weights {
+            return Err(ManifestError::LegacyReceiptMismatch("representation-weights"));
         }
         Ok(())
     }
@@ -479,14 +483,6 @@ impl TypedRiskPlan {
     pub fn manifest_digests(&self) -> &ManifestDigests {
         &self.manifest_digests
     }
-}
-
-// This helper deliberately returns an empty slice: legacy receipt verification
-// binds the ordered representation weights through the recomputed portfolio
-// inventory digest above. A manifest-aware caller should use
-// TypedRiskPlan::verify_manifest, which has the full content and exact order.
-fn self_manifest_weights_placeholder() -> Vec<RepresentationWeight> {
-    Vec::new()
 }
 
 fn validate_prior(value: Rational) -> Result<(), ManifestError> {
@@ -729,8 +725,6 @@ mod tests {
     const SHA_D: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
     const SHA_E: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     const SHA_F: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-    const SHA_1: &str = "1111111111111111111111111111111111111111111111111111111111111111";
-
     fn config(
         id: &str,
         response_frequency: f64,
@@ -975,6 +969,42 @@ mod tests {
         assert_eq!(
             typed.verify_legacy_cmaq053_receipt(&bad_receipt),
             Err(ManifestError::LegacyReceiptMismatch("target-envelope"))
+        );
+    }
+
+    #[test]
+    fn legacy_receipt_representation_weight_order_must_match() {
+        let delta = Rational::new(1, 320).unwrap();
+        let manifest = KernelFamilyManifest::build(
+            &configs(),
+            NullCalibration::reference_cmaq052_v1(delta),
+        )
+        .unwrap();
+        let local = fleet().local_alpha_for(&scope()).unwrap();
+        let alpha_test = local.divided_by_integer(2).unwrap();
+        let bindings = RiskPlanBindings {
+            deployment_plan_sha256: SHA_C.into(),
+            reference_manifest_sha256: manifest.digests().reference_bundle_sha256.clone(),
+            target_envelope_sha256: manifest.digests().target_envelope_sha256.clone(),
+            monitor_build_sha256: SHA_D.into(),
+            representation_inventory_sha256: manifest.digests().portfolio_inventory_sha256.clone(),
+            calibration_method_sha256: manifest.digests().calibration_contract_sha256.clone(),
+        };
+        let legacy = ComposedRiskPlan::new(
+            &fleet(),
+            scope(),
+            alpha_test,
+            delta,
+            manifest.representation_weights().to_vec(),
+            bindings,
+        )
+        .unwrap();
+        let typed = TypedRiskPlan::new(&fleet(), scope(), alpha_test, &manifest).unwrap();
+        let mut reordered = legacy.receipt().clone();
+        reordered.representation_weights.swap(0, 1);
+        assert_eq!(
+            typed.verify_legacy_cmaq053_receipt(&reordered),
+            Err(ManifestError::LegacyReceiptMismatch("representation-weights"))
         );
     }
 
