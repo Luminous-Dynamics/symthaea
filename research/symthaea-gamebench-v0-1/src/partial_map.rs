@@ -286,7 +286,7 @@ mod tests {
     use super::*;
 
     fn fixture(max_actions: u32) -> ExploreSpec {
-        // P . . . # . G. The wall at x=4 and goal at x=6 are initially hidden.
+        // P . . . # . G. The wall at x=4 is revealed by a paid scan.
         ExploreSpec::new(
             7,
             1,
@@ -318,9 +318,9 @@ mod tests {
         assert!(transition.scanned);
         assert!(!transition.moved);
         assert_eq!(transition.state.elapsed_actions, 1);
-        assert_eq!(transition.observation.visible_cells.len(), 3);
+        assert_eq!(transition.observation.visible_cells.len(), 5);
         assert!(transition.observation.visible_cells.iter().any(|cell| {
-            cell.position == Position::new(2, 0) && cell.cell == Cell::Floor
+            cell.position == Position::new(4, 0) && cell.cell == Cell::Wall
         }));
         assert!(!transition.observation.visible_cells.iter().any(|cell| {
             cell.position == Position::new(6, 0)
@@ -350,8 +350,8 @@ mod tests {
         let mut game = ExploreGame::new(fixture(2));
         game.step(ExploreAction::Scan).expect("scan");
         let transition = game
-            .step(ExploreAction::Move(Action::East))
-            .expect("blocked move is still a legal attempt");
+            .step(ExploreAction::Move(Action::West))
+            .expect("blocked border move is still a legal attempt");
         assert!(!transition.moved);
         assert_eq!(transition.state.position, Position::new(0, 0));
         assert_eq!(transition.state.elapsed_actions, 2);
