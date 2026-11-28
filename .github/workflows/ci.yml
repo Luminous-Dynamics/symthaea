@@ -320,6 +320,9 @@ jobs:
       - name: Clippy (theory)
         run: cargo clippy -p symthaea-muse --lib --features theory -- -D warnings
 
+      - name: Test shared protocol contracts
+        run: cargo test -p symthaea-muse-protocol --lib
+
       - name: Clippy (protocol + wasm UI)
         run: |
           cargo clippy -p symthaea-muse-protocol -- -D warnings
