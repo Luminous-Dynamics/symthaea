@@ -212,6 +212,7 @@ func prereqCheck(item CapabilityItem,f *flags){
 func Evaluate(in Input)Result{
  out:=Result{Profile:"mon044-capture-capability-result-v1",Version:Version,TrialID:in.TrialID,CapabilityVerdict:Indeterminate,CoverageVerdict:Indeterminate,CampaignVerdict:Indeterminate,ProductionActionPermitted:false,RequiredItemCount:len(in.RequiredItems),UnsupportedRequired:[]string{},ExcludedRequired:[]string{},UnknownRequired:[]string{},MissingRequired:[]string{},OutOfScopeDeclarations:[]string{},OptionalNegativeSpace:[]string{},Items:[]ItemResult{},ReasonCodes:[]string{}}
  f:=newFlags()
+ coverage:=newFlags()
  if in.Profile!=Profile||in.Version!=Version{f.block("profile_version_invalid")}
  if in.Mode!=OfflineFixture&&in.Mode!=RuntimeCandidate{f.block("mode_invalid")}
  if !validID(in.TrialID){f.block("trial_id_invalid")}
@@ -225,7 +226,8 @@ func Evaluate(in Input)Result{
  if !validDigest(in.CapabilityIdentitySHA256){f.block("capability_identity_digest_invalid")}else if in.CapabilityIdentitySHA256!=identity{f.block("capability_identity_digest_mismatch")}
  if !validDigest(in.CapabilityManifestSHA256){f.block("capability_manifest_digest_invalid")}else if in.CapabilityManifestSHA256!=ManifestDigest(in.Manifest){f.block("capability_manifest_digest_mismatch")}
  if !validDigest(in.RequiredScopeSHA256){f.block("required_scope_digest_invalid")}else if in.RequiredScopeSHA256!=RequiredScopeDigest(in.RequiredItems){f.block("required_scope_digest_mismatch")}
- if f.blocked{out.CapabilityVerdict=Blocked;out.CoverageVerdict=Blocked;out.ReasonCodes=f.sorted();return out}
+ if f.blocked{out.CapabilityVerdict=Blocked;out.CoverageVerdict=Blocked;coverage.block("capability_or_scope_contract_invalid");out.ReasonCodes=f.sorted();return out}
+ if f.unknown{coverage.hold("capability_or_scope_provenance_incomplete")}
 
  required:=map[string]RequiredItem{}
  for _,item:=range in.RequiredItems{
@@ -234,12 +236,13 @@ func Evaluate(in Input)Result{
   required[item.ItemID]=item
  }
  declared:=itemIDMap(in.Manifest.Items,f)
- if f.blocked{out.CapabilityVerdict=Blocked;out.CoverageVerdict=Blocked;out.ReasonCodes=f.sorted();return out}
+ if f.blocked{out.CapabilityVerdict=Blocked;out.CoverageVerdict=Blocked;coverage.block("required_scope_or_manifest_invalid");out.ReasonCodes=f.sorted();return out}
 
  for id,req:=range required{
   item,ok:=declared[id]
   if !ok{
    f.hold("required_capability_item_missing:"+id)
+   coverage.hold("required_capability_item_missing:"+id)
    out.MissingRequired=append(out.MissingRequired,id)
    out.Items=append(out.Items,ItemResult{ItemID:id,Required:req.Required,Status:Unknown,Verdict:Indeterminate,ReasonCodes:[]string{"required_capability_item_missing"}})
    continue
@@ -269,7 +272,10 @@ func Evaluate(in Input)Result{
   if req.Required&&verdict==Qualified{out.CoveredRequiredCount++}
   if req.Required&&verdict==Indeterminate{out.UnknownRequired=appendUnique(out.UnknownRequired,id)}
   if !req.Required&&verdict!=Qualified{out.OptionalNegativeSpace=appendUnique(out.OptionalNegativeSpace,id)}
-  for _,code:=range local.sorted(){if local.blocked{f.block(id+":"+code)}else{f.hold(id+":"+code)}}
+  for _,code:=range local.sorted(){
+   if local.blocked{f.block(id+":"+code)}else{f.hold(id+":"+code)}
+   if req.Required{if local.blocked{coverage.block(id+":"+code)}else{coverage.hold(id+":"+code)}}
+  }
   out.Items=append(out.Items,ItemResult{ItemID:id,Status:item.Status,Required:req.Required,Verdict:verdict,ReasonCodes:local.sorted()})
  }
  for id:=range declared{
@@ -279,7 +285,7 @@ func Evaluate(in Input)Result{
  sort.Strings(out.UnsupportedRequired);sort.Strings(out.ExcludedRequired);sort.Strings(out.UnknownRequired);sort.Strings(out.MissingRequired);sort.Strings(out.OptionalNegativeSpace)
  sort.Slice(out.Items,func(i,j int)bool{return out.Items[i].ItemID<out.Items[j].ItemID})
  out.CapabilityVerdict=f.verdict()
- out.CoverageVerdict=f.verdict()
+ out.CoverageVerdict=coverage.verdict()
  // Offline evidence digests cannot authenticate the capability issuer, required
  // scope source, conformance runner or source capture. MON-041 is still required.
  f.hold("capability_and_scope_provenance_not_authenticated")
