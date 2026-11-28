@@ -196,8 +196,6 @@ pub fn build_relation_closure_v1<V: RelationEdgeVerifierV1>(
             return Err(AssistanceRejectV1::DuplicateRelationEdge);
         }
         if selected.contains(&edge.kind) {
-            edge.validate_snapshot(context)?;
-            verifier.verify_relation_edge(edge, context)?;
             adjacency.entry(edge.from_evidence_id.clone()).or_default().push(edge);
         }
     }
@@ -218,6 +216,8 @@ pub fn build_relation_closure_v1<V: RelationEdgeVerifierV1>(
         }
         if let Some(outgoing) = adjacency.get(&current) {
             for edge in outgoing {
+                edge.validate_snapshot(context)?;
+                verifier.verify_relation_edge(edge, context)?;
                 traversed_edges.insert(edge.edge_id.clone());
                 if edge.kind == RelationKindV1::Contradicts {
                     conflicts.insert((
@@ -431,6 +431,17 @@ pub struct AssistanceBindingReceiptV1 {
     pub binding_sha256: String,
 }
 
+fn relation_context_digest_from_assistance(context: &AssistanceContextV1) -> Result<String, AssistanceRejectV1> {
+    digest_serialized(&RelationContextV1 {
+        valid_at_ms: context.valid_at_ms,
+        known_at_ms: context.known_at_ms,
+        scope_id: context.scope_id.clone(),
+        purpose_id: context.purpose_id.clone(),
+        audience_id: context.audience_id.clone(),
+        policy_sha256: context.policy_sha256.clone(),
+    })
+}
+
 fn assistance_binding_digest(receipt: &AssistanceBindingReceiptV1) -> Result<String, AssistanceRejectV1> {
     let mut unsigned = receipt.clone();
     unsigned.binding_sha256.clear();
@@ -457,6 +468,7 @@ pub enum AssistanceRejectV1 {
     ConstraintSetEmpty,
     DuplicateConstraintId,
     ConstraintClosureMismatch,
+    ConflictedEvidenceCannotBeUnqualified,
     EvidenceVerifierRejected,
     InvalidResponseSpan,
     ResponseSpanDigestMismatch,
@@ -499,6 +511,7 @@ impl AssistanceRejectV1 {
             Self::ConstraintSetEmpty => "constraint_set_empty",
             Self::DuplicateConstraintId => "duplicate_constraint_id",
             Self::ConstraintClosureMismatch => "constraint_closure_mismatch",
+            Self::ConflictedEvidenceCannotBeUnqualified => "conflicted_evidence_cannot_be_unqualified",
             Self::EvidenceVerifierRejected => "evidence_verifier_rejected",
             Self::InvalidResponseSpan => "invalid_response_span",
             Self::ResponseSpanDigestMismatch => "response_span_digest_mismatch",
@@ -542,7 +555,10 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
     verifier: &V,
 ) -> Result<VerifiedAssistanceBindingV1, AssistanceRejectV1> {
     context.validate()?;
-    if !closure.verify_integrity() || closure.closure_sha256 != context.relation_closure_sha256 {
+    if !closure.verify_integrity()
+        || closure.closure_sha256 != context.relation_closure_sha256
+        || closure.context_sha256 != relation_context_digest_from_assistance(context)?
+    {
         return Err(AssistanceRejectV1::RelationClosureDigestMismatch);
     }
     if digest_bytes(request_bytes) != context.request_sha256 {
@@ -557,6 +573,13 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
         constraint.validate(context)?;
         if constraint.relation_closure_sha256 != closure.closure_sha256 {
             return Err(AssistanceRejectV1::ConstraintClosureMismatch);
+        }
+        if closure.conflict_edges.iter().any(|edge| {
+            (edge.left_evidence_id == constraint.source_evidence_id
+                || edge.right_evidence_id == constraint.source_evidence_id)
+                && constraint.action == ResponseConstraintActionV1::MayAssert
+        }) {
+            return Err(AssistanceRejectV1::ConflictedEvidenceCannotBeUnqualified);
         }
         verifier.verify_constraint_evidence(constraint, context)
             .map_err(|_| AssistanceRejectV1::EvidenceVerifierRejected)?;
@@ -590,7 +613,7 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
     if receipt.disposition != ResponseDispositionV1::Answer && !receipt.claim_uses.is_empty() {
         return Err(AssistanceRejectV1::NonAnswerDispositionHasClaimUses);
     }
-    if receipt.disposition == ResponseDispositionV1::Answer
+    if receipt.disposition != ResponseDispositionV1::Abstain
         && constraints.iter().any(|constraint| {
             constraint.required && constraint.action == ResponseConstraintActionV1::MustAbstain
         })
@@ -677,7 +700,10 @@ pub fn seal_assistance_binding_v1(
     claim_uses: Vec<ResponseClaimUseV1>,
 ) -> Result<AssistanceBindingReceiptV1, AssistanceRejectV1> {
     context.validate()?;
-    if !closure.verify_integrity() || context.relation_closure_sha256 != closure.closure_sha256 {
+    if !closure.verify_integrity()
+        || context.relation_closure_sha256 != closure.closure_sha256
+        || closure.context_sha256 != relation_context_digest_from_assistance(context)?
+    {
         return Err(AssistanceRejectV1::RelationClosureDigestMismatch);
     }
     let mut receipt = AssistanceBindingReceiptV1 {
@@ -866,8 +892,8 @@ mod tests {
     #[test]
     fn relation_closure_is_bounded_deterministic_and_preserves_conflict() {
         let result = closure();
-        assert_eq!(result.evidence_ids, vec!["e1", "e2", "e3"]);
-        assert_eq!(result.traversed_edge_ids, vec!["r1", "r2", "r3"]);
+        assert_eq!(result.evidence_ids, vec!["e1".to_owned(), "e2".to_owned(), "e3".to_owned()]);
+        assert_eq!(result.traversed_edge_ids, vec!["r1".to_owned(), "r2".to_owned(), "r3".to_owned()]);
         assert_eq!(result.conflict_edges.len(), 1);
         assert!(result.verify_integrity());
     }
@@ -945,7 +971,7 @@ mod tests {
         let verified = verify_assistance_binding_v1(
             &receipt, b"request", bytes, &context, &vec![allowed], &closure, &FixtureVerifier
         ).unwrap();
-        assert_eq!(verified.binding_sha256(), receipt.binding_sha256);
+        assert_eq!(verified.binding_sha256(), receipt.binding_sha256.as_str());
     }
 
     #[test]
@@ -1093,8 +1119,8 @@ mod tests {
         let allowed = constraint(ResponseConstraintActionV1::MayAssert, true, &closure);
         let bytes = "The plan is café.".as_bytes();
         let mut invalid = claim_use(&allowed, bytes, None, None);
-        invalid.start_byte = 17; // inside the two-byte UTF-8 encoding for é
-        invalid.end_byte = 18;
+        invalid.start_byte = 16; // inside the two-byte UTF-8 encoding for é
+        invalid.end_byte = 17;
         let receipt = response_binding(
             &context, &vec![allowed.clone()], &closure, bytes,
             ResponseDispositionV1::Answer, vec![invalid]
