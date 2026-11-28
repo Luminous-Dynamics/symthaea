@@ -356,6 +356,7 @@ pub enum InteractionExecutionRejectV1 {
     ExecutionVerifierRejected,
     MissingRequiredControl,
     MissingRequiredAction,
+    EventAfterResponseCommit,
     ProhibitedActionOccurred,
     MissingNoActionCoverage,
     IncompleteNoActionCoverage,
@@ -391,6 +392,7 @@ impl InteractionExecutionRejectV1 {
             Self::ExecutionVerifierRejected => "execution_verifier_rejected",
             Self::MissingRequiredControl => "missing_required_control",
             Self::MissingRequiredAction => "missing_required_action",
+            Self::EventAfterResponseCommit => "event_after_response_commit",
             Self::ProhibitedActionOccurred => "prohibited_action_occurred",
             Self::MissingNoActionCoverage => "missing_no_action_coverage",
             Self::IncompleteNoActionCoverage => "incomplete_no_action_coverage",
@@ -528,9 +530,11 @@ pub fn verify_interaction_execution_v1<V: InteractionExecutionVerifierV1>(
     let event_manifest_sha256 = canonical_events_digest(events)?;
     let expected_response_sha256 = digest_bytes(response_bytes);
     let mut response_commit_count = 0usize;
+    let mut response_commit_at_ms = None;
     for event in events {
         if let InteractionExecutionEventKindV1::ResponseCommitted { response_sha256 } = &event.kind {
             response_commit_count += 1;
+            response_commit_at_ms = Some(event.occurred_at_ms);
             if response_sha256 != &expected_response_sha256 {
                 return Err(InteractionExecutionRejectV1::ResponseDigestMismatch);
             }
@@ -542,32 +546,40 @@ pub fn verify_interaction_execution_v1<V: InteractionExecutionVerifierV1>(
     if response_commit_count > 1 {
         return Err(InteractionExecutionRejectV1::DuplicateResponseCommit);
     }
+    let response_commit_at_ms = response_commit_at_ms
+        .ok_or(InteractionExecutionRejectV1::MissingResponseCommit)?;
 
     for preference in &selection.preferences {
         for requirement in &preference.requirements {
             match requirement {
                 BehaviorRequirementV1::ControlEquals { control_id, setting_sha256 } => {
-                    let applied = events.iter().any(|event| {
+                    let matching_controls: Vec<&InteractionExecutionEventV1> = events.iter().filter(|event| {
                         matches!(
                             &event.kind,
                             InteractionExecutionEventKindV1::ControlApplied {
                                 control_id: actual_control, setting_sha256: actual_setting
                             } if actual_control == control_id && actual_setting == setting_sha256
                         )
-                    });
-                    if !applied {
+                    }).collect();
+                    if matching_controls.iter().any(|event| event.occurred_at_ms > response_commit_at_ms) {
+                        return Err(InteractionExecutionRejectV1::EventAfterResponseCommit);
+                    }
+                    if !matching_controls.iter().any(|event| event.occurred_at_ms <= response_commit_at_ms) {
                         return Err(InteractionExecutionRejectV1::MissingRequiredControl);
                     }
                 }
                 BehaviorRequirementV1::ActionMustOccur { action_class_sha256 } => {
-                    let occurred = events.iter().any(|event| {
+                    let matching_actions: Vec<&InteractionExecutionEventV1> = events.iter().filter(|event| {
                         matches!(
                             &event.kind,
                             InteractionExecutionEventKindV1::ActionEmitted { action_class_sha256: actual }
                                 if actual == action_class_sha256
                         )
-                    });
-                    if !occurred {
+                    }).collect();
+                    if matching_actions.iter().any(|event| event.occurred_at_ms > response_commit_at_ms) {
+                        return Err(InteractionExecutionRejectV1::EventAfterResponseCommit);
+                    }
+                    if !matching_actions.iter().any(|event| event.occurred_at_ms <= response_commit_at_ms) {
                         return Err(InteractionExecutionRejectV1::MissingRequiredAction);
                     }
                 }
@@ -589,7 +601,7 @@ pub fn verify_interaction_execution_v1<V: InteractionExecutionVerifierV1>(
                     let expected_action_events_sha256 = action_events_digest_for_window(
                         events, action_class_sha256, *window_start_ms, *window_end_ms,
                     )?;
-                    let closure = events.iter().find(|event| {
+                    let matching_closures: Vec<&InteractionExecutionEventV1> = events.iter().filter(|event| {
                         matches!(
                             &event.kind,
                             InteractionExecutionEventKindV1::NoActionWindowClosed {
@@ -604,7 +616,14 @@ pub fn verify_interaction_execution_v1<V: InteractionExecutionVerifierV1>(
                                 && observed_through_ms >= window_end_ms
                                 && action_events_sha256 == &expected_action_events_sha256
                         )
-                    }).ok_or(InteractionExecutionRejectV1::MissingNoActionCoverage)?;
+                    }).collect();
+                    if matching_closures.iter().any(|event| event.occurred_at_ms > response_commit_at_ms) {
+                        return Err(InteractionExecutionRejectV1::EventAfterResponseCommit);
+                    }
+                    let closure = matching_closures.iter()
+                        .copied()
+                        .find(|event| event.occurred_at_ms <= response_commit_at_ms)
+                        .ok_or(InteractionExecutionRejectV1::MissingNoActionCoverage)?;
                     verifier.verify_no_action_window_coverage(
                         closure, &expected_action_events_sha256, selection, context,
                     ).map_err(|_| InteractionExecutionRejectV1::IncompleteNoActionCoverage)?;
@@ -859,6 +878,40 @@ mod tests {
     }
 
     #[test]
+    fn control_applied_after_response_cannot_retroactively_qualify_it() {
+        let response = b"I will keep it concise.";
+        let selection = selection(vec![pref(vec![BehaviorRequirementV1::ControlEquals {
+            control_id: "verbosity".into(), setting_sha256: sha("terse"),
+        }])]);
+        let events = vec![
+            response_event(response),
+            event("event:late-control", 310, InteractionExecutionEventKindV1::ControlApplied {
+                control_id: "verbosity".into(), setting_sha256: sha("terse"),
+            }),
+        ];
+        let receipt = seal(&selection, &events, response);
+        assert_eq!(verify(&selection, &events, response, &receipt),
+            Err(InteractionExecutionRejectV1::EventAfterResponseCommit));
+    }
+
+    #[test]
+    fn required_action_after_response_cannot_retroactively_qualify_it() {
+        let response = b"Calendar event created.";
+        let selection = selection(vec![pref(vec![BehaviorRequirementV1::ActionMustOccur {
+            action_class_sha256: sha("calendar_create"),
+        }])]);
+        let events = vec![
+            response_event(response),
+            event("event:late-calendar", 310, InteractionExecutionEventKindV1::ActionEmitted {
+                action_class_sha256: sha("calendar_create"),
+            }),
+        ];
+        let receipt = seal(&selection, &events, response);
+        assert_eq!(verify(&selection, &events, response, &receipt),
+            Err(InteractionExecutionRejectV1::EventAfterResponseCommit));
+    }
+
+    #[test]
     fn missing_no_action_coverage_does_not_prove_silence() {
         let response = b"No message sent.";
         let selection = selection(vec![pref(vec![BehaviorRequirementV1::ActionMustNotOccur {
@@ -1067,6 +1120,9 @@ mod tests {
         terse.preference_id = "pref:verbosity".into();
         let selection = selection(vec![no_outreach, terse]);
         let events = vec![
+            event("event:verbosity", 250, InteractionExecutionEventKindV1::ControlApplied {
+                control_id: "verbosity".into(), setting_sha256: sha("terse"),
+            }),
             event("event:no-outreach-window", 300,
                 InteractionExecutionEventKindV1::NoActionWindowClosed {
                     action_class_sha256: sha("outbound_message"),
@@ -1074,9 +1130,6 @@ mod tests {
                     action_events_sha256: digest_serialized(&Vec::<&InteractionExecutionEventV1>::new()).unwrap(),
                 }),
             response_event(response),
-            event("event:verbosity", 310, InteractionExecutionEventKindV1::ControlApplied {
-                control_id: "verbosity".into(), setting_sha256: sha("terse"),
-            }),
         ];
         let receipt = seal(&selection, &events, response);
         assert!(verify(&selection, &events, response, &receipt).is_ok());
