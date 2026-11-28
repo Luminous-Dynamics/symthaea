@@ -40,7 +40,7 @@ A uniform duration transform is:
 
     d_i' = r d_i, r in Q_positive
 
-For positive rational durations, ratios d_i/d_j remain invariant, while pulse rate and absolute duration transform equivariantly. The implementation stores reduced positive fractions and uses checked composition; the u64 representation bound is explicit. Rubato is not this action: a local time warp does not generally preserve all inter-onset ratios.
+For positive rational durations, ratios d_i/d_j remain invariant, while pulse rate and absolute duration transform equivariantly. The implementation stores reduced positive fractions in u64 fields and uses checked composition. The representable subset is not closed under every rational composition because checked arithmetic can overflow. Therefore v0 treats tempo scaling as an exact arithmetic/property-map fixture but always classifies it SoftRelationOnly for quotienting; it is not a complete continuous-group certificate. Rubato is not a constant tempo action: a local time warp does not generally preserve all inter-onset ratios.
 
 ### 1.3 Product action and commutators
 
@@ -56,7 +56,8 @@ The factor-of-12 reduction is an exact **candidate-count property of this constr
 
 | Relation class | Hard quotient? | Permitted use |
 |---|---|---|
-| Exact finite/continuous action, complete declared domain, invariant query | Fixture eligibility only in v0; production requires #11616 verifier | Exact symbolic orbit tests |
+| Exact finite C12 action, complete declared domain, invariant query | Fixture eligibility only in v0; production requires #11616 verifier | Exact symbolic orbit tests |
+| Bounded rational tempo-factor arithmetic | No in v0 | Exact property maps and soft comparisons |
 | Equivariant query | No | Transform the answer with the action |
 | Restricted partial isomorphism | No in v0 | Domain-local research; never extrapolate |
 | Human-calibrated performer/take nuisance | No | Soft retrieval or grouping with uncertainty |
@@ -113,7 +114,7 @@ All numbers below are proposed targets, not achieved results.
 | Performer/take invariance | #13908 crossed performer × source work | ≥90% accuracy on held-out performers and works; report each nuisance separately | ≥95% with calibrated abstention |
 | Temporal grounding | TAG-Bench | mIoU ≥40; Recall@0.7 ≥30%; occurrence count ≥25% | 50 / 40% / 40% |
 | Calibration | Per-property reliability and risk-coverage | ECE ≤0.05; nominal 95% intervals 93–97% coverage | ECE ≤0.03 with no subgroup collapse |
-| Quotient correctness | Exhaustive C12 and tempo fixtures | 100% closure/inverse/lift checks; zero missed candidates | Same on a held-out exact symbolic family |
+| Quotient correctness | Exhaustive C12 and tempo fixtures | 100% C12 closure/inverse/lift checks; zero missed candidates | Same on a held-out exact symbolic family |
 | Quotient efficiency | Exhaustive unquotiented search | ≥2× total-cost reduction after construction, verification and lift costs | ≥5× on a larger exact family |
 | Safety of hard quotient | Wrong-symmetry and partial-domain controls | Zero hard quotient for unknown, partial, human-only, sampled or one-way relations | Zero on adversarial mutation suite |
 | Temporal/output reliability | Parsing and repeated-event controls | ≥99% valid structured outputs; count errors reported separately | ≥99.9% |
@@ -133,7 +134,7 @@ The path is not to make one aggregate score look larger. It is to target known f
 
 ## 7. Execution sequence
 
-- **V0 (this increment):** exact symbolic C12 and rational-tempo action algebra, property classifier, reversible finite orbit fixture, strict schema, standalone Rust tests.
+- **V0 (this increment):** exact symbolic C12 and bounded rational-tempo arithmetic, property classifier, reversible finite orbit fixture, strict schema, standalone Rust tests.
 - **V0.2:** add octave/voice-permutation finite actions with explicit domains; add stabilizer and orbit-size checks; test partial-domain and omitted-element attacks.
 - **V0.3:** build an adapter to #11616's complete-task V2 certificate and independent verifier. Until this exists, keep runtime pruning disabled.
 - **Audio qualification:** materialize rights-cleared exact audio; render through at least two independently identified renderers; connect EVAL-045 path receipts to #13260 audio verification and #12327 cumulative audible drift.
