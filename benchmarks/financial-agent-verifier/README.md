@@ -54,6 +54,7 @@ The verifier does not grant action authority. Proposal-versus-authorization and 
 - JSON payload digesting uses RFC 8785 JCS. Integers outside the IEEE-754 safe integer range are rejected at the strict parser boundary and should be encoded as strings.
 - External payload resolution is opt-in and bounded to 16 MiB per payload.
 - Claim audit input is bounded to 8,192 claims; derivation-cycle analysis is iterative rather than recursive.
+- Inline claim locators must resolve within the exact evidence payload; external-format locators are not silently accepted.
 - Findings are sorted deterministically by gate, path, code, disposition and message.
 - Unknown or missing temporal and external-payload inputs remain INDETERMINATE, not PASS.
 
