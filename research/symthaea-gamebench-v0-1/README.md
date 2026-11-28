@@ -77,7 +77,7 @@ Candidate policy baselines in the core crate:
 
 ## Authored test inventory and validation
 
-- F1–F6 deterministic environment fixtures: 46 tests.
+- F1–F6 deterministic environment fixtures: 47 tests.
 - Candidate-output contract: 7 tests.
 - Random and greedy policy baselines: 5 tests.
 - Evaluator-owned F1 runner: **6 tests**.
