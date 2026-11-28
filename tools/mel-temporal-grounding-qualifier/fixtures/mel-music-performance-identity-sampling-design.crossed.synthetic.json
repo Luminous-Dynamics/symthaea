@@ -1,0 +1,63 @@
+{
+  "schema": "mel-music-performance-identity-sampling-design-v1",
+  "sampling_frame_id": "synthetic-crossed-frame-2026-11-28",
+  "target_population": "synthetic demonstration only",
+  "inclusion_exclusion_policy": "two generated source works; all three identity arms",
+  "pseudonymization_scope": "fixture-local synthetic pseudonyms; not real identities",
+  "independent_source_work_sampling_claimed": true,
+  "independence_basis": "Deliberately asserted to exercise the crossed-design negative control; not evidence of independence.",
+  "observations": [
+    {
+      "item_id": "crossed-item-a",
+      "pair_id": "crossed-pair-a",
+      "source_work_lineage_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "clean": {
+        "performer_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "performer_membership_sha256": ["1111111111111111111111111111111111111111111111111111111111111111"],
+        "session_identity_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+        "take_identity_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2",
+        "performance_identity_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3"
+      },
+      "performance_stay": {
+        "performer_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "performer_membership_sha256": ["1111111111111111111111111111111111111111111111111111111111111111"],
+        "session_identity_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4",
+        "take_identity_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5",
+        "performance_identity_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa6"
+      },
+      "musical_flip": {
+        "performer_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "performer_membership_sha256": ["1111111111111111111111111111111111111111111111111111111111111111"],
+        "session_identity_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa7",
+        "take_identity_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8",
+        "performance_identity_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa9"
+      }
+    },
+    {
+      "item_id": "crossed-item-b",
+      "pair_id": "crossed-pair-b",
+      "source_work_lineage_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "clean": {
+        "performer_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "performer_membership_sha256": ["1111111111111111111111111111111111111111111111111111111111111111"],
+        "session_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1",
+        "take_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2",
+        "performance_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb3"
+      },
+      "performance_stay": {
+        "performer_identity_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "performer_membership_sha256": ["2222222222222222222222222222222222222222222222222222222222222222"],
+        "session_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb4",
+        "take_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb5",
+        "performance_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb6"
+      },
+      "musical_flip": {
+        "performer_identity_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "performer_membership_sha256": ["1111111111111111111111111111111111111111111111111111111111111111"],
+        "session_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb7",
+        "take_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8",
+        "performance_identity_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb9"
+      }
+    }
+  ]
+}
