@@ -223,6 +223,9 @@ impl ConditionalRankSpectrumMonitor {
         }
 
         let contexts = build_context_bank();
+        if contexts.len() != CONTEXT_COUNT {
+            return Err(ConditionalError::EmptyFeatureBank);
+        }
         let component_count = feature_count
             .checked_mul(contexts.len())
             .and_then(|value| value.checked_mul(2))
@@ -726,25 +729,25 @@ mod tests {
 
     #[test]
     fn high_and_low_runs_activate_only_after_two_prior_observations() {
-        let mut monitor = monitor();
-        monitor.observe_rank(16).unwrap();
+        let mut high_monitor = monitor();
+        high_monitor.observe_rank(16).unwrap();
         assert!(
-            !monitor
+            !high_monitor
                 .active_context_names()
                 .contains(&"previous_high_run")
         );
-        monitor.observe_rank(16).unwrap();
+        high_monitor.observe_rank(16).unwrap();
         assert!(
-            monitor
+            high_monitor
                 .active_context_names()
                 .contains(&"previous_high_run")
         );
 
-        let mut monitor = monitor();
-        monitor.observe_rank(1).unwrap();
-        assert!(!monitor.active_context_names().contains(&"previous_low_run"));
-        monitor.observe_rank(1).unwrap();
-        assert!(monitor.active_context_names().contains(&"previous_low_run"));
+        let mut low_monitor = monitor();
+        low_monitor.observe_rank(1).unwrap();
+        assert!(!low_monitor.active_context_names().contains(&"previous_low_run"));
+        low_monitor.observe_rank(1).unwrap();
+        assert!(low_monitor.active_context_names().contains(&"previous_low_run"));
     }
 
     #[test]
