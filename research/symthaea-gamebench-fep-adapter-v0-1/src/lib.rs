@@ -222,10 +222,11 @@ impl InteractiveCandidate<Observation, Action> for FepNavigationCandidate {
         {
             return Err(FepAdapterError::ObservationGeometryChanged);
         }
-        // The next decide() call performs perceive(next_observation). That FEP
-        // perception step consumes the stored previous belief/action and
-        // performs the temporal-difference update. We only close the pending
-        // transition here; no evaluator state or reward enters the candidate.
+        // Consume only the next candidate-visible observation. This FEP
+        // perception step consumes the previous belief/action for TD learning.
+        let next_observation = self.encode_observation(feedback.next_observation)?;
+        self.agent.perceive(&next_observation);
+        self.belief_is_current = true;
         self.pending_action = None;
         Ok(())
     }
@@ -402,4 +403,5 @@ mod tests {
             })
             .expect("final observation feedback");
         assert!(candidate.pending_action.is_none());
-    }}
+    }
+}
