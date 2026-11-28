@@ -1,0 +1,235 @@
+{
+  "schema_version": "sdcb-observation-family-overlap-v1",
+  "title": "Exact passive observation-law overlap inside a narrow uncertain physical-decay envelope",
+  "status": "analytic-synthetic-reference-independent-authoring-runtime-replay-not-rust-or-ci-qualified",
+  "provenance": {
+    "parent_issue": 14133,
+    "nominal_covariance_issue": 14065,
+    "fixed_pair_lrt_issue": 14110,
+    "covariance_reference_pr": 14068,
+    "lrt_reference_pr": 14113,
+    "model_family": "stationary scalar OU process followed by first-order low-pass sensor"
+  },
+  "model": {
+    "physical_decay_units": "1/time",
+    "sensor_rate_units": "1/time",
+    "process_stationary_variance_units": "measurand^2",
+    "output_zero_lag_variance": "q=mu*process_stationary_variance/(lambda+mu)",
+    "covariance_kernel": "C(h)=q*exp(-r*h)*(1+r*h*psi(g*h)); r=min(lambda,mu); g=abs(lambda-mu); psi(x)=(1-exp(-x))/x and psi(0)=1",
+    "observed_finite_design_law": "Y_D ~ N(0,K_D+R_D), with complete pairwise covariance retained",
+    "equality_claim": "If lambda_B=mu_A, mu_B=lambda_A and q_B=q_A, then the complete stationary covariance kernels are identical for every h>=0. Adding the same declared readout covariance R_D preserves equality of every finite-dimensional observation law."
+  },
+  "world_a": {
+    "id": "world_a_physical_slow_sensor_fast",
+    "physical_decay": {
+      "numerator": 1,
+      "denominator": 4,
+      "decimal": "0.25"
+    },
+    "sensor_rate": {
+      "numerator": 4,
+      "denominator": 1,
+      "decimal": "4"
+    },
+    "process_stationary_variance": {
+      "numerator": 9,
+      "denominator": 1,
+      "decimal": "9"
+    },
+    "q": {
+      "numerator": 144,
+      "denominator": 17,
+      "decimal": "8.470588235294117647058823529411764705882352941176470588235294"
+    }
+  },
+  "world_b_nominal": {
+    "id": "near_world_b_physical_fast_sensor_slow",
+    "physical_decay": {
+      "numerator": 101,
+      "denominator": 25,
+      "decimal": "4.04"
+    },
+    "sensor_rate": {
+      "numerator": 1,
+      "denominator": 4,
+      "decimal": "0.25"
+    },
+    "process_stationary_variance": {
+      "numerator": 61776,
+      "denominator": 425,
+      "decimal": "145.355294117647058823529411764705882352941176470588235294117647"
+    },
+    "q": {
+      "numerator": 144,
+      "denominator": 17,
+      "decimal": "8.470588235294117647058823529411764705882352941176470588235294"
+    }
+  },
+  "uncertain_world_b_family": {
+    "parameter": "physical_decay_lambda_B",
+    "interval_decimal": [
+      "3.9996",
+      "4.0804"
+    ],
+    "exact_interval_rational": [
+      {
+        "numerator": 9999,
+        "denominator": 2500
+      },
+      {
+        "numerator": 10201,
+        "denominator": 2500
+      }
+    ],
+    "sensor_rate_fixed": {
+      "numerator": 1,
+      "denominator": 4,
+      "decimal": "0.25"
+    },
+    "variance_rule": "process_variance_B(lambda)=q_A*(lambda+mu_B)/mu_B",
+    "interpretation": "synthetic +/-1% interval around nominal 4.04; not a physical measurement uncertainty claim"
+  },
+  "exact_overlap_witness": {
+    "status": "FAMILY_INTERSECTION",
+    "world_a_id": "world_a_physical_slow_sensor_fast",
+    "world_b_parameters": {
+      "physical_decay": {
+        "numerator": 4,
+        "denominator": 1,
+        "decimal": "4"
+      },
+      "sensor_rate": {
+        "numerator": 1,
+        "denominator": 4,
+        "decimal": "0.25"
+      },
+      "process_stationary_variance": {
+        "numerator": 144,
+        "denominator": 1,
+        "decimal": "144"
+      },
+      "q": {
+        "numerator": 144,
+        "denominator": 17,
+        "decimal": "8.470588235294117647058823529411764705882352941176470588235294"
+      }
+    },
+    "witness_equations": [
+      "lambda_B=mu_A=4",
+      "mu_B=lambda_A=0.25",
+      "q_B=q_A=144/17",
+      "C_A(h)=C_B(h) for all h>=0"
+    ],
+    "proof_method": "exact rational pole-swap identity; rates and q compared using normalized rational arithmetic",
+    "finite_design_kl": "0 for every common finite sampling design with identical readout covariance, in exact arithmetic"
+  },
+  "alternative_envelopes": {
+    "plus_minus_one_percent": {
+      "interval": [
+        "3.9996",
+        "4.0804"
+      ],
+      "contains_lambda_4": true,
+      "outcome": "FAMILY_INTERSECTION",
+      "reason": "contains exact pole-swap witness"
+    },
+    "plus_minus_half_percent": {
+      "interval": [
+        "4.0198",
+        "4.0602"
+      ],
+      "contains_lambda_4": false,
+      "outcome": "NO_WITNESS_IN_THIS_PARAMETER_INTERVAL",
+      "limitation": "Excluding this pole-swap witness is not a general proof that all possible observation-law intersections are absent."
+    }
+  },
+  "composite_test_consequence": {
+    "families": "P_A={P_A,eta:eta in Theta_A}; P_B={P_B,xi:xi in Theta_B}",
+    "uniform_size_constraint": "sup_{Q in P_B} E_Q[phi(Y)] <= alpha",
+    "worst_case_power": "inf_{P in P_A} E_P[phi(Y)] <= alpha when P_A and P_B overlap",
+    "interpretation": "Any uniformly size-controlled possibly randomized passive test has worst-case power no larger than alpha over the full composite alternative family.",
+    "additional_samples": "Cannot break the exact family-level overlap; only changing the observation protocol can remove the shared distribution."
+  },
+  "passive_protocol": {
+    "sample_intervals": [
+      0.1,
+      0.25,
+      0.5,
+      1,
+      2,
+      4
+    ],
+    "sample_counts": [
+      8,
+      16,
+      32,
+      64
+    ],
+    "readout_noise_variance": 0.1,
+    "note": "Reuses the #14065 design as finite-design diagnostics; equality is established from the full analytic kernel, not from the finite grid."
+  },
+  "intervention_positive_control": {
+    "id": "traceable_sensor_inlet_unit_step",
+    "elapsed_time": 0.5,
+    "world_a_sensor_rate": "4",
+    "world_b_sensor_rate": "0.25",
+    "response_a": "0.864664716763387308106000505028",
+    "response_b": "0.117503097415404597135107856771",
+    "absolute_response_difference": "0.747161619347982710970892648257",
+    "claim_boundary": "synthetic noiseless step response; physical stimulus uncertainty, calibration and readout noise must be separately declared"
+  },
+  "negative_controls": [
+    {
+      "id": "nominal_near_pair",
+      "expected": "Do not call the lambda_B=4.04 fixed pair an exact alias."
+    },
+    {
+      "id": "one_percent_family",
+      "expected": "Detect the lambda_B=4 exact witness inside the declared interval."
+    },
+    {
+      "id": "half_percent_family",
+      "expected": "Do not claim the specific lambda_B=4 witness is inside this narrower interval."
+    },
+    {
+      "id": "readout_covariance",
+      "expected": "Adding the same measurement-noise covariance to both equal latent laws preserves equality."
+    },
+    {
+      "id": "sample_count",
+      "expected": "Increasing n does not resolve an exact family intersection."
+    },
+    {
+      "id": "inlet_step",
+      "expected": "A changed, calibrated observation protocol can distinguish sensor rates in this synthetic challenge."
+    },
+    {
+      "id": "nominal_point_substitution",
+      "expected": "Do not replace the declared nuisance interval with its nominal point estimate."
+    }
+  ],
+  "independent_replay": {
+    "method": "independent SciPy/NumPy construction of the same OU covariance law and exact rational arithmetic check",
+    "checked": {
+      "q_A": "144/17",
+      "q_B_at_lambda_4": "144/17",
+      "variance_B_at_lambda_4": "144",
+      "lambda_4_inside_plus_minus_one_percent": true,
+      "lambda_4_outside_plus_minus_half_percent": true,
+      "nominal_lambda_4_04_is_not_exact_swap": true,
+      "step_responses_match_frozen_values": true
+    }
+  },
+  "qualification": {
+    "analytic_identity_derived": true,
+    "exact_rational_rust_reference_authored": true,
+    "rust_compiled_or_executed": false,
+    "cargo_tests": false,
+    "clippy": false,
+    "hosted_ci": false,
+    "physical_sensor_uncertainty_measured": false,
+    "traceability_established": false,
+    "sota_superiority": false
+  },
+  "claim_boundary": "Synthetic analytical proof that the declared composite World B family contains an exact passive observation-law alias. The +/-1% interval is illustrative only and is not a claim about real sensor uncertainty."
+}
