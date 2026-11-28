@@ -81,9 +81,9 @@ Candidate policy baselines in the core crate:
 - Candidate-output contract: 7 tests.
 - Random and greedy policy baselines: 5 tests.
 - Evaluator-owned F1 runner: **6 tests**.
-- Core crate total: **65 authored tests**.
+- Core crate total: **68 authored tests**.
 - Separate candidate-adapter workspace: 6 FEP tests, 5 spatial HDC tests, 5 HDC-LTC tests (**16 authored tests**).
-- Combined source inventory: **81 authored Rust tests**.
+- Combined source inventory: **84 authored Rust tests**.
 
 These are authored counts, not observed execution results. Dedicated workflows run formatting, Cargo tests, and strict Clippy for each workspace. No pass is claimed until each exact-head workflow completes successfully.
 
@@ -115,3 +115,6 @@ F4 now includes `ExploreMemory`, a candidate-owned stateful map store:
 - exposes frontier positions (known traversable cells adjacent to unknown cells).
 
 The environment still returns only the current view. The memory primitive lives on the candidate side and can be ablated in future F4 policies. It is not yet a full exploration policy or proof that Symthaea's production episodic memory is using it.
+
+
+A first `MemoryFrontierCandidate` now composes this memory with frontier-based exploration. It plans only through known traversable cells, moves toward reachable unknown frontiers, scans when appropriate, and routes to the goal after that location has been observed. Its end-to-end F4 fixture runs against a map with an obstructed direct corridor and a navigable alternate route. This is a generic GameBench memory baseline, not yet Symthaea production episodic memory.
