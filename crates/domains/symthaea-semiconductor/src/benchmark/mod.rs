@@ -9,6 +9,7 @@ pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
+pub mod observation_process_trace;
 pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
@@ -19,6 +20,7 @@ pub mod secom_missingness;
 pub mod secom_observation_drift;
 pub mod secom_raw;
 pub mod secom_tabular_baselines;
+pub mod selection_risk_bounds;
 pub mod split_manifest;
 pub mod stratified_repeat;
 pub mod vm_snapshot_dependency_impact;
@@ -172,4 +174,23 @@ pub use ca_ocrc_bounded::{
     CaOcrcSetKindV1, CaOcrcTrackedEntryV1, close_ca_ocrc_feedback_horizon_v1,
     create_ca_ocrc_engine_v1, optimal_arbitrary_delay_proxy_policy_v1, proxy_survival_vector,
     proxy_tracking_load, seal_ca_ocrc_policy_v1, step_ca_ocrc_round_v1,
+};
+
+pub use selection_risk_bounds::{
+    SELECTION_AUDIT_DESIGN_SCHEMA_V1, SELECTION_RISK_INPUT_SCHEMA_V1,
+    SELECTION_RISK_REPORT_SCHEMA_V1, IndependentAuditEstimateV1,
+    IndependentAuditLossObservationV1, PopulationOutcomeStateV1,
+    QualifiedLossObservationV1, SelectionAuditDesignV1, SelectionRiskErrorV1,
+    SelectionRiskInputV1, SelectionRiskReportV1,
+    evaluate_selection_adjusted_population_risk_v1,
+};
+
+pub use observation_process_trace::{
+    AuditRetentionStateV1, ControllerFeedbackEvidenceV1, ControllerTrackingStateV1,
+    IndependentAuditEvidenceV1, IndependentAuditStateV1, K1QualificationEvidenceV1,
+    K1QualificationStateV1, OBSERVATION_TRACE_REPORT_SCHEMA_V1, OBSERVATION_TRACE_SCHEMA_V1,
+    ObservationControllerKindV1, ObservationProcessTraceErrorV1,
+    ObservationProcessTraceInputV1, ObservationProcessTraceReportV1,
+    ObservationRoundTraceV1, OperationalAcquisitionEvidenceV1,
+    OperationalAcquisitionStateV1, evaluate_observation_process_trace_v1,
 };
