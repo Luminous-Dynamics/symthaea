@@ -39,7 +39,7 @@ The code refuses to label an influence report causally qualified when the requir
 
 The comparison gate requires exact equality of benchmark ID, track, release, dataset split, grader, metric contract, reader model, prompt, tools, resource budget, task IDs and cluster unit. Candidate commit/configuration may differ; the comparison is intended to isolate that change under otherwise matched conditions.
 
-If benchmark or track differs, the receipt is explicitly cross_benchmark_or_track_not_comparable. Do not average AML textual, multimodal and coding scores, or LongMemEval-V2 Small and Medium, into one SOTA number.
+If benchmark or track differs, the receipt is explicitly cross_benchmark_or_track_not_comparable. Both candidate and baseline identity digests are validated before any mismatch report is emitted. Do not average AML textual, multimodal and coding scores, or LongMemEval-V2 Small and Medium, into one SOTA number.
 
 Partial comparisons are not marked matched. The list of mismatching fields is returned so an experiment can be repaired or transparently labelled non-comparable.
 
@@ -57,7 +57,7 @@ Use the official answerer, grader, split, task ordering and scoring denominator.
 
 ## 7. Tests
 
-Nine synthetic Rust tests exercise capsule/official-metric binding, monotone evidence flow, influence count closure, denominator and cost validation, hard-gate contradiction, causal-custody requirements, same-track comparison, cross-track rejection and sidecar tamper detection.
+Twelve synthetic Rust tests exercise capsule/official-metric binding, monotone evidence flow, influence count closure, denominator and cost validation, hard-gate contradiction, causal-custody requirements, same-track comparison, cross-track rejection and sidecar tamper detection.
 
 ## 8. Claim boundary
 
