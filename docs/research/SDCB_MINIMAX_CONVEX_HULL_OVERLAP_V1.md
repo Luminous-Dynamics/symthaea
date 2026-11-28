@@ -145,3 +145,13 @@ This supplies a useful power upper-bound diagnostic. The full primal/dual oracle
 - No continuous nuisance-family guarantee.
 - No Gaussian-mixture equality claim.
 - No physical sensor, metrological, CI, or SOTA qualification.
+
+
+## Standalone Rust known-answer verifier
+
+The branch also contains:
+
+- `scripts/research/sdcb_convex_hull_overlap.rs` — fixture-specific verifier using exact `i128` rational arithmetic. It checks probability-vector validity, pairwise disjointness, exact convex-mixture equality, the constant randomized primal test, the matching dual certificate, and the p_sup-GLRT zero-power result.
+- `scripts/research/run_sdcb_convex_hull_overlap_tests.sh` — dependency-free `rustc --test` and executable harness.
+
+Seven Rust unit tests are authored. The source and harness were fetched back from GitHub and their expected checks inspected. The authoring environment does not have `rustc`, so compilation and execution have **not** occurred. The earlier independent `Fraction` replay and JSON/fixture checks are not Rust qualification.
