@@ -187,11 +187,14 @@ fn run_replication(
             Scenario::StationarySticky if time <= config.shift_after => {
                 draw_predictive_rank(&mut rng, &predictive_counts)
             }
+            Scenario::StationarySticky if time == config.shift_after + 1 => {
+                // Start the new Markov regime from its exact uniform stationary
+                // law rather than inheriting the final nonuniform Pólya-null rank.
+                usize::try_from(rng.below(RANK_BUCKETS as u64) + 1)
+                    .expect("rank bucket index fits usize")
+            }
             Scenario::StationarySticky => {
-                let previous = previous_rank.unwrap_or_else(|| {
-                    usize::try_from(rng.below(RANK_BUCKETS as u64) + 1)
-                        .expect("rank bucket index fits usize")
-                });
+                let previous = previous_rank.expect("post-change chain has an initialized state");
                 draw_stationary_sticky_rank(&mut rng, previous)
             }
         };
