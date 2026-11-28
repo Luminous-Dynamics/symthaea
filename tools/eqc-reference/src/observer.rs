@@ -164,6 +164,37 @@ fn canonical_utc(value: &str) -> bool {
     (1..=last_day).contains(&day)
 }
 
+fn utc_epoch_seconds(value: &str) -> anyhow::Result<i64> {
+    if !canonical_utc(value) {
+        bail!("timestamp must be canonical UTC RFC3339 seconds");
+    }
+    let bytes = value.as_bytes();
+    let number = |range: std::ops::Range<usize>| -> anyhow::Result<i64> {
+        Ok(std::str::from_utf8(&bytes[range])?.parse()?)
+    };
+    let year = number(0..4)?;
+    let month = number(5..7)?;
+    let day = number(8..10)?;
+    let hour = number(11..13)?;
+    let minute = number(14..16)?;
+    let second = number(17..19)?;
+
+    // Proleptic Gregorian calendar conversion (days relative to 1970-01-01).
+    let adjusted_year = year - i64::from(month <= 2);
+    let era = if adjusted_year >= 0 {
+        adjusted_year
+    } else {
+        adjusted_year - 399
+    } / 400;
+    let year_of_era = adjusted_year - era * 400;
+    let adjusted_month = month + if month > 2 { -3 } else { 9 };
+    let day_of_year = (153 * adjusted_month + 2) / 5 + day - 1;
+    let day_of_era =
+        year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146_097 + day_of_era - 719_468;
+    Ok(days * 86_400 + hour * 3_600 + minute * 60 + second)
+}
+
 fn consume_challenge(
     ledger_directory: &Path,
     challenge_nonce: &str,
@@ -297,11 +328,18 @@ pub fn verify_and_consume(
     }
     let issued_at = required_str(&payload, "/issued_at")?;
     let expires_at = required_str(&payload, "/expires_at")?;
-    if issued_at > context.verification_time || context.verification_time > expires_at {
-        bail!("observer receipt is not currently valid");
+    let issued_epoch = utc_epoch_seconds(issued_at)?;
+    let expires_epoch = utc_epoch_seconds(expires_at)?;
+    let verification_epoch = utc_epoch_seconds(context.verification_time)?;
+    let maximum_lifetime = required_u64(trust_store, "/max_receipt_lifetime_seconds")?;
+    if issued_epoch > verification_epoch || verification_epoch >= expires_epoch {
+        bail!("observer receipt is not currently valid; expiry is exclusive");
     }
-    if expires_at <= issued_at {
+    if expires_epoch <= issued_epoch {
         bail!("observer receipt expiry must follow issuance");
+    }
+    if expires_epoch - issued_epoch > maximum_lifetime as i64 {
+        bail!("observer receipt lifetime exceeds the operator trust-store maximum");
     }
 
     let key_id = required_str(&payload, "/observer/key_id")?;
@@ -335,16 +373,16 @@ pub fn verify_and_consume(
     {
         bail!("observer binary or environment digest does not match the trusted profile");
     }
-    let valid_from = required_str(key, "/valid_from")?;
-    let valid_until = required_str(key, "/valid_until")?;
-    if !canonical_utc(valid_from) || !canonical_utc(valid_until) {
-        bail!("trusted observer key validity window is malformed");
-    }
-    if issued_at < valid_from || context.verification_time > valid_until {
-        bail!("observer key is outside its trusted validity window");
+    let valid_from = utc_epoch_seconds(required_str(key, "/valid_from")?)?;
+    let valid_until = utc_epoch_seconds(required_str(key, "/valid_until")?)?;
+    if valid_until <= valid_from
+        || issued_epoch < valid_from
+        || verification_epoch >= valid_until
+    {
+        bail!("observer key is outside its half-open trusted validity window");
     }
     if let Some(revoked_at) = key.get("revoked_at").and_then(Value::as_str) {
-        if !canonical_utc(revoked_at) || revoked_at <= context.verification_time {
+        if utc_epoch_seconds(revoked_at)? <= verification_epoch {
             bail!("observer signing key has been revoked");
         }
     }
@@ -595,6 +633,7 @@ mod tests {
         let trust_store = json!({
             "schema": "luminous.eqc.observer-trust-store.v0.1",
             "trust_store_id": "test-operator-root-v1",
+            "max_receipt_lifetime_seconds": 300,
             "keys": [{
                 "key_id": "observer-key-1",
                 "observer_id": "observer-1",
@@ -714,8 +753,9 @@ mod tests {
         wrong_trust["keys"][0]["public_key_hex"] =
             json!(hex(&SigningKey::from_bytes(&[9; 32]).verifying_key().to_bytes()));
         let wrong_trust_bytes = serde_json::to_vec(&wrong_trust).unwrap();
+        let wrong_trust_sha256 = sha256(&wrong_trust_bytes);
         let wrong_context = ObserverVerificationContext {
-            expected_trust_store_sha256: &sha256(&wrong_trust_bytes),
+            expected_trust_store_sha256: &wrong_trust_sha256,
             ..context
         };
         let (_, _, valid_envelope, _, _) = sample();
