@@ -252,7 +252,7 @@ impl ObserverOnlyVisionManifold {
         config: VisionConfig,
         width: u32,
         height: u32,
-        profile: TemporalObserverProfileV0_1,
+        mut profile: TemporalObserverProfileV0_1,
     ) -> Result<Self, String> {
         if width == 0 || height == 0 {
             return Err("observer constructor dimensions must be non-zero".to_string());
