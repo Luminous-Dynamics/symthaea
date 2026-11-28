@@ -70,3 +70,7 @@ required-features = ["prop-tests"]
 [[bin]]
 name = "verify_interaction_trace"
 path = "src/bin/verify_interaction_trace.rs"
+
+[[bin]]
+name = "cgrb_project_scenario"
+path = "src/bin/cgrb_project_scenario.rs"
