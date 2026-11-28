@@ -98,6 +98,8 @@ The adapter MUST:
 
 A read_committed consumer may stop at the LSO below the high watermark while transactions remain open. This is not by itself proof of missing committed business events. A capture whose boundary is moving or cannot be stabilized is indeterminate.
 
+**Offset-hole accounting is a hard requirement:** the adapter/verifier MUST NOT infer that every slot absent from the returned record array is a legal control/aborted-transaction gap. Each hole in the half-open range must be accounted for by broker-provided aborted-transaction metadata, control-marker evidence, or another version-pinned and independently checkable explanation. If the capture API cannot expose enough information to classify a hole, report the count and exact ranges as unclassified and keep the partition/campaign indeterminate. A record-count subtraction such as (end offset - start offset - visible record count) is a diagnostic only; it is not proof that the missing offsets are legal. Include a negative control that removes an in-range business record and verify that the evaluator cannot classify that hole as benign merely because source/event evidence was also omitted or incomplete.
+
 ## PostgreSQL/source-truth adapter contract
 
 The adapter MUST:
