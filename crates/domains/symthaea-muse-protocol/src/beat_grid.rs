@@ -678,21 +678,32 @@ pub fn verify_transition_grid_binding(
 /// neighboring pulse anchors. Linear interpolation is only used inside a
 /// bracketed interval; extrapolation beyond observed pulse support abstains.
 fn beat_position_milli(hypothesis: &BeatGridHypothesis, frame: u64) -> Option<i128> {
+    // An exact observed pulse is valid even if neighboring pulses are missing.
+    if let Some(anchor) = hypothesis
+        .pulse_anchors
+        .iter()
+        .find(|anchor| anchor.frame == frame)
+    {
+        return Some(i128::from(anchor.beat_index) * 1_000);
+    }
+
+    // Interpolate only between adjacent beat ordinals. Do not invent phase
+    // through a multi-beat detection gap or extrapolate beyond evidence.
     for pair in hypothesis.pulse_anchors.windows(2) {
         let left = pair[0];
         let right = pair[1];
-        if frame < left.frame || frame > right.frame {
+        if frame <= left.frame || frame >= right.frame {
             continue;
         }
         let frame_span = i128::from(right.frame) - i128::from(left.frame);
         let beat_span = i128::from(right.beat_index) - i128::from(left.beat_index);
-        if frame_span <= 0 || beat_span <= 0 {
+        if frame_span <= 0 || beat_span != 1 {
             return None;
         }
         let elapsed_frames = i128::from(frame) - i128::from(left.frame);
         return Some(
             i128::from(left.beat_index) * 1_000
-                + elapsed_frames * beat_span * 1_000 / frame_span,
+                + elapsed_frames * 1_000 / frame_span,
         );
     }
     None
@@ -1110,6 +1121,28 @@ mod tests {
         assert_eq!(
             found[0].code,
             TransitionGridBindingViolationCode::BeatPhaseMismatch
+        );
+    }
+
+    #[test]
+    fn abstains_from_phase_interpolation_across_a_multi_beat_pulse_gap() {
+        let contract = transition_contract();
+        let source_report = {
+            let mut report =
+                report_for_track(&contract.source, "source-grid", 100, 900);
+            report.hypotheses[0].pulse_anchors[1].beat_index = 2;
+            report
+        };
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        );
+        assert_eq!(
+            found[0].code,
+            TransitionGridBindingViolationCode::SourceAnchorOutsidePulseSupport
         );
     }
 
