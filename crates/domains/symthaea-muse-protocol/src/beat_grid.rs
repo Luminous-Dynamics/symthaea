@@ -83,6 +83,9 @@ pub struct MeterMapSegment {
 }
 
 /// A competing explanation of the source's pulse, tempo, and meter.
+///
+/// Confidence is a producer-supplied score in parts per million. It is not a
+/// calibrated probability unless a separate calibration record establishes that.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BeatGridHypothesis {
@@ -488,6 +491,44 @@ mod tests {
         assert_eq!(decoded, report);
         assert!(!json.contains("bpm_f32"));
         assert!(json.contains("\"bpm_milli\":120000"));
+    }
+
+    #[test]
+    fn rejects_duplicate_hypothesis_ids() {
+        let mut report = report();
+        report.disposition = BeatGridDisposition::Ambiguous;
+        report.hypotheses.push(hypothesis("grid-a", 700_000));
+        assert!(codes(&report).contains(&BeatGridViolationCode::DuplicateHypothesisId));
+    }
+
+    #[test]
+    fn rejects_pulse_anchor_at_exclusive_end_of_evidence_window() {
+        let mut report = report();
+        report.hypotheses[0].pulse_anchors[2].frame = report.evidence.covered_window.end_frame;
+        assert!(codes(&report).contains(&BeatGridViolationCode::PulseAnchorOutOfEvidenceWindow));
+    }
+
+    #[test]
+    fn rejects_meter_section_that_does_not_start_on_a_known_pulse() {
+        let mut report = report();
+        report.hypotheses[0].meter_map[0].start_beat_index = 7;
+        assert!(codes(&report).contains(&BeatGridViolationCode::MeterStartBeatNotInPulseMap));
+    }
+
+    #[test]
+    fn rejects_analysis_evidence_window_beyond_source_length() {
+        let mut report = report();
+        report.evidence.covered_window.end_frame = report.source.total_frames + 1;
+        assert!(codes(&report).contains(&BeatGridViolationCode::InvalidEvidenceWindow));
+    }
+
+    #[test]
+    fn requires_reason_for_not_evaluated_reports() {
+        let mut report = report();
+        report.disposition = BeatGridDisposition::NotEvaluated;
+        report.hypotheses.clear();
+        report.abstention_reason = None;
+        assert!(codes(&report).contains(&BeatGridViolationCode::MissingAbstentionReason));
     }
 
     #[test]
