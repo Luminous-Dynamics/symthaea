@@ -1,0 +1,754 @@
+{
+  "contract_version": "topo_adapt_trajectory_replay_v0_1",
+  "status": "proposed_research_contract_not_implemented_or_qualified",
+  "date": "2026-11-28",
+  "owner": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "issue": 14123,
+    "related_prs": [
+      14125,
+      14127,
+      14128
+    ]
+  },
+  "episode_semantics": {
+    "authoritative_state_owner": "independent_evaluator",
+    "decision_tick_order": [
+      "apply_exogenous_event_batch",
+      "generate_timestamped_observations",
+      "invoke_policy_with_only_available_observations",
+      "validate_action_authority_and_remaining_budgets",
+      "execute_or_record_rejected_failed_or_unknown_outcome",
+      "emit_receipt_and_post_state_digest"
+    ],
+    "causal_constraints": [
+      "policy_cannot_read_future_events_or_future_demand",
+      "observations_must_include_source_time_age_and_missingness",
+      "accepted_edits_persist_until_explicitly_changed_or_failed",
+      "episode_budgets_are_cumulative_unless_explicitly_replenished",
+      "unknown_execution_outcome_blocks_further_mutation_until_reconciliation"
+    ],
+    "simultaneous_event_rule": "apply_nonconflicting_events_as_one_batch; reject conflicting same-resource events unless an explicit composition rule is declared",
+    "duplicate_action_rule": "stable action IDs are idempotent; duplicate accepted mutations are never applied or charged twice"
+  },
+  "action_types": [
+    "no_op",
+    "add_edge",
+    "remove_edge",
+    "set_capacity",
+    "request_observation",
+    "defer",
+    "abstain"
+  ],
+  "receipt_required_fields": [
+    "episode_id",
+    "tick",
+    "action_id",
+    "policy_digest",
+    "pre_state_digest",
+    "observation_set_digest",
+    "consumed_observation_ids",
+    "action_type",
+    "target_resource_ids",
+    "reason_code",
+    "predicted_service_delta_and_uncertainty_when_available",
+    "resource_reservation",
+    "execution_status",
+    "post_state_digest_when_known",
+    "fixture_digest",
+    "evaluator_digest"
+  ],
+  "cumulative_budgets": [
+    {
+      "name": "topology_edits",
+      "unit": "typed_edit_count_and_cost",
+      "scope": "episode",
+      "measure": "additions_removals_rewires_capacity_changes_and_reversals"
+    },
+    {
+      "name": "edge_lifecycle",
+      "unit": "cost_units_per_edge_time",
+      "scope": "episode",
+      "measure": "installation_removal_maintenance_and_dormant_reserve_cost"
+    },
+    {
+      "name": "communication",
+      "unit": "messages_and_bytes",
+      "scope": "episode_and_tick",
+      "measure": "include_headers_retries_routing_and_coordination"
+    },
+    {
+      "name": "computation",
+      "unit": "node_updates_operations_wall_time_memory_bytes",
+      "scope": "episode_and_tick",
+      "measure": "record actual controller trace"
+    },
+    {
+      "name": "sensing",
+      "unit": "observations_bytes_latency_cost",
+      "scope": "episode",
+      "measure": "include requested and acquired observations"
+    },
+    {
+      "name": "service_latency",
+      "unit": "time_units",
+      "scope": "per_path_and_episode",
+      "measure": "propagation_queue_processing_and_deadline_misses"
+    },
+    {
+      "name": "energy",
+      "unit": "metered_energy_or_named_calibrated_proxy",
+      "scope": "episode",
+      "measure": "never mix proxy and measured energy without labeling"
+    }
+  ],
+  "outcome_families": [
+    "cumulative_demand_weighted_service",
+    "deadline_constrained_service",
+    "unmet_demand_and_service_deficit_area",
+    "time_to_recovery_and_recovery_success_by_horizon",
+    "lower_tail_service_and_preregistered_cvar",
+    "topology_churn_and_unnecessary_edits",
+    "lifecycle_cost_and_resource_per_service",
+    "latency_p50_p95_p99",
+    "calibration_and_selective_abstention",
+    "decision_regret_against_information_labeled_oracles"
+  ],
+  "p0_fixtures": [
+    "stationary_demand_no_edit",
+    "transient_demand_pulse",
+    "persistent_new_demand",
+    "single_bridge_failure",
+    "repeated_disruption_with_persistent_edits",
+    "shared_capacity_bottleneck",
+    "stale_and_partitioned_observation",
+    "conflicting_same_tick_events",
+    "exhausted_cumulative_budget",
+    "infeasible_demand",
+    "held_out_graph_family",
+    "two_x_graph_scale_transfer"
+  ],
+  "baseline_families": {
+    "decentralized_peers": [
+      "static_topology",
+      "fixed_topology_dynamic_routing",
+      "edge_weight_adaptation",
+      "local_greedy_repair",
+      "distributed_shortest_path_or_augmenting_path",
+      "degree_and_edge_budget_matched_random_rewiring",
+      "multi_rate_local_plus_slow_coordination",
+      "learned_policy_after_evaluator_qualification"
+    ],
+    "structural_message_passing_controls": [
+      "delaunay_or_geometric_augmentation",
+      "spectral_gap_or_expander_inspired_rewiring",
+      "effective_resistance_or_curvature_ranked_edits",
+      "sparsification",
+      "virtual_node_or_hub_shortcuts"
+    ],
+    "centralized_and_upper_bounds": [
+      "rolling_horizon_centralized_optimizer_with_current_information",
+      "capacity_aware_milp_or_min_cost_network_design",
+      "robust_or_stochastic_network_design",
+      "genetic_algorithm_under_matched_tuning_budget",
+      "exact_small_instance_oracle",
+      "offline_clairvoyant_trajectory_upper_bound",
+      "one_step_full_visibility_candidate_sweep_upper_bound"
+    ]
+  },
+  "promotion_gates": [
+    "contract_and_schema_conformance",
+    "persistent_state_and_action_semantics",
+    "causal_observation_and_no_future_leakage",
+    "independent_small_instance_reference",
+    "cumulative_resource_enforcement",
+    "deterministic_trajectory_receipts",
+    "faithful_comparator_reproduction",
+    "held_out_graph_demand_disturbance_and_scale_tournament",
+    "independent_replication"
+  ],
+  "aspirational_targets_not_results": {
+    "deterministic_reference_agreement": "100_percent",
+    "invalid_authority_or_budget_violations": 0,
+    "future_information_violations": 0,
+    "stationary_control_edits": 0,
+    "cumulative_service_improvement": ">=5_percentage_points_vs_strongest_matched_decentralized_baseline_with_paired_95_percent_CI_excluding_zero",
+    "held_out_graph_transfer": ">=90_percent_of_in_distribution_cumulative_service_including_2x_size_test",
+    "efficiency": ">=2x_lower_communication_or_preregistered_lifecycle_cost_reduction_at_non_inferior_service"
+  },
+  "evidence_lanes": {
+    "synthetic_network_control": "primary_algorithmic_lane",
+    "smart_cellular_bricks": "embodied_decentralized_comparator; code_data_and_weights_require_rights_admission",
+    "dynamic_atlas": "observational_developmental_trajectory_lane_not_a_causal_controller_benchmark",
+    "flim_bioelectric": "observational_multirate_signal_lane_not_an_architecture_prescription",
+    "manufacturing": "offline_then_shadow_mode_then_human_approved_advisory; no_initial_autonomous_actuation_claim",
+    "distribution_grid": "separate_future_qualification_with_power_flow_voltage_thermal_radiality_protection_and_switching_constraints"
+  },
+  "claim_boundary": [
+    "this_manifest_is_a_proposed_contract_not_an_implementation",
+    "no_controller_or_score_is_claimed",
+    "synthetic_flow_does_not_establish_biological_mechanism",
+    "simulation_does_not_establish_physical_self_repair_or_industrial_safety"
+  ],
+  "p1_extensions": [
+    {
+      "id": "reserve_route_option_value",
+      "question": "When does maintaining a dormant route before failure justify its installation and lifecycle cost?",
+      "controls": [
+        "always_on_reserve",
+        "never_reserve",
+        "online_risk_threshold_policy",
+        "clairvoyant_reserve_upper_bound"
+      ],
+      "required_metrics": [
+        "cumulative_service_deficit",
+        "reserve_install_cost",
+        "edge_time_maintenance_cost",
+        "activation_delay",
+        "post_shock_recovery_time"
+      ]
+    },
+    {
+      "id": "active_sensing_evsi",
+      "question": "Should the controller inspect, wait or reconfigure when a persistent demand shift and a transient pulse are observationally ambiguous?",
+      "controls": [
+        "no_sensing",
+        "random_sensing",
+        "free_oracle_observation_upper_bound"
+      ],
+      "required_metrics": [
+        "observation_cost",
+        "observation_latency",
+        "decision_regret",
+        "service_deficit_avoided",
+        "selective_risk_and_coverage"
+      ]
+    },
+    {
+      "id": "legitimate_target_change",
+      "question": "Can the system distinguish an authorized change in required function from damage, noise or unauthorized target substitution?",
+      "controls": [
+        "target_blind_policy",
+        "unauthorized_target_replacement",
+        "oracle_authority_upper_bound"
+      ],
+      "required_metrics": [
+        "authorized_change_detection",
+        "unauthorized_change_rejection",
+        "functional_constraint_satisfaction",
+        "abstention_and_false_acceptance"
+      ]
+    },
+    {
+      "id": "partitioned_local_authority",
+      "question": "Can local components preserve critical service during communication partitions without exceeding local permissions?",
+      "controls": [
+        "centralized_future_information_upper_bound",
+        "unrestricted_authority_ablation",
+        "local_only_policy"
+      ],
+      "required_metrics": [
+        "local_service_continuity",
+        "authority_violations",
+        "reconciliation_conflicts",
+        "unknown_outcome_count",
+        "recovery_after_reconnection"
+      ]
+    },
+    {
+      "id": "correlated_shock_sequences",
+      "question": "Does the policy retain service under clustered failures and overlapping recovery windows?",
+      "controls": [
+        "independent_iid_shock_generator_with_matched_marginals",
+        "clairvoyant_sequence_upper_bound"
+      ],
+      "required_metrics": [
+        "cvar_service_deficit",
+        "worst_window_service",
+        "recovery_overlap",
+        "repeat_failure_rate"
+      ]
+    },
+    {
+      "id": "topology_hysteresis",
+      "question": "Does the controller avoid repeated add/remove oscillations around a noisy decision threshold?",
+      "controls": [
+        "no_hysteresis_threshold_policy",
+        "observation_perturbation_control"
+      ],
+      "required_metrics": [
+        "edit_reversal_count",
+        "topology_churn",
+        "cumulative_lifecycle_cost",
+        "service_noninferiority"
+      ]
+    },
+    {
+      "id": "multi_rate_channel_factorial",
+      "related_owner": "symthaea issue #8388",
+      "question": "Do separate fast-local updates, delayed/low-frequency local aggregation and sparse nonlocal messages provide function or cost advantages beyond a single update rate?",
+      "channels": [
+        "fast_local_updates",
+        "delayed_low_frequency_local_aggregate",
+        "sparse_nonlocal_messages"
+      ],
+      "separate_experimental_arm": "optional_field_like_latent",
+      "separately_ablated_state": "target_and_capability_memory",
+      "conditions": [
+        "all_three_issue_8388_channels",
+        "remove_fast_local_channel",
+        "remove_delayed_low_frequency_aggregate",
+        "remove_sparse_nonlocal_message_channel",
+        "single_rate_collapse",
+        "shuffled_or_phase_randomized_channel_timing",
+        "swapped_channel_cadences",
+        "add_optional_field_like_latent_as_separate_arm",
+        "remove_or_corrupt_target_capability_memory"
+      ],
+      "required_metrics": [
+        "cumulative_service",
+        "recovery_time",
+        "message_bytes_by_channel",
+        "state_bytes_by_channel",
+        "update_cost_by_channel",
+        "stale_message_rejection",
+        "topology_churn"
+      ],
+      "fairness_rule": "Match aggregate controller updates, state bytes and communication where feasible; report unmatched resources. Persistent target/capability memory is not synonymous with a slow channel or field-like latent. Do not map biological seconds/minutes/hours directly onto software clocks."
+    }
+  ],
+  "p1_promotion_rule": "Run P1 only after deterministic P0 contract conformance, persistent-state replay, causal observation checks, independent small-instance references, and cumulative budget enforcement are qualified.",
+  "tournament_protocol": {
+    "graph_family_disjoint_splits": true,
+    "hold_out": [
+      "topology_generators",
+      "demand_patterns",
+      "disturbance_sequences",
+      "spatial_layouts",
+      "communication_faults",
+      "graph_sizes"
+    ],
+    "paired_design": "common_random_numbers_across_policies",
+    "statistical_unit": "independent_episode_or_disturbance_sequence_not_nodes_edges_or_ticks",
+    "sample_size_rule": "predeclared_power_or_precision_analysis",
+    "multiple_comparison_rule": "predeclared_primary_claims_and_adjustment_for_multiple_comparisons",
+    "full_census_required": [
+      "failure",
+      "timeout",
+      "infeasible",
+      "abstention",
+      "unknown_outcome"
+    ],
+    "reporting": [
+      "paired_effect_sizes",
+      "confidence_intervals",
+      "lower_tail_and_CVaR",
+      "calibration",
+      "selective_risk",
+      "pareto_frontiers",
+      "resource_differences",
+      "exact_versions_and_digests"
+    ],
+    "sota_claim_rule": "Strongest comparable baseline must be reproduced or deviation explained; holdout and resource accounting preregistered; independent replication required.",
+    "reference_scale_targets": {
+      "node_counts": [
+        7,
+        13,
+        20,
+        74
+      ],
+      "purpose": "Align synthetic scale tests with the 7-node, 13-node, 20-node and 74-node network sizes reported in the early-access resilience-based network-design study.",
+      "admission_rule": "Only call these a reproduction when the exact instance data, objective, uncertainty model, constraints and runtime protocol are reconciled. Otherwise use newly generated synthetic graphs and label them scale stress tests.",
+      "comparator_methods": [
+        "MILP_based_probabilistic_solution_discovery_algorithm",
+        "genetic_algorithm",
+        "decentralized_online_policies",
+        "exact_small_instance_oracle"
+      ]
+    }
+  },
+  "reference_comparator_targets": {
+    "smart_cellular_bricks_2026": {
+      "doi": "10.1038/s41467-026-75166-7",
+      "simulation_targets": {
+        "shape_classification_accuracy_percent": 98.97,
+        "damage_direction_detection_accuracy_percent": 94.8,
+        "distributed_voxel_graph_wl_classification_accuracy_percent": 100,
+        "damaged_shape_classification_mean_nca": 72.17,
+        "damaged_shape_classification_sd_nca": 35.68,
+        "damaged_shape_classification_mean_wl": 67.96,
+        "damaged_shape_classification_sd_wl": 44.11
+      },
+      "physical_demo": "Classifier transfer to four tested shape classes on assemblies of almost 200 modules; do not infer physical damage localization or repair from this result.",
+      "recovery_claim": "Damage localization and recovery/regrowth are simulation results; physical self-repair requires actuation and is future work.",
+      "rights_gate": "Symthaea issue #8423; code, dataset and model weights require separate rights/provenance admission."
+    },
+    "resilience_based_network_design_2026_early_access": {
+      "doi": "10.1016/j.cie.2026.112478",
+      "journal_issue_listed": "2027-01",
+      "network_sizes_nodes": [
+        7,
+        13,
+        20,
+        74
+      ],
+      "network_sizes_arcs": [
+        12,
+        31,
+        30,
+        258
+      ],
+      "methods": [
+        "MILP_based_PSDA",
+        "genetic_algorithm"
+      ],
+      "problem_scope": "Joint topology and integer-capacity design under repeated disruptions and chance-constrained recovery/resilience.",
+      "comparator_class": "centralized_network_design_not_decentralized_online_peer"
+    },
+    "nist_super_intelligence_for_manufacturing": {
+      "initiative_url": "https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing",
+      "initial_test_case": "Tennessee Eastman Process",
+      "validation_stage_order": [
+        "offline_benchmark",
+        "shadow_mode_advisory",
+        "human_approved_intervention"
+      ],
+      "project_status": "research initiative and planned benchmark/integration work, not a completed universal industrial leaderboard"
+    },
+    "dynamic_atlas_2026": {
+      "doi": "10.1038/s41592-025-02897-8",
+      "published_online": "2025-12-24",
+      "journal_volume_year": "Nature Methods volume 23, 2026",
+      "embryo_count": 500,
+      "mutant_genotypes": 18,
+      "data_location": "Dryad",
+      "task_lane": "observational developmental trajectory alignment and tissue-flow prediction",
+      "claim_boundary": "observational data do not establish a causal morphogenesis mechanism or validate a synthetic graph controller"
+    },
+    "xenopus_flim_2026": {
+      "doi": "10.1016/j.ydbio.2026.08.001",
+      "published_online": "2026-08-05",
+      "journal_issue": "Developmental Biology volume 539, November 2026",
+      "observation_duration_hours": 17,
+      "temporal_components": [
+        "seconds",
+        "minutes",
+        "hours"
+      ],
+      "independent_clutch_replicates": 3,
+      "measurement": "fluorescence-lifetime optical estimation of membrane potential",
+      "claim_boundary": "not direct electrophysiology; observational temporal structure does not prescribe software channel rates or prove causal control"
+    },
+    "developmental_graph_cellular_automata_2026": {
+      "doi": "10.1162/ARTL.a.486",
+      "publication": "Artificial Life, online 2026-09-04",
+      "authors": [
+        "Matias Barandiaran",
+        "James Stovold"
+      ],
+      "method": "deterministic and stochastic developmental graph cellular automata grow directed reservoirs from single-node seeds",
+      "reported_task_families": [
+        "task-driven NARMA family",
+        "task-independent reservoir metrics"
+      ],
+      "abstract_level_report": "deterministic growth produces task-specialized reservoirs; stochastic growth produces robust regular structures that outperform deterministic-grown reservoirs in the paper's robustness comparison",
+      "reproduction_rule": "Do not invent task order, split, training procedure or stability setting; retrieve full article/artifacts and reproduce exact protocol, or label clean-room implementation."
+    },
+    "distributed_spectral_topology_reconfiguration_2026": {
+      "doi": "10.1109/TCYB.2026.3690612",
+      "publication": "IEEE Transactions on Cybernetics 56(9), 2026",
+      "authors": [
+        "Yanping Peng",
+        "Jun Cheng",
+        "Bin Zhang",
+        "Mei Yan",
+        "Michael V Basin",
+        "Leszek Rutkowski"
+      ],
+      "method": "distributed spectral estimation with algebraic connectivity and Kirchhoff index for dynamic agent entry/exit and topology repair",
+      "task_scope": "open multiagent topology reconfiguration and cooperative control",
+      "caveat": "structural robustness comparator; require separate capacity/service evaluator for transport tasks"
+    },
+    "open_multiagent_resilient_consensus_2026": {
+      "doi": "10.1109/TIE.2026.3743690",
+      "publication_online": "2026-10-22",
+      "method": "fully distributed circulant-digraph topology reconfiguration under f-local attack models for open multiagent consensus",
+      "validation": "Raspberry Pi hardware-in-the-loop reported by the paper",
+      "caveat": "consensus-specific comparator; f-local attack model assumptions must be matched and cannot be generalized to arbitrary network service"
+    },
+    "active_topology_morphology_review_2026": {
+      "doi": "10.1063/5.0355885",
+      "publication": "Applied Physics Reviews, review online 2026-10-30",
+      "themes": [
+        "non-equilibrium activity",
+        "topological defects",
+        "multiscale modeling",
+        "control/interfacial regulation"
+      ],
+      "role": "scientific context for living-system topology/morphology, not an executable engineering baseline"
+    },
+    "gnn_progressive_ospf_metric_updates_2026": {
+      "doi": "10.1007/s44595-026-00004-6",
+      "publication": "Discover Telecommunications, published 2026-10-02",
+      "method": "GNN-PMU orders OSPF metric updates; exact Dijkstra/ECMP validates each intermediate state; serialized min-margin greedy is fallback",
+      "reported_results": {
+        "direct_acceptance_percent": [
+          90.5,
+          96.9
+        ],
+        "final_rejection_percent": [
+          0.4,
+          2.4
+        ]
+      },
+      "tested_robustness": [
+        "telemetry_corruption_and_staleness",
+        "localized_and_asymmetric_traffic_spikes",
+        "soft_routing_approximation_error",
+        "larger_update_batch_distribution_shift",
+        "forwarding_table_churn",
+        "end_to_end_reconfiguration_time"
+      ],
+      "topology_scale": "simulation topology transfer through 100 nodes",
+      "caveat": "paper-specific simulation result; reproduce exact tasks/splits/resources before direct SOTA comparison; learned scheduler is not the exact safety validator",
+      "code_availability": "The article states that simulation and analysis scripts are available from the corresponding author on reasonable request; do not assume a public code release. Reproduce from disclosed artifacts or create a distinctly labeled clean-room implementation."
+    },
+    "nist_ai_800_3_statistical_evaluation_2026": {
+      "publication": "NIST AI 800-3, published 2026-02",
+      "title": "Expanding the AI Evaluation Toolbox with Statistical Models",
+      "measurement_guidance": [
+        "separate frozen-benchmark from generalized-population estimands",
+        "use generalized linear mixed-effects models where assumptions fit",
+        "report uncertainty and benchmark-composition effects",
+        "inspect assumptions and retain raw benchmark results"
+      ],
+      "use_in_this_benchmark": "Report both fixed-manifest performance and generalized performance over graph families/episodes; do not treat correlated ticks as independent experimental units."
+    },
+    "event_triggered_barrier_certified_topology_switching_2026": {
+      "arxiv": "2611.21513v1",
+      "date": "2026-11-16",
+      "authors": [
+        "Amber He Wei",
+        "Shiyu Cheng",
+        "Andrew Clark",
+        "Bruno Sinopoli"
+      ],
+      "method": "Decentralized event-triggered communication-topology switching using robust barrier certificates and bounded estimation-error conditions; non-Zeno proof",
+      "reported_complexity": "O(2^N) to O(N) topology-dependent per-agent calculations",
+      "reported_case": "Four interconnected microgrids; fixed physical power lines; communication topology switched",
+      "reported_results": {
+        "average_connected_time_reduction_percent": 22.76,
+        "all_agents_simultaneously_disconnected_percent": 22.57
+      },
+      "status": "arXiv preprint; results are for its specified simulation and assumptions"
+    },
+    "runtime_dependability_certificates_2026": {
+      "doi": "10.1109/CASE69030.2026.11704118",
+      "publication": "2026 IEEE CASE, 17–26 August 2026, pp. 1775–1782",
+      "authors": [
+        "Isabel Fröhler",
+        "Birgit Vogel-Heuser",
+        "Josua Höfgen",
+        "Joseph Daniel Alterbaum",
+        "Ilya Kovalenko"
+      ],
+      "method": "Machine-interpretable runtime dependability contracts that are continuously enforced and revoked when assumptions fail; process-input, resource-identity and runtime-monitoring gates",
+      "case_study": "Additive manufacturing and robotic handling laboratory case",
+      "relevance": "Capability identity and continuous runtime certificate lifecycle; distinct from a graph service evaluator"
+    },
+    "effective_controllability_and_network_recovery_review_2026": {
+      "doi": "10.3390/s26196294",
+      "publication": "Sensors 2026, 26(19), 6294; 2026-10-04",
+      "type": "Structured critical review, 268-record corpus",
+      "key_recommendations": [
+        "service retention",
+        "cumulative performance loss",
+        "recovery time",
+        "communication-aware cooperation mode and safe fallback",
+        "validation progression simulation→real-data→SIL/HIL→field"
+      ],
+      "caveat": "E0-E4 ladder is author-defined, not externally standardized; cross-study percentage comparisons are not directly comparable"
+    }
+  },
+  "p2_research_tracks": [
+    {
+      "id": "strategic_attack_defense_coevolution",
+      "owner_issue": 14172,
+      "question": "Can a distributed defender preserve service when an adversary observes past defender actions and adapts its next intervention?",
+      "reuse_owners": [
+        13203,
+        13144,
+        13157,
+        12632,
+        14123
+      ],
+      "required_arms": [
+        "static_random_degree_betweenness_min_cut_attacks",
+        "dynamic_residual_graph_reranking",
+        "bounded_adaptive_attacker",
+        "local_greedy_defender",
+        "flow_aware_defender",
+        "reserve_route_defender",
+        "adaptive_topology_defender",
+        "exact_small_game_minimax_oracle"
+      ],
+      "metrics": [
+        "cross_play_service_matrix",
+        "worst_case_and_lower_tail_service",
+        "recovery_time",
+        "defender_and_attacker_cumulative_budgets",
+        "false_positive_defense_cost_in_benign_episodes",
+        "exploitability_or_regret_when_computable"
+      ],
+      "key_control": "attacker and defender receive only their declared observation sets; future actions, hidden seeds and private state are not leaked except in labeled upper bounds",
+      "admission_gate": "Reuse #13203 dynamic attack ranking and uncertain-delivery receipts; #14172 owns only strategic co-evolution, not a duplicate attack evaluator."
+    },
+    {
+      "id": "developmental_graph_growth_and_reservoir_morphogenesis",
+      "owner_issue": 14173,
+      "question": "Can local developmental rules grow a useful computational reservoir from a single-node seed under matched resource budgets?",
+      "reference_doi": "10.1162/ARTL.a.486",
+      "reuse_owners": [
+        14123,
+        14155,
+        8388,
+        13079,
+        13157,
+        13450,
+        13435
+      ],
+      "required_arms": [
+        "faithful_deterministic_DGCA_if_admitted",
+        "faithful_stochastic_DGCA_if_admitted",
+        "clean_room_DGCA_distinctly_labeled",
+        "fixed_size_echo_state_network",
+        "sparse_random_directed_reservoir",
+        "fixed_topology_optimized_reservoir",
+        "task_blind_local_growth",
+        "random_feasible_growth"
+      ],
+      "phases": [
+        "developmental_construction",
+        "task_adaptation",
+        "damage_recovery"
+      ],
+      "metrics": [
+        "held_out_task_error",
+        "reservoir_metrics",
+        "node_and_edge_budgets",
+        "construction_steps_and_compute",
+        "state_and_parameter_bytes",
+        "task_generalization",
+        "post_lesion_task_retention_and_recovery"
+      ],
+      "rights_rule": "Pin article version, code/data/checkpoint digests and all separate licenses; no unlicensed code or weights are copied.",
+      "admission_gate": "Use exact published NARMA definitions and task-independent metrics where recoverable; label unreproducible details and clean-room implementations distinctly."
+    },
+    {
+      "id": "open_population_topology_churn",
+      "related_references": [
+        "10.1109/TCYB.2026.3690612",
+        "10.1109/TIE.2026.3743690"
+      ],
+      "question": "Can a network retain task-specific function and authority as agents arrive, depart or are replaced?",
+      "comparator_arms": [
+        "distributed_algebraic_connectivity_plus_Kirchhoff_index_reconfiguration",
+        "circulant_digraph_f_local_resilient_consensus_when_consensus_is_the_task",
+        "static_topology",
+        "local_repair",
+        "centralized_upper_bound"
+      ],
+      "metrics": [
+        "service_continuity_during_churn",
+        "identity_and_authority_reconciliation",
+        "convergence_time_only_for_consensus_tasks",
+        "capacity_feasible_service_for_transport_tasks",
+        "reconfiguration_overhead",
+        "communication_and_state_cost"
+      ],
+      "key_rule": "Do not treat structural connectivity or consensus guarantees as a general capacity-constrained service solver."
+    },
+    {
+      "id": "ospf_sequential_routing_transition_safety",
+      "owner_issue": 14206,
+      "question": "Can a learned or distributed scheduler order OSPF metric updates while every intermediate shortest-path/ECMP state remains within capacity?",
+      "related_owners": [
+        14123,
+        14155,
+        14205
+      ],
+      "comparator_reference_doi": "10.1007/s44595-026-00004-6",
+      "required_arms": [
+        "conventional_metric_ordering",
+        "faithful_GNN_PMU_if_admitted",
+        "clean_room_GNN_sequence_scheduler",
+        "PPO_sequential_scheduler",
+        "serialized_min_margin_greedy",
+        "exact_small_instance_feasibility_oracle"
+      ],
+      "metrics": [
+        "false_safe_acceptance_zero",
+        "direct_safe_acceptance",
+        "fallback_activation_and_success",
+        "final_rejection",
+        "fallback_false_infeasibility",
+        "intermediate_peak_link_utilization",
+        "scheduler_validator_and_convergence_time",
+        "forwarding_table_churn"
+      ],
+      "key_boundary": "Use exact Dijkstra/ECMP for the routing lane; maximum flow from the TOPO-ADAPT core does not certify OSPF transition safety."
+    },
+    {
+      "id": "certified_event_triggered_communication_switching",
+      "owner_issue": 14247,
+      "reference": "arXiv:2611.21513v1 (2026-11-16)",
+      "question": "Can local barrier certificates determine when agents may disconnect/reconnect while preserving a declared safe set and non-Zeno behavior?",
+      "baseline_arms": [
+        "always_connected",
+        "periodic_communication",
+        "uncertified_threshold_trigger",
+        "centralized_barrier_oracle",
+        "decentralized_local_certificate",
+        "fail_closed_reconnect"
+      ],
+      "metrics": [
+        "false_safe_disconnections_zero",
+        "barrier_margin",
+        "estimation_error_envelope",
+        "non_zeno_dwell_time",
+        "connected_time_fraction",
+        "message_bytes",
+        "reconnect_latency",
+        "worst_agent_control_quality"
+      ],
+      "scope_boundary": "Communication graph is switched; the cited four-microgrid case keeps physical power-line topology fixed."
+    },
+    {
+      "id": "finite_horizon_robust_viability_and_recoverability",
+      "owner_issue": 14249,
+      "question": "Does the system retain an admissible policy to keep service safe against every allowed disturbance and recover to a target capability envelope before a deadline?",
+      "mathematical_reference": "Finite-horizon robust dynamic-programming viability kernel K_t={x in C: exists action a such that for all admissible disturbances w, F(x,a,w) is in K_(t+1)}",
+      "baseline_arms": [
+        "current_max_flow_only",
+        "connectivity_and_spectral_heuristics",
+        "greedy_service_repair",
+        "greedy_min_cost_repair",
+        "reserve_route",
+        "finite_horizon_MPC",
+        "exact_small_instance_robust_DP_oracle"
+      ],
+      "metrics": [
+        "robust_viability_classification",
+        "deadline_recoverability",
+        "minimum_repair_cost",
+        "minimum_recovery_time",
+        "disturbance_margin",
+        "false_viable_rate",
+        "cumulative_service_loss",
+        "resource_cost"
+      ],
+      "control": "Controller acts before disturbance realization using its declared information; clairvoyant policy is a labeled upper bound.",
+      "claim_boundary": "Finite synthetic graph-control state space only; no universal physical safety claim."
+    }
+  ]
+}
