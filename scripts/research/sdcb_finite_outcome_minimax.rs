@@ -39,6 +39,7 @@ enum ArithmeticOrSolverError {
     InvalidInput,
     EnumerationLimit,
     NoFeasibleVertex,
+    DualityGap,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -148,6 +149,7 @@ struct Law {
 
 impl Law {
     fn valid(&self, outcomes: usize) -> Exact<bool> {
+        let _law_identity = self.id;
         if self.probabilities.len() != outcomes {
             return Ok(false);
         }
@@ -244,6 +246,7 @@ fn solve_square(rows: &[LinearRow], dimension: usize) -> Exact<Option<Vec<Rat>>>
 struct BestVertex {
     value: Rat,
     point: Vec<Rat>,
+    bases_checked: usize,
 }
 
 fn inspect_basis(
@@ -271,7 +274,7 @@ fn inspect_basis(
         Some(current) => value.cmp(current.value)? == Ordering::Greater,
     };
     if replace {
-        *best = Some(BestVertex { value, point });
+        *best = Some(BestVertex { value, point, bases_checked: 0 });
     }
     Ok(())
 }
@@ -337,10 +340,12 @@ fn maximize_by_vertex_enumeration(
         dimension, equalities, inequalities, objective, choose, 0,
         &mut selected, &mut visited, basis_limit, &mut best,
     )?;
-    best.ok_or(ArithmeticOrSolverError::NoFeasibleVertex)
+    let mut result = best.ok_or(ArithmeticOrSolverError::NoFeasibleVertex)?;
+    result.bases_checked = visited;
+    Ok(result)
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct OracleResult {
     primal_power: Rat,
     primal_test: Vec<Rat>,
@@ -470,7 +475,7 @@ fn solve_minimax(
     // The two independent optima must agree exactly. Any mismatch is unresolved.
     let primal_dual_gap = dual_upper_bound.sub(primal.value)?;
     if !primal_dual_gap.is_zero() {
-        return Err(ArithmeticOrSolverError::InvalidInput);
+        return Err(ArithmeticOrSolverError::DualityGap);
     }
 
     let lambda = dual_negative.point[..alternatives_count].to_vec();
@@ -485,8 +490,8 @@ fn solve_minimax(
         dual_null_weights: null_weights,
         dual_slack: slack,
         primal_dual_gap,
-        primal_bases_checked: 0, // Filled by caller-facing diagnostics in a later revision.
-        dual_bases_checked: 0,
+        primal_bases_checked: primal.bases_checked,
+        dual_bases_checked: dual_negative.bases_checked,
     })
 }
 
@@ -542,6 +547,8 @@ fn main() {
                 println!("dual_lambda={:?}", result.dual_lambda);
                 println!("dual_null_weights={:?}", result.dual_null_weights);
                 println!("dual_slack={:?}", result.dual_slack);
+                println!("primal_bases_checked={}", result.primal_bases_checked);
+                println!("dual_bases_checked={}", result.dual_bases_checked);
             }
             Err(error) => {
                 println!("fixture={name}");
