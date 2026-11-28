@@ -20,6 +20,7 @@ pub enum EncoderError {
     InvalidLearningRate,
     StaleTransaction,
     AlreadyCommitted,
+    EvidenceCommitRejected,
 }
 impl fmt::Display for EncoderError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -155,20 +156,29 @@ impl PredictableEncoder {
         })
     }
 
-    /// Commit exactly one prepared update after the caller has committed the
-    /// current pair's evidence transaction. Stale/duplicate updates fail.
-    pub fn commit_next_version(
+    /// Commit the parent evidence transaction first, then advance the encoder.
+    /// The callback is invoked only after the prepared update is validated; a
+    /// rejected evidence commit leaves the encoder version unchanged.
+    pub fn commit_after_evidence<F>(
         &mut self,
         prepared: PreparedEncoderUpdate,
-    ) -> Result<(), EncoderError> {
+        commit_evidence: F,
+    ) -> Result<(), EncoderError>
+    where
+        F: FnOnce() -> bool,
+    {
         if prepared.base_version != self.version || prepared.base_digest != self.digest
             || self.last_sequence.is_some_and(|last| prepared.pair_sequence <= last)
         {
             return Err(EncoderError::StaleTransaction);
         }
+        let next_version = self.version.checked_add(1).ok_or(EncoderError::StaleTransaction)?;
+        if !commit_evidence() {
+            return Err(EncoderError::EvidenceCommitRejected);
+        }
         self.weights = prepared.next_weights;
         self.digest = prepared.next_digest;
-        self.version = self.version.checked_add(1).ok_or(EncoderError::StaleTransaction)?;
+        self.version = next_version;
         self.last_sequence = Some(prepared.pair_sequence);
         Ok(())
     }
@@ -273,9 +283,9 @@ mod tests {
     fn only_commit_advances_version_and_rejects_replay() {
         let mut encoder = encoder();
         let staged = encoder.prepare_next_version(1, &[0.2, 0.4], &[0.7, -0.1], 0.01, 0.001).unwrap();
-        encoder.commit_next_version(staged.clone()).unwrap();
+        encoder.commit_after_evidence(staged.clone(), || true).unwrap();
         assert_eq!(encoder.version(), 1);
-        assert!(matches!(encoder.commit_next_version(staged), Err(EncoderError::StaleTransaction)));
+        assert!(matches!(encoder.commit_after_evidence(staged, || true), Err(EncoderError::StaleTransaction)));
     }
 
     #[test]
@@ -287,10 +297,34 @@ mod tests {
     }
 
     #[test]
+    fn rejected_evidence_commit_does_not_advance_encoder() {
+        let mut encoder = encoder();
+        let digest = encoder.digest().to_string();
+        let staged = encoder.prepare_next_version(1, &[0.2, 0.4], &[0.7, -0.1], 0.01, 0.001).unwrap();
+        assert!(matches!(
+            encoder.commit_after_evidence(staged, || false),
+            Err(EncoderError::EvidenceCommitRejected)
+        ));
+        assert_eq!(encoder.version(), 0);
+        assert_eq!(encoder.digest(), digest);
+    }
+
+    #[test]
+    fn evidence_callback_observes_old_encoder_version() {
+        let mut encoder = encoder();
+        let staged = encoder.prepare_next_version(1, &[0.2, 0.4], &[0.7, -0.1], 0.01, 0.001).unwrap();
+        encoder.commit_after_evidence(staged, || {
+            assert_eq!(encoder.version(), 0);
+            true
+        }).unwrap();
+        assert_eq!(encoder.version(), 1);
+    }
+
+    #[test]
     fn sequence_must_increase() {
         let mut encoder = encoder();
         let staged = encoder.prepare_next_version(4, &[0.0, 0.0], &[1.0, 1.0], 0.1, 0.01).unwrap();
-        encoder.commit_next_version(staged).unwrap();
+        encoder.commit_after_evidence(staged, || true).unwrap();
         assert!(matches!(encoder.encode_pair(4, &[0.0, 0.0], &[1.0, 1.0]), Err(EncoderError::StaleTransaction)));
     }
 }
