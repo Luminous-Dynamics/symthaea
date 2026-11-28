@@ -671,6 +671,221 @@ pub fn render_string_literal(value: &str) -> Result<String, TypedNixError> {
 mod tests {
     use super::*;
 
+    fn sample_target_identity() -> NixTargetIdentity {
+        NixTargetIdentity {
+            host_id: "workstation-01".into(),
+            nixos_release: "26.11".into(),
+            system: "x86_64-linux".into(),
+            flake_ref: "git+file:///etc/nixos".into(),
+            nixpkgs_revision: "1111111111111111111111111111111111111111".into(),
+            flake_lock_digest: "sha256-test-lock".into(),
+            configuration_identity: "nixosConfigurations.workstation-01".into(),
+            module_set_digest: "sha256-test-module-set".into(),
+        }
+    }
+
+    fn sample_target_catalog(origin: NixOptionCatalogOrigin) -> NixOptionCatalogV1 {
+        let mut catalog = NixOptionCatalogV1::new(sample_target_identity(), origin).unwrap();
+        catalog
+            .register_option(
+                "networking.firewall.enable",
+                NixOptionValueKind::Bool,
+                Some(false),
+            )
+            .unwrap();
+        catalog
+            .register_option(
+                "environment.systemPackages",
+                NixOptionValueKind::ListOfPackages,
+                Some(false),
+            )
+            .unwrap();
+        catalog.register_package_attribute("ripgrep").unwrap();
+        catalog
+    }
+
+    #[test]
+    fn target_catalog_validates_exact_option_types_and_packages() {
+        let target = sample_target_identity();
+        let catalog = sample_target_catalog(NixOptionCatalogOrigin::TargetEvaluated);
+        let mut plan = NixModulePlan::new();
+        plan.insert(
+            NixAttributePath::parse("networking.firewall.enable").unwrap(),
+            NixExpr::Bool(true),
+        )
+        .unwrap();
+        plan.insert(
+            NixAttributePath::parse("environment.systemPackages").unwrap(),
+            NixExpr::List(vec![NixExpr::Package(
+                NixPackageRef::new("ripgrep").unwrap(),
+            )]),
+        )
+        .unwrap();
+
+        let validated = catalog.validate_plan(&target, &plan).unwrap();
+        assert_eq!(validated.target(), &target);
+        let source = validated.render_and_parse().unwrap();
+        assert!(source.contains("networking.firewall.enable = true;"));
+        assert!(source.contains("[ pkgs.ripgrep ]"));
+    }
+
+    #[test]
+    fn catalog_from_reference_or_controller_data_cannot_authorize_a_plan() {
+        let target = sample_target_identity();
+        let mut plan = NixModulePlan::new();
+        plan.insert(
+            NixAttributePath::parse("networking.firewall.enable").unwrap(),
+            NixExpr::Bool(true),
+        )
+        .unwrap();
+
+        for origin in [
+            NixOptionCatalogOrigin::PinnedReference,
+            NixOptionCatalogOrigin::ControllerLocalLive,
+            NixOptionCatalogOrigin::BundledReference,
+        ] {
+            let catalog = sample_target_catalog(origin);
+            assert_eq!(
+                catalog.validate_plan(&target, &plan).unwrap_err(),
+                TypedNixError::NonTargetCatalog
+            );
+        }
+    }
+
+    #[test]
+    fn every_target_identity_component_is_bound() {
+        let target = sample_target_identity();
+        let catalog = sample_target_catalog(NixOptionCatalogOrigin::TargetEvaluated);
+        let mut plan = NixModulePlan::new();
+        plan.insert(
+            NixAttributePath::parse("networking.firewall.enable").unwrap(),
+            NixExpr::Bool(true),
+        )
+        .unwrap();
+
+        let mut changed_lock = target.clone();
+        changed_lock.flake_lock_digest = "sha256-different-lock".into();
+        assert_eq!(
+            catalog.validate_plan(&changed_lock, &plan).unwrap_err(),
+            TypedNixError::TargetIdentityMismatch
+        );
+
+        let mut changed_module_set = target.clone();
+        changed_module_set.module_set_digest = "sha256-different-modules".into();
+        assert_eq!(
+            catalog
+                .validate_plan(&changed_module_set, &plan)
+                .unwrap_err(),
+            TypedNixError::TargetIdentityMismatch
+        );
+    }
+
+    #[test]
+    fn target_catalog_requires_complete_identity() {
+        let mut target = sample_target_identity();
+        target.flake_lock_digest.clear();
+        assert_eq!(
+            NixOptionCatalogV1::new(target, NixOptionCatalogOrigin::TargetEvaluated)
+                .err()
+                .unwrap(),
+            TypedNixError::IncompleteTargetIdentity("flake_lock_digest")
+        );
+    }
+
+    #[test]
+    fn unknown_and_read_only_options_fail_closed() {
+        let target = sample_target_identity();
+        let mut plan = NixModulePlan::new();
+        plan.insert(
+            NixAttributePath::parse("networking.firewall.enable").unwrap(),
+            NixExpr::Bool(true),
+        )
+        .unwrap();
+
+        let mut read_only = NixOptionCatalogV1::new(
+            target.clone(),
+            NixOptionCatalogOrigin::TargetEvaluated,
+        )
+        .unwrap();
+        read_only
+            .register_option(
+                "networking.firewall.enable",
+                NixOptionValueKind::Bool,
+                Some(true),
+            )
+            .unwrap();
+        assert_eq!(
+            read_only.validate_plan(&target, &plan).unwrap_err(),
+            TypedNixError::ReadOnlyOption("networking.firewall.enable".into())
+        );
+
+        let mut unknown_writeability = NixOptionCatalogV1::new(
+            target.clone(),
+            NixOptionCatalogOrigin::TargetEvaluated,
+        )
+        .unwrap();
+        unknown_writeability
+            .register_option(
+                "networking.firewall.enable",
+                NixOptionValueKind::Bool,
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            unknown_writeability
+                .validate_plan(&target, &plan)
+                .unwrap_err(),
+            TypedNixError::OptionWriteabilityUnknown("networking.firewall.enable".into())
+        );
+
+        let empty = NixOptionCatalogV1::new(
+            target.clone(),
+            NixOptionCatalogOrigin::TargetEvaluated,
+        )
+        .unwrap();
+        assert_eq!(
+            empty.validate_plan(&target, &plan).unwrap_err(),
+            TypedNixError::OptionNotFound("networking.firewall.enable".into())
+        );
+    }
+
+    #[test]
+    fn type_mismatches_and_unresolved_packages_fail_closed() {
+        let target = sample_target_identity();
+        let mut plan = NixModulePlan::new();
+        plan.insert(
+            NixAttributePath::parse("networking.firewall.enable").unwrap(),
+            NixExpr::String("true".into()),
+        )
+        .unwrap();
+
+        let catalog = sample_target_catalog(NixOptionCatalogOrigin::TargetEvaluated);
+        assert_eq!(
+            catalog.validate_plan(&target, &plan).unwrap_err(),
+            TypedNixError::OptionTypeMismatch {
+                path: "networking.firewall.enable".into(),
+                expected: "bool".into(),
+                actual: "string".into(),
+            }
+        );
+
+        let mut package_plan = NixModulePlan::new();
+        package_plan
+            .insert(
+                NixAttributePath::parse("environment.systemPackages").unwrap(),
+                NixExpr::List(vec![NixExpr::Package(
+                    NixPackageRef::new("notInTargetNixpkgs").unwrap(),
+                )]),
+            )
+            .unwrap();
+        assert_eq!(
+            catalog
+                .validate_plan(&target, &package_plan)
+                .unwrap_err(),
+            TypedNixError::PackageNotFound("notInTargetNixpkgs".into())
+        );
+    }
+
     #[test]
     fn string_literal_escapes_quotes_slashes_interpolation_and_whitespace() {
         let interpolation = concat!("$", "{builtins.abort \"x\"}");
