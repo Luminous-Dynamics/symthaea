@@ -314,8 +314,28 @@ impl FoveationManager {
         self.in_flight = still_in_flight;
     }
 
-    /// Drain all ready results for GWT injection.
+    /// Drain all ready results for GWT injection using legacy freshness
+    /// behavior. Call `drain_results_at` when the temporal budget is enabled
+    /// and the consumer needs a current-time freshness check.
     pub fn drain_results(&mut self) -> Vec<FoveationResult> {
+        self.results.drain(..).collect()
+    }
+
+    /// Drain results while rechecking source-clock freshness at the point of
+    /// injection. This closes the gap where a result was fresh when collected
+    /// but sat in the ready queue long enough to become stale before GWT use.
+    pub fn drain_results_at(&mut self, now_us: u64) -> Vec<FoveationResult> {
+        let maximum_age = self.temporal_budget.as_ref().map(|budget| budget.max_roi_age_us());
+        if let Some(maximum) = maximum_age {
+            self.results.retain(|result| {
+                let fresh = result.source_timestamp_us <= now_us
+                    && now_us.saturating_sub(result.source_timestamp_us) <= maximum;
+                if !fresh {
+                    self.temporal_stale_dropped = self.temporal_stale_dropped.saturating_add(1);
+                }
+                fresh
+            });
+        }
         self.results.drain(..).collect()
     }
 
