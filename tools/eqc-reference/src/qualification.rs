@@ -19,6 +19,7 @@ pub struct QualificationDimensions {
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct QualificationReport {
     pub schema: &'static str,
+    pub observer_evidence: Option<crate::observer::VerifiedObserverEvidence>,
     pub task_id: String,
     pub contract_checks_pass: bool,
     pub independent_evidence_verified: bool,
@@ -330,6 +331,7 @@ pub fn qualify_observation(
 
     Ok(QualificationReport {
         schema: "luminous.eqc.qualification-report.v0.1",
+        observer_evidence: None,
         task_id,
         contract_checks_pass,
         independent_evidence_verified,
@@ -339,6 +341,30 @@ pub fn qualify_observation(
         resource_usage,
         reasons,
     })
+}
+
+/// Apply independently verified observer evidence to the contract report.
+///
+/// A trusted receipt is necessary but not sufficient: every non-compensatory
+/// task dimension and resource-budget check must still pass.
+pub fn qualify_observation_with_observer(
+    task: &Value,
+    observation: &Value,
+    observer_evidence: crate::observer::VerifiedObserverEvidence,
+) -> anyhow::Result<QualificationReport> {
+    let mut report = qualify_observation(task, observation)?;
+    report.independent_evidence_verified = true;
+    report.observer_evidence = Some(observer_evidence);
+    report.qualified = report.contract_checks_pass && report.independent_evidence_verified;
+    report.qualification_status = if report.qualified {
+        "qualified_with_trusted_observer_v0_1"
+    } else {
+        "unqualified_contract_checks_failed"
+    };
+    report
+        .reasons
+        .retain(|reason| !reason.contains("no trusted observer attestation"));
+    Ok(report)
 }
 
 #[cfg(test)]
