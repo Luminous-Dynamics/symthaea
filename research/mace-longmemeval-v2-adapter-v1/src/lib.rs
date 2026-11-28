@@ -47,6 +47,10 @@ pub struct TrajectoryInsertReceiptV1 {
     pub receipt_sha256: String,
 }
 
+/// Privacy-minimized input contract for the official Memory.query API.
+/// Only query text and an optional question image are represented. No dataset
+/// question ID, question type, gold answer, evaluator function or grader label
+/// is provided to the memory backend.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MemoryQueryInputV1 {
@@ -56,8 +60,6 @@ pub struct MemoryQueryInputV1 {
     pub query_invocation_id: String,
     pub question_text_sha256: String,
     pub question_image_sha256: Option<String>,
-    /// Only query text and optional question image are represented here.
-    /// No question ID, question type, gold answer, eval function or grader label.
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
