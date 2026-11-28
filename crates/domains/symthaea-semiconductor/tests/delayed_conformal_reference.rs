@@ -7,13 +7,17 @@ use symthaea_semiconductor::benchmark::{
     CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_SCHEMA_V1,
     DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1,
     BoundedConformalScoreContractV1, BoundedConformalScoreKindV1, BoundedPredictionSetInputV1,
-    DELAYED_ACI_PREDICTION_SCHEMA_V1, CaOcrcFeedbackV1, CaOcrcPolicyV1,
+    DELAYED_ACI_PREDICTION_SCHEMA_V1, CONFORMAL_CALIBRATION_SAMPLE_SCHEMA_V1,
+    CONFORMAL_INTERVAL_INPUT_SCHEMA_V1, CONFORMAL_SCORE_POLICY_SCHEMA_V1,
+    CaOcrcFeedbackV1, CaOcrcPolicyV1,
     CaOcrcPredictionKindV1, CaOcrcRoundInputV1, CaOcrcTrackingDispositionV1,
-    DelayedAciLabelDeliveryV1, DelayedAciPolicyV1, DelayedAciPredictionInputV1,
+    ConformalCalibrationSampleV1, ConformalIntervalInputV1, ConformalScoreKindV1,
+    ConformalScorePolicyV1, DelayedAciLabelDeliveryV1, DelayedAciPolicyV1,
+    DelayedAciPredictionInputV1,
     DelayedAciDispositionV1, LabelConsumptionEligibilityReportV1,
     LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
     bounded_conformal_score_contract_sha256_v1, build_bounded_score_prediction_set_v1,
-    ca_ocrc_proxy_survival_v1, ca_ocrc_risk_gap_bound_v1,
+    build_conformal_interval_v1, ca_ocrc_proxy_survival_v1, ca_ocrc_risk_gap_bound_v1,
     create_ca_ocrc_engine_v1, create_delayed_aci_engine_v1,
     deliver_delayed_aci_label_v1,
     register_delayed_aci_prediction_v1, start_ca_ocrc_round_v1,
@@ -157,6 +161,110 @@ fn ca_feedback(origin: u64, current: u64, value: f64) -> CaOcrcFeedbackV1 {
             &payload,
         ),
     }
+}
+
+#[test]
+fn k1_conformal_interval_builder_feeds_the_immutable_delayed_aci_prediction() {
+    let score_policy = ConformalScorePolicyV1 {
+        schema: CONFORMAL_SCORE_POLICY_SCHEMA_V1.into(),
+        policy_id: "aci-absolute-residual-score.v1".into(),
+        revision: 1,
+        score_kind: ConformalScoreKindV1::AbsoluteResidual,
+        scale_floor: 1.0e-6,
+        maximum_calibration_samples: 50,
+        require_source_authenticity_assertion: false,
+    };
+    let score_policy_sha = sha256_json(&score_policy);
+    let mut calibration = Vec::new();
+    for index in 0..19_u64 {
+        let label_id = format!("aci-label-{index}");
+        let event_id = format!("aci-event-{index}");
+        let payload = digest(char::from(b'b' + (index % 20) as u8));
+        let residual = index as f64 + 1.0;
+        let mut report = eligibility_report(
+            &label_id,
+            1,
+            &event_id,
+            100.0 + residual,
+            &payload,
+        );
+        report.report_sha256.clear();
+        report.report_sha256 = sha256_json(&report);
+        calibration.push(ConformalCalibrationSampleV1 {
+            schema: CONFORMAL_CALIBRATION_SAMPLE_SCHEMA_V1.into(),
+            sample_id: format!("aci-sample-{index}"),
+            measurement_event_id: event_id,
+            label_id,
+            label_revision: 1,
+            label_payload_sha256: payload,
+            prediction_receipt_sha256: digest('q'),
+            global_model_artifact_sha256: digest('a'),
+            score_policy_sha256: score_policy_sha.clone(),
+            measurement_contract_sha256: digest('m'),
+            event_time_unix_seconds: 1_800_000_000 + index as i64 * 10 - 120,
+            prediction_at_unix_seconds: 1_800_000_000 + index as i64 * 10 - 60,
+            label_available_at_unix_seconds: 1_800_000_000 + index as i64 * 10,
+            eligibility_report_available_at_unix_seconds: 1_800_000_001 + index as i64 * 10,
+            prediction_value: 100.0,
+            prediction_scale: 1.0,
+            eligibility_report: report,
+        });
+    }
+    let set = build_conformal_interval_v1(
+        &score_policy,
+        &ConformalIntervalInputV1 {
+            schema: CONFORMAL_INTERVAL_INPUT_SCHEMA_V1.into(),
+            prediction_id: "aci-prediction-new".into(),
+            sample_id: "aci-sample-new".into(),
+            measurement_event_id: "aci-event-new".into(),
+            prediction_at_unix_seconds: 1_800_001_000,
+            clock_domain_id: "fab-clock".into(),
+            global_model_artifact_sha256: digest('a'),
+            measurement_contract_sha256: digest('m'),
+            point_prediction: 100.0,
+            prediction_scale: 1.0,
+            target_miscoverage: 0.05,
+        },
+        &calibration,
+    ).unwrap();
+    assert_eq!(set.lower_bound, Some(81.0));
+    assert_eq!(set.upper_bound, Some(119.0));
+
+    let mut engine = create_delayed_aci_engine_v1(
+        "aci-conformal-composition",
+        "fab-clock",
+        0.05,
+        DelayedAciPolicyV1 {
+            schema: DELAYED_ACI_POLICY_SCHEMA_V1.into(),
+            policy_id: "tau-daci-0.v1".into(),
+            revision: 1,
+            target_miscoverage: 0.05,
+            learning_rate: 0.1,
+            fixed_delay_rounds: 0,
+            require_source_authenticity_assertion: false,
+        },
+    ).unwrap();
+    let prediction = register_delayed_aci_prediction_v1(
+        &mut engine,
+        &DelayedAciPredictionInputV1 {
+            schema: DELAYED_ACI_PREDICTION_SCHEMA_V1.into(),
+            prediction_id: "aci-prediction-new".into(),
+            sample_id: "aci-sample-new".into(),
+            measurement_event_id: "aci-event-new".into(),
+            round_index: 0,
+            event_time_unix_seconds: 1_800_001_000,
+            feature_available_at_unix_seconds: 1_800_001_001,
+            prediction_at_unix_seconds: 1_800_001_002,
+            clock_domain_id: "fab-clock".into(),
+            global_model_artifact_sha256: digest('a'),
+            prediction_set_sha256: set.receipt_sha256.clone(),
+            lower_bound: set.lower_bound.unwrap(),
+            upper_bound: set.upper_bound.unwrap(),
+        },
+    ).unwrap();
+    assert_eq!(prediction.prediction_set_sha256, set.receipt_sha256);
+    assert_eq!(prediction.lower_bound, 81.0);
+    assert_eq!(prediction.upper_bound, 119.0);
 }
 
 #[test]
