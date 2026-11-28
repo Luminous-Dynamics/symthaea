@@ -14,10 +14,12 @@ Each record is chronological and contains a stable ID, sequence number, conditio
 
 The candidate's class probabilities and prediction outputs are frozen before labels. The true-label nonconformity is r_t(X_t,Y_t) = 1 - p_t(Y_t | X_t), computed by the evaluator only after an independent label exists. The candidate process never receives the audit membership, hidden label, or resulting true-label score.
 
-The config binds three distinct manifests:
+The config binds three distinct manifests by both a human-readable reference and a validated SHA-256 digest of the exact frozen manifest bytes:
 1. calibration protocol: alpha, delta, threshold grid, betting fractions and mixture weights;
 2. inclusion design: q_t schedule, q_min, randomization process and custodian custody;
 3. prediction artifact: frozen pre-label class probabilities and nonconformity function.
+
+The evaluator validates each digest as 64 lowercase hexadecimal characters and echoes all three into its report. It does not fetch the references or authenticate signatures; the external custodian must verify that the digests match the committed manifest bytes.
 
 The inclusion probability q_t must be the probability a label is actually observed, conditional on pre-label history. For an independent Bernoulli audit, q_t is the audit probability. If a predictable alert channel is combined with an independent audit channel, q_t can be pi_t + rho_t - pi_t*rho_t; that union formula is valid only under conditional independence. The module accepts q_t as an externally supplied pre-label value and does not generate random numbers or implement an alert channel.
 
@@ -91,6 +93,6 @@ The fixed-horizon evaluator is not time-uniform. It does not implement multiple-
 
 ## Tests authored
 
-The production module includes 17 tests covering default admissibility across audit floors, HT arithmetic, monotone loss and safe terminal behavior, nontrivial bounds, structural fallback, delta allocation, support failures, label/score consistency, sequence and ID integrity, grid/mixture validation, bounded scores, exact Bernoulli audit-mask enumeration with design-probability weights, exact Markov-outcome enumeration with history-adaptive predictable audit probabilities, an outcome-dependent selection negative control that demonstrates undercoverage when conditional ignorability is violated, strict tie semantics and calibration-manifest requirements.
+The production module includes 18 tests covering default admissibility across audit floors, HT arithmetic, monotone loss and safe terminal behavior, nontrivial bounds, structural fallback, delta allocation, support failures, label/score consistency, sequence and ID integrity, grid/mixture validation, bounded scores, exact Bernoulli audit-mask enumeration with design-probability weights, exact Markov-outcome enumeration with history-adaptive predictable audit probabilities, an outcome-dependent selection negative control that demonstrates undercoverage when conditional ignorability is violated, strict tie semantics, all three manifest-digest validations and calibration-manifest requirements.
 
 These tests are imported by path into the standalone Rust 1.96 epistemic harness. They are authored, not claimed as executed until an exact-head workflow result is observed.
