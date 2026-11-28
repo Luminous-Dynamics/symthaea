@@ -131,5 +131,26 @@
   ],
   "source_ids": [
     "GQ-SRC-01"
+  ],
+  "sources": [
+    {
+      "id": "GQ-SRC-01",
+      "title": "Historicising gqom as a post-kwaito phenomenon",
+      "author": "Dion Malcolm Eaby-Lomas",
+      "year": 2022,
+      "publication": "Journal of the Musical Arts in Africa, 18(1), 101–116",
+      "doi": "10.2989/18121004.2021.2020964",
+      "url": "https://doi.org/10.2989/18121004.2021.2020964",
+      "source_kind": "peer_reviewed_article",
+      "supports": [
+        "Gqom's relation to and distinction from Kwaito",
+        "historical emergence and dissemination",
+        "production, gender discourse and party-space context",
+        "rhythmic foregrounding, described raw/dark sound and slow-burn structures in analyzed examples"
+      ],
+      "limitations": [
+        "do not generalize analyzed examples to every contemporary Gqom variant; article notes changes over time"
+      ]
+    }
   ]
 }
