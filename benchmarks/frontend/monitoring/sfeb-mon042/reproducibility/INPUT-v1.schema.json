@@ -116,8 +116,7 @@
     "id": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 256,
-      "pattern": "^\\\\S(?:[^\\\\r\\\\n]*\\\\S)?$"
+      "maxLength": 256
     },
     "digest": {
       "type": "string",
