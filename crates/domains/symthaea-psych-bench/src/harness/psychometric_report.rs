@@ -149,7 +149,7 @@ impl PsychometricReport {
         let mut out = String::new();
 
         // Title
-        out.push_str("# Psychometric Assessment Report\n\n");
+        out.push_str("# Benchmark Diagnostic Report (not a psychometric assessment)\n\n");
 
         // Executive summary
         out.push_str("## Executive Summary\n\n");
@@ -162,15 +162,15 @@ impl PsychometricReport {
             self.summary.n_metrics
         ));
         out.push_str(&format!(
-            "- **Overall composite**: {:.1}%\n",
+            "- **Heuristic dashboard index**: {:.1}%\n",
             self.summary.overall_score * 100.0
         ));
         out.push_str(&format!(
-            "- **Strongest domain**: {}\n",
+            "- **Highest heuristic index**: {}\n",
             self.summary.strongest_domain
         ));
         out.push_str(&format!(
-            "- **Weakest domain**: {}\n\n",
+            "- **Lowest heuristic index**: {}\n\n",
             self.summary.weakest_domain
         ));
 
