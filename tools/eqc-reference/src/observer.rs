@@ -158,6 +158,25 @@ impl ObserverNonceLedger {
     pub fn is_empty(&self) -> bool {
         self.seen.is_empty()
     }
+
+    pub fn from_nonces(nonces: Vec<String>) -> anyhow::Result<Self> {
+        let mut seen = HashSet::new();
+        for nonce in nonces {
+            if !is_sha256(&nonce) {
+                bail!("nonce ledger contains malformed nonce");
+            }
+            if !seen.insert(nonce) {
+                bail!("nonce ledger contains a duplicate nonce");
+            }
+        }
+        Ok(Self { seen })
+    }
+
+    pub fn sorted_nonces(&self) -> Vec<String> {
+        let mut nonces = self.seen.iter().cloned().collect::<Vec<_>>();
+        nonces.sort();
+        nonces
+    }
 }
 
 /// Canonicalize the payload using RFC 8785 JSON Canonicalization Scheme.
