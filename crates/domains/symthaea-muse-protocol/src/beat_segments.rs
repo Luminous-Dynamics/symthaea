@@ -121,6 +121,7 @@ pub enum MirexValidSegmentError {
     SourceDurationExceedsMirEvalLimit,
     InvalidEventOrder,
     EventOutOfSourceBounds,
+    ReferenceDownbeatNotInReferenceBeatSequence,
     EmptySegmentList,
     TooManySegments,
     TooManyEvents,
@@ -190,6 +191,12 @@ pub fn score_mirex_valid_segments(
         estimated_downbeat_frames,
         total_source_frames,
     )?;
+    if reference_downbeat_frames
+        .iter()
+        .any(|frame| reference_beat_frames.binary_search(frame).is_err())
+    {
+        return Err(MirexValidSegmentError::ReferenceDownbeatNotInReferenceBeatSequence);
+    }
 
     if valid_segments.is_empty() {
         return Err(MirexValidSegmentError::EmptySegmentList);
@@ -556,6 +563,29 @@ mod tests {
         .unwrap();
         assert_eq!(source_global.segments[0].beat_report.reference_beats_scored, 6);
         assert_eq!(segment_local.segments[0].beat_report.reference_beats_scored, 1);
+    }
+
+    #[test]
+    fn rejects_reference_downbeat_not_present_in_reference_beat_sequence() {
+        let error = score_mirex_valid_segments(
+            &[1_000, 2_000, 3_000],
+            &[1_000, 2_000, 3_000],
+            &[1_500],
+            &[1_500],
+            1_000,
+            10_000,
+            &[BeatValidSegment {
+                start_frame: 0,
+                end_frame: 5_000,
+            }],
+            config(MirexSegmentBeatTrimPolicy::NoTrim),
+            evidence(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            MirexValidSegmentError::ReferenceDownbeatNotInReferenceBeatSequence
+        );
     }
 
     #[test]
