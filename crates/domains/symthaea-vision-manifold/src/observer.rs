@@ -16,8 +16,10 @@ pub const TEMPORAL_OBSERVER_PROFILE_ID_V0_1: &str = "symthaea-spacecraft-tempora
 /// Current serialized temporal observer checkpoint schema.
 pub const TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1: u32 = 3;
 /// Current emitted temporal witness schema.
-pub const TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1: u32 = 2;
+pub const TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1: u32 = 3;
 const Q16_16_SCALE: f32 = 65_536.0;
+const MAX_OBSERVER_PATCH_CELLS: usize = 1_048_576;
+const DEFAULT_PATCH_SURPRISE_TOP_K: usize = 128;
 const STANDARD_PREDICTION_HORIZONS_US: [u64; 4] = [33_000, 100_000, 500_000, 1_000_000];
 const DEFAULT_MAX_FRAME_BYTES: u64 = 64 * 1024 * 1024;
 const DEFAULT_MAX_INTERFRAME_GAP_US: u64 = 1_000_000;
@@ -31,6 +33,9 @@ pub struct TemporalObserverProfileV0_1 {
     pub fixed_horizon_us: u64,
     pub max_interframe_gap_us: u64,
     pub max_frame_bytes: u64,
+    /// Maximum number of localized patch-surprise entries emitted per frame.
+    #[serde(default = "default_patch_surprise_top_k")]
+    pub patch_surprise_top_k: usize,
     /// Fixed delayed-forecast horizons, in microseconds, scored against future
     /// observations and a persistence baseline. v0.1 locks the standard suite.
     #[serde(default = "default_prediction_horizons_us")]
@@ -46,6 +51,10 @@ fn default_prediction_horizons_us() -> Vec<u64> {
     STANDARD_PREDICTION_HORIZONS_US.to_vec()
 }
 
+fn default_patch_surprise_top_k() -> usize {
+    DEFAULT_PATCH_SURPRISE_TOP_K
+}
+
 impl Default for TemporalObserverProfileV0_1 {
     fn default() -> Self {
         Self {
@@ -54,6 +63,7 @@ impl Default for TemporalObserverProfileV0_1 {
             fixed_horizon_us: 30_000_000,
             max_interframe_gap_us: DEFAULT_MAX_INTERFRAME_GAP_US,
             max_frame_bytes: DEFAULT_MAX_FRAME_BYTES,
+            patch_surprise_top_k: default_patch_surprise_top_k(),
             prediction_horizons_us: default_prediction_horizons_us(),
             frame_width: None,
             frame_height: None,
@@ -85,6 +95,11 @@ impl TemporalObserverProfileV0_1 {
                 "observer v0.1 prediction horizons must match the frozen standard horizon suite"
                     .to_string(),
             );
+        }
+        if self.patch_surprise_top_k != DEFAULT_PATCH_SURPRISE_TOP_K {
+            return Err(format!(
+                "observer v0.1 patch-surprise top-k must equal {DEFAULT_PATCH_SURPRISE_TOP_K}"
+            ));
         }
         match (self.frame_width, self.frame_height) {
             (None, None) => {}
@@ -181,6 +196,15 @@ pub enum TemporalObserverStatusV0_1 {
     Observed,
 }
 
+/// One spatially localized patch-surprise value. Coordinates are indices in
+/// the committed patch grid, not pixel coordinates or object/part labels.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SpatialPatchSurpriseV0_1 {
+    pub row: u32,
+    pub col: u32,
+    pub value_q16_16: u32,
+}
+
 /// Quantized representation telemetry. Values are unsigned Q16.16; all units
 /// and claim limits are carried by the containing schema.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -203,6 +227,13 @@ pub struct TemporalObserverMetricsV0_1 {
     pub horizon_dropped_forecasts: Vec<u64>,
     pub horizon_expired_forecasts: Vec<u64>,
     pub salient_patch_count: u32,
+    pub patch_grid_rows: u32,
+    pub patch_grid_cols: u32,
+    pub patch_size_pixels: u32,
+    pub patch_surprise_nonzero_count: u32,
+    /// Largest accumulated patch-surprise values, descending by value then
+    /// stable row-major index. The map is truncated at the profile's top-k cap.
+    pub patch_surprise_top_k: Vec<SpatialPatchSurpriseV0_1>,
     pub encode_time_us: u64,
     pub evolve_time_us: u64,
 }
@@ -316,6 +347,16 @@ impl ObserverOnlyVisionManifold {
         profile.frame_width = Some(width);
         profile.frame_height = Some(height);
         profile.validate()?;
+        let initial_patch_cols = (width as usize).div_ceil(config.patch_size.max(1));
+        let initial_patch_rows = (height as usize).div_ceil(config.patch_size.max(1));
+        let initial_patch_cells = initial_patch_cols
+            .checked_mul(initial_patch_rows)
+            .ok_or_else(|| "observer patch-grid geometry overflow".to_string())?;
+        if initial_patch_cells == 0 || initial_patch_cells > MAX_OBSERVER_PATCH_CELLS {
+            return Err(format!(
+                "observer patch-grid cell count must be in 1..={MAX_OBSERVER_PATCH_CELLS}"
+            ));
+        }
         if config.enable_predictive_hierarchy {
             return Err(
                 "observer v0.1 rejects the adaptive predictive hierarchy until its weights and state can be frozen and attested"
@@ -449,6 +490,17 @@ impl ObserverOnlyVisionManifold {
         }
         identity.validate()?;
         self.validate_next_identity(&identity, pixels.len(), width, height, channels)?;
+        let initial_grid = self.inner.surprise_map().grid();
+        if initial_grid.frame_width != width || initial_grid.frame_height != height {
+            return Err("observer input dimensions differ from the fixed manifold patch grid".to_string());
+        }
+        let patch_cells = initial_grid
+            .cols
+            .checked_mul(initial_grid.rows)
+            .ok_or_else(|| "observer patch-grid geometry overflow".to_string())?;
+        if patch_cells == 0 || patch_cells > MAX_OBSERVER_PATCH_CELLS {
+            return Err("observer patch grid exceeds its fixed cell budget".to_string());
+        }
 
         let dt = match &self.last_identity {
             Some(previous) => (identity.timestamp_us - previous.timestamp_us) as f32 / 1_000_000.0,
@@ -496,8 +548,10 @@ impl ObserverOnlyVisionManifold {
         };
         let prediction_valid = status == TemporalObserverStatusV0_1::Observed;
         let horizon_accuracy = self.inner.horizon_accuracy();
+        let attention_map = self.inner.surprise_map().attention_map();
         let metrics = match quantize_telemetry(
             &telemetry,
+            &attention_map,
             &horizon_accuracy,
             &self.profile.prediction_horizons_us,
             prediction_valid,
@@ -817,6 +871,7 @@ fn validate_observer_state(state: &ManifoldState) -> Result<(), String> {
 
 fn quantize_telemetry(
     telemetry: &VisionTelemetry,
+    attention: &crate::types::AttentionMap,
     horizon: &crate::manifold::HorizonAccuracy,
     declared_horizons_us: &[u64],
     prediction_valid: bool,
@@ -901,6 +956,53 @@ fn quantize_telemetry(
         horizon_mean_lateness_us.push(Some(lateness_us as u64));
     }
 
+    let rows = attention.grid.rows;
+    let cols = attention.grid.cols;
+    let patch_size_pixels = attention.grid.patch_size;
+    let expected_patch_cells = rows
+        .checked_mul(cols)
+        .ok_or_else(|| "observer attention-map dimensions overflow".to_string())?;
+    if rows == 0
+        || cols == 0
+        || expected_patch_cells == 0
+        || expected_patch_cells > MAX_OBSERVER_PATCH_CELLS
+        || attention.values.len() != expected_patch_cells
+        || patch_size_pixels == 0
+    {
+        return Err("observer attention map dimensions violate the patch-grid contract".to_string());
+    }
+    let mut patch_values = Vec::new();
+    let mut nonzero_count = 0usize;
+    for (index, value) in attention.values.iter().copied().enumerate() {
+        if !value.is_finite() || value < 0.0 {
+            return Err("observer patch-surprise map contains an invalid value".to_string());
+        }
+        if value > 0.0 {
+            nonzero_count += 1;
+            patch_values.push((index, value));
+        }
+    }
+    patch_values.sort_by(|(left_index, left_value), (right_index, right_value)| {
+        right_value
+            .total_cmp(left_value)
+            .then_with(|| left_index.cmp(right_index))
+    });
+    patch_values.truncate(DEFAULT_PATCH_SURPRISE_TOP_K);
+    let patch_surprise_top_k = patch_values
+        .into_iter()
+        .map(|(index, value)| {
+            let row = u32::try_from(index / cols)
+                .map_err(|_| "observer patch row exceeds u32".to_string())?;
+            let col = u32::try_from(index % cols)
+                .map_err(|_| "observer patch column exceeds u32".to_string())?;
+            Ok(SpatialPatchSurpriseV0_1 {
+                row,
+                col,
+                value_q16_16: quantize("patch_surprise", value)?,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
     Ok(TemporalObserverMetricsV0_1 {
         prediction_error_q16_16: if prediction_valid {
             Some(quantize("prediction_error", telemetry.prediction_error)?)
@@ -927,6 +1029,15 @@ fn quantize_telemetry(
         horizon_expired_forecasts: horizon.expired_forecasts.clone(),
         salient_patch_count: u32::try_from(telemetry.num_salient_patches)
             .map_err(|_| "observer salient patch count exceeds u32".to_string())?,
+        patch_grid_rows: u32::try_from(rows)
+            .map_err(|_| "observer patch-grid rows exceed u32".to_string())?,
+        patch_grid_cols: u32::try_from(cols)
+            .map_err(|_| "observer patch-grid columns exceed u32".to_string())?,
+        patch_size_pixels: u32::try_from(patch_size_pixels)
+            .map_err(|_| "observer patch size exceeds u32".to_string())?,
+        patch_surprise_nonzero_count: u32::try_from(nonzero_count)
+            .map_err(|_| "observer patch-surprise count exceeds u32".to_string())?,
+        patch_surprise_top_k,
         encode_time_us: telemetry.encode_time_us,
         evolve_time_us: telemetry.evolve_time_us,
     })
@@ -1020,6 +1131,11 @@ mod tests {
         assert_eq!(value["status"], "warming_up");
         assert!(value["metrics"]["prediction_error_q16_16"].is_null());
         assert_eq!(value["metrics"]["horizon_sample_counts"], serde_json::json!([0, 0, 0, 0]));
+        assert_eq!(value["metrics"]["patch_grid_rows"], 4);
+        assert_eq!(value["metrics"]["patch_grid_cols"], 4);
+        assert_eq!(value["metrics"]["patch_size_pixels"], 8);
+        assert_eq!(value["metrics"]["patch_surprise_nonzero_count"], 0);
+        assert_eq!(value["metrics"]["patch_surprise_top_k"], serde_json::json!([]));
         assert_eq!(
             value["metrics"]["horizon_prediction_error_q16_16"],
             serde_json::json!([null, null, null, null])
@@ -1031,6 +1147,74 @@ mod tests {
         assert_eq!(value["pose_probability_claim"], false);
         assert_eq!(value["source_authentication_claim"], false);
         assert_eq!(value["physical_truth_claim"], false);
+    }
+
+    #[test]
+    fn patch_surprise_witness_localizes_changed_regions_with_bounded_top_k() {
+        let mut observer = observer();
+        let first = vec![80_u8; 32 * 32];
+        observer
+            .observe_frame(identity(0, 1_000_000), &first, 32, 32, 1)
+            .unwrap();
+
+        let mut changed = first.clone();
+        for row in 0..8 {
+            for col in 0..8 {
+                changed[row * 32 + col] = 220;
+            }
+        }
+        let witness = observer
+            .observe_frame(identity(1, 1_033_000), &changed, 32, 32, 1)
+            .unwrap();
+
+        assert_eq!(witness.metrics.patch_grid_rows, 4);
+        assert_eq!(witness.metrics.patch_grid_cols, 4);
+        assert_eq!(witness.metrics.patch_size_pixels, 8);
+        assert!(witness.metrics.patch_surprise_nonzero_count > 0);
+        assert!(!witness.metrics.patch_surprise_top_k.is_empty());
+        assert!(witness.metrics.patch_surprise_top_k.len() <= DEFAULT_PATCH_SURPRISE_TOP_K);
+        assert!(
+            witness.metrics.patch_surprise_top_k.iter().all(|patch| {
+                patch.row < witness.metrics.patch_grid_rows
+                    && patch.col < witness.metrics.patch_grid_cols
+                    && patch.value_q16_16 > 0
+            })
+        );
+        assert_eq!(
+            witness.metrics.patch_surprise_top_k[0].row,
+            0,
+            "single changed top-left patch should rank in the top row"
+        );
+        assert_eq!(
+            witness.metrics.patch_surprise_top_k[0].col,
+            0,
+            "single changed top-left patch should rank in the first column"
+        );
+        assert_eq!(witness.raw_frame_retained, false);
+        assert_eq!(
+            observer.save_checkpoint().unwrap().manifold_state.last_observed_frame,
+            None
+        );
+    }
+
+    #[test]
+    fn patch_grid_budget_rejects_large_geometry_before_frame_admission() {
+        let mut observer = observer();
+        let oversized_width = 8192;
+        let oversized_height = 8192;
+        let bytes = vec![0_u8; (oversized_width * oversized_height) as usize];
+        assert!(
+            observer
+                .observe_frame(
+                    identity(0, 1_000_000),
+                    &bytes,
+                    oversized_width,
+                    oversized_height,
+                    1,
+                )
+                .is_err()
+        );
+        assert_eq!(observer.frame_count(), 0);
     }
 
     #[test]
