@@ -1,0 +1,10 @@
+[package]
+name = "rite-bench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Standalone evaluator for qualified research-agent reliability"
+
+[workspace]
+resolver = "2"
