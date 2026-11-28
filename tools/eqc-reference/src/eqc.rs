@@ -1084,6 +1084,33 @@ mod tests {
                 "qualified receipt must reject malformed or unexpected '{pointer}'"
             );
         }
+
+        let mut receipt = valid_receipt();
+        receipt["system"]["model_id"] = json!(42);
+        assert!(!validator.is_valid(&receipt));
+    }
+
+    #[test]
+    fn receipt_schema_rejects_each_missing_nested_verifier_field() {
+        let validator = receipt_schema_validator();
+        for field in ["verifier_id", "verifier_digest_sha256", "replay"] {
+            let mut receipt = valid_receipt();
+            receipt["verifier"]
+                .as_object_mut()
+                .expect("verifier object")
+                .remove(field);
+            assert!(
+                !validator.is_valid(&receipt),
+                "receipt schema must reject verifier missing '{field}'"
+            );
+        }
+
+        let mut receipt = valid_receipt();
+        receipt["input_digests"][0]
+            .as_object_mut()
+            .expect("input digest object")
+            .remove("sha256");
+        assert!(!validator.is_valid(&receipt));
     }
 
     #[test]
