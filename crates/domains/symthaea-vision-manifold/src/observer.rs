@@ -29,6 +29,11 @@ pub struct TemporalObserverProfileV0_1 {
     pub fixed_horizon_us: u64,
     pub max_interframe_gap_us: u64,
     pub max_frame_bytes: u64,
+    /// Fixed constructor dimensions are committed into the profile digest.
+    #[serde(default)]
+    pub frame_width: Option<u32>,
+    #[serde(default)]
+    pub frame_height: Option<u32>,
 }
 
 impl Default for TemporalObserverProfileV0_1 {
@@ -39,6 +44,8 @@ impl Default for TemporalObserverProfileV0_1 {
             fixed_horizon_us: 30_000_000,
             max_interframe_gap_us: DEFAULT_MAX_INTERFRAME_GAP_US,
             max_frame_bytes: DEFAULT_MAX_FRAME_BYTES,
+            frame_width: None,
+            frame_height: None,
         }
     }
 }
@@ -59,6 +66,11 @@ impl TemporalObserverProfileV0_1 {
         }
         if self.max_frame_bytes == 0 || self.max_frame_bytes > 256 * 1024 * 1024 {
             return Err("observer max_frame_bytes must be in 1..=268435456".to_string());
+        }
+        match (self.frame_width, self.frame_height) {
+            (None, None) => {}
+            (Some(width), Some(height)) if width > 0 && height > 0 => {}
+            _ => return Err("observer fixed frame width/height must be both absent or both non-zero".to_string()),
         }
         Ok(())
     }
@@ -242,6 +254,16 @@ impl ObserverOnlyVisionManifold {
         height: u32,
         profile: TemporalObserverProfileV0_1,
     ) -> Result<Self, String> {
+        if width == 0 || height == 0 {
+            return Err("observer constructor dimensions must be non-zero".to_string());
+        }
+        if profile.frame_width.is_some_and(|expected| expected != width)
+            || profile.frame_height.is_some_and(|expected| expected != height)
+        {
+            return Err("observer profile frame geometry conflicts with constructor dimensions".to_string());
+        }
+        profile.frame_width = Some(width);
+        profile.frame_height = Some(height);
         profile.validate()?;
         if config.enable_predictive_hierarchy {
             return Err(
@@ -290,6 +312,11 @@ impl ObserverOnlyVisionManifold {
             return Err("unsupported temporal observer checkpoint schema".to_string());
         }
         checkpoint.profile.validate()?;
+        if checkpoint.profile.frame_width != Some(width)
+            || checkpoint.profile.frame_height != Some(height)
+        {
+            return Err("observer checkpoint constructor geometry does not match committed profile".to_string());
+        }
         if let Some(geometry) = checkpoint.frame_geometry {
             if geometry.width != width || geometry.height != height {
                 return Err(
@@ -490,6 +517,12 @@ impl ObserverOnlyVisionManifold {
             Some(previous) => {
                 if !previous.same_episode_context(identity) {
                     return Err("observer episode, target, sensor, clock or calibration scope changed".to_string());
+                }
+                if previous.frame_id == identity.frame_id {
+                    return Err("observer frame_id must not repeat within an episode".to_string());
+                }
+                if previous.source_evidence_id == identity.source_evidence_id {
+                    return Err("observer source_evidence_id must not repeat within an episode".to_string());
                 }
                 let expected_sequence = previous
                     .sequence
@@ -788,6 +821,46 @@ mod tests {
             ObserverOnlyVisionManifold::try_new(adaptive_levels, 32, 32).is_err(),
             "adaptive quantization boundaries must be excluded from v0.1"
         );
+    }
+
+    #[test]
+    fn frame_geometry_is_committed_in_profile_digest() {
+        let first = ObserverOnlyVisionManifold::try_new(
+            VisionConfig::default(),
+            32,
+            32,
+        )
+        .unwrap();
+        let second = ObserverOnlyVisionManifold::try_new(
+            VisionConfig::default(),
+            16,
+            64,
+        )
+        .unwrap();
+        assert_ne!(first.profile_sha256(), second.profile_sha256());
+    }
+
+    #[test]
+    fn duplicate_frame_and_source_evidence_ids_are_rejected() {
+        let mut observer = observer();
+        let frame = vec![64_u8; 32 * 32];
+        observer
+            .observe_frame(identity(0, 1_000_000), &frame, 32, 32, 1)
+            .unwrap();
+
+        let mut duplicate_frame = identity(1, 1_033_000);
+        duplicate_frame.frame_id = "frame-0".to_string();
+        assert!(observer
+            .observe_frame(duplicate_frame, &frame, 32, 32, 1)
+            .is_err());
+
+        let mut duplicate_evidence = identity(1, 1_033_000);
+        duplicate_evidence.source_evidence_id = "evidence-0".to_string();
+        assert!(observer
+            .observe_frame(duplicate_evidence, &frame, 32, 32, 1)
+            .is_err());
+
+        assert_eq!(observer.frame_count(), 1);
     }
 
     #[test]
