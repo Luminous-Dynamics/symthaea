@@ -460,7 +460,7 @@ mod tests {
         let value = scenario("s1", MultipartyAddressing::DirectToAgent, true, false);
         let guess = prediction(&value, MultipartyDecision::StaySilent);
         let metrics = score_multiparty_control(&[value], &[guess]).unwrap();
-        assert_eq!(metrics.stop_on_resolution_rate, 1.0);
+        assert_eq!(metrics.stop_on_resolution_rate, Some(1.0));
     }
 
     #[test]
