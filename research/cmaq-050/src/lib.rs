@@ -166,12 +166,13 @@ impl ProductFourierConditionalMonitor {
         let covariate_dimension = self.covariate_map.feature_dimension();
         let mut product_feature_difference = vec![0.0; response_dimension * covariate_dimension];
 
-        for covariate_index in 0..covariate_dimension {
-            for response_index in 0..response_dimension {
+        for (covariate_index, covariate_feature) in covariate_features.iter().enumerate() {
+            for (response_index, (y_feature, x_feature)) in
+                y_features.iter().zip(&x_features).enumerate()
+            {
                 let product_index = covariate_index * response_dimension + response_index;
-                product_feature_difference[product_index] = 0.5
-                    * covariate_features[covariate_index]
-                    * (y_features[response_index] - x_features[response_index]);
+                product_feature_difference[product_index] =
+                    0.5 * covariate_feature * (y_feature - x_feature);
             }
         }
         let norm = l2_norm(&product_feature_difference);
