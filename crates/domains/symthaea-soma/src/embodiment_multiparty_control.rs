@@ -97,6 +97,7 @@ pub struct MultipartyPredictionV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MultipartyControlError {
     WrongSchema,
+    EmptyEvaluationSet,
     InvalidIdentifier,
     InvalidDigest,
     InvalidParticipantCount,
@@ -125,18 +126,18 @@ pub struct MultipartyControlMetrics {
     pub action_accuracy: f32,
     pub explicitly_addressed_count: usize,
     pub addressed_response_count: usize,
-    pub addressed_response_rate: f32,
+    pub addressed_response_rate: Option<f32>,
     pub unaddressed_count: usize,
     pub silence_preserved_count: usize,
-    pub silence_preservation_rate: f32,
+    pub silence_preservation_rate: Option<f32>,
     pub false_activation_count: usize,
-    pub false_activation_rate: f32,
+    pub false_activation_rate: Option<f32>,
     pub human_resolution_count: usize,
     pub stop_compliant_count: usize,
-    pub stop_on_resolution_rate: f32,
+    pub stop_on_resolution_rate: Option<f32>,
     pub answer_graded_count: usize,
     pub answers_correct_count: usize,
-    pub answer_accuracy: f32,
+    pub answer_accuracy: Option<f32>,
     pub deadline_met_count: usize,
     pub deadline_met_rate: f32,
     pub median_decision_latency_ms: u32,
@@ -240,6 +241,9 @@ pub fn score_multiparty_control(
     scenarios: &[MultipartyScenarioV1],
     predictions: &[MultipartyPredictionV1],
 ) -> Result<MultipartyControlMetrics, MultipartyControlError> {
+    if scenarios.is_empty() {
+        return Err(MultipartyControlError::EmptyEvaluationSet);
+    }
     let mut scenario_by_id = HashMap::with_capacity(scenarios.len());
     for scenario in scenarios {
         verify_multiparty_scenario(scenario)?;
@@ -355,12 +359,8 @@ pub fn score_multiparty_control(
     })
 }
 
-fn rate(numerator: usize, denominator: usize) -> f32 {
-    if denominator == 0 {
-        0.0
-    } else {
-        numerator as f32 / denominator as f32
-    }
+fn rate(numerator: usize, denominator: usize) -> Option<f32> {
+    (denominator > 0).then_some(numerator as f32 / denominator as f32)
 }
 
 fn percentile_nearest_rank(sorted: &[u32], quantile: f32) -> u32 {
@@ -434,7 +434,7 @@ mod tests {
         let guess = prediction(&value, MultipartyDecision::StaySilent);
         verify_multiparty_prediction(&value, &guess).unwrap();
         let metrics = score_multiparty_control(&[value], &[guess]).unwrap();
-        assert_eq!(metrics.silence_preservation_rate, 1.0);
+        assert_eq!(metrics.silence_preservation_rate, Some(1.0));
         assert_eq!(metrics.false_activation_count, 0);
     }
 
@@ -444,7 +444,7 @@ mod tests {
         let guess = prediction(&value, MultipartyDecision::Respond);
         let metrics = score_multiparty_control(&[value], &[guess]).unwrap();
         assert_eq!(metrics.false_activation_count, 1);
-        assert_eq!(metrics.silence_preservation_rate, 0.0);
+        assert_eq!(metrics.silence_preservation_rate, Some(0.0));
     }
 
     #[test]
@@ -452,7 +452,7 @@ mod tests {
         let value = scenario("s1", MultipartyAddressing::DirectToAgent, true, true);
         let guess = prediction(&value, MultipartyDecision::StopSpeaking);
         let metrics = score_multiparty_control(&[value], &[guess]).unwrap();
-        assert_eq!(metrics.stop_on_resolution_rate, 1.0);
+        assert_eq!(metrics.stop_on_resolution_rate, Some(1.0));
     }
 
     #[test]
@@ -468,7 +468,7 @@ mod tests {
         let value = scenario("s1", MultipartyAddressing::Ambiguous, false, false);
         let guess = prediction(&value, MultipartyDecision::AskClarifying);
         let metrics = score_multiparty_control(&[value], &[guess]).unwrap();
-        assert_eq!(metrics.action_accuracy, 1.0);
+        assert_eq!(metrics.action_accuracy, Some(1.0));
     }
 
     #[test]
@@ -476,8 +476,8 @@ mod tests {
         let value = scenario("s1", MultipartyAddressing::DirectToAgent, false, false);
         let guess = prediction(&value, MultipartyDecision::Respond);
         let metrics = score_multiparty_control(&[value], &[guess]).unwrap();
-        assert_eq!(metrics.addressed_response_rate, 1.0);
-        assert_eq!(metrics.answer_accuracy, 1.0);
+        assert_eq!(metrics.addressed_response_rate, Some(1.0));
+        assert_eq!(metrics.answer_accuracy, Some(1.0));
     }
 
     #[test]
@@ -509,12 +509,32 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn undefined_rates_remain_none_when_a_category_has_no_items() {
+        let value = scenario("s1", MultipartyAddressing::DirectToAgent, true, false);
+        let guess = prediction(&value, MultipartyDecision::StaySilent);
+        let metrics = score_multiparty_control(&[value], &[guess]).unwrap();
+        assert_eq!(metrics.silence_preservation_rate, None);
+        assert_eq!(metrics.false_activation_rate, None);
+        assert_eq!(metrics.stop_on_resolution_rate, Some(1.0));
+        assert_eq!(metrics.answer_accuracy, None);
+    }
+
+    #[test]
+    fn empty_evaluation_set_is_not_reported_as_zero_percent() {
+        assert_eq!(
+            score_multiparty_control(&[], &[]),
+            Err(MultipartyControlError::EmptyEvaluationSet)
+        );
+    }
+
     #[test]
     fn deadline_metrics_use_decision_latency() {
         let value = scenario("s1", MultipartyAddressing::DirectToAgent, false, false);
         let mut guess = prediction(&value, MultipartyDecision::Respond);
         guess.decision_latency_ms = 900;
         let metrics = score_multiparty_control(&[value], &[guess]).unwrap();
-        assert_eq!(metrics.deadline_met_rate, 0.0);
+        assert_eq!(metrics.deadline_met_rate, Some(0.0));
     }
 }
