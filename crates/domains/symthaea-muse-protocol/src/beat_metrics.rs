@@ -185,8 +185,8 @@ pub enum MirexBeatMetricError {
 
 /// Score one beat track using the pinned MIREX/mir_eval semantics.
 ///
-/// Input event frames must be non-decreasing and source-local, matching the
-/// function applies mir_eval's default five-second initial trim to both
+/// Input event frames must be non-decreasing and source-local, matching
+/// mir_eval. The function applies the default five-second initial trim to both
 /// sequences before computing all eight public columns.
 pub fn score_mirex_beat_track(
     reference_frames: &[u64],
@@ -907,13 +907,29 @@ mod tests {
     }
 
     #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
     struct GoldenFixtureSet {
+        schema_version: u16,
+        oracle: GoldenFixtureOracle,
         sample_rate_hz: u32,
         total_frames: u64,
         cases: Vec<GoldenFixtureCase>,
     }
 
     #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct GoldenFixtureOracle {
+        library: String,
+        version: String,
+        source_commit: String,
+        evaluator_repository: String,
+        evaluator_commit: String,
+        metric_keys: Vec<String>,
+        trim_seconds: u64,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
     struct GoldenFixtureCase {
         name: String,
         reference_frames: Vec<u64>,
@@ -938,33 +954,22 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_mir_eval_082_fixture_matches_all_eight_public_columns() {
-        let json = include_str!("../fixtures/mirex-beat-metrics-v1/golden.json");
-        let fixture: GoldenFixtureSet = serde_json::from_str(json).unwrap();
-        assert_eq!(fixture.sample_rate_hz, 1_000);
-        assert_eq!(fixture.total_frames, 15_000);
-        assert_eq!(fixture.cases.len(), 8);
-
-        for case in fixture.cases {
-            let actual = score_mirex_beat_track(
-                &case.reference_frames,
-                &case.estimated_frames,
-                fixture.sample_rate_hz,
-                fixture.total_frames,
-            )
-            .unwrap()
-            .scores;
-            assert_score_close(actual, case.expected);
-            assert!(!case.name.is_empty());
-        }
-    }
-
-    #[test]
     fn checked_in_mir_eval_082_fixture_matches_all_public_metric_columns() {
         let json = include_str!("../fixtures/mirex-beat-metrics-v1/golden.json");
         let fixture: GoldenFixtureSet = serde_json::from_str(json).unwrap();
+        assert_eq!(fixture.schema_version, MIREX_BEAT_SCORE_SCHEMA_VERSION);
         assert_eq!(fixture.sample_rate_hz, 1_000);
         assert_eq!(fixture.total_frames, 15_000);
+        assert_eq!(fixture.oracle.library, "mir_eval");
+        assert_eq!(fixture.oracle.version, MIR_EVAL_REFERENCE_VERSION);
+        assert_eq!(fixture.oracle.source_commit, MIR_EVAL_REFERENCE_COMMIT);
+        assert_eq!(fixture.oracle.evaluator_repository, "ismir-mirex/mirex-evaluation");
+        assert_eq!(
+            fixture.oracle.evaluator_commit,
+            MIREX_EVALUATOR_SOURCE_COMMIT
+        );
+        assert_eq!(fixture.oracle.trim_seconds, MIREX_INITIAL_TRIM_SECONDS);
+        assert_eq!(fixture.oracle.metric_keys.len(), 8);
         assert_eq!(fixture.cases.len(), 8);
 
         for case in fixture.cases {
@@ -977,7 +982,7 @@ mod tests {
             .unwrap();
             assert_score_close(report.scores, case.expected);
             assert_eq!(
-                report.scoring_receipt.mir_eval_version,
+                report.scoring_receipt.reference_library_version,
                 MIR_EVAL_REFERENCE_VERSION
             );
             assert_eq!(
