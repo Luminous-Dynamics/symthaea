@@ -460,7 +460,7 @@ impl PsychBenchmark for MetacognitiveCalibrationBenchmark {
 
         result.insert("calibration_error_ece", metric_with_bounds(&eces, 0.0, Some(1.0)));
         result.insert("discrimination_gamma", metric_with_bounds(&gammas, -1.0, Some(1.0)));
-        result.insert("overconfidence", metric_with_bounds(&overconfs, -1.0, Some(1.0)));
+        result.insert("overconfidence", metric_with_bounds(&overconfs, 0.0, Some(1.0)));
         result.insert(
             "resolution",
             metric_with_bounds(&resolutions, 0.0, Some(0.25)),
