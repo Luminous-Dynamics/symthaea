@@ -103,7 +103,7 @@ pub use conjecture_feed::{
     ResearchProvenance,
 };
 pub use extractor::{
-    ContentExtractor, ContentMetadata, ContentType, ExtractedContent, NumericSeries,
+    ContentExtractor, ContentMetadata, ContentType, ExtractedClaim, ExtractedContent, NumericSeries,
 };
 pub use integrator::{IntegratorConfig, IntegratorStats, KnowledgeIntegrator};
 pub use knowledge_graph::{
