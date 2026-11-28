@@ -172,6 +172,14 @@ External references:
 - GameWorld: https://gameworld-project.github.io/
 - GameWorld paper: https://arxiv.org/abs/2604.07429
 
+### Snapshot used for comparison (2026-11-28)
+
+- BALROG's public experiment viewer currently exposes a Claude Opus 5 Max naive-agent submission at **63.40% ± 1.85 percentage points overall progress**, based on 254 completed episodes. Its NetHack allocation is incomplete (4 of 5 planned seeds). The metric is normalized progress, not task-success rate; it is not a causal-mechanism score.
+- GameWorld's project page reports **Gemini 3 Flash Preview at 41.9% progress / 21.2% success** on its standard generalist leaderboard, with novice and expert human progress baselines of **64.1%** and **82.6%**. GameWorld evaluates 34 browser games and 170 tasks with serialized-state verification. Its separate real-time and Fine-Control protocols must not be mixed with the standard paused benchmark.
+- A November 27 secondary leaderboard aggregation reports a **76.8% GameWorld Fine-Control** result for GPT-6.1 Terra under a 400-step protocol. Treat this as a distinct protocol snapshot and verify the corresponding official run/configuration before making a direct claim; it is not the standard GameWorld score.
+
+Implication: general game progress is already a crowded and interface-sensitive target. The causal-twin track should first establish a distinct, reproducible capability—decision-sufficient causal discovery with low intervention regret—then add external tracks. A higher internal score cannot be called an industry win until a matched public benchmark protocol is independently reproduced.
+
 ## 10. Integration and ownership
 
 - #14137 owns game task taxonomy, adapters, game protocol, and game-specific result mapping.
