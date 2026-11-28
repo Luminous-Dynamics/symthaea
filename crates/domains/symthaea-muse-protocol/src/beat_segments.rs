@@ -479,7 +479,10 @@ mod tests {
         assert_eq!(schema["$defs"]["score_evidence"]["properties"]["valid_segment_policy"]["const"],
             "declared_valid_segments");
         assert_eq!(
-            schema["$defs"]["config"]["properties"]["beat_trim_policy"]["enum"].as_array().unwrap().len(),
+            schema["$defs"]["config"]["properties"]["beat_trim_policy"]["enum"]
+                .as_array()
+                .unwrap()
+                .len(),
             3
         );
         assert_eq!(
