@@ -35,6 +35,9 @@
 /// shipped. Declaring it is step 4a of making that document true.
 pub mod catalog;
 
+#[cfg(test)]
+mod research_profile_contract_tests;
+
 use serde::{Deserialize, Serialize};
 
 /// Identifies one *rendered* audio artifact. Populated by `muse_studio`'s
