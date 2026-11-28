@@ -169,3 +169,9 @@ func TestClonedConformanceReportCannotCrossCapabilityIdentity(t *testing.T){
  in.CapabilityManifestSHA256=ManifestDigest(in.Manifest)
  if got:=Evaluate(in);got.CoverageVerdict!=Blocked{t.Fatalf("conformance from old config must not qualify new config: %+v",got)}
 }
+
+func BenchmarkEvaluateTwoRequiredItems(b *testing.B){
+ in:=validInput()
+ b.ReportAllocs();b.ResetTimer()
+ for i:=0;i<b.N;i++{_ = Evaluate(in)}
+}
