@@ -14,7 +14,7 @@ The API separates:
 1. `encode_pair`: transform current X/Y with the current frozen version; no mutation.
 2. `prepare_next_version`: stage a candidate version from the symmetric pair mean; no mutation.
 3. Parent evidence commit.
-4. `commit_next_version`: advance the encoder version only after the parent commits the current evidence transaction.
+4. `commit_after_evidence`: invoke the parent evidence-commit callback first; only if it succeeds does the encoder version advance. A rejected callback leaves the encoder unchanged.
 
 The update rule in this first implementation is a bounded deterministic Hebbian-style adaptation using only the unordered pair mean. It is a research baseline, not claimed to be an optimal learned representation. Its value is that it exercises the predictability boundary with a small, auditable implementation.
 
