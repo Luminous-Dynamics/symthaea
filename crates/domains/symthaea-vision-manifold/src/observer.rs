@@ -14,10 +14,11 @@ use crate::types::{ManifoldState, VisionConfig, VisionTelemetry, VisualModality}
 /// Stable observer profile identifier for this wire-contract revision.
 pub const TEMPORAL_OBSERVER_PROFILE_ID_V0_1: &str = "symthaea-spacecraft-temporal-observer-v0.1";
 /// Current serialized temporal observer checkpoint schema.
-pub const TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1: u32 = 2;
+pub const TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1: u32 = 3;
 /// Current emitted temporal witness schema.
-pub const TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1: u32 = 1;
+pub const TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1: u32 = 2;
 const Q16_16_SCALE: f32 = 65_536.0;
+const STANDARD_PREDICTION_HORIZONS_US: [u64; 4] = [33_000, 100_000, 500_000, 1_000_000];
 const DEFAULT_MAX_FRAME_BYTES: u64 = 64 * 1024 * 1024;
 const DEFAULT_MAX_INTERFRAME_GAP_US: u64 = 1_000_000;
 const MAX_EXPECTED_FRAME_COUNT: u64 = 100_000;
@@ -30,11 +31,19 @@ pub struct TemporalObserverProfileV0_1 {
     pub fixed_horizon_us: u64,
     pub max_interframe_gap_us: u64,
     pub max_frame_bytes: u64,
+    /// Fixed delayed-forecast horizons, in microseconds, scored against future
+    /// observations and a persistence baseline. v0.1 locks the standard suite.
+    #[serde(default = "default_prediction_horizons_us")]
+    pub prediction_horizons_us: Vec<u64>,
     /// Fixed constructor dimensions are committed into the profile digest.
     #[serde(default)]
     pub frame_width: Option<u32>,
     #[serde(default)]
     pub frame_height: Option<u32>,
+}
+
+fn default_prediction_horizons_us() -> Vec<u64> {
+    STANDARD_PREDICTION_HORIZONS_US.to_vec()
 }
 
 impl Default for TemporalObserverProfileV0_1 {
@@ -45,6 +54,7 @@ impl Default for TemporalObserverProfileV0_1 {
             fixed_horizon_us: 30_000_000,
             max_interframe_gap_us: DEFAULT_MAX_INTERFRAME_GAP_US,
             max_frame_bytes: DEFAULT_MAX_FRAME_BYTES,
+            prediction_horizons_us: default_prediction_horizons_us(),
             frame_width: None,
             frame_height: None,
         }
@@ -69,6 +79,12 @@ impl TemporalObserverProfileV0_1 {
         }
         if self.max_frame_bytes == 0 || self.max_frame_bytes > 256 * 1024 * 1024 {
             return Err("observer max_frame_bytes must be in 1..=268435456".to_string());
+        }
+        if self.prediction_horizons_us != STANDARD_PREDICTION_HORIZONS_US {
+            return Err(
+                "observer v0.1 prediction horizons must match the frozen standard horizon suite"
+                    .to_string(),
+            );
         }
         match (self.frame_width, self.frame_height) {
             (None, None) => {}
@@ -175,6 +191,17 @@ pub struct TemporalObserverMetricsV0_1 {
     pub attention_entropy_q16_16: u32,
     pub motion_surprise_q16_16: u32,
     pub cross_scale_prediction_error_q16_16: Option<u32>,
+    /// Delayed forecast errors against matured future observations; null until
+    /// each horizon has at least one scored sample. Values are Q16.16.
+    pub horizon_prediction_error_q16_16: Vec<Option<u32>>,
+    pub horizon_persistence_error_q16_16: Vec<Option<u32>>,
+    /// Signed Q16.16 relative skill versus persistence, clamped by the evaluator
+    /// to [-1, 1]. Positive is better than persistence; negative is worse.
+    pub horizon_relative_skill_q16_16: Vec<Option<i32>>,
+    pub horizon_sample_counts: Vec<u64>,
+    pub horizon_mean_lateness_us: Vec<Option<u64>>,
+    pub horizon_dropped_forecasts: Vec<u64>,
+    pub horizon_expired_forecasts: Vec<u64>,
     pub salient_patch_count: u32,
     pub encode_time_us: u64,
     pub evolve_time_us: u64,
@@ -468,8 +495,14 @@ impl ObserverOnlyVisionManifold {
             TemporalObserverStatusV0_1::Observed
         };
         let prediction_valid = status == TemporalObserverStatusV0_1::Observed;
-        let metrics =
-            match quantize_telemetry(&telemetry, prediction_valid, self.cross_scale_enabled) {
+        let horizon_accuracy = self.inner.horizon_accuracy();
+        let metrics = match quantize_telemetry(
+            &telemetry,
+            &horizon_accuracy,
+            &self.profile.prediction_horizons_us,
+            prediction_valid,
+            self.cross_scale_enabled,
+        ) {
                 Ok(metrics) => metrics,
                 Err(error) => {
                     self.poisoned = true;
@@ -784,6 +817,8 @@ fn validate_observer_state(state: &ManifoldState) -> Result<(), String> {
 
 fn quantize_telemetry(
     telemetry: &VisionTelemetry,
+    horizon: &crate::manifold::HorizonAccuracy,
+    declared_horizons_us: &[u64],
     prediction_valid: bool,
     cross_scale_enabled: bool,
 ) -> Result<TemporalObserverMetricsV0_1, String> {
@@ -797,6 +832,75 @@ fn quantize_telemetry(
         }
         Ok(scaled as u32)
     };
+    let quantize_signed = |name: &str, value: f32| -> Result<i32, String> {
+        if !value.is_finite() || !(-1.0..=1.0).contains(&value) {
+            return Err(format!("observer telemetry {name} is outside [-1, 1]"));
+        }
+        let scaled = (value * Q16_16_SCALE).round();
+        if !scaled.is_finite() || scaled < i32::MIN as f32 || scaled > i32::MAX as f32 {
+            return Err(format!("observer telemetry {name} signed quantization overflow"));
+        }
+        Ok(scaled as i32)
+    };
+    let lengths = [
+        horizon.horizons.len(),
+        horizon.errors.len(),
+        horizon.persistence_errors.len(),
+        horizon.relative_skill.len(),
+        horizon.sample_counts.len(),
+        horizon.mean_lateness_seconds.len(),
+        horizon.dropped_forecasts.len(),
+        horizon.expired_forecasts.len(),
+    ];
+    if lengths.iter().any(|length| *length != declared_horizons_us.len()) {
+        return Err("delayed-horizon telemetry shape does not match the committed profile".to_string());
+    }
+
+    let mut horizon_prediction_error_q16_16 = Vec::with_capacity(lengths[0]);
+    let mut horizon_persistence_error_q16_16 = Vec::with_capacity(lengths[0]);
+    let mut horizon_relative_skill_q16_16 = Vec::with_capacity(lengths[0]);
+    let mut horizon_mean_lateness_us = Vec::with_capacity(lengths[0]);
+    for index in 0..declared_horizons_us.len() {
+        let observed_horizon_us = (horizon.horizons[index] as f64 * 1_000_000.0).round();
+        if !observed_horizon_us.is_finite()
+            || observed_horizon_us < 0.0
+            || observed_horizon_us as u64 != declared_horizons_us[index]
+        {
+            return Err(format!(
+                "delayed-horizon schedule mismatch at index {index}: declared={}us",
+                declared_horizons_us[index]
+            ));
+        }
+        if horizon.sample_counts[index] == 0 {
+            horizon_prediction_error_q16_16.push(None);
+            horizon_persistence_error_q16_16.push(None);
+            horizon_relative_skill_q16_16.push(None);
+            horizon_mean_lateness_us.push(None);
+            continue;
+        }
+        horizon_prediction_error_q16_16.push(Some(quantize(
+            "horizon_prediction_error",
+            horizon.errors[index],
+        )?));
+        horizon_persistence_error_q16_16.push(Some(quantize(
+            "horizon_persistence_error",
+            horizon.persistence_errors[index],
+        )?));
+        horizon_relative_skill_q16_16.push(Some(quantize_signed(
+            "horizon_relative_skill",
+            horizon.relative_skill[index],
+        )?));
+        let lateness = horizon.mean_lateness_seconds[index];
+        if !lateness.is_finite() || lateness < 0.0 {
+            return Err(format!("horizon mean lateness is invalid at index {index}"));
+        }
+        let lateness_us = (lateness as f64 * 1_000_000.0).round();
+        if !lateness_us.is_finite() || lateness_us < 0.0 || lateness_us > u64::MAX as f64 {
+            return Err(format!("horizon mean lateness overflows at index {index}"));
+        }
+        horizon_mean_lateness_us.push(Some(lateness_us as u64));
+    }
+
     Ok(TemporalObserverMetricsV0_1 {
         prediction_error_q16_16: if prediction_valid {
             Some(quantize("prediction_error", telemetry.prediction_error)?)
@@ -814,6 +918,13 @@ fn quantize_telemetry(
         } else {
             None
         },
+        horizon_prediction_error_q16_16,
+        horizon_persistence_error_q16_16,
+        horizon_relative_skill_q16_16,
+        horizon_sample_counts: horizon.sample_counts.clone(),
+        horizon_mean_lateness_us,
+        horizon_dropped_forecasts: horizon.dropped_forecasts.clone(),
+        horizon_expired_forecasts: horizon.expired_forecasts.clone(),
         salient_patch_count: u32::try_from(telemetry.num_salient_patches)
             .map_err(|_| "observer salient patch count exceeds u32".to_string())?,
         encode_time_us: telemetry.encode_time_us,
@@ -899,7 +1010,7 @@ mod tests {
             .unwrap();
         let value = serde_json::to_value(&witness).unwrap();
 
-        assert_eq!(value["schema_version"], 1);
+        assert_eq!(value["schema_version"], TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1);
         assert_eq!(value["producer"], "symthaea-vision-manifold");
         assert_eq!(
             value["observer_profile_id"],
@@ -908,6 +1019,11 @@ mod tests {
         assert_eq!(value["identity"]["modality"], "Visible");
         assert_eq!(value["status"], "warming_up");
         assert!(value["metrics"]["prediction_error_q16_16"].is_null());
+        assert_eq!(value["metrics"]["horizon_sample_counts"], serde_json::json!([0, 0, 0, 0]));
+        assert_eq!(
+            value["metrics"]["horizon_prediction_error_q16_16"],
+            serde_json::json!([null, null, null, null])
+        );
         assert_eq!(value["observer_only"], true);
         assert_eq!(value["learning_frozen"], true);
         assert_eq!(value["raw_frame_retained"], false);
@@ -1089,6 +1205,23 @@ mod tests {
             .unwrap();
         assert_eq!(second.status, TemporalObserverStatusV0_1::Observed);
         assert!(second.metrics.prediction_error_q16_16.is_some());
+        assert_eq!(
+            second.metrics.horizon_sample_counts.len(),
+            second.metrics.horizon_prediction_error_q16_16.len()
+        );
+        assert_eq!(second.metrics.horizon_sample_counts[0], 0);
+        assert_eq!(
+            second.metrics.horizon_prediction_error_q16_16[0],
+            None
+        );
+        assert_eq!(
+            second.metrics.horizon_prediction_error_q16_16[1],
+            None
+        );
+        assert!(
+            second.metrics.horizon_prediction_error_q16_16[2].is_none()
+                && second.metrics.horizon_prediction_error_q16_16[3].is_none()
+        );
         assert_eq!(
             first.observer_profile_sha256,
             second.observer_profile_sha256
