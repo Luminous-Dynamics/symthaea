@@ -1206,6 +1206,24 @@ mod tests {
     }
 
     #[test]
+    fn relation_closure_cannot_be_reused_after_bitemporal_snapshot_advances() {
+        let closure = closure();
+        let mut changed_context = assistance_context(&closure);
+        changed_context.known_at_ms = 200;
+        assert_eq!(
+            seal_assistance_binding_v1(
+                &changed_context,
+                &vec![constraint(ResponseConstraintActionV1::MayAssert, false, &closure)],
+                &closure,
+                b"claim",
+                ResponseDispositionV1::Answer,
+                Vec::new(),
+            ),
+            Err(AssistanceRejectV1::RelationClosureDigestMismatch)
+        );
+    }
+
+    #[test]
     fn conflicted_evidence_cannot_be_bound_as_an_unqualified_assertion() {
         let closure = closure();
         let context = assistance_context(&closure);
