@@ -317,7 +317,7 @@ mod tests {
         let pr = PsychometricReport::from_report(&report);
         let md = pr.to_markdown();
 
-        assert!(md.contains("Psychometric Assessment Report"));
+        assert!(md.contains("Benchmark Diagnostic Report (not a psychometric assessment)"));
         assert!(md.contains("Executive Summary"));
         assert!(md.contains("Benchmark Results"));
         assert!(md.contains("Domain Analysis"));
