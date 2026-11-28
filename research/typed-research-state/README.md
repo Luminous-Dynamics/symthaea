@@ -29,6 +29,7 @@ cargo clippy --manifest-path research/typed-research-state/Cargo.toml --locked -
 - The prefix digest is SHA-256 over compact JSON for the ordered object `{research_episode_id, sequence_number, evidence}`, using the exact evidence records in their existing order. The validator rejects any prefix digest that does not match this manifest.
 - Every relation binds one claim ID and one evidence ID.
 - Exact quote byte spans are represented by offsets plus quote digest; artifact custody remains upstream.
+- `verify_claim_source_quote` recomputes the SHA-256 of the pinned artifact bytes, bounds-checks the span, requires a valid UTF-8 slice, and verifies the quote digest before returning the exact slice. This proves byte identity only, not semantic support or classifier correctness.
 - UNKNOWN source lineage is not inferred to be independent. Unknown lineage can still leave a support/refutation conflict visible.
 - Truth adjudication requires its own authority ID, evidence reference and time; classifier identity cannot serve as the adjudicator.
 - Decision usability is scoped to the active decision and policy.
@@ -40,6 +41,6 @@ cargo clippy --manifest-path research/typed-research-state/Cargo.toml --locked -
 
 ## Important limitations
 
-The examples are synthetic. The schema/validator also accepts PRODUCTION_PUBLIC_STATE, but the checked-in examples are explicitly synthetic. The validator checks shape and policy-state transitions, not natural-language entailment, artifact custody signatures or truth. It does not implement the production sequential research policy. The source tree audit in #11171 still identifies the production callable as unresolved.
+The examples are synthetic. The schema/validator also accepts PRODUCTION_PUBLIC_STATE, but the checked-in examples are explicitly synthetic. The validator checks shape and policy-state transitions, not natural-language entailment, artifact custody signatures or truth. The quote resolver checks exact artifact bytes when the caller supplies them, but the caller must still authenticate the artifact reference and independently qualify the classifier. It does not implement the production sequential research policy. The source tree audit in #11171 still identifies the production callable as unresolved.
 
 Do not use this crate as a second evidence store, a source trust service, a posterior engine, or a scheduler. ResearchState is a projection over existing evidence-prefix, custody and adjudication references.
