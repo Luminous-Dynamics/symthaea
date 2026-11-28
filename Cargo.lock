@@ -2965,6 +2965,7 @@ version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
+ "const-oid 0.9.6",
  "generic-array",
 ]
 
@@ -20178,7 +20179,7 @@ dependencies = [
  "criterion",
  "serde",
  "serde_json",
- "sha2",
+ "sha2 0.10.9",
  "symthaea-core",
  "symthaea-fep",
  "tracing",
