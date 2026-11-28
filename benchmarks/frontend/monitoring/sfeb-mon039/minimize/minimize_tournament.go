@@ -8,8 +8,18 @@ import (
  "strings"
 )
 
-const MaxReductionOrders = 8
+const (
+ MaxReductionOrders = 8
+ TournamentProfile = "mon039-multi-order-tournament-input-v1"
+ TournamentVersion = "1.0.0"
+)
 
+type TournamentInput struct {
+ Profile string `json:"profile"`
+ Version string `json:"version"`
+ Input Input `json:"input"`
+ Orders [][]string `json:"orders"`
+}
 type OrderedReduction struct {
  Order []string `json:"order"`
  OrderSHA256 string `json:"order_sha256"`
