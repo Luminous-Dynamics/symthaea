@@ -118,6 +118,7 @@ pub enum StratifiedRiskError {
     InvalidCoverageTarget,
     InvalidConfidenceThreshold,
     ZeroMinimumSampleSize,
+    DecisionCostsNotSupported,
 }
 
 impl std::fmt::Display for StratifiedRiskError {
@@ -164,6 +165,9 @@ impl std::fmt::Display for StratifiedRiskError {
             }
             Self::ZeroMinimumSampleSize => {
                 write!(formatter, "minimum audit sample size must be positive")
+            }
+            Self::DecisionCostsNotSupported => {
+                write!(formatter, "decision costs are not implemented in this design-based risk report")
             }
         }
     }
@@ -298,6 +302,9 @@ pub fn evaluate_stratified_audit_risk(
     validate_plan(plan)?;
     if config.minimum_sample_size == 0 {
         return Err(StratifiedRiskError::ZeroMinimumSampleSize);
+    }
+    if config.decision_costs.is_some() {
+        return Err(StratifiedRiskError::DecisionCostsNotSupported);
     }
     if config
         .target_coverages
