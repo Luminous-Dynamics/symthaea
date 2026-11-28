@@ -36,6 +36,8 @@
 pub mod catalog;
 /// DJ transition contracts and deterministic validation (MEL-DJ-002).
 pub mod transition;
+/// Audio-derived pulse and beat-grid hypotheses (MEL-DJ-007).
+pub mod beat_grid;
 
 use serde::{Deserialize, Serialize};
 
