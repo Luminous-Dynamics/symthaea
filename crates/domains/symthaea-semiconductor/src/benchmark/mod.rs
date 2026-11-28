@@ -9,6 +9,7 @@ pub mod gated_streaming_adapter;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
+pub mod observation_process_trace;
 pub mod metrology_semantics;
 pub mod mf_acquisition;
 pub mod pair_manifest;
@@ -182,4 +183,14 @@ pub use selection_risk_bounds::{
     QualifiedLossObservationV1, SelectionAuditDesignV1, SelectionRiskErrorV1,
     SelectionRiskInputV1, SelectionRiskReportV1,
     evaluate_selection_adjusted_population_risk_v1,
+};
+
+pub use observation_process_trace::{
+    AuditRetentionStateV1, ControllerFeedbackEvidenceV1, ControllerTrackingStateV1,
+    IndependentAuditEvidenceV1, IndependentAuditStateV1, K1QualificationEvidenceV1,
+    K1QualificationStateV1, OBSERVATION_TRACE_REPORT_SCHEMA_V1, OBSERVATION_TRACE_SCHEMA_V1,
+    ObservationControllerKindV1, ObservationProcessTraceErrorV1,
+    ObservationProcessTraceInputV1, ObservationProcessTraceReportV1,
+    ObservationRoundTraceV1, OperationalAcquisitionEvidenceV1,
+    OperationalAcquisitionStateV1, evaluate_observation_process_trace_v1,
 };
