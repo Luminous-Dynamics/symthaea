@@ -106,14 +106,8 @@ impl ProductFourierConditionalMonitor {
             return Err(ProductPairError::TargetDimensionMismatch);
         }
         validate_digest(&target_sha256, "target_sha256")?;
-        validate_digest(
-            &response_reference_sha256,
-            "response_reference_sha256",
-        )?;
-        validate_digest(
-            &covariate_reference_sha256,
-            "covariate_reference_sha256",
-        )?;
+        validate_digest(&response_reference_sha256, "response_reference_sha256")?;
+        validate_digest(&covariate_reference_sha256, "covariate_reference_sha256")?;
 
         let monitor = ConvexTargetApproachabilityMonitor::new(
             target,
@@ -170,13 +164,11 @@ impl ProductFourierConditionalMonitor {
         let y_features = self.response_map.transform(y)?;
         let response_dimension = self.response_map.feature_dimension();
         let covariate_dimension = self.covariate_map.feature_dimension();
-        let mut product_feature_difference =
-            vec![0.0; response_dimension * covariate_dimension];
+        let mut product_feature_difference = vec![0.0; response_dimension * covariate_dimension];
 
         for covariate_index in 0..covariate_dimension {
             for response_index in 0..response_dimension {
-                let product_index =
-                    covariate_index * response_dimension + response_index;
+                let product_index = covariate_index * response_dimension + response_index;
                 product_feature_difference[product_index] = 0.5
                     * covariate_features[covariate_index]
                     * (y_features[response_index] - x_features[response_index]);
@@ -239,9 +231,7 @@ impl ProductFourierConditionalMonitor {
         self.monitor.is_quarantined()
     }
 
-    pub fn mean_product_feature_difference(
-        &self,
-    ) -> Result<Vec<f64>, ApproachabilityError> {
+    pub fn mean_product_feature_difference(&self) -> Result<Vec<f64>, ApproachabilityError> {
         self.monitor.mean_observation()
     }
 
@@ -281,12 +271,7 @@ mod tests {
         "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
     fn response_map() -> FourierFeatureMap {
-        FourierFeatureMap::new(
-            1,
-            vec![vec![1.0], vec![3.0]],
-            RESPONSE_MAP_SHA.into(),
-        )
-        .unwrap()
+        FourierFeatureMap::new(1, vec![vec![1.0], vec![3.0]], RESPONSE_MAP_SHA.into()).unwrap()
     }
 
     fn covariate_map() -> FourierFeatureMap {
@@ -325,7 +310,13 @@ mod tests {
         .enumerate()
         {
             let update = monitor
-                .observe_pair(sequence as u64 + 1, &format!("pair-{sequence}"), &[z], &[x], &[y])
+                .observe_pair(
+                    sequence as u64 + 1,
+                    &format!("pair-{sequence}"),
+                    &[z],
+                    &[x],
+                    &[y],
+                )
                 .unwrap();
             assert!(l2_norm(&update.product_feature_difference) <= 1.0 + 1e-12);
         }
@@ -344,10 +335,12 @@ mod tests {
                     &[0.2],
                 )
                 .unwrap();
-            assert!(update
-                .product_feature_difference
-                .iter()
-                .all(|value| value.abs() < 1e-12));
+            assert!(
+                update
+                    .product_feature_difference
+                    .iter()
+                    .all(|value| value.abs() < 1e-12)
+            );
         }
         assert_eq!(monitor.log_e_value(), 0.0);
     }
