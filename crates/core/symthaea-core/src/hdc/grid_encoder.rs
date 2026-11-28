@@ -487,9 +487,9 @@ mod tests {
                             dense_cells.push(enc.encode_cell(row, col, color as usize));
                         }
                     }
-                    let dense_storage_bytes =
+                    let dense_vector_payload_bytes =
                         dense_cells.len() * dimension * std::mem::size_of::<f32>();
-                    let bundled_storage_bytes = dimension * std::mem::size_of::<f32>();
+                    let bundled_grid_vector_bytes = dimension * std::mem::size_of::<f32>();
                     let mut continuous_correct = 0usize;
                     let mut dense_reference_correct = 0usize;
                     let mut total = 0usize;
@@ -565,8 +565,8 @@ mod tests {
                          mean_true_margin={mean_true_margin:.6} \
                          dense_per_cell_top1={dense_reference_correct}/{total} \
                          dense_per_cell_accuracy={dense_reference_accuracy:.6} \
-                         dense_storage_bytes={dense_storage_bytes} \
-                         bundled_grid_bytes={bundled_storage_bytes} \
+                         dense_vector_payload_bytes={dense_vector_payload_bytes} \
+                         bundled_grid_vector_bytes={bundled_grid_vector_bytes} \
                          binary_xor_top1={binary_correct}/{total} \
                          binary_xor_accuracy={binary_accuracy:.6}"
                     );
