@@ -567,6 +567,54 @@ fn validate_ca_feedback_input(
     Ok(())
 }
 
+fn aci_prediction_digest(
+    receipt: &DelayedAciPredictionReceiptV1,
+) -> Result<String, JointRiskTraceErrorV1> {
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    json_sha256(&canonical)
+}
+
+fn aci_update_digest(
+    receipt: &DelayedAciUpdateReceiptV1,
+) -> Result<String, JointRiskTraceErrorV1> {
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    json_sha256(&canonical)
+}
+
+fn aci_degenerate_digest(
+    receipt: &AciDegenerateResolutionReceiptV1,
+) -> Result<String, JointRiskTraceErrorV1> {
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    json_sha256(&canonical)
+}
+
+fn ca_prediction_digest(
+    receipt: &super::ca_ocrc_bounded::CaOcrcPredictionReceiptV1,
+) -> Result<String, JointRiskTraceErrorV1> {
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    json_sha256(&canonical)
+}
+
+fn ca_feedback_digest(
+    receipt: &super::ca_ocrc_bounded::CaOcrcFeedbackResultV1,
+) -> Result<String, JointRiskTraceErrorV1> {
+    let mut canonical = receipt.clone();
+    canonical.feedback_receipt_sha256.clear();
+    json_sha256(&canonical)
+}
+
+fn ca_round_report_digest(
+    report: &CaOcrcRoundReportV1,
+) -> Result<String, JointRiskTraceErrorV1> {
+    let mut canonical = report.clone();
+    canonical.report_sha256.clear();
+    json_sha256(&canonical)
+}
+
 fn validate_aci_arm(
     arm: &JointBenchmarkArmV1,
     evidence: &JointTauAciArmEvidenceV1,
@@ -586,13 +634,15 @@ fn validate_aci_arm(
                 arm.arm_id, prediction.round
             )));
         };
-        if prediction.sample_id != row.sample_id
+        if prediction.delay_rounds == 0
+            || prediction.sample_id != row.sample_id
             || prediction.measurement_event_id != row.measurement_event_id
             || prediction.model_artifact_sha256 != arm.global_model_artifact_sha256
             || prediction.policy_sha256 != arm.controller_policy_sha256
             || prediction.phase != prediction.round % prediction.delay_rounds
             || prediction.expected_delivery_round
-                != prediction.round.saturating_add(prediction.delay_rounds)
+                != prediction.round.checked_add(prediction.delay_rounds).unwrap_or(u64::MAX)
+            || aci_prediction_digest(prediction)? != prediction.receipt_sha256
             || predictions.insert(prediction.sample_id.as_str(), prediction).is_some()
         {
             return Err(JointRiskTraceErrorV1(format!(
@@ -616,12 +666,6 @@ fn validate_aci_arm(
                 arm.arm_id
             )));
         };
-        if row.outcome_state != PopulationOutcomeStateV1::Qualified {
-            return Err(JointRiskTraceErrorV1(format!(
-                "tau-ACI arm {} physical delivery was recorded for non-qualified row {}",
-                arm.arm_id, row.round_id
-            )));
-        }
         validate_aci_delivery(delivery, prediction, row)?;
         if deliveries_by_sample.insert(delivery.sample_id.as_str(), delivery).is_some() {
             return Err(JointRiskTraceErrorV1(format!(
@@ -654,9 +698,11 @@ fn validate_aci_arm(
     let mut observed_miscoverage = 0_usize;
     let mut observed_count = 0_usize;
     for update in &evidence.updates {
-        if !update_receipts.insert(update.receipt_sha256.as_str()) {
+        if !update_receipts.insert(update.receipt_sha256.as_str())
+            || aci_update_digest(update)? != update.receipt_sha256
+        {
             return Err(JointRiskTraceErrorV1(format!(
-                "tau-ACI arm {} repeats an update receipt",
+                "tau-ACI arm {} repeats or tampers with an update receipt",
                 arm.arm_id
             )));
         }
@@ -678,11 +724,67 @@ fn validate_aci_arm(
             )));
         }
         let mutates = update.disposition == AciUpdateDispositionV1::Updated;
-        if update.phase_state_mutated != mutates {
+        if update.phase_state_mutated != mutates
+            || update.phase != Some(prediction.phase)
+        {
             return Err(JointRiskTraceErrorV1(format!(
-                "tau-ACI arm {} update mutation flag conflicts with disposition",
+                "tau-ACI arm {} update mutation/phase flag conflicts with receipt",
                 arm.arm_id
             )));
+        }
+        let delivery = deliveries_by_sample.get(update.sample_id.as_str());
+        if row.outcome_state != PopulationOutcomeStateV1::Unmeasured {
+            let Some(delivery) = delivery else {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "tau-ACI arm {} update has no matching label delivery input",
+                    arm.arm_id
+                )));
+            };
+            if delivery.label_id != update.label_id
+                || delivery.label_revision != update.label_revision
+                || delivery.label_payload_sha256 != update.label_payload_sha256
+                || update.eligibility_report_sha256.as_deref()
+                    != Some(delivery.eligibility_report.report_sha256.as_str())
+            {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "tau-ACI arm {} update does not bind delivered label ID/revision/payload/report",
+                    arm.arm_id
+                )));
+            }
+        }
+        match row.outcome_state {
+            PopulationOutcomeStateV1::Qualified if !matches!(
+                update.disposition,
+                AciUpdateDispositionV1::Updated | AciUpdateDispositionV1::Duplicate
+            ) => {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "tau-ACI arm {} does not accept its qualified feedback for {}",
+                    arm.arm_id, row.sample_id
+                )));
+            }
+            PopulationOutcomeStateV1::Unknown
+                if update.disposition != AciUpdateDispositionV1::HeldUnknown =>
+            {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "tau-ACI arm {} UNKNOWN row {} lacks a held-unknown receipt",
+                    arm.arm_id, row.sample_id
+                )));
+            }
+            PopulationOutcomeStateV1::Blocked
+                if update.disposition != AciUpdateDispositionV1::Blocked =>
+            {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "tau-ACI arm {} BLOCKED row {} lacks a blocked receipt",
+                    arm.arm_id, row.sample_id
+                )));
+            }
+            PopulationOutcomeStateV1::Unmeasured => {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "tau-ACI arm {} emits a label update for unmeasured row {}",
+                    arm.arm_id, row.sample_id
+                )));
+            }
+            _ => {}
         }
         if mutates {
             if row.outcome_state != PopulationOutcomeStateV1::Qualified {
@@ -747,7 +849,8 @@ fn validate_aci_arm(
                 arm.arm_id
             )));
         };
-        if resolution.measurement_event_id != prediction.measurement_event_id
+        if aci_degenerate_digest(resolution)? != resolution.receipt_sha256
+            || resolution.measurement_event_id != prediction.measurement_event_id
             || resolution.issued_round != prediction.round
             || resolution.resolution_round != prediction.expected_delivery_round
             || (prediction.interval.kind == AciIntervalKindV1::Bounded)
@@ -902,7 +1005,13 @@ fn validate_ca_arm(
         let input_digest = json_sha256(&canonical_round_input)?;
         if round_input.schema != CA_OCRC_ROUND_INPUT_SCHEMA_V1
             || round_input.prediction.round != report.round
+            || round_input.prediction.sample_id != row.sample_id
+            || round_input.prediction.measurement_event_id != row.measurement_event_id
+            || round_input.prediction.physical_measurement_selected != row.physical_measurement_selected
+            || round_input.prediction.global_model_artifact_sha256 != arm.global_model_artifact_sha256
             || report.input_sha256 != input_digest
+            || ca_prediction_digest(prediction)? != prediction.receipt_sha256
+            || ca_round_report_digest(report)? != report.report_sha256
             || prediction.round != report.round
             || prediction.sample_id != row.sample_id
             || prediction.measurement_event_id != row.measurement_event_id
@@ -938,6 +1047,23 @@ fn validate_ca_arm(
                 )));
             };
             validate_ca_feedback_input(feedback, report.round, outcome_row)?;
+            let result = report.feedback_results.iter().find(|result| {
+                result.sample_id == feedback.sample_id
+                    && result.label_id == feedback.label_id
+                    && result.label_revision == feedback.label_revision
+            });
+            let Some(result) = result else {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "CA-OCRC arm {} round {} has an input feedback without a result receipt",
+                    arm.arm_id, report.round
+                )));
+            };
+            if ca_feedback_digest(result)? != result.feedback_receipt_sha256 {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "CA-OCRC arm {} has a tampered feedback result receipt",
+                    arm.arm_id
+                )));
+            }
         }
         weighted_feedback_sum += report.weighted_feedback_sum;
         max_occupancy = max_occupancy.max(report.tracking_occupancy_after);
