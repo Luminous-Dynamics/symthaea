@@ -1,18 +1,20 @@
-//! Offline Draft 2020-12 schema and instance auditor for the beverage corpus.
+//! Offline Draft 2020-12 schema and synthetic Beverage benchmark auditor.
 //!
-//! This executable validates the schema document against the bundled Draft 2020-12
-//! meta-schema, then validates the corpus instance. Remote and file reference
-//! retrieval is disabled; validation must be self-contained and reproducible.
+//! The executable validates the schema document against the bundled Draft 2020-12
+//! meta-schema, validates the corpus instance, and applies a small set of explicit
+//! fixture-only invariants. Remote and file reference retrieval is disabled.
 
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const DRAFT_2020_12_URI: &str = "https://json-schema.org/draft/2020-12/schema";
+const BEVERAGE_BENCHMARK: &str = "BEVERAGE_ENGINEERING_BENCHMARK_V1";
 
 #[derive(Debug, Clone)]
 struct Args {
@@ -34,7 +36,9 @@ struct AuditReceipt {
     schema_meta_valid: bool,
     validator_built: bool,
     instance_valid: Option<bool>,
+    semantic_checks_passed: Option<bool>,
     validation_errors: Vec<String>,
+    semantic_errors: Vec<String>,
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -84,7 +88,7 @@ where
     })
 }
 
-fn validate_values(schema: &Value, instance: &Value) -> Result<Vec<String>, String> {
+fn validate_schema_instance(schema: &Value, instance: &Value) -> Result<Vec<String>, String> {
     let schema_uri = schema
         .get("$schema")
         .and_then(Value::as_str)
@@ -112,6 +116,97 @@ fn validate_values(schema: &Value, instance: &Value) -> Result<Vec<String>, Stri
         .collect())
 }
 
+fn expected_fixture_disposition(scenario: &Value) -> Option<&'static str> {
+    let string = |key: &str| scenario.get(key).and_then(Value::as_str);
+    let asserted_as_measured = scenario
+        .get("asserted_as_measured")
+        .and_then(Value::as_bool)?;
+
+    let evidence_class = string("evidence_class")?;
+    let data_integrity = string("data_integrity")?;
+    let rights_status = string("rights_status")?;
+    let calibration_status = string("calibration_status")?;
+    let split_status = string("split_status")?;
+    let cutoff_status = string("cutoff_status")?;
+    let domain_shift = string("domain_shift")?;
+    let hard_gate = string("hard_gate")?;
+
+    let reject = matches!(
+        data_integrity,
+        "group_leakage" | "post_cutoff_feature" | "unit_inconsistent"
+    ) || (asserted_as_measured && evidence_class != "MEASURED")
+        || hard_gate == "violated";
+    if reject {
+        return Some("REJECT");
+    }
+
+    let indeterminate = evidence_class == "UNKNOWN"
+        || rights_status != "verified"
+        || matches!(calibration_status, "missing" | "expired" | "unknown")
+        || split_status != "batch_grouped"
+        || cutoff_status == "unknown"
+        || hard_gate == "unknown"
+        || domain_shift == "unknown";
+    if indeterminate {
+        return Some("INDETERMINATE");
+    }
+
+    if domain_shift == "known_shift" {
+        Some("ELIGIBLE_WITH_SHIFT_WARNING")
+    } else {
+        Some("ELIGIBLE")
+    }
+}
+
+fn validate_beverage_fixture_semantics(instance: &Value) -> Option<Vec<String>> {
+    if instance.get("benchmark").and_then(Value::as_str) != Some(BEVERAGE_BENCHMARK) {
+        return None;
+    }
+
+    let mut errors = Vec::new();
+    if instance.get("fixture_class").and_then(Value::as_str)
+        != Some("SYNTHETIC_CONTRACT_FIXTURES_ONLY")
+    {
+        errors.push("fixture_class must remain SYNTHETIC_CONTRACT_FIXTURES_ONLY".to_owned());
+    }
+
+    let Some(scenarios) = instance.get("scenarios").and_then(Value::as_array) else {
+        errors.push("scenarios must be an array".to_owned());
+        return Some(errors);
+    };
+
+    let mut identifiers = HashSet::new();
+    for (index, scenario) in scenarios.iter().enumerate() {
+        let location = format!("scenarios[{index}]");
+        let Some(identifier) = scenario.get("scenario_id").and_then(Value::as_str) else {
+            errors.push(format!("{location}: scenario_id must be a string"));
+            continue;
+        };
+        if !identifiers.insert(identifier.to_owned()) {
+            errors.push(format!("{location}: duplicate scenario_id {identifier:?}"));
+        }
+        if scenario.get("synthetic").and_then(Value::as_bool) != Some(true) {
+            errors.push(format!("{location}: every fixture must declare synthetic=true"));
+        }
+
+        let expected = scenario
+            .get("expected_disposition")
+            .and_then(Value::as_str);
+        match expected_fixture_disposition(scenario) {
+            Some(calculated) if expected == Some(calculated) => {}
+            Some(calculated) => errors.push(format!(
+                "{location}: expected_disposition {:?} does not match fixture oracle {calculated}",
+                expected
+            )),
+            None => errors.push(format!(
+                "{location}: missing or malformed input for the deterministic fixture oracle"
+            )),
+        }
+    }
+
+    Some(errors)
+}
+
 fn make_receipt(
     args: &Args,
     schema_bytes: &[u8],
@@ -129,7 +224,7 @@ fn make_receipt(
         .to_owned();
 
     let (schema_meta_valid, validator_built, instance_valid, validation_errors) =
-        match validate_values(&schema, &instance) {
+        match validate_schema_instance(&schema, &instance) {
             Ok(errors) => (true, true, Some(errors.is_empty()), errors),
             Err(error) => {
                 let meta_valid = jsonschema::draft202012::meta::validate(&schema).is_ok()
@@ -138,7 +233,24 @@ fn make_receipt(
             }
         };
 
-    let status = if schema_meta_valid && validator_built && instance_valid == Some(true) {
+    let semantic_errors = if instance_valid == Some(true) {
+        validate_beverage_fixture_semantics(&instance).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let semantic_checks_passed = if instance_valid == Some(true)
+        && instance.get("benchmark").and_then(Value::as_str) == Some(BEVERAGE_BENCHMARK)
+    {
+        Some(semantic_errors.is_empty())
+    } else {
+        None
+    };
+
+    let status = if schema_meta_valid
+        && validator_built
+        && instance_valid == Some(true)
+        && semantic_checks_passed.is_none_or(|passed| passed)
+    {
         "PASS"
     } else {
         "FAIL"
@@ -155,7 +267,9 @@ fn make_receipt(
         schema_meta_valid,
         validator_built,
         instance_valid,
+        semantic_checks_passed,
         validation_errors,
+        semantic_errors,
     })
 }
 
@@ -198,52 +312,99 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    fn scenario(id: &str) -> Value {
+        json!({
+            "scenario_id": id,
+            "synthetic": true,
+            "evidence_class": "MEASURED",
+            "asserted_as_measured": true,
+            "data_integrity": "valid",
+            "rights_status": "verified",
+            "calibration_status": "verified",
+            "split_status": "batch_grouped",
+            "cutoff_status": "pre_cutoff",
+            "domain_shift": "none",
+            "hard_gate": "clear",
+            "expected_disposition": "ELIGIBLE"
+        })
+    }
+
+    fn corpus(scenarios: Vec<Value>) -> Value {
+        json!({
+            "schema_version": "1.0.0",
+            "benchmark": BEVERAGE_BENCHMARK,
+            "fixture_class": "SYNTHETIC_CONTRACT_FIXTURES_ONLY",
+            "scenarios": scenarios
+        })
+    }
+
     fn schema() -> Value {
         json!({
             "$schema": DRAFT_2020_12_URI,
             "type": "object",
+            "required": ["schema_version", "benchmark", "fixture_class", "scenarios"],
             "properties": {
-                "scenario_id": { "type": "string", "minLength": 1 },
-                "synthetic": { "const": true }
+                "schema_version": { "const": "1.0.0" },
+                "benchmark": { "const": BEVERAGE_BENCHMARK },
+                "fixture_class": { "const": "SYNTHETIC_CONTRACT_FIXTURES_ONLY" },
+                "scenarios": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "scenario_id", "synthetic", "evidence_class",
+                            "asserted_as_measured", "data_integrity", "rights_status",
+                            "calibration_status", "split_status", "cutoff_status",
+                            "domain_shift", "hard_gate", "expected_disposition"
+                        ],
+                        "properties": {
+                            "scenario_id": { "type": "string", "minLength": 1 },
+                            "synthetic": { "const": true },
+                            "evidence_class": { "enum": ["MEASURED", "MODELLED", "SIMULATED", "DECLARED", "UNKNOWN"] },
+                            "asserted_as_measured": { "type": "boolean" },
+                            "data_integrity": { "enum": ["valid", "group_leakage", "post_cutoff_feature", "unit_inconsistent"] },
+                            "rights_status": { "enum": ["verified", "unknown", "restricted"] },
+                            "calibration_status": { "enum": ["verified", "missing", "expired", "unknown"] },
+                            "split_status": { "enum": ["batch_grouped", "row_randomized", "unknown"] },
+                            "cutoff_status": { "enum": ["pre_cutoff", "post_cutoff_feature", "unknown", "not_applicable"] },
+                            "domain_shift": { "enum": ["none", "known_shift", "unknown"] },
+                            "hard_gate": { "enum": ["clear", "violated", "unknown"] },
+                            "expected_disposition": { "enum": ["ELIGIBLE", "REJECT", "INDETERMINATE", "ELIGIBLE_WITH_SHIFT_WARNING"] }
+                        },
+                        "additionalProperties": false
+                    }
+                }
             },
-            "required": ["scenario_id", "synthetic"],
             "additionalProperties": false
         })
     }
 
     #[test]
-    fn accepts_valid_draft_2020_12_schema_and_instance() {
-        let errors = validate_values(
-            &schema(),
-            &json!({"scenario_id": "SYN-001", "synthetic": true}),
-        )
-        .expect("offline schema validation");
+    fn accepts_valid_draft_2020_12_schema_and_synthetic_corpus() {
+        let data = corpus(vec![scenario("BEV-SYN-001")]);
+        let errors = validate_schema_instance(&schema(), &data)
+            .expect("offline schema validation");
         assert!(errors.is_empty());
+        assert!(validate_beverage_fixture_semantics(&data)
+            .expect("beverage fixture semantics")
+            .is_empty());
     }
 
     #[test]
     fn rejects_instance_with_missing_required_field() {
-        let errors = validate_values(&schema(), &json!({"synthetic": true}))
-            .expect("schema itself remains valid");
-        assert!(!errors.is_empty());
-        assert!(errors[0].contains("scenario_id"));
-    }
-
-    #[test]
-    fn rejects_instance_that_violates_synthetic_only_const() {
-        let errors = validate_values(
-            &schema(),
-            &json!({"scenario_id": "SYN-001", "synthetic": false}),
-        )
-        .expect("schema itself remains valid");
-        assert!(!errors.is_empty());
+        let mut data = corpus(vec![scenario("BEV-SYN-001")]);
+        data["scenarios"][0].as_object_mut().unwrap().remove("scenario_id");
+        assert!(!validate_schema_instance(&schema(), &data)
+            .expect("schema itself remains valid")
+            .is_empty());
     }
 
     #[test]
     fn rejects_a_non_2020_12_dialect() {
         let mut candidate = schema();
         candidate["$schema"] = json!("http://json-schema.org/draft-07/schema#");
-        assert!(validate_values(&candidate, &json!({})).is_err());
+        assert!(validate_schema_instance(&candidate, &corpus(vec![scenario("BEV-SYN-001")])).is_err());
     }
 
     #[test]
@@ -252,7 +413,7 @@ mod tests {
             "$schema": DRAFT_2020_12_URI,
             "$ref": "https://example.invalid/remote-schema.json"
         });
-        let result = validate_values(&candidate, &json!({}));
+        let result = validate_schema_instance(&candidate, &json!({}));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("offline Draft 2020-12 validator"));
     }
@@ -264,12 +425,56 @@ mod tests {
             "$defs": { "identifier": { "type": "string", "minLength": 1 } },
             "$ref": "#/$defs/identifier"
         });
-        assert!(validate_values(&candidate, &json!("ok"))
+        assert!(validate_schema_instance(&candidate, &json!("ok"))
             .expect("local references are self-contained")
             .is_empty());
-        assert!(!validate_values(&candidate, &json!(""))
+        assert!(!validate_schema_instance(&candidate, &json!(""))
             .expect("local references are self-contained")
             .is_empty());
+    }
+
+    #[test]
+    fn rejects_duplicate_scenario_ids() {
+        let data = corpus(vec![scenario("BEV-SYN-001"), scenario("BEV-SYN-001")]);
+        let errors = validate_beverage_fixture_semantics(&data).unwrap();
+        assert!(errors.iter().any(|error| error.contains("duplicate scenario_id")));
+    }
+
+    #[test]
+    fn rejects_fixtures_that_are_not_marked_synthetic() {
+        let mut data = corpus(vec![scenario("BEV-SYN-001")]);
+        data["scenarios"][0]["synthetic"] = json!(false);
+        let errors = validate_beverage_fixture_semantics(&data).unwrap();
+        assert!(errors.iter().any(|error| error.contains("synthetic=true")));
+    }
+
+    #[test]
+    fn oracle_rejects_leakage_and_measurement_class_confusion() {
+        let mut leakage = scenario("BEV-SYN-002");
+        leakage["data_integrity"] = json!("group_leakage");
+        leakage["expected_disposition"] = json!("REJECT");
+        assert_eq!(expected_fixture_disposition(&leakage), Some("REJECT"));
+
+        let mut confusion = scenario("BEV-SYN-003");
+        confusion["evidence_class"] = json!("MODELLED");
+        confusion["expected_disposition"] = json!("REJECT");
+        assert_eq!(expected_fixture_disposition(&confusion), Some("REJECT"));
+    }
+
+    #[test]
+    fn oracle_preserves_shift_warning_and_indeterminate_controls() {
+        let mut shifted = scenario("BEV-SYN-004");
+        shifted["domain_shift"] = json!("known_shift");
+        shifted["expected_disposition"] = json!("ELIGIBLE_WITH_SHIFT_WARNING");
+        assert_eq!(
+            expected_fixture_disposition(&shifted),
+            Some("ELIGIBLE_WITH_SHIFT_WARNING")
+        );
+
+        let mut unknown = scenario("BEV-SYN-005");
+        unknown["calibration_status"] = json!("missing");
+        unknown["expected_disposition"] = json!("INDETERMINATE");
+        assert_eq!(expected_fixture_disposition(&unknown), Some("INDETERMINATE"));
     }
 
     #[test]
