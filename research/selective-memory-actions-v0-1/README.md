@@ -12,6 +12,7 @@ cargo fmt --manifest-path research/selective-memory-actions-v0-1/Cargo.toml -- -
 ## Scope
 
 - Separates ingestion actions from query-time information actions.
+- Adds graded preference influence: ignore (never expose), support (supporting context), or dominate (strong constraint only with an independent upstream authorization gate).
 - Ranks precomputed probability-weighted loss distributions using integer fixed-point arithmetic.
 - Applies hard admission gates before cost ranking.
 - Requires a separate per-action hard-resource-feasibility result from the #9666 budget owner; infeasible actions cannot win through a low scalar cost.
@@ -22,7 +23,7 @@ cargo fmt --manifest-path research/selective-memory-actions-v0-1/Cargo.toml -- -
 
 ## Tests and current validation
 
-Twenty-one focused unit tests are authored, including use-time staleness after queue delay, unknown freshness, overdue decisions, inclusive age boundary, exact-deadline behavior, explicit no-deadline versus unknown-deadline handling, retrieval-time revalidation failure and a correction/retraction discovered after retrieval. They have not been run because the current environment has no Cargo/Rust toolchain.
+Twenty-five focused unit tests are authored, including use-time staleness after queue delay, unknown freshness, overdue decisions, inclusive age boundary, exact-deadline behavior, explicit no-deadline versus unknown-deadline handling, retrieval-time revalidation failure and a correction/retraction discovered after retrieval. They have not been run because the current environment has no Cargo/Rust toolchain. The four preference-influence tests cover legal ignore under absent admission, support under current canonical evidence, domination blocked without separate authorization, and domination selected when that authorization is present.
 
 ## Deliberate limitations
 
