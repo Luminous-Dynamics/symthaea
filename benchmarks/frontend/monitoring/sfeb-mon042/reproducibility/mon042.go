@@ -265,7 +265,7 @@ func Evaluate(in Input)Result{
  // geometry only. It does not authenticate the domain evidence.
  // Domain inventories and outcome receipts are only hash-bound here. MON-041
  // must authenticate origins, key state, and nonce/attestation ledgers.
- f.hold("dependency_domain_custody_not_authenticated")
+ f.hold("sampling_and_dependency_domain_custody_not_authenticated")
  if in.Mode==RuntimeCandidate{f.hold("runtime_independence_attestation_adapter_not_implemented")}
  out.CampaignVerdict=Indeterminate;out.ProductionUsePermitted=false
  out.DomainInventoryAuthenticated=false;out.ReasonCodes=f.sorted()
