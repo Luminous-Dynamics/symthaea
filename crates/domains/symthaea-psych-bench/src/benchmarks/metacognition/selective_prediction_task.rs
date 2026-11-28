@@ -29,6 +29,10 @@ pub struct SelectivePredictionObservation {
     pub source_is_current: bool,
     /// Whether a clarification or evidence request can obtain relevant context.
     pub clarification_available: bool,
+    /// Confidence emitted by the evaluated system for its direct answer.
+    /// In the synthetic fixture this is a controlled input; the feature-gated
+    /// Symthaea adapter can populate it from CognitiveLoopService snapshots.
+    pub reported_confidence: f64,
     /// Policy-side estimate of the probability that a targeted request resolves
     /// the information gap. This is an observation, not evaluator truth.
     pub estimated_clarification_resolution_probability: f64,
@@ -65,6 +69,79 @@ pub struct SelectivePolicyDecision {
     pub action: DecisionAction,
     pub confidence: f64,
     pub clarification_target: Option<ClarificationTarget>,
+}
+
+/// Runtime confidence-based policy adapter. The caller supplies the
+/// evaluated system's per-item confidence through reported_confidence;
+/// evidence sufficiency, premise integrity and source freshness remain separate
+/// decision inputs. This does not turn the rolling calibration-error EMA into
+/// a per-item probability.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct RuntimeConfidencePolicy {
+    pub answer_threshold: f64,
+    pub minimum_net_information_value: f64,
+    pub information_request_burden: f64,
+}
+
+impl Default for RuntimeConfidencePolicy {
+    fn default() -> Self {
+        Self {
+            answer_threshold: 0.80,
+            minimum_net_information_value: 0.05,
+            information_request_burden: 0.12,
+        }
+    }
+}
+
+impl RuntimeConfidencePolicy {
+    pub fn decide(
+        self,
+        observation: &SelectivePredictionObservation,
+    ) -> SelectivePolicyDecision {
+        let direct_answer_probability = if !observation.premise_consistent {
+            0.05
+        } else if !observation.source_is_current {
+            0.20
+        } else {
+            observation.reported_confidence
+        };
+        let expected_information_value = observation
+            .estimated_clarification_resolution_probability
+            * (observation.estimated_post_clarification_accuracy - direct_answer_probability)
+            - self.information_request_burden;
+        let action = if observation.clarification_available
+            && expected_information_value > self.minimum_net_information_value
+        {
+            DecisionAction::RequestInformation
+        } else if observation.premise_consistent
+            && observation.source_is_current
+            && observation.reported_confidence >= self.answer_threshold
+        {
+            DecisionAction::Answer
+        } else {
+            DecisionAction::Abstain
+        };
+
+        SelectivePolicyDecision {
+            action,
+            confidence: observation.reported_confidence,
+            clarification_target: (action == DecisionAction::RequestInformation)
+                .then(|| target_for_observation(observation)),
+        }
+    }
+}
+
+/// Copy the live system's per-cycle prediction-confidence value into a task
+/// observation. Call this with service.consciousness_snapshot() from a
+/// symthaea-backend build. The task context still supplies premise, freshness
+/// and clarification availability; this function only transfers model confidence.
+#[cfg(feature = "symthaea-backend")]
+pub fn observation_with_symthaea_snapshot_confidence(
+    mut observation: SelectivePredictionObservation,
+    snapshot: &symthaea::cognitive_loop::snapshot::ConsciousnessSnapshot,
+) -> SelectivePredictionObservation {
+    observation.reported_confidence = f64::from(snapshot.prediction_confidence);
+    observation
 }
 
 /// A fixed candidate-answer case. Evaluator-only fields are private so policy
@@ -386,6 +463,7 @@ pub fn fixture_items() -> Vec<SyntheticSelectivePredictionItem> {
                 premise_consistent,
                 source_is_current,
                 clarification_available,
+                reported_confidence: evidence_strength,
                 estimated_clarification_resolution_probability: if clarification_available {
                     0.75
                 } else {
@@ -411,6 +489,7 @@ pub fn fixture_items() -> Vec<SyntheticSelectivePredictionItem> {
                     premise_consistent: true,
                     source_is_current: true,
                     clarification_available: false,
+                    reported_confidence: 0.94,
                     estimated_clarification_resolution_probability: 0.0,
                     estimated_post_clarification_accuracy: 0.94,
                 },
@@ -458,6 +537,11 @@ fn validate_items(
         if !evidence.is_finite() || !(0.0..=1.0).contains(&evidence) {
             return Err(SelectivePredictionTaskError::InvalidEvidenceStrength { index });
         }
+        if !item.observation.reported_confidence.is_finite()
+            || !(0.0..=1.0).contains(&item.observation.reported_confidence)
+        {
+            return Err(SelectivePredictionTaskError::InvalidPolicyConfidence { index });
+        }
         if !item
             .observation
             .estimated_clarification_resolution_probability
@@ -491,6 +575,8 @@ fn validate_items(
                     || observation.clarification_available
                     || !observation.premise_consistent
                     || !observation.source_is_current
+                    || !observation.reported_confidence.is_finite()
+                    || !(0.0..=1.0).contains(&observation.reported_confidence)
                     || !observation
                         .estimated_clarification_resolution_probability
                         .is_finite()
@@ -1076,6 +1162,32 @@ mod tests {
             &changed_receipt,
         )
         .expect("replay should reject changed receipt"));
+    }
+
+    #[test]
+    fn runtime_confidence_policy_consumes_external_confidence_and_fails_closed_on_traps() {
+        let items = fixture_items();
+        let policy = RuntimeConfidencePolicy::default();
+
+        let supported = policy.decide(&items[0].observation);
+        assert_eq!(supported.action, DecisionAction::Answer);
+        assert_eq!(supported.confidence, items[0].observation.reported_confidence);
+
+        let stale = policy.decide(&items[11].observation);
+        assert_eq!(stale.action, DecisionAction::RequestInformation);
+        assert_eq!(stale.clarification_target, Some(ClarificationTarget::RefreshSource));
+
+        let false_premise = policy.decide(&items[9].observation);
+        assert_eq!(false_premise.action, DecisionAction::Abstain);
+
+        let report = evaluate_policy_with(
+            &items,
+            "runtime_confidence_adapter",
+            |observation| policy.decide(observation),
+            SelectivePredictionCostModel::default(),
+        )
+        .expect("runtime policy should be evaluated through the public adapter");
+        assert_eq!(report.items, 14);
     }
 
     #[test]
