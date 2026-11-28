@@ -59,3 +59,29 @@ The separate package `research/symthaea-gamebench-fep-adapter-v0-1/` implements 
 - Total: **58 authored tests**. These counts are source inventory, not observed test results.
 - Two isolated workflows run rustfmt, Cargo tests, and strict Clippy.
 - No test/format/Clippy pass is claimed until both workflows pass on the exact branch head.
+
+
+## Candidate interface and deterministic baselines
+
+The public candidate contract is observation/action-only:
+- receives the current observation, offered action attempts, remaining budget, and step count;
+- returns one offered action, optional calibrated success confidence, and normalized feature forecasts;
+- receives only previous and next candidate-visible observations after acting;
+- never receives environment objects, hidden state, task seed, evaluator IDs, exact planners, or evaluator outcomes.
+
+The reset contract has no episode ID or seed argument. Candidate randomness is initialized from candidate-owned configuration, never the task seed. A confidence of None is valid; action softmax and HDC similarity are not calibrated task-success probabilities.
+
+Candidate policy baselines in the core crate:
+- RandomLegalCandidate: seeded random legal policy with an internal per-episode counter.
+- GreedyManhattanCandidate: one-step Manhattan policy, O1 full-map only; no route search or episodic memory.
+
+## Authored test inventory and validation
+
+- F1–F6 deterministic environment fixtures: 41 tests.
+- Candidate-output contract: 7 tests.
+- Random and greedy policy baselines: 5 tests.
+- Core crate total: **53 authored tests**.
+- Separate candidate-adapter workspace: 6 FEP tests, 5 spatial HDC tests, 5 HDC-LTC tests (**16 authored tests**).
+- Combined source inventory: **69 authored Rust tests**.
+
+These are authored counts, not observed execution results. Dedicated workflows run formatting, Cargo tests, and strict Clippy for each workspace. No pass is claimed until each exact-head workflow completes successfully.
