@@ -15,7 +15,10 @@ const F1_ACTIONS: [Action; 4] = [Action::North, Action::East, Action::South, Act
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct F1EpisodeReport {
+    /// Environment-computed task outcome, independent of candidate protocol status.
     pub success: bool,
+    /// True only when candidate reset/decision/feedback all completed validly.
+    pub candidate_protocol_valid: bool,
     pub terminal_status: TerminalStatus,
     pub actions_attempted: u32,
     pub optimal_actions: Option<u32>,
@@ -92,7 +95,8 @@ where
 
     let final_state = game.state();
     let terminal_status = game.status();
-    let success = terminal_status == TerminalStatus::Success && candidate_error.is_none();
+    let success = terminal_status == TerminalStatus::Success;
+    let candidate_protocol_valid = candidate_error.is_none();
     let excess_actions = if success {
         optimal_actions.map(|optimal| i64::from(actions_attempted) - i64::from(optimal))
     } else {
@@ -101,6 +105,7 @@ where
 
     F1EpisodeReport {
         success,
+        candidate_protocol_valid,
         terminal_status,
         actions_attempted,
         optimal_actions,
@@ -178,6 +183,7 @@ mod tests {
         let mut candidate = DecisionFailureCandidate;
         let report = evaluate_f1(spec, &mut candidate);
         assert!(!report.success);
+        assert!(!report.candidate_protocol_valid);
         assert_eq!(report.actions_attempted, 0);
         assert!(report.events.is_empty());
         assert!(report.candidate_error.is_some());
@@ -223,9 +229,58 @@ mod tests {
         let mut candidate = FeedbackFailureCandidate { pending: None };
         let report = evaluate_f1(spec, &mut candidate);
         assert!(!report.success);
+        assert!(!report.candidate_protocol_valid);
         assert_eq!(report.actions_attempted, 1);
         assert!(report.candidate_error.is_some());
         assert_eq!(report.events.len(), 1);
+    }
+
+    #[derive(Debug)]
+    struct TerminalFeedbackFailureCandidate;
+
+    impl InteractiveCandidate<Observation, Action> for TerminalFeedbackFailureCandidate {
+        type Error = std::io::Error;
+
+        fn reset(&mut self) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn decide(
+            &mut self,
+            _input: CandidateInput<'_, Observation, Action>,
+        ) -> Result<crate::CandidateDecision<Action>, Self::Error> {
+            Ok(crate::CandidateDecision {
+                action: Action::East,
+                confidence: None,
+                forecasts: Vec::new(),
+            })
+        }
+
+        fn observe_transition(
+            &mut self,
+            _feedback: CandidateFeedback<'_, Observation, Action>,
+        ) -> Result<(), Self::Error> {
+            Err(std::io::Error::other("feedback failed after task completion"))
+        }
+    }
+
+    #[test]
+    fn task_outcome_and_candidate_protocol_validity_are_separate() {
+        let spec = GridSpec::new(
+            2,
+            1,
+            vec![Cell::Floor, Cell::Goal],
+            Position::new(0, 0),
+            Position::new(1, 0),
+            2,
+        )
+        .expect("valid one-move map");
+        let mut candidate = TerminalFeedbackFailureCandidate;
+        let report = evaluate_f1(spec, &mut candidate);
+        assert!(report.success);
+        assert!(!report.candidate_protocol_valid);
+        assert_eq!(report.actions_attempted, 1);
+        assert_eq!(report.candidate_error.as_deref(), Some("candidate transition feedback failed: feedback failed after task completion"));
     }
 
     #[test]
