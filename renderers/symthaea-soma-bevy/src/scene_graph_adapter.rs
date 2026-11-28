@@ -15,6 +15,7 @@ use super::{
     PresentationPolicyState, RenderedSceneEntity,
     SceneClock, SceneElementPresentation, SceneFrameMetadata, SceneGroupId,
 };
+use bevy::color::Alpha;
 use bevy::sprite_render::AlphaMode2d;
 use bevy::prelude::*;
 use symthaea_soma::embodiment_policy::{
@@ -302,8 +303,10 @@ pub(super) fn render_pending_scene_graph(
     }
 
     let mut relation_count = 0_usize;
+    if graph.effective_intensity > 0.0 {
     for relation in &layout.semantic_paths {
-        let color = relation_color(relation.kind);
+        let color = relation_color(relation.kind)
+            .with_alpha(graph.effective_intensity.clamp(0.0, 1.0));
         let material = materials.add(ColorMaterial {
             color,
             alpha_mode: AlphaMode2d::Blend,
@@ -337,6 +340,7 @@ pub(super) fn render_pending_scene_graph(
             ));
         }
         relation_count += 1;
+    }
     }
 
     latest_ack.latest = Some(SceneGraphSubmissionAck {
