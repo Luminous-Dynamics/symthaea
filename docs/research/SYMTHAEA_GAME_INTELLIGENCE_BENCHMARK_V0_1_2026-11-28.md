@@ -501,3 +501,64 @@ The next productive step is not another environment family. It is the candidate 
 5. For F4, score memory retention by requiring the candidate to navigate from accumulated observations after earlier cells disappear from the current view.
 6. For F6, compare no-probe, fixed probe, random probe, entropy-greedy, decision-value probe, and exact evaluator-only oracle under equal interaction budgets.
 7. Only after these controls pass should an external benchmark adapter or performance campaign be treated as a capability result.
+
+
+## 16. Candidate interface and first Symthaea policy adapters — 28 November 2026
+
+The research programme now has a candidate-facing interface separate from environment state and evaluator authority.
+
+### 16.1 Observation/action-only contract
+
+The standalone GameBench crate adds `InteractiveCandidate<O, A>` with:
+- `reset(episode_id)`;
+- `decide(observation, offered_actions, remaining_actions, episode_step)`;
+- `observe_transition(previous_observation, action, next_observation)`.
+
+A candidate is not passed the environment object, full task specification, hidden state, task seed, remaining resource-pile truth, transition oracle, BFS searcher, or evaluator reward. The environment supplies only its declared observation fields. The evaluator validates every decision before action execution.
+
+A decision contains one offered action, optional success confidence, and optional forecasts over named observed features. **Confidence is optional by design.** A softmax policy probability measures relative action selection, not the empirical probability of achieving a task postcondition. The FEP candidate therefore returns no calibrated confidence while still returning predictive coordinate distributions. A later calibration study must use a frozen held-out cohort; confidence must not be reverse-engineered from leaderboard score.
+
+### 16.2 Matched candidate arms now present in source
+
+| Candidate arm | Implemented interface | Scope / limits |
+|---|---|---|
+| Random legal | Seeded and reproducible random selection from offered actions | Sanity lower bound |
+| Greedy Manhattan | One-step distance-to-goal heuristic and deterministic coordinate forecast | O1 complete map only; no route search or episodic memory |
+| FEP ActiveInferenceAgent | Uses actual `symthaea-fep::ActiveInferenceAgent`, normalized 2D position observations, EFE action selection, predicted state and temporal-difference updates from subsequent observation | F1 O1 only; explicit identity transition + directional bias prior; not full HDC+CfC |
+| Exact BFS | Crate-private evaluator diagnostic | Not a candidate and never accessible through the public candidate API |
+
+The FEP adapter is in `research/symthaea-gamebench-fep-adapter-v0-1/`, an isolated Cargo workspace that path-depends on the repository's actual `crates/core/symthaea-fep`. It does not add FEP dependencies to the production root workspace.
+
+### 16.3 Prediction measurement
+
+The FEP adapter reports small normalized discrete coordinate distributions using predicted means and belief precision, rather than a single point with fake certainty. The next work should score:
+- per-feature log score / Brier score where the outcome is categorical;
+- calibration and sharpness separately;
+- one-step and multi-step position error;
+- action-ranking regret against matched candidate actions;
+- task success and path cost independently from prediction quality.
+
+The current FEP action model is intentionally simple and structured. It has not been trained or evaluated on a campaign yet. It is a reproducible baseline candidate, not an established performance improvement.
+
+### 16.4 Current test inventory and qualification status
+
+The current branch contains **52 authored tests** in the environment/candidate crate (F1–F6: 41, candidate-output contract: 7, random/greedy policy baselines: 4), plus **6 authored FEP-adapter tests**. These are source counts only, not observed passes.
+
+Two dedicated GitHub workflows are configured:
+- `GameBench Rust v0.1`: deterministic environment, candidate contract, and policy baseline crate.
+- `GameBench FEP Adapter v0.1`: the FEP candidate adapter against the actual sibling `symthaea-fep` package.
+
+No local Cargo/Rust toolchain is available in this execution environment. Only an exact-head passing rustfmt, test and strict-Clippy result may qualify either crate. Skipped broad CI jobs are not passes.
+
+### 16.5 What would justify a claim of cognitive improvement?
+
+The immediate experiment is a paired, frozen F1 campaign across identical maps and seeds:
+1. random legal;
+2. greedy Manhattan;
+3. FEP ActiveInferenceAgent;
+4. exact BFS evaluator reference.
+
+Report success, normalized excess path cost, invalid action rate, decision latency, forecast log score, forecast calibration, and compute. Do not compare the exact oracle as a learned-agent baseline. Do not tune on the sealed test seeds.
+
+Then expand to F4 memory retention and F6 probe choice. FEP is only the first submodule baseline. A full Symthaea candidate that combines HDC representations, CfC/LTC temporal dynamics, and the existing memory/planning pathways requires a separate adapter with source-level API review and component-matched ablations. It must not inherit the label from this narrower FEP arm.
+
