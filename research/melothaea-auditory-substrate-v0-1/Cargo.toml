@@ -1,0 +1,16 @@
+[package]
+name = "mel-hear-011-auditory-substrate"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Multi-view auditory evidence contract and known-signal fixture validator"
+
+[workspace]
+members = ["."]
+resolver = "2"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
