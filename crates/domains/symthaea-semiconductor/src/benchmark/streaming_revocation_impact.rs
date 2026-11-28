@@ -453,3 +453,330 @@ pub fn assess_streaming_revocation_impact_v1(
     report.report_sha256 = report_digest(&report)?;
     Ok(report)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::benchmark::gated_streaming_adapter::{
+        LabelEvidenceFrontierV1, StreamingAdapterPolicyV1, StreamingLabelDeliveryV1,
+        StreamingPredictionInputV1, STREAMING_ADAPTER_POLICY_SCHEMA_V1,
+        STREAMING_DELIVERY_SCHEMA_V1, STREAMING_PREDICTION_SCHEMA_V1,
+        create_gated_streaming_adapter_engine_v1, deliver_qualified_stream_label_v1,
+        predict_and_register_stream_sample_v1,
+    };
+
+    fn digest(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
+
+    fn policy() -> StreamingAdapterPolicyV1 {
+        StreamingAdapterPolicyV1 {
+            schema: STREAMING_ADAPTER_POLICY_SCHEMA_V1.into(),
+            policy_id: "stream-revocation-test.v1".into(),
+            revision: 1,
+            feature_learning_rate: 0.2,
+            feature_norm_floor: 1e-6,
+            maximum_abs_weight_delta: 0.25,
+            maximum_abs_feature_value: 10.0,
+            maximum_abs_prediction_error: 100.0,
+            global_context_ema_alpha: 0.2,
+            local_context_ema_alpha: 0.3,
+            minimum_context_support: 2,
+            temporal_ema_alpha: 0.1,
+            temporal_activation_threshold: 0.05,
+            require_source_authenticity_assertion: true,
+        }
+    }
+
+    fn build_engine() -> GatedStreamingAdapterEngineV1 {
+        create_gated_streaming_adapter_engine_v1(
+            "revocation-engine-001",
+            "fab-clock",
+            &digest('a'),
+            &digest('b'),
+            vec![0.0, 0.0],
+            policy(),
+        )
+        .unwrap()
+    }
+
+    fn prediction(
+        sample: &str,
+        event: &str,
+        event_time: i64,
+        prediction_time: i64,
+        features: Vec<f64>,
+    ) -> StreamingPredictionInputV1 {
+        StreamingPredictionInputV1 {
+            schema: STREAMING_PREDICTION_SCHEMA_V1.into(),
+            sample_id: sample.into(),
+            measurement_event_id: event.into(),
+            event_time_unix_seconds: event_time,
+            feature_available_at_unix_seconds: event_time + 1,
+            prediction_at_unix_seconds: prediction_time,
+            clock_domain_id: "fab-clock".into(),
+            global_model_artifact_sha256: digest('a'),
+            feature_schema_sha256: digest('b'),
+            feature_vector: features,
+            selected_feature_indices: vec![0, 1],
+            global_baseline_prediction: 10.0,
+            context_key: Some("tool-1/chamber-1".into()),
+        }
+    }
+
+    fn make_report(
+        label_id: &str,
+        revision: u64,
+        event_id: &str,
+        payload: &str,
+        eligibility: LabelConsumptionEligibilityV1,
+    ) -> LabelConsumptionEligibilityReportV1 {
+        let mut report = LabelConsumptionEligibilityReportV1 {
+            schema: "luminous.semi-bench.label-consumption-report.v1".into(),
+            label_id: label_id.into(),
+            label_revision: revision,
+            measurement_event_id: event_id.into(),
+            calibration_certificate_id: "cal-001".into(),
+            frontier: LabelEvidenceFrontierV1::CurrentAtK1,
+            eligibility,
+            downstream_consumption_allowed: eligibility
+                == LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            reasons: Vec::new(),
+            label_sha256: payload.into(),
+            measurement_sha256: digest('c'),
+            qualified_corrected_value: 11.0,
+            qualified_standard_uncertainty_upper_bound: Some(0.1),
+            qualification_report_sha256: digest('d'),
+            requalification_report_sha256: digest('e'),
+            requalification_frontier_sha256: digest('f'),
+            source_authenticity_proven: true,
+            training_snapshot_mutated: false,
+            equipment_control_authority: false,
+            report_sha256: String::new(),
+        };
+        report.report_sha256 = label_report_digest(&report).unwrap();
+        report
+    }
+
+    fn delivery(
+        sample: &str,
+        event: &str,
+        label: &str,
+        revision: u64,
+        times: (i64, i64),
+    ) -> StreamingLabelDeliveryV1 {
+        let payload = digest('c');
+        let (available, delivered) = times;
+        StreamingLabelDeliveryV1 {
+            schema: STREAMING_DELIVERY_SCHEMA_V1.into(),
+            sample_id: sample.into(),
+            label_id: label.into(),
+            label_revision: revision,
+            measurement_event_id: event.into(),
+            label_payload_sha256: payload.clone(),
+            label_value: 11.0,
+            label_available_at_unix_seconds: available,
+            eligibility_report_available_at_unix_seconds: available,
+            delivered_at_unix_seconds: delivered,
+            clock_domain_id: "fab-clock".into(),
+            idempotency_key: format!("{label}:{revision}"),
+            eligibility_report: make_report(
+                label,
+                revision,
+                event,
+                &payload,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            ),
+        }
+    }
+
+    fn two_update_engine() -> GatedStreamingAdapterEngineV1 {
+        let mut engine = build_engine();
+        for index in 0..2 {
+            let sample = format!("sample-{index}");
+            let event = format!("event-{index}");
+            predict_and_register_stream_sample_v1(
+                &mut engine,
+                &prediction(
+                    &sample,
+                    &event,
+                    100 + index * 10,
+                    102 + index * 10,
+                    vec![1.0 + index as f64, 1.0],
+                ),
+            )
+            .unwrap();
+            deliver_qualified_stream_label_v1(
+                &mut engine,
+                &delivery(
+                    &sample,
+                    &event,
+                    &format!("label-{index}"),
+                    1,
+                    (110 + index * 10, 112 + index * 10),
+                ),
+            )
+            .unwrap();
+        }
+        engine
+    }
+
+    fn input(
+        engine: GatedStreamingAdapterEngineV1,
+        reports: Vec<LabelConsumptionEligibilityReportV1>,
+    ) -> StreamingRevocationImpactInputV1 {
+        StreamingRevocationImpactInputV1 {
+            schema: STREAMING_REVOCATION_IMPACT_INPUT_SCHEMA_V1.into(),
+            input_id: "revocation-impact-test-input".into(),
+            engine,
+            current_label_reports: reports,
+        }
+    }
+
+    fn latest_reports(
+        engine: &GatedStreamingAdapterEngineV1,
+    ) -> Vec<LabelConsumptionEligibilityReportV1> {
+        engine
+            .accepted_update_journal
+            .iter()
+            .map(|entry| entry.delivery.eligibility_report.clone())
+            .collect()
+    }
+
+    #[test]
+    fn two_updates_form_a_valid_contiguous_state_and_journal_chain() {
+        let engine = two_update_engine();
+        assert_eq!(engine.accepted_update_journal.len(), 2);
+        assert_eq!(engine.adapter_state.accepted_update_count, 2);
+        assert_ne!(engine.journal_head_sha256, engine.genesis_state_sha256);
+        let report = assess_streaming_revocation_impact_v1(&input(engine.clone(), latest_reports(&engine))).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::CompleteNoReplayRequired);
+    }
+
+    #[test]
+    fn revocation_directly_impacts_one_update_and_taints_later_state_suffix() {
+        let engine = two_update_engine();
+        let original_state = engine.adapter_state.clone();
+        let mut reports = latest_reports(&engine);
+        reports[0].eligibility = LabelConsumptionEligibilityV1::Blocked;
+        reports[0].downstream_consumption_allowed = false;
+        reports[0].report_sha256 = label_report_digest(&reports[0]).unwrap();
+
+        let report = assess_streaming_revocation_impact_v1(&input(engine.clone(), reports)).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::RebuildRequired);
+        assert_eq!(report.first_affected_update_sequence, Some(1));
+        assert_eq!(report.directly_invalidated_update_sequences, vec![1]);
+        assert_eq!(report.inherited_impacted_update_sequences, vec![2]);
+        assert_eq!(report.entries[0].state, StreamingUpdateImpactStateV1::DirectReplayRequired);
+        assert_eq!(report.entries[1].state, StreamingUpdateImpactStateV1::InheritedReplayRequired);
+        assert!(!report.running_adapter_mutated);
+        assert_eq!(engine.adapter_state, original_state);
+    }
+
+    #[test]
+    fn revocation_of_second_update_leaves_first_update_unaffected() {
+        let engine = two_update_engine();
+        let mut reports = latest_reports(&engine);
+        reports[1].eligibility = LabelConsumptionEligibilityV1::Blocked;
+        reports[1].downstream_consumption_allowed = false;
+        reports[1].report_sha256 = label_report_digest(&reports[1]).unwrap();
+        let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(report.first_affected_update_sequence, Some(2));
+        assert_eq!(report.entries[0].state, StreamingUpdateImpactStateV1::Unaffected);
+        assert_eq!(report.entries[1].state, StreamingUpdateImpactStateV1::DirectReplayRequired);
+    }
+
+    #[test]
+    fn unknown_current_report_taints_suffix_as_indeterminate() {
+        let engine = two_update_engine();
+        let mut reports = latest_reports(&engine);
+        reports[0].eligibility = LabelConsumptionEligibilityV1::Unknown;
+        reports[0].downstream_consumption_allowed = false;
+        reports[0].report_sha256 = label_report_digest(&reports[0]).unwrap();
+        let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::Unknown);
+        assert_eq!(report.directly_indeterminate_update_sequences, vec![1]);
+        assert_eq!(report.inherited_impacted_update_sequences, vec![2]);
+        assert_eq!(report.entries[1].state, StreamingUpdateImpactStateV1::InheritedIndeterminate);
+    }
+
+    #[test]
+    fn missing_current_k1_report_returns_unknown_not_clean() {
+        let engine = two_update_engine();
+        let reports = vec![latest_reports(&engine)[0].clone()];
+        let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::Unknown);
+        assert_eq!(report.unresolved_label_keys, vec!["label-1:1"]);
+    }
+
+    #[test]
+    fn tampered_journal_entry_digest_is_rejected() {
+        let mut engine = two_update_engine();
+        engine.accepted_update_journal[0].entry_sha256 = digest('0');
+        let reports = latest_reports(&engine);
+        let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::Rejected);
+        assert!(report.reason_codes[0].contains("journal_entry_digest_invalid"));
+    }
+
+    #[test]
+    fn current_report_payload_mismatch_is_rejected() {
+        let engine = two_update_engine();
+        let mut reports = latest_reports(&engine);
+        reports[0].label_sha256 = digest('9');
+        reports[0].report_sha256 = label_report_digest(&reports[0]).unwrap();
+        let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::Rejected);
+        assert_eq!(
+            report.reason_codes,
+            vec!["current_k1_report_does_not_match_historical_payload"]
+        );
+    }
+
+    #[test]
+    fn duplicate_current_reports_are_rejected() {
+        let engine = two_update_engine();
+        let report0 = latest_reports(&engine)[0].clone();
+        let report = assess_streaming_revocation_impact_v1(&input(engine, vec![report0.clone(), report0])).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::Rejected);
+    }
+
+    #[test]
+    fn stale_k0_current_report_is_unknown_and_never_clean() {
+        let engine = two_update_engine();
+        let mut reports = latest_reports(&engine);
+        reports[0].frontier = LabelEvidenceFrontierV1::AsKnownAtK0;
+        reports[0].report_sha256 = label_report_digest(&reports[0]).unwrap();
+        let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::Unknown);
+    }
+
+    #[test]
+    fn read_only_impact_report_is_deterministic() {
+        let engine = two_update_engine();
+        let reports = latest_reports(&engine);
+        let first = assess_streaming_revocation_impact_v1(&input(engine.clone(), reports.clone())).unwrap();
+        let second = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(first.report_sha256, second.report_sha256);
+        assert!(!first.historical_receipts_rewritten);
+        assert!(!first.replay_generation_executed);
+        assert!(!first.equipment_control_authority);
+    }
+
+    #[test]
+    fn missing_or_out_of_order_journal_sequence_is_rejected() {
+        let mut engine = two_update_engine();
+        engine.accepted_update_journal[1].update_sequence = 3;
+        let reports = latest_reports(&engine);
+        let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::Rejected);
+    }
+
+    #[test]
+    fn empty_journal_is_complete_without_replay() {
+        let engine = build_engine();
+        let report = assess_streaming_revocation_impact_v1(&input(engine, Vec::new())).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::CompleteNoReplayRequired);
+        assert!(report.entries.is_empty());
+    }
+}
