@@ -174,8 +174,9 @@ pub struct EvaluatorScore {
     /// False may still be behaviorally represented by an equivalent parameterization.
     pub generating_model_in_version_space: bool,
     /// Whether some legal candidate has identical predictions over every length-4
-    /// intervention sequence in the finite numeric input language. For Boolean and
-    /// interaction episodes the generating truth is inside the declared grammar.
+    /// intervention sequence in the finite numeric input language. For Boolean
+    /// episodes the generating truth is inside the declared grammar; interaction
+    /// structural-shift controls may add an evaluator-only quadratic-u term.
     pub generating_truth_behaviorally_represented: bool,
     pub set_score: SetScore,
     /// Scores structural-family recovery independently of coefficients and sensor parameters.
