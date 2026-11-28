@@ -137,6 +137,28 @@ pub enum CgrbWorldApplyResultV1 {
     Rejected(CgrbWorldRejectV1),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CgrbWorldTransportFaultV1 {
+    None,
+    DropBeforeApply,
+    ApplyThenLoseAcknowledgement,
+    DuplicateDelivery,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "delivery", content = "detail", rename_all = "snake_case")]
+pub enum CgrbWorldDispatchResultV1 {
+    Acknowledged {
+        receipt: CgrbWorldReceiptV1,
+        delivery_count: u32,
+    },
+    OutcomeUnknown {
+        operation_id: String,
+    },
+    Rejected(CgrbWorldRejectV1),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CgrbWorldAuditEventV1 {
     pub operation_id: String,
@@ -218,6 +240,78 @@ impl CgrbWorldV1 {
 
     pub fn audit_events(&self) -> &[CgrbWorldAuditEventV1] {
         &self.audit
+    }
+
+    /// Read-only lookup in the in-memory reference model. This is not an
+    /// independent external oracle and cannot establish deployment trust.
+    pub fn operation_receipt(&self, operation_id: &str) -> Option<&CgrbWorldReceiptV1> {
+        self.operations
+            .get(operation_id)
+            .map(|(_, receipt)| receipt)
+    }
+
+    /// Deterministic transport-fault harness. These faults model delivery and
+    /// acknowledgement loss around the synchronous reference mutation. They
+    /// are not a substitute for testing a real networked connector.
+    pub fn dispatch_with_fault(
+        &mut self,
+        action: &CgrbWorldActionV1,
+        fault: CgrbWorldTransportFaultV1,
+    ) -> CgrbWorldDispatchResultV1 {
+        match fault {
+            CgrbWorldTransportFaultV1::DropBeforeApply => {
+                CgrbWorldDispatchResultV1::OutcomeUnknown {
+                    operation_id: action.operation_id.clone(),
+                }
+            }
+            CgrbWorldTransportFaultV1::ApplyThenLoseAcknowledgement => {
+                match self.apply(action) {
+                    CgrbWorldApplyResultV1::Applied(_)
+                    | CgrbWorldApplyResultV1::Replayed(_) => {
+                        CgrbWorldDispatchResultV1::OutcomeUnknown {
+                            operation_id: action.operation_id.clone(),
+                        }
+                    }
+                    CgrbWorldApplyResultV1::Rejected(reason) => {
+                        CgrbWorldDispatchResultV1::Rejected(reason)
+                    }
+                }
+            }
+            CgrbWorldTransportFaultV1::DuplicateDelivery => {
+                match self.apply(action) {
+                    CgrbWorldApplyResultV1::Applied(receipt)
+                    | CgrbWorldApplyResultV1::Replayed(receipt) => {
+                        match self.apply(action) {
+                            CgrbWorldApplyResultV1::Applied(_)
+                            | CgrbWorldApplyResultV1::Replayed(_) => {
+                                CgrbWorldDispatchResultV1::Acknowledged {
+                                    receipt,
+                                    delivery_count: 2,
+                                }
+                            }
+                            CgrbWorldApplyResultV1::Rejected(reason) => {
+                                CgrbWorldDispatchResultV1::Rejected(reason)
+                            }
+                        }
+                    }
+                    CgrbWorldApplyResultV1::Rejected(reason) => {
+                        CgrbWorldDispatchResultV1::Rejected(reason)
+                    }
+                }
+            }
+            CgrbWorldTransportFaultV1::None => match self.apply(action) {
+                CgrbWorldApplyResultV1::Applied(receipt)
+                | CgrbWorldApplyResultV1::Replayed(receipt) => {
+                    CgrbWorldDispatchResultV1::Acknowledged {
+                        receipt,
+                        delivery_count: 1,
+                    }
+                }
+                CgrbWorldApplyResultV1::Rejected(reason) => {
+                    CgrbWorldDispatchResultV1::Rejected(reason)
+                }
+            },
+        }
     }
 
     pub fn read_cell(
@@ -762,6 +856,94 @@ mod tests {
             ),
             Err(CgrbWorldRejectV1::InvalidIdentity)
         );
+    }
+
+    #[test]
+    fn apply_then_lost_acknowledgement_requires_reconciliation() {
+        let mut world = CgrbWorldV1::new();
+        let request = action(
+            "op-lost-ack",
+            0,
+            CgrbWorldMutationV1::Set {
+                subject: "record-1".into(),
+                attribute: "status".into(),
+                value: CgrbWorldValueV1::Text("confirmed".into()),
+            },
+            CgrbWorldIdempotencyV1::Idempotent,
+            None,
+        );
+        assert_eq!(
+            world.dispatch_with_fault(
+                &request,
+                CgrbWorldTransportFaultV1::ApplyThenLoseAcknowledgement
+            ),
+            CgrbWorldDispatchResultV1::OutcomeUnknown {
+                operation_id: "op-lost-ack".into()
+            }
+        );
+        assert!(world.operation_receipt("op-lost-ack").is_some());
+        assert_eq!(world.audit_events().len(), 1);
+        assert_eq!(
+            world.read_cell("record-1", "status"),
+            Some(&CgrbWorldValueV1::Text("confirmed".into()))
+        );
+    }
+
+    #[test]
+    fn dropped_before_apply_is_unknown_to_caller_but_no_reference_effect_exists() {
+        let mut world = CgrbWorldV1::new();
+        let request = action(
+            "op-dropped",
+            0,
+            CgrbWorldMutationV1::Set {
+                subject: "record-1".into(),
+                attribute: "status".into(),
+                value: CgrbWorldValueV1::Text("confirmed".into()),
+            },
+            CgrbWorldIdempotencyV1::Idempotent,
+            None,
+        );
+        assert_eq!(
+            world.dispatch_with_fault(&request, CgrbWorldTransportFaultV1::DropBeforeApply),
+            CgrbWorldDispatchResultV1::OutcomeUnknown {
+                operation_id: "op-dropped".into()
+            }
+        );
+        assert!(world.operation_receipt("op-dropped").is_none());
+        assert_eq!(world.state_version(), 0);
+        assert!(world.audit_events().is_empty());
+    }
+
+    #[test]
+    fn duplicate_transport_delivery_has_one_effect_and_two_deliveries() {
+        let mut world = CgrbWorldV1::new();
+        let request = action(
+            "op-duplicate-delivery",
+            0,
+            CgrbWorldMutationV1::AppendText {
+                subject: "outbox-1".into(),
+                attribute: "messages".into(),
+                value: "hello".into(),
+            },
+            CgrbWorldIdempotencyV1::KeyedIdempotent,
+            Some("stable-key"),
+        );
+        let result = world.dispatch_with_fault(
+            &request,
+            CgrbWorldTransportFaultV1::DuplicateDelivery,
+        );
+        assert!(matches!(
+            result,
+            CgrbWorldDispatchResultV1::Acknowledged {
+                delivery_count: 2,
+                receipt: CgrbWorldReceiptV1 { effect_count: 1, .. }
+            }
+        ));
+        assert_eq!(
+            world.read_cell("outbox-1", "messages"),
+            Some(&CgrbWorldValueV1::TextList(vec!["hello".into()]))
+        );
+        assert_eq!(world.audit_events().len(), 1);
     }
 
     #[test]
