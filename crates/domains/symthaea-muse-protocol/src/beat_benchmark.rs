@@ -274,9 +274,6 @@ pub fn validate_beat_benchmark_manifest(
         );
     }
 
-    let is_mirex_2026 = manifest
-        .protocol_id
-        .eq_ignore_ascii_case(MIREX_2026_BEAT_PROTOCOL_ID);
     let mut track_ids = BTreeSet::new();
     let mut audio_splits: BTreeMap<String, BTreeSet<BeatDatasetSplit>> = BTreeMap::new();
     let mut source_master_splits: BTreeMap<String, BTreeSet<BeatDatasetSplit>> =
@@ -352,10 +349,9 @@ pub fn validate_beat_benchmark_manifest(
         }
 
         let dataset_id = track.dataset_id.trim().to_ascii_lowercase();
-        let mirex_locked = is_mirex_2026
-            && MIREX_2026_LOCKED_DATASETS
-                .iter()
-                .any(|locked| *locked == dataset_id.as_str());
+        let mirex_locked = MIREX_2026_LOCKED_DATASETS
+            .iter()
+            .any(|locked| *locked == dataset_id.as_str());
         if mirex_locked
             && (track.split != BeatDatasetSplit::LockedTest
                 || track.purpose != BeatDatasetPurpose::BenchmarkEvaluation)
@@ -887,6 +883,23 @@ mod tests {
         );
         let found = codes(&manifest(vec![track]));
         assert!(found.contains(
+            &BeatBenchmarkViolationCode::MirexLockedDatasetUsedOutsideLockedTest
+        ));
+    }
+
+    #[test]
+    fn locked_mirex_test_datasets_cannot_be_repurposed_for_another_dev_suite() {
+        let track = valid_track(
+            "gtzan-cross-suite-dev",
+            "gtzan",
+            BeatDatasetSplit::Development,
+            BeatDatasetPurpose::Development,
+            &"2".repeat(64),
+            "master-gtzan-cross-suite",
+        );
+        let mut manifest = manifest(vec![track]);
+        manifest.protocol_id = "mel-dj-internal-research".to_string();
+        assert!(codes(&manifest).contains(
             &BeatBenchmarkViolationCode::MirexLockedDatasetUsedOutsideLockedTest
         ));
     }
