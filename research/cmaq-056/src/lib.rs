@@ -423,13 +423,13 @@ impl TypedRiskPlan {
         &self,
         receipt: &CompositionReceipt,
     ) -> Result<(), ManifestError> {
-        let delta_reference = match self.calibration {
+        let delta_reference = match &self.calibration {
             NullCalibration::DirectConditionalPairedEquality { .. } => {
                 return Err(ManifestError::LegacyReceiptRequiresReferenceCalibration);
             }
             NullCalibration::ReferenceCalibratedBoundedMean {
                 delta_reference, ..
-            } => delta_reference,
+            } => *delta_reference,
         };
 
         if receipt.fleet_plan_sha256 != self.fleet_plan_sha256
