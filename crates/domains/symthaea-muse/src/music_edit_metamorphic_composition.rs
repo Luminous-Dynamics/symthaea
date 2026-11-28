@@ -744,19 +744,34 @@ mod tests {
         }
     }
 
-    fn step(
-        pair_id: &str,
-        base_sample: &str,
-        output_sample: &str,
-        base_audio: &str,
-        output_audio: &str,
-        base_instruction: &str,
-        output_instruction: &str,
-        base_envelope: &str,
-        output_envelope: &str,
+    struct StepSpec<'a> {
+        pair_id: &'a str,
+        base_sample: &'a str,
+        output_sample: &'a str,
+        base_audio: &'a str,
+        output_audio: &'a str,
+        base_instruction: &'a str,
+        output_instruction: &'a str,
+        base_envelope: &'a str,
+        output_envelope: &'a str,
         family: MusicEditMetamorphicTransformFamilyV1,
         property_mapping: MusicEditMetamorphicPropertyMappingV1,
-    ) -> MusicEditMetamorphicPathStepV1 {
+    }
+
+    fn step(spec: StepSpec<'_>) -> MusicEditMetamorphicPathStepV1 {
+        let StepSpec {
+            pair_id,
+            base_sample,
+            output_sample,
+            base_audio,
+            output_audio,
+            base_instruction,
+            output_instruction,
+            base_envelope,
+            output_envelope,
+            family,
+            property_mapping,
+        } = spec;
         let identity = mapping_is_identity(&property_mapping);
         let relation = if identity {
             MusicEditMetamorphicRelationV1::Invariant
@@ -844,32 +859,63 @@ mod tests {
         let left = path(
             "transpose-then-tempo",
             vec![
-                step(
-                    "left-1", "origin", "left-pitch", &origin_audio, &d(5),
-                    &origin_instruction, &d(6), &origin_envelope, &d(7),
-                    MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
-                    transpose.clone(),
-                ),
-                step(
-                    "left-2", "left-pitch", "left-final", &d(5), &d(8),
-                    &d(6), &final_instruction, &d(7), &final_envelope,
-                    MusicEditMetamorphicTransformFamilyV1::TempoScaling, tempo.clone(),
-                ),
+                step(StepSpec {
+                pair_id: "left-1",
+                base_sample: "origin",
+                output_sample: "left-pitch",
+                base_audio: &origin_audio,
+                output_audio: &d(5),
+                base_instruction: &origin_instruction,
+                output_instruction: &d(6),
+                base_envelope: &origin_envelope,
+                output_envelope: &d(7),
+                family: MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+                property_mapping: transpose.clone(),
+            }),
+                step(StepSpec {
+                pair_id: "left-2",
+                base_sample: "left-pitch",
+                output_sample: "left-final",
+                base_audio: &d(5),
+                output_audio: &d(8),
+                base_instruction: &d(6),
+                output_instruction: &final_instruction,
+                base_envelope: &d(7),
+                output_envelope: &final_envelope,
+                family: MusicEditMetamorphicTransformFamilyV1::TempoScaling,
+                property_mapping: tempo.clone(),
+            }),
             ],
         );
         let right = path(
             "tempo-then-transpose",
             vec![
-                step(
-                    "right-1", "origin", "right-tempo", &origin_audio, &d(11),
-                    &origin_instruction, &d(12), &origin_envelope, &d(13),
-                    MusicEditMetamorphicTransformFamilyV1::TempoScaling, tempo,
-                ),
-                step(
-                    "right-2", "right-tempo", "right-final", &d(11), &d(14),
-                    &d(12), &final_instruction, &d(13), &final_envelope,
-                    MusicEditMetamorphicTransformFamilyV1::GlobalTransposition, transpose,
-                ),
+                step(StepSpec {
+                pair_id: "right-1",
+                base_sample: "origin",
+                output_sample: "right-tempo",
+                base_audio: &origin_audio,
+                output_audio: &d(11),
+                base_instruction: &origin_instruction,
+                output_instruction: &d(12),
+                base_envelope: &origin_envelope,
+                output_envelope: &d(13),
+                family: MusicEditMetamorphicTransformFamilyV1::TempoScaling,
+                property_mapping: tempo,
+            }),
+                step(StepSpec {
+                pair_id: "right-2",
+                base_sample: "right-tempo",
+                output_sample: "right-final",
+                base_audio: &d(11),
+                output_audio: &d(14),
+                base_instruction: &d(12),
+                output_instruction: &final_instruction,
+                base_envelope: &d(13),
+                output_envelope: &final_envelope,
+                family: MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+                property_mapping: transpose,
+            }),
             ],
         );
         (left, right)
@@ -943,32 +989,32 @@ mod tests {
         let start_envelope = d(4);
         let end_instruction = d(9);
         let end_envelope = d(10);
-        let left_step = step(
-            "tolerance-left",
-            "origin",
-            "left-end",
-            &start_audio,
-            &d(5),
-            &start_instruction,
-            &end_instruction,
-            &start_envelope,
-            &end_envelope,
-            MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
-            mapping(1.0, 2.0, 0.1, 1.0, 0.0, 0.0),
-        );
-        let right_step = step(
-            "tolerance-right",
-            "origin",
-            "right-end",
-            &start_audio,
-            &d(6),
-            &start_instruction,
-            &end_instruction,
-            &start_envelope,
-            &end_envelope,
-            MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
-            mapping(1.0, 2.0, 0.2, 1.0, 0.0, 0.0),
-        );
+        let left_step = step(StepSpec {
+                pair_id: "tolerance-left",
+                base_sample: "origin",
+                output_sample: "left-end",
+                base_audio: &start_audio,
+                output_audio: &d(5),
+                base_instruction: &start_instruction,
+                output_instruction: &end_instruction,
+                base_envelope: &start_envelope,
+                output_envelope: &end_envelope,
+                family: MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+                property_mapping: mapping(1.0, 2.0, 0.1, 1.0, 0.0, 0.0),
+            });
+        let right_step = step(StepSpec {
+                pair_id: "tolerance-right",
+                base_sample: "origin",
+                output_sample: "right-end",
+                base_audio: &start_audio,
+                output_audio: &d(6),
+                base_instruction: &start_instruction,
+                output_instruction: &end_instruction,
+                base_envelope: &start_envelope,
+                output_envelope: &end_envelope,
+                family: MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+                property_mapping: mapping(1.0, 2.0, 0.2, 1.0, 0.0, 0.0),
+            });
         let left = path("tolerance-left", vec![left_step]);
         let right = path("tolerance-right", vec![right_step]);
         let case = preregistered_case("tolerance-noncommute", &left, &right, false);
@@ -989,20 +1035,60 @@ mod tests {
         let offset = mapping(1.0, 3.0, 0.0, 1.0, 0.0, 0.0);
 
         let left = path("scale-then-offset", vec![
-            step("left-scale", "origin", "scaled", &start_audio, &d(5),
-                &start_instruction, &d(6), &start_envelope, &d(7),
-                MusicEditMetamorphicTransformFamilyV1::GlobalTransposition, scale.clone()),
-            step("left-offset", "scaled", "left-end", &d(5), &d(8),
-                &d(6), &end_instruction, &d(7), &end_envelope,
-                MusicEditMetamorphicTransformFamilyV1::KeyScaleShift, offset.clone()),
+            step(StepSpec {
+                pair_id: "left-scale",
+                base_sample: "origin",
+                output_sample: "scaled",
+                base_audio: &start_audio,
+                output_audio: &d(5),
+                base_instruction: &start_instruction,
+                output_instruction: &d(6),
+                base_envelope: &start_envelope,
+                output_envelope: &d(7),
+                family: MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+                property_mapping: scale.clone(),
+            }),
+            step(StepSpec {
+                pair_id: "left-offset",
+                base_sample: "scaled",
+                output_sample: "left-end",
+                base_audio: &d(5),
+                output_audio: &d(8),
+                base_instruction: &d(6),
+                output_instruction: &end_instruction,
+                base_envelope: &d(7),
+                output_envelope: &end_envelope,
+                family: MusicEditMetamorphicTransformFamilyV1::KeyScaleShift,
+                property_mapping: offset.clone(),
+            }),
         ]);
         let right = path("offset-then-scale", vec![
-            step("right-offset", "origin", "offset", &start_audio, &d(11),
-                &start_instruction, &d(12), &start_envelope, &d(13),
-                MusicEditMetamorphicTransformFamilyV1::KeyScaleShift, offset),
-            step("right-scale", "offset", "right-end", &d(11), &d(14),
-                &d(12), &end_instruction, &d(13), &end_envelope,
-                MusicEditMetamorphicTransformFamilyV1::GlobalTransposition, scale),
+            step(StepSpec {
+                pair_id: "right-offset",
+                base_sample: "origin",
+                output_sample: "offset",
+                base_audio: &start_audio,
+                output_audio: &d(11),
+                base_instruction: &start_instruction,
+                output_instruction: &d(12),
+                base_envelope: &start_envelope,
+                output_envelope: &d(13),
+                family: MusicEditMetamorphicTransformFamilyV1::KeyScaleShift,
+                property_mapping: offset,
+            }),
+            step(StepSpec {
+                pair_id: "right-scale",
+                base_sample: "offset",
+                output_sample: "right-end",
+                base_audio: &d(11),
+                output_audio: &d(14),
+                base_instruction: &d(12),
+                output_instruction: &end_instruction,
+                base_envelope: &d(13),
+                output_envelope: &end_envelope,
+                family: MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+                property_mapping: scale,
+            }),
         ]);
         let case = preregistered_case("scale-offset-noncommute", &left, &right, false);
         let report = compare_music_edit_metamorphic_paths_v1(&case, &left, &right).unwrap();
@@ -1064,12 +1150,32 @@ mod tests {
     fn broken_audio_chain_is_rejected() {
         let first = mapping(1.0, 1.0, 0.0, 1.0, 0.0, 0.0);
         let second = mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
-        let left = step("step-1", "origin", "middle", &d(2), &d(3),
-            &d(4), &d(5), &d(6), &d(7),
-            MusicEditMetamorphicTransformFamilyV1::GlobalTransposition, first);
-        let right = step("step-2", "middle", "end", &d(99), &d(8),
-            &d(5), &d(9), &d(7), &d(10),
-            MusicEditMetamorphicTransformFamilyV1::GainHeadroom, second);
+        let left = step(StepSpec {
+                pair_id: "step-1",
+                base_sample: "origin",
+                output_sample: "middle",
+                base_audio: &d(2),
+                output_audio: &d(3),
+                base_instruction: &d(4),
+                output_instruction: &d(5),
+                base_envelope: &d(6),
+                output_envelope: &d(7),
+                family: MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+                property_mapping: first,
+            });
+        let right = step(StepSpec {
+                pair_id: "step-2",
+                base_sample: "middle",
+                output_sample: "end",
+                base_audio: &d(99),
+                output_audio: &d(8),
+                base_instruction: &d(5),
+                output_instruction: &d(9),
+                base_envelope: &d(7),
+                output_envelope: &d(10),
+                family: MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
+                property_mapping: second,
+            });
         let error = compose_music_edit_metamorphic_path_v1(&path("broken-audio", vec![left, right]))
             .unwrap_err();
         assert!(error.contains(&MusicEditMetamorphicCompositionIssueV1::BrokenAudioChain));
@@ -1077,11 +1183,19 @@ mod tests {
 
     #[test]
     fn noninvariant_and_abstain_relations_are_not_composable() {
-        let mut noninvariant = step(
-            "noninvariant", "origin", "changed", &d(2), &d(3), &d(4), &d(5), &d(6), &d(7),
-            MusicEditMetamorphicTransformFamilyV1::AbsolutePitchShift,
-            mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
-        );
+        let mut noninvariant = step(StepSpec {
+                pair_id: "noninvariant",
+                base_sample: "origin",
+                output_sample: "changed",
+                base_audio: &d(2),
+                output_audio: &d(3),
+                base_instruction: &d(4),
+                output_instruction: &d(5),
+                base_envelope: &d(6),
+                output_envelope: &d(7),
+                family: MusicEditMetamorphicTransformFamilyV1::AbsolutePitchShift,
+                property_mapping: mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+            });
         noninvariant.pair.expected_relation = MusicEditMetamorphicRelationV1::NonInvariant;
         noninvariant.pair.admissibility_reason = Some("absolute target changed".to_owned());
         let error = compose_music_edit_metamorphic_path_v1(&path(
@@ -1091,11 +1205,19 @@ mod tests {
         .unwrap_err();
         assert!(error.contains(&MusicEditMetamorphicCompositionIssueV1::NonComposableRelation));
 
-        let mut abstain = step(
-            "abstain", "origin", "changed", &d(2), &d(3), &d(4), &d(5), &d(6), &d(7),
-            MusicEditMetamorphicTransformFamilyV1::TargetMasking,
-            mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
-        );
+        let mut abstain = step(StepSpec {
+                pair_id: "abstain",
+                base_sample: "origin",
+                output_sample: "changed",
+                base_audio: &d(2),
+                output_audio: &d(3),
+                base_instruction: &d(4),
+                output_instruction: &d(5),
+                base_envelope: &d(6),
+                output_envelope: &d(7),
+                family: MusicEditMetamorphicTransformFamilyV1::TargetMasking,
+                property_mapping: mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+            });
         abstain.pair.expected_relation = MusicEditMetamorphicRelationV1::AbstainExpected;
         abstain.pair.admissibility_reason =
             Some("target is masked and the property is not estimable".to_owned());
@@ -1138,18 +1260,32 @@ mod tests {
         let first_mapping = mapping(1.0, 1.0, 0.0, 1.0, 0.0, 0.0);
         let second_mapping = mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
 
-        let first = step(
-            "sample-1", "origin", "middle", &d(2), &d(3),
-            &d(4), &d(5), &d(6), &d(7),
-            MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
-            first_mapping.clone(),
-        );
-        let wrong_sample = step(
-            "sample-2", "wrong-middle", "end", &d(3), &d(8),
-            &d(5), &d(9), &d(7), &d(10),
-            MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
-            second_mapping.clone(),
-        );
+        let first = step(StepSpec {
+                pair_id: "sample-1",
+                base_sample: "origin",
+                output_sample: "middle",
+                base_audio: &d(2),
+                output_audio: &d(3),
+                base_instruction: &d(4),
+                output_instruction: &d(5),
+                base_envelope: &d(6),
+                output_envelope: &d(7),
+                family: MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+                property_mapping: first_mapping.clone(),
+            });
+        let wrong_sample = step(StepSpec {
+                pair_id: "sample-2",
+                base_sample: "wrong-middle",
+                output_sample: "end",
+                base_audio: &d(3),
+                output_audio: &d(8),
+                base_instruction: &d(5),
+                output_instruction: &d(9),
+                base_envelope: &d(7),
+                output_envelope: &d(10),
+                family: MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
+                property_mapping: second_mapping.clone(),
+            });
         let error = compose_music_edit_metamorphic_path_v1(&path(
             "broken-sample",
             vec![first.clone(), wrong_sample],
@@ -1157,12 +1293,19 @@ mod tests {
         .unwrap_err();
         assert!(error.contains(&MusicEditMetamorphicCompositionIssueV1::BrokenSampleChain));
 
-        let wrong_instruction = step(
-            "instruction-2", "middle", "end", &d(3), &d(8),
-            &d(55), &d(9), &d(7), &d(10),
-            MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
-            second_mapping.clone(),
-        );
+        let wrong_instruction = step(StepSpec {
+                pair_id: "instruction-2",
+                base_sample: "middle",
+                output_sample: "end",
+                base_audio: &d(3),
+                output_audio: &d(8),
+                base_instruction: &d(55),
+                output_instruction: &d(9),
+                base_envelope: &d(7),
+                output_envelope: &d(10),
+                family: MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
+                property_mapping: second_mapping.clone(),
+            });
         let error = compose_music_edit_metamorphic_path_v1(&path(
             "broken-instruction",
             vec![first.clone(), wrong_instruction],
@@ -1172,12 +1315,19 @@ mod tests {
             &MusicEditMetamorphicCompositionIssueV1::BrokenInstructionChain
         ));
 
-        let wrong_envelope = step(
-            "envelope-2", "middle", "end", &d(3), &d(8),
-            &d(5), &d(9), &d(77), &d(10),
-            MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
-            second_mapping,
-        );
+        let wrong_envelope = step(StepSpec {
+                pair_id: "envelope-2",
+                base_sample: "middle",
+                output_sample: "end",
+                base_audio: &d(3),
+                output_audio: &d(8),
+                base_instruction: &d(5),
+                output_instruction: &d(9),
+                base_envelope: &d(77),
+                output_envelope: &d(10),
+                family: MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
+                property_mapping: second_mapping,
+            });
         let error = compose_music_edit_metamorphic_path_v1(&path(
             "broken-validity-envelope",
             vec![first, wrong_envelope],
@@ -1190,18 +1340,32 @@ mod tests {
 
     #[test]
     fn duplicate_pair_identity_is_rejected() {
-        let first = step(
-            "duplicate", "origin", "middle", &d(2), &d(3),
-            &d(4), &d(5), &d(6), &d(7),
-            MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
-            mapping(1.0, 1.0, 0.0, 1.0, 0.0, 0.0),
-        );
-        let mut second = step(
-            "unique", "middle", "end", &d(3), &d(8),
-            &d(5), &d(9), &d(7), &d(10),
-            MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
-            mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
-        );
+        let first = step(StepSpec {
+                pair_id: "duplicate",
+                base_sample: "origin",
+                output_sample: "middle",
+                base_audio: &d(2),
+                output_audio: &d(3),
+                base_instruction: &d(4),
+                output_instruction: &d(5),
+                base_envelope: &d(6),
+                output_envelope: &d(7),
+                family: MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+                property_mapping: mapping(1.0, 1.0, 0.0, 1.0, 0.0, 0.0),
+            });
+        let mut second = step(StepSpec {
+                pair_id: "unique",
+                base_sample: "middle",
+                output_sample: "end",
+                base_audio: &d(3),
+                output_audio: &d(8),
+                base_instruction: &d(5),
+                output_instruction: &d(9),
+                base_envelope: &d(7),
+                output_envelope: &d(10),
+                family: MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
+                property_mapping: mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+            });
         second.pair.pair_id = first.pair.pair_id.clone();
         second.transform_receipt.pair_id = second.pair.pair_id.clone();
         second.transform_receipt.receipt_sha256.clear();
