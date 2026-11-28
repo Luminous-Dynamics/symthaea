@@ -205,6 +205,24 @@ fn seed_manifest_digest(
     json_sha256(&canonical)
 }
 
+/// Verifies a versioned initial seed manifest and its declared raw-residual score contract.
+pub fn verify_aci_residual_seed_manifest_v1(
+    manifest: &AciResidualSeedManifestV1,
+) -> Result<(), AciResidualWindowErrorV1> {
+    if manifest.schema != ACI_RESIDUAL_SEED_MANIFEST_SCHEMA_V1
+        || manifest.seed_id.trim().is_empty()
+        || manifest.score_contract_id != ACI_RAW_SIGNED_RESIDUAL_SCORE_CONTRACT_V1
+        || manifest.signed_residuals.iter().any(|value| !value.is_finite())
+        || !valid_sha256(&manifest.manifest_sha256)
+        || seed_manifest_digest(manifest)? != manifest.manifest_sha256
+    {
+        return Err(AciResidualWindowErrorV1(
+            "ACI residual seed manifest failed schema, score, numeric or digest verification".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn policy_digest(
     policy: &AciResidualWindowPolicyV1,
 ) -> Result<String, AciResidualWindowErrorV1> {
@@ -411,6 +429,13 @@ fn validate_window(window: &AciResidualWindowV1) -> Result<(), AciResidualWindow
     Ok(())
 }
 
+/// Verifies the complete bounded window and append-only residual history.
+pub fn verify_aci_residual_window_v1(
+    window: &AciResidualWindowV1,
+) -> Result<(), AciResidualWindowErrorV1> {
+    validate_window(window)
+}
+
 /// Creates a FIFO residual window from a sealed initial calibration seed.
 pub fn create_aci_residual_window_v1(
     engine_id: &str,
@@ -582,6 +607,7 @@ pub fn bind_aci_interval_construction_v1(
 ) -> Result<AciResidualIntervalBindingReceiptV1, AciResidualWindowErrorV1> {
     verify_delayed_aci_prediction_receipt_v1(prediction)
         .map_err(|error| AciResidualWindowErrorV1(error.to_string()))?;
+    verify_aci_residual_interval_construction_v1(construction)?;
     if construction.schema != ACI_RESIDUAL_INTERVAL_SCHEMA_V1
         || construction_digest(construction)? != construction.receipt_sha256
         || construction.point_prediction.to_bits() != prediction.point_prediction.to_bits()
@@ -692,6 +718,7 @@ fn append_residual_candidate(
         .map_err(|error| AciResidualWindowErrorV1(error.to_string()))?;
     verify_delayed_aci_update_receipt_v1(update)
         .map_err(|error| AciResidualWindowErrorV1(error.to_string()))?;
+    verify_aci_residual_interval_binding_v1(binding)?;
     if binding.schema != ACI_RESIDUAL_INTERVAL_BINDING_SCHEMA_V1
         || binding_digest(binding)? != binding.binding_sha256
         || construction.schema != ACI_RESIDUAL_INTERVAL_SCHEMA_V1
@@ -841,17 +868,122 @@ pub fn verify_aci_residual_interval_construction_v1(
         || receipt.alpha_at_issue <= 0.0
         || receipt.alpha_at_issue > 1.0
         || receipt.minimum_calibration_count == 0
-        || receipt.calibration_count < receipt.minimum_calibration_count
-            && receipt.interval.kind != AciIntervalKindV1::CalibrationUnbounded
         || receipt.score_contract_id != ACI_RAW_SIGNED_RESIDUAL_SCORE_CONTRACT_V1
+        || receipt.lower_tail_probability.to_bits() != (receipt.alpha_at_issue / 2.0).to_bits()
+        || receipt.upper_tail_probability.to_bits()
+            != (1.0 - receipt.alpha_at_issue / 2.0).to_bits()
     {
         return Err(AciResidualWindowErrorV1(
             "ACI residual interval construction receipt is malformed".into(),
         ));
     }
+
+    let n_plus_one = receipt
+        .calibration_count
+        .checked_add(1)
+        .ok_or_else(|| AciResidualWindowErrorV1("calibration count overflow".into()))?;
+    let lower_value = ((n_plus_one as f64) * receipt.lower_tail_probability).floor();
+    let upper_value = ((n_plus_one as f64) * receipt.upper_tail_probability).ceil();
+    let expected_lower_rank = (lower_value >= 1.0
+        && lower_value <= receipt.calibration_count as f64)
+        .then_some(lower_value as usize);
+    let expected_upper_rank = (upper_value >= 1.0
+        && upper_value <= receipt.calibration_count as f64)
+        .then_some(upper_value as usize);
+    if receipt.lower_order_statistic_rank != expected_lower_rank
+        || receipt.upper_order_statistic_rank != expected_upper_rank
+        || receipt.lower_signed_residual.is_some() != expected_lower_rank.is_some()
+        || receipt.upper_signed_residual.is_some() != expected_upper_rank.is_some()
+        || receipt.lower_signed_residual.is_some_and(|value| !value.is_finite())
+        || receipt.upper_signed_residual.is_some_and(|value| !value.is_finite())
+    {
+        return Err(AciResidualWindowErrorV1(
+            "ACI residual interval order-statistic ranks/residuals are inconsistent".into(),
+        ));
+    }
+
+    let expected_calibration_unbounded = receipt.calibration_count
+        < receipt.minimum_calibration_count
+        || (expected_lower_rank.is_none() && expected_upper_rank.is_none());
+    let valid_interval = match receipt.interval.kind {
+        AciIntervalKindV1::Bounded => {
+            if expected_calibration_unbounded {
+                false
+            } else if let (Some(lower), Some(upper), Some(actual_lower), Some(actual_upper)) = (
+                receipt.lower_signed_residual,
+                receipt.upper_signed_residual,
+                receipt.interval.lower,
+                receipt.interval.upper,
+            ) {
+                actual_lower.to_bits() == (receipt.point_prediction + lower).to_bits()
+                    && actual_upper.to_bits() == (receipt.point_prediction + upper).to_bits()
+                    && actual_lower <= actual_upper
+            } else {
+                false
+            }
+        }
+        AciIntervalKindV1::LowerUnbounded => {
+            !expected_calibration_unbounded
+                && expected_lower_rank.is_none()
+                && expected_upper_rank.is_some()
+                && receipt.interval.lower.is_none()
+                && receipt.interval.upper.is_some_and(|upper| {
+                    receipt.upper_signed_residual.is_some_and(|residual| {
+                        upper.is_finite()
+                            && upper.to_bits()
+                                == (receipt.point_prediction + residual).to_bits()
+                    })
+                })
+        }
+        AciIntervalKindV1::UpperUnbounded => {
+            !expected_calibration_unbounded
+                && expected_lower_rank.is_some()
+                && expected_upper_rank.is_none()
+                && receipt.interval.upper.is_none()
+                && receipt.interval.lower.is_some_and(|lower| {
+                    receipt.lower_signed_residual.is_some_and(|residual| {
+                        lower.is_finite()
+                            && lower.to_bits()
+                                == (receipt.point_prediction + residual).to_bits()
+                    })
+                })
+        }
+        AciIntervalKindV1::CalibrationUnbounded => {
+            expected_calibration_unbounded
+                && receipt.interval.lower.is_none()
+                && receipt.interval.upper.is_none()
+        }
+        AciIntervalKindV1::FullRealLine | AciIntervalKindV1::Empty => false,
+    };
+    if !valid_interval {
+        return Err(AciResidualWindowErrorV1(
+            "ACI interval endpoints do not match the declared finite-sample residual ranks".into(),
+        ));
+    }
+
     if construction_digest(receipt)? != receipt.receipt_sha256 {
         return Err(AciResidualWindowErrorV1(
             "ACI residual interval construction digest mismatch".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub fn verify_aci_residual_interval_binding_v1(
+    receipt: &AciResidualIntervalBindingReceiptV1,
+) -> Result<(), AciResidualWindowErrorV1> {
+    if receipt.schema != ACI_RESIDUAL_INTERVAL_BINDING_SCHEMA_V1
+        || receipt.sample_id.trim().is_empty()
+        || receipt.measurement_event_id.trim().is_empty()
+        || !valid_sha256(&receipt.prediction_receipt_sha256)
+        || !valid_sha256(&receipt.construction_receipt_sha256)
+        || !valid_sha256(&receipt.window_sha256)
+        || !receipt.point_prediction.is_finite()
+        || !receipt.alpha_at_issue.is_finite()
+        || binding_digest(receipt)? != receipt.binding_sha256
+    {
+        return Err(AciResidualWindowErrorV1(
+            "ACI residual interval binding receipt is malformed or tampered".into(),
         ));
     }
     Ok(())
