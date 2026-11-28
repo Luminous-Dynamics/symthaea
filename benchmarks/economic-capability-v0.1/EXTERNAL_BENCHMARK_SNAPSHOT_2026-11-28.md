@@ -67,6 +67,80 @@ Finance Agent v2.1 is a proprietary question set and a different version from v1
 - Interpretation: the narrow reported accuracy gap between the leading and much lower-cost entry makes cost/quality frontier analysis important. Also track all-pass rate, material false claims, source admissibility, latency, token/tool use and cost per independently accepted research task.
 - Claim boundary: research QA does not qualify point-in-time backtesting, accounting reconstruction, investable alpha, investment suitability or financial authority.
 
+## Enterprise IT operations and SRE agents
+
+The newly relevant benchmark family is not a single leaderboard: detection, root-cause localization, diagnosis, safe mitigation, actual service recovery, IT service-management completion and human capability are separate constructs.
+
+### ITBench / ITBench-AA
+
+- IBM's ITBench initial release describes 94 scenarios across SRE, CISO and FinOps. Its paper reports the best-performing agent at 13.8% SRE resolution, 25.2% CISO resolution and 0% FinOps on that initial release. Those are release- and harness-specific resolution metrics, not the same as ITBench-AA's SRE-only diagnostic metric.
+- Artificial Analysis' ITBench-AA evaluates **59 Kubernetes root-cause tasks** (40 public plus 19 private tasks shared by IBM), with three repeats per task. It scores average precision at full recall, so the score penalizes false-positive root-cause entity lists after requiring no false negatives. Its current displayed table lists GPT-5.6 Sol Max at **56.2%**, Step 5 Preview at **55.6%**, and Gemini 3.8 Flash High at **52.5%**.
+- Sources: https://github.com/itbench-hub/ITBench ; https://artificialanalysis.ai/evaluations/itbench-aa ; methodology/news: https://artificialanalysis.ai/articles/itbench-aa-launch
+- Snapshot: accessed 2026-11-28.
+- Interpretation: ITBench-AA is diagnosis/entity-attribution, not successful mitigation, recovery, rollback or operator independence. Do not call 56.2% a service restoration rate.
+
+### SWEOps-Bench
+
+SWEOps-Bench (paper dated 2026-11-04) contains **55 reproducible incident tasks** from **16 Kubernetes operator projects**. It starts each task from a healthy cluster, triggers a confirmed historical software fault under controlled workload, and asks agents to investigate runtime evidence and submit source/configuration repair. It reports stage-wise accuracy, verified recovery, lifecycle latency and tokens.
+
+Across six agent/model configurations, the paper reports:
+- faulty-state detection: **72.7%–90.9%**;
+- end-to-end verified recovery: **14.5%–52.7%**.
+
+That gap is especially important: noticing an incident is much easier than actually repairing it and passing the required post-repair checks. The paper also notes that a correct recovery can occur with an incorrect reported root-cause narrative, while clearing runtime symptoms can still fail fix-specific functional checks.
+
+- Paper: https://arxiv.org/abs/2611.06099
+- Snapshot: accessed 2026-11-28; paper dated November 4, 2026.
+- Interpretation: this is the closest technical comparison for code/configuration incident recovery. Keep root-cause narration, actual repair, service recovery and fix-specific functional verification as separate endpoints.
+
+### ITSMBench (Atomicwork / New Measure) and Enterprise Worlds
+
+Atomicwork/New Measure's open ITSMBench evaluates **89 L2/L3 service-management tasks** in a simulated enterprise of 42 mocked software applications, about 1,800 database tables and 2,000+ REST endpoints. Each task has 10–30 expert-authored deterministic verifiers over final environment state. The task principles are useful: critical information is distributed across tools; safe action requires corroboration across systems; and passing checks include both the correct judgment and the complete, safe footprint of the change.
+
+- Benchmark description: https://simulation.ressl.ai/benchmarks/atomicwork/itbench/blog
+- Repository: https://github.com/new-measure/ITSMBench
+- Snapshot: accessed 2026-11-28.
+- Interpretation: use this as a service-request/workflow comparison, particularly for identity, endpoint, network, security and compliance operations. Its mocked APIs and scoped 89-task taskset are not equivalent to live enterprise platforms or deep SRE recovery.
+
+Name collision warning: Vibrant Labs' Enterprise Worlds also publishes an ITSMBench line; its current site describes a **separate 53-task** executable environment with 900+ records, 16 entity types and 93 typed tools. Do not merge that 53-task release with Atomicwork/New Measure's 89-task benchmark or quote their scores interchangeably.
+
+- Enterprise Worlds current description: https://enterpriseworlds.vibrantlabs.com/
+- Research/methodology note: https://research.vibrantlabs.com/projects/itsmbench
+
+### AI SRE Arena v1 (Edge Delta)
+
+The October 2026 AI SRE Arena report describes **21 injected Kubernetes incidents**, two native products and two read-only control configurations, with 72 judged investigations. Its public report states:
+- native detection: Edge Delta 18/21 versus Grafana 12/21;
+- on the 12 incidents both investigated: root cause 11/12 versus 9/12, supported fix 7/12 versus 5/12;
+- the published table lists unsafe advice on 0/18 Edge Delta investigations versus 2/12 Grafana investigations.
+
+The rubric v1 page identifies one GPT-6-Astra judge and one published answer key. This is useful open prior art, but one judge/answer-key lineage and a small scenario set require independent replication before strong comparative claims.
+
+- Official report / code / answer keys: https://edgedelta.com/arena
+- Snapshot: accessed 2026-11-28; report published October 2026.
+
+### PagerDuty SRE Agent benchmark
+
+PagerDuty's 2026 report describes a self-built Kubernetes microservice fault-injection suite. Its latest complete sweep covers **17 scenarios** and compares localization, diagnosis, mitigation, evidence grounding, explanation quality and misdirection. It uses three LLM judges from different providers. The report discloses material limitations: a single trial per agent, failed runs excluded from quality scores, an incomplete human/judge statistical study, and focus primarily on triage/diagnosis with only a smaller remediation component.
+
+The company reports that the benchmark helped uncover and remedy an over-engineered investigation design, leading to roughly a 20-point diagnosis-score improvement while reducing latency/cost. This is vendor-reported development evidence, not an independent universal result.
+
+- Official report: https://www.pagerduty.com/resources/ai/learn/sre-agent-benchmark-report/
+- Snapshot: accessed 2026-11-28.
+
+### What ITOPS-CAP-001 should add
+
+Mycelix [ITOPS-CAP-001 #6846](https://github.com/Luminous-Dynamics/mycelix/issues/6846), under [CIV-IMPACT-001 #5046](https://github.com/Luminous-Dynamics/mycelix/issues/5046), should compare against these existing suites instead of claiming a new SRE or ITSM benchmark category. The differentiator should be the **composed qualification and economic/human outcome**:
+1. separate detect/localize/diagnose/propose/authorize/attempt/restore/functional-verify/reconcile states;
+2. least-privilege authority and exact target/environment/effect binding;
+3. no-op, wrong-target, symptom-twin, stale-approval and safe-abstention controls;
+4. independently checked postconditions and fix-specific functional invariants;
+5. interruption/retry/unknown-outcome/rollback and recurrence behavior;
+6. fully loaded cost per independently accepted recovery;
+7. operator capability dividend/debt: unaided baseline, assisted performance, immediate AI-off challenge, delayed retention, novel-incident transfer and outage recovery.
+
+For the Luminous synthetic development phase, #6846's proposed construction target is 40–60 scenarios across at least eight incident families, with scenario-family holdouts and repeated stochastic-agent runs. Keep the sample-size/cluster structure explicit: repeats improve variance estimates but do not replace independent incident families. The three OPS-01/02/03 scenarios authored in the pilot blueprint are anchor patterns only, not an admitted or complete task population.
+
 ## Engineering computation: verification, validation and uncertainty
 
 Engineering-tool comparisons should be based on known-answer and physical validation evidence—not model-generated explanations, a successful process exit, or parser success alone.
