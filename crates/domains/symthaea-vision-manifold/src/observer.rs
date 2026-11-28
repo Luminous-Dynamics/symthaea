@@ -345,13 +345,19 @@ impl ObserverOnlyVisionManifold {
             self.poisoned = true;
             return Err(format!("observer invariant failure after observation: {error}"));
         }
-        let model_digest_after = model_sha256(&state)?;
+        let model_digest_after = match model_sha256(&state) {
+            Ok(digest) => digest,
+            Err(error) => {
+                self.poisoned = true;
+                return Err(error);
+            }
+        };
         if model_digest_after != self.frozen_model_sha256 {
             self.poisoned = true;
             return Err("frozen observer model changed during evaluation".to_string());
         }
 
-        let first_timestamp_us = *self.first_timestamp_us.get_or_insert(identity.timestamp_us);
+        let first_timestamp_us = self.first_timestamp_us.unwrap_or(identity.timestamp_us);
         let horizon_elapsed_us = identity.timestamp_us - first_timestamp_us;
         let accepted_frame_count = state.frame_count;
         let status = if accepted_frame_count <= 1 {
@@ -360,8 +366,15 @@ impl ObserverOnlyVisionManifold {
             TemporalObserverStatusV0_1::Observed
         };
         let prediction_valid = status == TemporalObserverStatusV0_1::Observed;
-        let metrics = quantize_telemetry(&telemetry, prediction_valid, self.cross_scale_enabled)?;
+        let metrics = match quantize_telemetry(&telemetry, prediction_valid, self.cross_scale_enabled) {
+            Ok(metrics) => metrics,
+            Err(error) => {
+                self.poisoned = true;
+                return Err(format!("observer telemetry could not be represented: {error}"));
+            }
+        };
 
+        self.first_timestamp_us = Some(first_timestamp_us);
         self.last_identity = Some(identity.clone());
         Ok(TemporalPerceptionWitnessV0_1 {
             schema_version: TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1,
@@ -462,6 +475,12 @@ impl ObserverOnlyVisionManifold {
         }
         let manifold_state = self.inner.save_state();
         validate_observer_state(&manifold_state)?;
+        validate_run_state(
+            &self.profile,
+            self.first_timestamp_us,
+            self.last_identity.as_ref(),
+            manifold_state.frame_count,
+        )?;
         let frozen_model_sha256 = model_sha256(&manifold_state)?;
         if frozen_model_sha256 != self.frozen_model_sha256 {
             return Err("observer model digest changed before checkpoint".to_string());
