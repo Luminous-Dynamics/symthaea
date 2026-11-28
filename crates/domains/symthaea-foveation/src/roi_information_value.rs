@@ -29,6 +29,7 @@ pub struct RoiCalibrationEvidence {
 pub struct RoiValueEstimate {
     pub candidate_id: String,
     pub task_id: String,
+    pub task_family: String,
     pub source_clock_domain_id: String,
     pub source_frame_id: u64,
     pub source_timestamp_us: u64,
@@ -36,6 +37,10 @@ pub struct RoiValueEstimate {
     pub expected_loss_without_roi: f32,
     /// Expected normalized task decision loss after using this ROI, [0, 1].
     pub expected_loss_with_roi: f32,
+    /// Conservative lower confidence bound on expected loss reduction, [0, 1].
+    pub expected_loss_reduction_lcb: f32,
+    /// Confidence level attached to the lower bound, [0, 1].
+    pub confidence_level: f32,
     /// Expected normalized loss from waiting for this ROI result, [0, 1].
     pub latency_penalty: f32,
     /// Expected normalized loss from evidence becoming stale, [0, 1].
@@ -50,6 +55,7 @@ pub struct RoiInformationValueConfig {
     pub maximum_source_age_us: u64,
     pub minimum_calibration_samples: u64,
     pub maximum_expected_calibration_error: f32,
+    pub minimum_confidence_level: f32,
     pub minimum_net_benefit: f32,
     pub minimum_benefit_per_1000_pixels: f32,
 }
@@ -60,6 +66,7 @@ impl Default for RoiInformationValueConfig {
             maximum_source_age_us: 500_000,
             minimum_calibration_samples: 100,
             maximum_expected_calibration_error: 0.10,
+            minimum_confidence_level: 0.95,
             minimum_net_benefit: 0.01,
             minimum_benefit_per_1000_pixels: 0.001,
         }
@@ -72,6 +79,8 @@ impl RoiInformationValueConfig {
             || self.minimum_calibration_samples == 0
             || !self.maximum_expected_calibration_error.is_finite()
             || !(0.0..=1.0).contains(&self.maximum_expected_calibration_error)
+            || !self.minimum_confidence_level.is_finite()
+            || !(0.0..=1.0).contains(&self.minimum_confidence_level)
             || !self.minimum_net_benefit.is_finite()
             || !(0.0..=1.0).contains(&self.minimum_net_benefit)
             || !self.minimum_benefit_per_1000_pixels.is_finite()
@@ -107,6 +116,9 @@ pub enum RoiInformationValueError {
     ClockDomainMismatch,
     InsufficientCalibrationSamples,
     CalibrationErrorTooHigh,
+    CalibrationTaskMismatch,
+    ConfidenceEvidenceTooWeak,
+    InvalidConfidenceBound,
     NoExpectedLossReduction,
     BelowMinimumNetBenefit,
     BelowMinimumValuePerPixel,
@@ -129,6 +141,7 @@ pub fn evaluate_roi_information_value(
     }
     validate_identifier(&estimate.candidate_id)?;
     validate_identifier(&estimate.task_id)?;
+    validate_identifier(&estimate.task_family)?;
     validate_identifier(&estimate.source_clock_domain_id)?;
     validate_identifier(&estimate.calibration.calibration_id)?;
     validate_identifier(&estimate.calibration.task_family)?;
@@ -147,6 +160,9 @@ pub fn evaluate_roi_information_value(
     if estimate.calibration.sample_count < config.minimum_calibration_samples {
         return Err(RoiInformationValueError::InsufficientCalibrationSamples);
     }
+    if estimate.calibration.task_family != estimate.task_family {
+        return Err(RoiInformationValueError::CalibrationTaskMismatch);
+    }
     if !estimate.calibration.expected_calibration_error.is_finite()
         || !(0.0..=config.maximum_expected_calibration_error)
             .contains(&estimate.calibration.expected_calibration_error)
@@ -157,6 +173,8 @@ pub fn evaluate_roi_information_value(
     for value in [
         estimate.expected_loss_without_roi,
         estimate.expected_loss_with_roi,
+        estimate.expected_loss_reduction_lcb,
+        estimate.confidence_level,
         estimate.latency_penalty,
         estimate.staleness_penalty,
     ] {
@@ -170,8 +188,15 @@ pub fn evaluate_roi_information_value(
     if expected_loss_reduction <= 0.0 {
         return Err(RoiInformationValueError::NoExpectedLossReduction);
     }
-    let net_benefit =
-        expected_loss_reduction - estimate.latency_penalty - estimate.staleness_penalty;
+    if estimate.expected_loss_reduction_lcb > expected_loss_reduction {
+        return Err(RoiInformationValueError::InvalidConfidenceBound);
+    }
+    if estimate.confidence_level < config.minimum_confidence_level {
+        return Err(RoiInformationValueError::ConfidenceEvidenceTooWeak);
+    }
+    let net_benefit = estimate.expected_loss_reduction_lcb
+        - estimate.latency_penalty
+        - estimate.staleness_penalty;
     if net_benefit < config.minimum_net_benefit {
         return Err(RoiInformationValueError::BelowMinimumNetBenefit);
     }
@@ -285,12 +310,15 @@ mod tests {
     fn estimate(id: &str, loss_without: f32, loss_with: f32, pixels: u64) -> RoiValueEstimate {
         RoiValueEstimate {
             candidate_id: id.to_owned(),
-            task_id: "turn-boundary".to_owned(),
+            task_id: "turn-boundary-001".to_owned(),
+            task_family: "turn_floor_state".to_owned(),
             source_clock_domain_id: "clock:camera-1".to_owned(),
             source_frame_id: 7,
             source_timestamp_us: 1_000,
             expected_loss_without_roi: loss_without,
             expected_loss_with_roi: loss_with,
+            expected_loss_reduction_lcb: (loss_without - loss_with - 0.05).max(0.0),
+            confidence_level: 0.95,
             latency_penalty: 0.02,
             staleness_penalty: 0.01,
             source_pixel_cost: pixels,
@@ -313,8 +341,8 @@ mod tests {
             RoiInformationValueConfig::default(),
         ).unwrap();
         assert!((score.expected_loss_reduction - 0.3).abs() < 1e-6);
-        assert!((score.net_benefit - 0.27).abs() < 1e-6);
-        assert!((score.benefit_per_1000_pixels - 0.027).abs() < 1e-6);
+        assert!((score.net_benefit - 0.22).abs() < 1e-6);
+        assert!((score.benefit_per_1000_pixels - 0.022).abs() < 1e-6);
     }
 
     #[test]
@@ -332,6 +360,30 @@ mod tests {
         assert_eq!(ranking.ranked[0].candidate_id, "roi-high");
         assert_eq!(ranking.ranked[1].candidate_id, "roi-low");
         assert!(ranking.rejected.is_empty());
+    }
+
+    #[test]
+    fn calibration_task_family_must_match_roi_task() {
+        let mut value = estimate("roi-1", 0.8, 0.5, 10_000);
+        value.calibration.task_family = "shared_referent".to_owned();
+        assert_eq!(
+            evaluate_roi_information_value(
+                &value, 1_100, "clock:camera-1", RoiInformationValueConfig::default()
+            ),
+            Err(RoiInformationValueError::CalibrationTaskMismatch)
+        );
+    }
+
+    #[test]
+    fn confidence_level_below_policy_floor_is_rejected() {
+        let mut value = estimate("roi-1", 0.8, 0.5, 10_000);
+        value.confidence_level = 0.90;
+        assert_eq!(
+            evaluate_roi_information_value(
+                &value, 1_100, "clock:camera-1", RoiInformationValueConfig::default()
+            ),
+            Err(RoiInformationValueError::ConfidenceEvidenceTooWeak)
+        );
     }
 
     #[test]
