@@ -349,7 +349,7 @@
       {
         "name": "NIST Super Intelligence for Manufacturing",
         "url": "https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing",
-        "status": "NIST describes five research threads including integration test bench/benchmark studies and digital-twin VVUQ; Tennessee Eastman Process is the initial test case; this is a current project roadmap, not a released completed industry leaderboard; harness/toolkit are planned for FY28"
+        "status": "NIST TIDAL (Teamed, Integrated, Digital-twin-assured and Layered Intelligence) programme: asset/site/enterprise tiers; human-machine teaming; contextualized OT data and knowledge graphs; DT VVUQ; integration test bench with UNS/MQTT, I3X and OPC UA; Tennessee Eastman initial use case; metrics accuracy/latency/cost/grounding with fault-detection recall prioritized and progressive context ablation; benchmark harness/toolkit planned for FY28"
       },
       {
         "name": "IEEE IES Industrial AI Hub dataset catalogue",
@@ -395,6 +395,9 @@
       "Symthaea in shadow mode before any decision authority"
     ],
     "metrics": [
+      "correct OT context retrieval and relation grounding across asset/site/enterprise hierarchy",
+      "human-verified knowledge-graph indexing, source evidence lineage and context integrity",
+      "progressive context ablation across measurements, operational hierarchy and digital-twin context",
       "fault-detection recall is weighted ahead of precision in the NIST manufacturing fault-diagnosis description; publish both by severity rather than collapsing them",
       "grounding: select the correct operational-technology data/context and bind diagnoses to traceable evidence",
       "context ablation: compare data-only, structured context and richer digital-twin context at matched task/resource budgets",
@@ -441,6 +444,32 @@
         "live operation excluded from this benchmark"
       ],
       "claim_limit": "Generic max-flow topology benchmark does not establish power-system feasibility, grid safety or authorization for live switching."
+    },
+    "reference_architecture": {
+      "name": "NIST TIDAL",
+      "expansion": "Teamed, Integrated, Digital-twin-assured and Layered Intelligence",
+      "layers": [
+        "asset",
+        "site/area",
+        "enterprise"
+      ],
+      "components": [
+        "human-machine teaming",
+        "contextualized OT data",
+        "knowledge graphs",
+        "digital-twin VVUQ",
+        "UNS/MQTT",
+        "I3X",
+        "OPC UA"
+      ],
+      "possible_luminous_mapping": {
+        "Symthaea": "topology/configuration proposal and evaluation",
+        "Mycelix": "authority, provenance and decision receipts",
+        "Symtropy": "physical/engineering constraint qualification",
+        "Sol-Atlas": "spatial and topological context"
+      },
+      "status": "proposed systems mapping; not an implemented or validated end-to-end industrial system",
+      "claim_limit": "Operators retain authority; offline and shadow-mode evaluation only before any recommendation."
     }
   },
   "separate_biological_mycelium_lane": {
