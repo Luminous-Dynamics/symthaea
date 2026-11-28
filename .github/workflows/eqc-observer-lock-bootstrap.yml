@@ -6,6 +6,7 @@ on:
     paths:
       - "tools/eqc-reference/Cargo.toml"
       - "tools/eqc-reference/src/observer.rs"
+      - "docs/research/eqc-observer-*.schema.json"
       - ".github/workflows/eqc-observer-lock-bootstrap.yml"
   workflow_dispatch:
 
