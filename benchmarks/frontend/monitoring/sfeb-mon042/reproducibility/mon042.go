@@ -220,11 +220,14 @@ func Evaluate(in Input)Result{
   out.OneSidedConfidenceLowerBound=OneSidedClopperPearsonLower(clusterSuccesses,len(ordered),in.ConfidenceLevel)
   if out.OneSidedConfidenceLowerBound>=in.MinimumReliability&&!f.blocked&&!f.unknown{out.StatisticalVerdict=Qualified}else if !f.unknown&&out.OneSidedConfidenceLowerBound<in.MinimumReliability{out.StatisticalVerdict=Blocked;f.block("cluster_reproducibility_below_preregistered_threshold")}else{out.StatisticalVerdict=Indeterminate}
  }else{out.StatisticalVerdict=Indeterminate}
+ // DesignVerdict describes the supplied dependency graph and preregistered
+ // geometry only. It does not authenticate the domain evidence.
+ out.DesignVerdict=f.verdict()
  // Domain inventories and outcome receipts are only hash-bound here. MON-041
  // must authenticate origins, key state, and nonce/attestation ledgers.
  f.hold("dependency_domain_custody_not_authenticated")
  if in.Mode==RuntimeCandidate{f.hold("runtime_independence_attestation_adapter_not_implemented")}
- out.DesignVerdict=f.verdict();out.CampaignVerdict=Indeterminate;out.ProductionUsePermitted=false
+ out.CampaignVerdict=Indeterminate;out.ProductionUsePermitted=false
  out.DomainInventoryAuthenticated=false;out.ReasonCodes=f.sorted()
  return out
 }
