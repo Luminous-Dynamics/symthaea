@@ -1105,6 +1105,18 @@ mod tests {
     }
 
     #[test]
+    fn search_oracle_fails_closed_when_step_budget_is_insufficient() {
+        let manifest = ScenarioManifest {
+            max_steps: 1,
+            ..ScenarioManifest::default()
+        };
+        assert_eq!(
+            run_search_oracle(&manifest),
+            Err(TransitionError::PlannerExhausted)
+        );
+    }
+
+    #[test]
     fn search_oracle_matches_shortest_reference_action_counts() {
         for seed in [42, 43] {
             let manifest = ScenarioManifest { seed, ..ScenarioManifest::default() };
