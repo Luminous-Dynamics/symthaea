@@ -754,7 +754,7 @@ mod tests {
             prediction_at_unix_seconds: 1_800_100_000,
             clock_domain_id: "fab-clock".into(),
             global_model_artifact_sha256: digest('a'),
-            measurement_contract_sha256: digest('m'),
+            measurement_contract_sha256: digest('9'),
             point_prediction: 100.0,
             prediction_scale: 2.0,
             target_miscoverage: alpha,
@@ -769,7 +769,7 @@ mod tests {
     ) -> ConformalCalibrationSampleV1 {
         let label_id = format!("label-{index}");
         let event_id = format!("event-{index}");
-        let payload = digest(char::from(b'b' + (index % 20) as u8));
+        let payload = format!("{:064x}", index + 1);
         let mut report = LabelConsumptionEligibilityReportV1 {
             schema: "luminous.semi-bench.label-consumption-report.v1".into(),
             label_id: label_id.clone(),
@@ -802,10 +802,10 @@ mod tests {
             label_id,
             label_revision: 1,
             label_payload_sha256: payload,
-            prediction_receipt_sha256: digest('q'),
+            prediction_receipt_sha256: digest('8'),
             global_model_artifact_sha256: digest('a'),
             score_policy_sha256: json_sha256(score_policy).unwrap(),
-            measurement_contract_sha256: digest('m'),
+            measurement_contract_sha256: digest('9'),
             event_time_unix_seconds: available_at - 120,
             prediction_at_unix_seconds: available_at - 60,
             label_available_at_unix_seconds: available_at,
