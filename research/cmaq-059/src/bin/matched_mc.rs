@@ -163,11 +163,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         HASH_A.into(),
         HASH_B.into(),
     )?;
-    let (first_plan, alpha_test) =
+    let (_, alpha_test) =
         alpha_and_plan(&fleet, &manifest, "matched-calibration-scope".into())?;
     let alpha = alpha_test.numerator() as f64 / alpha_test.denominator() as f64;
     let (sigma, calibration_stream_sha256) = calibration_sigma()?;
-    let c058_coordinates = coordinates_per_c058_pair(&configurations);
 
     let raw_file = File::create("cmaq-059-matched-mc-raw.csv")?;
     let summary_file = File::create("cmaq-059-matched-mc-summary.csv")?;
@@ -256,13 +255,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 first_alarm: c058_alarm,
                 feature_coordinates: c058_coordinates,
                 kernel_evaluations: 0,
-                update_latencies_ns: vec![c058_p99],
+                update_latencies_ns: c058_latencies,
             };
             let scpt_outcome = ArmOutcome {
                 first_alarm: scpt_alarm,
                 feature_coordinates: 0,
                 kernel_evaluations: scpt_kernel_evaluations,
-                update_latencies_ns: vec![scpt_p99],
+                update_latencies_ns: scpt_latencies,
             };
 
             if kind.is_null() {
@@ -285,11 +284,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (Arm::Cmaq058, &c058_outcome),
                 (Arm::ScptFixedBandwidth, &scpt_outcome),
             ] {
-                let early_or_miss = if kind.is_null() {
-                    false
-                } else {
-                    outcome.first_alarm.is_none_or(|alarm| alarm <= change_point)
-                };
                 let is_detection = !kind.is_null()
                     && outcome.first_alarm.is_some_and(|alarm| alarm > change_point);
                 let restricted_delay = if kind.is_null() {
@@ -317,7 +311,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     stream.seed_sha256,
                     stream.stream_sha256,
                 )?;
-                let _ = early_or_miss;
             }
 
             c058_outcomes.push(c058_outcome);
@@ -335,7 +328,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut latencies = outcomes.iter()
                 .flat_map(|x| x.update_latencies_ns.iter().copied())
                 .collect::<Vec<_>>();
-            let latency_p50 = nearest_rank(&mut latencies.clone(), 0.50);
+            let mut latency_copy = latencies.clone();
+            let latency_p50 = nearest_rank(&mut latency_copy, 0.50);
             let latency_p99 = nearest_rank(&mut latencies, 0.99);
 
             if kind.is_null() {
@@ -344,37 +338,60 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Arm::ScptFixedBandwidth => false_alarms_scpt,
                 };
                 let interval = clopper_pearson(false_alarms, replicates, 0.95)?;
-                writeln!(
-                    summary,
-                    "{EXPERIMENT_ID},{},{},{horizon},{replicates},{alpha:.12},{false_alarms},{:.12},{:.12},{:.12},,,,,,{feature_coordinates_total},{kernel_evaluations_total},{latency_p50},{latency_p99},{sigma:.12},{calibration_stream_sha256}",
-                    kind.id(),
-                    arm.name(),
-                    interval.estimate,
-                    interval.lower,
-                    interval.upper,
-                )?;
+                let fields = vec![
+                    EXPERIMENT_ID.to_string(),
+                    kind.id().to_string(),
+                    arm.name().to_string(),
+                    horizon.to_string(),
+                    replicates.to_string(),
+                    format!("{alpha:.12}"),
+                    false_alarms.to_string(),
+                    format!("{:.12}", interval.estimate),
+                    format!("{:.12}", interval.lower),
+                    format!("{:.12}", interval.upper),
+                    String::new(), String::new(), String::new(), String::new(),
+                    String::new(), String::new(), String::new(), String::new(),
+                    String::new(),
+                    feature_coordinates_total.to_string(),
+                    kernel_evaluations_total.to_string(),
+                    latency_p50.to_string(),
+                    latency_p99.to_string(),
+                    format!("{sigma:.12}"),
+                    calibration_stream_sha256.clone(),
+                ];
+                writeln!(summary, "{}", fields.join(","))?;
             } else {
                 let trials = match arm {
                     Arm::Cmaq058 => &detections_c058,
                     Arm::ScptFixedBandwidth => &detections_scpt,
                 };
                 let detection = summarize_detection_trials(trials, 0.95)?;
-                writeln!(
-                    summary,
-                    "{EXPERIMENT_ID},{},{},{horizon},{replicates},{alpha:.12},,,,{},{},{:.12},{:.12},{:.12},{:.12},{:.4},{},{},{},{feature_coordinates_total},{kernel_evaluations_total},{latency_p50},{latency_p99},{sigma:.12},{calibration_stream_sha256}",
-                    kind.id(),
-                    arm.name(),
-                    "",
-                    detection.detections,
-                    detection.early_alarms,
-                    detection.unconditional_power,
-                    detection.power_interval.lower,
-                    detection.power_interval.upper,
-                    detection.restricted_mean_delay,
-                    detection.restricted_delay_p50,
-                    detection.restricted_delay_p90,
-                    detection.restricted_delay_p95,
-                )?;
+                let fields = vec![
+                    EXPERIMENT_ID.to_string(),
+                    kind.id().to_string(),
+                    arm.name().to_string(),
+                    horizon.to_string(),
+                    replicates.to_string(),
+                    format!("{alpha:.12}"),
+                    String::new(), String::new(), String::new(), String::new(),
+                    detection.detections.to_string(),
+                    detection.early_alarms.to_string(),
+                    format!("{:.12}", detection.unconditional_power),
+                    format!("{:.12}", detection.power_interval.lower),
+                    format!("{:.12}", detection.power_interval.upper),
+                    format!("{:.4}", detection.restricted_mean_delay),
+                    detection.restricted_delay_p50.to_string(),
+                    detection.restricted_delay_p90.to_string(),
+                    detection.restricted_delay_p95.to_string(),
+                    feature_coordinates_total.to_string(),
+                    kernel_evaluations_total.to_string(),
+                    latency_p50.to_string(),
+                    latency_p99.to_string(),
+                    format!("{sigma:.12}"),
+                    calibration_stream_sha256.clone(),
+                ];
+                writeln!(summary, "{}", fields.join(","))?;
+            }
             }
         }
     }
@@ -385,7 +402,5 @@ fn main() -> Result<(), Box<dyn Error>> {
         "completed experiment={} replicates={} horizon={} alpha={} sigma={} calibration_stream={}",
         EXPERIMENT_ID, replicates, horizon, alpha, sigma, calibration_stream_sha256
     );
-    let _ = first_plan;
-    let _ = c058_coordinates;
     Ok(())
 }
