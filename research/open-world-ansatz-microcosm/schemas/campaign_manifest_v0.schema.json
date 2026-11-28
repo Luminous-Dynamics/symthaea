@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea-open-world-campaign-v0.schema.json",
+  "title": "Symthaea open-world paired campaign manifest v0",
+  "description": "Public design metadata only. Evaluator seed and confirmation ledgers are referenced by digest and must remain in separate evaluator-controlled custody.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "benchmark_revision",
+    "source_commit_sha",
+    "agent_artifact_sha256",
+    "policy_config_sha256",
+    "task_contract_sha256",
+    "seed_ledger_sha256",
+    "confirmation_ledger_sha256",
+    "pairs"
+  ],
+  "properties": {
+    "schema_version": { "const": "symthaea-open-world-campaign-v0" },
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "benchmark_revision": { "type": "string", "minLength": 1 },
+    "source_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "agent_artifact_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "policy_config_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "task_contract_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "seed_ledger_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "confirmation_ledger_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "pairs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "pair_id",
+          "world_alias",
+          "world_family",
+          "access_arms",
+          "design",
+          "shared_initial_evidence_sha256",
+          "intervention_trace_sha256",
+          "action_budget",
+          "compute_budget_units"
+        ],
+        "properties": {
+          "pair_id": { "type": "string", "minLength": 1 },
+          "world_alias": { "type": "string", "minLength": 1 },
+          "world_family": { "enum": ["boolean_mechanism", "numeric_mechanism", "two_input_response"] },
+          "access_arms": {
+            "type": "array",
+            "const": ["a0", "a2"],
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "design": { "enum": ["matched_trace", "adaptive_budget"] },
+          "shared_initial_evidence_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "intervention_trace_sha256": {
+            "oneOf": [
+              { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+              { "type": "null" }
+            ]
+          },
+          "action_budget": { "type": "integer", "minimum": 1 },
+          "compute_budget_units": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": { "properties": { "design": { "const": "matched_trace" } }, "required": ["design"] },
+            "then": { "properties": { "intervention_trace_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" } } }
+          },
+          {
+            "if": { "properties": { "design": { "const": "adaptive_budget" } }, "required": ["design"] },
+            "then": { "properties": { "intervention_trace_sha256": { "type": "null" } } }
+          }
+        ]
+      }
+    }
+  },
+  "additionalProperties": false
+}

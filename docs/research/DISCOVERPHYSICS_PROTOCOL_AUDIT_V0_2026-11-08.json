@@ -1,0 +1,199 @@
+{
+  "audit_version": "discoverphysics-protocol-audit-v0",
+  "audit_date": "2026-11-08",
+  "status": "blocked_on_protocol_parity",
+  "benchmark_claim_allowed": false,
+  "upstream": {
+    "repository": "https://github.com/SampsonML/DiscoverPhysics",
+    "commit_sha": "33b7fa9df96de9c35744efd181ca7e5a8dd60ad5",
+    "signature_status": "verified",
+    "license": "MIT"
+  },
+  "source_files": [
+    {
+      "path": "scripts/run_benchmark.py",
+      "git_blob_sha": "09627b43fcdc18c3b3d88966aab67d048cf42623",
+      "role": "primary_yaml_runner"
+    },
+    {
+      "path": "scripts/run_stats.py",
+      "git_blob_sha": "2f2c7152db70de1d6c3fee5557d8eaf17b77a254",
+      "role": "pass_at_k_aggregation"
+    },
+    {
+      "path": "scripts/yml_benchmark.py",
+      "git_blob_sha": "7f3faddd0ebfe33da038655781f8b0365ea10be4",
+      "role": "legacy_runner"
+    },
+    {
+      "path": "ScienceAgent/scienceagent/worlds.py",
+      "git_blob_sha": "a6b7569ba1dab193e030278fc500d8eeadc1924e",
+      "role": "world_registry"
+    },
+    {
+      "path": "configs/bench.yml",
+      "git_blob_sha": "f7df11e6297148b885484d5ce2a4eb9509f311a2",
+      "role": "checked_in_batch_config"
+    },
+    {
+      "path": "README.md",
+      "git_blob_sha": "1f88a06647c33f177629fa711a51d65bdd1ef29c",
+      "role": "documented_protocol"
+    }
+  ],
+  "thresholds": {
+    "primary_runner": {
+      "normalized_mse_strictly_less_than": 0.1,
+      "explanation_score_greater_than_or_equal_to": 0.75,
+      "source": "scripts/run_benchmark.py"
+    },
+    "public_stats": {
+      "normalized_mse_strictly_less_than": 0.1,
+      "explanation_score_greater_than_or_equal_to": 0.75,
+      "source": "scripts/run_stats.py"
+    },
+    "readme": {
+      "normalized_mse_strictly_less_than": 0.1,
+      "explanation_score_greater_than_or_equal_to": 0.75,
+      "source": "README.md"
+    },
+    "legacy_runner": {
+      "metric": "raw_geometric_mean_position_error",
+      "strictly_less_than": 0.5,
+      "explanation_score_greater_than_or_equal_to": 0.7,
+      "source": "scripts/yml_benchmark.py"
+    },
+    "public_leaderboard": {
+      "normalized_mse_strictly_less_than": 0.1,
+      "explanation_score_greater_than_or_equal_to": 0.9,
+      "source": "https://sampsonml.github.io/DiscoverPhysicsLeaderboard/",
+      "threshold_present_in_pinned_primary_runner": false
+    },
+    "parity_resolved": false
+  },
+  "world_inventory": {
+    "registry_keys": [
+      "gravity",
+      "yukawa",
+      "fractional",
+      "wave",
+      "oscillator",
+      "extra_dimensions",
+      "dark_matter",
+      "three_species",
+      "ether",
+      "hubble",
+      "circle",
+      "coulomb_easy"
+    ],
+    "registry_count": 12,
+    "readme_predefined_table_keys": [
+      "gravity",
+      "yukawa",
+      "fractional",
+      "coulomb_easy",
+      "extra_dimensions",
+      "circle",
+      "three_species",
+      "dark_matter",
+      "ether",
+      "hubble",
+      "oscillator"
+    ],
+    "readme_predefined_table_count": 11,
+    "readme_yaml_example_keys": [
+      "gravity",
+      "yukawa",
+      "fractional",
+      "dark_matter",
+      "three_species",
+      "ether",
+      "hubble",
+      "coulomb_easy",
+      "extra_dimensions",
+      "circle",
+      "oscillator"
+    ],
+    "readme_yaml_example_count": 11,
+    "checked_in_bench_config_keys": [
+      "gravity",
+      "yukawa",
+      "fractional",
+      "dark_matter",
+      "three_species",
+      "ether",
+      "hubble",
+      "coulomb_easy",
+      "extra_dimensions",
+      "circle",
+      "oscillator",
+      "running_coupling",
+      "force_geography"
+    ],
+    "checked_in_bench_config_count": 13,
+    "checked_in_config_unregistered_keys": [
+      "running_coupling",
+      "force_geography"
+    ],
+    "primary_runner_variance_keys": [
+      "circle",
+      "confinement",
+      "coulomb_easy",
+      "dark_matter",
+      "diffusion",
+      "ether",
+      "ether_hard",
+      "extra_dimensions",
+      "force_geography",
+      "fractional",
+      "gravity",
+      "gravity_hard",
+      "hubble",
+      "hubble_hard",
+      "mond",
+      "non_symmetric",
+      "oscillator",
+      "running_coupling",
+      "species",
+      "three_species",
+      "yukawa"
+    ],
+    "variance_key_count": 21,
+    "stats_denominator": 22,
+    "stats_denominator_comment": "11 public + 11 private = 22",
+    "public_private_manifest_present": false,
+    "inventory_parity_resolved": false
+  },
+  "seed_and_aggregation": {
+    "readme_example_seed_pool": [
+      0,
+      1
+    ],
+    "readme_example_max_rounds": 16,
+    "readme_example_noise_fraction": 0.075,
+    "readme_example_judge_model": "claude-opus-4-6",
+    "stats_seed_pool_source": "archived per-run config.yml",
+    "missing_trial_seed_policy": "count_as_failure",
+    "pass_at_k": "A world passes if at least one of seed indices 0..k-1 passes.",
+    "expected_pass_at_k": {
+      "draws": 1000,
+      "sampling": "K distinct seed positions without replacement from configured seed pool",
+      "rng_seed": 0,
+      "denominator": 22
+    },
+    "seed_pool_parity_resolved": false
+  },
+  "adapter_decision": {
+    "allowed_label": "DiscoverPhysics-public-source@33b7fa9",
+    "allowed_scope": "only explicitly listed and registered public world/seed cells whose official runner is verified",
+    "forbidden_claim": "full 22-world leaderboard reproduction or direct SOTA comparison",
+    "safe_code_generation": "typed hypothesis to allowlisted Python AST projection at benchmark boundary; separate restricted process",
+    "blocking_questions": [
+      "Which exact scorer revision and explanation threshold generated the public leaderboard?",
+      "What is the authoritative 22-world manifest and public/private partition?",
+      "Which per-world variance constants belong to every task?",
+      "What is the official per-world seed pool and Pass@k/E@k configuration?",
+      "Which checked-in configuration is the supported reproducible public batch config?"
+    ]
+  }
+}

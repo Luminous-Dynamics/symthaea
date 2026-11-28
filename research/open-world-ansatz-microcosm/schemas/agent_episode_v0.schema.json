@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea-open-world-research-episode-v0.schema.json",
+  "title": "Symthaea blind open-world research episode protocol v0",
+  "description": "Agent-facing wire contract. It intentionally contains no generating mechanism, hidden state, measurement map, oracle, or evaluator score.",
+  "oneOf": [
+    { "$ref": "#/$defs/agent_view" },
+    { "$ref": "#/$defs/agent_action" },
+    { "$ref": "#/$defs/agent_response" }
+  ],
+  "$defs": {
+    "structure_access": {
+      "oneOf": [
+        { "const": "boolean_withheld" },
+        { "type": "object", "required": ["boolean_supplied"], "properties": { "boolean_supplied": { "enum": ["direct", "hidden_lag"] } }, "additionalProperties": false },
+        { "const": "numeric_withheld" },
+        { "type": "object", "required": ["numeric_supplied"], "properties": { "numeric_supplied": { "enum": ["direct_response", "leaky_memory"] } }, "additionalProperties": false },
+        { "const": "interaction_withheld" },
+        { "type": "object", "required": ["interaction_supplied"], "properties": { "interaction_supplied": { "enum": ["single_input_u", "single_input_v", "additive_two_input", "bilinear_interaction"] } }, "additionalProperties": false }
+      ]
+    },
+    "intervention": {
+      "oneOf": [
+        { "type": "object", "required": ["kind", "value"], "properties": { "kind": { "const": "boolean" }, "value": { "type": "boolean" } }, "additionalProperties": false },
+        { "type": "object", "required": ["kind", "value"], "properties": { "kind": { "const": "numeric" }, "value": { "type": "integer", "enum": [-1, 0, 1] } }, "additionalProperties": false },
+        { "type": "object", "required": ["kind", "value"], "properties": { "kind": { "const": "pair" }, "value": { "type": "array", "items": { "type": "integer", "enum": [-1, 0, 1] }, "minItems": 2, "maxItems": 2 } }, "additionalProperties": false }
+      ]
+    },
+    "measurement": {
+      "oneOf": [
+        { "type": "object", "required": ["kind", "value"], "properties": { "kind": { "const": "boolean" }, "value": { "type": "boolean" } }, "additionalProperties": false },
+        { "type": "object", "required": ["kind", "value"], "properties": { "kind": { "const": "numeric" }, "value": { "type": "integer" } }, "additionalProperties": false }
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "required": ["evidence_id", "action_index", "intervention", "measurement"],
+      "properties": {
+        "evidence_id": { "type": "string", "pattern": "^E[0-9]{4}$" },
+        "action_index": { "type": "integer", "minimum": 1 },
+        "intervention": { "$ref": "#/$defs/intervention" },
+        "measurement": { "$ref": "#/$defs/measurement" }
+      },
+      "additionalProperties": false
+    },
+    "task_manifest": {
+      "type": "object",
+      "required": ["protocol_version", "episode_id", "world_family", "structure_access", "intervention_domain", "dynamics", "max_probe_actions", "probe_cost_units"],
+      "properties": {
+        "protocol_version": { "const": "symthaea-open-world-research-episode-v0" },
+        "episode_id": { "type": "string", "minLength": 1 },
+        "world_family": { "enum": ["boolean_mechanism", "numeric_mechanism", "two_input_response"] },
+        "structure_access": { "$ref": "#/$defs/structure_access" },
+        "intervention_domain": {
+          "oneOf": [
+            { "type": "object", "required": ["kind", "values"], "properties": { "kind": { "const": "boolean" }, "values": { "type": "array", "items": { "type": "boolean" }, "minItems": 2, "maxItems": 2 } }, "additionalProperties": false },
+            { "type": "object", "required": ["kind", "values"], "properties": { "kind": { "const": "integer" }, "values": { "type": "array", "items": { "type": "integer", "enum": [-1, 0, 1] }, "minItems": 3, "maxItems": 3 } }, "additionalProperties": false },
+            { "type": "object", "required": ["kind", "values"], "properties": { "kind": { "const": "integer_pair" }, "values": { "type": "array", "items": { "type": "integer", "enum": [-1, 0, 1] }, "minItems": 3, "maxItems": 3 } }, "additionalProperties": false }
+          ]
+        },
+        "dynamics": { "enum": ["stateful_across_probes", "independent_probes"] },
+        "max_probe_actions": { "type": "integer", "minimum": 1 },
+        "probe_cost_units": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "agent_view": {
+      "type": "object",
+      "required": ["task", "observations", "remaining_probe_actions", "evidence_prefix_sha256", "status"],
+      "properties": {
+        "task": { "$ref": "#/$defs/task_manifest" },
+        "observations": { "type": "array", "items": { "$ref": "#/$defs/observation" } },
+        "remaining_probe_actions": { "type": "integer", "minimum": 0 },
+        "evidence_prefix_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "status": { "enum": ["open", "submitted"] }
+      },
+      "additionalProperties": false
+    },
+    "claim_disposition": {
+      "enum": ["identified", "ambiguous", "no_compatible_model", "abstain"]
+    },
+    "boolean_hypothesis": {
+      "type": "object",
+      "required": ["mechanism", "measurement_map", "initial_hidden_state"],
+      "properties": {
+        "mechanism": { "enum": ["direct", "hidden_lag"] },
+        "measurement_map": { "enum": ["identity", "invert", "constant_zero"] },
+        "initial_hidden_state": { "type": ["boolean", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "numeric_model": {
+      "type": "object",
+      "required": ["mechanism", "gain", "decay", "initial_state", "sensor"],
+      "properties": {
+        "mechanism": { "enum": ["direct_response", "leaky_memory"] },
+        "gain": { "type": "integer", "enum": [1, 2, 3] },
+        "decay": { "type": ["integer", "null"], "enum": [0, 1, 2, null] },
+        "initial_state": { "type": ["integer", "null"], "enum": [-1, 0, 1, null] },
+        "sensor": { "enum": ["identity", "negate", "double", "constant_zero"] }
+      },
+      "additionalProperties": false
+    },
+    "interaction_model": {
+      "type": "object",
+      "required": ["structure", "bias", "weight_u", "weight_v", "interaction_weight"],
+      "properties": {
+        "structure": { "enum": ["single_input_u", "single_input_v", "additive_two_input", "bilinear_interaction"] },
+        "bias": { "type": "integer", "enum": [-1, 0, 1] },
+        "weight_u": { "type": "integer", "enum": [-2, -1, 0, 1, 2] },
+        "weight_v": { "type": "integer", "enum": [-2, -1, 0, 1, 2] },
+        "interaction_weight": { "type": "integer", "enum": [-2, -1, 0, 1, 2] }
+      },
+      "additionalProperties": false
+    },
+    "agent_submission": {
+      "type": "object",
+      "required": ["claim", "evidence_prefix_sha256", "cited_evidence_ids", "rationale"],
+      "properties": {
+        "claim": {
+          "oneOf": [
+            { "type": "object", "required": ["family", "claim"], "properties": { "family": { "const": "boolean" }, "claim": { "type": "object", "required": ["compatible_models", "disposition"], "properties": { "compatible_models": { "type": "array", "items": { "$ref": "#/$defs/boolean_hypothesis" } }, "disposition": { "$ref": "#/$defs/claim_disposition" } }, "additionalProperties": false } }, "additionalProperties": false },
+            { "type": "object", "required": ["family", "claim"], "properties": { "family": { "const": "numeric" }, "claim": { "type": "object", "required": ["compatible_models", "disposition"], "properties": { "compatible_models": { "type": "array", "items": { "$ref": "#/$defs/numeric_model" } }, "disposition": { "$ref": "#/$defs/claim_disposition" } }, "additionalProperties": false } }, "additionalProperties": false },
+            { "type": "object", "required": ["family", "claim"], "properties": { "family": { "const": "interaction" }, "claim": { "type": "object", "required": ["compatible_models", "disposition"], "properties": { "compatible_models": { "type": "array", "items": { "$ref": "#/$defs/interaction_model" } }, "disposition": { "$ref": "#/$defs/claim_disposition" } }, "additionalProperties": false } }, "additionalProperties": false }
+          ]
+        },
+        "evidence_prefix_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "cited_evidence_ids": { "type": "array", "items": { "type": "string", "pattern": "^E[0-9]{4}$" }, "minItems": 1, "uniqueItems": true },
+        "rationale": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "agent_action": {
+      "oneOf": [
+        { "type": "object", "required": ["action", "payload"], "properties": { "action": { "const": "probe" }, "payload": { "type": "object", "required": ["intervention"], "properties": { "intervention": { "$ref": "#/$defs/intervention" } }, "additionalProperties": false } }, "additionalProperties": false },
+        { "type": "object", "required": ["action", "payload"], "properties": { "action": { "const": "submit" }, "payload": { "type": "object", "required": ["submission"], "properties": { "submission": { "$ref": "#/$defs/agent_submission" } }, "additionalProperties": false } }, "additionalProperties": false }
+      ]
+    },
+    "agent_response": {
+      "type": "object",
+      "required": ["status", "view"],
+      "properties": { "status": { "enum": ["open", "submitted"] }, "view": { "$ref": "#/$defs/agent_view" } },
+      "additionalProperties": false
+    }
+  }
+}
