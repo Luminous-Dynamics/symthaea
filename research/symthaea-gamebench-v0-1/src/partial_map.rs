@@ -51,6 +51,7 @@ pub struct ExploreSpec {
 }
 
 impl ExploreSpec {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         width: u16,
         height: u16,
