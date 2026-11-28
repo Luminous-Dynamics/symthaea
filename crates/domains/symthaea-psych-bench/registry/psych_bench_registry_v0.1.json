@@ -1,0 +1,747 @@
+{
+  "registry_id": "org.luminousdynamics.symthaea.psychbench",
+  "registry_version": "0.1.0",
+  "schema_version": 1,
+  "maturity": "pilot_incomplete",
+  "generated_at": "2026-11-28",
+  "completeness_note": "Pilot registry for selected anchor families only. It is not an exhaustive inventory of the crate and must not be used to generate total benchmark counts until all implementations are registered and checked by CI.",
+  "evidence_classes": [
+    "synthetic_mechanism",
+    "external_task",
+    "human_normed",
+    "ecological_interactive",
+    "theory_probe"
+  ],
+  "comparison_policy": {
+    "same_protocol_inter_system": "Permitted only when registry version, stimuli, scorer, budgets, adapter permissions and run manifest match.",
+    "human_normative": "Prohibited unless task/version, stimulus, response mode, metric unit, administration, population and sample metadata are documented and independently judged comparable.",
+    "consciousness": "Theory probes and architecture tests never establish or disprove subjective experience."
+  },
+  "metric_policy": {
+    "bounds": "Bounds are mathematical support, not an empirical normative range. Null upper bounds denote an unbounded upper support.",
+    "missing": "Missing, not-run, invalid and failed results must remain distinct.",
+    "unqualified": "Metrics marked semantics_needs_audit are excluded from standardized comparisons and composites.",
+    "aggregation": "No cross-construct or cross-domain scalar is licensed by this pilot registry."
+  },
+  "benchmarks": [
+    {
+      "id": "worm.nback",
+      "version": "0.1.0",
+      "benchmark_name": "WorM::N-back",
+      "domain": "working_memory",
+      "construct_card": {
+        "construct": "Working-memory updating and maintenance under serial interference.",
+        "operationalization": "Detect whether the current item matches the item presented n positions earlier for n=1,2,3.",
+        "exclusions": [
+          "This synthetic HDC task is not a human-normed measure of working-memory capacity.",
+          "Its score is not an IQ or general-intelligence estimate."
+        ]
+      },
+      "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/worm/nback.rs",
+      "evidence_classes": [
+        "synthetic_mechanism"
+      ],
+      "validation_status": "mechanics_only",
+      "stimulus_provenance": {
+        "kind": "synthetic_hdc",
+        "generator": "Deterministic ContinuousHV sequences derived from BenchmarkConfig trial seeds.",
+        "external_dataset": null,
+        "licence": "Internal generated stimuli; no external participant dataset."
+      },
+      "paradigm_sources": [
+        {
+          "citation": "Kirchner, W. K. (1958). Age differences in short-term retention of rapidly changing information.",
+          "doi": "10.1037/h0043688"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "hit_rate",
+          "key_pattern": "nback_{n}::hit_rate",
+          "parameters": {
+            "n": [
+              1,
+              2,
+              3
+            ]
+          },
+          "unit": "proportion",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "mean trial hit rate within each n-back condition",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "false_alarm_rate",
+          "key_pattern": "nback_{n}::false_alarm_rate",
+          "parameters": {
+            "n": [
+              1,
+              2,
+              3
+            ]
+          },
+          "unit": "proportion",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "lower",
+          "estimand": "mean false-alarm rate within each n-back condition",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "accuracy",
+          "key_pattern": "nback_{n}::accuracy",
+          "parameters": {
+            "n": [
+              1,
+              2,
+              3
+            ]
+          },
+          "unit": "hit_rate_minus_false_alarm_rate",
+          "bounds": {
+            "lower": -1,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "hit_rate minus false_alarm_rate; this is a discrimination index, not ordinary proportion correct",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "reaction_time",
+          "key_pattern": "nback_{n}::rt_ticks",
+          "parameters": {
+            "n": [
+              1,
+              2,
+              3
+            ]
+          },
+          "unit": "simulation_ticks",
+          "bounds": {
+            "lower": 0,
+            "upper": null
+          },
+          "direction": "lower",
+          "estimand": "pooled decision ticks for the condition",
+          "comparison_status": "same_build_and_clock_only",
+          "validation_status": "verified_in_code"
+        }
+      ],
+      "controls": {
+        "status": "not_qualified",
+        "positive_controls": [],
+        "negative_controls": [],
+        "note": "Register sham, unrelated-module and shortcut controls before using this task for causal mechanism claims."
+      },
+      "comparison_eligibility": {
+        "inter_system_same_protocol": "eligible_after_runner_and_scorer_validation",
+        "human_normative": "not_eligible"
+      }
+    },
+    {
+      "id": "executive.stroop",
+      "version": "0.1.0",
+      "benchmark_name": "Executive::Stroop",
+      "domain": "executive_control",
+      "construct_card": {
+        "construct": "Interference control during color-word response selection.",
+        "operationalization": "Select ink color under congruent, incongruent and neutral conditions.",
+        "exclusions": [
+          "The implementation uses synthetic ContinuousHV color vectors and a simulated deliberation-tick proxy.",
+          "The current reaction-time unit is not human milliseconds."
+        ]
+      },
+      "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs",
+      "evidence_classes": [
+        "synthetic_mechanism"
+      ],
+      "validation_status": "mechanics_only",
+      "stimulus_provenance": {
+        "kind": "synthetic_hdc",
+        "generator": "Seeded ContinuousHV color vectors and generated congruency conditions.",
+        "external_dataset": null,
+        "licence": "Internal generated stimuli."
+      },
+      "paradigm_sources": [
+        {
+          "citation": "Stroop, J. R. (1935). Studies of interference in serial verbal reactions.",
+          "doi": "10.1037/h0054651"
+        },
+        {
+          "citation": "MacLeod, C. M. (1991). Half a century of research on the Stroop effect.",
+          "doi": "10.1037/0033-2909.109.2.163"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "congruent_accuracy",
+          "key": "congruent_accuracy",
+          "unit": "proportion",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "mean accuracy over congruent trials",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "incongruent_accuracy",
+          "key": "incongruent_accuracy",
+          "unit": "proportion",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "mean accuracy over incongruent trials",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "neutral_accuracy",
+          "key": "neutral_accuracy",
+          "unit": "proportion",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "mean accuracy over neutral trials",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "stroop_effect",
+          "key": "stroop_effect",
+          "unit": "congruent_minus_incongruent_accuracy",
+          "bounds": {
+            "lower": -1,
+            "upper": 1
+          },
+          "direction": "construct_diagnostic",
+          "estimand": "congruent accuracy minus incongruent accuracy; magnitude and sign are construct-dependent, not a monotonic ability score",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "reaction_time",
+          "key_pattern": "{congruent,incongruent,neutral}::rt_ticks",
+          "unit": "simulation_ticks",
+          "bounds": {
+            "lower": 0,
+            "upper": null
+          },
+          "direction": "lower",
+          "estimand": "condition-specific simulated deliberation ticks",
+          "comparison_status": "same_build_and_clock_only",
+          "validation_status": "verified_in_code"
+        }
+      ],
+      "controls": {
+        "status": "not_qualified",
+        "positive_controls": [],
+        "negative_controls": [],
+        "note": "Add symbol-renaming invariance, neutral-word controls, and selective inhibition ablations before mechanistic claims."
+      },
+      "comparison_eligibility": {
+        "inter_system_same_protocol": "eligible_after_runner_and_scorer_validation",
+        "human_normative": "not_eligible"
+      }
+    },
+    {
+      "id": "metacognition.calibration",
+      "version": "0.1.0",
+      "benchmark_name": "Metacognition::Calibration",
+      "domain": "metacognition",
+      "construct_card": {
+        "construct": "Confidence calibration and discrimination in memory-retrieval judgments.",
+        "operationalization": "Compare internal confidence against the correctness of delayed retrieval under varying memory load and interference.",
+        "exclusions": [
+          "The task uses synthetic HDC items and an architecture-derived confidence heuristic.",
+          "Published human reference figures in source comments are not a matched human cohort for this implementation."
+        ]
+      },
+      "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/metacognition/calibration.rs",
+      "evidence_classes": [
+        "synthetic_mechanism"
+      ],
+      "validation_status": "mechanics_only",
+      "stimulus_provenance": {
+        "kind": "synthetic_hdc",
+        "generator": "Seeded category prototypes, noisy item vectors, working-memory load and distractors.",
+        "external_dataset": null,
+        "licence": "Internal generated stimuli."
+      },
+      "paradigm_sources": [
+        {
+          "citation": "Lichtenstein, S., Fischhoff, B., & Phillips, L. D. (1982). Calibration of probabilities: The state of the art.",
+          "doi": null
+        },
+        {
+          "citation": "Fleming, S. M., & Lau, H. (2014). How to measure metacognition.",
+          "doi": "10.3389/fnhum.2014.00443"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "calibration_error",
+          "key": "calibration_error_ece",
+          "unit": "expected_calibration_error",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "lower",
+          "estimand": "expected calibration error over benchmark trials",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "discrimination_gamma",
+          "key": "discrimination_gamma",
+          "unit": "Goodman_Kruskal_gamma",
+          "bounds": {
+            "lower": -1,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "ordinal association between confidence and correctness",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "response_time",
+          "key": "rt_ticks",
+          "unit": "simulation_ticks",
+          "bounds": {
+            "lower": 0,
+            "upper": null
+          },
+          "direction": "lower",
+          "estimand": "simulated confidence/retrieval deliberation ticks",
+          "comparison_status": "same_build_and_clock_only",
+          "validation_status": "verified_in_code"
+        }
+      ],
+      "controls": {
+        "status": "not_qualified",
+        "positive_controls": [],
+        "negative_controls": [],
+        "note": "Need confidence-shuffle, label-shuffle, confidence-blind and feedback-intervention controls; calibration must be measured on held-out trials."
+      },
+      "comparison_eligibility": {
+        "inter_system_same_protocol": "eligible_after_runner_and_scorer_validation",
+        "human_normative": "not_eligible"
+      }
+    },
+    {
+      "id": "social.tom.false_belief",
+      "version": "0.1.0",
+      "benchmark_name": "ToMBench::FalseBelief",
+      "domain": "social_cognition",
+      "construct_card": {
+        "construct": "Tracking another agent's stale belief when the world changes outside that agent's observation.",
+        "operationalization": "Predict the belief-consistent location rather than the current reality location in Sally-Anne-style scenarios.",
+        "exclusions": [
+          "This implementation uses generated scenarios and an HDC agent-model representation.",
+          "Passing this task alone does not establish general Theory of Mind or empathy."
+        ]
+      },
+      "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/tombench/false_belief.rs",
+      "evidence_classes": [
+        "synthetic_mechanism"
+      ],
+      "validation_status": "mechanics_only",
+      "stimulus_provenance": {
+        "kind": "generated_scenario",
+        "generator": "Programmatically authored false-belief scenarios; no external participant responses.",
+        "external_dataset": null,
+        "licence": "Internal task fixtures."
+      },
+      "paradigm_sources": [
+        {
+          "citation": "Wimmer, H., & Perner, J. (1983). Beliefs about beliefs: Representation and constraining function of wrong beliefs in young children's understanding of deception.",
+          "doi": "10.1016/0010-0277(83)90004-5"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "false_belief_accuracy",
+          "key": "false_belief_accuracy",
+          "unit": "proportion",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "mean correctness of belief-location predictions",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "response_time",
+          "key": "rt_ticks",
+          "unit": "simulation_ticks",
+          "bounds": {
+            "lower": 0,
+            "upper": null
+          },
+          "direction": "lower",
+          "estimand": "simulated response-time ticks; emitted by default backend only",
+          "comparison_status": "same_build_and_clock_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "action_confidence",
+          "key": "action_confidence",
+          "unit": "proportion",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "calibration_diagnostic",
+          "estimand": "confidence output; emitted only with symthaea-backend feature",
+          "comparison_status": "feature_specific_only",
+          "validation_status": "feature_gated"
+        }
+      ],
+      "controls": {
+        "status": "not_qualified",
+        "positive_controls": [],
+        "negative_controls": [],
+        "note": "Add perspective reversal, knowledge-state intervention, source swap, and unrelated memory-ablation controls."
+      },
+      "comparison_eligibility": {
+        "inter_system_same_protocol": "eligible_after_adapter_and_feature_match",
+        "human_normative": "not_eligible"
+      }
+    },
+    {
+      "id": "causal.intervention_effect",
+      "version": "0.1.0",
+      "benchmark_name": "CausalReasoning::InterventionEffect",
+      "domain": "causal_reasoning",
+      "construct_card": {
+        "construct": "Distinguishing observational conditioning from intervention and recovering causal effects under confounding.",
+        "operationalization": "Encode causal DAGs in HDC binding structures and test intervention/observation residual discrimination plus backdoor/frontdoor adjustment.",
+        "exclusions": [
+          "This is a synthetic HDC algebra benchmark, not a real-world causal identification study.",
+          "The current causal_score is a weighted heuristic composite and should not be treated as a general causal-reasoning scale."
+        ]
+      },
+      "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/causal_reasoning/intervention.rs",
+      "evidence_classes": [
+        "synthetic_mechanism"
+      ],
+      "validation_status": "mechanics_only",
+      "stimulus_provenance": {
+        "kind": "synthetic_causal_dag",
+        "generator": "Seeded causal DAGs encoded as HDC bound structures.",
+        "external_dataset": null,
+        "licence": "Internal generated structures."
+      },
+      "paradigm_sources": [
+        {
+          "citation": "Pearl, J. (2009). Causality: Models, Reasoning, and Inference. 2nd ed.",
+          "doi": "10.1017/CBO9780511803161"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "intervention_discrimination",
+          "key": "intervention_discrimination",
+          "unit": "one_minus_cosine_similarity",
+          "bounds": {
+            "lower": 0,
+            "upper": 2
+          },
+          "direction": "higher",
+          "estimand": "mean discrimination between observational and interventional residuals",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "backdoor_accuracy",
+          "key": "backdoor_accuracy",
+          "unit": "clamped_improvement",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "mean clamped improvement from confounder adjustment",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "frontdoor_accuracy",
+          "key": "frontdoor_accuracy",
+          "unit": "cosine_similarity",
+          "bounds": {
+            "lower": -1,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "mean cosine similarity of estimated and target effect vectors",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "causal_score",
+          "key": "causal_score",
+          "unit": "weighted_heuristic_index",
+          "bounds": {
+            "lower": -0.3,
+            "upper": 1.4
+          },
+          "direction": "diagnostic_only",
+          "estimand": "0.4*intervention_discrimination + 0.3*backdoor_accuracy + 0.3*frontdoor_accuracy",
+          "comparison_status": "not_eligible_until_validated",
+          "validation_status": "semantics_needs_audit"
+        }
+      ],
+      "controls": {
+        "status": "not_qualified",
+        "positive_controls": [],
+        "negative_controls": [],
+        "note": "Add identifiable/non-identifiable DAG pairs, hidden-confounder negative controls, graph-structure transfer, and intervention/sham ablations."
+      },
+      "comparison_eligibility": {
+        "inter_system_same_protocol": "eligible_after_runner_and_scorer_validation",
+        "human_normative": "not_eligible"
+      }
+    },
+    {
+      "id": "theory.qualia.shared_input_metacognitive_ignition",
+      "version": "0.1.0",
+      "benchmark_name": "QualiaConfidence::MetacognitiveIgnition",
+      "domain": "theory_probe",
+      "construct_card": {
+        "construct": "Alignment between HOT and GWT decisions when both modules receive common target activation evidence.",
+        "operationalization": "Compare shared target-activation scores with GWT ignition under varying workspace competition and HOT thresholds.",
+        "exclusions": [
+          "HOT and GWT share the target-activation input; ROC/AUC and ECE are not independent HOT-generated readouts.",
+          "This synthetic theory probe is not a measure or probability estimate of consciousness and cannot prove or disprove subjective experience."
+        ]
+      },
+      "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/qualia_confidence/metacognitive_ignition.rs",
+      "evidence_classes": [
+        "theory_probe",
+        "synthetic_mechanism"
+      ],
+      "validation_status": "theory_probe_only",
+      "stimulus_provenance": {
+        "kind": "synthetic_activation_and_competition",
+        "generator": "Generated target activation, filler competition and internal HOT/GWT state.",
+        "external_dataset": null,
+        "licence": "Internal generated stimuli."
+      },
+      "paradigm_sources": [
+        {
+          "citation": "Rosenthal (1986, 2005), Higher-Order Thought theory.",
+          "doi": null
+        },
+        {
+          "citation": "Dehaene & Naccache (2001), Global Neuronal Workspace theory.",
+          "doi": null
+        },
+        {
+          "citation": "Lau & Rosenthal (2011), Empirical support and theoretical implications of the global workspace theory.",
+          "doi": null
+        }
+      ],
+      "metrics": [
+        {
+          "id": "shared_input_alignment",
+          "key": "shared_input_alignment_score",
+          "unit": "heuristic_proportion",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "diagnostic_only",
+          "estimand": "legacy alignment heuristic using the activation signal shared by HOT and GWT",
+          "comparison_status": "not_eligible_until_independent_readout",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "input_score_roc_auc",
+          "key": "hot_input_score_roc_auc",
+          "unit": "area_under_roc",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "diagnostic_only",
+          "estimand": "ROC of shared target-activation input against GWT ignition",
+          "comparison_status": "not_eligible_as_HOT_metacognition",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "input_score_calibration_error",
+          "key": "hot_input_score_calibration_ece",
+          "unit": "expected_calibration_error",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "lower",
+          "estimand": "reliability error of shared activation input against GWT ignition frequency",
+          "comparison_status": "not_eligible_as_HOT_metacognition",
+          "validation_status": "verified_in_code"
+        }
+      ],
+      "controls": {
+        "status": "partial",
+        "positive_controls": [],
+        "negative_controls": [
+          "same-HOT-input/different-GWT-competition counterfactual is planned but not implemented"
+        ],
+        "note": "A genuinely independent HOT readout and counterfactual same-evidence/different-competition design are required before confirmatory metacognition claims."
+      },
+      "comparison_eligibility": {
+        "inter_system_same_protocol": "theory_probe_diagnostics_only",
+        "human_normative": "not_eligible"
+      }
+    },
+    {
+      "id": "pce.hidden_resource_delivery.v1",
+      "version": "0.2.0",
+      "benchmark_name": "PCE::HiddenResourceDelivery",
+      "domain": "ecological_interaction",
+      "construct_card": {
+        "construct": "Goal-directed action under partial observation, resource dependency, limited information acquisition and an exogenous gate failure.",
+        "operationalization": "Inspect locations, acquire a valve key and water filter, unlock a route, recover after gate failure and deliver the filter to the outpost.",
+        "exclusions": [
+          "Current generator offers only two seed-parity layouts.",
+          "Scripted/reference and search policies access evaluator state; they are ceilings, not black-box competitors.",
+          "Benchmark-internal cost units are not joules, latency, tokens or currency."
+        ]
+      },
+      "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/cognitive_ecology.rs",
+      "evidence_classes": [
+        "ecological_interactive"
+      ],
+      "validation_status": "environment_smoke_unvalidated",
+      "stimulus_provenance": {
+        "kind": "seeded_scenario",
+        "generator": "pce-kernel-0.2.0; seed parity selects one of two hand-authored layouts.",
+        "external_dataset": null,
+        "licence": "Original Luminous Dynamics scenario specification."
+      },
+      "paradigm_sources": [
+        {
+          "citation": "Original Luminous Dynamics PsychBench Cognitive Ecology specification v0.1 (2026-11-28).",
+          "doi": null
+        }
+      ],
+      "metrics": [
+        {
+          "id": "goal_completed",
+          "key": "goal_completed",
+          "unit": "binary",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "whether the required filter delivery was completed",
+          "comparison_status": "same_manifest_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "action_efficiency",
+          "key": "action_efficiency",
+          "unit": "ratio_to_full_information_minimum_action_count",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "BFS no-intervention minimum action count divided by agent action attempts",
+          "comparison_status": "same_manifest_and_budget_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "cost_efficiency",
+          "key": "cost_efficiency",
+          "unit": "ratio_to_full_information_minimum_manifest_cost",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "Dijkstra no-intervention minimum manifest cost divided by observed manifest cost",
+          "comparison_status": "same_manifest_and_cost_model_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "invalid_actions",
+          "key": "invalid_actions",
+          "unit": "count",
+          "bounds": {
+            "lower": 0,
+            "upper": null
+          },
+          "direction": "lower",
+          "estimand": "number of agent actions rejected by environment rules",
+          "comparison_status": "same_manifest_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "resource_cost_units",
+          "key": "resource_cost_units",
+          "unit": "manifest_defined_relative_cost_units",
+          "bounds": {
+            "lower": 0,
+            "upper": null
+          },
+          "direction": "lower",
+          "estimand": "sum of manifest-defined action costs including rejected-action surcharge",
+          "comparison_status": "same_manifest_and_cost_model_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "goal_completion_per_cost_unit",
+          "key": "goal_completion_per_cost_unit",
+          "unit": "completed_goals_per_relative_cost_unit",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "one divided by cost units for completed goal; zero if incomplete",
+          "comparison_status": "same_manifest_and_cost_model_only",
+          "validation_status": "verified_in_code"
+        }
+      ],
+      "controls": {
+        "status": "smoke_controls_only",
+        "positive_controls": [
+          "scripted reference policy",
+          "full-information BFS action oracle",
+          "full-information Dijkstra cost oracle"
+        ],
+        "negative_controls": [
+          "deterministic random-action floor policy"
+        ],
+        "note": "These controls distinguish mechanics but do not yet qualify cognitive constructs; add held-out topologies, partial-observation planners, causal ablations and independent scorer controls."
+      },
+      "comparison_eligibility": {
+        "inter_system_same_protocol": "eligible_for_environment_smoke_only",
+        "human_normative": "not_eligible"
+      }
+    }
+  ]
+}
