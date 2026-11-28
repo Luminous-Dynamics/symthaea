@@ -42,6 +42,19 @@ jobs:
           cargo generate-lockfile --manifest-path tools/eqc-reference/Cargo.toml
           test -s tools/eqc-reference/Cargo.lock
 
+      - name: Commit the lockfile to the review branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/eqc-reference/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "Standalone observer lockfile is already current."
+          else
+            git commit -m "chore(eqc): lock observer signature verifier dependencies"
+            git push origin HEAD:feat/eqc-standalone-review-2026-11-28
+          fi
+
       - name: Check formatting
         run: cargo fmt --manifest-path tools/eqc-reference/Cargo.toml -- --check
 
@@ -77,15 +90,3 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Commit the lockfile to the review branch
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tools/eqc-reference/Cargo.lock
-          if git diff --cached --quiet; then
-            echo "Standalone observer lockfile is already current."
-          else
-            git commit -m "chore(eqc): lock observer signature verifier dependencies"
-            git push origin HEAD:feat/eqc-standalone-review-2026-11-28
-          fi
