@@ -109,7 +109,7 @@ It differs from the adjudicated-cohort risk/coverage evaluator, the inverse-prop
 - The v1 restriction is constant predictable weights a_t=1, deterministic envelopes c_n=1 and b_n=1/q_min, and HT loss I_t * 1{r_t > lambda}/q_t.
 - It uses fixed betting fractions and mixture weights, computes the observable martingale-mixture E-value, and inverts by log-space bisection for every threshold on a predeclared nested grid.
 - The total failure budget delta is split across the fixed threshold grid. The selection rule chooses the smallest grid threshold with upper bound <= alpha; if none qualifies, lambda=1 returns the full label space with structurally zero miscoverage.
-- Calibration protocol, inclusion design, and prediction artifact each have separate frozen manifest references.
+- Calibration protocol, inclusion design, and prediction artifact each have separate frozen manifest references and validated 64-character lowercase SHA-256 digest commitments, echoed into the report. The evaluator does not fetch or authenticate signatures over those manifests.
 - Observed nonconformity scores are sorted once; suffix weights and a monotone cursor compute all threshold totals in O(N log N + N + J).
 - Fixed-quota SRSWOR marginal pi_i values are not substituted for predictable q_t. Sequential design assumptions must be justified separately.
 
@@ -120,4 +120,4 @@ Assumptions/limitations:
 - It is not an anytime/time-uniform, adaptive-budget, estimated-propensity or multi-risk implementation.
 - No accuracy, scientific truth, live benchmark or SOTA claim follows from this evaluator.
 
-The production source currently contains **17 authored tests**, including exact Bernoulli mask enumeration weighted by the actual design probabilities, a Markov outcome process with history-adaptive predictable audit probabilities, and a deliberately invalid outcome-dependent selection negative control showing why conditional ignorability is necessary. The negative control is not a theorem proof. Exact Rust 1.96 formatting, tests and strict Clippy remain required.
+The production source currently contains **18 authored tests**, including exact Bernoulli mask enumeration weighted by the actual design probabilities, a Markov outcome process with history-adaptive predictable audit probabilities, and a deliberately invalid outcome-dependent selection negative control showing why conditional ignorability is necessary. The negative control is not a theorem proof. Exact Rust 1.96 formatting, tests and strict Clippy remain required.
