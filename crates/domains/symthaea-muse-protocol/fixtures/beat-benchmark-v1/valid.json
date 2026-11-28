@@ -39,7 +39,8 @@
         0,
         44100,
         88200
-      ]
+      ],
+      "publication_ceiling": null
     }
   ]
 }
