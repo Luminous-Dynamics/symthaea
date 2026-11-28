@@ -57,6 +57,7 @@ pub enum ControllerTrackingStateV1 {
     Retained,
     ReceivedQualified,
     ReceivedUnqualified,
+    CapacityDenied,
     Expired,
     Evicted,
     ImmediateTrivial,
@@ -206,6 +207,7 @@ pub struct ObservationProcessTraceReportV1 {
     pub controller_retained_count: usize,
     pub controller_received_qualified_count: usize,
     pub controller_received_unqualified_count: usize,
+    pub controller_capacity_denied_count: usize,
     pub controller_expired_count: usize,
     pub controller_evicted_count: usize,
     pub controller_immediate_trivial_count: usize,
@@ -627,6 +629,7 @@ fn validate_controller(
                     | ControllerTrackingStateV1::Retained
                     | ControllerTrackingStateV1::ReceivedQualified
                     | ControllerTrackingStateV1::ReceivedUnqualified
+                    | ControllerTrackingStateV1::CapacityDenied
                     | ControllerTrackingStateV1::Expired
                     | ControllerTrackingStateV1::Evicted
             ) {
@@ -682,6 +685,18 @@ fn validate_controller(
             {
                 return Err(ObservationProcessTraceErrorV1(format!(
                     "round {}: RECEIVED_QUALIFIED requires eligible K1 and a state-changing controller receipt chain",
+                    row.round_id
+                )));
+            }
+        }
+        ControllerTrackingStateV1::CapacityDenied => {
+            if controller.prediction_receipt_sha256.is_none()
+                || controller.feedback_receipt_sha256.is_some()
+                || controller.update_receipt_sha256.is_some()
+                || controller.controller_state_changed
+            {
+                return Err(ObservationProcessTraceErrorV1(format!(
+                    "round {}: CAPACITY_DENIED requires a prediction receipt and no feedback/state update",
                     row.round_id
                 )));
             }
@@ -1187,6 +1202,7 @@ pub fn evaluate_observation_process_trace_v1(
         controller_retained_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::Retained),
         controller_received_qualified_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::ReceivedQualified),
         controller_received_unqualified_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::ReceivedUnqualified),
+        controller_capacity_denied_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::CapacityDenied),
         controller_expired_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::Expired),
         controller_evicted_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::Evicted),
         controller_immediate_trivial_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::ImmediateTrivial),
@@ -1722,6 +1738,31 @@ mod tests {
         let report = evaluate_observation_process_trace_v1(&data).unwrap();
         assert_eq!(report.controller_received_qualified_count, 1);
         assert_eq!(report.controller_state_update_count, 1);
+    }
+
+    #[test]
+    fn caocrc_capacity_denial_is_distinct_from_unsubmitted_and_expired() {
+        let mut trace = row(1);
+        trace.controller.tracking_state = ControllerTrackingStateV1::CapacityDenied;
+        trace.controller.policy_sha256 = Some(digest('a'));
+        trace.controller.delay_contract_sha256 = Some(digest('b'));
+        trace.controller.feedback_delay_contract_steps = Some(2);
+        trace.controller.tracking_capacity = Some(2);
+        trace.controller.tracking_occupancy_after = Some(2);
+        trace.controller.proxy_uniform_draw = Some(0.2);
+        trace.controller.proxy_delay_steps = Some(2);
+        trace.controller.proxy_survival_probability = Some(0.5);
+        trace.controller.prediction_receipt_sha256 = Some(digest('c'));
+        let mut data = input(vec![trace]);
+        data.controller_kind = ObservationControllerKindV1::CaOcrc;
+        data.controller_policy_sha256 = Some(digest('a'));
+        data.controller_delay_contract_sha256 = Some(digest('b'));
+        data.controller_delay_steps = Some(2);
+        data.controller_tracking_capacity = Some(2);
+        let report = evaluate_observation_process_trace_v1(&data).unwrap();
+        assert_eq!(report.controller_capacity_denied_count, 1);
+        assert_eq!(report.controller_state_update_count, 0);
+        assert_eq!(report.maximum_controller_occupancy, 2);
     }
 
     #[test]
