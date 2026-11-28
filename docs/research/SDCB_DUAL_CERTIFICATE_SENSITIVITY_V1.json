@@ -1,0 +1,215 @@
+{
+  "schema_version": "sdcb-dual-certificate-sensitivity-v1",
+  "title": "Exact dual-certificate sensitivity at a least-favourable active-set switch",
+  "status": "analytic-exact-rational-known-answer;rust-authored-not-compiled-or-ci-qualified",
+  "provenance": {
+    "parent_issue": 14226,
+    "robust_minimax_issue": 14185,
+    "finite_outcome_oracle_pr": 14218,
+    "whole_experiment_issue": 14161,
+    "base_commit": "f5d7bf4b3fbf7cdbf72083db77e88a9ac2c81820"
+  },
+  "design_variable": {
+    "symbol": "u",
+    "domain": [
+      0,
+      1
+    ],
+    "type": "scalar-rational"
+  },
+  "alpha": {
+    "numerator": 1,
+    "denominator": 10
+  },
+  "families": {
+    "alternatives": [
+      {
+        "id": "A1",
+        "bernoulli_parameter": "3/4 + u/10"
+      },
+      {
+        "id": "A2",
+        "bernoulli_parameter": "17/20 - u/10"
+      }
+    ],
+    "nulls": [
+      {
+        "id": "B1",
+        "bernoulli_parameter": "1/5 + u/10"
+      },
+      {
+        "id": "B2",
+        "bernoulli_parameter": "3/10 - u/10"
+      }
+    ]
+  },
+  "exact_value": {
+    "p_min": "min(3/4+u/10,17/20-u/10)",
+    "q_max": "max(1/5+u/10,3/10-u/10)",
+    "primal_test": {
+      "phi_0": "0",
+      "phi_1": "alpha/q_max"
+    },
+    "maximin_power": "alpha*p_min/q_max",
+    "active_sets": {
+      "u_less_than_half": {
+        "least_favourable_alternative": "A1",
+        "least_favourable_null": "B2"
+      },
+      "u_equal_half": {
+        "least_favourable_alternatives": [
+          "A1",
+          "A2"
+        ],
+        "least_favourable_nulls": [
+          "B1",
+          "B2"
+        ]
+      },
+      "u_greater_than_half": {
+        "least_favourable_alternative": "A2",
+        "least_favourable_null": "B1"
+      }
+    }
+  },
+  "frozen_design_points": [
+    {
+      "u": "0",
+      "p_min": "3/4",
+      "q_max": "3/10",
+      "phi_1": "1/3",
+      "maximin_power": "1/4",
+      "smooth_derivative": "7/60",
+      "lambda": [
+        "1",
+        "0"
+      ],
+      "w": [
+        "0",
+        "5/2"
+      ]
+    },
+    {
+      "u": "1/4",
+      "p_min": "31/40",
+      "q_max": "11/40",
+      "phi_1": "4/11",
+      "maximin_power": "31/110",
+      "smooth_derivative": "84/605",
+      "lambda": [
+        "1",
+        "0"
+      ],
+      "w": [
+        "0",
+        "31/11"
+      ]
+    },
+    {
+      "u": "1/2",
+      "p_min": "4/5",
+      "q_max": "1/4",
+      "phi_1": "2/5",
+      "maximin_power": "8/25",
+      "smooth_derivative": "NONDIFFERENTIABLE",
+      "active_alternatives": [
+        "A1",
+        "A2"
+      ],
+      "active_nulls": [
+        "B1",
+        "B2"
+      ],
+      "canonical_lambda": [
+        "1",
+        "0"
+      ],
+      "canonical_w": [
+        "16/5",
+        "0"
+      ],
+      "alternate_lambda": [
+        "1/3",
+        "2/3"
+      ],
+      "alternate_w": [
+        "8/5",
+        "8/5"
+      ]
+    },
+    {
+      "u": "3/4",
+      "p_min": "31/40",
+      "q_max": "11/40",
+      "phi_1": "4/11",
+      "maximin_power": "31/110",
+      "smooth_derivative": "-84/605",
+      "lambda": [
+        "0",
+        "1"
+      ],
+      "w": [
+        "31/11",
+        "0"
+      ]
+    },
+    {
+      "u": "1",
+      "p_min": "3/4",
+      "q_max": "3/10",
+      "phi_1": "1/3",
+      "maximin_power": "1/4",
+      "smooth_derivative": "-7/60",
+      "lambda": [
+        "0",
+        "1"
+      ],
+      "w": [
+        "5/2",
+        "0"
+      ]
+    }
+  ],
+  "sensitivity": {
+    "smooth_branch_formula": "dV/du = alpha*(p_prime*q - p*q_prime)/(q*q)",
+    "left_derivative": "21/125",
+    "right_derivative": "-21/125",
+    "clarke_generalized_gradient": [
+      "-21/125",
+      "21/125"
+    ],
+    "h_for_exact_one_sided_difference_quotient": "1/10000",
+    "left_difference_quotient": "4200/25001",
+    "right_difference_quotient": "-4200/25001",
+    "interpretation": "The maximin value has a strict cusp maximum at u=1/2, where both the least-favourable alternative and null switch. The dual certificate is non-unique at the switch.",
+    "positive_part_kink": {
+      "outcome": "y=1",
+      "subgradient_interval": [
+        "0",
+        "1"
+      ],
+      "kkt_selected_subgradient": "phi(1)=alpha/q_max=2/5 at u=1/2",
+      "interpretation": "the positive-part residual has zero argument at the active outcome; the primal randomized test supplies the KKT-consistent subgradient. Do not force differentiability through the active-set switch."
+    }
+  },
+  "dual_certificate": {
+    "general_value": "alpha*sum_j w_j + sum_k positive(sum_i lambda_i*p_i(k,u) - sum_j w_j*q_j(k,u))",
+    "left_certificate": "lambda=(1,0), w=(0,p_min/q_max)",
+    "right_certificate": "lambda=(0,1), w=(p_min/q_max,0)",
+    "switch_family": "lambda=(t,1-t) for t in [0,1]; w=(s,16/5-s) for s in [0,16/5]",
+    "positive_part_slack_at_switch": "(0,0)",
+    "primal_dual_gap_at_frozen_points": "0"
+  },
+  "validation": {
+    "independent_python_fraction_replay": "passed",
+    "rust_tests": {
+      "authored": 9,
+      "compiled": false,
+      "executed": false
+    },
+    "hosted_ci": "not checked for the final head at manifest authoring",
+    "physical_validation": false,
+    "global_continuous_design_certificate": false,
+    "claim_boundary": "Exact rational one-dimensional finite-law fixture; not a general differentiable robust-LP solver or global continuous experiment optimizer."
+  }
+}
