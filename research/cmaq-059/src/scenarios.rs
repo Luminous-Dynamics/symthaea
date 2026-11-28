@@ -228,7 +228,7 @@ pub fn generate_stream(
         let epsilon_y: f64 = StandardNormal.sample(&mut rng);
         let mut x_mean = common_mean;
         let mut y_mean = common_mean;
-        let mut x_scale = common_scale;
+        let x_scale = common_scale;
         let mut y_scale = common_scale;
 
         match config.kind {
