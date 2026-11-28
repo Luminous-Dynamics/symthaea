@@ -48,8 +48,7 @@ func TestRevocationInvalidatesOnlyDependentClaim(t *testing.T){
 }
 func TestTransitiveInvalidationTraversesIntermediateClaims(t *testing.T){
  in:=healthyInput()
- in.Edges=append(in.Edges,edge("db-source-truth","connector-capability",Requires))
- // conformance report also feeds capability; changing a source invalidates capability then recovery claim.
+ // The existing graph already contains source -> capability -> recovery claim.
  rev:=at.Add(-time.Minute)
  for i:=range in.Nodes{if in.Nodes[i].ID=="db-source-truth"{in.Nodes[i].RevokedAt=&rev}}
  got:=Evaluate(in)
