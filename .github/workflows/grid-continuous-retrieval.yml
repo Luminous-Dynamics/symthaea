@@ -1,0 +1,51 @@
+name: Continuous GridEncoder retrieval qualification
+
+on:
+  push:
+    branches:
+      - research/grid-continuous-retrieval-qualification-v0
+    paths:
+      - "crates/core/symthaea-core/src/hdc/grid_encoder.rs"
+      - "Cargo.toml"
+      - ".github/workflows/grid-continuous-retrieval.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "crates/core/symthaea-core/src/hdc/grid_encoder.rs"
+      - ".github/workflows/grid-continuous-retrieval.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grid-continuous-retrieval-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  QUALIFIED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  exact-head-tests:
+    name: Exact-head native multi-cell retrieval baseline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFIED_SHA }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting of retrieval source
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/grid_encoder.rs
+
+      - name: Run native multi-cell retrieval sweep
+        run: cargo test --locked -p symthaea-core --no-default-features multi_cell_retrieval_reports_native_baseline --lib -- --nocapture
+
+      - name: Run core-library Clippy
+        run: cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings

@@ -441,4 +441,137 @@ mod tests {
         let enc = GridEncoder::new(512, 3, 3, 4, 42);
         assert_eq!(enc.dimension(), 512);
     }
+
+    /// Native Rust diagnostic for the existing continuous-grid matched filter.
+    ///
+    /// This test deliberately records measurements instead of asserting a
+    /// performance threshold. It compares the bundled continuous query with
+    /// the BinaryGridEncoder XOR/cleanup baseline at the same grid sizes.
+    /// The binary baseline has a fixed BinaryHV dimension and is therefore
+    /// reported separately rather than described as a dimension-matched arm.
+    #[test]
+    fn multi_cell_retrieval_reports_native_baseline() {
+        use super::super::binary_grid_encoder::BinaryGridEncoder;
+
+        let fixtures: [(&str, Vec<Vec<u8>>); 3] = [
+            ("sparse_sample", sample_grid()),
+            (
+                "dense_cycle",
+                (0..5)
+                    .map(|row| (0..5).map(|col| ((row * 5 + col) % 6) as u8).collect())
+                    .collect(),
+            ),
+            ("single_class", vec![vec![3; 5]; 5]),
+        ];
+        let dimensions = [256, 512, 1_024, 2_048, 4_096, 8_192, 16_384];
+        let seeds = [12_345_u64, 54_321_u64, 99_991_u64];
+
+        for (fixture_name, grid) in fixtures {
+            let rows = grid.len();
+            let cols = grid.first().map_or(0, Vec::len);
+            assert!(rows > 0 && cols > 0, "fixture must be non-empty");
+            assert!(
+                grid.iter().all(|row| row.len() == cols),
+                "fixture must be rectangular"
+            );
+
+            for dimension in dimensions {
+                for seed in seeds {
+                    let enc = GridEncoder::new(dimension, rows, cols, 6, seed);
+                    let bundled = enc.encode_grid(&grid);
+                    // Explicit high-memory reference: one unbundled positional
+                    // HV per observed cell, stored for direct indexed retrieval.
+                    let mut dense_cells = Vec::with_capacity(rows * cols);
+                    for (row, values) in grid.iter().enumerate() {
+                        for (col, &color) in values.iter().enumerate() {
+                            dense_cells.push(enc.encode_cell(row, col, color as usize));
+                        }
+                    }
+                    let dense_vector_payload_bytes =
+                        dense_cells.len() * dimension * std::mem::size_of::<f32>();
+                    let bundled_grid_vector_bytes = dimension * std::mem::size_of::<f32>();
+                    let mut continuous_correct = 0usize;
+                    let mut dense_reference_correct = 0usize;
+                    let mut total = 0usize;
+                    let mut true_score_sum = 0.0_f64;
+                    let mut true_margin_sum = 0.0_f64;
+
+                    for (row_index, row) in grid.iter().enumerate() {
+                        for (col_index, &actual) in row.iter().enumerate() {
+                            let query = enc.query_position(&bundled, row_index, col_index);
+                            let true_score = query.similarity(enc.color_hv(actual as usize));
+                            let dense_cell = &dense_cells[row_index * cols + col_index];
+                            let mut dense_best_index = 0usize;
+                            let mut dense_best_score = f32::NEG_INFINITY;
+                            for candidate in 0..enc.num_colors() {
+                                let candidate_cell =
+                                    enc.encode_cell(row_index, col_index, candidate);
+                                let score = dense_cell.similarity(&candidate_cell);
+                                if score > dense_best_score {
+                                    dense_best_index = candidate;
+                                    dense_best_score = score;
+                                }
+                            }
+                            if dense_best_index == actual as usize {
+                                dense_reference_correct += 1;
+                            }
+                            let mut best_index = 0usize;
+                            let mut best_score = f32::NEG_INFINITY;
+                            let mut best_alternative = f32::NEG_INFINITY;
+
+                            for candidate in 0..enc.num_colors() {
+                                let score = query.similarity(enc.color_hv(candidate));
+                                if score > best_score {
+                                    best_index = candidate;
+                                    best_score = score;
+                                }
+                                if candidate != actual as usize {
+                                    best_alternative = best_alternative.max(score);
+                                }
+                            }
+
+                            if best_index == actual as usize {
+                                continuous_correct += 1;
+                            }
+                            true_score_sum += true_score as f64;
+                            true_margin_sum += (true_score - best_alternative) as f64;
+                            total += 1;
+                        }
+                    }
+
+                    let binary = BinaryGridEncoder::new(rows, cols, 6, seed);
+                    let binary_hv = binary.encode_grid(&grid);
+                    let binary_decoded = binary.decode_grid(&binary_hv, rows, cols);
+                    let binary_correct = grid
+                        .iter()
+                        .zip(&binary_decoded)
+                        .flat_map(|(expected, predicted)| expected.iter().zip(predicted))
+                        .filter(|(expected, predicted)| expected == predicted)
+                        .count();
+
+                    assert_eq!(total, rows * cols);
+                    assert_eq!(binary_decoded.len(), rows);
+                    let continuous_accuracy = continuous_correct as f64 / total as f64;
+                    let dense_reference_accuracy = dense_reference_correct as f64 / total as f64;
+                    let binary_accuracy = binary_correct as f64 / total as f64;
+                    let mean_true_score = true_score_sum / total as f64;
+                    let mean_true_margin = true_margin_sum / total as f64;
+
+                    println!(
+                        "GRID_RETRIEVAL_V1 fixture={fixture_name} dim={dimension} seed={seed} \
+                         cells={total} continuous_top1={continuous_correct}/{total} \
+                         continuous_accuracy={continuous_accuracy:.6} \
+                         mean_true_cosine={mean_true_score:.6} \
+                         mean_true_margin={mean_true_margin:.6} \
+                         dense_per_cell_top1={dense_reference_correct}/{total} \
+                         dense_per_cell_accuracy={dense_reference_accuracy:.6} \
+                         dense_vector_payload_bytes={dense_vector_payload_bytes} \
+                         bundled_grid_vector_bytes={bundled_grid_vector_bytes} \
+                         binary_xor_top1={binary_correct}/{total} \
+                         binary_xor_accuracy={binary_accuracy:.6}"
+                    );
+                }
+            }
+        }
+    }
 }

@@ -20,6 +20,20 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # Source-only placeholder directory matched by crates/core/*; not a Cargo package.
+    "crates/core/symthaea",
+    # Source-only attestation prototype; no Cargo package manifest exists yet.
+    "crates/core/symthaea-observation-attestation",
+    # Test-only directory under the core glob; it is not a Cargo package.
+    "crates/core/symthaea-iit",
+    # Incomplete research artifacts without a complete package/manifest closure.
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    # Temporarily excluded on main; remove when integrating the real crate from PR #13453.
+    "crates/domains/symthaea-experiment-design",
+    "crates/domains/symthaea-marine-geometry",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
