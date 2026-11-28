@@ -153,18 +153,44 @@ impl ObservationLog {
 /// and measured outputs.
 pub struct InteractionWorld {
     truth: ModelHypothesis,
+    /// Evaluator-only additive u² term. Candidate ModelHypothesis deliberately
+    /// has no representation for this structural misspecification.
+    quadratic_u_term: i64,
 }
 
 impl InteractionWorld {
     pub fn new(truth: ModelHypothesis) -> Result<Self, InteractionError> {
+        Self::new_with_quadratic_u_term(truth, 0)
+    }
+
+    /// Builds an evaluator world with an optional u² term outside the candidate
+    /// grammar. Keep the coefficient in the evaluator process only.
+    pub fn new_with_quadratic_u_term(
+        truth: ModelHypothesis,
+        quadratic_u_term: i64,
+    ) -> Result<Self, InteractionError> {
         truth.validate()?;
-        Ok(Self { truth })
+        Ok(Self {
+            truth,
+            quadratic_u_term,
+        })
     }
 
     pub fn run(&self, interventions: &[[i64; 2]]) -> Result<ObservationLog, InteractionError> {
         let mut measurements = Vec::with_capacity(interventions.len());
         for input in interventions {
-            measurements.push(self.truth.predict(*input)?);
+            let base = self.truth.predict(*input)?;
+            let square = input[0]
+                .checked_mul(input[0])
+                .ok_or(InteractionError::ArithmeticOverflow)?;
+            let shift = self
+                .quadratic_u_term
+                .checked_mul(square)
+                .ok_or(InteractionError::ArithmeticOverflow)?;
+            measurements.push(
+                base.checked_add(shift)
+                    .ok_or(InteractionError::ArithmeticOverflow)?,
+            );
         }
         Ok(ObservationLog {
             interventions: interventions.to_vec(),
@@ -476,6 +502,18 @@ mod tests {
         let world = InteractionWorld::new(bilinear_truth()).unwrap();
         let log = world.run(&[[1, 1], [1, -1]]).unwrap();
         assert_eq!(log.measurements, vec![3, -1]);
+    }
+
+    #[test]
+    fn evaluator_world_can_add_quadratic_u_term_outside_candidate_grammar() {
+        let world = InteractionWorld::new_with_quadratic_u_term(bilinear_truth(), 1).unwrap();
+        let log = world.run(&[[1, 1], [-1, -1], [-1, 0]]).unwrap();
+        assert_eq!(log.measurements, vec![4, 0, 0]);
+        assert!(discover(&log, StructureAccess::Withheld)
+            .unwrap()
+            .compatible_models
+            .len()
+            <= candidate_models(StructureAccess::Withheld).len());
     }
 
     #[test]
