@@ -405,7 +405,7 @@ impl StreamSegmentInputV1 {
     }
 }
 
-impl StreamMemTimelineIngestReceiptV1 {
+impl StreamTimelineIngestReceiptV1 {
     fn unsigned_digest(&self) -> Result<String, StreamMemRejectV1> {
         let mut unsigned = self.clone();
         unsigned.receipt_sha256.clear();
@@ -800,7 +800,6 @@ mod tests {
     }
 
     fn segment(sequence: u64, day: u32, ordinal: u32) -> StreamTimelineIngestReceiptV1 {
-        let b = binding();
         StreamTimelineIngestReceiptV1 {
             schema_version: SCHEMA_VERSION_V1.into(),
             run_id: b.run_id.clone(),
