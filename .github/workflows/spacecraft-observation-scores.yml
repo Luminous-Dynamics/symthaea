@@ -1,0 +1,35 @@
+name: Spacecraft observation candidate scoring
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-fep/src/free_energy.rs"
+      - ".github/workflows/spacecraft-observation-scores.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "crates/core/symthaea-fep/src/free_energy.rs"
+      - ".github/workflows/spacecraft-observation-scores.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observational-scores:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format FEP package
+        run: cargo fmt -p symthaea-fep -- --check
+      - name: Candidate scoring tests
+        run: cargo test -p symthaea-fep --lib observational_candidate_tests -- --test-threads=1
+      - name: Full FEP unit tests
+        run: cargo test -p symthaea-fep --lib -- --test-threads=1
+      - name: Strict FEP Clippy
+        run: cargo clippy -p symthaea-fep --all-targets -- -D warnings
