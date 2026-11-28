@@ -92,9 +92,33 @@ These are **research targets**, not achieved results. Freeze benchmark versions 
 
 Targets should be revised only after a baseline run and preregistration. A high target is not evidence that the architecture can achieve it.
 
+## Production researcher boundary audit — 2026-11-28
+
+A default-branch source audit identified a concrete production surface and a blocking evidence-attribution defect. The relevant entry point is `WebResearcher::research_and_verify` in [`src/web_research/researcher.rs`](https://github.com/Luminous-Dynamics/symthaea/blob/05ab60f36a43fa0da011dec9870d8a21f3e7167e/src/web_research/researcher.rs#L61-L184). It is a useful retrieval/extraction executor to adapt, but it is **not yet a qualified state-contingent research policy**:
+
+1. It builds a fixed keyword-triggered query list (`plan_queries`), fetches sources, and processes them in a fixed loop. It has no public prospective action/forecast contract and does not expose an offer-scoped next-action decision.
+2. Every extracted `SourceEvidence` is constructed with `supports: Some(true)`; its similarity is computed against the original query, not against the individual extracted claim. The same `all_sources.clone()` is then supplied to every claim's `VerificationContext`. See the source construction and claim loop in `research_and_verify` above.
+3. `EpistemicVerifier::verify_claim` consumes `SourceEvidence.supports` as the support/refutation label and multiplies it by credibility and similarity; it does not independently derive claim-specific entailment from `relevant_text`. `verify_from_results` has a second circular path that maps `result.confidence > 0.5` to support. [`verifier.rs`](https://github.com/Luminous-Dynamics/symthaea/blob/05ab60f36a43fa0da011dec9870d8a21f3e7167e/src/web_research/verifier.rs#L140-L234).
+4. The overall research confidence is the arithmetic mean of claim confidences; the result's summary is a short prefix of the first selected page, not a synthesis of individually attributed evidence. The pipeline caps verification at ten extracted claims per call.
+5. `KnowledgeIntegrator::integrate` integrates a claim when its confidence crosses a threshold; it does not require independent correctness adjudication. [`integrator.rs`](https://github.com/Luminous-Dynamics/symthaea/blob/05ab60f36a43fa0da011dec9870d8a21f3e7167e/src/web_research/integrator.rs#L89-L127).
+6. In the default branch, `EpistemicConsciousness::research` still maps `claim.confidence > 0.7` into `was_correct`. PR #13969 changes this to an unadjudicated `None` record and prevents pending claims from training calibration; its focused harness is valuable, but it does not modify `researcher.rs`, `verifier.rs` or `integrator.rs`. Until that PR is merged and its exact head requalified, the default-branch behavior remains the old implementation. [`mod.rs`](https://github.com/Luminous-Dynamics/symthaea/blob/05ab60f36a43fa0da011dec9870d8a21f3e7167e/src/web_research/mod.rs#L175-L200).
+
+**Integration ruling:** use `WebResearcher` initially as a retrieval/extraction tool behind the existing permitted-offer boundary; do not treat its present confidence, support labels or aggregate epistemic status as independently qualified evidence. Do not wire `ScientificMethodEngine` as the missing research planner: its current cognitive-loop call site updates a standing input-coherence hypothesis from prediction error and consciousness level, not from web-research decisions or adjudicated scientific outcomes ([`cycle.rs`](https://github.com/Luminous-Dynamics/symthaea/blob/05ab60f36a43fa0da011dec9870d8a21f3e7167e/src/cognitive_loop/cycle.rs)).
+
+The smallest safe repair sequence under #11171 is:
+
+- Replace the boolean `supports` placeholder with an explicit claim/source relation whose default is `UNCLASSIFIED`; retain the exact source span, claim ID, artifact digest, and source-family lineage.
+- Make support classification claim-specific and quote/span-backed. A retrieval similarity score may rank passages but must never create a support label.
+- Keep extraction, source classification, truth adjudication and decision usability as different fields/stages. Correlated/syndicated pages must not count as independent support.
+- Require the evidence-prefix digest and correction state before a claim is eligible for any downstream decision or knowledge-graph integration.
+- Make integration store provisional/unadjudicated claims as such; only independently adjudicated outcomes may train calibration or source reliability.
+- Expose the existing retrieval actions as permitted offers. A policy selects an offer and emits a pre-action forecast; the executor performs it and returns an immutable receipt. Do not let the policy create its own permissions or label its own outcomes.
+
+**Mandatory negative controls:** a source with high query similarity but no claim-relevant span must remain unclassified; one source that supports claim A but is irrelevant to claim B must not support B; a negated/contradictory quote must not be converted to positive support; duplicate or syndicated sources must not inflate independent-source count; changing irrelevant page metadata must leave the decision invariant; corrupting the evidence-prefix digest must fail closed. These tests are more important than improving headline retrieval accuracy until the attribution defect is repaired.
+
 ## Immediate execution sequence
 
-1. **Close the calibration loop:** PR #13969 had a focused Rust 1.96 pass (20/20 standalone production-source tests, formatting and strict Clippy) at an earlier head `37e67653b22001dd4b6a97302c1527a1337ae3cb`. Its current head `e1401580f683dd8887148bc481770d04b96f17ab` contains subsequent benchmark-strategy additions and its focused adjudication workflow was queued in the 28 Nov audit; do not project the earlier pass onto the current head. Neither head validates the entire web-research runtime or proves external adjudicator quality.
+1. **Close the calibration loop:** PR #13969 has a prior focused Rust 1.96 pass (20/20 standalone production-source tests, formatting and strict Clippy) at an earlier head `37e67653b22001dd4b6a97302c1527a1337ae3cb`. Subsequent commits require a new exact-head pass; never project that earlier result forward. The standalone harness does not compile the entire web-research runtime or prove external adjudicator quality.
 2. **Complete decision custody:** integrate the proposed offer/context digest contracts with the upstream AgentView owner; then add prefix-only candidate replay and process-level separation.
 3. **Make time semantics explicit:** asynchronous experiments need event time, observation/availability time, and decision time. Simulation tick alone is not enough for delayed or censored evidence.
 4. **Add selective-risk reporting:** calibration is not sufficient if the agent cannot abstain safely. Evaluate risk-coverage and decision utility.
