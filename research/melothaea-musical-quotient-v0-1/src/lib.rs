@@ -381,9 +381,7 @@ pub fn classify_action(
             | MusicalProperty::RelativeIntervals
             | MusicalProperty::RhythmicRatios,
         )
-        | (ActionKind::Rubato, MusicalProperty::RhythmicRatios) => {
-            PropertyEffect::EmpiricalOnly
-        }
+        | (ActionKind::Rubato, MusicalProperty::RhythmicRatios) => PropertyEffect::EmpiricalOnly,
         (ActionKind::LossyCrop, _) => PropertyEffect::ErasesEvidence,
         _ => PropertyEffect::Unsupported,
     };
@@ -413,9 +411,7 @@ pub fn classify_action(
                 return match evidence {
                     EvidenceClass::HumanCalibratedNuisance
                     | EvidenceClass::SampledProposal
-                    | EvidenceClass::RestrictedPartialIsomorphism => {
-                        Disposition::SoftRelationOnly
-                    }
+                    | EvidenceClass::RestrictedPartialIsomorphism => Disposition::SoftRelationOnly,
                     EvidenceClass::OneWayNonInvertible => Disposition::NotEstimable,
                     EvidenceClass::ExactFiniteAction
                     | EvidenceClass::ExactRationalActionFragment => Disposition::Unsupported,
@@ -524,12 +520,10 @@ pub fn build_complete_quality_orbits(
         let representative = Chord::new(PitchClass(0), *quality);
         let mut members = Vec::with_capacity(usize::from(PITCH_CLASS_COUNT));
         for pitch_class in 0..PITCH_CLASS_COUNT {
-            let candidate = *roots
-                .get(&pitch_class)
-                .ok_or(OrbitError::IncompleteOrbit {
-                    quality: *quality,
-                    observed: roots.len(),
-                })?;
+            let candidate = *roots.get(&pitch_class).ok_or(OrbitError::IncompleteOrbit {
+                quality: *quality,
+                observed: roots.len(),
+            })?;
             let witness = ChordLiftWitness {
                 transposition: Transposition::new(pitch_class),
             };
@@ -539,10 +533,7 @@ pub fn build_complete_quality_orbits(
                     observed: roots.len(),
                 });
             }
-            members.push(ChordOrbitMember {
-                candidate,
-                witness,
-            });
+            members.push(ChordOrbitMember { candidate, witness });
         }
         orbits.push(ChordQualityOrbit {
             representative,
@@ -594,7 +585,10 @@ mod tests {
             for offset in 0..PITCH_CLASS_COUNT {
                 let transformed = original.transpose(Transposition::new(offset));
                 assert_eq!(transformed.quality(), original.quality());
-                assert_eq!(transformed.relative_intervals(), original.relative_intervals());
+                assert_eq!(
+                    transformed.relative_intervals(),
+                    original.relative_intervals()
+                );
                 assert_eq!(
                     transformed.root().value(),
                     (original.root().value() + offset) % PITCH_CLASS_COUNT
@@ -641,10 +635,7 @@ mod tests {
     #[test]
     fn independent_pitch_and_tempo_actions_commute() {
         let source = chord(7, TriadQuality::Minor);
-        let pitch_only = MusicalAction::new(
-            Transposition::new(5),
-            TempoScale::identity(),
-        );
+        let pitch_only = MusicalAction::new(Transposition::new(5), TempoScale::identity());
         let tempo_only =
             MusicalAction::new(Transposition::identity(), TempoScale::new(3, 2).unwrap());
         let left = pitch_only.compose(tempo_only).unwrap();
@@ -809,10 +800,7 @@ mod tests {
             })
         );
 
-        let duplicate = [
-            chord(0, TriadQuality::Major),
-            chord(0, TriadQuality::Major),
-        ];
+        let duplicate = [chord(0, TriadQuality::Major), chord(0, TriadQuality::Major)];
         assert_eq!(
             build_complete_quality_orbits(&duplicate, &[TriadQuality::Major]),
             Err(OrbitError::DuplicateCandidate)
