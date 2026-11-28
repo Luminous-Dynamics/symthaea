@@ -1,0 +1,156 @@
+{
+  "schema": "symthaea.roi-information-value-fixtures.v1",
+  "verification_scope": "Structural JSON manifest fixtures only. Runtime replay must validate all calibration, source-clock, confidence-bound, staleness and duplicate-ID relations.",
+  "positive": [
+    {
+      "name": "two-calibrated-rois-and-one-stale-rejection",
+      "expected": "accept_with_rejection",
+      "manifest": {
+        "schema": "symthaea.roi-information-value-manifest.v1",
+        "now_us": 2000000,
+        "now_clock_domain_id": "clock:camera-1",
+        "config": {
+          "maximum_source_age_us": 500000,
+          "minimum_calibration_samples": 100,
+          "maximum_expected_calibration_error": 0.1,
+          "minimum_confidence_level": 0.95,
+          "minimum_net_benefit": 0.01,
+          "minimum_benefit_per_1000_pixels": 0.001
+        },
+        "candidates": [
+          {
+            "candidate_id": "roi-turn",
+            "task_id": "turn-001",
+            "task_family": "turn_floor_state",
+            "source_clock_domain_id": "clock:camera-1",
+            "source_frame_id": 42,
+            "source_timestamp_us": 1900000,
+            "expected_loss_without_roi": 0.8,
+            "expected_loss_with_roi": 0.5,
+            "expected_loss_reduction_lcb": 0.2,
+            "confidence_level": 0.95,
+            "latency_penalty": 0.02,
+            "staleness_penalty": 0.01,
+            "source_pixel_cost": 10000,
+            "calibration": {
+              "calibration_id": "turn-cal-v1",
+              "model_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "calibration_report_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "task_family": "turn_floor_state",
+              "sample_count": 500,
+              "expected_calibration_error": 0.04
+            }
+          },
+          {
+            "candidate_id": "roi-backchannel",
+            "task_id": "backchannel-004",
+            "task_family": "backchannel",
+            "source_clock_domain_id": "clock:camera-1",
+            "source_frame_id": 42,
+            "source_timestamp_us": 1950000,
+            "expected_loss_without_roi": 0.7,
+            "expected_loss_with_roi": 0.4,
+            "expected_loss_reduction_lcb": 0.2,
+            "confidence_level": 0.95,
+            "latency_penalty": 0.04,
+            "staleness_penalty": 0.03,
+            "source_pixel_cost": 5000,
+            "calibration": {
+              "calibration_id": "backchannel-cal-v1",
+              "model_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "calibration_report_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "task_family": "backchannel",
+              "sample_count": 600,
+              "expected_calibration_error": 0.05
+            }
+          },
+          {
+            "candidate_id": "roi-stale",
+            "task_id": "turn-002",
+            "task_family": "turn_floor_state",
+            "source_clock_domain_id": "clock:camera-1",
+            "source_frame_id": 41,
+            "source_timestamp_us": 1000000,
+            "expected_loss_without_roi": 0.9,
+            "expected_loss_with_roi": 0.3,
+            "expected_loss_reduction_lcb": 0.4,
+            "confidence_level": 0.99,
+            "latency_penalty": 0.01,
+            "staleness_penalty": 0.01,
+            "source_pixel_cost": 10000,
+            "calibration": {
+              "calibration_id": "turn-cal-v1",
+              "model_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "calibration_report_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "task_family": "turn_floor_state",
+              "sample_count": 500,
+              "expected_calibration_error": 0.04
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "calibration-task-family-mismatch",
+      "base_positive": "two-calibrated-rois-and-one-stale-rejection",
+      "expected_rejection": "calibration_task_mismatch",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/manifest/candidates/0/calibration/task_family",
+          "value": "shared_referent"
+        }
+      ]
+    },
+    {
+      "name": "source-clock-domain-mismatch",
+      "base_positive": "two-calibrated-rois-and-one-stale-rejection",
+      "expected_rejection": "clock_domain_mismatch",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/manifest/candidates/0/source_clock_domain_id",
+          "value": "clock:other-camera"
+        }
+      ]
+    },
+    {
+      "name": "lower-bound-exceeds-point-estimate",
+      "base_positive": "two-calibrated-rois-and-one-stale-rejection",
+      "expected_rejection": "invalid_confidence_bound",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/manifest/candidates/0/expected_loss_reduction_lcb",
+          "value": 0.9
+        }
+      ]
+    },
+    {
+      "name": "duplicate-candidate-identities",
+      "base_positive": "two-calibrated-rois-and-one-stale-rejection",
+      "expected_rejection": "duplicate_candidate_id",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/manifest/candidates/1/candidate_id",
+          "value": "roi-turn"
+        }
+      ]
+    },
+    {
+      "name": "confidence-below-policy-floor",
+      "base_positive": "two-calibrated-rois-and-one-stale-rejection",
+      "expected_rejection": "confidence_evidence_too_weak",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/manifest/candidates/0/confidence_level",
+          "value": 0.9
+        }
+      ]
+    }
+  ]
+}

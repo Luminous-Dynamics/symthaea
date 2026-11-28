@@ -1,0 +1,106 @@
+{
+  "schema_version": "symthaea.turn-candidate-fixtures.v1",
+  "description": "Candidate record fixtures and expected decision-gate outcomes. Lifecycle/sequence behavior is checked by the Rust gate tests.",
+  "positive": [
+    {
+      "id": "wait_above_threshold",
+      "candidate": {
+        "event_id": "turn-1",
+        "sequence": 1,
+        "clock_domain_id": "clock:turn-1",
+        "observed_at_monotonic_ns": "100",
+        "expires_at_monotonic_ns": "1000",
+        "action": "wait",
+        "confidence": 0.9,
+        "calibration_id": "cal-v1"
+      },
+      "expected": "emitted"
+    },
+    {
+      "id": "yield_above_strict_threshold",
+      "candidate": {
+        "event_id": "turn-2",
+        "sequence": 2,
+        "clock_domain_id": "clock:turn-1",
+        "observed_at_monotonic_ns": "200",
+        "expires_at_monotonic_ns": "1000",
+        "action": "yield",
+        "confidence": 0.97,
+        "calibration_id": "cal-v1"
+      },
+      "expected": "emitted"
+    },
+    {
+      "id": "yield_below_strict_threshold",
+      "candidate": {
+        "event_id": "turn-3",
+        "sequence": 3,
+        "clock_domain_id": "clock:turn-1",
+        "observed_at_monotonic_ns": "300",
+        "expires_at_monotonic_ns": "1000",
+        "action": "yield",
+        "confidence": 0.93,
+        "calibration_id": "cal-v1"
+      },
+      "expected": "abstained"
+    },
+    {
+      "id": "continue_below_threshold",
+      "candidate": {
+        "event_id": "turn-4",
+        "sequence": 4,
+        "clock_domain_id": "clock:turn-1",
+        "observed_at_monotonic_ns": "400",
+        "expires_at_monotonic_ns": "1000",
+        "action": "continue",
+        "confidence": 0.7,
+        "calibration_id": "cal-v1"
+      },
+      "expected": "abstained"
+    }
+  ],
+  "negative": [
+    {
+      "id": "confidence_out_of_range",
+      "candidate": {
+        "event_id": "turn-5",
+        "sequence": 5,
+        "clock_domain_id": "clock:turn-1",
+        "observed_at_monotonic_ns": "500",
+        "expires_at_monotonic_ns": "1000",
+        "action": "respond",
+        "confidence": 1.2,
+        "calibration_id": "cal-v1"
+      },
+      "expected": "schema_reject"
+    },
+    {
+      "id": "unknown_action",
+      "candidate": {
+        "event_id": "turn-6",
+        "sequence": 6,
+        "clock_domain_id": "clock:turn-1",
+        "observed_at_monotonic_ns": "600",
+        "expires_at_monotonic_ns": "1000",
+        "action": "interrupt_now",
+        "confidence": 0.99,
+        "calibration_id": "cal-v1"
+      },
+      "expected": "schema_reject"
+    },
+    {
+      "id": "noncanonical_timestamp",
+      "candidate": {
+        "event_id": "turn-7",
+        "sequence": 7,
+        "clock_domain_id": "clock:turn-1",
+        "observed_at_monotonic_ns": "0600",
+        "expires_at_monotonic_ns": "1000",
+        "action": "wait",
+        "confidence": 0.9,
+        "calibration_id": "cal-v1"
+      },
+      "expected": "schema_reject"
+    }
+  ]
+}

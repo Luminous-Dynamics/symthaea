@@ -1,0 +1,196 @@
+# Symthaea Turn Control and Reciprocal Interaction Benchmark v0.1
+
+**Date:** 2026-11-27  
+**Status:** benchmark protocol and targets; no Symthaea result claimed
+
+## 1. Research objective
+
+Evaluate turn-taking as a real-time control decision, not a post-hoc transcript label or an animation choice.
+
+Symthaea's turn-state vocabulary is:
+
+- WAIT — keep listening; do not take the floor.
+- RESPOND — begin a response when the floor is available.
+- CONTINUE — retain the floor while producing a coherent response.
+- YIELD — stop or relinquish the floor when the partner takes it or asks to speak.
+
+A decision must be causal, timestamped, bounded to one active transition, and revocable by user control. The renderer may visualize a decision but must not infer it from visual style or animation state.
+
+## 2. External baseline: TurnBench
+
+The TurnBench page currently describes:
+- a 30-hour held-out dual-channel dyadic conversation corpus;
+- 154 dialogues, 106 actors, six conversation styles;
+- three independent annotators per dialogue and Fleiss' kappa of 0.78;
+- a 104-hour training corpus and 7.3-hour development split;
+- end-of-turn and interruption events with event times.
+
+Its current published v1 leaderboard includes Kuroko at 0.983 recall / 0.065 FPR / 619 ms median latency; OpenYap Turn at 0.978 / 0.077 / 298 ms; p99lab turn-1-mini at 0.975 / 0.075 / 595 ms; and Neosapience Nunchi v2 at 0.959 / 0.064 / 254 ms. The FD-VAD row has lower FPR (0.049) but only 0.826 recall and 1,025 ms latency. No single listed system simultaneously dominates recall, FPR and latency.
+
+**Important benchmark caveat:** TurnBench itself documents a v1 scoring weakness. Multiple predictions can be emitted for one pause, late fallbacks up to three seconds can still count, and the ranking is based on recall. Simple voice-activity rules can consequently rank highly without making a single timely decision. The maintainers describe a planned v2 with per-frame probabilities and fixed hidden decision points.
+
+Therefore:
+- use v1 as a diagnostic track only and always report false-positive and latency columns;
+- do not claim state-of-the-art from recall-only v1 rank;
+- prepare an evaluation adapter for v2 when released;
+- maintain a fixed-decision, one-action-per-event internal evaluation in the interim.
+
+Source: https://turnbench.sesame.com/
+
+## 2.1 Intent-conditioned timing (TACT alignment)
+
+Binary fixed-window end-of-turn labels are insufficient as the only timing target. The TACT benchmark (arXiv:2609.27372) contains 9,728 episodes / 73.2 hours from five dyadic corpora and models response-offset appropriateness conditional on speaker intent. It scores temporal predictions with a proper probabilistic rule and reports materially better agreement with human judgments than binary metrics in its evaluation.
+
+Add a separate **intent-conditioned timing** lane without removing the existing causal one-decision and false-positive-constrained lanes:
+
+- Predict a distribution over the appropriate response offset / floor-transfer timing, not only a binary speak-now flag.
+- Condition on the permitted current and past evidence for the speaker's intent class; do not use future audio or annotator-only intent labels at inference.
+- Keep the gold intent posterior evaluator-only. Use proper scoring (TACT-compatible weighted CRPS where the benchmark adapter permits), calibration and coverage; never replace latency/FPR with a single probabilistic score.
+- Compare intent-conditioned predictions to human floor-transfer timing distributions, and report the six intent classes separately.
+- Include a matched ablation with/without conversation/profile context and an explicit profile-invariance check so the model does not merely learn speaker identity.
+- Preserve one emitted control action per hidden decision event. A distribution forecast does not authorize or dispatch speech; the causal action gate and live permission checks remain separate.
+
+This changes the research question from "did the model predict a fixed turn boundary?" to "given the speaker's likely intent, what response timing is appropriate, and how uncertain is that prediction?" It must be a separate benchmark stratum because TACT's dyadic corpora and scoring protocol are not interchangeable with TurnBench, DuplexAct or the multi-party challenge set.
+
+Reference: https://arxiv.org/abs/2609.27372.
+
+## 3. Symthaea evaluation protocol
+
+### 3.1 Frozen input
+
+Use the same permitted TurnBench split and annotation version for all compared systems. Freeze audio, timestamps, channel layout, resampling, VAD settings, model versions, thresholds and post-processing configuration.
+
+Do not leak test labels, future audio, future chunks, future video frames, or annotator corrections into the decision path. Every prediction must include the latest input timestamp consumed, the output timestamp, the decision, confidence/calibration value (if available), and a stable decision ID.
+
+### 3.2 Decision cardinality and causality
+
+For each hidden decision point:
+- emit at most one action for that event;
+- no backdating;
+- no prediction based on samples after the decision timestamp;
+- no repeated late fallback predictions for the same pause;
+- missing input, unavailable clock, or uncertain authority must produce WAIT/abstain, not an invented turn transfer.
+
+The primary scorer must evaluate fixed hidden decision points or use the official v2 protocol. A second diagnostic scorer may report event detection, but cannot replace the hidden-point score.
+
+### 3.3 Conversation-style stratification
+
+Report each of the six styles separately:
+1. Casual;
+2. Task-oriented;
+3. Instructional;
+4. Collaborative;
+5. Argumentative;
+6. Narrative.
+
+Also stratify by overlap, backchannel density, interruption type, speaking rate, channel bleed, echo, noise, language/accent when the corpus terms permit it, and network/chunk loss.
+
+Do not average away a failure that occurs mainly in backchannel-dense casual dialogue or emotionally charged disagreement.
+
+### 3.4 Cost-sensitive control utility
+
+A false interruption is not equivalent to a missed decorative backchannel. Report a pre-registered cost matrix and the full confusion matrix.
+
+Proposed internal cost starting point (to be validated with users):
+- false RESPOND while the partner holds the floor: cost 5;
+- false YIELD while Symthaea should continue: cost 4;
+- missed floor transfer: cost 3;
+- late but correct response: cost 2, scaled by delay;
+- missed optional backchannel: cost 1;
+- WAIT/abstain under genuinely ambiguous input: cost 0 for safety, but count coverage separately.
+
+Report utility at several cost ratios (1:1, 2:1, 5:1) so conclusions do not depend on one hand-picked weight.
+
+## 4. Metrics
+
+Primary:
+- event precision and recall for end-of-turn and interruption;
+- false interruption rate per conversation minute;
+- false-positive rate at fixed hidden decision points;
+- median, p90 and p95 decision latency;
+- duplicate/late action rate;
+- floor-transfer timing error;
+- calibration (Brier score, log loss and reliability curve when probabilities are available);
+- abstention/coverage versus error;
+- cost-sensitive interaction utility.
+
+Secondary:
+- WAIT/RESPOND/CONTINUE/YIELD transition validity;
+- time to stop speech after YIELD;
+- rate of talking over an active user;
+- successful recovery after interruption;
+- backchannel appropriateness;
+- CPU/GPU/RAM, model and output frame budget, and energy per interaction minute.
+
+Latency must be measured at the client output boundary, preserving both source and client clock domains. Never subtract raw monotonic timestamps from unrelated domains.
+
+## 5. Proposed targets (not results)
+
+The following are ambitious internal targets for a frozen, architecture-matched evaluation, not claims about TurnBench's current official leaderboard:
+
+| Metric | Target |
+|---|---:|
+| End-of-turn recall | >= 0.97 |
+| Interruption recall | >= 0.95 |
+| False-positive rate | <= 0.04 |
+| False interruptions | <= 0.05 per conversation minute |
+| Median decision latency | <= 200 ms |
+| P95 decision latency | <= 500 ms |
+| Duplicate/late decisions | 0 |
+| Per-style recall floor | >= 0.92 |
+| Calibration | report Brier/ECE; improve over matched VAD and semantic baselines |
+| TACT-compatible intent-conditioned timing composite | >=0.55 initial; stretch >=0.65 |
+| Correlation with held-out human timing judgments | >=0.83 Spearman |
+| Intent-profile invariance | report memory/profile-swap delta; no material collapse |
+| Unauthorized or stale action | 0 |
+
+The target deliberately aims to improve on the recall/false-positive/latency trade-off rather than only beating the highest recall number. Human floor-transfer timing is a useful reference, but TurnBench's event-latency metric is not identical to the human overlap statistic; do not claim direct equivalence.
+
+
+
+**TACT baseline context (2026-09-23):** the published evaluation reports a best system composite of 0.47 and human topline of 0.86; TACT aligns with held-out human judgments at Spearman 0.81 versus 0.46 for reproduced binary metrics. These are TACT-specific results, not comparable to TurnBench recall or VideoFDB TOR alignment. The proposed >=0.55/0.65 values above are target scores only and require the same scoring implementation, permitted split, and calibration protocol.
+
+## 6. Baselines and ablations
+
+Compare:
+- energy/VAD threshold baseline;
+- VAD plus fixed hangover;
+- causal acoustic model;
+- semantic turn detector;
+- Symthaea's event/state controller;
+- oracle upper bound using gold labels (evaluation only; never inference).
+
+Ablate:
+- acoustic evidence only;
+- language/semantic context only;
+- joint model;
+- fixed versus adaptive decision threshold;
+- with/without uncertainty abstention;
+- with/without hysteresis;
+- with/without conversation-style conditioning.
+
+Keep compute and context budgets matched. Report ablations separately instead of only publishing the best system.
+
+## 7. Connection to embodiment and receipts
+
+The turn decision and the visual cue remain different layers:
+
+1. The turn controller emits a typed WAIT/RESPOND/CONTINUE/YIELD event.
+2. Event validation checks session, sequence, source, timestamp and expiry.
+3. The canonical cue is bound into the presentation permit digest.
+4. The policy authorizes a chosen visual/audio output channel.
+5. The receipt ledger separates Authorized, Submitted, Observed and Stopped.
+6. The renderer draws only the authorized cue.
+
+A visual pulse cannot count as a RESPOND decision. A YIELD animation cannot count as proof that speech stopped. A missing clock or missing input cannot be silently converted into a confident action.
+
+## 8. Next experiments
+
+1. Implement a trace adapter for official TurnBench v1 submissions and preserve the official output timestamps.
+2. Add a fixed-hidden-point local evaluator with one-decision cardinality and cost-sensitive scoring.
+3. Build conversation-style-specific confusion and latency reports.
+4. Test a causal WAIT/RESPOND/CONTINUE/YIELD controller using frozen clips before live microphone access.
+5. Only after offline qualification, evaluate streaming with explicitly granted microphone permission and a local-only default.
+6. Re-run on TurnBench v2 when its hidden decision protocol is published.
+
+No TurnBench data has been downloaded in this increment. No official or local Symthaea benchmark score is claimed.

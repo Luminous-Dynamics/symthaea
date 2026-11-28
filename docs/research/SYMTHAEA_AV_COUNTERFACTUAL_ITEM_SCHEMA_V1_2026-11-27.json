@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:symthaea:av-counterfactual-item:v1",
+  "title": "Symthaea counterfactual audiovisual benchmark item v1",
+  "description": "A privacy-minimized manifest for paired audiovisual counterfactual trials. Cross-condition identity and timing invariants require a separate verifier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "item_id",
+    "pair_id",
+    "task_family",
+    "task_requires_visual_evidence",
+    "baseline_audio_digest",
+    "baseline_timing_profile",
+    "gold_decision",
+    "conditions"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.av-counterfactual-item.v1"
+    },
+    "item_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "pair_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "task_family": {
+      "enum": [
+        "turn_floor_state",
+        "backchannel",
+        "attention_gaze",
+        "gesture_cue",
+        "shared_referent",
+        "temporal_alignment"
+      ]
+    },
+    "task_requires_visual_evidence": {
+      "type": "boolean"
+    },
+    "baseline_audio_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "baseline_timing_profile": {
+      "$ref": "#/$defs/timing"
+    },
+    "gold_decision": {
+      "enum": [
+        "wait",
+        "respond",
+        "continue",
+        "yield",
+        "acknowledge",
+        "refer_to_shared_object",
+        "abstain"
+      ]
+    },
+    "gold_decision_when_visual_counterfactual": {
+      "enum": [
+        "wait",
+        "respond",
+        "continue",
+        "yield",
+        "acknowledge",
+        "refer_to_shared_object",
+        "abstain"
+      ]
+    },
+    "conditions": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/condition"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "duration_ms",
+        "frame_count",
+        "width",
+        "height",
+        "fps_numerator",
+        "fps_denominator"
+      ],
+      "properties": {
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600000
+        },
+        "frame_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "fps_numerator": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 240000
+        },
+        "fps_denominator": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition_id",
+        "condition_type",
+        "audio_digest",
+        "video_digest",
+        "timing_profile",
+        "visual_variant",
+        "annotated_visual_cue",
+        "expected_decision",
+        "model_visible_payloads"
+      ],
+      "properties": {
+        "condition_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "condition_type": {
+          "enum": [
+            "av_positive",
+            "av_counterfactual",
+            "av_irrelevant_control",
+            "audio_only",
+            "video_only",
+            "av_temporally_shuffled"
+          ]
+        },
+        "audio_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "video_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timing_profile": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/timing"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visual_variant": {
+          "enum": [
+            "cue_present",
+            "cue_removed",
+            "cue_substituted",
+            "irrelevant_appearance_change",
+            "irrelevant_background_change",
+            "none",
+            "temporally_shuffled"
+          ]
+        },
+        "annotated_visual_cue": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cue_type",
+                "start_ms",
+                "end_ms",
+                "task_relevance"
+              ],
+              "properties": {
+                "cue_type": {
+                  "enum": [
+                    "turn_yield",
+                    "backchannel",
+                    "gaze_shift",
+                    "gesture",
+                    "shared_referent",
+                    "other"
+                  ]
+                },
+                "start_ms": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "end_ms": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "task_relevance": {
+                  "type": "boolean"
+                }
+              }
+            }
+          ]
+        },
+        "expected_decision": {
+          "enum": [
+            "wait",
+            "respond",
+            "continue",
+            "yield",
+            "acknowledge",
+            "refer_to_shared_object",
+            "abstain"
+          ]
+        },
+        "model_visible_payloads": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "audio",
+              "video"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "condition_type": {
+                "const": "audio_only"
+              }
+            },
+            "required": [
+              "condition_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "audio_digest": {
+                "$ref": "#/$defs/digest"
+              },
+              "video_digest": {
+                "type": "null"
+              },
+              "timing_profile": {
+                "type": "null"
+              },
+              "visual_variant": {
+                "const": "none"
+              },
+              "annotated_visual_cue": {
+                "type": "null"
+              },
+              "model_visible_payloads": {
+                "const": [
+                  "audio"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "condition_type": {
+                "const": "video_only"
+              }
+            },
+            "required": [
+              "condition_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "audio_digest": {
+                "type": "null"
+              },
+              "video_digest": {
+                "$ref": "#/$defs/digest"
+              },
+              "timing_profile": {
+                "$ref": "#/$defs/timing"
+              },
+              "model_visible_payloads": {
+                "const": [
+                  "video"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "condition_type": {
+                "enum": [
+                  "av_positive",
+                  "av_counterfactual",
+                  "av_irrelevant_control",
+                  "av_temporally_shuffled"
+                ]
+              }
+            },
+            "required": [
+              "condition_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "audio_digest": {
+                "$ref": "#/$defs/digest"
+              },
+              "video_digest": {
+                "$ref": "#/$defs/digest"
+              },
+              "timing_profile": {
+                "$ref": "#/$defs/timing"
+              },
+              "model_visible_payloads": {
+                "const": [
+                  "audio",
+                  "video"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

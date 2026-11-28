@@ -15,6 +15,10 @@ use crate::crop::extract_crop;
 use crate::types::{
     FoveationConfig, FoveationRequest, FoveationResult, FoveationTelemetry, FrameBuffer,
 };
+use crate::temporal_budget::{
+    TemporalBudgetDecision, TemporalFoveationBudget, TemporalFoveationConfig,
+    TemporalFoveationError, TemporalTrigger,
+};
 
 /// Prioritized request wrapper for the BinaryHeap (highest surprise first).
 #[derive(Debug)]
@@ -70,9 +74,12 @@ pub struct FoveationManager {
     // Neuromodulated effective parameters (updated via modulate())
     effective_surprise_threshold: f32,
     effective_max_concurrent: usize,
+    // Optional event-triggered temporal ROI budget; disabled by default.
+    temporal_budget: Option<TemporalFoveationBudget>,
     // Telemetry counters
     total_dispatched: u64,
     total_completed: u64,
+    temporal_stale_dropped: u64,
     avg_processing_time_us: f32,
     last_confidence: f32,
 }
@@ -95,8 +102,10 @@ impl FoveationManager {
             patch_size,
             effective_surprise_threshold,
             effective_max_concurrent,
+            temporal_budget: None,
             total_dispatched: 0,
             total_completed: 0,
+            temporal_stale_dropped: 0,
             avg_processing_time_us: 0.0,
             last_confidence: 0.0,
         }
@@ -140,8 +149,30 @@ impl FoveationManager {
     /// 1. Collects any completed in-flight results
     /// 2. Dispatches the highest-priority pending request (if budget allows)
     pub fn tick(&mut self, now_us: u64) {
-        // Collect completed results
-        self.collect_results();
+        // Collect completed results and discard stale ones when temporal
+        // qualification is enabled.
+        self.collect_results(now_us);
+
+        // The manager only retains the newest full-resolution frame. A queued
+        // saliency request from an older frame must never be cropped from the
+        // new buffer and then falsely labelled with the old frame identity.
+        let current_frame_id = self.frame_buffer.as_ref().map(|frame| frame.frame_id);
+        let maximum_age = self.temporal_budget.as_ref().map(|budget| budget.max_roi_age_us());
+        loop {
+            let stale = self.pending.peek().is_some_and(|request| {
+                let frame_mismatch = current_frame_id != Some(request.frame_id);
+                let age_mismatch = maximum_age.is_some_and(|maximum| {
+                    request.timestamp_us > now_us
+                        || now_us.saturating_sub(request.timestamp_us) > maximum
+                });
+                frame_mismatch || age_mismatch
+            });
+            if !stale {
+                break;
+            }
+            self.pending.pop();
+            self.temporal_stale_dropped = self.temporal_stale_dropped.saturating_add(1);
+        }
 
         // Check dispatch budget (uses neuromodulated effective value)
         if self.in_flight.len() >= self.effective_max_concurrent {
@@ -151,6 +182,42 @@ impl FoveationManager {
         let cooldown_us = self.config.cooldown_ms * 1000;
         if now_us.saturating_sub(self.last_dispatch_us) < cooldown_us {
             return;
+        }
+
+        // Optional temporal budget gates ROI work without changing upstream
+        // capture cadence or granting camera/sensor permissions.
+        let mut temporal_pixel_cost = None;
+        if !self.pending.is_empty() {
+            if let Some(budget) = self.temporal_budget.as_mut() {
+                let Some(frame) = self.frame_buffer.as_ref() else {
+                    return;
+                };
+                // One patch plus one patch of context on each side. This
+                // intentionally budgets ROI pixels, not full-frame FPS.
+                let width = self.patch_size.saturating_mul(3).min(frame.width as usize);
+                let height = self.patch_size.saturating_mul(3).min(frame.height as usize);
+                let estimated_pixels = width.saturating_mul(height) as u64;
+                let source_timestamp_us = self.pending.peek().map_or(now_us, |request| request.timestamp_us);
+                match budget.decide(
+                    now_us,
+                    source_timestamp_us,
+                    estimated_pixels,
+                    self.in_flight.len(),
+                ) {
+                    Ok(TemporalBudgetDecision::Dispatch { pixel_cost, .. }) => {
+                        temporal_pixel_cost = Some(pixel_cost);
+                    }
+                    Ok(TemporalBudgetDecision::StaleEvidence { .. }) => {
+                        self.pending.pop();
+                        self.temporal_stale_dropped = self.temporal_stale_dropped.saturating_add(1);
+                        return;
+                    }
+                    Ok(TemporalBudgetDecision::Defer { .. })
+                    | Ok(TemporalBudgetDecision::BudgetExhausted { .. })
+                    | Ok(TemporalBudgetDecision::ConcurrencyLimited { .. })
+                    | Err(_) => return,
+                }
+            }
         }
 
         // Dispatch highest-priority pending request
@@ -186,6 +253,16 @@ impl FoveationManager {
 
                 match self.channel.request(request) {
                     Ok(rx) => {
+                        if let Some(pixel_cost) = temporal_pixel_cost {
+                            // Charge the pre-downscale ROI estimate used in decide(),
+                            // not the smaller output dimensions after crop resizing.
+                            let budget_commit_failed = self.temporal_budget.as_mut()
+                                .is_some_and(|budget| budget.record_dispatch(now_us, pixel_cost).is_err());
+                            if budget_commit_failed {
+                                tracing::warn!("temporal foveation budget invariant failed; disabling optional policy");
+                                self.temporal_budget = None;
+                            }
+                        }
                         self.in_flight.push(rx);
                         self.last_dispatch_us = now_us;
                         self.total_dispatched += 1;
@@ -199,14 +276,25 @@ impl FoveationManager {
         }
     }
 
-    /// Collect completed results from in-flight receivers.
-    fn collect_results(&mut self) {
+    /// Collect completed results from in-flight receivers. When the optional
+    /// temporal policy is enabled, results older than its source-clock horizon
+    /// are dropped instead of injected as current conversational evidence.
+    fn collect_results(&mut self, now_us: u64) {
+        let maximum_age = self.temporal_budget.as_ref().map(|budget| budget.max_roi_age_us());
         let mut still_in_flight = Vec::new();
 
         for rx in self.in_flight.drain(..) {
             match rx.try_recv() {
                 Ok(result) => {
                     self.total_completed += 1;
+                    let stale = maximum_age.is_some_and(|maximum| {
+                        result.source_timestamp_us > now_us
+                            || now_us.saturating_sub(result.source_timestamp_us) > maximum
+                    });
+                    if stale {
+                        self.temporal_stale_dropped = self.temporal_stale_dropped.saturating_add(1);
+                        continue;
+                    }
                     // Exponential moving average of processing time
                     let alpha = 0.2;
                     self.avg_processing_time_us = self.avg_processing_time_us * (1.0 - alpha)
@@ -215,7 +303,6 @@ impl FoveationManager {
                     self.results.push_back(result);
                 }
                 Err(mpsc::TryRecvError::Empty) => {
-                    // Still processing
                     still_in_flight.push(rx);
                 }
                 Err(mpsc::TryRecvError::Disconnected) => {
@@ -227,8 +314,28 @@ impl FoveationManager {
         self.in_flight = still_in_flight;
     }
 
-    /// Drain all ready results for GWT injection.
+    /// Drain all ready results for GWT injection using legacy freshness
+    /// behavior. Call `drain_results_at` when the temporal budget is enabled
+    /// and the consumer needs a current-time freshness check.
     pub fn drain_results(&mut self) -> Vec<FoveationResult> {
+        self.results.drain(..).collect()
+    }
+
+    /// Drain results while rechecking source-clock freshness at the point of
+    /// injection. This closes the gap where a result was fresh when collected
+    /// but sat in the ready queue long enough to become stale before GWT use.
+    pub fn drain_results_at(&mut self, now_us: u64) -> Vec<FoveationResult> {
+        let maximum_age = self.temporal_budget.as_ref().map(|budget| budget.max_roi_age_us());
+        if let Some(maximum) = maximum_age {
+            self.results.retain(|result| {
+                let fresh = result.source_timestamp_us <= now_us
+                    && now_us.saturating_sub(result.source_timestamp_us) <= maximum;
+                if !fresh {
+                    self.temporal_stale_dropped = self.temporal_stale_dropped.saturating_add(1);
+                }
+                fresh
+            });
+        }
         self.results.drain(..).collect()
     }
 
@@ -243,6 +350,49 @@ impl FoveationManager {
             avg_processing_time_us: self.avg_processing_time_us,
             last_confidence: self.last_confidence,
         }
+    }
+
+    /// Enable the optional event-triggered temporal ROI budget. This only
+    /// gates processing of frames already received by the foveation bridge;
+    /// it does not request or authorize sensor capture.
+    pub fn enable_temporal_budget(
+        &mut self,
+        config: TemporalFoveationConfig,
+        now_us: u64,
+    ) -> Result<(), TemporalFoveationError> {
+        self.temporal_budget = Some(TemporalFoveationBudget::new(config, now_us)?);
+        Ok(())
+    }
+
+    /// Disable the temporal budget and restore the legacy cooldown-only policy.
+    pub fn disable_temporal_budget(&mut self) {
+        self.temporal_budget = None;
+    }
+
+    /// Feed an upstream, already-authorized interaction/saliency event into
+    /// the ROI scheduler. Supported signals include prosody changes, turn
+    /// boundary candidates, backchannels, visual surprise and cross-modal
+    /// disagreement. Signal timestamps must use the foveation source clock.
+    pub fn notify_temporal_trigger(
+        &mut self,
+        trigger: TemporalTrigger,
+        now_us: u64,
+    ) -> Result<bool, TemporalFoveationError> {
+        match self.temporal_budget.as_mut() {
+            Some(budget) => budget.observe_trigger(trigger, now_us),
+            None => Ok(false),
+        }
+    }
+
+    /// Access temporal budget state read-only.
+    pub fn temporal_budget(&self) -> Option<&TemporalFoveationBudget> {
+        self.temporal_budget.as_ref()
+    }
+
+    /// Count of pending or completed ROI results rejected for temporal staleness
+    /// or source-frame identity mismatch.
+    pub fn temporal_stale_dropped(&self) -> u64 {
+        self.temporal_stale_dropped
     }
 
     /// Number of pending requests in the queue.
@@ -338,6 +488,109 @@ mod tests {
 
     fn default_manager() -> FoveationManager {
         FoveationManager::new(FoveationConfig::default(), 8)
+    }
+
+    #[test]
+    fn temporal_budget_gates_baseline_and_event_burst_roi_dispatch() {
+        use crate::temporal_budget::{
+            TemporalFoveationConfig, TemporalTrigger, TemporalTriggerKind,
+        };
+
+        let mut mgr = default_manager();
+        mgr.enable_temporal_budget(TemporalFoveationConfig::default(), 0)
+            .unwrap();
+        mgr.on_frame(make_frame(64, 64, 128));
+        mgr.on_saliency(&[(2, 3, 0.8, [0.5, -0.2])]);
+        mgr.tick(1_000_000);
+        assert_eq!(mgr.total_dispatched, 1);
+
+        // A second high-saliency ROI is queued, but the baseline cadence is 1 Hz.
+        mgr.on_frame(make_frame(64, 64, 129));
+        mgr.on_saliency(&[(2, 3, 0.9, [0.5, -0.2])]);
+        mgr.tick(1_100_000);
+        assert_eq!(mgr.total_dispatched, 1);
+        assert_eq!(mgr.pending_count(), 1);
+
+        // A high-urgency interaction event changes only the ROI dispatch cadence.
+        mgr.notify_temporal_trigger(TemporalTrigger {
+            id: "turn-boundary-1".to_owned(),
+            timestamp_us: 1_150_000,
+            kind: TemporalTriggerKind::TurnBoundaryCandidate,
+            urgency: 0.95,
+        }, 1_150_000).unwrap();
+        mgr.tick(1_249_999);
+        assert_eq!(mgr.total_dispatched, 1);
+        mgr.tick(1_250_000);
+        assert_eq!(mgr.total_dispatched, 2);
+    }
+
+    #[test]
+    fn temporal_budget_charges_pre_downscale_roi_pixel_work() {
+        use crate::temporal_budget::TemporalFoveationConfig;
+
+        let config = FoveationConfig {
+            max_crop_pixels: 256,
+            ..FoveationConfig::default()
+        };
+        let mut mgr = FoveationManager::new(config, 128);
+        mgr.enable_temporal_budget(
+            TemporalFoveationConfig {
+                pixel_token_capacity: 200_000,
+                pixel_tokens_per_second: 1,
+                ..TemporalFoveationConfig::default()
+            },
+            0,
+        ).unwrap();
+        mgr.on_frame(make_frame(512, 512, 128));
+        mgr.on_saliency(&[(1, 1, 0.9, [0.0, 0.0])]);
+        mgr.tick(1_000_000);
+
+        // The padded source ROI is 384x384 = 147,456 pixels, even though the
+        // cropper downsizes it to the 256-pixel output budget before dispatch.
+        assert_eq!(
+            mgr.temporal_budget().unwrap().tokens_remaining(),
+            200_000 - (384 * 384)
+        );
+        assert_eq!(mgr.total_dispatched, 1);
+    }
+
+    #[test]
+    fn temporal_budget_drops_old_pending_roi_instead_of_dispatching_stale_evidence() {
+        use crate::temporal_budget::TemporalFoveationConfig;
+
+        let mut mgr = default_manager();
+        mgr.enable_temporal_budget(TemporalFoveationConfig::default(), 0).unwrap();
+        mgr.on_frame(make_frame(64, 64, 128));
+        mgr.on_saliency(&[(2, 3, 0.9, [0.0, 0.0])]);
+        mgr.tick(1_600_001);
+        assert_eq!(mgr.total_dispatched, 0);
+        assert_eq!(mgr.pending_count(), 0);
+        assert_eq!(mgr.temporal_stale_dropped(), 1);
+    }
+
+    #[test]
+    fn queued_roi_is_not_cropped_from_a_different_frame() {
+        let mut mgr = default_manager();
+        mgr.on_frame(make_frame(64, 64, 128));
+        mgr.on_saliency(&[(2, 3, 0.9, [0.0, 0.0])]);
+        let mut newer = make_frame(64, 64, 129);
+        newer.frame_id = 2;
+        mgr.on_frame(newer);
+        mgr.tick(1_000_000);
+        assert_eq!(mgr.total_dispatched, 0);
+        assert_eq!(mgr.pending_count(), 0);
+        assert_eq!(mgr.temporal_stale_dropped(), 1);
+    }
+
+    #[test]
+    fn temporal_budget_is_disabled_by_default_and_can_be_removed() {
+        let mut mgr = default_manager();
+        assert!(mgr.temporal_budget().is_none());
+        mgr.enable_temporal_budget(TemporalFoveationConfig::default(), 0)
+            .unwrap();
+        assert!(mgr.temporal_budget().is_some());
+        mgr.disable_temporal_budget();
+        assert!(mgr.temporal_budget().is_none());
     }
 
     #[test]

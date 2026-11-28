@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+
+[package]
+name = "symthaea-soma-bevy"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Isolated Bevy 0.20.1 renderer adapter for Symthaea Soma scene frames"
+
+[dependencies]
+bevy = { version = "=0.20.1", default-features = false, features = ["2d"] }
+symthaea-soma = { path = "../../crates/domains/symthaea-soma", default-features = false }

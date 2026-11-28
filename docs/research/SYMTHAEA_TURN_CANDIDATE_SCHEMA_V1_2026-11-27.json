@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea/turn-candidate-v1.json",
+  "title": "Symthaea Turn Candidate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "sequence",
+    "clock_domain_id",
+    "observed_at_monotonic_ns",
+    "expires_at_monotonic_ns",
+    "action",
+    "confidence",
+    "calibration_id"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "clock_domain_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "observed_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "expires_at_monotonic_ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "wait",
+        "respond",
+        "continue",
+        "yield"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "calibration_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    }
+  }
+}

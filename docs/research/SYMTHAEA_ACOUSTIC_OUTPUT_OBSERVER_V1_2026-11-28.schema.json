@@ -1,0 +1,566 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea-acoustic-output-observer-v1.schema.json",
+  "title": "Symthaea Acoustic Output Observation v1",
+  "description": "A privacy-minimized measurement record. It is evidence input, not a stop verdict or attestation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "observation_id",
+    "observation_sequence",
+    "output_lane",
+    "observer",
+    "sensor",
+    "clock",
+    "interval",
+    "signal",
+    "coverage",
+    "binding",
+    "raw_window_digest",
+    "previous_record_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-acoustic-output-observer-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observation_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_lane": {
+      "enum": [
+        "software_loopback",
+        "physical_acoustic"
+      ]
+    },
+    "observer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observer_id",
+        "software_digest",
+        "process_boundary"
+      ],
+      "properties": {
+        "observer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "software_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "process_boundary": {
+          "enum": [
+            "same_process",
+            "separate_process_same_host",
+            "separate_device",
+            "external_recorder"
+          ]
+        },
+        "host_identity_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "sensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sensor_id",
+        "sensor_type",
+        "model",
+        "position",
+        "sample_rate_hz",
+        "channel_count",
+        "measurement_metric",
+        "measurement_window_ms",
+        "calibration_record_digest",
+        "calibration_status",
+        "calibration_valid_until_utc",
+        "detection_rule_id"
+      ],
+      "properties": {
+        "sensor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sensor_type": {
+          "enum": [
+            "pipewire_sink_monitor",
+            "alsa_loopback",
+            "speaker_line_tap",
+            "measurement_microphone",
+            "sound_level_meter",
+            "other"
+          ]
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "position": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "channel_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "measurement_metric": {
+          "enum": [
+            "pcm_peak",
+            "pcm_rms",
+            "laeq",
+            "lceq",
+            "cross_correlation",
+            "energy_ratio",
+            "other"
+          ]
+        },
+        "measurement_window_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "calibration_record_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "calibration_status": {
+          "enum": [
+            "valid",
+            "expired",
+            "invalid",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "calibration_valid_until_utc": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "detection_rule_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock_id",
+        "timebase",
+        "ticks_per_second",
+        "uncertainty_ns",
+        "drift_bound_ppm",
+        "mapping_digest"
+      ],
+      "properties": {
+        "clock_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timebase": {
+          "enum": [
+            "monotonic",
+            "audio_device_frame",
+            "ptp",
+            "utc",
+            "unknown"
+          ]
+        },
+        "ticks_per_second": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "uncertainty_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "drift_bound_ppm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mapping_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_tick",
+        "end_tick",
+        "sample_count"
+      ],
+      "properties": {
+        "start_tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "metric",
+        "value",
+        "unit",
+        "threshold",
+        "attribution_method",
+        "attribution_confidence",
+        "clipped",
+        "quiet_dwell_ms"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "present",
+            "absent",
+            "unknown"
+          ]
+        },
+        "metric": {
+          "enum": [
+            "pcm_peak",
+            "pcm_rms",
+            "laeq",
+            "lceq",
+            "cross_correlation",
+            "energy_ratio",
+            "other"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "attribution_method": {
+          "enum": [
+            "direct_pcm_match",
+            "cross_correlation",
+            "channel_identity",
+            "time_window_only",
+            "unresolved"
+          ]
+        },
+        "attribution_confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "clipped": {
+          "type": "boolean"
+        },
+        "quiet_dwell_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "dropped_samples",
+        "overrun_count",
+        "noise_floor_valid",
+        "clock_continuity"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "lost"
+          ]
+        },
+        "dropped_samples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overrun_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "noise_floor_valid": {
+          "type": "boolean"
+        },
+        "clock_continuity": {
+          "type": "boolean"
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "action_id",
+        "segment_id",
+        "stop_trigger_id",
+        "output_stream_id",
+        "canonical_cue_digest",
+        "policy_version"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "segment_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stop_trigger_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "output_stream_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_cue_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_version": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "raw_window_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "previous_record_digest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "output_lane": {
+            "const": "physical_acoustic"
+          }
+        },
+        "required": [
+          "output_lane"
+        ]
+      },
+      "then": {
+        "properties": {
+          "observer": {
+            "properties": {
+              "process_boundary": {
+                "enum": [
+                  "separate_device",
+                  "external_recorder"
+                ]
+              }
+            }
+          },
+          "sensor": {
+            "properties": {
+              "sensor_type": {
+                "enum": [
+                  "measurement_microphone",
+                  "sound_level_meter"
+                ]
+              },
+              "calibration_record_digest": {
+                "$ref": "#/$defs/digest"
+              },
+              "calibration_status": {
+                "const": "valid"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "output_lane": {
+            "const": "software_loopback"
+          }
+        },
+        "required": [
+          "output_lane"
+        ]
+      },
+      "then": {
+        "properties": {
+          "sensor": {
+            "properties": {
+              "sensor_type": {
+                "enum": [
+                  "pipewire_sink_monitor",
+                  "alsa_loopback",
+                  "speaker_line_tap"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "signal": {
+            "properties": {
+              "state": {
+                "const": "absent"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        },
+        "required": [
+          "signal"
+        ]
+      },
+      "then": {
+        "properties": {
+          "signal": {
+            "properties": {
+              "value": {
+                "type": "number"
+              },
+              "threshold": {
+                "type": "number"
+              },
+              "attribution_method": {
+                "enum": [
+                  "direct_pcm_match",
+                  "cross_correlation",
+                  "channel_identity"
+                ]
+              },
+              "clipped": {
+                "const": false
+              }
+            }
+          },
+          "coverage": {
+            "properties": {
+              "status": {
+                "const": "complete"
+              },
+              "noise_floor_valid": {
+                "const": true
+              },
+              "clock_continuity": {
+                "const": true
+              },
+              "dropped_samples": {
+                "const": 0
+              },
+              "overrun_count": {
+                "const": 0
+              }
+            },
+            "required": [
+              "status",
+              "noise_floor_valid",
+              "clock_continuity",
+              "dropped_samples",
+              "overrun_count"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^(sha256|blake3):[0-9a-f]{64}$"
+    }
+  }
+}

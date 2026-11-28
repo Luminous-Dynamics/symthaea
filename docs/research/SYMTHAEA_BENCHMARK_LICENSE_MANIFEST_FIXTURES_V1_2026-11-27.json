@@ -1,0 +1,306 @@
+{
+  "schema": "symthaea.benchmark-license-manifest-fixtures.v1",
+  "warning": "All grants and rights holders in these fixtures are fictional test values and do not represent actual access, legal permission, or approval.",
+  "positive": [
+    {
+      "name": "fictional-consented-corpus-commercial-evaluation",
+      "expected": "accept",
+      "manifest": {
+        "schema": "symthaea.benchmark-license-manifest.v1",
+        "dataset_id": "fixture-consented-av-corpus",
+        "dataset_version": "v1.0.0",
+        "dataset_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_uri": "urn:symthaea:fixture:consented-av-corpus:v1",
+        "rights_holder": "Fixture Rights Holder - not a real grant",
+        "license_id": "fixture-commercial-research-license",
+        "license_version": "v1",
+        "access_status": "approved",
+        "access_grant_ref": "fixture-only-grant-not-valid",
+        "approved_at": "2026-11-27T00:00:00Z",
+        "expires_at": "2027-11-27T00:00:00Z",
+        "approved_intended_uses": [
+          "noncommercial_research",
+          "commercial_evaluation",
+          "commercial_development"
+        ],
+        "permitted_operations": [
+          "evaluation",
+          "derivative_media",
+          "publication",
+          "commercial_use"
+        ],
+        "intended_use": "commercial_development",
+        "commercial_use_authorized": true,
+        "training_use_authorized": false,
+        "derivative_media_authorized": true,
+        "redistribution_authorized": false,
+        "publication_authorized": true,
+        "permitted_transformations": [
+          "annotation_only",
+          "trim",
+          "temporal_shuffle",
+          "counterfactual_visual_substitution"
+        ],
+        "raw_media_stored_in_repo": false,
+        "model_terms_ref": "fixture-model-terms-v1",
+        "retention_policy_ref": "fixture-retention-policy-v1",
+        "deletion_policy_ref": "fixture-deletion-policy-v1",
+        "approval_record_ref": "fixture-only-approval-record"
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "commercial-use-of-noncommercial-videofdb",
+      "expected_rejection": "intended_use_outside_license",
+      "manifest": {
+        "schema": "symthaea.benchmark-license-manifest.v1",
+        "dataset_id": "video-fdb-v1.0.0",
+        "dataset_version": "v1.0.0",
+        "dataset_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_uri": "urn:symthaea:fixture:consented-av-corpus:v1",
+        "rights_holder": "Fixture Rights Holder - not a real grant",
+        "license_id": "nvidia-video-evaluation-license",
+        "license_version": "fixture-ref",
+        "access_status": "approved",
+        "access_grant_ref": "fixture-only-grant-not-valid",
+        "approved_at": "2026-11-27T00:00:00Z",
+        "expires_at": "2027-11-27T00:00:00Z",
+        "approved_intended_uses": [
+          "noncommercial_research"
+        ],
+        "permitted_operations": [
+          "evaluation"
+        ],
+        "intended_use": "commercial_development",
+        "commercial_use_authorized": false,
+        "training_use_authorized": false,
+        "derivative_media_authorized": false,
+        "redistribution_authorized": false,
+        "publication_authorized": false,
+        "permitted_transformations": [
+          "annotation_only"
+        ],
+        "raw_media_stored_in_repo": false,
+        "model_terms_ref": "fixture-model-terms-v1",
+        "retention_policy_ref": "fixture-retention-policy-v1",
+        "deletion_policy_ref": "fixture-deletion-policy-v1",
+        "approval_record_ref": "fixture-only-approval-record"
+      }
+    },
+    {
+      "name": "training-on-evaluation-only-dataset",
+      "expected_rejection": "training_not_authorized",
+      "manifest": {
+        "schema": "symthaea.benchmark-license-manifest.v1",
+        "dataset_id": "video-fdb-v1.0.0",
+        "dataset_version": "v1.0.0",
+        "dataset_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_uri": "urn:symthaea:fixture:consented-av-corpus:v1",
+        "rights_holder": "Fixture Rights Holder - not a real grant",
+        "license_id": "nvidia-video-evaluation-license",
+        "license_version": "v1",
+        "access_status": "approved",
+        "access_grant_ref": "fixture-only-grant-not-valid",
+        "approved_at": "2026-11-27T00:00:00Z",
+        "expires_at": "2027-11-27T00:00:00Z",
+        "approved_intended_uses": [
+          "noncommercial_research"
+        ],
+        "permitted_operations": [
+          "evaluation"
+        ],
+        "intended_use": "training",
+        "commercial_use_authorized": false,
+        "training_use_authorized": false,
+        "derivative_media_authorized": false,
+        "redistribution_authorized": false,
+        "publication_authorized": false,
+        "permitted_transformations": [
+          "annotation_only"
+        ],
+        "raw_media_stored_in_repo": false,
+        "model_terms_ref": "fixture-model-terms-v1",
+        "retention_policy_ref": "fixture-retention-policy-v1",
+        "deletion_policy_ref": "fixture-deletion-policy-v1",
+        "approval_record_ref": "fixture-only-approval-record"
+      }
+    },
+    {
+      "name": "counterfactual-transform-without-derivative-rights",
+      "expected_rejection": "derivative_not_authorized",
+      "manifest": {
+        "schema": "symthaea.benchmark-license-manifest.v1",
+        "dataset_id": "fixture-consented-av-corpus",
+        "dataset_version": "v1.0.0",
+        "dataset_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_uri": "urn:symthaea:fixture:consented-av-corpus:v1",
+        "rights_holder": "Fixture Rights Holder - not a real grant",
+        "license_id": "fixture-commercial-research-license",
+        "license_version": "v1",
+        "access_status": "approved",
+        "access_grant_ref": "fixture-only-grant-not-valid",
+        "approved_at": "2026-11-27T00:00:00Z",
+        "expires_at": "2027-11-27T00:00:00Z",
+        "approved_intended_uses": [
+          "noncommercial_research",
+          "commercial_evaluation",
+          "commercial_development"
+        ],
+        "permitted_operations": [
+          "evaluation"
+        ],
+        "intended_use": "commercial_development",
+        "commercial_use_authorized": true,
+        "training_use_authorized": false,
+        "derivative_media_authorized": false,
+        "redistribution_authorized": false,
+        "publication_authorized": true,
+        "permitted_transformations": [
+          "counterfactual_visual_substitution"
+        ],
+        "raw_media_stored_in_repo": false,
+        "model_terms_ref": "fixture-model-terms-v1",
+        "retention_policy_ref": "fixture-retention-policy-v1",
+        "deletion_policy_ref": "fixture-deletion-policy-v1",
+        "approval_record_ref": "fixture-only-approval-record"
+      }
+    },
+    {
+      "name": "expired-access-grant",
+      "expected_rejection": "access_not_active",
+      "manifest": {
+        "schema": "symthaea.benchmark-license-manifest.v1",
+        "dataset_id": "fixture-consented-av-corpus",
+        "dataset_version": "v1.0.0",
+        "dataset_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_uri": "urn:symthaea:fixture:consented-av-corpus:v1",
+        "rights_holder": "Fixture Rights Holder - not a real grant",
+        "license_id": "fixture-commercial-research-license",
+        "license_version": "v1",
+        "access_status": "expired",
+        "access_grant_ref": "fixture-only-grant-not-valid",
+        "approved_at": "2026-11-27T00:00:00Z",
+        "expires_at": "2026-11-26T00:00:00Z",
+        "approved_intended_uses": [
+          "noncommercial_research",
+          "commercial_evaluation",
+          "commercial_development"
+        ],
+        "permitted_operations": [
+          "evaluation",
+          "derivative_media",
+          "publication",
+          "commercial_use"
+        ],
+        "intended_use": "commercial_development",
+        "commercial_use_authorized": true,
+        "training_use_authorized": false,
+        "derivative_media_authorized": true,
+        "redistribution_authorized": false,
+        "publication_authorized": true,
+        "permitted_transformations": [
+          "annotation_only",
+          "trim",
+          "temporal_shuffle",
+          "counterfactual_visual_substitution"
+        ],
+        "raw_media_stored_in_repo": false,
+        "model_terms_ref": "fixture-model-terms-v1",
+        "retention_policy_ref": "fixture-retention-policy-v1",
+        "deletion_policy_ref": "fixture-deletion-policy-v1",
+        "approval_record_ref": "fixture-only-approval-record"
+      }
+    },
+    {
+      "name": "raw-media-in-public-git",
+      "expected_rejection": "raw_media_repository_violation",
+      "manifest": {
+        "schema": "symthaea.benchmark-license-manifest.v1",
+        "dataset_id": "fixture-consented-av-corpus",
+        "dataset_version": "v1.0.0",
+        "dataset_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_uri": "urn:symthaea:fixture:consented-av-corpus:v1",
+        "rights_holder": "Fixture Rights Holder - not a real grant",
+        "license_id": "fixture-commercial-research-license",
+        "license_version": "v1",
+        "access_status": "approved",
+        "access_grant_ref": "fixture-only-grant-not-valid",
+        "approved_at": "2026-11-27T00:00:00Z",
+        "expires_at": "2027-11-27T00:00:00Z",
+        "approved_intended_uses": [
+          "noncommercial_research",
+          "commercial_evaluation",
+          "commercial_development"
+        ],
+        "permitted_operations": [
+          "evaluation",
+          "derivative_media",
+          "publication",
+          "commercial_use"
+        ],
+        "intended_use": "commercial_development",
+        "commercial_use_authorized": true,
+        "training_use_authorized": false,
+        "derivative_media_authorized": true,
+        "redistribution_authorized": false,
+        "publication_authorized": true,
+        "permitted_transformations": [
+          "annotation_only",
+          "trim",
+          "temporal_shuffle",
+          "counterfactual_visual_substitution"
+        ],
+        "raw_media_stored_in_repo": true,
+        "model_terms_ref": "fixture-model-terms-v1",
+        "retention_policy_ref": "fixture-retention-policy-v1",
+        "deletion_policy_ref": "fixture-deletion-policy-v1",
+        "approval_record_ref": "fixture-only-approval-record"
+      }
+    },
+    {
+      "name": "intended-use-not-in-approved-scope",
+      "expected_rejection": "intended_use_outside_approved_scope",
+      "manifest": {
+        "schema": "symthaea.benchmark-license-manifest.v1",
+        "dataset_id": "fixture-consented-av-corpus",
+        "dataset_version": "v1.0.0",
+        "dataset_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_uri": "urn:symthaea:fixture:consented-av-corpus:v1",
+        "rights_holder": "Fixture Rights Holder - not a real grant",
+        "license_id": "fixture-commercial-research-license",
+        "license_version": "v1",
+        "access_status": "approved",
+        "access_grant_ref": "fixture-only-grant-not-valid",
+        "approved_at": "2026-11-27T00:00:00Z",
+        "expires_at": "2027-11-27T00:00:00Z",
+        "approved_intended_uses": [
+          "noncommercial_research"
+        ],
+        "permitted_operations": [
+          "evaluation",
+          "derivative_media",
+          "publication",
+          "commercial_use"
+        ],
+        "intended_use": "commercial_development",
+        "commercial_use_authorized": true,
+        "training_use_authorized": false,
+        "derivative_media_authorized": true,
+        "redistribution_authorized": false,
+        "publication_authorized": true,
+        "permitted_transformations": [
+          "annotation_only",
+          "trim",
+          "temporal_shuffle",
+          "counterfactual_visual_substitution"
+        ],
+        "raw_media_stored_in_repo": false,
+        "model_terms_ref": "fixture-model-terms-v1",
+        "retention_policy_ref": "fixture-retention-policy-v1",
+        "deletion_policy_ref": "fixture-deletion-policy-v1",
+        "approval_record_ref": "fixture-only-approval-record"
+      }
+    }
+  ]
+}

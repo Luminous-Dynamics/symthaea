@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea.roi-calibration-report.v1.json",
+  "title": "Symthaea ROI calibration report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "report_id",
+    "model_digest",
+    "task_family",
+    "calibration_dataset_digest",
+    "evaluation_dataset_digest",
+    "calibration_split_digest",
+    "evaluation_split_digest",
+    "calibration_sample_count",
+    "evaluation_sample_count",
+    "bins",
+    "loss_bound_confidence_level",
+    "loss_bound_observations",
+    "expected_calibration_error",
+    "brier_score",
+    "report_digest"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.roi-calibration-report.v1"
+    },
+    "report_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "model_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "task_family": {
+      "$ref": "#/$defs/identifier"
+    },
+    "calibration_dataset_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "evaluation_dataset_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "calibration_split_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "evaluation_split_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "calibration_sample_count": {
+      "type": "integer",
+      "minimum": 100
+    },
+    "evaluation_sample_count": {
+      "type": "integer",
+      "minimum": 100
+    },
+    "bins": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/bin"
+      }
+    },
+    "loss_bound_confidence_level": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 0.999
+    },
+    "loss_bound_observations": {
+      "type": "array",
+      "minItems": 100,
+      "items": {
+        "$ref": "#/$defs/lossBoundObservation"
+      }
+    },
+    "expected_calibration_error": {
+      "$ref": "#/$defs/unit"
+    },
+    "brier_score": {
+      "$ref": "#/$defs/unit"
+    },
+    "report_digest": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "unit": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "bin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_count",
+        "mean_confidence",
+        "observed_accuracy",
+        "mean_brier_score"
+      ],
+      "properties": {
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mean_confidence": {
+          "$ref": "#/$defs/unit"
+        },
+        "observed_accuracy": {
+          "$ref": "#/$defs/unit"
+        },
+        "mean_brier_score": {
+          "$ref": "#/$defs/unit"
+        }
+      }
+    },
+    "lossBoundObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluation_item_id",
+        "independent_cluster_token",
+        "claimed_loss_reduction_lcb",
+        "realized_loss_reduction"
+      ],
+      "properties": {
+        "evaluation_item_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "independent_cluster_token": {
+          "$ref": "#/$defs/identifier"
+        },
+        "claimed_loss_reduction_lcb": {
+          "$ref": "#/$defs/unit"
+        },
+        "realized_loss_reduction": {
+          "$ref": "#/$defs/unit"
+        }
+      }
+    }
+  }
+}

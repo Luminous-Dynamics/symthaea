@@ -1,0 +1,129 @@
+{
+  "schema_version": "symthaea.scene-transition-fixtures.v1",
+  "description": "Pure transition planner scenarios. All target/source permits must still be rechecked by the host before each rendered frame.",
+  "positive": [
+    {
+      "id": "initial_scene",
+      "source": null,
+      "target": {
+        "form": "living_constellation",
+        "privacy_class": "public",
+        "grant_id": "grant-v1",
+        "intensity": 0.8,
+        "source_expiry_ns": null,
+        "target_expiry_ns": "1000",
+        "same_digest": true,
+        "sequence": 1
+      },
+      "expected_kind": "initial",
+      "expected_duration_ns": 0
+    },
+    {
+      "id": "same_cue_cross_form",
+      "source": {
+        "form": "living_constellation",
+        "privacy_class": "public",
+        "grant_id": "grant-v1",
+        "intensity": 0.8,
+        "source_expiry_ns": "1000",
+        "same_digest": true,
+        "sequence": 1
+      },
+      "target": {
+        "form": "puppet_theatre",
+        "privacy_class": "public",
+        "grant_id": "grant-v1",
+        "intensity": 0.8,
+        "target_expiry_ns": "1200",
+        "same_digest": true,
+        "sequence": 1
+      },
+      "expected_kind": "cross_form_same_cue",
+      "expected_duration_ns": 180000000
+    },
+    {
+      "id": "new_cue_cross_form",
+      "source": {
+        "form": "living_constellation",
+        "privacy_class": "public",
+        "grant_id": "grant-v1",
+        "intensity": 0.8,
+        "source_expiry_ns": "1000",
+        "same_digest": false,
+        "sequence": 1
+      },
+      "target": {
+        "form": "mycelial_being",
+        "privacy_class": "public",
+        "grant_id": "grant-v1",
+        "intensity": 0.8,
+        "target_expiry_ns": "1200",
+        "same_digest": false,
+        "sequence": 2
+      },
+      "expected_kind": "cross_form_new_cue",
+      "expected_duration_ns": 180000000
+    },
+    {
+      "id": "same_form_update",
+      "source": {
+        "form": "living_constellation",
+        "privacy_class": "public",
+        "grant_id": "grant-v1",
+        "intensity": 0.8,
+        "source_expiry_ns": "1000",
+        "same_digest": false,
+        "sequence": 1
+      },
+      "target": {
+        "form": "living_constellation",
+        "privacy_class": "public",
+        "grant_id": "grant-v1",
+        "intensity": 0.8,
+        "target_expiry_ns": "1200",
+        "same_digest": false,
+        "sequence": 2
+      },
+      "expected_kind": "same_form_update",
+      "expected_duration_ns": 90000000
+    }
+  ],
+  "negative": [
+    {
+      "id": "grant_change",
+      "expected_kind": "hard_cut"
+    },
+    {
+      "id": "privacy_class_change",
+      "expected_kind": "hard_cut"
+    },
+    {
+      "id": "reduced_intensity",
+      "expected_kind": "hard_cut"
+    },
+    {
+      "id": "static_motion",
+      "expected_kind": "hard_cut"
+    },
+    {
+      "id": "source_expired",
+      "expected_kind": "hard_cut"
+    },
+    {
+      "id": "target_expired",
+      "expected_error": "target_expired"
+    },
+    {
+      "id": "same_event_digest_changed",
+      "expected_error": "event_content_mismatch"
+    },
+    {
+      "id": "sequence_regression",
+      "expected_error": "sequence_regression"
+    },
+    {
+      "id": "clock_domain_mismatch",
+      "expected_error": "wrong_clock_domain"
+    }
+  ]
+}

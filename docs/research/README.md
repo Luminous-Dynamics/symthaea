@@ -22,6 +22,92 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 
 ---
 
+
+## Current embodiment research (2026-11-27)
+
+The polyembodiment programme treats the digital avatar, puppets, abstract forms,
+and future physical companions as adapters for one renderer-neutral semantic
+event contract.
+
+- [Polyembodiment architecture](SYMTHAEA_POLYEMBODIMENT_ARCHITECTURE_V0_1_2026-11-27.md)
+- [Embodiment benchmark plan](SYMTHAEA_EMBODIMENT_BENCHMARK_PLAN_V0_1_2026-11-27.md)
+- [Dynamic temporal attention](SYMTHAEA_DYNAMIC_TEMPORAL_ATTENTION_V0_1_2026-11-27.md)
+- [Consent and presentation policy](SYMTHAEA_EMBODIMENT_CONSENT_POLICY_V0_1_2026-11-27.md)
+- [Deterministic scene compiler](SYMTHAEA_EMBODIMENT_SCENE_COMPILER_V0_1_2026-11-27.md)
+- [Bevy 0.20.1 renderer adapter](../../renderers/symthaea-soma-bevy/README.md)
+- [Scene frame schema](SYMTHAEA_EMBODIMENT_SCENE_SCHEMA_V1_2026-11-27.json)
+- [Scene frame fixtures](SYMTHAEA_EMBODIMENT_SCENE_FIXTURES_V1_2026-11-27.json)
+- [Phase-anchored action timeline](SYMTHAEA_PHASE_ANCHORED_ACTION_TIMELINE_V0_1_2026-11-28.md)
+- [ROI calibration report verifier](SYMTHAEA_ROI_CALIBRATION_REPORT_V1_2026-11-28.md)
+- [ROI calibration report schema](SYMTHAEA_ROI_CALIBRATION_REPORT_SCHEMA_V1_2026-11-28.json)
+- [Typed scene-graph renderer bridge](SYMTHAEA_TYPED_SCENE_GRAPH_RENDERER_BRIDGE_V0_1_2026-11-28.md)
+- [Competitive strategy and qualification scorecard](SYMTHAEA_POLYEMBODIMENT_COMPETITIVE_STRATEGY_V0_1_2026-11-28.md)
+- [Multi-party addressee and silence benchmark](SYMTHAEA_MULTIPARTY_CONTROL_BENCHMARK_V1_2026-11-28.md)
+- [Continuous-stream engagement benchmark](SYMTHAEA_CONTINUOUS_STREAM_ENGAGEMENT_BENCHMARK_V1_2026-11-28.md)
+- [Continuous-stream opportunity/prediction schema](SYMTHAEA_STREAM_ENGAGEMENT_SCHEMA_V1_2026-11-28.json)
+- [False-positive-constrained floor transition benchmark](SYMTHAEA_FLOOR_TRANSITION_BENCHMARK_V1_2026-11-28.md)
+- [Floor transition evaluation schema](SYMTHAEA_FLOOR_TRANSITION_SCHEMA_V1_2026-11-28.json)
+- [Presentation outcome receipts](SYMTHAEA_PRESENTATION_OUTCOME_RECEIPTS_V0_1_2026-11-27.md)
+- [Compositor presentation observer](SYMTHAEA_COMPOSITOR_PRESENTATION_OBSERVER_V0_1_2026-11-27.md)
+- [Acoustic output observer protocol](SYMTHAEA_ACOUSTIC_OUTPUT_OBSERVER_V0_1_2026-11-28.md)
+- [Conversational Grounded Recovery Benchmark (CGRB)](SYMTHAEA_CONVERSATIONAL_GROUNDED_RECOVERY_BENCHMARK_V0_1_2026-11-28.md)
+- [CGRB scenario JSON Schema](SYMTHAEA_CGRB_SCENARIO_SCHEMA_V0_1_2026-11-28.json)
+- [CGRB scenario positive/negative fixtures](SYMTHAEA_CGRB_SCENARIO_FIXTURES_V0_1_2026-11-28.json)
+- [CGRB Rust state-outcome reference verifier](../../crates/domains/symthaea-soma/src/cgrb_state.rs)
+- [CGRB harness-pinned read-only oracle interface](../../crates/domains/symthaea-soma/src/cgrb_state.rs)
+- [CGRB deterministic reference world](../../crates/domains/symthaea-soma/src/cgrb_world.rs)
+- [CGRB model/evaluator scenario projection](../../crates/domains/symthaea-soma/src/cgrb_scenario.rs)
+- [Acoustic output observation JSON Schema](SYMTHAEA_ACOUSTIC_OUTPUT_OBSERVER_V1_2026-11-28.schema.json)
+- [Acoustic output observer positive/negative fixtures](SYMTHAEA_ACOUSTIC_OUTPUT_OBSERVER_FIXTURES_V1_2026-11-28.json)
+- [Wayland presentation-feedback ledger](../../crates/domains/symthaea-soma/src/embodiment_presentation_feedback.rs)
+- [Presentation receipt schema](SYMTHAEA_PRESENTATION_RECEIPT_SCHEMA_V1_2026-11-27.json)
+- [Presentation receipt fixtures](SYMTHAEA_PRESENTATION_RECEIPT_FIXTURES_V1_2026-11-27.json)
+- [Presentation grant schema](SYMTHAEA_PRESENTATION_CONSENT_GRANT_SCHEMA_V1_2026-11-27.json)
+- [Presentation grant fixtures](SYMTHAEA_PRESENTATION_CONSENT_GRANT_FIXTURES_V1_2026-11-27.json)
+- [Competitive baselines and differentiation](SYMTHAEA_EMBODIMENT_COMPETITIVE_BASELINES_V0_1_2026-11-27.md)
+- [Integrated interaction benchmark protocol](SYMTHAEA_INTERACTION_BENCH_INTEGRATION_V0_1_2026-11-27.md)
+- [Counterfactual audiovisual grounding protocol](SYMTHAEA_COUNTERFACTUAL_AV_GROUNDING_PROTOCOL_V0_1_2026-11-27.md)
+- [Counterfactual AV item JSON Schema](SYMTHAEA_AV_COUNTERFACTUAL_ITEM_SCHEMA_V1_2026-11-27.json)
+- [Counterfactual AV paired fixtures](SYMTHAEA_AV_COUNTERFACTUAL_ITEM_FIXTURES_V1_2026-11-27.json)
+- [Rust counterfactual AV manifest verifier and per-item scorer](../../crates/domains/symthaea-soma/src/embodiment_av_counterfactual.rs)
+- [Benchmark provenance and license gate](SYMTHAEA_BENCHMARK_DATA_PROVENANCE_AND_LICENSE_GATE_V0_1_2026-11-27.md)
+- [Benchmark license manifest JSON Schema](SYMTHAEA_BENCHMARK_LICENSE_MANIFEST_SCHEMA_V1_2026-11-27.json)
+- [Benchmark license manifest fixtures](SYMTHAEA_BENCHMARK_LICENSE_MANIFEST_FIXTURES_V1_2026-11-27.json)
+- [Rust benchmark license manifest gate](../../crates/domains/symthaea-soma/src/benchmark_license_gate.rs)
+- [Visual language and perceptual qualification](SYMTHAEA_VISUAL_LANGUAGE_AND_PERCEPTUAL_QUALIFICATION_V0_1_2026-11-27.md)
+- [Explicit scene relationship graph v2](SYMTHAEA_SCENE_RELATIONSHIP_GRAPH_V0_1_2026-11-27.md)
+- [Scene graph v2 JSON Schema](SYMTHAEA_SCENE_GRAPH_SCHEMA_V2_2026-11-27.json)
+- [Scene graph v2 fixtures](SYMTHAEA_SCENE_GRAPH_FIXTURES_V2_2026-11-27.json)
+- [Typed scene graph v2 compiler and verifier](../../crates/domains/symthaea-soma/src/embodiment_scene_graph.rs)
+- [Deterministic seven-form Bevy layout](../../renderers/symthaea-soma-bevy/src/visual_grammar.rs)
+- [Event-triggered temporal foveation research](SYMTHAEA_EVENT_TRIGGERED_TEMPORAL_FOVEATION_V0_1_2026-11-28.md)
+- [Temporal pixel-budget foveation scheduler](../../crates/domains/symthaea-foveation/src/temporal_budget.rs)
+- [Calibrated ROI expected-value ranking](../../crates/domains/symthaea-foveation/src/roi_information_value.rs)
+- [ROI information-value manifest JSON Schema](SYMTHAEA_ROI_INFORMATION_VALUE_MANIFEST_SCHEMA_V1_2026-11-28.json)
+- [ROI information-value manifest fixtures](SYMTHAEA_ROI_INFORMATION_VALUE_FIXTURES_V1_2026-11-28.json)
+- [Foveation manager integration](../../crates/domains/symthaea-foveation/src/manager.rs)
+- [Interaction trace schema](SYMTHAEA_INTERACTION_TRACE_SCHEMA_V1_2026-11-27.json)
+- [Interaction trace fixtures](SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json)
+- [Causal interaction-trace verifier](../../crates/domains/symthaea-soma/src/embodiment_interaction_trace.rs)
+- [Trace-verifier CLI](../../crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs)
+- [Turn-control benchmark protocol](SYMTHAEA_TURN_CONTROL_BENCHMARK_V0_1_2026-11-27.md)
+- [Cross-form semantic continuity](SYMTHAEA_CROSS_FORM_CONTINUITY_V0_1_2026-11-27.md)
+- [Scene continuity descriptor schema](SYMTHAEA_SCENE_CONTINUITY_SCHEMA_V1_2026-11-27.json)
+- [Scene continuity fixtures](SYMTHAEA_SCENE_CONTINUITY_FIXTURES_V1_2026-11-27.json)
+- [Causal turn decision gate](SYMTHAEA_CAUSAL_TURN_GATE_V0_1_2026-11-27.md)
+- [Turn candidate schema](SYMTHAEA_TURN_CANDIDATE_SCHEMA_V1_2026-11-27.json)
+- [Turn candidate fixtures](SYMTHAEA_TURN_CANDIDATE_FIXTURES_V1_2026-11-27.json)
+- [Event schema](SYMTHAEA_EMBODIMENT_EVENT_SCHEMA_V1_2026-11-27.json)
+- [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
+- [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
+
+The renderer-independent event, projection, policy, receipt, scene, scene-graph, turn-control, continuity, interaction-trace verification, compositor-feedback, audiovisual-counterfactual and benchmark-license modules live under
+`crates/domains/symthaea-soma/src/`. The optional temporal pixel-budget policy lives in the separate `crates/domains/symthaea-foveation/` package and is disabled by default. When enabled, it drops stale source-frame requests/results and never crops an older request from a newer retained frame buffer. The cross-event trace verifier has a Rust CLI at
+`crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs`; it checks causal relationships but is not a JSON Schema validator.
+A standalone Bevy 0.20.1 adapter has transition-aware source code under
+`renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
+All 231 tracked polyembodiment and temporal-foveation regression tests are authored but unexecuted; this inventory excludes pre-existing tests elsewhere in the foveation package, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
+
 ## Theoretical Foundations
 
 ### Integrated Information Theory (IIT)

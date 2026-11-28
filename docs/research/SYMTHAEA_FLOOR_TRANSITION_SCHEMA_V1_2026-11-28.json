@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea.floor-transition.v1.json",
+  "title": "Symthaea floor transition evaluation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "config",
+    "events",
+    "predictions"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.floor-transition.v1"
+    },
+    "config": {
+      "$ref": "#/$defs/config"
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/prediction"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "end_of_turn_threshold",
+        "interruption_threshold",
+        "maximum_false_positive_rate"
+      ],
+      "properties": {
+        "end_of_turn_threshold": {
+          "$ref": "#/$defs/probability"
+        },
+        "interruption_threshold": {
+          "$ref": "#/$defs/probability"
+        },
+        "maximum_false_positive_rate": {
+          "$ref": "#/$defs/probability"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "event_id",
+        "session_id",
+        "clock_domain_id",
+        "current_speaker_id",
+        "event_start_monotonic_ns",
+        "ground_truth_at_monotonic_ns",
+        "kind",
+        "source_event_digest"
+      ],
+      "properties": {
+        "schema": {
+          "const": "symthaea.floor-transition.v1"
+        },
+        "event_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "session_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "clock_domain_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "current_speaker_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "event_start_monotonic_ns": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "ground_truth_at_monotonic_ns": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "kind": {
+          "enum": [
+            "end_of_turn",
+            "successful_takeover",
+            "temporary_hold",
+            "backchannel",
+            "other_directed_speech",
+            "ambient_speech",
+            "no_floor_change"
+          ]
+        },
+        "source_event_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "clock_domain_id",
+        "end_of_turn_probability",
+        "interruption_probability",
+        "end_of_turn_detected_at_monotonic_ns",
+        "interruption_detected_at_monotonic_ns"
+      ],
+      "properties": {
+        "event_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "clock_domain_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "end_of_turn_probability": {
+          "$ref": "#/$defs/probability"
+        },
+        "interruption_probability": {
+          "$ref": "#/$defs/probability"
+        },
+        "end_of_turn_detected_at_monotonic_ns": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interruption_detected_at_monotonic_ns": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
