@@ -378,27 +378,26 @@ pub fn assess_streaming_revocation_impact_v1(
         let state = match own {
             CurrentRisk::Blocked => StreamingUpdateImpactStateV1::DirectReplayRequired,
             CurrentRisk::Unknown => StreamingUpdateImpactStateV1::DirectIndeterminate,
-            CurrentRisk::Clear => match first_problem {
-                Some((first, CurrentRisk::Blocked)) if sequence > first => {
+            CurrentRisk::Clear => {
+                let earlier_blocked = direct_blocked.iter().any(|value| *value < sequence);
+                let earlier_unknown = direct_unknown.iter().any(|value| *value < sequence);
+                if earlier_blocked {
                     inherited.push(sequence);
                     StreamingUpdateImpactStateV1::InheritedReplayRequired
-                }
-                Some((first, CurrentRisk::Unknown)) if sequence > first => {
+                } else if earlier_unknown {
                     inherited.push(sequence);
                     StreamingUpdateImpactStateV1::InheritedIndeterminate
+                } else {
+                    StreamingUpdateImpactStateV1::Unaffected
                 }
-                _ => StreamingUpdateImpactStateV1::Unaffected,
             },
         };
-        let inherited_from_label_ids = match first_problem {
-            Some((first, _)) if sequence > first => input.engine.accepted_update_journal
-                .iter()
-                .filter(|candidate| candidate.update_sequence <= first)
-                .filter(|candidate| risks.get(&candidate.update_sequence) != Some(&CurrentRisk::Clear))
-                .map(|candidate| candidate.delivery.label_id.clone())
-                .collect(),
-            _ => Vec::new(),
-        };
+        let inherited_from_label_ids = input.engine.accepted_update_journal
+            .iter()
+            .filter(|candidate| candidate.update_sequence < sequence)
+            .filter(|candidate| risks.get(&candidate.update_sequence) != Some(&CurrentRisk::Clear))
+            .map(|candidate| candidate.delivery.label_id.clone())
+            .collect::<Vec<_>>();
         entries.push(StreamingUpdateImpactEntryV1 {
             update_sequence: sequence,
             label_id: journal_entry.delivery.label_id.clone(),
@@ -410,21 +409,19 @@ pub fn assess_streaming_revocation_impact_v1(
         });
     }
 
-    let status = match first_problem {
-        None => StreamingRevocationImpactStatusV1::CompleteNoReplayRequired,
-        Some((_, CurrentRisk::Blocked)) => StreamingRevocationImpactStatusV1::RebuildRequired,
-        Some((_, CurrentRisk::Unknown)) => StreamingRevocationImpactStatusV1::Unknown,
-        Some((_, CurrentRisk::Clear)) => StreamingRevocationImpactStatusV1::CompleteNoReplayRequired,
+    let status = if !direct_blocked.is_empty() {
+        StreamingRevocationImpactStatusV1::RebuildRequired
+    } else if !direct_unknown.is_empty() {
+        StreamingRevocationImpactStatusV1::Unknown
+    } else {
+        StreamingRevocationImpactStatusV1::CompleteNoReplayRequired
     };
     let mut reason_codes = Vec::new();
-    match status {
-        StreamingRevocationImpactStatusV1::RebuildRequired => {
-            reason_codes.push("accepted_update_uses_now_blocked_label_evidence".into());
-        }
-        StreamingRevocationImpactStatusV1::Unknown => {
-            reason_codes.push("accepted_update_has_missing_or_unknown_current_k1_evidence".into());
-        }
-        _ => {}
+    if !direct_blocked.is_empty() {
+        reason_codes.push("accepted_update_uses_now_blocked_label_evidence".into());
+    }
+    if !direct_unknown.is_empty() {
+        reason_codes.push("accepted_update_has_missing_or_unknown_current_k1_evidence".into());
     }
     unresolved.sort();
     unresolved.dedup();
