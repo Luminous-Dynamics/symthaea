@@ -35,16 +35,10 @@ pub struct GroupMemBenchRunBindingV1 {
     pub benchmark_repository: String,
     pub benchmark_commit_sha: String,
     pub dataset_snapshot_sha256: String,
-    pub split_manifest_sha256: String,
     pub domain: GroupDomainV1,
-    pub reader_model_config_sha256: String,
-    pub reader_prompt_sha256: String,
-    pub judge_model_config_sha256: String,
-    pub judge_prompt_sha256: String,
     pub retrieval_config_sha256: String,
     pub top_k: u32,
     pub context_budget_tokens: u32,
-    pub seed: u64,
     pub binding_sha256: String,
 }
 
@@ -91,11 +85,6 @@ impl GroupMemBenchRunBindingV1 {
         }
         for digest in [
             self.dataset_snapshot_sha256.as_str(),
-            self.split_manifest_sha256.as_str(),
-            self.reader_model_config_sha256.as_str(),
-            self.reader_prompt_sha256.as_str(),
-            self.judge_model_config_sha256.as_str(),
-            self.judge_prompt_sha256.as_str(),
             self.retrieval_config_sha256.as_str(),
         ] {
             if !valid_sha256(digest) {
@@ -544,16 +533,10 @@ mod tests {
             benchmark_repository: OFFICIAL_BENCHMARK_REPOSITORY.to_owned(),
             benchmark_commit_sha: PINNED_BENCHMARK_COMMIT.to_owned(),
             dataset_snapshot_sha256: sha("dataset"),
-            split_manifest_sha256: sha("split"),
             domain: GroupDomainV1::Finance,
-            reader_model_config_sha256: sha("reader-model"),
-            reader_prompt_sha256: sha("reader-prompt"),
-            judge_model_config_sha256: sha("judge-model"),
-            judge_prompt_sha256: sha("judge-prompt"),
             retrieval_config_sha256: sha("retrieval"),
             top_k: 10,
             context_budget_tokens: 4096,
-            seed: 17,
             binding_sha256: String::new(),
         }.seal().expect("valid run binding")
     }
@@ -661,6 +644,19 @@ mod tests {
         assert!(validate_messages(&ordered).is_ok());
         let unordered = vec![ordered[2].clone(), ordered[0].clone()];
         assert_eq!(validate_messages(&unordered), Err(AdapterRejectV1::NonCanonicalMessageOrder));
+    }
+
+    #[test]
+    fn evaluator_only_run_controls_are_not_candidate_visible() {
+        let raw = format!(
+            r#"{{"op":"reset","run_binding":{{"schema_version":"mace_groupmembench_adapter_v1","run_id":"opaque","benchmark_repository":"UCSB-NLP-Chang/GroupMemBench","benchmark_commit_sha":"{}","dataset_snapshot_sha256":"{}","domain":"finance","retrieval_config_sha256":"{}","top_k":10,"context_budget_tokens":4096,"binding_sha256":"{}","judge_model_config_sha256":"{}"}}}}"#,
+            PINNED_BENCHMARK_COMMIT,
+            sha("dataset"),
+            sha("retrieval"),
+            sha("binding"),
+            sha("judge-config"),
+        );
+        assert_eq!(parse_request(&raw), Err(AdapterRejectV1::InvalidJson));
     }
 
     #[test]
