@@ -1322,7 +1322,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_reference_events_do_not_create_interior_continuity_matches() {
+    fn duplicate_reference_events_preserve_mir_eval_over_one_cemgil_behavior() {
         let reference = [5_000, 6_000, 7_000, 8_000, 9_000, 10_000, 10_000, 11_000, 12_000];
         let estimated = [5_000, 6_000, 7_000, 8_000, 9_000, 10_000, 11_000, 12_000];
         let scores = score_mirex_beat_track(
@@ -1333,7 +1333,10 @@ mod tests {
         )
         .unwrap()
         .scores;
-        assert!(scores.cmlt <= 8.0 / 9.0);
+        assert!((scores.cemgil - (18.0 / 17.0)).abs() < 1e-12);
+        assert!((scores.cmlt - (8.0 / 9.0)).abs() < 1e-12);
+        assert!((scores.amlt - (8.0 / 9.0)).abs() < 1e-12);
+        assert!(scores.cemgil > 1.0);
     }
 
     #[test]
