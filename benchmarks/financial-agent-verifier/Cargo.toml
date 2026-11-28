@@ -1,0 +1,19 @@
+[package]
+name = "financial-agent-verifier"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Offline semantic verifier for Luminous financial research benchmark v1"
+
+[workspace]
+resolver = "2"
+
+[dependencies]
+hex = "=0.4.3"
+jsonschema = "=0.63.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_json_canonicalizer = "=0.4.1"
+sha2 = "0.10"
