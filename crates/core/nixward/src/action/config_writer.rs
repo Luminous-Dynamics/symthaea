@@ -122,6 +122,28 @@ impl ConfigWriter {
         self
     }
 
+    fn contains_package_reference(source: &str, package_attr: &str) -> bool {
+        let needle = format!("pkgs.{package_attr}");
+        let mut search_from = 0usize;
+        while let Some(relative) = source[search_from..].find(&needle) {
+            let start = search_from + relative;
+            let end = start + needle.len();
+            let preceding = source[..start].chars().next_back();
+            let following = source[end..].chars().next();
+            let left_boundary = preceding.is_none_or(|ch| {
+                ch.is_whitespace() || matches!(ch, '[' | ',' | '(')
+            });
+            let right_boundary = following.is_none_or(|ch| {
+                ch.is_whitespace() || matches!(ch, ']' | ',' | ';' | ')')
+            });
+            if left_boundary && right_boundary {
+                return true;
+            }
+            search_from = end;
+        }
+        false
+    }
+
     /// Add a package to `environment.systemPackages`.
     ///
     /// Returns a patch that, when applied, adds the package to the config.
@@ -136,7 +158,7 @@ impl ConfigWriter {
         let pkg_entry = format!("    pkgs.{package_attr}");
 
         // Check if already present
-        if original.contains(&format!("pkgs.{package_attr}")) {
+        if Self::contains_package_reference(&original, &package_attr) {
             return Ok(ConfigPatch {
                 target: config_path,
                 original: original.clone(),
