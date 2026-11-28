@@ -1,0 +1,81 @@
+name: MEL HEAR-009 matched perception-reasoning qualification
+
+on:
+  push:
+    branches:
+      - research/mel-hear-009-perception-reasoning-gap-v0-20261128
+    paths:
+      - "benchmarks/mel/schemas/mel-hear-009-perception-reasoning-panel-v0.schema.json"
+      - "benchmarks/mel/registry/mel-hear-009-perception-reasoning-synthetic-v0.json"
+      - "tools/mel-hear-009-qualifier/**"
+      - "docs/research/MEL-HEAR-009-PERCEPTION-REASONING-GAP-V0.md"
+      - ".github/workflows/mel-hear-009-qualification.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - research/mel-performance-identity-inference-v3-20261127
+    paths:
+      - "benchmarks/mel/schemas/mel-hear-009-perception-reasoning-panel-v0.schema.json"
+      - "benchmarks/mel/registry/mel-hear-009-perception-reasoning-synthetic-v0.json"
+      - "tools/mel-hear-009-qualifier/**"
+      - "docs/research/MEL-HEAR-009-PERCEPTION-REASONING-GAP-V0.md"
+      - ".github/workflows/mel-hear-009-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-head matched perception and reasoning contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head or push commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact tested source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'tested_head=%s\n' "$actual"
+
+      - name: Install pinned Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify canonical formatting
+        run: cargo +1.96.0 fmt --manifest-path tools/mel-hear-009-qualifier/Cargo.toml --check
+
+      - name: Verify locked package metadata
+        run: cargo +1.96.0 metadata --locked --manifest-path tools/mel-hear-009-qualifier/Cargo.toml --no-deps --format-version 1
+
+      - name: Run exact-source tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-hear-009-qualifier/Cargo.toml
+
+      - name: Run warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-hear-009-qualifier/Cargo.toml --all-targets -- -D warnings
+
+      - name: Replay retained matched-condition fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-hear-009-qualifier/Cargo.toml -- benchmarks/mel/registry/mel-hear-009-perception-reasoning-synthetic-v0.json > "$RUNNER_TEMP/hear-009-report.json"
+          jq -e '
+            .schema == "mel-hear-009-perception-reasoning-replay-v0"
+            and (.panel_sha256 | test("^[a-f0-9]{64}$"))
+            and .report.reference_scorable == true
+            and .report.condition_count == 5
+            and .report.reasoner_identity_matched == true
+            and .report.raw_audio_model_identity_matched == true
+            and .report.diagnostics.oracle_correct_audio_derived_incorrect == true
+            and .report.diagnostics.oracle_incorrect_audio_derived_correct == false
+            and .report.diagnostics.raw_audio_correct_fusion_incorrect == false
+            and .report.diagnostics.raw_audio_incorrect_fusion_correct == false
+            and .report.diagnostics.no_evidence_control_correct == false
+          ' "$RUNNER_TEMP/hear-009-report.json"
