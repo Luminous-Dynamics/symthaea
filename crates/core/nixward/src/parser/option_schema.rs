@@ -170,11 +170,13 @@ pub enum OptionSchemaSource {
 
 /// Load options and retain whether they came from the local live host or a
 /// bundled reference set. This is deliberately not called TargetBound.
-fn load_options_with_provenance(
-) -> (Vec<NixOptionSchema>, OptionSchemaSource, Option<Instant>) {
+fn load_options_with_provenance() -> (Vec<NixOptionSchema>, OptionSchemaSource, Option<Instant>) {
     match load_nixos_options() {
         Ok(schemas) if !schemas.is_empty() => {
-            tracing::info!(count = schemas.len(), "Loaded controller-local NixOS options");
+            tracing::info!(
+                count = schemas.len(),
+                "Loaded controller-local NixOS options"
+            );
             (
                 schemas,
                 OptionSchemaSource::ControllerLocalLive,
@@ -182,7 +184,9 @@ fn load_options_with_provenance(
             )
         }
         Ok(_) => {
-            tracing::info!("Live NixOS option command returned an empty set; using bundled references");
+            tracing::info!(
+                "Live NixOS option command returned an empty set; using bundled references"
+            );
             (
                 load_bundled_options().unwrap_or_default(),
                 OptionSchemaSource::BundledReference,
@@ -457,14 +461,26 @@ mod tests {
         assert_eq!(schema.read_only, Some(true));
         assert_eq!(
             schema.location.as_deref(),
-            Some(&["services".to_string(), "example".to_string(), "readOnly".to_string()][..])
+            Some(
+                &[
+                    "services".to_string(),
+                    "example".to_string(),
+                    "readOnly".to_string()
+                ][..]
+            )
         );
         assert_eq!(
-            schema.default_value.as_ref().and_then(|value| value["_type"].as_str()),
+            schema
+                .default_value
+                .as_ref()
+                .and_then(|value| value["_type"].as_str()),
             Some("literalExpression")
         );
         assert_eq!(
-            schema.example.as_ref().and_then(|value| value["_type"].as_str()),
+            schema
+                .example
+                .as_ref()
+                .and_then(|value| value["_type"].as_str()),
             Some("literalExpression")
         );
         assert_eq!(
@@ -484,7 +500,10 @@ mod tests {
             refresh_interval: Duration::from_secs(60),
         };
 
-        cache.apply_live_result(Err("synthetic live lookup failure".to_string()), attempted_at);
+        cache.apply_live_result(
+            Err("synthetic live lookup failure".to_string()),
+            attempted_at,
+        );
 
         assert_eq!(cache.source(), OptionSchemaSource::BundledReference);
         assert!(cache.last_live_refresh_age().is_none());
@@ -522,7 +541,10 @@ mod tests {
             refresh_interval: Duration::from_secs(60),
         };
 
-        cache.apply_live_result(Ok(parse_nixos_options(sample_json()).unwrap()), attempted_at);
+        cache.apply_live_result(
+            Ok(parse_nixos_options(sample_json()).unwrap()),
+            attempted_at,
+        );
 
         assert_eq!(cache.source(), OptionSchemaSource::ControllerLocalLive);
         assert!(cache.last_live_refresh_age().is_some());
