@@ -425,7 +425,7 @@ jobs:
           cargo +1.96.0 run --locked --manifest-path tools/mel-temporal-grounding-qualifier/Cargo.toml --bin mel-music-performance-identity-sampling-design -- tools/mel-temporal-grounding-qualifier/fixtures/mel-music-performance-identity-sampling-design.crossed.synthetic.json > "$RUNNER_TEMP/music-performance-identity-sampling-design-report.json"
           jq -e '
             .schema == "mel-music-performance-identity-sampling-design-report-v1"
-            and .design_shape == "crossed_performer_or_session"
+            and .design_shape == "crossed_performer_session_or_take"
             and .disposition == "crossed_inference_required"
             and .observation_count == 2
             and .source_work_cluster_count == 2
