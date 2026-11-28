@@ -681,7 +681,7 @@ mod tests {
             .timeout(std::time::Duration::from_secs(2))
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
-            .dns_resolver(resolver)
+            .dns_resolver2(resolver)
             .build()
             .expect("guarded test client");
 
