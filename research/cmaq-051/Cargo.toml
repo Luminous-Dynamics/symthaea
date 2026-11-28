@@ -1,0 +1,13 @@
+[package]
+name = "cmaq-051-representation-eportfolio"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Fixed equal-weight mixture of discrete and continuous conditional paired e-processes"
+
+[dependencies]
+cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
+cmaq-048-fourier-kernel-approachability = { path = "../cmaq-048" }
+
+[workspace]
