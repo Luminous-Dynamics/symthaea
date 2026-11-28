@@ -1,0 +1,51 @@
+name: Financial Agent Semantic Verifier
+
+on:
+  pull_request:
+    branches:
+      - research/sym-fin-eval-002-benchmark-protocol
+    paths:
+      - "benchmarks/financial-agent-verifier/**"
+      - "benchmarks/financial-agent-v1/**"
+      - ".github/workflows/financial-agent-verifier.yml"
+  push:
+    branches:
+      - main
+      - research/fin-research-semantic-verifier-v0-1
+    paths:
+      - "benchmarks/financial-agent-verifier/**"
+      - "benchmarks/financial-agent-v1/**"
+      - ".github/workflows/financial-agent-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: financial-agent-verifier-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semantic-verifier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Format check
+        run: cargo fmt --manifest-path benchmarks/financial-agent-verifier/Cargo.toml --check
+      - name: Resolve and record dependency graph
+        run: cargo generate-lockfile --manifest-path benchmarks/financial-agent-verifier/Cargo.toml
+      - name: Upload generated Cargo.lock for review
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: financial-agent-verifier-cargo-lock
+          path: benchmarks/financial-agent-verifier/Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+      - name: Schema, byte-binding and semantic negative-control tests
+        run: cargo test --locked --manifest-path benchmarks/financial-agent-verifier/Cargo.toml
