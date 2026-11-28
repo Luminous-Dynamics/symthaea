@@ -1,0 +1,12 @@
+[package]
+name = "cmaq-047-controlled-blackwell-actions"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Controlled diagnostic action selection with anytime-valid Blackwell betting"
+
+[dependencies]
+cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
+
+[workspace]
