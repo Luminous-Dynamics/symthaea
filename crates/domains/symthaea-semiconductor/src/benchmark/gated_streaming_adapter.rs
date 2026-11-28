@@ -109,15 +109,36 @@ pub struct StreamingAdapterStateV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StreamingAcceptedUpdateJournalEntryV1 {
+    pub schema: String,
+    pub engine_id: String,
+    pub generation_id: String,
+    pub update_sequence: u64,
+    pub arrival_sequence: u64,
+    pub parent_state_sha256: String,
+    pub resulting_state_sha256: String,
+    pub parent_journal_sha256: String,
+    pub prediction_receipt: StreamingPredictionReceiptV1,
+    pub delivery: StreamingLabelDeliveryV1,
+    pub update_receipt: StreamingUpdateReceiptV1,
+    pub entry_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GatedStreamingAdapterEngineV1 {
     pub schema: String,
     pub engine_id: String,
+    pub generation_id: String,
     pub clock_domain_id: String,
     pub global_model_artifact_sha256: String,
     pub feature_schema_sha256: String,
     pub policy_sha256: String,
     pub policy: StreamingAdapterPolicyV1,
+    pub genesis_adapter_state: StreamingAdapterStateV1,
+    pub genesis_state_sha256: String,
     pub adapter_state: StreamingAdapterStateV1,
+    pub journal_head_sha256: String,
+    pub accepted_update_journal: Vec<StreamingAcceptedUpdateJournalEntryV1>,
     pub next_prediction_sequence: u64,
     pub pending_predictions: BTreeMap<String, StreamingPredictionReceiptV1>,
     pub seen_measurement_event_ids: BTreeSet<String>,
@@ -277,6 +298,32 @@ fn update_receipt_digest(
     canonical.receipt_sha256.clear();
     json_sha256(&canonical)
 }
+fn journal_entry_digest(
+    entry: &StreamingAcceptedUpdateJournalEntryV1,
+) -> Result<String, GatedStreamingAdapterErrorV1> {
+    let mut canonical = entry.clone();
+    canonical.entry_sha256.clear();
+    json_sha256(&canonical)
+}
+
+fn genesis_journal_digest(
+    engine_id: &str,
+    generation_id: &str,
+    global_model_artifact_sha256: &str,
+    feature_schema_sha256: &str,
+    policy_sha256: &str,
+    genesis_state_sha256: &str,
+) -> Result<String, GatedStreamingAdapterErrorV1> {
+    json_sha256(&(
+        GATED_STREAMING_ADAPTER_SCHEMA_V1,
+        engine_id,
+        generation_id,
+        global_model_artifact_sha256,
+        feature_schema_sha256,
+        policy_sha256,
+        genesis_state_sha256,
+    ))
+}
 
 /// Independently verifies the immutable prediction receipt and its read-only
 /// state invariant.
@@ -428,9 +475,12 @@ fn validate_engine(
     }
     require_text(&engine.engine_id, "engine.engine_id")?;
     require_text(&engine.clock_domain_id, "engine.clock_domain_id")?;
+    require_text(&engine.generation_id, "engine.generation_id")?;
     if !valid_sha256(&engine.global_model_artifact_sha256)
         || !valid_sha256(&engine.feature_schema_sha256)
         || !valid_sha256(&engine.policy_sha256)
+        || !valid_sha256(&engine.genesis_state_sha256)
+        || !valid_sha256(&engine.journal_head_sha256)
     {
         return Err(GatedStreamingAdapterErrorV1(
             "engine model, feature-schema or policy digest is malformed".into(),
@@ -440,6 +490,26 @@ fn validate_engine(
     if json_sha256(&engine.policy)? != engine.policy_sha256 {
         return Err(GatedStreamingAdapterErrorV1(
             "streaming adapter policy content differs from its sealed digest".into(),
+        ));
+    }
+    if adapter_state_digest(&engine.genesis_adapter_state)? != engine.genesis_state_sha256
+        || engine.accepted_update_journal.len() as u64
+            != engine.adapter_state.accepted_update_count
+        || engine.accepted_update_journal.last().map_or(
+            engine.journal_head_sha256
+                != genesis_journal_digest(
+                    &engine.engine_id,
+                    &engine.generation_id,
+                    &engine.global_model_artifact_sha256,
+                    &engine.feature_schema_sha256,
+                    &engine.policy_sha256,
+                    &engine.genesis_state_sha256,
+                )?,
+            |entry| entry.entry_sha256 != engine.journal_head_sha256,
+        )
+    {
+        return Err(GatedStreamingAdapterErrorV1(
+            "streaming adapter genesis or accepted-update journal anchor is inconsistent".into(),
         ));
     }
     if engine.adapter_state.feature_weights.is_empty()
@@ -494,21 +564,37 @@ pub fn create_gated_streaming_adapter_engine_v1(
             "initial feature adapter weights must be non-empty and finite".into(),
         ));
     }
+    let generation_id = format!("{engine_id}:generation:0");
+    let genesis_adapter_state = StreamingAdapterStateV1 {
+        feature_weights: initial_feature_weights,
+        global_context_residual_ema: 0.0,
+        global_temporal_residual_ema: 0.0,
+        contexts: BTreeMap::new(),
+        accepted_update_count: 0,
+    };
+    let genesis_state_sha256 = adapter_state_digest(&genesis_adapter_state)?;
+    let journal_head_sha256 = genesis_journal_digest(
+        engine_id,
+        &generation_id,
+        global_model_artifact_sha256,
+        feature_schema_sha256,
+        &policy_sha256,
+        &genesis_state_sha256,
+    )?;
     Ok(GatedStreamingAdapterEngineV1 {
         schema: GATED_STREAMING_ADAPTER_SCHEMA_V1.into(),
         engine_id: engine_id.into(),
+        generation_id,
         clock_domain_id: clock_domain_id.into(),
         global_model_artifact_sha256: global_model_artifact_sha256.into(),
         feature_schema_sha256: feature_schema_sha256.into(),
         policy_sha256,
         policy,
-        adapter_state: StreamingAdapterStateV1 {
-            feature_weights: initial_feature_weights,
-            global_context_residual_ema: 0.0,
-            global_temporal_residual_ema: 0.0,
-            contexts: BTreeMap::new(),
-            accepted_update_count: 0,
-        },
+        genesis_adapter_state: genesis_adapter_state.clone(),
+        genesis_state_sha256,
+        adapter_state: genesis_adapter_state,
+        journal_head_sha256,
+        accepted_update_journal: Vec::new(),
         next_prediction_sequence: 0,
         pending_predictions: BTreeMap::new(),
         seen_measurement_event_ids: BTreeSet::new(),
@@ -1032,11 +1118,30 @@ pub fn deliver_qualified_stream_label_v1(
         Some(next_state.accepted_update_count),
     )?;
 
+    let update_sequence = next_state.accepted_update_count;
+    let mut journal_entry = StreamingAcceptedUpdateJournalEntryV1 {
+        schema: "luminous.semi-bench.streaming-update-journal-entry.v1".into(),
+        engine_id: engine.engine_id.clone(),
+        generation_id: engine.generation_id.clone(),
+        update_sequence,
+        arrival_sequence: update_sequence,
+        parent_state_sha256: before.clone(),
+        resulting_state_sha256: after,
+        parent_journal_sha256: engine.journal_head_sha256.clone(),
+        prediction_receipt: prediction_receipt.clone(),
+        delivery: delivery.clone(),
+        update_receipt: receipt.clone(),
+        entry_sha256: String::new(),
+    };
+    journal_entry.entry_sha256 = journal_entry_digest(&journal_entry)?;
+
     engine.adapter_state = next_state;
     engine
         .accepted_label_revisions
         .insert(format!("{}:{}", delivery.label_id, delivery.label_revision));
     engine.pending_predictions.remove(&delivery.sample_id);
+    engine.journal_head_sha256 = journal_entry.entry_sha256.clone();
+    engine.accepted_update_journal.push(journal_entry);
     Ok(receipt)
 }
 
