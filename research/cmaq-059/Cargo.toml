@@ -7,6 +7,12 @@ license = "AGPL-3.0-or-later"
 description = "Finite-sample calibration intervals and benchmark-integrity metrics for CMAQ"
 
 [dependencies]
+cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
+cmaq-048-fourier-kernel-approachability = { path = "../cmaq-048" }
+cmaq-053-compositional-risk-budget = { path = "../cmaq-053" }
+cmaq-054-evidence-adaptive-kernel-family = { path = "../cmaq-054" }
+cmaq-056-typed-null-manifest = { path = "../cmaq-056" }
+cmaq-058-exact-restart-renewal = { path = "../cmaq-058" }
 sha2 = "=0.10.9"
 statrs = "=0.19.1"
 rand = "=0.9.2"
