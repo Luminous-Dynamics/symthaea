@@ -122,7 +122,8 @@
         },
         "source_master_family_id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$"
         },
         "valid_segment_policy": {
           "const": "declared_valid_segments"
@@ -326,7 +327,20 @@
             5
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "scoring_receipt": {
+              "properties": {
+                "task": {
+                  "const": "beat_tracking"
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "downbeat_report": {
       "type": "object",
@@ -371,7 +385,23 @@
         "scoring_receipt": {
           "$ref": "#/$defs/scoring_receipt"
         }
-      }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "scoring_receipt": {
+              "properties": {
+                "task": {
+                  "const": "downbeat_estimation"
+                },
+                "initial_trim_seconds": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "segment_result": {
       "type": "object",
