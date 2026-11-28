@@ -52,8 +52,18 @@ jq -e '
   and .global_order_inferred == false
   and .partition_count == 3
   and .business_event_count == 4
-  and .offset_gaps_accepted == 4
+  and .offset_gap_slots_unclassified == 0
 ' "$TMP/result.json" >/dev/null
+
+# Remove the same business record from both supplied arrays. Digest recomputation must not turn the unexplained range hole into a pass.
+jq 'del(.partition_captures[0].records[1]) | del(.business_events[1])' "$TMP/bound-input.json" > "$TMP/omitted-record-unbound.json"
+"$TMP/mon038" --input "$TMP/omitted-record-unbound.json" --derive-fixture-proof-digests > "$TMP/omitted-record.json"
+set +e
+"$TMP/mon038" --input "$TMP/omitted-record.json" > "$TMP/omitted-record-result.json"
+OMITTED_STATUS=$?
+set -e
+[ "$OMITTED_STATUS" -eq 3 ] || { echo "unexplained offset omission must exit indeterminate (3), got $OMITTED_STATUS" >&2; exit 1; }
+jq -e '.capture_verdict == "indeterminate" and .offset_gap_slots_unclassified == 1 and (.reason_codes | index("offset_gap_slots_unclassified") != null)' "$TMP/omitted-record-result.json" >/dev/null
 
 jq '.unexpected_field = true' "$TMP/bound-input.json" > "$TMP/unknown.json"
 set +e
