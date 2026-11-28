@@ -5,6 +5,7 @@ on:
     paths:
       - "research/cmaq-062/**"
       - "research/cmaq-059/**"
+      - "research/cmaq-058/**"
       - "research/cmaq-053/**"
       - "research/cmaq-048/**"
       - ".github/workflows/cmaq-062.yml"
