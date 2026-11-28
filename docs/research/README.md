@@ -49,13 +49,16 @@ event contract.
 - [Counterfactual audiovisual grounding protocol](SYMTHAEA_COUNTERFACTUAL_AV_GROUNDING_PROTOCOL_V0_1_2026-11-27.md)
 - [Counterfactual AV item JSON Schema](SYMTHAEA_AV_COUNTERFACTUAL_ITEM_SCHEMA_V1_2026-11-27.json)
 - [Counterfactual AV paired fixtures](SYMTHAEA_AV_COUNTERFACTUAL_ITEM_FIXTURES_V1_2026-11-27.json)
+- [Rust counterfactual AV manifest verifier and per-item scorer](../../crates/domains/symthaea-soma/src/embodiment_av_counterfactual.rs)
 - [Benchmark provenance and license gate](SYMTHAEA_BENCHMARK_DATA_PROVENANCE_AND_LICENSE_GATE_V0_1_2026-11-27.md)
 - [Benchmark license manifest JSON Schema](SYMTHAEA_BENCHMARK_LICENSE_MANIFEST_SCHEMA_V1_2026-11-27.json)
 - [Benchmark license manifest fixtures](SYMTHAEA_BENCHMARK_LICENSE_MANIFEST_FIXTURES_V1_2026-11-27.json)
+- [Rust benchmark license manifest gate](../../crates/domains/symthaea-soma/src/benchmark_license_gate.rs)
 - [Visual language and perceptual qualification](SYMTHAEA_VISUAL_LANGUAGE_AND_PERCEPTUAL_QUALIFICATION_V0_1_2026-11-27.md)
 - [Explicit scene relationship graph v2](SYMTHAEA_SCENE_RELATIONSHIP_GRAPH_V0_1_2026-11-27.md)
 - [Scene graph v2 JSON Schema](SYMTHAEA_SCENE_GRAPH_SCHEMA_V2_2026-11-27.json)
 - [Scene graph v2 fixtures](SYMTHAEA_SCENE_GRAPH_FIXTURES_V2_2026-11-27.json)
+- [Typed scene graph v2 compiler and verifier](../../crates/domains/symthaea-soma/src/embodiment_scene_graph.rs)
 - [Deterministic seven-form Bevy layout](../../renderers/symthaea-soma-bevy/src/visual_grammar.rs)
 - [Interaction trace schema](SYMTHAEA_INTERACTION_TRACE_SCHEMA_V1_2026-11-27.json)
 - [Interaction trace fixtures](SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json)
@@ -72,12 +75,12 @@ event contract.
 - [Event fixtures](SYMTHAEA_EMBODIMENT_EVENT_FIXTURES_V1_2026-11-27.json)
 - [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
 
-The renderer-independent event, projection, policy, receipt, scene, turn-control, continuity, interaction-trace verification and compositor-feedback modules live under
+The renderer-independent event, projection, policy, receipt, scene, scene-graph, turn-control, continuity, interaction-trace verification, compositor-feedback, audiovisual-counterfactual and benchmark-license modules live under
 `crates/domains/symthaea-soma/src/`. The cross-event trace verifier has a Rust CLI at
 `crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs`; it checks causal relationships but is not a JSON Schema validator.
 A standalone Bevy 0.20.1 adapter has transition-aware source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
-All 163 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
+All 190 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
 
 ## Theoretical Foundations
 
