@@ -88,7 +88,12 @@ pub struct AciResidualWindowV1 {
     pub policy: AciResidualWindowPolicyV1,
     pub policy_sha256: String,
     pub seed_manifest_sha256: String,
+    pub initial_seed_count: usize,
+    /// Bounded active calibration window used for interval construction.
     pub observations: Vec<AciResidualObservationV1>,
+    /// Append-only seed + qualified K1 residual history; never FIFO-evicted.
+    pub append_journal: Vec<AciResidualObservationV1>,
+    pub journal_sha256: String,
     pub next_sequence: u64,
     pub accepted_label_revisions: BTreeSet<String>,
     pub window_sha256: String,
@@ -211,6 +216,11 @@ fn window_digest(window: &AciResidualWindowV1) -> Result<String, AciResidualWind
     canonical.window_sha256.clear();
     json_sha256(&canonical)
 }
+fn residual_journal_digest(
+    observations: &[AciResidualObservationV1],
+) -> Result<String, AciResidualWindowErrorV1> {
+    json_sha256(observations)
+}
 
 fn construction_digest(
     receipt: &AciResidualIntervalConstructionReceiptV1,
@@ -297,76 +307,106 @@ fn validate_window(window: &AciResidualWindowV1) -> Result<(), AciResidualWindow
     validate_policy(&window.policy)?;
     if !valid_sha256(&window.policy_sha256)
         || !valid_sha256(&window.seed_manifest_sha256)
+        || !valid_sha256(&window.journal_sha256)
         || policy_digest(&window.policy)? != window.policy_sha256
+        || window.initial_seed_count > window.policy.capacity
         || window.observations.len() > window.policy.capacity
-        || window.observations.iter().any(|item| !item.signed_residual.is_finite())
+        || window.append_journal.len() as u64 != window.next_sequence
+        || window.append_journal.len() < window.initial_seed_count
+        || window.append_journal.iter().any(|item| !item.signed_residual.is_finite())
+        || residual_journal_digest(&window.append_journal)? != window.journal_sha256
         || window_digest(window)? != window.window_sha256
     {
         return Err(AciResidualWindowErrorV1(
-            "ACI residual-window state digest, capacity or numeric invariant failed".into(),
+            "ACI residual-window digest, journal, capacity or numeric invariant failed".into(),
         ));
     }
 
-    let mut previous_sequence = None;
-    let mut retained_revisions = BTreeSet::new();
-    for observation in &window.observations {
-        if previous_sequence.is_some_and(|previous| observation.sequence <= previous)
-            || observation.sequence >= window.next_sequence
-        {
+    let mut accepted_revisions = BTreeSet::new();
+    for (index, observation) in window.append_journal.iter().enumerate() {
+        if observation.sequence != index as u64 {
             return Err(AciResidualWindowErrorV1(
-                "ACI residual observations are not in strict sequence order".into(),
+                "residual append journal sequence is not contiguous".into(),
             ));
         }
-        previous_sequence = Some(observation.sequence);
-        match observation.source {
-            AciResidualObservationSourceV1::InitialSeed => {
-                if observation.sample_id.is_some()
-                    || observation.measurement_event_id.is_some()
-                    || observation.label_id.is_some()
-                    || observation.label_revision.is_some()
-                    || observation.prediction_receipt_sha256.is_some()
-                    || observation.update_receipt_sha256.is_some()
-                    || observation.label_payload_sha256.is_some()
-                    || observation.qualification_report_sha256.is_some()
-                {
-                    return Err(AciResidualWindowErrorV1(
-                        "initial seed observation must not claim online label lineage".into(),
-                    ));
-                }
+        if index < window.initial_seed_count {
+            if observation.source != AciResidualObservationSourceV1::InitialSeed
+                || observation.sample_id.is_some()
+                || observation.measurement_event_id.is_some()
+                || observation.label_id.is_some()
+                || observation.label_revision.is_some()
+                || observation.prediction_receipt_sha256.is_some()
+                || observation.update_receipt_sha256.is_some()
+                || observation.label_payload_sha256.is_some()
+                || observation.qualification_report_sha256.is_some()
+            {
+                return Err(AciResidualWindowErrorV1(
+                    "initial seed journal row contains online label lineage".into(),
+                ));
             }
-            AciResidualObservationSourceV1::QualifiedK1Update => {
-                let (Some(sample), Some(event), Some(label), Some(revision),
-                    Some(prediction_sha), Some(update_sha), Some(payload_sha), Some(report_sha)) = (
-                    observation.sample_id.as_deref(),
-                    observation.measurement_event_id.as_deref(),
-                    observation.label_id.as_deref(),
-                    observation.label_revision,
-                    observation.prediction_receipt_sha256.as_deref(),
-                    observation.update_receipt_sha256.as_deref(),
-                    observation.label_payload_sha256.as_deref(),
-                    observation.qualification_report_sha256.as_deref(),
-                ) else {
-                    return Err(AciResidualWindowErrorV1(
-                        "qualified residual observation is missing K1 lineage".into(),
-                    ));
-                };
-                if sample.trim().is_empty()
-                    || event.trim().is_empty()
-                    || label.trim().is_empty()
-                    || revision == 0
-                    || !valid_sha256(prediction_sha)
-                    || !valid_sha256(update_sha)
-                    || !valid_sha256(payload_sha)
-                    || !valid_sha256(report_sha)
-                    || !retained_revisions.insert(format!("{label}:{revision}"))
-                    || !window.accepted_label_revisions.contains(&format!("{label}:{revision}"))
-                {
-                    return Err(AciResidualWindowErrorV1(
-                        "qualified residual observation has invalid/duplicate K1 lineage".into(),
-                    ));
-                }
+        } else {
+            if observation.source != AciResidualObservationSourceV1::QualifiedK1Update {
+                return Err(AciResidualWindowErrorV1(
+                    "post-seed residual journal row is not a qualified K1 update".into(),
+                ));
+            }
+            let (
+                Some(sample),
+                Some(event),
+                Some(label),
+                Some(revision),
+                Some(prediction_sha),
+                Some(update_sha),
+                Some(payload_sha),
+                Some(report_sha),
+            ) = (
+                observation.sample_id.as_deref(),
+                observation.measurement_event_id.as_deref(),
+                observation.label_id.as_deref(),
+                observation.label_revision,
+                observation.prediction_receipt_sha256.as_deref(),
+                observation.update_receipt_sha256.as_deref(),
+                observation.label_payload_sha256.as_deref(),
+                observation.qualification_report_sha256.as_deref(),
+            )
+            else {
+                return Err(AciResidualWindowErrorV1(
+                    "qualified residual journal row is missing K1 lineage".into(),
+                ));
+            };
+            if sample.trim().is_empty()
+                || event.trim().is_empty()
+                || label.trim().is_empty()
+                || revision == 0
+                || !valid_sha256(prediction_sha)
+                || !valid_sha256(update_sha)
+                || !valid_sha256(payload_sha)
+                || !valid_sha256(report_sha)
+                || !accepted_revisions.insert(format!("{label}:{revision}"))
+            {
+                return Err(AciResidualWindowErrorV1(
+                    "qualified residual journal row has invalid or duplicate identity/digests"
+                        .into(),
+                ));
             }
         }
+    }
+    if accepted_revisions != window.accepted_label_revisions {
+        return Err(AciResidualWindowErrorV1(
+            "accepted label revision index differs from append-only residual journal".into(),
+        ));
+    }
+
+    let expected_active = window
+        .append_journal
+        .iter()
+        .skip(window.append_journal.len().saturating_sub(window.policy.capacity))
+        .cloned()
+        .collect::<Vec<_>>();
+    if expected_active != window.observations {
+        return Err(AciResidualWindowErrorV1(
+            "bounded residual window does not match append-journal suffix".into(),
+        ));
     }
     Ok(())
 }
@@ -410,12 +450,17 @@ pub fn create_aci_residual_window_v1(
         })
         .collect::<Vec<_>>();
 
+    let append_journal = observations.clone();
+    let journal_sha256 = residual_journal_digest(&append_journal)?;
     let mut window = AciResidualWindowV1 {
         schema: ACI_RESIDUAL_WINDOW_SCHEMA_V1.into(),
         engine_id: engine_id.into(),
         policy_sha256: policy_digest(&policy)?,
         seed_manifest_sha256: seed.manifest_sha256.clone(),
+        initial_seed_count: seed.signed_residuals.len(),
         observations,
+        append_journal,
+        journal_sha256,
         next_sequence: seed.signed_residuals.len() as u64,
         accepted_label_revisions: BTreeSet::new(),
         policy,
@@ -683,7 +728,7 @@ fn append_residual_candidate(
     let before = window.window_sha256.clone();
     let sequence = window.next_sequence;
     let mut next = window.clone();
-    next.observations.push(AciResidualObservationV1 {
+    let observation = AciResidualObservationV1 {
         sequence,
         source: AciResidualObservationSourceV1::QualifiedK1Update,
         signed_residual,
@@ -695,7 +740,9 @@ fn append_residual_candidate(
         update_receipt_sha256: Some(update.receipt_sha256.clone()),
         label_payload_sha256: Some(delivery.label_payload_sha256.clone()),
         qualification_report_sha256: Some(delivery.eligibility_report.report_sha256.clone()),
-    });
+    };
+    next.observations.push(observation.clone());
+    next.append_journal.push(observation);
     let evicted = if next.observations.len() > next.policy.capacity {
         next.observations.remove(0);
         true
@@ -708,6 +755,7 @@ fn append_residual_candidate(
         .ok_or_else(|| AciResidualWindowErrorV1("residual observation sequence overflow".into()))?;
     next.accepted_label_revisions
         .insert(format!("{}:{}", delivery.label_id, delivery.label_revision));
+    next.journal_sha256 = residual_journal_digest(&next.append_journal)?;
     next.window_sha256 = window_digest(&next)?;
 
     let mut receipt = AciResidualAppendReceiptV1 {
