@@ -2409,11 +2409,12 @@ pub fn is_lower_better(metric_key: &str) -> bool {
 }
 
 impl BenchmarkReport {
-    /// Compute a normalized cognitive profile: domain → score [0.0, 1.0].
+    /// Compute a legacy baseline-relative triage index: domain → [0.0, 1.0].
     ///
-    /// Groups benchmarks by domain via `domain_of()`, looks up baseline
-    /// comparisons, and averages the ratios per domain. Lower-is-better
-    /// metrics are inverted so that 1.0 always means "at or above baseline".
+    /// Groups metrics by the current domain mapper and averages capped ratios.
+    /// Metrics can have different constructs, units, reference sources, and
+    /// uncertainty; this is a debugging visualization only, not a calibrated
+    /// cognitive profile or psychometric score.
     pub fn cognitive_profile(&self) -> BTreeMap<String, f64> {
         use crate::harness::baselines::BaselineCollection;
         let bl = BaselineCollection::all();
@@ -2453,7 +2454,7 @@ impl BenchmarkReport {
             .collect()
     }
 
-    /// Format the cognitive profile as an ASCII horizontal bar chart.
+    /// Format the legacy heuristic baseline-relative index as an ASCII bar chart.
     pub fn format_profile(&self) -> String {
         let profile = self.cognitive_profile();
         if profile.is_empty() {
@@ -2461,7 +2462,7 @@ impl BenchmarkReport {
         }
 
         let bar_width = 20;
-        let mut lines = vec!["Cognitive Profile".to_string()];
+        let mut lines = vec!["Heuristic Baseline-Relative Dashboard (not psychometric)".to_string()];
 
         for (domain, score) in &profile {
             let filled = (score * bar_width as f64).round() as usize;
@@ -2474,13 +2475,13 @@ impl BenchmarkReport {
         lines.join("\n")
     }
 
-    /// Compute domain composite scores as mean z-scores per domain.
+    /// Compute legacy descriptive mean standardized differences per mapped domain.
     ///
-    /// For each benchmark, looks up the key metric's z-score (from baseline SD).
-    /// Averages z-scores within each domain to produce composite indices.
-    /// Returns `None` for domains with no z-score-enabled baselines.
-    ///
-    /// Interpretation: z=0 = human mean, z=+1 = 1 SD above human, z=-1 = 1 SD below.
+    /// This averages z-like values from heterogeneous metrics using the current
+    /// name-based baseline mapper. It is not a validated domain construct, and
+    /// z=0 does not imply population comparability unless each source/task/unit
+    /// is compatible. Keep this for debugging only; do not call it an IQ-like
+    /// or overall cognitive ability measure.
     pub fn composite_scores(&self) -> BTreeMap<String, CompositeScore> {
         use crate::harness::baselines::BaselineCollection;
         let bl = BaselineCollection::all();
@@ -2539,7 +2540,7 @@ impl BenchmarkReport {
         }
 
         let mut lines = Vec::new();
-        lines.push("Domain Composite Scores (z-score: 0=human mean)".to_string());
+        lines.push("Descriptive Reference Differences by Mapped Domain (not psychometric composites)".to_string());
         lines.push(format!(
             "{:<14} {:>6} {:>4}  {}",
             "Domain", "z", "n", "Benchmarks"
@@ -2551,7 +2552,7 @@ impl BenchmarkReport {
 
         for (domain, cs) in &composites {
             let label = if cs.mean_z > 1.0 {
-                "***" // well above human
+                "***" // far above selected reference mean
             } else if cs.mean_z > 0.5 {
                 "**"
             } else if cs.mean_z > 0.0 {
@@ -2559,7 +2560,7 @@ impl BenchmarkReport {
             } else if cs.mean_z > -0.5 {
                 ""
             } else {
-                "(!)" // notably below human
+                "(!)" // far below selected reference mean
             };
             lines.push(format!(
                 "{:<14} {:>+6.2} {:>4}  {} {}",
@@ -2929,7 +2930,7 @@ mod tests {
         report.add(r);
         let output = report.format_profile();
         assert!(!output.is_empty());
-        assert!(output.contains("Cognitive Profile"), "output: {}", output);
+        assert!(output.contains("Heuristic Baseline-Relative Dashboard"), "output: {}", output);
         assert!(output.contains("WorM"), "output: {}", output);
     }
 
