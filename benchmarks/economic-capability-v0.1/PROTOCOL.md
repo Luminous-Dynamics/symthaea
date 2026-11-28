@@ -204,6 +204,28 @@ External benchmarks are versioned comparators with different task sets and scori
 
 The dated external snapshot is in [EXTERNAL_BENCHMARK_SNAPSHOT_2026-11-28.md](EXTERNAL_BENCHMARK_SNAPSHOT_2026-11-28.md). All external figures must be rechecked and version-pinned before any public report.
 
+## 10a. Long-horizon and dynamic-state stress profile
+
+The external computer-use and robotics results show why task success must be evaluated over the full workflow horizon, not at a single tool call or final narrative. This profile is an evaluation overlay on task-owner fixtures, not a new task schema.
+
+For each selected multi-step task, freeze an event tape and test at least these failure classes:
+
+1. **Cross-source reconciliation:** equivalent facts arrive from different sources with different authority, timestamps and reliability. The workflow must preserve source identity and conflict instead of selecting the most convenient value.
+2. **Hidden/implicit state:** the visible request omits a required precondition or the target application holds a state not present in the prompt. The agent must discover it through permitted reads or ask for clarification.
+3. **Multi-item completeness:** a task names multiple records, assets, affected services or deliverables. The system must verify the complete set and expose omissions rather than accepting the first plausible match.
+4. **Temporal drift and streaming updates:** evidence, application state, permissions or environmental observations change between planning and execution. The workflow must re-check the relevant frontier before irreversible steps.
+5. **Partial execution and interruption:** a tool call times out, a process restarts, or only part of a multi-step workflow completes. Replay must not duplicate effects; the system must reconstruct completed, pending and indeterminate steps.
+6. **Postcondition and rollback:** the agent must distinguish command acceptance from achieved state. When a postcondition fails, it should hold, compensate or escalate according to the task owner's policy; do not declare success from an exit code or ticket status alone.
+7. **Proactive clarification and safe abstention:** missing or conflicting evidence must trigger a useful question, bounded proposal, safe hold or human escalation when the expected value of acting is lower than the risk of acting incorrectly.
+
+For every case, record: exact event/input sequence, known-at and retrieval times where relevant, state transitions, attempted actions, permissions, postcondition oracle, retries, recovery/rollback behavior, human intervention, time and fully burdened cost. Keep a trace of the information available at each decision; future observations cannot retroactively justify an earlier action.
+
+Required adversarial variants include reordered delivery of equivalent events, late corrections, duplicate events, stale application state, conflicting identities, omitted list members, delayed tool responses, partial writes, repeated retries, permission revocation, a failed rollback and a correct no-action outcome. Metamorphic checks must show that irrelevant evidence does not alter unrelated outputs, while a material source revision or state change alters only the dependent decisions.
+
+Compare the same base model and tools with/without the Symthaea orchestration, durable task ledger, retrieval/memory, source reconciliation and postcondition verifier. Keep tool permissions, model version, task data, context, retry budget, action budget and acceptance oracle matched. Report completion and partial-credit separately. The target is not merely to improve the final score: reduce wrong-state acceptance, unsafe or unauthorized effects, human recovery time and cost per independently accepted task.
+
+No LLM judge should be the sole oracle for application state, accounting arithmetic, physical inspection or solver convergence. Use deterministic application postconditions or independent domain-specific adjudication wherever such a reference is available.
+
 ## 11. Qualification ladder
 
 - **E0 — Contract integrity:** schemas, task identity, metric boundaries, comparator and oracle are structurally coherent.
