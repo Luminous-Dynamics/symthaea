@@ -1514,6 +1514,68 @@ mod tests {
     }
 
     #[test]
+    fn per_evidence_pass_is_demoted_when_principal_proof_context_is_missing() {
+        let mut audit: Value = serde_json::from_slice(AUDIT).unwrap();
+        let manifest: Value = serde_json::from_slice(MANIFEST).unwrap();
+        let artifacts = manifest["artifacts"].as_array().unwrap();
+        let mut claims = audit["claims"].as_array().unwrap().clone();
+        claims.retain(|claim| claim["claim_id"] == "C-001" || claim["claim_id"] == "C-003");
+        for claim in &mut claims {
+            for relation in claim["evidence_relations"].as_array_mut().unwrap() {
+                let id = relation["evidence_id"].as_str().unwrap();
+                let artifact = artifacts
+                    .iter()
+                    .find(|artifact| artifact["evidence_id"] == id)
+                    .unwrap();
+                relation["source_snapshot_sha256"] = artifact["content_sha256"].clone();
+                relation["temporally_admissible"] = Value::Bool(true);
+            }
+        }
+        audit["claims"] = Value::Array(claims);
+        let audit_bytes = serde_json::to_vec(&audit).unwrap();
+
+        let mut temporal = temporal(TemporalDisposition::Pass);
+        temporal.principal_profile_id = None;
+        let result = report(&audit_bytes, &temporal);
+
+        assert_eq!(result.temporal, Disposition::Indeterminate);
+        assert_eq!(result.candidate_claims, Disposition::Indeterminate);
+        assert!(result
+            .findings
+            .iter()
+            .any(|finding| finding.code == "TEMPORAL_PRINCIPAL_OR_RIGHTS_PROOF_MISSING"));
+    }
+
+    #[test]
+    fn supported_claim_cannot_ignore_an_admissible_refutation() {
+        let mut audit: Value = serde_json::from_slice(AUDIT).unwrap();
+        let manifest: Value = serde_json::from_slice(MANIFEST).unwrap();
+        let artifact = &manifest["artifacts"][0];
+        let mut claim = audit["claims"][0].clone();
+        claim["evidence_relations"][0]["source_snapshot_sha256"] =
+            artifact["content_sha256"].clone();
+        claim["evidence_relations"][0]["temporally_admissible"] = Value::Bool(true);
+        let mut refutation = claim["evidence_relations"][0].clone();
+        refutation["relation"] = Value::String("refutes".into());
+        claim["evidence_relations"]
+            .as_array_mut()
+            .unwrap()
+            .push(refutation);
+        audit["claims"] = serde_json::json!([claim]);
+
+        let result = report(
+            &serde_json::to_vec(&audit).unwrap(),
+            &temporal(TemporalDisposition::Pass),
+        );
+
+        assert_eq!(result.candidate_claims, Disposition::Fail);
+        assert!(result
+            .findings
+            .iter()
+            .any(|finding| finding.code == "SUPPORTED_CLAIM_IGNORES_ADMISSIBLE_REFUTATION"));
+    }
+
+    #[test]
     fn task_manifest_digest_is_bound_to_exact_bytes() {
         let mut task: Value = serde_json::from_slice(TASK).unwrap();
         task["evidence_manifest_sha256"] = Value::String("00".repeat(32));
