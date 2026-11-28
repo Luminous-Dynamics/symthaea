@@ -1,12 +1,14 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Normative comparison of agent performance against human baselines.
+//! Descriptive comparison of agent metrics against selected human reference data.
 //!
-//! Computes z-scores, percentiles, and clinical-style interpretations for each
-//! benchmark metric by comparing agent values to published human population
-//! norms. Uses the Abramowitz & Stegun (1964) approximation for the standard
-//! normal CDF.
+//! Computes standardized differences and reference-distribution percentiles.
+//! These are not clinical interpretations, do not diagnose impairment, and do
+//! not establish human-level cognition. Comparisons are only meaningful when
+//! task, metric, unit, protocol, and reference population are compatible.
+//! The legacy cross-metric mean z-score is a dashboard summary only; it is not
+//! a validated general cognitive ability estimate.
 
 use serde::{Deserialize, Serialize};
 
@@ -46,25 +48,21 @@ pub fn z_to_percentile(z: f64) -> f64 {
     super::analysis::normal_cdf(z) * 100.0
 }
 
-/// Clinical interpretation of a z-score.
+/// Neutral description of a standardized difference from a reference mean.
 ///
-/// Uses standard neuropsychological classification bands:
-/// - Superior: z > 2.0 (>97.7th percentile)
-/// - Above average: z > 1.0 (>84.1th percentile)
-/// - Average: -1.0 <= z <= 1.0 (15.9th to 84.1th percentile)
-/// - Below average: z < -1.0 (<15.9th percentile)
-/// - Impaired: z < -2.0 (<2.3rd percentile)
+/// These labels are descriptive only. They must not be used as clinical
+/// classifications or as claims about general intelligence or human parity.
 pub fn interpret_z(z: f64) -> &'static str {
     if z > 2.0 {
-        "Superior"
+        "far above reference mean"
     } else if z > 1.0 {
-        "Above average"
+        "above reference mean"
     } else if z >= -1.0 {
-        "Average"
+        "within one SD of reference mean"
     } else if z >= -2.0 {
-        "Below average"
+        "below reference mean"
     } else {
-        "Impaired"
+        "far below reference mean"
     }
 }
 
@@ -365,9 +363,9 @@ impl NormativeReport {
     pub fn to_markdown(&self) -> String {
         let mut out = String::new();
 
-        out.push_str("## Normative Comparison Report\n\n");
+        out.push_str("## Descriptive Reference Comparison (not a clinical assessment)\n\n");
         out.push_str(&format!(
-            "Overall: mean z = {:.2}, percentile = {:.1}%, interpretation = {}\n\n",
+            "Descriptive mean across listed metrics (not a global ability estimate): mean z = {:.2}, normal-CDF percentile transform = {:.1}%, interpretation = {}\n\n",
             self.overall_mean_z,
             self.overall_percentile,
             interpret_z(self.overall_mean_z),
@@ -396,14 +394,14 @@ impl NormativeReport {
         }
 
         if !self.strengths.is_empty() {
-            out.push_str("\n### Strengths (z > 1.0)\n\n");
+            out.push_str("\n### Metrics above their selected reference mean by more than 1 SD\n\n");
             for s in &self.strengths {
                 out.push_str(&format!("- {}\n", s));
             }
         }
 
         if !self.weaknesses.is_empty() {
-            out.push_str("\n### Weaknesses (z < -1.0)\n\n");
+            out.push_str("\n### Metrics below their selected reference mean by more than 1 SD\n\n");
             for w in &self.weaknesses {
                 out.push_str(&format!("- {}\n", w));
             }
@@ -485,19 +483,19 @@ mod tests {
 
     #[test]
     fn test_interpret_z_ranges() {
-        assert_eq!(interpret_z(2.5), "Superior");
-        assert_eq!(interpret_z(2.01), "Superior");
-        assert_eq!(interpret_z(1.5), "Above average");
-        assert_eq!(interpret_z(1.01), "Above average");
-        assert_eq!(interpret_z(1.0), "Average");
-        assert_eq!(interpret_z(0.0), "Average");
-        assert_eq!(interpret_z(-0.5), "Average");
-        assert_eq!(interpret_z(-1.0), "Average");
-        assert_eq!(interpret_z(-1.5), "Below average");
-        assert_eq!(interpret_z(-1.01), "Below average");
-        assert_eq!(interpret_z(-2.0), "Below average");
-        assert_eq!(interpret_z(-2.01), "Impaired");
-        assert_eq!(interpret_z(-3.0), "Impaired");
+        assert_eq!(interpret_z(2.5), "far above reference mean");
+        assert_eq!(interpret_z(2.01), "far above reference mean");
+        assert_eq!(interpret_z(1.5), "above reference mean");
+        assert_eq!(interpret_z(1.01), "above reference mean");
+        assert_eq!(interpret_z(1.0), "within one SD of reference mean");
+        assert_eq!(interpret_z(0.0), "within one SD of reference mean");
+        assert_eq!(interpret_z(-0.5), "within one SD of reference mean");
+        assert_eq!(interpret_z(-1.0), "within one SD of reference mean");
+        assert_eq!(interpret_z(-1.5), "below reference mean");
+        assert_eq!(interpret_z(-1.01), "below reference mean");
+        assert_eq!(interpret_z(-2.0), "below reference mean");
+        assert_eq!(interpret_z(-2.01), "far below reference mean");
+        assert_eq!(interpret_z(-3.0), "far below reference mean");
     }
 
     #[test]
@@ -522,7 +520,7 @@ mod tests {
         assert!((score.human_sd - 0.10).abs() < 1e-10);
         assert!((score.z_score - 0.5).abs() < 1e-10);
         assert!(score.percentile > 50.0 && score.percentile < 100.0);
-        assert_eq!(score.interpretation, "Average");
+        assert_eq!(score.interpretation, "within one SD of reference mean");
     }
 
     #[test]
@@ -623,7 +621,8 @@ mod tests {
         );
         assert!(md.contains("| Benchmark |"), "Missing table header");
         assert!(md.contains("|-----------|"), "Missing table separator");
-        assert!(md.contains("mean z ="), "Missing overall mean z");
+        assert!(md.contains("mean z ="), "Missing descriptive mean z");
+        assert!(md.contains("not a clinical assessment"));
         assert!(md.contains("percentile ="), "Missing overall percentile");
 
         // If any scores were produced, table should have data rows
