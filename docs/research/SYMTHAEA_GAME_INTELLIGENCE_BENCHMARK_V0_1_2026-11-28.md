@@ -377,7 +377,7 @@ A third-party result page is unnecessary for this snapshot: GPT-6-Astra-Max appe
 
 The GameWorld project page currently describes 34 browser games and 170 tasks, with five genres and direct state-derived success/progress metrics. Its visible generalist podium lists Gemini-3-Flash-Preview at **41.9% progress / 21.2% success**, GPT-5.2 at **40.6% / 20.6%**, and Claude-Sonnet-4.6 at **39.3% / 20.6%**. The visible novice-human progress baseline is **64.1%**, and expert-human progress is **82.6%**.
 
-A November 27, 2026 Benchmark Almanac read of the **GameWorld official leaderboard** reports a newer **Fine-Control Protocol, 400-step** result: GPT-6.1 Terra at **76.8%**, Gemini 3.8 Flash at **63.5%**, and Qwen3.8-Flash-Next at **61.5%**. The new score is protocol-specific; it must not be compared as though it were the same run as the standard-protocol public podium. The Almanac is a secondary snapshot of the official leaderboard, so preserve its provenance as such until a raw official result capsule is downloaded and independently inspected.
+The official GameWorld repository now publishes a **Fine-Control Protocol, 400-step** leaderboard. GPT-6.1-Terra (one run per task) reports **61.18% general success / 76.79% general progress**, and **55.29% computer-use success / 72.53% computer-use progress**. The same table shows Gemini-3.8-Flash at 42.35% / 63.52% general success/progress (one run per task), and Qwen3.8-Flash-Next at 29.80% / 55.86% (three runs per task). These are protocol-specific and must not be compared as though they were the same run as the standard paused-protocol podium. The upstream repository states that all entries use 170 tasks and 400 steps, while the number of runs differs by model.
 
 Sources:
 - GameWorld project results and human baselines: https://gameworld-project.github.io/
@@ -388,6 +388,9 @@ The programme should record at least four distinct columns when reproducing Game
 2. fine-control paused protocol progress and success;
 3. GameWorld-RT progress and success (real-time, separate);
 4. human novice/expert reference, with the exact interface and action budget.
+
+
+Fine-control protocol source: official [GameWorld repository README](https://github.com/gameworld-project/GameWorld), read 2026-11-28. It specifies 170 tasks, 400 steps per run, and one run per task for GPT/Gemini versus three for Qwen variants. The official standard leaderboard is on the [project page](https://gameworld-project.github.io/).
 
 ### 13.2 SIMA 2: compare training-environment and held-out-environment capability
 
@@ -405,7 +408,7 @@ Do not set a single cross-benchmark target. Use protocol-matched goals:
 |---|---|---|
 | BALROG LLM | GPT-6-Astra-Max 68.3 ± 2.0 overall progress | First reproduce a small, exact BALROG slice; then aim to exceed 68.3 only under the same benchmark release, interface, model/tool budget, and episode protocol |
 | GameWorld standard | Gemini-3-Flash-Preview 41.9 progress / 21.2 success on visible podium | First reproduce one puzzle and one platformer family; report progress and success separately |
-| GameWorld fine-control | GPT-6.1 Terra 76.8 progress, 400-step Fine-Control Protocol (secondary snapshot of official board) | Protocol-match the exact fine-control action rate and 400-step boundary before claiming a challenge; target >76.8 only after official raw result and local baseline are verified |
+| GameWorld fine-control | GPT-6.1-Terra 76.79 general progress / 61.18 general success; 72.53 CUA progress / 55.29 CUA success, 400-step official protocol | Match action interface, 400-step limit, and runs-per-task; report success and progress separately |
 | SIMA 2 held-out environments | About 14% ASKA / 13% MineDojo | Build a genuinely unseen mechanics/world split and compare success, adaptation cost, and skill transfer; do not compare unlike games directly |
 | Rust-native GameBench | Exact oracle exists only for small deterministic fixtures | 100% on frozen known-answer controls; then test held-out maps, rules and compositions with statistical uncertainty |
 
