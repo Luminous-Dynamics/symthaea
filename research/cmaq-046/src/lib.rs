@@ -301,7 +301,6 @@ impl ConvexTargetApproachabilityMonitor {
         let distance_to_target = self.target.distance(&next_mean)?;
         let horizon_distance = distance_to_target * next_seen as f64;
         let raw_regret = horizon_distance - next_residual_sum;
-        let regret_tolerance = 1e-9 * horizon_distance.abs().max(next_residual_sum.abs()).max(1.0);
         if !raw_regret.is_finite() {
             return Err(ApproachabilityError::ArithmeticOverflow);
         }
