@@ -617,6 +617,25 @@ mod tests {
         ]
     }
 
+    fn single_monitor(seed: [u8; 32]) -> SparsePredictableExpertMonitor {
+        let mut only = configs().remove(0);
+        only.prior_weight = Rational::one();
+        let configurations = vec![only];
+        let manifest = KernelFamilyManifest::build(&configurations, NullCalibration::direct_v1()).unwrap();
+        let fleet = FleetBudgetPlan::new(Rational::probability(1, 20).unwrap(), HASH_A.into(), HASH_B.into()).unwrap();
+        let scope = FleetScope {
+            stream_id: "sparse-single-test".into(),
+            asset_id: "asset".into(),
+            evidence_channel_id: "paired".into(),
+            asset_index: 1,
+            evidence_channel_index: 1,
+            deployment_index: 1,
+        };
+        let local = fleet.local_alpha_for(&scope).unwrap();
+        let plan = TypedRiskPlan::new(&fleet, scope, local.divided_by_integer(2).unwrap(), &manifest).unwrap();
+        SparsePredictableExpertMonitor::new(&plan, &manifest, &configurations, 0.5, 0.1, 256, seed).unwrap()
+    }
+
     fn monitor(seed: [u8;32]) -> SparsePredictableExpertMonitor {
         let configurations = configs();
         let manifest = KernelFamilyManifest::build(&configurations, NullCalibration::direct_v1()).unwrap();
@@ -649,7 +668,7 @@ mod tests {
 
     #[test]
     fn current_pair_does_not_change_pre_pair_selection_or_direction() {
-        let mut baseline = monitor([9u8; 32]);
+        let mut baseline = single_monitor([9u8; 32]);
         baseline.observe_pair(1, "history", &[0.1], &[0.0], &[1.0]).unwrap();
         let mut left = baseline.clone();
         let mut right = baseline;
@@ -658,6 +677,7 @@ mod tests {
         assert_eq!(a.update.selected_expert_index, b.update.selected_expert_index);
         assert_eq!(a.update.selection_probability, b.update.selection_probability);
         assert_eq!(a.update.random_draw, b.update.random_draw);
+        assert!(a.update.direction_norm > 0.0);
         assert_eq!(a.update.direction_norm, b.update.direction_norm);
         assert_ne!(a.update.factor, b.update.factor);
         assert_eq!(left.observations_seen(), 1);
