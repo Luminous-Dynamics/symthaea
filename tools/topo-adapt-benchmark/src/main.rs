@@ -2,7 +2,14 @@ use std::collections::BTreeSet;
 
 use topo_adapt_benchmark::{evaluate_episode, Fixture, FIXTURE_JSON};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
+    if let Err(error) = run() {
+        eprintln!("topology benchmark failed: {error}");
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), String> {
     let fixture = Fixture::parse(FIXTURE_JSON)?;
     fixture.validate()?;
 
@@ -15,7 +22,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut variants: Vec<(String, Vec<&str>)> =
                 vec![("no_edit".to_string(), Vec::new())];
             for edge in &case.candidate_edges {
-                let id = edge.id.as_deref().ok_or("candidate edge has no ID")?;
+                let id = edge
+                    .id
+                    .as_deref()
+                    .ok_or_else(|| format!("{}: candidate edge has no ID", case.id))?;
                 variants.push((format!("edit:{id}"), vec![id]));
             }
 
@@ -39,6 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("{}", serde_json::to_string_pretty(&reports)?);
+    let output = serde_json::to_string_pretty(&reports).map_err(|e| e.to_string())?;
+    println!("{output}");
     Ok(())
 }
