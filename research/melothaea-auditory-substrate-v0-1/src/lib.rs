@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+pub mod dsp;
+
 //! Contract-only validation for the first MEL-HEAR-011 auditory evidence fixture.
 //!
 //! This crate does not implement an audio front end. It verifies provenance,
