@@ -34,7 +34,7 @@ pub use normative_comparison::{NormativeReport, NormativeScore};
 pub use psychometric_report::{BenchmarkDetail, PsychometricReport, ReportSummary};
 pub use reliability_analysis::{
     PracticeDirection, PracticeEffect, ReliabilityBattery, ReliabilityClass, TestRetestResult,
-    compute_icc, compute_sem, pearson_r,
+    compute_icc, compute_icc_2_1, compute_sem, pearson_r,
 };
 pub use report::{
     BaselineComparison, BenchmarkReport, BenchmarkResult, CompositeScore, ForestPlotRow,
