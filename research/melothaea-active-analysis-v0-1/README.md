@@ -8,4 +8,4 @@ cargo +1.96.0 test --locked --all-targets
 cargo +1.96.0 clippy --locked --all-targets -- -D warnings
 ```
 
-Likelihood models are supplied and externally calibrated. This crate validates probability contracts and computes one-step decision value; it does not estimate auditory probabilities or provide a globally optimal multi-step sensing policy.
+Likelihood tables are supplied and externally calibrated. This crate validates probability contracts and computes one-step decision value; it does not estimate auditory probabilities or provide a globally optimal multi-step sensing policy.
