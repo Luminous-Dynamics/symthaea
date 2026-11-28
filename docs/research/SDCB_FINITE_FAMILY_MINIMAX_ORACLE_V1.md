@@ -2,6 +2,8 @@
 
 **Status:** exact analytical result for a small synthetic finite family; standalone Rust reference authored but not compiled, CI-qualified, or physically validated. Machine-readable fixture: `docs/research/SDCB_FINITE_FAMILY_MINIMAX_ORACLE_V1.json`.
 
+Run the standalone harness with `bash scripts/research/run_sdcb_finite_family_tests.sh`.
+
 ## 1. Why this fixture
 
 Issue #14136 proposes a conservative family p-value
