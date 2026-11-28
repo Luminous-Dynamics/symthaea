@@ -318,13 +318,15 @@ For open-ended or agentic tasks, repeat evaluations across controlled seeds and 
 
 MLPerf's distinction between closed and open divisions is a useful precedent: the closed division emphasizes matched model/reference setups; the open division allows model substitution or retraining. EQC should preserve both comparable baselines and an innovation track.
 
-## 7.1 Current external benchmark snapshot (2026-11-27)
+## 7.1 Current external benchmark snapshot (2026-11-28)
 
 This section records the public evidence used to set the first comparison targets. These numbers are not directly comparable across benchmarks because task scope, scoring, attempts, tools, budgets and environments differ.
 
+This 2026-11-28 snapshot should be treated as a dated reference, not a permanently current leaderboard. The Scale V2 page itself is marked as updated on 2026-09-22; the ranking/values above are the entries displayed when this EQC review was refreshed on 2026-11-28. Do not compare systems using best-of result selection, different harnesses, token/cost caps, or evaluation modes without reporting those differences.
+
 | Domain | Current public reference | What it measures | Important limitation for EQC |
 |---|---|---|---|
-| Software engineering — issue resolution | SWE-Bench Pro V2: 642 tasks across 11 repositories; locked V2 protocol | Repository-level bug/feature resolution with hidden tests, no web tools during the agent phase, two-sided reference/empty-patch admission and pristine re-grading | Resolve rate does not score authority, input provenance, state mutation containment or independent reproducibility. V2 scores are not comparable with the previous 731-task split |
+| Software engineering — issue resolution | SWE-Bench Pro V2: 642 tasks across 11 repositories; Claude Opus 5 currently 99.40 ±0.40, Gemini 4 Argon 99.22 ±0.45, Claude Fable 5.1 99.10 ±0.50 (Scale leaderboard snapshot, 2026-11-28) | Repository-level bug/feature resolution with hidden tests, no web tools during the agent phase, two-sided reference/empty-patch admission and pristine re-grading | Near-ceiling raw resolve rate is not an evidence-integrity score; it does not score authority, input provenance, state mutation containment or independent reproducibility. V2 scores are not comparable with the previous 731-task split |
 | Software engineering — investigation | SWE Atlas Codebase Q&A: 124 tasks; top systems around 30% under the strictest rubric threshold in the published Q&A release | Runtime-backed codebase comprehension, architecture, root cause, onboarding, security and API integration | Tests whether an agent actually investigates execution, not just whether it can produce a patch; human rubric and task-specific criteria differ from SWE-Bench Pro |
 | Software engineering — test quality | SWE Atlas Test Writing: 90 tasks | Unit, integration and acceptance tests with behavior-oriented grading | Test count is not quality. Weak assertions that pass on broken implementations must fail the benchmark |
 | Software engineering — maintenance | SWE Atlas Refactoring: 70 tasks; published top results remain below 50% | Multi-file decomposition, extraction, relocation, interface evolution, dead-code removal and documentation consistency | Passing the old test suite is necessary but not sufficient; score call-site recall, completeness, maintainability and stale-artifact removal |
