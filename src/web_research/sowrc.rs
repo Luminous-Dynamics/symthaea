@@ -302,7 +302,13 @@ pub fn evaluate_sowrc(
         .filter_map(|observation| {
             observation
                 .true_label_nonconformity
-                .map(|score| (score, 1.0 / observation.inclusion_probability, observation.record_id.as_str()))
+                .map(|score| {
+                    (
+                        score,
+                        1.0 / observation.inclusion_probability,
+                        observation.record_id.as_str(),
+                    )
+                })
         })
         .collect::<Vec<_>>();
     observed_scores.sort_by(|left, right| {
@@ -730,6 +736,33 @@ mod tests {
         assert_eq!(
             report.selection_status,
             SowrcSelectionStatus::SafeTerminalFullLabelSet
+        );
+    }
+
+    #[test]
+    fn scores_equal_to_lambda_are_not_miscovered() {
+        let mut cfg = config(1.0);
+        cfg.threshold_grid = vec![0.5, 1.0];
+        let rows = vec![
+            observation(0, "equal", 1.0, Some(0.5)),
+            observation(1, "above", 1.0, Some(0.500_001)),
+            observation(2, "below", 1.0, Some(0.499_999)),
+        ];
+        let report = evaluate_sowrc(&rows, &cfg).unwrap();
+        let half = &report.threshold_bounds[0];
+        assert_eq!(half.lambda, 0.5);
+        assert_eq!(half.horvitz_thompson_loss_total, 1.0);
+        assert_eq!(half.empirical_weighted_risk, 1.0 / 3.0);
+    }
+
+    #[test]
+    fn empty_calibration_protocol_manifest_is_rejected() {
+        let rows = vec![observation(0, "a", 1.0, Some(0.1))];
+        let mut cfg = config(1.0);
+        cfg.calibration_protocol_manifest_ref.clear();
+        assert_eq!(
+            evaluate_sowrc(&rows, &cfg).unwrap_err(),
+            SowrcError::InvalidCalibrationProtocolManifest
         );
     }
 
