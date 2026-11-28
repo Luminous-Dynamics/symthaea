@@ -114,6 +114,8 @@ pub enum StratifiedRiskError {
     SelectedRecordMissingAdjudication(String),
     NonSelectedRecordHasAdjudication(String),
     NoAuditSample,
+    InvalidCoverageTarget,
+    InvalidConfidenceThreshold,
 }
 
 impl std::fmt::Display for StratifiedRiskError {
@@ -131,6 +133,8 @@ impl std::fmt::Display for StratifiedRiskError {
             Self::SelectedRecordMissingAdjudication(id) => write!(formatter, "selected audit record has no independent adjudication: {id}"),
             Self::NonSelectedRecordHasAdjudication(id) => write!(formatter, "non-selected record has an audit label: {id}"),
             Self::NoAuditSample => write!(formatter, "audit plan contains no selected records"),
+            Self::InvalidCoverageTarget => write!(formatter, "coverage targets must be finite and in (0, 1]"),
+            Self::InvalidConfidenceThreshold => write!(formatter, "confidence thresholds must be finite and in [0, 1]"),
         }
     }
 }
@@ -262,6 +266,20 @@ pub fn evaluate_stratified_audit_risk(
     config: &RiskCoverageConfig,
 ) -> Result<StratifiedRiskReport, StratifiedRiskError> {
     validate_plan(plan)?;
+    if config
+        .target_coverages
+        .iter()
+        .any(|value| !value.is_finite() || *value <= 0.0 || *value > 1.0)
+    {
+        return Err(StratifiedRiskError::InvalidCoverageTarget);
+    }
+    if config
+        .confidence_thresholds
+        .iter()
+        .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+    {
+        return Err(StratifiedRiskError::InvalidConfidenceThreshold);
+    }
     if predictions.len() != plan.population_size {
         return Err(StratifiedRiskError::PredictionCountMismatch);
     }
@@ -271,9 +289,9 @@ pub fn evaluate_stratified_audit_risk(
         if prediction.id.trim().is_empty() {
             return Err(StratifiedRiskError::EmptyPredictionId);
         }
-        if !prediction_by_id
+        if prediction_by_id
             .insert(prediction.id.as_str(), prediction)
-            .is_none()
+            .is_some()
         {
             return Err(StratifiedRiskError::DuplicatePredictionId(
                 prediction.id.clone(),
@@ -288,12 +306,13 @@ pub fn evaluate_stratified_audit_risk(
         }
     }
 
+    let plan_ids: HashSet<&str> = plan
+        .selections
+        .iter()
+        .map(|selection| selection.record_id.as_str())
+        .collect();
     for prediction in predictions {
-        if !plan
-            .selections
-            .iter()
-            .any(|selection| selection.record_id == prediction.id)
-        {
+        if !plan_ids.contains(prediction.id.as_str()) {
             return Err(StratifiedRiskError::UnknownPredictionId(
                 prediction.id.clone(),
             ));
@@ -777,6 +796,29 @@ mod tests {
     }
 
     #[test]
+    fn invalid_operating_point_configuration_fails_closed() {
+        let plan = four_unit_plan();
+        let rows = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("b", 0.8, true, Some(true)),
+            prediction("c", 0.4, true, None),
+            prediction("d", 0.2, true, None),
+        ];
+        let mut invalid = config();
+        invalid.target_coverages = vec![1.1];
+        assert_eq!(
+            evaluate_stratified_audit_risk(&rows, &plan, &invalid).unwrap_err(),
+            StratifiedRiskError::InvalidCoverageTarget
+        );
+        let mut invalid = config();
+        invalid.confidence_thresholds = vec![f64::NAN];
+        assert_eq!(
+            evaluate_stratified_audit_risk(&rows, &plan, &invalid).unwrap_err(),
+            StratifiedRiskError::InvalidConfidenceThreshold
+        );
+    }
+
+    #[test]
     fn invalid_prediction_cohort_size_and_duplicate_ids_fail_closed() {
         let plan = four_unit_plan();
         let rows = vec![
@@ -814,6 +856,7 @@ mod tests {
         let report = evaluate_stratified_audit_risk(&rows, &plan, &config()).unwrap();
         assert_eq!(report.observed_model_policy.accepted_population_count, 3);
         assert_eq!(report.confidence_threshold_baselines.len(), 2);
-        assert_eq!(report.confidence_threshold_baselines[0].estimate.accepted_population_count, 1);
+        assert_eq!(report.confidence_threshold_baselines[0].estimate.accepted_population_count, 2);
+        assert_eq!(report.confidence_threshold_baselines[1].estimate.accepted_population_count, 1);
     }
 }
