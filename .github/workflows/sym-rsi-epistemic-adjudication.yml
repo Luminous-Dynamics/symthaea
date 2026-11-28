@@ -8,6 +8,7 @@ on:
       - research/epistemic-selective-observation-v1
       - research/stratified-epistemic-audit-design-v1
       - research/epistemic-sowrc-finite-risk-control-v4
+      - research/predictable-bernoulli-audit-receipt-v1
     paths:
       - "src/web_research/types.rs"
       - "src/web_research/meta_learning.rs"
@@ -16,6 +17,7 @@ on:
       - "src/web_research/stratified_audit.rs"
       - "src/web_research/stratified_risk.rs"
       - "src/web_research/sowrc.rs"
+      - "src/web_research/predictable_audit.rs"
       - "src/web_research/mod.rs"
       - "tests/epistemic_consciousness_tests.rs"
       - "tools/sym-rsi-epistemic-adjudication/**"
@@ -30,6 +32,7 @@ on:
       - "src/web_research/stratified_audit.rs"
       - "src/web_research/stratified_risk.rs"
       - "src/web_research/sowrc.rs"
+      - "src/web_research/predictable_audit.rs"
       - "src/web_research/mod.rs"
       - "tests/epistemic_consciousness_tests.rs"
       - "tools/sym-rsi-epistemic-adjudication/**"
@@ -62,6 +65,7 @@ jobs:
             src/web_research/stratified_audit.rs \
             src/web_research/stratified_risk.rs \
             src/web_research/sowrc.rs \
+            src/web_research/predictable_audit.rs \
             src/web_research/mod.rs \
             tests/epistemic_consciousness_tests.rs \
             tools/sym-rsi-epistemic-adjudication/src/lib.rs
@@ -78,6 +82,7 @@ jobs:
             src/web_research/stratified_audit.rs
             src/web_research/stratified_risk.rs
             src/web_research/sowrc.rs
+            src/web_research/predictable_audit.rs
             src/web_research/mod.rs
             tests/epistemic_consciousness_tests.rs
             tools/sym-rsi-epistemic-adjudication/src/lib.rs
@@ -91,6 +96,7 @@ jobs:
             src/web_research/stratified_audit.rs \
             src/web_research/stratified_risk.rs \
             src/web_research/sowrc.rs \
+            src/web_research/predictable_audit.rs \
             src/web_research/mod.rs \
             tests/epistemic_consciousness_tests.rs \
             tools/sym-rsi-epistemic-adjudication/src/lib.rs
@@ -104,6 +110,7 @@ jobs:
             src/web_research/stratified_audit.rs \
             src/web_research/stratified_risk.rs \
             src/web_research/sowrc.rs \
+            src/web_research/predictable_audit.rs \
             src/web_research/mod.rs \
             tests/epistemic_consciousness_tests.rs \
             tools/sym-rsi-epistemic-adjudication/src/lib.rs
