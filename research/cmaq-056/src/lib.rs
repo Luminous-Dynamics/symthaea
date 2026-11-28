@@ -29,6 +29,8 @@ const INVENTORY_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/CMAQ-056/PORTFOLIO-INVENTORY
 const TARGET_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/CMAQ-056/TARGET-ENVELOPE/V1\0";
 const REFERENCE_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/CMAQ-056/REFERENCE-BUNDLE/V1\0";
 const CALIBRATION_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/CMAQ-056/CALIBRATION-CONTRACT/V1\0";
+const FEATURE_MAP_SEMANTICS: &str = "rff-cos-sin-interleaved-unit-norm-v1";
+const TARGET_SEMANTICS: &str = "convex-box-support-eprocess-v1";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ManifestError {
@@ -182,10 +184,13 @@ impl KernelFamilyManifest {
 
         let mut inventory = Encoder::with_domain(INVENTORY_DOMAIN);
         inventory.u32(FORMAT_VERSION);
+        inventory.string(FEATURE_MAP_SEMANTICS)?;
+        inventory.string(TARGET_SEMANTICS)?;
         encode_calibration(&mut inventory, &calibration)?;
 
         let mut target_encoder = Encoder::with_domain(TARGET_DOMAIN);
         target_encoder.u32(FORMAT_VERSION);
+        target_encoder.string(TARGET_SEMANTICS)?;
         target_encoder.u64(configurations.len() as u64);
 
         let mut reference_encoder = Encoder::with_domain(REFERENCE_DOMAIN);
