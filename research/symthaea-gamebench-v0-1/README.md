@@ -34,3 +34,28 @@ cargo clippy --all-targets -- -D warnings
 ```
 
 No execution result is claimed until the exact branch head passes these commands. Passing fixture tests establish only the stated environment mechanics, not Symthaea cognitive capability, game-playing performance, visual competence, or SOTA.
+
+
+## Candidate interface and policy baselines
+
+The public candidate contract is observation/action-only:
+- a candidate receives the current observation, offered action attempts, remaining interaction budget, and episode step;
+- it returns one offered action, optional calibrated success confidence, and normalized feature forecasts;
+- after the action, it receives only the previous and next candidate-visible observations;
+- the evaluator owns true state, task rules, outcome scoring, and exact planning.
+
+A missing confidence value is valid. An action-selection softmax is not automatically a calibrated probability of task success.
+
+Two candidate policy baselines now implement this interface:
+- `RandomLegalCandidate`: seeded, reproducible random legal action.
+- `GreedyManhattanCandidate`: one-step Manhattan heuristic, requiring complete O1 map access; it does not search routes or retain memory.
+
+The separate package `research/symthaea-gamebench-fep-adapter-v0-1/` implements an actual `symthaea-fep::ActiveInferenceAgent` F1 candidate. It is a named FEP submodule baseline, not the complete HDC+CfC Symthaea architecture. It currently requires a visible goal and uses an explicit 2D position transition prior. The adapter reports forecast distributions but leaves calibrated success confidence unavailable.
+
+## Authored tests and qualification status
+
+- Environment, candidate contract, and policy baseline: **52 unit tests authored** (F1–F6: 41; candidate contract: 7; random/greedy policies: 4).
+- FEP navigation adapter: **6 unit tests authored**.
+- Total: **58 authored tests**. These counts are source inventory, not observed test results.
+- Two isolated workflows run rustfmt, Cargo tests, and strict Clippy.
+- No test/format/Clippy pass is claimed until both workflows pass on the exact branch head.
