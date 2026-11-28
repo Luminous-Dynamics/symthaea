@@ -1,22 +1,29 @@
 #![forbid(unsafe_code)]
 
-//! Uncertainty-aware null-reference target for bounded iid stationary streams.
+//! Uncertainty-aware reference envelope for bounded common-conditional-mean
+//! martingale streams.
 //!
-//! Independent reference blocks r_i in R^d obey ||r_i||_2 <= R. Coordinate
-//! values therefore lie in [-R,R]. For m independent reference blocks, the
-//! simultaneous Hoeffding radius
+//! Reference increments r_i in R^d are adapted to G_i and satisfy
+//! E[r_i | G_(i-1)] = mu for one fixed (non-random) vector mu, with
+//! ||r_i||_2 <= R. Coordinates lie in [-R,R]. Azuma-Hoeffding gives the
+//! simultaneous coordinatewise envelope radius
 //!
 //!   epsilon = R * sqrt(2 * ln(2d/delta) / m)
 //!
-//! gives P(mu not in S_hat) <= delta for the true iid mean mu, where S_hat is
-//! the coordinatewise box around the reference sample mean. An independent
-//! iid test stream then uses the CMAQ-046 e-process at alpha_test conditional
-//! on mu being in S_hat. The unconditional false-alarm bound is
+//! and P(mu not in S_hat) <= delta for the box around the reference sample
+//! mean. The test phase continues under an enlarged filtration containing all
+//! reference history and previous test observations. It must satisfy the same
+//! conditional-mean identity E[r_t | F_(t-1)] = mu and the same bound R.
+//! Conditional on the reference envelope containing mu, CMAQ-046's e-process
+//! is valid at alpha_test. Therefore
 //!
 //!   P(false alarm ever) <= alpha_test + delta <= alpha_total.
 //!
-//! This is an iid stationary mean guarantee. It is not a conditional-mean
-//! guarantee for arbitrary serially dependent test streams.
+//! This contract permits serial dependence and predictable heteroskedasticity.
+//! It does not permit conditional-mean drift, unmodelled covariate-dependent
+//! means, different reference/test conditional means, or norm violations.
+//! The implementation checks bounded inputs and receipt structure; it cannot
+//! verify the stochastic conditional-mean assumptions or source provenance.
 
 use std::collections::HashSet;
 
@@ -92,7 +99,9 @@ impl RiskFraction {
     }
 }
 
-/// One independent calibration block, represented by one bounded vector.
+/// One bounded reference increment, represented by one vector. A unique ID
+/// or trace digest does not prove independence; validity rests on the stated
+/// common-conditional-mean martingale assumption.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReferenceBlock {
     pub block_id: String,
@@ -258,8 +267,10 @@ impl CalibratedReferenceApproachabilityMonitor {
         })
     }
 
-    /// Adds one independent test observation. Test block IDs are consumed only
-    /// after the CMAQ-046 update succeeds.
+    /// Adds one bounded test-phase martingale increment. Under the null, its
+    /// conditional mean given all reference history and previous test values
+    /// must equal the same fixed reference-phase mean mu. Test block IDs are
+    /// consumed only after the CMAQ-046 update succeeds.
     pub fn observe(
         &mut self,
         test_block_id: &str,
