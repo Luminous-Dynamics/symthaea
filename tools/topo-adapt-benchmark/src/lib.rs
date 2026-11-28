@@ -551,3 +551,10 @@ fn solve_flow(
         edge_maintenance_cost_units: 0,
     })
 }
+
+
+mod trajectory;
+pub use trajectory::{
+    ActionDisposition, ActionReceipt, EpisodeRuntimeState, ExogenousEvent,
+    ExogenousEventKind, PolicyAction, TickReceipt,
+};

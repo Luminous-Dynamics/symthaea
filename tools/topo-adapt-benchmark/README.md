@@ -42,3 +42,41 @@ actually emits message/update traces.
 
 This is a benchmark evaluator, not a learned controller. It does not model
 biological transport, bioelectricity, physical repair or industrial actuation.
+
+## Stateful trajectory replay (P0 research API)
+
+The `EpisodeRuntimeState` API is the sequential counterpart to the static
+`evaluate_episode` evaluator. It maintains accepted candidate edges, demand
+changes, event/action IDs and cumulative edit/maintenance ledgers across ticks.
+
+A caller supplies each tick's event batch and at most one bounded
+`PolicyAction`. The runtime:
+- applies events to a persistent graph;
+- rejects same-tick conflicting mutations to one resource;
+- requires strictly increasing ticks and does not allow callers to skip a
+  fixture demand/intervention time;
+- requires each action to bind to the exact previewed pre-action state digest;
+- applies cumulative edit and maximum-active-edge limits;
+- treats repeated action/event IDs idempotently;
+- computes max-flow and an exhaustive independent min-cut before and after the
+  action;
+- emits deterministic state and event digests and a per-tick receipt.
+
+The P0 action surface is intentionally small: no-op, add a candidate edge,
+defer and abstain. Remove/rewire, capacity changes, richer observation
+requests, multi-agent authority and a learned controller are not implemented
+in this slice.
+
+Message bytes and controller updates are `None` (unmeasured), not zero. The
+runtime must not claim to enforce those budgets until a controller adapter
+produces actual message and update traces. Maintenance cost is charged once per
+active edge per simulated tick in the current research accounting unit; this
+is a synthetic accounting convention, not measured physical energy or money.
+
+Thirteen tests are authored for repeated disruption, the snapshot-reset negative control, persistent runtime-created edges,
+cumulative budgets, event-order invariance, conflict rejection, duplicate
+action IDs and event IDs, stale pre-state digests, deterministic replay,
+demand persistence, skipped-schedule rejection and context-bound state digests.
+
+Run:
+    cargo test -p topo-adapt-benchmark
