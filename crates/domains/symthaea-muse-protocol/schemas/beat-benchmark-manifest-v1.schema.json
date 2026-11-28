@@ -33,7 +33,8 @@
       "minItems": 1,
       "items": {
         "$ref": "#/$defs/track"
-      }
+      },
+      "maxItems": 10000
     }
   },
   "$defs": {
@@ -206,7 +207,8 @@
           "minItems": 1,
           "items": {
             "$ref": "#/$defs/valid_segment"
-          }
+          },
+          "maxItems": 4096
         },
         "beat_frames": {
           "type": "array",
@@ -215,7 +217,8 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
-          }
+          },
+          "maxItems": 200000
         },
         "downbeat_annotations_available": {
           "type": "boolean"
@@ -226,7 +229,8 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
-          }
+          },
+          "maxItems": 200000
         },
         "publication_ceiling": {
           "oneOf": [
