@@ -358,7 +358,7 @@ fn verify_condition(
                         return Err(AvCounterfactualError::UnexpectedVisualCueAnnotation);
                     }
                 }
-                _ => unreachable!(),
+                _ => return Err(AvCounterfactualError::VisualVariantMismatch),
             }
         }
     }
@@ -459,7 +459,7 @@ pub fn evaluate_av_counterfactual_item(
     }
     if prediction_by_id
         .keys()
-        .any(|id| !item.conditions.iter().any(|condition| condition.condition_id == *id))
+        .any(|id| !item.conditions.iter().any(|condition| condition.condition_id.as_str() == *id))
     {
         return Err(AvCounterfactualError::UnexpectedPrediction);
     }
