@@ -22,6 +22,7 @@ mod orchestration_view;
 mod pages;
 mod palette;
 mod playback;
+mod perform_page;
 mod player_bar;
 mod score_view;
 mod state;
