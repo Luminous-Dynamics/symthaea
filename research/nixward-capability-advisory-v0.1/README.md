@@ -171,6 +171,18 @@ The preferred target-bound source is the evaluated option set for the exact targ
 
 This implies a strict two-stage API: HDC search returns **candidates**; a deterministic resolver then checks exact target membership, type, namespace, read-only status, module/overlay context and source revision. A bundled or local catalog may help discovery, but must never silently become authoritative for a remote host.
 
+## 3. User-goal conformance contract
+
+The goal corpus is a separate benchmark arm from the security-advisory corpus. It tests whether an assistant can convert broad requests into explicit requirements and whether it recognizes when a missing choice must block plan promotion.
+
+- `schemas/goal-corpus-v0.1.schema.json` defines target identity, hard/soft/forbidden constraints, desired outcomes, verification obligations and unresolved user decisions.
+- `scenarios/goal-corpus-v0.1.json` contains 16 synthetic user-goal cases spanning packages, services, public/private networking, Home Manager, multiple hosts, disk operations, encryption, backup, GPU drivers, development shells, updates and recovery.
+- `crates/core/nixward/tests/goal_corpus.rs` checks requirement identities, explicit verification obligations, exact target identity for plan candidates, and blocks silent assumption of high-risk or irreversible decisions.
+
+The expected classifications are only `plan_candidate`, `needs_clarification` and `abstain`. A `plan_candidate` is not an executable or approved plan. It still must pass exact option/package resolution, impact review, evaluation/build/VM checks and the separate authority boundary.
+
+The goal corpus and the security corpus must be scored independently. More plan candidates are not automatically better: unsafe assumptions and wrong target binding are hard failures, while excessive clarification must be evaluated against benign-task completion and user burden.
+
 ## 4. Security-advisory contract
 
 ### 4.1 Two independent tracks
