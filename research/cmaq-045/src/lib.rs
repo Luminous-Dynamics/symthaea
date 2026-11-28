@@ -75,25 +75,25 @@ impl HaarContrast {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Context {
-    PreviousRankBucket(usize),
-    PreviousTwoStepUp,
-    PreviousTwoStepDown,
-    PreviousExtremeLow,
-    PreviousExtremeHigh,
-    PreviousHighRun,
-    PreviousLowRun,
+    RankBucket(usize),
+    TwoStepUp,
+    TwoStepDown,
+    ExtremeLow,
+    ExtremeHigh,
+    HighRun,
+    LowRun,
 }
 
 impl Context {
     fn name(self) -> &'static str {
         match self {
-            Self::PreviousRankBucket(_) => "previous_rank_bucket",
-            Self::PreviousTwoStepUp => "previous_two_step_up",
-            Self::PreviousTwoStepDown => "previous_two_step_down",
-            Self::PreviousExtremeLow => "previous_extreme_low",
-            Self::PreviousExtremeHigh => "previous_extreme_high",
-            Self::PreviousHighRun => "previous_high_run",
-            Self::PreviousLowRun => "previous_low_run",
+            Self::RankBucket(_) => "previous_rank_bucket",
+            Self::TwoStepUp => "previous_two_step_up",
+            Self::TwoStepDown => "previous_two_step_down",
+            Self::ExtremeLow => "previous_extreme_low",
+            Self::ExtremeHigh => "previous_extreme_high",
+            Self::HighRun => "previous_high_run",
+            Self::LowRun => "previous_low_run",
         }
     }
 }
@@ -306,8 +306,8 @@ impl ConditionalRankSpectrumMonitor {
             }
         }
 
-        let low_cutoff = (rank_buckets + 3) / 4;
-        let high_cutoff = (3 * rank_buckets + 3) / 4;
+        let low_cutoff = rank_buckets.div_ceil(4);
+        let high_cutoff = (3 * rank_buckets).div_ceil(4);
         if last_rank <= low_cutoff {
             active.push(PREVIOUS_RANK_BUCKETS + 2);
         }
@@ -488,34 +488,34 @@ impl ConditionalRankSpectrumMonitor {
 
 fn build_context_bank() -> Vec<Context> {
     let mut contexts = (0..PREVIOUS_RANK_BUCKETS)
-        .map(Context::PreviousRankBucket)
+        .map(Context::RankBucket)
         .collect::<Vec<_>>();
     contexts.extend([
-        Context::PreviousTwoStepUp,
-        Context::PreviousTwoStepDown,
-        Context::PreviousExtremeLow,
-        Context::PreviousExtremeHigh,
-        Context::PreviousHighRun,
-        Context::PreviousLowRun,
+        Context::TwoStepUp,
+        Context::TwoStepDown,
+        Context::ExtremeLow,
+        Context::ExtremeHigh,
+        Context::HighRun,
+        Context::LowRun,
     ]);
     contexts
 }
 
 fn context_index(context: Context) -> usize {
     match context {
-        Context::PreviousRankBucket(index) => index,
-        Context::PreviousTwoStepUp => PREVIOUS_RANK_BUCKETS,
-        Context::PreviousTwoStepDown => PREVIOUS_RANK_BUCKETS + 1,
-        Context::PreviousExtremeLow => PREVIOUS_RANK_BUCKETS + 2,
-        Context::PreviousExtremeHigh => PREVIOUS_RANK_BUCKETS + 3,
-        Context::PreviousHighRun => PREVIOUS_RANK_BUCKETS + 4,
-        Context::PreviousLowRun => PREVIOUS_RANK_BUCKETS + 5,
+        Context::RankBucket(index) => index,
+        Context::TwoStepUp => PREVIOUS_RANK_BUCKETS,
+        Context::TwoStepDown => PREVIOUS_RANK_BUCKETS + 1,
+        Context::ExtremeLow => PREVIOUS_RANK_BUCKETS + 2,
+        Context::ExtremeHigh => PREVIOUS_RANK_BUCKETS + 3,
+        Context::HighRun => PREVIOUS_RANK_BUCKETS + 4,
+        Context::LowRun => PREVIOUS_RANK_BUCKETS + 5,
     }
 }
 
 fn update_history(previous: RankHistory, current_rank: usize, rank_buckets: usize) -> RankHistory {
-    let low_cutoff = (rank_buckets + 3) / 4;
-    let high_cutoff = (3 * rank_buckets + 3) / 4;
+    let low_cutoff = rank_buckets.div_ceil(4);
+    let high_cutoff = (3 * rank_buckets).div_ceil(4);
     let is_low = current_rank <= low_cutoff;
     let is_high = current_rank >= high_cutoff;
     RankHistory {
