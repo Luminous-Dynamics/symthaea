@@ -170,6 +170,8 @@ pub enum BeatBenchmarkViolationCode {
     DuplicateTrackId,
     EmptyDatasetId,
     EmptyDatasetRevision,
+    EmptyDatasetReference,
+    EmptyCollectionProcessReference,
     InvalidAudioSha256,
     InvalidAnnotationSha256,
     MirexLockedDatasetUsedOutsideLockedTest,
@@ -179,8 +181,9 @@ pub enum BeatBenchmarkViolationCode {
     EmptyRightsReference,
     MissingPrivatePublicationCeiling,
     UnknownAnnotationProvenance,
+    AutoOnlyAnnotationsUnqualified,
     EmptyAnnotationRevision,
-    KnownTrainingOverlap,
+    KnownDatasetOverlap,
     OverlapAuditUnknown,
     InvalidSampleRate,
     InvalidChannelCount,
@@ -188,6 +191,7 @@ pub enum BeatBenchmarkViolationCode {
     SourceFrameCountExceedsJsonSafeInteger,
     MissingSourceMasterFamilyId,
     EmptySourceMasterFamilyId,
+    NonCanonicalSourceMasterFamilyId,
     EmptyValidSegments,
     EmptyValidSegment,
     ValidSegmentOutOfBounds,
@@ -314,6 +318,22 @@ pub fn validate_beat_benchmark_manifest(
                 format!("{base}.dataset_revision"),
             );
         }
+        if track.dataset_reference.trim().is_empty() {
+            push(
+                &mut violations,
+                BeatBenchmarkViolationCode::EmptyDatasetReference,
+                BeatBenchmarkViolationSeverity::Reject,
+                format!("{base}.dataset_reference"),
+            );
+        }
+        if track.collection_process_reference.trim().is_empty() {
+            push(
+                &mut violations,
+                BeatBenchmarkViolationCode::EmptyCollectionProcessReference,
+                BeatBenchmarkViolationSeverity::Reject,
+                format!("{base}.collection_process_reference"),
+            );
+        }
         if !is_lowercase_sha256(&track.audio_sha256) {
             push(
                 &mut violations,
@@ -426,6 +446,14 @@ pub fn validate_beat_benchmark_manifest(
                 format!("{base}.annotation_provenance"),
             );
         }
+        if track.annotation_provenance == BeatAnnotationProvenance::AutoOnly {
+            push(
+                &mut violations,
+                BeatBenchmarkViolationCode::AutoOnlyAnnotationsUnqualified,
+                BeatBenchmarkViolationSeverity::Unqualified,
+                format!("{base}.annotation_provenance"),
+            );
+        }
         if track.annotation_revision.trim().is_empty() {
             push(
                 &mut violations,
@@ -438,7 +466,7 @@ pub fn validate_beat_benchmark_manifest(
             BeatOverlapAuditStatus::Clear => {}
             BeatOverlapAuditStatus::KnownOverlap => push(
                 &mut violations,
-                BeatBenchmarkViolationCode::KnownTrainingOverlap,
+                BeatBenchmarkViolationCode::KnownDatasetOverlap,
                 BeatBenchmarkViolationSeverity::Reject,
                 format!("{base}.overlap_audit"),
             ),
@@ -490,9 +518,15 @@ pub fn validate_beat_benchmark_manifest(
                 BeatBenchmarkViolationSeverity::Reject,
                 format!("{base}.source_master_family_id"),
             ),
+            Some(family) if family.trim() != family => push(
+                &mut violations,
+                BeatBenchmarkViolationCode::NonCanonicalSourceMasterFamilyId,
+                BeatBenchmarkViolationSeverity::Reject,
+                format!("{base}.source_master_family_id"),
+            ),
             Some(family) => {
                 source_master_splits
-                    .entry(family.to_string())
+                    .entry(family.to_ascii_lowercase())
                     .or_default()
                     .insert(track.split);
             }
@@ -657,7 +691,7 @@ fn validate_track_annotations(
         violations,
     );
     for (index, frame) in track.downbeat_frames.iter().enumerate() {
-        if !track.beat_frames.contains(frame) {
+        if track.beat_frames.binary_search(frame).is_err() {
             push(
                 violations,
                 BeatBenchmarkViolationCode::DownbeatNotPresentInBeatAnnotations,
@@ -665,6 +699,12 @@ fn validate_track_annotations(
             );
         }
     }
+}
+
+/// Binary-search a sorted, non-overlapping valid-segment list.
+fn frame_in_valid_segments(frame: u64, segments: &[BeatValidSegment]) -> bool {
+    let insertion = segments.partition_point(|segment| segment.start_frame <= frame);
+    insertion > 0 && frame < segments[insertion - 1].end_frame
 }
 
 fn validate_ordered_frames(
@@ -679,9 +719,7 @@ fn validate_ordered_frames(
     for (index, frame) in frames.iter().enumerate() {
         if *frame >= total_frames
             || *frame > MAX_SAFE_JSON_INTEGER
-            || !segments
-                .iter()
-                .any(|segment| segment.start_frame <= *frame && *frame < segment.end_frame)
+            || !frame_in_valid_segments(*frame, segments)
         {
             push(
                 violations,
@@ -737,6 +775,8 @@ mod tests {
             track_id: track_id.to_string(),
             dataset_id: dataset_id.to_string(),
             dataset_revision: "2026-01".to_string(),
+            dataset_reference: "urn:fixture:synthetic-dataset".to_string(),
+            collection_process_reference: "urn:fixture:synthetic-collection-process".to_string(),
             audio_sha256: audio_sha.to_string(),
             source_master_family_id: Some(master_id.to_string()),
             split,
