@@ -25,3 +25,10 @@ The `dsp` module now provides a deterministic CPU reference pipeline:
 - Triangular log-frequency power partition of the same STFT bins.
 
 The ERB implementation is not a gammatone cochlear model. The log-frequency view is not a true constant-Q transform: it inherits the fixed linear-frequency STFT grid. A separate multi-resolution CQT implementation remains future work. These baseline algorithms expose their assumptions so later implementations can be compared fairly.
+
+
+## Causal gammatone filterbank
+
+A standalone fourth-order complex resonator cascade provides ERB-spaced auditory filtering. It retains both a demodulated complex envelope and mean band power. Each frame distinguishes local averaging support from the full causal filter-state support beginning at the segment reset.
+
+This is a linear, fixed-parameter gammatone-like approximation, not a complete cochlear model. The triangular ERB/STFT rebinning remains a separate feature baseline.
