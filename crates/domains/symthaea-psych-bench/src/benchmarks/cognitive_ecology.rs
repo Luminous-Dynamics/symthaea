@@ -489,6 +489,267 @@ pub fn replay(
     Ok((state, receipts))
 }
 
+/// Evaluator-computed outcome for a fully replayed command trace.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScenarioScore {
+    pub goal_completed: bool,
+    pub transitions_used: u32,
+    pub agent_attempts: u32,
+    pub invalid_actions: u32,
+    pub inspections: u32,
+    pub evaluator_perturbations: u32,
+    pub successful_recoveries: u32,
+    pub optimal_agent_steps: u32,
+    /// 0 when the goal is incomplete; otherwise optimal steps / actual agent attempts, capped at 1.
+    pub action_efficiency: f64,
+}
+
+/// Auditable output of a deterministic trace evaluation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EvaluatedTrace {
+    pub scenario_id: String,
+    pub manifest_digest: String,
+    pub final_state_digest: String,
+    pub receipts: Vec<StepReceipt>,
+    pub score: ScenarioScore,
+}
+
+fn score_replayed_state(
+    manifest: &ScenarioManifest,
+    state: &WorldState,
+    commands: &[RecordedCommand],
+) -> ScenarioScore {
+    let agent_attempts = commands
+        .iter()
+        .filter(|command| matches!(command, RecordedCommand::Agent(_)))
+        .count() as u32;
+    let invalid_actions = state
+        .event_log
+        .iter()
+        .filter(|event| matches!(event.kind, EventKind::ActionRejected { .. }))
+        .count() as u32;
+    let inspections = state
+        .event_log
+        .iter()
+        .filter(|event| matches!(event.kind, EventKind::Inspected(_)))
+        .count() as u32;
+    let evaluator_perturbations = state
+        .event_log
+        .iter()
+        .filter(|event| matches!(event.kind, EventKind::Perturbed(_)))
+        .count() as u32;
+
+    let mut awaiting_recovery = false;
+    let mut successful_recoveries = 0;
+    for event in &state.event_log {
+        match event.kind {
+            EventKind::Perturbed(_) => awaiting_recovery = true,
+            EventKind::GateOpened if awaiting_recovery => {
+                successful_recoveries += 1;
+                awaiting_recovery = false;
+            }
+            _ => {}
+        }
+    }
+
+    let optimal_agent_steps = if manifest.layout().filter_location == Site::Depot {
+        8
+    } else {
+        9
+    };
+    let action_efficiency = if state.delivered && agent_attempts > 0 {
+        (optimal_agent_steps as f64 / agent_attempts as f64).min(1.0)
+    } else {
+        0.0
+    };
+
+    ScenarioScore {
+        goal_completed: state.delivered,
+        transitions_used: state.tick,
+        agent_attempts,
+        invalid_actions,
+        inspections,
+        evaluator_perturbations,
+        successful_recoveries,
+        optimal_agent_steps,
+        action_efficiency,
+    }
+}
+
+/// Replay and score a command trace using evaluator-only state.
+///
+/// This function never trusts a caller-supplied final state or score. It
+/// reconstructs the state from the manifest and commands before scoring.
+pub fn evaluate_trace(
+    manifest: &ScenarioManifest,
+    commands: &[RecordedCommand],
+) -> Result<EvaluatedTrace, TransitionError> {
+    let (state, receipts) = replay(manifest, commands)?;
+    let final_state_digest = state
+        .digest()
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
+    Ok(EvaluatedTrace {
+        scenario_id: manifest.scenario_id.clone(),
+        manifest_digest: manifest
+            .digest()
+            .map_err(|error| TransitionError::Serialization(error.to_string()))?,
+        final_state_digest,
+        score: score_replayed_state(manifest, &state, commands),
+        receipts,
+    })
+}
+
+/// Recompute a trace and reject any receipt mismatch.
+pub fn verify_trace(
+    manifest: &ScenarioManifest,
+    commands: &[RecordedCommand],
+    expected_receipts: &[StepReceipt],
+) -> Result<EvaluatedTrace, TransitionError> {
+    let evaluated = evaluate_trace(manifest, commands)?;
+    if evaluated.receipts != expected_receipts {
+        return Err(TransitionError::ReplayMismatch);
+    }
+    Ok(evaluated)
+}
+
+/// Export one JSON receipt per line for artifact storage.
+pub fn receipts_to_jsonl(receipts: &[StepReceipt]) -> Result<String, serde_json::Error> {
+    let mut output = String::new();
+    for receipt in receipts {
+        output.push_str(&serde_json::to_string(receipt)?);
+        output.push('\n');
+    }
+    Ok(output)
+}
+
+fn push_agent_action(
+    manifest: &ScenarioManifest,
+    state: &mut WorldState,
+    commands: &mut Vec<RecordedCommand>,
+    action: Action,
+) -> Result<(), TransitionError> {
+    let (next, _receipt, outcome) = attempt(manifest, state, action.clone())?;
+    *state = next;
+    commands.push(RecordedCommand::Agent(action));
+    match outcome {
+        AttemptOutcome::Accepted => Ok(()),
+        AttemptOutcome::Rejected(error) => Err(error),
+    }
+}
+
+fn push_evaluator_perturbation(
+    manifest: &ScenarioManifest,
+    state: &mut WorldState,
+    commands: &mut Vec<RecordedCommand>,
+    perturbation: Perturbation,
+) -> Result<(), TransitionError> {
+    let (next, _receipt) = perturb(manifest, state, perturbation)?;
+    *state = next;
+    commands.push(RecordedCommand::Evaluator(perturbation));
+    Ok(())
+}
+
+/// A transparent scripted baseline that solves the current generated layout.
+/// When requested, the evaluator injects a gate failure and the policy recovers.
+pub fn run_reference_policy(
+    manifest: &ScenarioManifest,
+    inject_gate_failure: bool,
+) -> Result<EvaluatedTrace, TransitionError> {
+    let mut state = WorldState::initial(manifest)
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
+    let mut commands = Vec::new();
+
+    push_agent_action(manifest, &mut state, &mut commands, Action::Inspect)?;
+    push_agent_action(
+        manifest,
+        &mut state,
+        &mut commands,
+        Action::Collect(Item::ValveKey),
+    )?;
+    if manifest.layout().filter_location == Site::Depot {
+        push_agent_action(
+            manifest,
+            &mut state,
+            &mut commands,
+            Action::Collect(Item::WaterFilter),
+        )?;
+    }
+    push_agent_action(
+        manifest,
+        &mut state,
+        &mut commands,
+        Action::Move(Site::Crossing),
+    )?;
+    push_agent_action(manifest, &mut state, &mut commands, Action::Inspect)?;
+    push_agent_action(manifest, &mut state, &mut commands, Action::UseValveKey)?;
+
+    if inject_gate_failure {
+        push_evaluator_perturbation(
+            manifest,
+            &mut state,
+            &mut commands,
+            Perturbation::FailCrossingGate,
+        )?;
+        push_agent_action(manifest, &mut state, &mut commands, Action::Inspect)?;
+        push_agent_action(manifest, &mut state, &mut commands, Action::UseValveKey)?;
+    }
+
+    push_agent_action(
+        manifest,
+        &mut state,
+        &mut commands,
+        Action::Move(Site::Outpost),
+    )?;
+    if manifest.layout().filter_location == Site::Outpost {
+        push_agent_action(manifest, &mut state, &mut commands, Action::Inspect)?;
+        push_agent_action(
+            manifest,
+            &mut state,
+            &mut commands,
+            Action::Collect(Item::WaterFilter),
+        )?;
+    }
+    push_agent_action(manifest, &mut state, &mut commands, Action::Deliver)?;
+    evaluate_trace(manifest, &commands)
+}
+
+/// Deterministic random-action baseline. It sees only that the episode has
+/// ended; action choices are generated from a fixed SplitMix64 stream.
+pub fn run_random_policy(manifest: &ScenarioManifest) -> Result<EvaluatedTrace, TransitionError> {
+    let mut state = WorldState::initial(manifest)
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
+    let mut commands = Vec::new();
+    let mut rng = manifest.seed ^ 0xD1B5_4A32_D192_ED03;
+
+    for _ in 0..manifest.max_steps {
+        if state.delivered {
+            break;
+        }
+        rng = rng.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut value = rng;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        value ^= value >> 31;
+
+        let action = match value % 9 {
+            0 => Action::Inspect,
+            1 => Action::Move(Site::Depot),
+            2 => Action::Move(Site::Crossing),
+            3 => Action::Move(Site::Outpost),
+            4 => Action::Collect(Item::WaterFilter),
+            5 => Action::Collect(Item::ValveKey),
+            6 => Action::UseValveKey,
+            7 => Action::Deliver,
+            _ => Action::Wait,
+        };
+        let (next, _receipt, _outcome) = attempt(manifest, &state, action.clone())?;
+        state = next;
+        commands.push(RecordedCommand::Agent(action));
+    }
+
+    evaluate_trace(manifest, &commands)
+}
+
 /// Apply an evaluator-only regime shift. It is not available to the agent.
 pub fn perturb(
     manifest: &ScenarioManifest,
