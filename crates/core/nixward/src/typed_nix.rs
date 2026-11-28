@@ -143,6 +143,13 @@ impl NixPackageRef {
     pub fn new(attribute: &str) -> Result<Self, TypedNixError> {
         let parsed = NixAttributePath::parse(attribute)
             .map_err(|_| TypedNixError::InvalidPackagePath(attribute.to_string()))?;
+        if parsed
+            .0
+            .first()
+            .is_some_and(|segment| segment.as_str() == "pkgs")
+        {
+            return Err(TypedNixError::InvalidPackagePath(attribute.to_string()));
+        }
         Ok(Self { attribute: parsed })
     }
 
@@ -322,7 +329,8 @@ mod tests {
         assert!(rendered.contains(&concat!("\\", "$", "{")));
         assert!(rendered.contains("\\n"));
         assert!(rendered.contains("\\t"));
-        assert!(!rendered.contains(&concat!("$", "{builtins.abort")));
+        let without_escaped_interpolation = rendered.replace(&concat!("\\", "$", "{"), "");
+        assert!(!without_escaped_interpolation.contains(&concat!("$", "{")));
     }
 
     #[test]
@@ -340,7 +348,7 @@ mod tests {
         let injected_path = concat!("services.", "$", "{name}.enable");
         assert!(NixAttributePath::parse(&injected_path).is_err());
         assert!(NixPackageRef::new("ripgrep; builtins.abort").is_err());
-        assert!(NixPackageRef::new("pkgs.ripgrep").is_ok());
+        assert!(NixPackageRef::new("pkgs.ripgrep").is_err());
     }
 
     #[test]
