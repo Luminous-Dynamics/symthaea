@@ -231,7 +231,7 @@ Build and qualify the environment kernel before adding a natural-language wrappe
 - Deterministic `step`, runner-facing `attempt`, and evaluator-only `perturb` transitions. Rejected actions consume a tick and are recorded as `ActionRejected` events. Hard errors (step limit, manifest mismatch, serialization failure) fail closed.
 - Separate evaluator state from agent-visible inspected-site observations.
 - BLAKE3 state/manifest digests, manifest-mismatch rejection, deterministic trace replay and replay-receipt verification.
-- Evaluator scoring reconstructed only from the replayed state/command trace: goal completion, total transitions, agent attempts, invalid actions, inspections, interventions, recovery, action efficiency, and a manifest-bound action-cost ledger with goal completion per cost unit.
+- Evaluator scoring reconstructed only from the replayed state/command trace: goal completion, total transitions, agent attempts, invalid actions, inspections, interventions, recovery, BFS minimum action count, Dijkstra minimum action cost, action efficiency, cost efficiency, and a manifest-bound action-cost ledger with goal completion per cost unit.
 - JSONL receipt export.
 - A scripted reference policy that solves both generated layouts, an intervention variant that recovers after gate failure, and a deterministic SplitMix64 random-action baseline.
 - Example runner: `cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines`; add `--jsonl` for JSONL summary records.
@@ -239,7 +239,7 @@ Build and qualify the environment kernel before adding a natural-language wrappe
 
 **Remaining protocol limits:**
 - The seed currently selects only two layouts. This is a minimal deterministic variation, not a rich procedural world generator.
-- The scripted reference policy is optimal only for this hand-authored two-layout task. A BFS oracle computes a shortest valid action plan for the current state space, but it is still an evaluator ceiling for this small fully specified environment, not a general agent or search over hidden/incomplete world models. The oracle's state key deliberately omits event history and tick because BFS order makes the shortest path dominate; any future action with stateful hidden side effects must be added to the key and tested for Markov sufficiency.
+- The scripted reference policy is optimal only for this hand-authored two-layout task. A BFS oracle computes a shortest valid action plan; a separate Dijkstra oracle computes minimum manifest-defined action cost under the hard step budget. Both inspect full evaluator state and are ceilings for this small fully specified environment, not fair black-box competitors or planners over hidden/incomplete world models. The BFS key omits event history and tick because BFS order makes the shortest path dominate; the Dijkstra key retains the number of steps used so a cheap but longer route cannot erase a shorter feasible route. Any future stateful action effects must be added to these keys and tested for Markov sufficiency.
 - The random policy is a floor baseline, not a representative distribution of capable agents.
 - Invalid attempts consume action ticks. An over-budget inspection is charged as an invalid action and does not consume additional observation budget. The first `CostModel` uses benchmark-defined relative units (inspect=2, move=1, interaction=1, wait=1, invalid surcharge=1); these are not joules, latency, API tokens or dollars. External wrappers must add measured wall-clock, memory, token, energy and monetary costs. Per-action resource budgets and rate limits remain to be formalized.
 - JSONL export exists as a string serializer, but durable artifact writing, an external independent verifier binary, distractors, delayed transfer, and held-out topologies remain pending.
@@ -247,7 +247,7 @@ Build and qualify the environment kernel before adding a natural-language wrappe
 **Next implementation sequence:**
 1. Expand the seeded generator to multiple topology/rule families with independently derived sub-seeds.
 2. Add distractor/interruption, delayed retention and structural transfer stages.
-3. Extend the BFS oracle to larger procedurally generated topologies, then add a planner operating only on agent-visible observations so the comparison distinguishes full-information ceiling from feasible agent planning; match action/observation/compute budgets.
+3. Extend BFS and Dijkstra oracles to larger procedurally generated topologies, then add a planner operating only on agent-visible observations so the comparison distinguishes full-information action/cost ceilings from feasible agent planning; match action/observation/compute budgets.
 4. Add positive/negative/sham and unrelated-module mechanism controls.
 5. Finalize versioned trial/scorer metadata and CI validity gates.
 6. Add LLM and human adapters only after the environment and scorer are stable.
