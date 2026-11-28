@@ -123,11 +123,13 @@
       "properties": {
         "start_frame": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "end_frame": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       }
     },
@@ -154,7 +156,8 @@
         },
         "total_frames": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
       }
     },
@@ -194,10 +197,13 @@
       "properties": {
         "frame": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "beat_index": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "confidence_ppm": {
           "type": "integer",
@@ -218,13 +224,18 @@
       "properties": {
         "frame": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "beat_index": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "bar_index": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "confidence_ppm": {
           "type": "integer",
@@ -244,7 +255,8 @@
       "properties": {
         "frame": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "bpm_milli": {
           "type": "integer",
@@ -269,7 +281,9 @@
       ],
       "properties": {
         "start_beat_index": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "numerator": {
           "type": "integer",
