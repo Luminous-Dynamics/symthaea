@@ -30,9 +30,20 @@ jobs:
           components: clippy, rustfmt
       - name: Check formatting
         run: cargo fmt --manifest-path research/typed-research-state/Cargo.toml -- --check
+      - name: Regenerate nested lockfile for one-run dependency diagnosis
+        run: cargo generate-lockfile --manifest-path research/typed-research-state/Cargo.toml
       - name: Run locked validator tests
         run: cargo test --manifest-path research/typed-research-state/Cargo.toml --locked --all-targets
       - name: Run ResearchState examples
         run: cargo run --manifest-path research/typed-research-state/Cargo.toml --locked
       - name: Run strict Clippy
         run: cargo clippy --manifest-path research/typed-research-state/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Upload generated lockfile diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typed-research-state-generated-lockfile
+          path: research/typed-research-state/Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
