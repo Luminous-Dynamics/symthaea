@@ -79,11 +79,11 @@ event contract.
 - [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
 
 The renderer-independent event, projection, policy, receipt, scene, scene-graph, turn-control, continuity, interaction-trace verification, compositor-feedback, audiovisual-counterfactual and benchmark-license modules live under
-`crates/domains/symthaea-soma/src/`. The optional temporal pixel-budget policy lives in the separate `crates/domains/symthaea-foveation/` package and is disabled by default. The cross-event trace verifier has a Rust CLI at
+`crates/domains/symthaea-soma/src/`. The optional temporal pixel-budget policy lives in the separate `crates/domains/symthaea-foveation/` package and is disabled by default. When enabled, it drops stale source-frame requests/results and never crops an older request from a newer retained frame buffer. The cross-event trace verifier has a Rust CLI at
 `crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs`; it checks causal relationships but is not a JSON Schema validator.
 A standalone Bevy 0.20.1 adapter has transition-aware source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
-All 203 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
+All 207 tracked polyembodiment and temporal-foveation regression tests are authored but unexecuted; this inventory excludes pre-existing tests elsewhere in the foveation package, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
 
 ## Theoretical Foundations
 
