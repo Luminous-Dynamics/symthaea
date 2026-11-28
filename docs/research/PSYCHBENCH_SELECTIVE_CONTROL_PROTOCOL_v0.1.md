@@ -68,11 +68,13 @@ The task adapter at `src/benchmarks/metacognition/selective_prediction_task.rs` 
 
 - a fixed 14-item synthetic v0.1 fixture covering supported evidence, difficult-but-answerable items, missing constraints, false premises, stale evidence and unavailable sources;
 - four matched controls: always-answer, always-abstain, evidence-threshold and premise/freshness-aware;
-- evaluator-only answerability, counterfactual correctness and clarification outcomes;
-- fixed evaluator-charged action costs;
+- evaluator-only answerability, counterfactual correctness, correct clarification target and post-clarification outcome;
+- targeted requests: supply a missing constraint, verify a premise or refresh a stale source;
+- one evaluator-mediated clarification cycle followed by a fresh policy decision, using only the updated observation;
+- fixed evaluator-charged action costs for both initial and follow-up decisions;
 - a BLAKE3 manifest digest shared across all policy reports;
-- clarification precision and recall; and
-- tests intended to prevent a reward loophole for answering everything or abstaining on everything, and to reject inconsistent evaluator labels.
+- initial-answer, final-answer and post-clarification accuracy, plus clarification precision/recall and follow-up cost; and
+- tests intended to prevent a reward loophole for answering everything or abstaining on everything, to verify useful recovery and to reject inconsistent evaluator labels and invalid updated observations.
 
 Run the fixture with:
 
@@ -82,7 +84,7 @@ The runner emits JSONL (one JSON report per line).
 
 ### Interpretation limits
 
-This fixture is deliberately small and hand-authored. It is a *policy-control smoke test*, not a validated benchmark, a general task generator, a trained Symthaea integration, a human study, a public-dataset reproduction or a state-of-the-art comparison. Its action costs are arbitrary relative fixture units, not seconds, tokens, joules or money. The four controls are transparent baselines, not external foundation models. The fixture does not yet execute a multi-turn clarification exchange; it scores whether the initial request is supported by an evaluator-known clarification opportunity.
+This fixture is deliberately small and hand-authored. It is a *policy-control smoke test*, not a validated benchmark, a general task generator, a trained Symthaea integration, a human study, a public-dataset reproduction or a state-of-the-art comparison. Its action costs are arbitrary relative fixture units, not seconds, tokens, joules or money. The four controls are transparent baselines, not external foundation models. It models only one targeted clarification and one subsequent decision, with a deterministic synthetic evidence reveal; it is not a general conversation benchmark or an interactive user study.
 
 ## 5. Metric protocol
 
