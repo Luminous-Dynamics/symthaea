@@ -64,7 +64,9 @@ fn schema_and_corpus_are_parseable_and_version_bound() {
     );
     assert_eq!(corpus["synthetic_only"].as_bool(), Some(true));
     assert!(
-        corpus["cases"].as_array().is_some_and(|cases| cases.len() >= 12),
+        corpus["cases"]
+            .as_array()
+            .is_some_and(|cases| cases.len() >= 12),
         "the frozen corpus must retain at least twelve cases"
     );
 }
@@ -77,9 +79,14 @@ fn case_and_evidence_identities_are_unique_and_complete() {
 
     for case in cases {
         let case_id = case["case_id"].as_str().expect("case_id");
-        assert!(case_ids.insert(case_id), "duplicate case identity: {case_id}");
         assert!(
-            case["cluster_id"].as_str().is_some_and(|value| !value.is_empty()),
+            case_ids.insert(case_id),
+            "duplicate case identity: {case_id}"
+        );
+        assert!(
+            case["cluster_id"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty()),
             "{case_id}: independent cluster identity is required"
         );
         assert!(
@@ -176,13 +183,12 @@ fn stale_or_mismatched_evidence_cannot_support_a_definitive_safe_claim() {
             .into_iter()
             .flatten()
             .any(|item| {
-                matches!(
-                    item["freshness"].as_str(),
-                    Some("stale" | "unknown")
-                ) || matches!(
-                    item["subject_binding"].as_str(),
-                    Some("mismatched" | "unbound")
-                ) || matches!(item["integrity"].as_str(), Some("unsigned" | "unknown"))
+                matches!(item["freshness"].as_str(), Some("stale" | "unknown"))
+                    || matches!(
+                        item["subject_binding"].as_str(),
+                        Some("mismatched" | "unbound")
+                    )
+                    || matches!(item["integrity"].as_str(), Some("unsigned" | "unknown"))
             });
 
         if has_unusable_evidence {
