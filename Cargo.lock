@@ -20178,6 +20178,7 @@ dependencies = [
  "criterion",
  "serde",
  "serde_json",
+ "sha2",
  "symthaea-core",
  "symthaea-fep",
  "tracing",
