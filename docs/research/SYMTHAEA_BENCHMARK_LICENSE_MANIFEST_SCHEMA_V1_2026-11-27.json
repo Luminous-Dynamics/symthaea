@@ -46,6 +46,7 @@
     "source_uri": {
       "type": "string",
       "format": "uri",
+      "pattern": "^(https://|urn:)",
       "maxLength": 2048
     },
     "rights_holder": {
