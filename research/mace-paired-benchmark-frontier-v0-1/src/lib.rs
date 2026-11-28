@@ -252,9 +252,6 @@ fn validate_and_group_outcomes(
         if !valid_sha256(&row.outcome_receipt_sha256) {
             return Err(FrontierRejectV1::InvalidOutcomeReceipt);
         }
-        if task_outcome_payload_sha256_v1(row)? != row.outcome_receipt_sha256 {
-            return Err(FrontierRejectV1::OutcomePayloadMismatch);
-        }
         if row.evaluator_custody != OutcomeCustodyV1::PublicDiagnosticOnly {
             return Err(FrontierRejectV1::InvalidOutcome);
         }
@@ -268,6 +265,11 @@ fn validate_and_group_outcomes(
         }
         if row.metric_values.values().any(|value| !value.is_finite()) {
             return Err(FrontierRejectV1::NonFiniteMetric);
+        }
+        // Validate metric shape and numeric domain before verifying the payload
+        // digest, so malformed values receive their precise rejection reason.
+        if task_outcome_payload_sha256_v1(row)? != row.outcome_receipt_sha256 {
+            return Err(FrontierRejectV1::OutcomePayloadMismatch);
         }
         let rows = grouped.entry(row.arm_id.clone()).or_default();
         let key = (row.independent_cluster_id.clone(), row.task_id.clone());
@@ -756,6 +758,7 @@ mod tests {
         for row in rows.clone() {
             let mut repeated=row;
             repeated.task_id=format!("repeat-{}",repeated.task_id);
+            repeated.outcome_receipt_sha256=task_outcome_payload_sha256_v1(&repeated).unwrap();
             rows.push(repeated);
         }
         let mut adjusted=manifests.clone();
