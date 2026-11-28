@@ -6,23 +6,23 @@
     {
       "id": "MON038-P001",
       "classification": "positive_control",
-      "name": "closed_multi_partition_capture",
+      "name": "closed_gap_free_multi_partition_capture",
       "expected_capture_outcome": "qualified",
-      "mutation": "All partitions covered; LSO equals stable high watermark; read_committed; sparse offsets link to exact business events"
+      "mutation": "All partitions covered; LSO equals stable high watermark; read_committed; every offset in the captured ranges has a visible-record receipt"
     },
     {
       "id": "MON038-P002",
       "classification": "positive_control",
       "name": "transaction_spans_partitions",
       "expected_capture_outcome": "qualified",
-      "mutation": "One transaction is represented across ledger and logical-message partitions without global order inference"
+      "mutation": "One transaction is represented across ledger and logical-message partitions with gap-free visible capture and no global order inference"
     },
     {
-      "id": "MON038-P003",
-      "classification": "positive_control",
-      "name": "aborted_offset_gaps",
-      "expected_capture_outcome": "qualified",
-      "mutation": "Offsets 100 and 102 remain valid in a read_committed capture; no missing event is invented at offset 101"
+      "id": "MON038-N023",
+      "classification": "negative_control",
+      "name": "unclassified_read_committed_offset_hole",
+      "expected_capture_outcome": "indeterminate",
+      "mutation": "Offsets 100 and 102 are visible but offset 101 has no broker-log/control-marker classification in the v1 evidence bundle"
     },
     {
       "id": "MON038-N001",

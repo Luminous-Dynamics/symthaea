@@ -2,7 +2,7 @@
 
 ## Hypothesis
 
-A stable per-partition capture vector can establish transactional visibility and event-set closure for multi-partition Kafka without a global ordering assumption. It should preserve legal offset gaps while detecting truncation, partition drift, topic recreation, missing capture ranges and event/capture disagreement.
+A stable per-partition capture vector can establish range and event-set closure without a global ordering assumption. V1 must not infer the cause of offset holes from arithmetic or matching arrays; unexplained slots remain indeterminate until exact broker-log evidence is available.
 
 ## Prospective targets (not achieved)
 
@@ -13,7 +13,7 @@ A stable per-partition capture vector can establish transactional visibility and
 | Visibility | 100% of non-read_committed captures rejected |
 | Range closure | 100% detection of LSO/HW instability, truncation and out-of-range records |
 | Business-event join | 100% exact event/transaction/payload/partition-offset linkage |
-| Legal sparse offsets | 100% of known aborted/control-offset gaps accepted without inventing missing business events |
+| Sparse offset slots without exact broker-log classification | 100% reported as unclassified and held indeterminate |\n| Known aborted/control-marker intervals (future v2) | 100% accepted only with exact authenticated interval evidence |
 | Unsafe promotion | 0 across 10,000 deterministic adversarial mutations |
 | Runtime overhead | p95 < 50 ms for 10,000 records over 256 partitions on a pinned 2-vCPU host |
 
@@ -25,7 +25,7 @@ Compare: (1) Kafka read_committed consumer capture with offsets only; (2) consum
 
 Hold Kafka broker/client versions, topic configs, producer transaction schedule, transactional IDs, partition count, retention, consumer isolation and machine budget constant. Include aborted and open transactions, producer fencing, leader changes, retention movement, topic delete/recreate, compaction, partition expansion and cross-partition transactions.
 
-Report false-qualified, false-blocked and indeterminate outcomes; visible business-event recall/precision; legal gap acceptance; capture time; RPO/RTO; CPU/memory; operator intervention; and total restore cost. Do not compare verifier microseconds directly to Kafka throughput benchmarks.
+Report false-qualified, false-blocked and indeterminate outcomes; visible business-event recall/precision; gap-classification coverage and unclassified-range holds; capture time; RPO/RTO; CPU/memory; operator intervention; and total restore cost. Do not compare verifier microseconds directly to Kafka throughput benchmarks.
 
 ## Version matrix
 

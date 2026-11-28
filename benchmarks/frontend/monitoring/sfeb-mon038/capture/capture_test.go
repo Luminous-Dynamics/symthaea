@@ -31,32 +31,32 @@ func fixture()Input{
   },
   PartitionCaptures:[]PartitionCapture{
    {CaptureID:"capture-038-001",ClusterID:"kafka-cluster-1",Topic:"ledger",TopicID:"topic-id-ledger",Partition:0,
-    StartOffset:100,EndOffsetExclusive:104,LogStartOffsetAtStart:50,LogStartOffsetAtEnd:50,
-    LastStableOffsetBefore:104,LastStableOffsetAfter:104,HighWatermarkBefore:104,HighWatermarkAfter:104,LeaderEpochBefore:3,LeaderEpochAfter:3,
+    StartOffset:100,EndOffsetExclusive:102,LogStartOffsetAtStart:50,LogStartOffsetAtEnd:50,
+    LastStableOffsetBefore:102,LastStableOffsetAfter:102,HighWatermarkBefore:102,HighWatermarkAfter:102,LeaderEpochBefore:3,LeaderEpochAfter:3,
     IsolationLevel:"read_committed",CleanupPolicy:"delete",CaptureStartedAt:now.Add(-80*time.Second),CaptureCompletedAt:now.Add(-40*time.Second),CaptureComplete:true,
     Records:[]CapturedRecord{
      {Topic:"ledger",TopicID:"topic-id-ledger",Partition:0,Offset:100,RecordClass:"row_change",EventID:"row-1",TransactionID:"tx-1",DataCollection:"public.ledger",PayloadSHA256:da},
-     {Topic:"ledger",TopicID:"topic-id-ledger",Partition:0,Offset:102,RecordClass:"row_change",EventID:"row-2",TransactionID:"tx-1",DataCollection:"public.ledger",PayloadSHA256:db},
+     {Topic:"ledger",TopicID:"topic-id-ledger",Partition:0,Offset:101,RecordClass:"row_change",EventID:"row-2",TransactionID:"tx-1",DataCollection:"public.ledger",PayloadSHA256:db},
     }},
    {CaptureID:"capture-038-001",ClusterID:"kafka-cluster-1",Topic:"ledger",TopicID:"topic-id-ledger",Partition:1,
-    StartOffset:200,EndOffsetExclusive:202,LogStartOffsetAtStart:100,LogStartOffsetAtEnd:100,
-    LastStableOffsetBefore:202,LastStableOffsetAfter:202,HighWatermarkBefore:202,HighWatermarkAfter:202,LeaderEpochBefore:8,LeaderEpochAfter:8,
+    StartOffset:200,EndOffsetExclusive:201,LogStartOffsetAtStart:100,LogStartOffsetAtEnd:100,
+    LastStableOffsetBefore:201,LastStableOffsetAfter:201,HighWatermarkBefore:201,HighWatermarkAfter:201,LeaderEpochBefore:8,LeaderEpochAfter:8,
     IsolationLevel:"read_committed",CleanupPolicy:"delete",CaptureStartedAt:now.Add(-80*time.Second),CaptureCompletedAt:now.Add(-40*time.Second),CaptureComplete:true,
     Records:[]CapturedRecord{
      {Topic:"ledger",TopicID:"topic-id-ledger",Partition:1,Offset:200,RecordClass:"row_change",EventID:"row-3",TransactionID:"tx-2",DataCollection:"public.ledger",PayloadSHA256:dc},
     }},
    {CaptureID:"capture-038-001",ClusterID:"kafka-cluster-1",Topic:"message",TopicID:"topic-id-message",Partition:0,
-    StartOffset:40,EndOffsetExclusive:43,LogStartOffsetAtStart:0,LogStartOffsetAtEnd:0,
-    LastStableOffsetBefore:43,LastStableOffsetAfter:43,HighWatermarkBefore:43,HighWatermarkAfter:43,LeaderEpochBefore:5,LeaderEpochAfter:5,
+    StartOffset:40,EndOffsetExclusive:42,LogStartOffsetAtStart:0,LogStartOffsetAtEnd:0,
+    LastStableOffsetBefore:42,LastStableOffsetAfter:42,HighWatermarkBefore:42,HighWatermarkAfter:42,LeaderEpochBefore:5,LeaderEpochAfter:5,
     IsolationLevel:"read_committed",CleanupPolicy:"delete",CaptureStartedAt:now.Add(-80*time.Second),CaptureCompletedAt:now.Add(-40*time.Second),CaptureComplete:true,
     Records:[]CapturedRecord{
      {Topic:"message",TopicID:"topic-id-message",Partition:0,Offset:40,RecordClass:"logical_message",EventID:"message-1",TransactionID:"tx-1",DataCollection:"LOGICAL_DECODING_MESSAGE",PayloadSHA256:dd},
-     {Topic:"message",TopicID:"topic-id-message",Partition:0,Offset:42,RecordClass:"transaction_metadata",TransactionID:"tx-1",PayloadSHA256:da},
+     {Topic:"message",TopicID:"topic-id-message",Partition:0,Offset:41,RecordClass:"transaction_metadata",TransactionID:"tx-1",PayloadSHA256:da},
     }},
   },
   BusinessEvents:[]BusinessEvent{
    {EventID:"row-1",TransactionID:"tx-1",Topic:"ledger",TopicID:"topic-id-ledger",Partition:0,Offset:100,RecordClass:"row_change",DataCollection:"public.ledger",PayloadSHA256:da},
-   {EventID:"row-2",TransactionID:"tx-1",Topic:"ledger",TopicID:"topic-id-ledger",Partition:0,Offset:102,RecordClass:"row_change",DataCollection:"public.ledger",PayloadSHA256:db},
+   {EventID:"row-2",TransactionID:"tx-1",Topic:"ledger",TopicID:"topic-id-ledger",Partition:0,Offset:101,RecordClass:"row_change",DataCollection:"public.ledger",PayloadSHA256:db},
    {EventID:"row-3",TransactionID:"tx-2",Topic:"ledger",TopicID:"topic-id-ledger",Partition:1,Offset:200,RecordClass:"row_change",DataCollection:"public.ledger",PayloadSHA256:dc},
    {EventID:"message-1",TransactionID:"tx-1",Topic:"message",TopicID:"topic-id-message",Partition:0,Offset:40,RecordClass:"logical_message",DataCollection:"LOGICAL_DECODING_MESSAGE",PayloadSHA256:dd},
   },
@@ -73,15 +73,20 @@ func TestCleanMultiPartitionVectorQualifiesWithoutGlobalOrder(t *testing.T){
  if got.CampaignVerdict!=Indeterminate||got.ProductionUsePermitted{t.Fatalf("synthetic capture must not authorize production: %+v",got)}
  if got.GlobalOrderInferred{t.Fatal("partition vector must never infer global order")}
  if got.PartitionCount!=3||got.BusinessEventCount!=4{t.Fatalf("wrong capture counts: %+v",got)}
- if got.OffsetGapsAccepted!=4{t.Fatalf("all invisible offset slots in the half-open ranges must be retained: %+v",got)}
- if got.Partitions[0].OffsetGapSlots!=2||got.Partitions[1].OffsetGapSlots!=1||got.Partitions[2].OffsetGapSlots!=1{t.Fatalf("per-partition offset holes were miscounted: %+v",got.Partitions)}
+ if got.OffsetGapSlotsUnclassified!=0{t.Fatalf("contiguous capture must have zero unclassified gaps: %+v",got)}
+ if got.Partitions[0].OffsetGapSlots!=0||got.Partitions[1].OffsetGapSlots!=0||got.Partitions[2].OffsetGapSlots!=0{t.Fatalf("contiguous fixture unexpectedly contains offset holes: %+v",got.Partitions)}
 }
 func TestMissingPartitionRangeIsIndeterminate(t *testing.T){in:=fixture();in.PartitionCaptures=in.PartitionCaptures[:2];refresh(&in);expect(t,in,Indeterminate)}
 func TestDuplicatePartitionRangeBlocks(t *testing.T){in:=fixture();in.PartitionCaptures=append(in.PartitionCaptures,in.PartitionCaptures[0]);refresh(&in);expect(t,in,Blocked)}
 func TestPartitionOutsideDeclaredCountBlocks(t *testing.T){in:=fixture();in.PartitionCaptures[0].Partition=2;for i:=range in.PartitionCaptures[0].Records{in.PartitionCaptures[0].Records[i].Partition=2};in.BusinessEvents[0].Partition=2;in.BusinessEvents[1].Partition=2;refresh(&in);expect(t,in,Blocked)}
 func TestReadUncommittedCaptureBlocks(t *testing.T){in:=fixture();in.PartitionCaptures[0].IsolationLevel="read_uncommitted";refresh(&in);expect(t,in,Blocked)}
 func TestLastStableOffsetMustBeStable(t *testing.T){in:=fixture();in.PartitionCaptures[0].LastStableOffsetBefore=105;refresh(&in);expect(t,in,Indeterminate)}
-func TestRangeCannotEndBeforeLastStableOffset(t *testing.T){in:=fixture();in.PartitionCaptures[0].EndOffsetExclusive=103;refresh(&in);expect(t,in,Indeterminate)}
+func TestRangeCannotEndBeforeLastStableOffset(t *testing.T) {
+ in:=fixture();p:=&in.PartitionCaptures[0]
+ p.LastStableOffsetBefore=103;p.LastStableOffsetAfter=103
+ p.HighWatermarkBefore=103;p.HighWatermarkAfter=103
+ refresh(&in);expect(t,in,Indeterminate)
+}
 func TestRangeCannotExtendPastLastStableOffset(t *testing.T){in:=fixture();in.PartitionCaptures[0].EndOffsetExclusive=105;refresh(&in);expect(t,in,Blocked)}
 func TestLogStartAdvancingPastCaptureStartBlocks(t *testing.T){in:=fixture();in.PartitionCaptures[0].LogStartOffsetAtEnd=101;refresh(&in);expect(t,in,Blocked)}
 func TestCompactedTopicBlocksExactHistoryClaim(t *testing.T){in:=fixture();in.TopicInventory[0].CleanupPolicy="compact,delete";in.PartitionCaptures[0].CleanupPolicy="compact,delete";refresh(&in);expect(t,in,Blocked)}
@@ -93,7 +98,23 @@ func TestBusinessEventMustMatchExactCapturedRecord(t *testing.T){in:=fixture();i
 func TestCapturedBusinessRecordMustAppearInMon037EventSet(t *testing.T){in:=fixture();in.BusinessEvents=in.BusinessEvents[:3];refresh(&in);expect(t,in,Blocked)}
 func TestDuplicatePartitionOffsetBlocks(t *testing.T){in:=fixture();duplicate:=in.PartitionCaptures[0].Records[0];in.PartitionCaptures[0].Records=append(in.PartitionCaptures[0].Records,duplicate);refresh(&in);expect(t,in,Blocked)}
 func TestOutOfOrderCapturedRecordsBlock(t *testing.T){in:=fixture();records:=in.PartitionCaptures[0].Records;records[0],records[1]=records[1],records[0];refresh(&in);expect(t,in,Blocked)}
-func TestOffsetGapsAreNotTreatedAsMissingMessages(t *testing.T){in:=fixture();got:=Evaluate(in);if got.CaptureVerdict!=Qualified{t.Fatalf("legal Kafka offset gaps were misclassified: %+v",got)};if got.OffsetGapsAccepted!=4{t.Fatalf("range offset holes were not counted, including leading/trailing positions: %+v",got.Partitions)}}
+func TestOffsetGapsRemainUnclassifiedWithoutBrokerLogProof(t *testing.T){
+ in:=fixture();p:=&in.PartitionCaptures[0]
+ p.EndOffsetExclusive++;p.LastStableOffsetBefore++;p.LastStableOffsetAfter++;p.HighWatermarkBefore++;p.HighWatermarkAfter++
+ refresh(&in);got:=Evaluate(in)
+ if got.CaptureVerdict!=Indeterminate{t.Fatalf("unclassified gap must hold qualification: %+v",got)}
+ if got.OffsetGapSlotsUnclassified!=1{t.Fatalf("want one unclassified offset slot: %+v",got)}
+ found:=false;for _,issue:=range got.Issues{if issue.Code=="offset_gap_slots_unclassified"{found=true}}
+ if !found{t.Fatalf("missing explicit unclassified-gap reason: %+v",got.Issues)}
+}
+func TestOmittedBusinessRecordAndEventCannotMaskOffsetGap(t *testing.T){
+ in:=fixture()
+ in.PartitionCaptures[0].Records=in.PartitionCaptures[0].Records[:1]
+ in.BusinessEvents=append(in.BusinessEvents[:1],in.BusinessEvents[2:]...)
+ refresh(&in);got:=Evaluate(in)
+ if got.CaptureVerdict!=Indeterminate{t.Fatalf("matching incomplete arrays must not qualify a capture with an unexplained gap: %+v",got)}
+ if got.OffsetGapSlotsUnclassified!=1{t.Fatalf("missing source and observed record must remain visible as an unclassified gap: %+v",got)}
+}
 func TestSameTransactionMaySpanDifferentPartitions(t *testing.T){in:=fixture();got:=Evaluate(in);if got.CaptureVerdict!=Qualified{t.Fatalf("cross-partition transaction was rejected: %+v",got)}}
 func TestBoundaryMutationAfterCaptureBindingBlocks(t *testing.T){in:=fixture();in.Boundary.TerminalPosition="0/ABCDF0";expect(t,in,Blocked)}
 func TestMissingCaptureCompleteIsIndeterminate(t *testing.T){in:=fixture();in.PartitionCaptures[1].CaptureComplete=false;refresh(&in);expect(t,in,Indeterminate)}
@@ -153,33 +174,33 @@ func TestHighWatermarkMustRemainStable(t *testing.T) {
 
 func TestLSOCannotExceedHighWatermark(t *testing.T) {
 	in := fixture()
-	in.PartitionCaptures[0].LastStableOffsetAfter = 105
-	in.PartitionCaptures[0].EndOffsetExclusive = 105
+	in.PartitionCaptures[0].LastStableOffsetAfter = 103
+	in.PartitionCaptures[0].EndOffsetExclusive = 103
 	refresh(&in)
 	expect(t, in, Blocked)
 }
 
 func TestLSOBelowHighWatermarkMeansOpenTransactionRemains(t *testing.T) {
-	in := fixture()
-	in.PartitionCaptures[0].LastStableOffsetAfter = 103
-	in.PartitionCaptures[0].EndOffsetExclusive = 103
-	refresh(&in)
-	expect(t, in, Indeterminate)
+ in:=fixture();p:=&in.PartitionCaptures[0]
+ p.LastStableOffsetBefore=102;p.LastStableOffsetAfter=102
+ p.HighWatermarkBefore=103;p.HighWatermarkAfter=103
+ p.EndOffsetExclusive=102
+ refresh(&in);expect(t,in,Indeterminate)
 }
 
 
 func TestTombstoneWithoutKeyDigestBlocks(t *testing.T) {
 	in := fixture()
 	tombstone := CapturedRecord{
-		Topic: "ledger", TopicID: "topic-id-ledger", Partition: 0, Offset: 103,
+		Topic: "ledger", TopicID: "topic-id-ledger", Partition: 0, Offset: 102,
 		RecordClass: "tombstone", PayloadSHA256: da,
 	}
 	in.PartitionCaptures[0].Records = append(in.PartitionCaptures[0].Records, tombstone)
-	in.PartitionCaptures[0].EndOffsetExclusive = 105
-	in.PartitionCaptures[0].LastStableOffsetBefore = 105
-	in.PartitionCaptures[0].LastStableOffsetAfter = 105
-	in.PartitionCaptures[0].HighWatermarkBefore = 105
-	in.PartitionCaptures[0].HighWatermarkAfter = 105
+	in.PartitionCaptures[0].EndOffsetExclusive = 103
+	in.PartitionCaptures[0].LastStableOffsetBefore = 103
+	in.PartitionCaptures[0].LastStableOffsetAfter = 103
+	in.PartitionCaptures[0].HighWatermarkBefore = 103
+	in.PartitionCaptures[0].HighWatermarkAfter = 103
 	refresh(&in)
 	expect(t, in, Blocked)
 }
@@ -187,15 +208,15 @@ func TestTombstoneWithoutKeyDigestBlocks(t *testing.T) {
 func TestTombstoneWithKeyDigestCanBeCaptured(t *testing.T) {
 	in := fixture()
 	tombstone := CapturedRecord{
-		Topic: "ledger", TopicID: "topic-id-ledger", Partition: 0, Offset: 103,
+		Topic: "ledger", TopicID: "topic-id-ledger", Partition: 0, Offset: 102,
 		RecordClass: "tombstone", PayloadSHA256: da, KeySHA256: db,
 	}
 	in.PartitionCaptures[0].Records = append(in.PartitionCaptures[0].Records, tombstone)
-	in.PartitionCaptures[0].EndOffsetExclusive = 105
-	in.PartitionCaptures[0].LastStableOffsetBefore = 105
-	in.PartitionCaptures[0].LastStableOffsetAfter = 105
-	in.PartitionCaptures[0].HighWatermarkBefore = 105
-	in.PartitionCaptures[0].HighWatermarkAfter = 105
+	in.PartitionCaptures[0].EndOffsetExclusive = 103
+	in.PartitionCaptures[0].LastStableOffsetBefore = 103
+	in.PartitionCaptures[0].LastStableOffsetAfter = 103
+	in.PartitionCaptures[0].HighWatermarkBefore = 103
+	in.PartitionCaptures[0].HighWatermarkAfter = 103
 	refresh(&in)
 	expect(t, in, Qualified)
 }

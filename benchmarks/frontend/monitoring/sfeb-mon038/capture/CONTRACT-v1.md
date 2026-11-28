@@ -22,7 +22,11 @@ The producer-fence time must precede the capture window. The input binds a fence
 
 ## Offset holes and ordering
 
-Offsets need only be strictly increasing within the partition, not contiguous. The reported hole count for a range is its width (end-exclusive minus start-inclusive) minus the number of visible records. This includes leading, interior and trailing offset positions not represented by visible records. Such holes can arise from aborted transactions or control records hidden from a read_committed consumer; the evaluator does not infer a cause from the count.
+Offsets need only be strictly increasing within the partition, not contiguous. V1 does not include a broker-log scan or authenticated control-marker/aborted-transaction interval evidence. Therefore the range-width-minus-visible-record-count calculation is diagnostic only: any positive result is reported as `offset_gap_slots_unclassified` and holds the component verdict at indeterminate.
+
+V1 MUST NOT call these holes accepted, legal, aborted, or control-marker gaps. In particular, if both the visible-record array and the independent business-event array omit the same event, their mutual equality cannot close the capture range. The unexplained offset slot remains indeterminate.
+
+A future v2 can admit classified holes only with independently authenticated evidence that accounts for the exact offset interval, for example a broker-log/record-batch inspection that identifies visible data records, aborted transactional records and transaction control markers under a pinned Kafka version and stable leader-epoch/LSO/HW boundary. A bare aborted-transactions list or arithmetic gap count is not a substitute for exact interval accounting.
 
 Ordering is local to (cluster, topic, partition). No global order is inferred between partitions. A transaction may span multiple partitions; its relationship is joined by transaction/event identity and verified separately by MON-037.
 
