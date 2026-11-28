@@ -12,8 +12,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let fixture_bytes = fs::read(root.join("fixtures/auditory-evidence-v0.1.json"))?;
     let source_asset = fs::read(root.join("fixtures/synthetic-tone-f32le-hex.txt"))?;
     let fixture: Value = serde_json::from_slice(&fixture_bytes)?;
-    let report = validate_fixture(&fixture, &source_asset)
-        .map_err(std::io::Error::other)?;
+    let report = validate_fixture(&fixture, &source_asset).map_err(std::io::Error::other)?;
     println!("{}", serde_json::to_string(&report)?);
     Ok(())
 }
