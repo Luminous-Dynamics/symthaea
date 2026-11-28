@@ -266,19 +266,39 @@ impl std::fmt::Display for TransitionError {
             Self::StepLimitReached => write!(f, "scenario step limit reached"),
             Self::ObservationBudgetExhausted => write!(f, "observation budget exhausted"),
             Self::NotAdjacent { from, to } => write!(f, "no direct route from {from:?} to {to:?}"),
-            Self::GateNotTraversable(state) => write!(f, "crossing gate is not traversable: {state:?}"),
-            Self::ItemUnavailable { site, item } => write!(f, "{item:?} is not available at {site:?}"),
-            Self::SiteNotInspected(site) => write!(f, "inspect {site:?} before collecting hidden resources"),
-            Self::MechanismNotDiscovered => write!(f, "inspect the crossing to discover the gate mechanism"),
-            Self::MissingValveKey => write!(f, "valve key is required to operate the crossing gate"),
-            Self::WrongLocation { expected, actual } => write!(f, "action requires {expected:?}, currently at {actual:?}"),
+            Self::GateNotTraversable(state) => {
+                write!(f, "crossing gate is not traversable: {state:?}")
+            },
+            Self::ItemUnavailable { site, item } => {
+                write!(f, "{item:?} is not available at {site:?}")
+            },
+            Self::SiteNotInspected(site) => {
+                write!(f, "inspect {site:?} before collecting hidden resources")
+            },
+            Self::MechanismNotDiscovered => {
+                write!(f, "inspect the crossing to discover the gate mechanism")
+            },
+            Self::MissingValveKey => {
+                write!(f, "valve key is required to operate the crossing gate")
+            },
+            Self::WrongLocation { expected, actual } => {
+                write!(f, "action requires {expected:?}, currently at {actual:?}")
+            },
             Self::MissingWaterFilter => write!(f, "water filter is required for delivery"),
             Self::AlreadyDelivered => write!(f, "delivery goal is already complete"),
             Self::GateAlreadyOpen => write!(f, "crossing gate is already safely open"),
-            Self::ManifestMismatch => write!(f, "world state belongs to a different scenario manifest"),
-            Self::Serialization(message) => write!(f, "could not serialize transition evidence: {message}"),
-            Self::ReplayMismatch => write!(f, "recorded receipts do not match deterministic replay"),
-            Self::PlannerExhausted => write!(f, "search oracle found no valid plan within the step budget"),
+            Self::ManifestMismatch => {
+                write!(f, "world state belongs to a different scenario manifest")
+            },
+            Self::Serialization(message) => {
+                write!(f, "could not serialize transition evidence: {message}")
+            },
+            Self::ReplayMismatch => {
+                write!(f, "recorded receipts do not match deterministic replay")
+            },
+            Self::PlannerExhausted => {
+                write!(f, "search oracle found no valid plan within the step budget")
+            },
         }
     }
 }
@@ -332,7 +352,9 @@ pub fn attempt(
         Err(error) => {
             let before_state_digest = state
                 .digest()
-                .map_err(|serialization| TransitionError::Serialization(serialization.to_string()))?;
+                .map_err(|serialization| {
+                    TransitionError::Serialization(serialization.to_string())
+                })?;
             let mut next = state.clone();
             next.tick += 1;
             let event = Event {
