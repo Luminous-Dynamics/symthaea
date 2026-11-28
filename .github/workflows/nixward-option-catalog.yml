@@ -1,0 +1,49 @@
+name: NixWard option-catalog provenance
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/core/nixward/src/parser/option_schema.rs"
+      - "crates/core/nixward/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/nixward-option-catalog.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/core/nixward/src/parser/option_schema.rs"
+      - "crates/core/nixward/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/nixward-option-catalog.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nixward-option-catalog-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  option-catalog:
+    name: option-catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CARGO_INCREMENTAL: 0
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check option-schema formatting
+        run: rustfmt +1.96.0 --check --edition 2024 crates/core/nixward/src/parser/option_schema.rs
+      - name: Run option-schema unit tests
+        run: cargo +1.96.0 test --locked -p nixward --lib parser::option_schema
