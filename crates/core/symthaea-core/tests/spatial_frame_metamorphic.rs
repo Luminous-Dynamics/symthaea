@@ -81,8 +81,7 @@ fn transpose(matrix: Mat3) -> Mat3 {
 
 fn determinant(matrix: Mat3) -> f64 {
     let [a, b, c] = matrix;
-    a[0] * (b[1] * c[2] - b[2] * c[1])
-        - a[1] * (b[0] * c[2] - b[2] * c[0])
+    a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
         + a[2] * (b[0] * c[1] - b[1] * c[0])
 }
 
@@ -146,7 +145,10 @@ impl Rigid3 {
     }
 
     fn transform_point(self, point_in_source: Vec3) -> Vec3 {
-        add(matrix_vector(self.rotation, point_in_source), self.translation)
+        add(
+            matrix_vector(self.rotation, point_in_source),
+            self.translation,
+        )
     }
 
     fn transform_vector(self, vector_in_source: Vec3) -> Vec3 {
@@ -318,10 +320,16 @@ fn transform_composition_is_ordered_and_inverse_round_trip_closes() {
         "non-commuting rotations must expose reversed composition order"
     );
 
-    let returned = first.inverse().transform_point(first.transform_point(point));
+    let returned = first
+        .inverse()
+        .transform_point(first.transform_point(point));
     assert_vec_close(returned, point, EPS);
     let inverse_matrix_product = matrix_multiply(first.rotation, first.inverse().rotation);
-    assert!(matrix_is_close(inverse_matrix_product, identity_matrix(), EPS));
+    assert!(matrix_is_close(
+        inverse_matrix_product,
+        identity_matrix(),
+        EPS
+    ));
 }
 
 #[test]
@@ -336,7 +344,9 @@ fn non_origin_pivot_rotation_preserves_local_geometry() {
         rotation: identity_matrix(),
         translation: pivot,
     };
-    let about_pivot = translate_back.compose(rotation).compose(translate_to_origin);
+    let about_pivot = translate_back
+        .compose(rotation)
+        .compose(translate_to_origin);
 
     let point = [4.0, -1.0, 2.0];
     let pivot_point = about_pivot.transform_point(pivot);
@@ -371,8 +381,7 @@ fn wxyz_and_xyzw_adapters_agree_only_when_decoded_by_the_declared_order() {
 #[test]
 fn transform_direction_is_not_symmetric_and_valid_inverse_is_explicit() {
     // T_world_from_camera maps a camera-frame point into world coordinates.
-    let t_world_from_camera =
-        Rigid3::from_axis_angle([0.0, 0.0, 1.0], 0.6, [4.0, -2.0, 1.0]);
+    let t_world_from_camera = Rigid3::from_axis_angle([0.0, 0.0, 1.0], 0.6, [4.0, -2.0, 1.0]);
     let point_camera = [0.5, 1.0, 3.0];
     let point_world = t_world_from_camera.transform_point(point_camera);
 
@@ -389,8 +398,7 @@ fn transform_direction_is_not_symmetric_and_valid_inverse_is_explicit() {
 #[test]
 fn observer_reframe_changes_camera_relative_left_right_but_not_world_geometry() {
     let camera_world_a = Rigid3::identity();
-    let camera_world_b =
-        Rigid3::from_axis_angle([0.0, 0.0, 1.0], PI, [0.0, 0.0, 0.0]);
+    let camera_world_b = Rigid3::from_axis_angle([0.0, 0.0, 1.0], PI, [0.0, 0.0, 0.0]);
     let world_map_before = [[1.0, 0.0, 5.0], [2.0, 0.0, 5.0]];
     let world_distance_before = distance(world_map_before[0], world_map_before[1]);
 
@@ -478,15 +486,18 @@ fn frame_graph_cycle_closes_only_for_consistent_edges() {
     let t_a_from_c = t_c_from_b.compose(t_b_from_a).inverse();
 
     let cycle = t_a_from_c.compose(t_c_from_b).compose(t_b_from_a);
-    assert_vec_close(cycle.transform_point([0.7, -1.2, 2.5]), [0.7, -1.2, 2.5], EPS);
+    assert_vec_close(
+        cycle.transform_point([0.7, -1.2, 2.5]),
+        [0.7, -1.2, 2.5],
+        EPS,
+    );
     assert!(matrix_is_close(cycle.rotation, identity_matrix(), EPS));
 
     let inconsistent_edge = Rigid3 {
         translation: add(t_a_from_c.translation, [0.05, 0.0, 0.0]),
         ..t_a_from_c
     };
-    let inconsistent_cycle =
-        inconsistent_edge.compose(t_c_from_b).compose(t_b_from_a);
+    let inconsistent_cycle = inconsistent_edge.compose(t_c_from_b).compose(t_b_from_a);
     assert!(
         norm(inconsistent_cycle.translation) > 1.0e-2,
         "a modified non-identity edge must expose cycle-closure error"
