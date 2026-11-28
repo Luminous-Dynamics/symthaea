@@ -1,0 +1,47 @@
+{
+  "profile": "mon-jcs-v1-negative",
+  "cases": [
+    {
+      "name": "duplicate_member",
+      "raw_json": "{\"claim_id\":\"a\",\"claim_id\":\"b\"}",
+      "expected": "reject",
+      "reason": "Duplicate object member names are ambiguous and must not be silently collapsed."
+    },
+    {
+      "name": "invalid_utf8",
+      "raw_bytes_hex": "7b226e616d65223a22ff227d",
+      "expected": "reject",
+      "reason": "Input is not valid UTF-8."
+    },
+    {
+      "name": "non_json_nan",
+      "raw_json": "{\"value\":NaN}",
+      "expected": "reject",
+      "reason": "NaN is not a valid JSON number."
+    },
+    {
+      "name": "non_json_infinity",
+      "raw_json": "{\"value\":Infinity}",
+      "expected": "reject",
+      "reason": "Infinity is not a valid JSON number."
+    },
+    {
+      "name": "trailing_data",
+      "raw_json": "{\"claim_id\":\"a\"} {\"claim_id\":\"b\"}",
+      "expected": "reject",
+      "reason": "A single envelope must contain exactly one JSON value."
+    },
+    {
+      "name": "out_of_profile_integer",
+      "raw_json": "{\"sequence\":9007199254740993}",
+      "expected": "reject",
+      "reason": "This profile rejects integers outside the exact interoperable binary64 integer range instead of allowing silent rounding."
+    },
+    {
+      "name": "wrong_domain_prefix",
+      "canonical_utf8": "{}",
+      "expected": "digest_mismatch",
+      "reason": "A digest computed without the exact MON domain prefix must not equal claim_digest."
+    }
+  ]
+}

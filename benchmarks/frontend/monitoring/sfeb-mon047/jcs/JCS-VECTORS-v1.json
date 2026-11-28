@@ -1,0 +1,64 @@
+{
+  "profile": "mon-jcs-v1",
+  "standard": "RFC 8785",
+  "digest_profile": {
+    "canonical_sha256": "SHA-256(JCS UTF-8 bytes)",
+    "claim_digest_prefix_ascii": "MON-046:CLAIM-ENVELOPE:v1",
+    "prefix_terminator_hex": "00",
+    "claim_digest": "SHA-256(prefix || 0x00 || JCS UTF-8 bytes)"
+  },
+  "vectors": [
+    {
+      "name": "empty_object",
+      "input": {},
+      "canonical_utf8": "{}",
+      "canonical_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "claim_digest": "196606f9955d310db80338d017d6143722c6384b80fbd28da7f721ac266ead8b"
+    },
+    {
+      "name": "basic_claim",
+      "input": {
+        "claim_id": "claim-0001",
+        "profile": "mon-recovery-claim-v1",
+        "version": 1
+      },
+      "canonical_utf8": "{\"claim_id\":\"claim-0001\",\"profile\":\"mon-recovery-claim-v1\",\"version\":1}",
+      "canonical_sha256": "2df8a95cdf7daefdf25cb1b1dfa16765e09dd2d2d17fe60175e3dfe4ad5e93be",
+      "claim_digest": "ca58c9e13efd4377a4cc808e5fe1ff43319d3a158528dddeee0cd6fc7a2adb40"
+    },
+    {
+      "name": "sorted_keys",
+      "input": {
+        "z": "recovery",
+        "a": 1,
+        "b": 2
+      },
+      "canonical_utf8": "{\"a\":1,\"b\":2,\"z\":\"recovery\"}",
+      "canonical_sha256": "a4571e0bdb61f3430225c4e12265a34a90357d2119bedf33549fca8eff7eae1c",
+      "claim_digest": "f679abdeeb2141504b2fb6016ecc9d02a18a0dfa3aaf998019832d8ef1a77f97"
+    },
+    {
+      "name": "unicode_preserved_no_normalization",
+      "input": {
+        "label": "café",
+        "scope": "db/orders"
+      },
+      "canonical_utf8": "{\"label\":\"café\",\"scope\":\"db/orders\"}",
+      "canonical_sha256": "453b491150b8c76d253621e3941b9e87523bf377d2902363b6d867b1cc4aa6b9",
+      "claim_digest": "9e96a0c95f546da702c39d23bae1cf22ebfd584721fa843f437f84027e445126"
+    },
+    {
+      "name": "nested_array",
+      "input": {
+        "dependencies": [
+          "evidence:01",
+          "policy:02"
+        ],
+        "verdict": "indeterminate"
+      },
+      "canonical_utf8": "{\"dependencies\":[\"evidence:01\",\"policy:02\"],\"verdict\":\"indeterminate\"}",
+      "canonical_sha256": "fdeb9af390202a2a4a9eb4023e7bfb514d15c3c543308e6b0b8cb90ea7e2ff5b",
+      "claim_digest": "1dd312e9a11da71e409de2c6aa9c0c246e451cc3051892cde7381c52fbad4b07"
+    }
+  ]
+}
