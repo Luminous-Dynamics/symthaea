@@ -633,3 +633,88 @@ The opportunity is not to reproduce each vendor's hardware/streaming surface. It
 - Set-level Pareto trajectories and causal copilot forecasts that preserve DJ steering and veto.
 
 Compare to the vendors as products, but only make technical superiority claims on matched data, named software/hardware versions, frozen inputs, equal candidate/compute budgets, blinded DJ cohorts and pre-registered outcomes.
+
+
+## 32. Reuse MUSE-STEM evidence governance; do not create a second provenance stack
+
+MEL-DJ-007 should reuse the principles already authored in MUSE-STEM-001 rather than duplicate its generic artifact-integrity mechanisms:
+
+- Content-address exact source audio and analysis manifests.
+- Bind observations to the exact audio and sample clock, not a mutable track name or a user-facing filename.
+- Treat digests as substitution detection relative to a retained manifest, not signatures or proof of creator identity.
+- Require a canonical, replayable manifest for any multi-artifact bundle.
+- Separate PASS, REJECT, UNQUALIFIED, and NOT_ESTIMABLE outcomes. Missing evidence is not success.
+- Keep source-derived observations distinct from symbolic/oracle-derived evidence and from human corrections.
+- Preserve exact sample clock and explicit transforms; no implicit trim, resample, warp or alignment during admission.
+
+The DJ beat-grid report and transition contract are not part-stem evidence bundles and must not import MUSE-STEM's PartId/track-event semantics. Reuse the evidence discipline only. The authoritative existing owners remain:
+- #11389 — score-to-audio conformance.
+- #11564 — source-bound pitch-energy observations.
+- #11597 — model-agnostic MIDI transcription evaluation.
+- #14227 — physics-grounded auditory-scene evidence.
+
+For beat-grid benchmarking, add a second provenance dimension: **source-master family**. Split keys must group originals, encodings, remasters, edits, radio cuts, DJ edits, stems, and excerpts derived from one master where identity can be established. A new file hash alone does not prove an independent recording. Record both exact file digest and normalized source-master family identifier; when family identity is unknown, mark the item and exclude it from the strongest leakage-safe claim.
+
+## 33. MEL-DJ-007 evaluation harness contract
+
+The next implementation increment is a Rust-first benchmark-manifest validator and MIREX-compatible event scorer. It belongs beside the DJ evaluation work, not inside the real-time audio callback and not inside the generic shared player.
+
+### Evaluation input manifest
+
+Each evaluated source record should bind:
+- exact audio SHA-256 and source-master family ID;
+- dataset/cohort ID, collection source, rights/permission record, license, and permitted purpose;
+- split role (train, validation, development, locked_test, private_external);
+- exact annotation digest/version/provenance and annotator/adjudication process;
+- sample rate, channel layout, frame count, valid annotation segments, beat anchors and downbeat anchors;
+- permitted use flags and explicit restriction policy;
+- analysis model/version/config/checkpoint digest and output manifest digest;
+- any human-corrected beatgrid history as a separate artifact, never silently replacing source annotations.
+
+### Leakage and rights gates
+
+- GTZAN and SMC are MIREX 2026 locked test data: prohibit all training, validation, model selection, parameter tuning and development use.
+- Reject any dataset record whose permitted-use rules conflict with its split role or experiment purpose.
+- Reject exact audio digest duplication across disjoint splits.
+- Reject source-master family duplication across disjoint splits, even if the file digest differs.
+- Preserve all valid-segment boundaries; score only the exact annotated valid regions using duration-weighted protocol semantics.
+- Record overlap audits against known upstream training/evaluation corpora. Unknown overlap is reported as unknown, not as zero overlap.
+- Private Yamaha data can support external validation only with explicit data-owner permission and a publication ceiling.
+- No MIREX test audio should be committed as a repository fixture; use synthetic generated events and small CC0/owned fixtures for known-answer tests.
+
+### Metric adapter
+
+The evaluation harness must implement or call a pinned MIREX-compatible scorer and retain:
+- beat F-measure with the 70 ms tolerance;
+- Cemgil with the 40 ms Gaussian standard deviation;
+- Goto and P-score;
+- CMLc/CMLt and AMLc/AMLt continuity;
+- downbeat F-measure, precision, recall using the declared ±70 ms tolerance;
+- per-track and duration-weighted valid-segment aggregation, exactly as the chosen MIREX protocol specifies.
+
+Additional DJ-oriented metrics are separate:
+- local tempo MAE and slope/turning-point error;
+- half/double-time confusion;
+- phase drift over long durations;
+- phase lock/reacquisition after tempo ramps and discontinuities;
+- selective coverage, abstention, confidence calibration and risk/coverage curves;
+- human correction time, number of edits and downstream transition failures.
+
+Never combine standardized metric columns into one composite score that conceals a continuity regression, downbeat error or unsupported segment.
+
+### Known-answer fixtures and mutation controls
+
+The test suite should include:
+- perfect, missed, extra and time-shifted beats around the 70 ms boundary;
+- exact and near-boundary downbeats around ±70 ms;
+- known F1 precision/recall cases;
+- continuity breaks after a single inserted/deleted beat;
+- valid-segment masking with excluded annotations outside segments;
+- tempo ramps and local turning points;
+- half/double-time hypotheses with identical beat phase but incorrect pulse rate;
+- same source-master represented by different encoding hashes across partitions;
+- GTZAN/SMC locked-test misuse attempts;
+- rights flag false, missing annotation provenance, unknown overlap, and invalid source clock;
+- adversarial empty, duplicate, reversed and out-of-range event lists.
+
+This creates a testable benchmark apparatus before choosing or implementing the next beat-tracker architecture. Its correctness is separate from detector performance.
