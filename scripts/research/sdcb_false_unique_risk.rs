@@ -246,13 +246,16 @@ fn print_report(episodes: &[Episode]) {
         ] {
             match endpoint.conditional_false_unique_risk() {
                 Some(risk) => println!(
-                    "  {name}: singleton={} commitment={:.6} false_unique={}/{} conditional_risk={:.6} joint_risk={:.6}",
+                    "  {name}: singleton={} commitment={:.6} false_unique={}/{} conditional_risk={:.6} joint_risk={:.6} compatibility_misses={} generating_covered={}/{}",
                     endpoint.singleton_count,
                     endpoint.commitment_rate(),
                     endpoint.false_unique_count,
                     endpoint.singleton_count,
                     risk,
-                    endpoint.joint_false_unique_risk()
+                    endpoint.joint_false_unique_risk(),
+                    endpoint.compatibility_miss_count,
+                    endpoint.generating_covered_count,
+                    endpoint.n
                 ),
                 None => println!("  {name}: NO_SINGLETON_COHORT commitment=0 false_unique_bound=WITHHELD"),
             }
