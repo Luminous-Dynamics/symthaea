@@ -31,7 +31,10 @@ pub struct GroupSpecV1 {
 #[serde(deny_unknown_fields)]
 pub struct CalibrationExampleV1 {
     pub run_id: String,
+    /// Stable HMAC-SHA256 commitment to the independent sampling unit; never a raw identity.
     pub independent_cluster_id: String,
+    pub episode_commitment_sha256: String,
+    pub observation_commitment_sha256: String,
     pub group_id: String,
     pub sufficiency_score: f64,
     pub hard_gates_pass: bool,
@@ -46,6 +49,7 @@ pub struct CalibrationConfigV1 {
     pub run_id: String,
     pub calibration_data_sha256: String,
     pub calibration_split_sha256: String,
+    pub evaluation_split_sha256: String,
     pub group_hierarchy_sha256: String,
     pub sufficiency_score_definition_sha256: String,
     pub decision_loss_definition_sha256: String,
@@ -60,6 +64,90 @@ pub struct CalibrationConfigV1 {
     pub unacceptable_loss_threshold: f64,
     pub minimum_independent_clusters: usize,
     pub exchangeability_justified_by_design: bool,
+}
+
+/// Calibration/evaluation partition inventories contain opaque HMAC commitments,
+/// never raw identities. Both partitions must use the same keyed namespace.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SplitRoleV1 { Calibration, Evaluation }
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SplitInventoryV1 {
+    pub schema_version: String,
+    pub run_id: String,
+    pub role: SplitRoleV1,
+    pub benchmark_suite_sha256: String,
+    pub dataset_snapshot_sha256: String,
+    pub split_sha256: String,
+    pub task_spec_sha256: String,
+    pub group_hierarchy_sha256: String,
+    pub sufficiency_score_definition_sha256: String,
+    pub decision_loss_definition_sha256: String,
+    pub independence_unit_schema_sha256: String,
+    pub calibration_examples_sha256: Option<String>,
+    pub cluster_commitments: Vec<String>,
+    pub episode_commitments: Vec<String>,
+    pub observation_commitments: Vec<String>,
+    pub outcome_labels_sealed: bool,
+    pub candidate_outcome_access: bool,
+    pub evaluation_outcome_seal_sha256: Option<String>,
+    pub inventory_sha256: String,
+}
+
+impl SplitInventoryV1 {
+    pub fn verify_integrity(&self) -> bool {
+        let mut unsigned = self.clone();
+        unsigned.inventory_sha256.clear();
+        serde_json::to_vec(&unsigned)
+            .map(|bytes| sha256_hex(&bytes) == self.inventory_sha256)
+            .unwrap_or(false)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SplitAuditReceiptV1 {
+    pub schema_version: String,
+    pub run_id: String,
+    pub calibration_split_sha256: String,
+    pub evaluation_split_sha256: String,
+    pub calibration_inventory_sha256: String,
+    pub evaluation_inventory_sha256: String,
+    pub calibration_cluster_count: usize,
+    pub evaluation_cluster_count: usize,
+    pub calibration_episode_count: usize,
+    pub evaluation_episode_count: usize,
+    pub calibration_observation_count: usize,
+    pub evaluation_observation_count: usize,
+    pub cluster_overlap_count: usize,
+    pub episode_overlap_count: usize,
+    pub observation_overlap_count: usize,
+    pub preregistration_sha256: String,
+    pub audit_method: String,
+    pub receipt_sha256: String,
+}
+
+impl SplitAuditReceiptV1 {
+    pub fn verify_integrity(&self) -> bool {
+        let mut unsigned = self.clone();
+        unsigned.receipt_sha256.clear();
+        serde_json::to_vec(&unsigned)
+            .map(|bytes| sha256_hex(&bytes) == self.receipt_sha256)
+            .unwrap_or(false)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SplitAuditRejectV1 {
+    InvalidInventory, InvalidDigest, DuplicateCommitment, UnsortedCommitments,
+    WrongSplitRole, RunMismatch, SplitMismatch, SplitNotDisjoint,
+    DatasetSnapshotMismatch, TaskSpecMismatch, HierarchyMismatch,
+    ScoreDefinitionMismatch, LossDefinitionMismatch, IndependenceUnitMismatch,
+    CalibrationRowsMismatch, EvaluationLabelsNotSealed, CandidateHasOutcomeAccess,
+    MissingEvaluationOutcomeSeal, InsufficientCalibrationClusters,
+    InsufficientEvaluationClusters, SerializationFailure,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -135,6 +223,8 @@ pub struct CalibrationManifestV1 {
     pub run_id: String,
     pub calibration_data_sha256: String,
     pub calibration_split_sha256: String,
+    pub evaluation_split_sha256: String,
+    pub split_audit_receipt_sha256: String,
     pub calibration_cluster_count: usize,
     pub calibration_example_count: usize,
     pub group_hierarchy_sha256: String,
@@ -190,6 +280,7 @@ pub enum CalibrationRejectV1 {
     GroupHierarchyDigestMismatch,
     CalibrationDataDigestMismatch,
     ThresholdGridDigestMismatch,
+    SplitAuditRejected,
     SerializationFailure,
 }
 
@@ -282,7 +373,7 @@ fn validate_config(config: &CalibrationConfigV1) -> Result<(), CalibrationReject
     }
     for value in [
         config.calibration_data_sha256.as_str(), config.calibration_split_sha256.as_str(),
-        config.group_hierarchy_sha256.as_str(), config.sufficiency_score_definition_sha256.as_str(),
+        config.evaluation_split_sha256.as_str(), config.group_hierarchy_sha256.as_str(), config.sufficiency_score_definition_sha256.as_str(),
         config.decision_loss_definition_sha256.as_str(), config.decision_policy_sha256.as_str(),
         config.candidate_code_sha256.as_str(), config.evaluator_code_sha256.as_str(),
         config.threshold_grid_sha256.as_str(),
@@ -305,6 +396,163 @@ fn validate_config(config: &CalibrationConfigV1) -> Result<(), CalibrationReject
         return Err(CalibrationRejectV1::ThresholdGridDigestMismatch);
     }
     Ok(())
+}
+
+
+
+fn sorted_unique_commitments(values: &[String]) -> Result<(), SplitAuditRejectV1> {
+    if values.iter().any(|value| !valid_digest(value)) {
+        return Err(SplitAuditRejectV1::InvalidDigest);
+    }
+    if values.windows(2).any(|window| window[0] == window[1]) {
+        return Err(SplitAuditRejectV1::DuplicateCommitment);
+    }
+    if values.windows(2).any(|window| window[0] > window[1]) {
+        return Err(SplitAuditRejectV1::UnsortedCommitments);
+    }
+    Ok(())
+}
+
+fn split_inventory_digest(inventory: &SplitInventoryV1) -> Result<String, SplitAuditRejectV1> {
+    let mut unsigned = inventory.clone();
+    unsigned.inventory_sha256.clear();
+    serde_json::to_vec(&unsigned)
+        .map(|bytes| sha256_hex(&bytes))
+        .map_err(|_| SplitAuditRejectV1::SerializationFailure)
+}
+
+fn preregistration_digest(config: &CalibrationConfigV1) -> Result<String, SplitAuditRejectV1> {
+    let payload = (
+        &config.run_id, &config.calibration_data_sha256,
+        &config.calibration_split_sha256, &config.evaluation_split_sha256,
+        &config.group_hierarchy_sha256, &config.sufficiency_score_definition_sha256,
+        &config.decision_loss_definition_sha256, &config.decision_policy_sha256,
+        &config.candidate_code_sha256, &config.evaluator_code_sha256,
+        &config.threshold_grid_sha256, &config.thresholds,
+        config.threshold_selection_method, config.risk_target_alpha,
+        config.familywise_delta, config.unacceptable_loss_threshold,
+        config.minimum_independent_clusters,
+    );
+    serde_json::to_vec(&payload)
+        .map(|bytes| sha256_hex(&bytes))
+        .map_err(|_| SplitAuditRejectV1::SerializationFailure)
+}
+
+/// Verify calibration/evaluation disjointness at cluster, episode and observation levels.
+pub fn audit_calibration_evaluation_splits_v1(
+    config: &CalibrationConfigV1,
+    calibration: &SplitInventoryV1,
+    evaluation: &SplitInventoryV1,
+) -> Result<SplitAuditReceiptV1, SplitAuditRejectV1> {
+    for inventory in [calibration, evaluation] {
+        if inventory.schema_version != "mace_split_inventory_v1"
+            || inventory.run_id != config.run_id
+            || !inventory.verify_integrity()
+            || split_inventory_digest(inventory)? != inventory.inventory_sha256
+        {
+            return Err(SplitAuditRejectV1::InvalidInventory);
+        }
+        for value in [
+            inventory.benchmark_suite_sha256.as_str(), inventory.dataset_snapshot_sha256.as_str(),
+            inventory.split_sha256.as_str(), inventory.task_spec_sha256.as_str(),
+            inventory.group_hierarchy_sha256.as_str(), inventory.sufficiency_score_definition_sha256.as_str(),
+            inventory.decision_loss_definition_sha256.as_str(), inventory.independence_unit_schema_sha256.as_str(),
+        ] {
+            if !valid_digest(value) { return Err(SplitAuditRejectV1::InvalidDigest); }
+        }
+        sorted_unique_commitments(&inventory.cluster_commitments)?;
+        sorted_unique_commitments(&inventory.episode_commitments)?;
+        sorted_unique_commitments(&inventory.observation_commitments)?;
+    }
+    if calibration.role != SplitRoleV1::Calibration || evaluation.role != SplitRoleV1::Evaluation {
+        return Err(SplitAuditRejectV1::WrongSplitRole);
+    }
+    if calibration.run_id != evaluation.run_id { return Err(SplitAuditRejectV1::RunMismatch); }
+    if calibration.split_sha256 != config.calibration_split_sha256
+        || evaluation.split_sha256 != config.evaluation_split_sha256
+        || calibration.split_sha256 == evaluation.split_sha256 {
+        return Err(SplitAuditRejectV1::SplitMismatch);
+    }
+    if calibration.dataset_snapshot_sha256 != evaluation.dataset_snapshot_sha256
+        || calibration.benchmark_suite_sha256 != evaluation.benchmark_suite_sha256 {
+        return Err(SplitAuditRejectV1::DatasetSnapshotMismatch);
+    }
+    if calibration.task_spec_sha256 != evaluation.task_spec_sha256 {
+        return Err(SplitAuditRejectV1::TaskSpecMismatch);
+    }
+    if calibration.group_hierarchy_sha256 != config.group_hierarchy_sha256
+        || evaluation.group_hierarchy_sha256 != config.group_hierarchy_sha256 {
+        return Err(SplitAuditRejectV1::HierarchyMismatch);
+    }
+    if calibration.sufficiency_score_definition_sha256 != config.sufficiency_score_definition_sha256
+        || evaluation.sufficiency_score_definition_sha256 != config.sufficiency_score_definition_sha256 {
+        return Err(SplitAuditRejectV1::ScoreDefinitionMismatch);
+    }
+    if calibration.decision_loss_definition_sha256 != config.decision_loss_definition_sha256
+        || evaluation.decision_loss_definition_sha256 != config.decision_loss_definition_sha256 {
+        return Err(SplitAuditRejectV1::LossDefinitionMismatch);
+    }
+    if calibration.independence_unit_schema_sha256 != evaluation.independence_unit_schema_sha256 {
+        return Err(SplitAuditRejectV1::IndependenceUnitMismatch);
+    }
+    if calibration.calibration_examples_sha256.as_deref() != Some(config.calibration_data_sha256.as_str())
+        || evaluation.calibration_examples_sha256.is_some() {
+        return Err(SplitAuditRejectV1::CalibrationRowsMismatch);
+    }
+    if calibration.outcome_labels_sealed || !evaluation.outcome_labels_sealed {
+        return Err(SplitAuditRejectV1::EvaluationLabelsNotSealed);
+    }
+    if calibration.candidate_outcome_access || evaluation.candidate_outcome_access {
+        return Err(SplitAuditRejectV1::CandidateHasOutcomeAccess);
+    }
+    if calibration.evaluation_outcome_seal_sha256.is_some()
+        || evaluation.evaluation_outcome_seal_sha256.as_deref().is_none_or(|value| !valid_digest(value)) {
+        return Err(SplitAuditRejectV1::MissingEvaluationOutcomeSeal);
+    }
+    if calibration.cluster_commitments.len() < config.minimum_independent_clusters {
+        return Err(SplitAuditRejectV1::InsufficientCalibrationClusters);
+    }
+    if evaluation.cluster_commitments.len() < config.minimum_independent_clusters {
+        return Err(SplitAuditRejectV1::InsufficientEvaluationClusters);
+    }
+
+    let cal_clusters: BTreeSet<&str> = calibration.cluster_commitments.iter().map(String::as_str).collect();
+    let eval_clusters: BTreeSet<&str> = evaluation.cluster_commitments.iter().map(String::as_str).collect();
+    let cluster_overlap_count = cal_clusters.intersection(&eval_clusters).count();
+    let cal_episodes: BTreeSet<&str> = calibration.episode_commitments.iter().map(String::as_str).collect();
+    let eval_episodes: BTreeSet<&str> = evaluation.episode_commitments.iter().map(String::as_str).collect();
+    let episode_overlap_count = cal_episodes.intersection(&eval_episodes).count();
+    let cal_observations: BTreeSet<&str> = calibration.observation_commitments.iter().map(String::as_str).collect();
+    let eval_observations: BTreeSet<&str> = evaluation.observation_commitments.iter().map(String::as_str).collect();
+    let observation_overlap_count = cal_observations.intersection(&eval_observations).count();
+    if cluster_overlap_count > 0 || episode_overlap_count > 0 || observation_overlap_count > 0 {
+        return Err(SplitAuditRejectV1::SplitNotDisjoint);
+    }
+
+    let mut receipt = SplitAuditReceiptV1 {
+        schema_version: "mace_calibration_evaluation_split_audit_v1".into(),
+        run_id: config.run_id.clone(),
+        calibration_split_sha256: calibration.split_sha256.clone(),
+        evaluation_split_sha256: evaluation.split_sha256.clone(),
+        calibration_inventory_sha256: calibration.inventory_sha256.clone(),
+        evaluation_inventory_sha256: evaluation.inventory_sha256.clone(),
+        calibration_cluster_count: calibration.cluster_commitments.len(),
+        evaluation_cluster_count: evaluation.cluster_commitments.len(),
+        calibration_episode_count: calibration.episode_commitments.len(),
+        evaluation_episode_count: evaluation.episode_commitments.len(),
+        calibration_observation_count: calibration.observation_commitments.len(),
+        evaluation_observation_count: evaluation.observation_commitments.len(),
+        cluster_overlap_count, episode_overlap_count, observation_overlap_count,
+        preregistration_sha256: preregistration_digest(config)?,
+        audit_method: "opaque_cluster_episode_observation_commitment_disjointness_v1".into(),
+        receipt_sha256: String::new(),
+    };
+    let mut unsigned = receipt.clone();
+    unsigned.receipt_sha256.clear();
+    receipt.receipt_sha256 = serde_json::to_vec(&unsigned)
+        .map(|bytes| sha256_hex(&bytes))
+        .map_err(|_| SplitAuditRejectV1::SerializationFailure)?;
+    Ok(receipt)
 }
 
 fn hierarchy_depth(id: &str, groups: &BTreeMap<String, GroupSpecV1>) -> Result<usize, CalibrationRejectV1> {
@@ -496,9 +744,28 @@ fn blank_certificate(config:&CalibrationConfigV1,manifest:&str,group:&GroupSpecV
     }
 }
 
-pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&[GroupSpecV1],
-    examples:&[CalibrationExampleV1])->Result<CalibrationResultV1,CalibrationRejectV1>{
+pub fn calibrate_selective_evidence_v1(
+    config: &CalibrationConfigV1,
+    group_specs: &[GroupSpecV1],
+    examples: &[CalibrationExampleV1],
+    calibration_inventory: &SplitInventoryV1,
+    evaluation_inventory: &SplitInventoryV1,
+) -> Result<CalibrationResultV1, CalibrationRejectV1> {
     validate_config(config)?;
+    let split_audit = audit_calibration_evaluation_splits_v1(
+        config, calibration_inventory, evaluation_inventory,
+    ).map_err(|_| CalibrationRejectV1::SplitAuditRejected)?;
+    let expected_clusters: BTreeSet<&str> = examples.iter().map(|row| row.independent_cluster_id.as_str()).collect();
+    let expected_episodes: BTreeSet<&str> = examples.iter().map(|row| row.episode_commitment_sha256.as_str()).collect();
+    let expected_observations: BTreeSet<&str> = examples.iter().map(|row| row.observation_commitment_sha256.as_str()).collect();
+    if calibration_inventory.cluster_commitments.iter().map(String::as_str).collect::<BTreeSet<_>>() != expected_clusters
+        || calibration_inventory.episode_commitments.iter().map(String::as_str).collect::<BTreeSet<_>>() != expected_episodes
+        || calibration_inventory.observation_commitments.iter().map(String::as_str).collect::<BTreeSet<_>>() != expected_observations
+        || !split_audit.verify_integrity()
+        || split_audit.preregistration_sha256 != preregistration_digest(config).map_err(|_| CalibrationRejectV1::SplitAuditRejected)?
+    {
+        return Err(CalibrationRejectV1::SplitAuditRejected);
+    }
     let groups=validate_groups(group_specs)?;
     if groups.is_empty(){return Err(CalibrationRejectV1::InvalidConfig);}
     if digest_serialized(group_specs)?!=config.group_hierarchy_sha256{return Err(CalibrationRejectV1::GroupHierarchyDigestMismatch);}
@@ -516,6 +783,8 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
     let mut manifest=CalibrationManifestV1{
         schema_version:SCHEMA_VERSION_V1.into(),record_type:"calibration_manifest".into(),run_id:config.run_id.clone(),
         calibration_data_sha256:config.calibration_data_sha256.clone(),calibration_split_sha256:config.calibration_split_sha256.clone(),
+        evaluation_split_sha256:config.evaluation_split_sha256.clone(),
+        split_audit_receipt_sha256:split_audit.receipt_sha256.clone(),
         calibration_cluster_count:examples.iter().map(|row|row.independent_cluster_id.as_str()).collect::<BTreeSet<_>>().len(),
         calibration_example_count:examples.len(),group_hierarchy_sha256:config.group_hierarchy_sha256.clone(),
         sufficiency_score_definition_sha256:config.sufficiency_score_definition_sha256.clone(),
