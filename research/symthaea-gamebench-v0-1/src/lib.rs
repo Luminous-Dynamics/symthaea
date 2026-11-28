@@ -1,5 +1,12 @@
 #![forbid(unsafe_code)]
 
+mod sokoban;
+pub use sokoban::{
+    SokobanGame, SokobanSpec, SokobanSpecError, SokobanState, SokobanStepError,
+    SokobanTransition,
+};
+
+
 //! Standalone, deterministic game-environment primitives for Symthaea GameBench.
 //!
 //! V0.1 implements only the navigation fixture (F1) and structured / local
