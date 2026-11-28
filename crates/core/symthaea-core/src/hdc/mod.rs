@@ -303,6 +303,8 @@ pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned proje
 // Grid encoding for 2D spatial reasoning (ARC-style puzzles)
 pub mod binary_grid_encoder;
 pub mod grid_encoder;
+// Metric-local continuous 2D coordinates with explicit translation actions.
+pub mod spatial_fourier_encoder;
 
 // Global Workspace Theory (conscious access, competition, broadcasting)
 pub mod global_workspace; // GWT implementation with competitive dynamics
