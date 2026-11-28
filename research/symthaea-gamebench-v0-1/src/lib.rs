@@ -457,6 +457,7 @@ impl Error for ReplayError {}
 
 /// Exact breadth-first shortest-path oracle for the deterministic navigation
 /// fixture. This is evaluator-only reference logic, not an agent action API.
+#[allow(dead_code)]
 pub(crate) fn optimal_path(spec: &GridSpec) -> Option<Vec<Action>> {
     let start = State {
         position: spec.start,
