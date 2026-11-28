@@ -1,0 +1,46 @@
+name: CMAQ-056 typed null and content-addressed manifest
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-056/**"
+      - "research/cmaq-053/**"
+      - "research/cmaq-054/**"
+      - ".github/workflows/cmaq-056.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-056-typed-manifest
+  cancel-in-progress: true
+
+jobs:
+  typed-null-manifest:
+    name: typed-null-manifest
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-056-typed-null-manifest-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Generate dependency lockfile
+        run: cargo +1.100.0 generate-lockfile --manifest-path research/cmaq-056/Cargo.toml
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-056/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-056/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-056/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Canonical manifest digest probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-056/Cargo.toml --locked --bin manifest_probe > cmaq-056-manifest-smoke.csv
+      - name: Preserve manifest receipts and generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-056-manifest-smoke
+          path: |
+            cmaq-056-manifest-smoke.csv
+            research/cmaq-056/Cargo.lock
+          if-no-files-found: error
