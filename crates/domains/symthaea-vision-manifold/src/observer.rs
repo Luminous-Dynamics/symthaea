@@ -187,6 +187,15 @@ pub struct TemporalPerceptionWitnessV0_1 {
     pub physical_truth_claim: bool,
 }
 
+/// Fixed per-episode image geometry. The observer never silently accepts a
+/// resolution, aspect-ratio or channel-layout switch mid-episode.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TemporalObserverFrameGeometryV0_1 {
+    pub width: u32,
+    pub height: u32,
+    pub channels: usize,
+}
+
 /// Complete resumable observer checkpoint. The underlying mutable manifold is
 /// kept inside the checkpoint type and is only restored through this wrapper.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -198,6 +207,7 @@ pub struct TemporalObserverCheckpointV0_1 {
     pub frozen_model_sha256: String,
     pub first_timestamp_us: Option<u64>,
     pub last_identity: Option<ObserverFrameIdentityV0_1>,
+    pub frame_geometry: Option<TemporalObserverFrameGeometryV0_1>,
     pub manifold_state: ManifoldState,
 }
 
@@ -209,6 +219,7 @@ pub struct ObserverOnlyVisionManifold {
     frozen_model_sha256: String,
     first_timestamp_us: Option<u64>,
     last_identity: Option<ObserverFrameIdentityV0_1>,
+    frame_geometry: Option<TemporalObserverFrameGeometryV0_1>,
     cross_scale_enabled: bool,
     poisoned: bool,
 }
@@ -232,8 +243,20 @@ impl ObserverOnlyVisionManifold {
         profile: TemporalObserverProfileV0_1,
     ) -> Result<Self, String> {
         profile.validate()?;
+        if config.enable_predictive_hierarchy {
+            return Err(
+                "observer v0.1 rejects the adaptive predictive hierarchy until its weights and state can be frozen and attested"
+                    .to_string(),
+            );
+        }
+        if config.learning.adaptive_levels {
+            return Err(
+                "observer v0.1 rejects adaptive encoder quantization; encoding boundaries must remain fixed"
+                    .to_string(),
+            );
+        }
         let config_sha256 = sha256_json(&config)?;
-        let cross_scale_enabled = config.enable_predictive_hierarchy;
+        let cross_scale_enabled = false;
         let mut inner = VisionManifold::try_new(config, width, height)?;
         inner.enable_observer_only()?;
         let state = inner.save_state();
@@ -249,6 +272,7 @@ impl ObserverOnlyVisionManifold {
             frozen_model_sha256,
             first_timestamp_us: None,
             last_identity: None,
+            frame_geometry: None,
             cross_scale_enabled,
             poisoned: false,
         })
@@ -287,6 +311,7 @@ impl ObserverOnlyVisionManifold {
             &checkpoint.profile,
             checkpoint.first_timestamp_us,
             checkpoint.last_identity.as_ref(),
+            checkpoint.frame_geometry,
             checkpoint.manifold_state.frame_count,
         )?;
 
@@ -306,7 +331,8 @@ impl ObserverOnlyVisionManifold {
         observer.observer_profile_sha256 = observer_profile_sha256;
         observer.first_timestamp_us = checkpoint.first_timestamp_us;
         observer.last_identity = checkpoint.last_identity.clone();
-        observer.cross_scale_enabled = config.enable_predictive_hierarchy;
+        observer.frame_geometry = checkpoint.frame_geometry;
+        observer.cross_scale_enabled = false;
         Ok(observer)
     }
 
@@ -376,6 +402,11 @@ impl ObserverOnlyVisionManifold {
 
         self.first_timestamp_us = Some(first_timestamp_us);
         self.last_identity = Some(identity.clone());
+        self.frame_geometry = Some(TemporalObserverFrameGeometryV0_1 {
+            width,
+            height,
+            channels,
+        });
         Ok(TemporalPerceptionWitnessV0_1 {
             schema_version: TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1,
             producer: "symthaea-vision-manifold".to_string(),
@@ -414,6 +445,17 @@ impl ObserverOnlyVisionManifold {
     ) -> Result<(), String> {
         if width == 0 || height == 0 || !matches!(channels, 1 | 3 | 4) {
             return Err("observer frame geometry or channel count is invalid".to_string());
+        }
+        if let Some(previous) = self.frame_geometry {
+            if previous
+                != (TemporalObserverFrameGeometryV0_1 {
+                    width,
+                    height,
+                    channels,
+                })
+            {
+                return Err("observer frame geometry changed within the fixed episode profile".to_string());
+            }
         }
         let expected_bytes = (width as usize)
             .checked_mul(height as usize)
@@ -479,6 +521,7 @@ impl ObserverOnlyVisionManifold {
             &self.profile,
             self.first_timestamp_us,
             self.last_identity.as_ref(),
+            self.frame_geometry,
             manifold_state.frame_count,
         )?;
         let frozen_model_sha256 = model_sha256(&manifold_state)?;
@@ -493,6 +536,7 @@ impl ObserverOnlyVisionManifold {
             frozen_model_sha256,
             first_timestamp_us: self.first_timestamp_us,
             last_identity: self.last_identity.clone(),
+            frame_geometry: self.frame_geometry,
             manifold_state,
         })
     }
@@ -522,11 +566,18 @@ fn validate_run_state(
     profile: &TemporalObserverProfileV0_1,
     first_timestamp_us: Option<u64>,
     last_identity: Option<&ObserverFrameIdentityV0_1>,
+    frame_geometry: Option<TemporalObserverFrameGeometryV0_1>,
     frame_count: u64,
 ) -> Result<(), String> {
-    match (first_timestamp_us, last_identity) {
-        (None, None) if frame_count == 0 => Ok(()),
-        (Some(first), Some(last)) => {
+    match (first_timestamp_us, last_identity, frame_geometry) {
+        (None, None, None) if frame_count == 0 => Ok(()),
+        (Some(first), Some(last), Some(geometry)) => {
+            if geometry.width == 0
+                || geometry.height == 0
+                || !matches!(geometry.channels, 1 | 3 | 4)
+            {
+                return Err("observer checkpoint frame geometry is invalid".to_string());
+            }
             last.validate()?;
             if frame_count == 0 || frame_count > profile.expected_frame_count {
                 return Err("observer checkpoint frame count is outside profile budget".to_string());
@@ -539,7 +590,7 @@ fn validate_run_state(
             }
             Ok(())
         }
-        _ => Err("observer checkpoint cursor is incomplete".to_string()),
+        _ => Err("observer checkpoint cursor or fixed geometry is incomplete".to_string()),
     }
 }
 
@@ -704,6 +755,49 @@ mod tests {
         assert_eq!(value["pose_probability_claim"], false);
         assert_eq!(value["source_authentication_claim"], false);
         assert_eq!(value["physical_truth_claim"], false);
+    }
+
+    #[test]
+    fn adaptive_encoder_profiles_are_rejected_before_construction() {
+        let mut predictive = VisionConfig::default();
+        predictive.enable_predictive_hierarchy = true;
+        assert!(
+            ObserverOnlyVisionManifold::try_new(predictive, 32, 32).is_err(),
+            "adaptive predictive hierarchy must be frozen and attested before observer use"
+        );
+
+        let mut adaptive_levels = VisionConfig::default();
+        adaptive_levels.learning.adaptive_levels = true;
+        assert!(
+            ObserverOnlyVisionManifold::try_new(adaptive_levels, 32, 32).is_err(),
+            "adaptive quantization boundaries must be excluded from v0.1"
+        );
+    }
+
+    #[test]
+    fn frame_geometry_is_fixed_and_checkpoint_bound() {
+        let mut observer = observer();
+        let frame = vec![64_u8; 32 * 32];
+        observer
+            .observe_frame(identity(0, 1_000_000), &frame, 32, 32, 1)
+            .unwrap();
+        let count = observer.frame_count();
+
+        let changed_shape = vec![64_u8; 16 * 64];
+        assert!(observer
+            .observe_frame(identity(1, 1_033_000), &changed_shape, 16, 64, 1)
+            .is_err());
+        assert_eq!(observer.frame_count(), count);
+
+        let checkpoint = observer.save_checkpoint().unwrap();
+        assert_eq!(
+            checkpoint.frame_geometry,
+            Some(TemporalObserverFrameGeometryV0_1 {
+                width: 32,
+                height: 32,
+                channels: 1,
+            })
+        );
     }
 
     #[test]
