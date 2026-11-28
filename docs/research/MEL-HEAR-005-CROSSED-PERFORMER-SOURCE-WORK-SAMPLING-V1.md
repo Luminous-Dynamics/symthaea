@@ -26,9 +26,9 @@ The comparison wrapper requires exactly one sampling observation for every basel
 
 ## 3. Design classification
 
-- **Work-disjoint independent clusters:** every required identity is present and no performer, session or take spans source works.
+- **Work-disjoint clusters:** every required identity is present and no performer, session or take spans source works.
 - **Nested within work:** multiple performers, sessions or takes occur within a work, but none is reused across works.
-- **Crossed performer or session:** at least one performer, session or take identity occurs across multiple works.
+- **Crossed performer, session, or take:** at least one performer, session or take identity occurs across multiple works.
 - **Insufficiently identified:** any required sampling-frame, work, performer, session or take identity is missing.
 
 A multi-performer ensemble recorded within one work is nested, not crossed. Every declared ensemble participant is retained in the membership set; it is not silently assigned to one invented musician or counted as an independent work.
