@@ -39,6 +39,37 @@ pub enum TypedNixError {
     /// rnix rejected the rendered source.
     #[error("rendered Nix module did not parse: {0}")]
     Syntax(String),
+    /// A required target identity field is missing.
+    #[error("target identity field is empty: {0}")]
+    IncompleteTargetIdentity(&'static str),
+    /// The supplied catalog was not evaluated from the exact target.
+    #[error("option catalog is not from a target evaluation")]
+    NonTargetCatalog,
+    /// Catalog and requested host/source identities differ.
+    #[error("option catalog target identity does not match the requested target")]
+    TargetIdentityMismatch,
+    /// The target evaluated option set has no such option.
+    #[error("option is absent from the target catalog: {0}")]
+    OptionNotFound(String),
+    /// Read-only state is missing; writeability cannot be established.
+    #[error("option writeability is unknown: {0}")]
+    OptionWriteabilityUnknown(String),
+    /// A target option is read-only.
+    #[error("option is read-only: {0}")]
+    ReadOnlyOption(String),
+    /// The typed value does not match the target option's declared type.
+    #[error("option type mismatch at {path}: expected {expected}, got {actual}")]
+    OptionTypeMismatch {
+        path: String,
+        expected: String,
+        actual: String,
+    },
+    /// A package is not present in the target package set.
+    #[error("package is absent from the target package catalog: {0}")]
+    PackageNotFound(String),
+    /// A catalog entry could not be registered because it already exists.
+    #[error("duplicate option in target catalog: {0}")]
+    DuplicateCatalogOption(String),
 }
 
 /// A restricted Nix identifier suitable for a static attribute name.
@@ -279,6 +310,330 @@ impl NixModulePlan {
         }
 
         Ok(source)
+    }
+}
+
+/// Complete identity of the NixOS configuration being planned.
+///
+/// Every field participates in equality checks. A release label alone is not
+/// sufficient: the pinned nixpkgs revision, flake lock, selected configuration
+/// and evaluated module-set digest are also bound.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NixTargetIdentity {
+    /// Stable host / installation identity.
+    pub host_id: String,
+    /// NixOS release label.
+    pub nixos_release: String,
+    /// Nix system platform, e.g. x86_64-linux.
+    pub system: String,
+    /// Flake reference or immutable local source identity.
+    pub flake_ref: String,
+    /// Exact nixpkgs revision in the selected lock.
+    pub nixpkgs_revision: String,
+    /// Content digest of the selected flake.lock.
+    pub flake_lock_digest: String,
+    /// Selected nixosConfigurations attribute.
+    pub configuration_identity: String,
+    /// Digest of the evaluated module/overlay closure.
+    pub module_set_digest: String,
+}
+
+impl NixTargetIdentity {
+    /// Reject incomplete identities before they can bind a catalog.
+    pub fn validate(&self) -> Result<(), TypedNixError> {
+        for (field, value) in [
+            ("host_id", self.host_id.as_str()),
+            ("nixos_release", self.nixos_release.as_str()),
+            ("system", self.system.as_str()),
+            ("flake_ref", self.flake_ref.as_str()),
+            ("nixpkgs_revision", self.nixpkgs_revision.as_str()),
+            ("flake_lock_digest", self.flake_lock_digest.as_str()),
+            ("configuration_identity", self.configuration_identity.as_str()),
+            ("module_set_digest", self.module_set_digest.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                return Err(TypedNixError::IncompleteTargetIdentity(field));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Provenance class declared by the option-catalog adapter.
+///
+/// Only TargetEvaluated can be used to validate a mutation. The enum is a
+/// caller-supplied provenance assertion; it does not cryptographically
+/// authenticate the evaluator or catalog. The trusted adapter must establish
+/// that it actually evaluated the exact target before constructing this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NixOptionCatalogOrigin {
+    /// Produced from the evaluated option/package universe of the exact target flake.
+    TargetEvaluated,
+    /// Produced from a pinned release/revision without target overlays and modules.
+    PinnedReference,
+    /// Observed from the controller's local NixOS installation.
+    ControllerLocalLive,
+    /// Bundled reference data for discovery only.
+    BundledReference,
+}
+
+/// Supported option value shapes in the first deterministic resolver slice.
+///
+/// Unknown and complex option types fail closed until their semantics are
+/// represented explicitly; the resolver does not guess from type-name similarity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NixOptionValueKind {
+    /// Boolean option.
+    Bool,
+    /// Integer option.
+    Integer,
+    /// String option.
+    String,
+    /// Package option.
+    Package,
+    /// List whose elements are package references.
+    ListOfPackages,
+    /// List whose elements are strings.
+    ListOfStrings,
+    /// Attribute-set option; nested submodule schemas are not yet validated.
+    AttributeSet,
+    /// Option type not yet modelled by the typed IR.
+    Unsupported(String),
+}
+
+impl NixOptionValueKind {
+    fn label(&self) -> String {
+        match self {
+            Self::Bool => "bool".into(),
+            Self::Integer => "int".into(),
+            Self::String => "string".into(),
+            Self::Package => "package".into(),
+            Self::ListOfPackages => "listOf package".into(),
+            Self::ListOfStrings => "listOf string".into(),
+            Self::AttributeSet => "attribute set".into(),
+            Self::Unsupported(value) => value.clone(),
+        }
+    }
+}
+
+/// One option's source-derived type and writeability metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NixOptionRecord {
+    /// Expected typed value kind.
+    pub value_kind: NixOptionValueKind,
+    /// None means that the target option source did not establish writeability.
+    pub read_only: Option<bool>,
+}
+
+/// A target-specific option and package catalog.
+///
+/// This is a contract for an adapter that evaluates the exact target flake.
+/// It must never be populated from the controller's local or bundled catalog
+/// and then labelled TargetEvaluated. The constructor does not authenticate
+/// its caller or evaluate Nix itself.
+#[derive(Debug, Clone)]
+pub struct NixOptionCatalogV1 {
+    target: NixTargetIdentity,
+    origin: NixOptionCatalogOrigin,
+    options: BTreeMap<NixAttributePath, NixOptionRecord>,
+    package_attributes: std::collections::BTreeSet<NixAttributePath>,
+}
+
+impl NixOptionCatalogV1 {
+    /// Create a catalog record for a specific target identity and declared origin.
+    pub fn new(
+        target: NixTargetIdentity,
+        origin: NixOptionCatalogOrigin,
+    ) -> Result<Self, TypedNixError> {
+        target.validate()?;
+        Ok(Self {
+            target,
+            origin,
+            options: BTreeMap::new(),
+            package_attributes: std::collections::BTreeSet::new(),
+        })
+    }
+
+    /// Register an option from the evaluated target option set.
+    pub fn register_option(
+        &mut self,
+        path: &str,
+        value_kind: NixOptionValueKind,
+        read_only: Option<bool>,
+    ) -> Result<(), TypedNixError> {
+        let path = NixAttributePath::parse(path)?;
+        let rendered = path.as_nix();
+        if self
+            .options
+            .insert(
+                path,
+                NixOptionRecord {
+                    value_kind,
+                    read_only,
+                },
+            )
+            .is_some()
+        {
+            return Err(TypedNixError::DuplicateCatalogOption(rendered));
+        }
+        Ok(())
+    }
+
+    /// Register a package attribute from the exact target pkgs set.
+    pub fn register_package_attribute(
+        &mut self,
+        attribute: &str,
+    ) -> Result<(), TypedNixError> {
+        let package = NixPackageRef::new(attribute)?;
+        self.package_attributes.insert(package.attribute);
+        Ok(())
+    }
+
+    /// The target identity to which every option and package entry is bound.
+    pub fn target(&self) -> &NixTargetIdentity {
+        &self.target
+    }
+
+    /// Validate every option and package reference before a module plan is rendered.
+    ///
+    /// This verifies a caller-supplied target-evaluated catalog contract. It does
+    /// not authenticate the adapter, execute Nix evaluation or establish runtime
+    /// behavior. Those are separate qualification stages.
+    pub fn validate_plan(
+        &self,
+        requested_target: &NixTargetIdentity,
+        plan: &NixModulePlan,
+    ) -> Result<ValidatedNixModule, TypedNixError> {
+        requested_target.validate()?;
+        if self.origin != NixOptionCatalogOrigin::TargetEvaluated {
+            return Err(TypedNixError::NonTargetCatalog);
+        }
+        if &self.target != requested_target {
+            return Err(TypedNixError::TargetIdentityMismatch);
+        }
+
+        for (path, value) in &plan.assignments {
+            let rendered_path = path.as_nix();
+            let option = self
+                .options
+                .get(path)
+                .ok_or_else(|| TypedNixError::OptionNotFound(rendered_path.clone()))?;
+
+            match option.read_only {
+                Some(false) => {}
+                Some(true) => return Err(TypedNixError::ReadOnlyOption(rendered_path)),
+                None => return Err(TypedNixError::OptionWriteabilityUnknown(rendered_path)),
+            }
+
+            match &option.value_kind {
+                NixOptionValueKind::Bool if matches!(value, NixExpr::Bool(_)) => {}
+                NixOptionValueKind::Integer if matches!(value, NixExpr::Int(_)) => {}
+                NixOptionValueKind::String if matches!(value, NixExpr::String(_)) => {}
+                NixOptionValueKind::Package => {
+                    self.validate_package_value(value, &rendered_path)?;
+                }
+                NixOptionValueKind::ListOfPackages => {
+                    let NixExpr::List(items) = value else {
+                        return Err(self.type_mismatch(path, &option.value_kind, value));
+                    };
+                    for item in items {
+                        self.validate_package_value(item, &rendered_path)?;
+                    }
+                }
+                NixOptionValueKind::ListOfStrings => {
+                    let NixExpr::List(items) = value else {
+                        return Err(self.type_mismatch(path, &option.value_kind, value));
+                    };
+                    if !items.iter().all(|item| matches!(item, NixExpr::String(_))) {
+                        return Err(self.type_mismatch(path, &option.value_kind, value));
+                    }
+                }
+                NixOptionValueKind::AttributeSet
+                    if matches!(value, NixExpr::AttributeSet(_)) => {}
+                NixOptionValueKind::Unsupported(_) => {
+                    return Err(self.type_mismatch(path, &option.value_kind, value));
+                }
+                _ => return Err(self.type_mismatch(path, &option.value_kind, value)),
+            }
+        }
+
+        Ok(ValidatedNixModule {
+            target: self.target.clone(),
+            plan: plan.clone(),
+        })
+    }
+
+    fn validate_package_value(
+        &self,
+        value: &NixExpr,
+        option_path: &str,
+    ) -> Result<(), TypedNixError> {
+        let NixExpr::Package(package) = value else {
+            return Err(TypedNixError::OptionTypeMismatch {
+                path: option_path.to_string(),
+                expected: "package".into(),
+                actual: value.kind_label(),
+            });
+        };
+
+        if !self.package_attributes.contains(&package.attribute) {
+            return Err(TypedNixError::PackageNotFound(
+                package.attribute.as_nix(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn type_mismatch(
+        &self,
+        path: &NixAttributePath,
+        expected: &NixOptionValueKind,
+        actual: &NixExpr,
+    ) -> TypedNixError {
+        TypedNixError::OptionTypeMismatch {
+            path: path.as_nix(),
+            expected: expected.label(),
+            actual: actual.kind_label(),
+        }
+    }
+}
+
+/// A plan that passed deterministic validation against one target catalog.
+///
+/// This type proves only that the supplied catalog contains the declared
+/// options/packages, that options are marked writable and that typed values
+/// match the limited kinds supported above. It does not prove catalog
+/// authenticity, Nix evaluation, buildability, activation or runtime success.
+#[derive(Debug, Clone)]
+pub struct ValidatedNixModule {
+    target: NixTargetIdentity,
+    plan: NixModulePlan,
+}
+
+impl ValidatedNixModule {
+    /// The exact target identity validated by the resolver.
+    pub fn target(&self) -> &NixTargetIdentity {
+        &self.target
+    }
+
+    /// Render the validated plan and apply the rnix syntax gate.
+    pub fn render_and_parse(&self) -> Result<String, TypedNixError> {
+        self.plan.render_and_parse()
+    }
+}
+
+impl NixExpr {
+    fn kind_label(&self) -> String {
+        match self {
+            Self::Bool(_) => "bool",
+            Self::Int(_) => "int",
+            Self::String(_) => "string",
+            Self::Null => "null",
+            Self::List(_) => "list",
+            Self::AttributeSet(_) => "attribute set",
+            Self::Package(_) => "package",
+        }
+        .into()
     }
 }
 
