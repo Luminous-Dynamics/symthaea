@@ -29,7 +29,9 @@ which remains a nonnegative supermartingale under the common null even when expe
 
     q_(t,k) = w_k E_(t,k) / E_t.
 
-The posterior describes which registered expert currently explains the evidence. It does not change prior weights, maps, targets, alpha or null assumptions. Rejection occurs at E_t >= 1/alpha_test from the CMAQ-053 composed risk plan. Each child receives the exact threshold alpha_test*w_k; therefore an individual expert cannot be stopped by its own threshold before the corresponding mixture contribution alone has reached the family rejection boundary.
+The posterior describes which registered expert currently explains the evidence. It does not change prior weights, maps, targets, alpha or null assumptions. At the root, rejection occurs at E_t >= 1/alpha_test from the CMAQ-053 composed risk plan. Each child receives the exact threshold alpha_test*w_k; therefore an individual expert cannot be stopped by its own threshold before the corresponding mixture contribution alone has reached the family rejection boundary.
+
+For nested restart portfolios, `new_with_threshold_scale` constructs a child family with effective threshold alpha_component = alpha_test * c, where c is a frozen parent prior mass such as the start-time weight nu_s. Its member thresholds are alpha_test * c * w_k. Consequently a child can only stop when its contribution after parent weighting reaches 1/alpha_test. All child families must share the same reference envelope; the reference-failure budget is paid once, not once per restart. The default `new` constructor is exactly c=1.
 
 ## Implementation contract
 
@@ -37,7 +39,7 @@ The posterior describes which registered expert currently explains the evidence.
 - Fixed response and covariate Fourier maps per expert, with immutable map/target/reference bindings.
 - Fixed positive rational priors normalized exactly to one.
 - Requires the portfolio inventory digest to equal the representation_inventory_sha256 in the immutable CMAQ-053 risk plan.
-- Child alpha values are computed from alpha_test times prior weight and reduced exactly before conversion to the CMAQ-046 u32 interface. Unrepresentable thresholds fail closed.
+- Root child alpha values are computed from alpha_test times prior weight. The nested `new_with_threshold_scale` constructor first multiplies alpha_test by the frozen parent prior mass, then derives each member alpha from that component threshold and its kernel prior. Products are reduced exactly before conversion to the CMAQ-046 u32 interface; unrepresentable thresholds fail closed.
 - One global monotone pair sequence and pair-ID replay inventory.
 - All feature transforms, child updates, mixture log-sum-exp and posterior weights are staged before a single family commit.
 - Child monitors keep only bounded O(d) state; pair IDs are stored once at the family level.
@@ -49,7 +51,7 @@ The e-value and posterior are necessarily evaluated in floating-point log space.
 ## Tests and deterministic probe
 
 The Rust crate has no third-party dependencies and tests:
-- exact rational prior normalization and member-alpha derivation;
+- exact rational prior normalization, root and nested component-threshold scaling, and member-alpha derivation;
 - duplicate expert IDs, dimension mismatches and inventory-binding mismatch;
 - initial wealth normalization and posterior sum;
 - deterministic scale-selective alternative where one registered response frequency is deliberately blind and another resolves the change;
