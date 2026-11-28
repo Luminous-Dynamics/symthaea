@@ -50,6 +50,7 @@ pub enum CaOcrcTrackingDispositionV1 {
     NotAdmittedCapacityFull,
     ImmediateKnownLossApplied,
     FeedbackUpdated,
+    Duplicate,
     FeedbackNotTracked,
     HeldUnknown,
     Blocked,
@@ -165,6 +166,9 @@ pub struct CaOcrcFeedbackV1 {
     pub current_round: u64,
     pub origin_round: u64,
     pub actual_delay: u64,
+    pub prediction_id: String,
+    pub sample_id: String,
+    pub measurement_event_id: String,
     pub label_id: String,
     pub label_revision: u64,
     pub label_payload_sha256: String,
@@ -521,8 +525,12 @@ pub fn receive_ca_ocrc_feedback_v1(
     if feedback.schema != CA_OCRC_FEEDBACK_SCHEMA_V1 {
         return Err(CaOcrcErrorV1("CA-OCRC feedback schema is unsupported".into()));
     }
+    if json_sha256(&engine.policy)? != engine.policy_sha256 {
+        return Err(CaOcrcErrorV1("CA-OCRC policy digest mismatch".into()));
+    }
     let current = engine.current_round.ok_or_else(|| CaOcrcErrorV1("no CA-OCRC round is active".into()))?;
     let before = engine.threshold;
+    let guarantee_before = engine.guarantee_state;
     let revision_key = format!("{}:{}", feedback.label_id, feedback.label_revision);
     if engine.accepted_label_revisions.contains(&revision_key) {
         let mut receipt = CaOcrcFeedbackReceiptV1 {
@@ -532,7 +540,7 @@ pub fn receive_ca_ocrc_feedback_v1(
             current_round: feedback.current_round,
             label_id: feedback.label_id.clone(),
             label_revision: feedback.label_revision,
-            disposition: CaOcrcTrackingDispositionV1::FeedbackNotTracked,
+            disposition: CaOcrcTrackingDispositionV1::Duplicate,
             reasons: Vec::new(),
             observed_loss: None,
             proxy_survival_probability: None,
@@ -550,7 +558,6 @@ pub fn receive_ca_ocrc_feedback_v1(
         receipt.receipt_sha256 = feedback_digest(&receipt)?;
         return Ok(receipt);
     }
-    let guarantee_before = engine.guarantee_state;
     let tracked = engine.tracked_rounds.get(&feedback.origin_round).cloned();
     let mut reasons = Vec::new();
 
@@ -560,6 +567,9 @@ pub fn receive_ca_ocrc_feedback_v1(
     {
         reasons.push(CaOcrcReasonV1::FeedbackRoundMismatch);
     }
+    require_text(&feedback.prediction_id, "feedback.prediction_id")?;
+    require_text(&feedback.sample_id, "feedback.sample_id")?;
+    require_text(&feedback.measurement_event_id, "feedback.measurement_event_id")?;
     let Some(tracked) = tracked else {
         let mut receipt = CaOcrcFeedbackReceiptV1 {
             schema: CA_OCRC_UPDATE_RECEIPT_SCHEMA_V1.into(),
@@ -591,6 +601,12 @@ pub fn receive_ca_ocrc_feedback_v1(
     if feedback.actual_delay > tracked.proxy_delay {
         reasons.push(CaOcrcReasonV1::FeedbackNotInTrackingSet);
     }
+    if feedback.prediction_id != tracked.prediction_id
+        || feedback.sample_id != tracked.sample_id
+        || feedback.measurement_event_id != tracked.measurement_event_id
+    {
+        reasons.push(CaOcrcReasonV1::InvalidPredictionIdentity);
+    }
     if feedback.clock_domain_id != tracked.clock_domain_id || feedback.clock_domain_id != engine.clock_domain_id {
         reasons.push(CaOcrcReasonV1::ClockDomainMismatch);
     }
@@ -605,6 +621,9 @@ pub fn receive_ca_ocrc_feedback_v1(
     }
     if feedback.delivered_at_unix_seconds < feedback.eligibility_report_available_at_unix_seconds {
         reasons.push(CaOcrcReasonV1::ReportUnavailableAtDelivery);
+    }
+    if report.schema != "luminous.semi-bench.label-consumption-report.v1" {
+        reasons.push(CaOcrcReasonV1::EligibilityReportDigestMismatch);
     }
     if report.frontier != LabelEvidenceFrontierV1::CurrentAtK1 {
         reasons.push(CaOcrcReasonV1::LabelNotCurrentK1);
