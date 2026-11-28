@@ -215,7 +215,9 @@ fn validate_condition_common(condition: &Condition, budget_sha: &str) -> Result<
         require_sha256(value, name)?;
     }
     if condition.budget_profile_sha256 != budget_sha {
-        return Err("condition budget profile differs from the panel's frozen matched profile".to_owned());
+        return Err(
+            "condition budget profile differs from the panel's frozen matched profile".to_owned(),
+        );
     }
     if condition.reference_label_exposed {
         return Err("reference labels must not be exposed to any model condition".to_owned());
@@ -229,7 +231,10 @@ fn validate_condition_common(condition: &Condition, budget_sha: &str) -> Result<
         (condition.reasoner_model_identity_sha256.as_ref(), "reasoner_model_identity_sha256"),
         (condition.audio_evidence_manifest_sha256.as_ref(), "audio_evidence_manifest_sha256"),
         (condition.oracle_symbolic_reference_sha256.as_ref(), "oracle_symbolic_reference_sha256"),
-        (condition.predicted_symbolic_representation_sha256.as_ref(), "predicted_symbolic_representation_sha256"),
+        (
+            condition.predicted_symbolic_representation_sha256.as_ref(),
+            "predicted_symbolic_representation_sha256",
+        ),
         (condition.transcription_report_sha256.as_ref(), "transcription_report_sha256"),
         (condition.alignment_report_sha256.as_ref(), "alignment_report_sha256"),
     ] {
@@ -265,7 +270,10 @@ fn validate_condition_kind(
                 || condition.alignment_report_sha256.is_some()
                 || condition.reasoner_model_identity_sha256.is_none()
             {
-                return Err("oracle_symbolic requires only an oracle structure reference and a fixed reasoning head".to_owned());
+                return Err(
+                    "oracle_symbolic requires only an oracle structure reference and a fixed reasoning head"
+                        .to_owned(),
+                );
             }
         }
         ConditionKind::AudioDerivedSymbolic => {
@@ -276,7 +284,10 @@ fn validate_condition_kind(
                 || condition.alignment_report_sha256.is_none()
                 || condition.reasoner_model_identity_sha256.is_none()
             {
-                return Err("audio_derived_symbolic requires exact audio evidence, predicted structure, transcription/alignment receipts and a reasoning head".to_owned());
+                return Err(
+                    "audio_derived_symbolic requires exact audio evidence, predicted structure, transcription/alignment receipts and a reasoning head"
+                        .to_owned(),
+                );
             }
         }
         ConditionKind::RawAudio => {
@@ -287,7 +298,10 @@ fn validate_condition_kind(
                 || condition.alignment_report_sha256.is_some()
                 || condition.reasoner_model_identity_sha256.is_some()
             {
-                return Err("raw_audio requires the exact audio evidence and no symbolic representation".to_owned());
+                return Err(
+                    "raw_audio requires the exact audio evidence and no symbolic representation"
+                        .to_owned(),
+                );
             }
         }
         ConditionKind::AudioPlusPredictedStructure => {
@@ -298,7 +312,10 @@ fn validate_condition_kind(
                 || condition.alignment_report_sha256.is_none()
                 || condition.reasoner_model_identity_sha256.is_some()
             {
-                return Err("audio_plus_predicted_structure requires exact audio and model-derived structure, never oracle structure".to_owned());
+                return Err(
+                    "audio_plus_predicted_structure requires exact audio and model-derived structure, never oracle structure"
+                        .to_owned(),
+                );
             }
         }
         ConditionKind::NoEvidenceControl => require_absent(condition, condition.kind)?,
@@ -310,7 +327,10 @@ fn score_condition(
     condition: &Condition,
     reference: ReferenceDisposition,
 ) -> ConditionMetrics {
-    let scorable = matches!(reference, ReferenceDisposition::Same | ReferenceDisposition::Different);
+    let scorable = matches!(
+        reference,
+        ReferenceDisposition::Same | ReferenceDisposition::Different
+    );
     let answered = if matches!(condition.prediction, Prediction::Same | Prediction::Different) {
         1
     } else {
@@ -388,7 +408,10 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
     let reasoner_identity_matched = oracle.reasoner_model_identity_sha256
         == audio_derived.reasoner_model_identity_sha256;
     if !reasoner_identity_matched {
-        return Err("oracle and audio-derived symbolic conditions must use the same downstream reasoning head".to_owned());
+        return Err(
+            "oracle and audio-derived symbolic conditions must use the same downstream reasoning head"
+                .to_owned(),
+        );
     }
 
     let raw_audio_model_identity_matched = raw_audio.model_identity_sha256
@@ -403,7 +426,10 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
         && raw_audio.decoding_config_sha256 == fusion.decoding_config_sha256
         && raw_audio.decoding_config_sha256 == no_evidence.decoding_config_sha256;
     if !raw_audio_model_identity_matched {
-        return Err("raw, fusion and no-evidence controls must share model, runtime, prompt, adapter and decoding identities".to_owned());
+        return Err(
+            "raw, fusion and no-evidence controls must share model, runtime, prompt, adapter and decoding identities"
+                .to_owned(),
+        );
     }
 
     let mut conditions = panel
@@ -429,7 +455,8 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
     let raw_correct = scorable && metric(ConditionKind::RawAudio).correct == 1;
     let fusion_correct =
         scorable && metric(ConditionKind::AudioPlusPredictedStructure).correct == 1;
-    let no_evidence_correct = scorable.then(|| metric(ConditionKind::NoEvidenceControl).correct == 1);
+    let no_evidence_correct =
+        scorable.then(|| metric(ConditionKind::NoEvidenceControl).correct == 1);
 
     Ok(AuditReport {
         schema: "mel-hear-009-perception-reasoning-report-v0".to_owned(),
@@ -444,8 +471,12 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
         reasoner_identity_matched,
         raw_audio_model_identity_matched,
         diagnostics: PerceptionReasoningDiagnostics {
-            oracle_correct_audio_derived_incorrect: scorable && oracle_correct && !audio_derived_correct,
-            oracle_incorrect_audio_derived_correct: scorable && !oracle_correct && audio_derived_correct,
+            oracle_correct_audio_derived_incorrect: scorable
+                && oracle_correct
+                && !audio_derived_correct,
+            oracle_incorrect_audio_derived_correct: scorable
+                && !oracle_correct
+                && audio_derived_correct,
             raw_audio_correct_fusion_incorrect: scorable && raw_correct && !fusion_correct,
             raw_audio_incorrect_fusion_correct: scorable && !raw_correct && fusion_correct,
             no_evidence_control_correct: no_evidence_correct,
@@ -478,7 +509,12 @@ mod tests {
         assert!(!report.diagnostics.raw_audio_incorrect_fusion_correct);
         assert_eq!(report.diagnostics.no_evidence_control_correct, Some(false));
         assert_eq!(
-            report.conditions.iter().find(|c| c.kind == ConditionKind::AudioDerivedSymbolic).unwrap().incorrect,
+            report
+                .conditions
+                .iter()
+                .find(|condition| condition.kind == ConditionKind::AudioDerivedSymbolic)
+                .unwrap()
+                .incorrect,
             1
         );
     }
@@ -509,7 +545,8 @@ mod tests {
     #[test]
     fn mismatched_matched_budget_profile_is_rejected() {
         let mut panel = fixture();
-        panel.conditions[1].budget_profile_sha256 = "abababababababababababababababababababababababababababababababab".to_owned();
+        panel.conditions[1].budget_profile_sha256 =
+            "abababababababababababababababababababababababababababababababab".to_owned();
         assert!(audit_panel(&panel).is_err());
     }
 
