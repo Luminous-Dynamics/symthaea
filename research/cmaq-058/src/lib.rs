@@ -255,9 +255,9 @@ impl CapitalRestartRenewalMonitor {
     }
 
     /// Processes one pair through the shared CMAQ-057 factor policy and then
-    /// applies the exact O(K) renewal recurrence. The policy and all renewal
-    /// states are cloned/staged first; neither child history nor capital is
-    /// committed unless the complete kernel/start mixture normalizes.
+    /// applies the exact O(K) renewal recurrence. The child prepares an
+    /// immutable update without mutating its replay ledger; the parent stages
+    /// all renewal values and posteriors before committing the child and parent.
     pub fn observe_pair(
         &mut self,
         sequence: u64,
@@ -828,6 +828,111 @@ mod tests {
             ])
             .unwrap();
             assert!((log_total - direct_total).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn renewal_recurrence_matches_naive_enumerator_across_kernel_counts_and_dyadic_horizons() {
+        let horizons = [
+            1usize, 2, 3, 7, 8, 15, 16, 31, 32, 63, 64, 127, 128, 255, 256, 511, 512,
+            1_024,
+        ];
+
+        for kernel_count in [1usize, 2, 3, 7] {
+            for horizon in horizons {
+                let factors_by_kernel = (0..kernel_count)
+                    .map(|kernel| {
+                        (1..=horizon)
+                            .map(|time| {
+                                let kernel = kernel as u64;
+                                let time = time as u64;
+                                let residue =
+                                    (time * 37 + kernel * 19 + time * (kernel + 1) * 7) % 97;
+                                match residue % 5 {
+                                    0 => 0.55,
+                                    1 => 1.45,
+                                    2 => 0.80,
+                                    3 => 1.20,
+                                    _ => 1.00,
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+
+                let mut cumulative = vec![0.0; kernel_count];
+                let mut inverse_prefix = vec![f64::NEG_INFINITY; kernel_count];
+                let mut restart_wealth = vec![f64::NEG_INFINITY; kernel_count];
+
+                for time in 1..=horizon {
+                    let log_start_prior =
+                        rational_log(weight_for_start(time as u64).unwrap()).unwrap();
+                    for kernel in 0..kernel_count {
+                        let (next_cumulative, next_inverse_prefix, next_restart_wealth) =
+                            advance_kernel_restart(
+                                cumulative[kernel],
+                                inverse_prefix[kernel],
+                                log_start_prior,
+                                factors_by_kernel[kernel][time - 1].ln(),
+                            )
+                            .unwrap();
+                        cumulative[kernel] = next_cumulative;
+                        inverse_prefix[kernel] = next_inverse_prefix;
+                        restart_wealth[kernel] = next_restart_wealth;
+                    }
+                }
+
+                let (naive_wealth, naive_future) = naive_restart_logs(&factors_by_kernel);
+                for kernel in 0..kernel_count {
+                    assert!(
+                        (restart_wealth[kernel] - naive_wealth[kernel]).abs() < 1e-9,
+                        "kernel_count={kernel_count}, horizon={horizon}, kernel={kernel}"
+                    );
+                }
+
+                // Equal rational priors are used here to test the aggregation
+                // independently of the manifest-construction test fixtures.
+                let log_kernel_prior = -(kernel_count as f64).ln();
+                let mut fast_terms = vec![rational_log(future_mass_after(horizon as u64).unwrap()).unwrap()];
+                let mut naive_terms = vec![naive_future];
+                for kernel in 0..kernel_count {
+                    fast_terms.push(log_kernel_prior + restart_wealth[kernel]);
+                    naive_terms.push(log_kernel_prior + naive_wealth[kernel]);
+                }
+                let fast_total = log_sum_exp(&fast_terms).unwrap();
+                let naive_total = log_sum_exp(&naive_terms).unwrap();
+                assert!(
+                    (fast_total - naive_total).abs() < 1e-9,
+                    "mixture kernel_count={kernel_count}, horizon={horizon}"
+                );
+
+                let posterior_sum = fast_terms
+                    .iter()
+                    .map(|term| (*term - fast_total).exp())
+                    .sum::<f64>();
+                assert!(
+                    (posterior_sum - 1.0).abs() < 1e-10,
+                    "posterior kernel_count={kernel_count}, horizon={horizon}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn dyadic_start_prior_and_future_mass_sum_to_one_exactly_through_horizon_cap() {
+        let mut started_mass = Rational::new(0, 1).unwrap();
+        for sequence in 1..=MAX_RENEWAL_HORIZON {
+            started_mass = started_mass
+                .checked_add(weight_for_start(sequence).unwrap())
+                .unwrap();
+            let total_mass = started_mass
+                .checked_add(future_mass_after(sequence).unwrap())
+                .unwrap();
+            assert_eq!(
+                total_mass,
+                Rational::one(),
+                "start prior mass did not normalize at sequence {sequence}"
+            );
         }
     }
 
