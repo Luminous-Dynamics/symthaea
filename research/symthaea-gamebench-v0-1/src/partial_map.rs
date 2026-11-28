@@ -285,13 +285,13 @@ mod tests {
     use super::*;
 
     fn fixture(max_actions: u32) -> ExploreSpec {
-        // P . # . G. The wall at x=2 and goal at x=4 are not initially visible.
+        // P . . . # . G. The wall at x=4 and goal at x=6 are initially hidden.
         ExploreSpec::new(
-            5,
+            7,
             1,
-            vec![Cell::Floor, Cell::Floor, Cell::Wall, Cell::Floor, Cell::Goal],
+            vec![Cell::Floor, Cell::Floor, Cell::Floor, Cell::Floor, Cell::Wall, Cell::Floor, Cell::Goal],
             Position::new(0, 0),
-            Position::new(4, 0),
+            Position::new(6, 0),
             max_actions,
             1,
             2,
@@ -306,7 +306,7 @@ mod tests {
         assert_eq!(observation.position, Position::new(0, 0));
         assert_eq!(observation.visible_cells.len(), 2);
         assert!(!observation.visible_cells.iter().any(|cell| {
-            cell.position == Position::new(2, 0) || cell.position == Position::new(4, 0)
+            cell.position == Position::new(4, 0) || cell.position == Position::new(6, 0)
         }));
     }
 
@@ -319,10 +319,10 @@ mod tests {
         assert_eq!(transition.state.elapsed_actions, 1);
         assert_eq!(transition.observation.visible_cells.len(), 3);
         assert!(transition.observation.visible_cells.iter().any(|cell| {
-            cell.position == Position::new(2, 0) && cell.cell == Cell::Wall
+            cell.position == Position::new(2, 0) && cell.cell == Cell::Floor
         }));
         assert!(!transition.observation.visible_cells.iter().any(|cell| {
-            cell.position == Position::new(4, 0)
+            cell.position == Position::new(6, 0)
         }));
     }
 
@@ -335,10 +335,10 @@ mod tests {
         }));
 
         game.step(ExploreAction::Move(Action::East)).expect("move to x=1");
-        let moved = game.step(ExploreAction::Move(Action::East)).expect("blocked at wall x=2");
-        assert_eq!(moved.state.position, Position::new(1, 0));
+        let moved = game.step(ExploreAction::Move(Action::East)).expect("move to x=2");
+        assert_eq!(moved.state.position, Position::new(2, 0));
         assert!(!moved.observation.visible_cells.iter().any(|cell| {
-            cell.position == Position::new(4, 0)
+            cell.position == Position::new(0, 0)
         }));
         // The environment never attaches the earlier scan result to this view.
         assert!(!moved.observation.scan_was_used_for_this_observation);
