@@ -12,6 +12,9 @@ use std::fmt::{Display, Formatter};
 mod hdc_candidate;
 pub use hdc_candidate::{HdcCandidateError, HdcSpatialCandidate};
 
+mod hdc_ltc_candidate;
+pub use hdc_ltc_candidate::{HdcLtcAdapterError, HdcLtcSpatialCandidate};
+
 use symthaea_fep::{
     ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation as FepObservation,
 };
