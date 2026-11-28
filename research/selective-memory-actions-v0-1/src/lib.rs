@@ -45,6 +45,12 @@ pub enum Action {
     Clarify,
     Abstain,
     Probe,
+    /// Do not expose this preference to the current response/task context.
+    IgnorePreference,
+    /// Expose the preference as supporting context, not as a controlling instruction.
+    SupportPreference,
+    /// Apply a preference as a strong interaction constraint; requires an upstream explicit authorization gate.
+    DominatePreference,
 }
 
 impl Action {
@@ -54,7 +60,14 @@ impl Action {
             | Self::SessionOnly
             | Self::DiscardCandidate
             | Self::RequestConfirmation => Stage::Ingestion,
-            Self::Use | Self::Verify | Self::Clarify | Self::Abstain | Self::Probe => {
+            Self::Use
+            | Self::Verify
+            | Self::Clarify
+            | Self::Abstain
+            | Self::Probe
+            | Self::IgnorePreference
+            | Self::SupportPreference
+            | Self::DominatePreference => {
                 Stage::Query
             }
         }
@@ -71,6 +84,9 @@ impl Action {
             Self::Clarify => 6,
             Self::Abstain => 7,
             Self::Probe => 8,
+            Self::IgnorePreference => 9,
+            Self::SupportPreference => 10,
+            Self::DominatePreference => 11,
         }
     }
 }
@@ -142,6 +158,10 @@ pub struct AdmissionSnapshot {
     pub verifier_available: bool,
     pub clarification_authorized: bool,
     pub probe_authorized: bool,
+    /// Upstream authority has explicitly approved this preference to dominate
+    /// the current response/task within its declared scope. Never set from
+    /// candidate model prose or inferred preference strength.
+    pub dominant_preference_authorized: bool,
 }
 
 /// One legal-stage action and its estimated loss distribution.
@@ -199,7 +219,7 @@ pub fn select_action(
         return Err(SelectionError::EmptyOptions);
     }
 
-    let mut seen = [false; 9];
+    let mut seen = [false; 12];
     let mut best: Option<PolicyDecision> = None;
 
     for option in options {
@@ -266,13 +286,24 @@ pub const fn is_admissible(action: Action, gates: AdmissionSnapshot) -> bool {
         }
         Action::DiscardCandidate => true,
         Action::RequestConfirmation => gates.clarification_authorized,
-        Action::Use => {
+        Action::Use | Action::SupportPreference => {
             gates.source_qualified
                 && gates.scope_qualified
                 && gates.freshness_at_use.is_qualified()
                 && gates.not_revoked_or_erased
                 && gates.canonical_revalidation_at_use
         }
+        Action::DominatePreference => {
+            gates.source_qualified
+                && gates.scope_qualified
+                && gates.freshness_at_use.is_qualified()
+                && gates.not_revoked_or_erased
+                && gates.canonical_revalidation_at_use
+                && gates.dominant_preference_authorized
+        }
+        // Ignoring a preference is always a legal non-use decision. This does
+        // not authorize reading or exposing the underlying memory.
+        Action::IgnorePreference => true,
         Action::Verify => gates.verification_authorized && gates.verifier_available,
         Action::Clarify => gates.clarification_authorized,
         Action::Abstain => true,
@@ -764,6 +795,92 @@ mod tests {
                 action: Action::Abstain,
             })
         );
+    }
+
+    #[test]
+    fn irrelevant_preference_can_be_ignored_without_memory_admission() {
+        let gates = AdmissionSnapshot::default();
+        let options = [
+            option(Action::IgnorePreference, &LOW_LOSS, 0, 0, 0),
+            option(Action::SupportPreference, &HIGH_LOSS, 0, 0, 1),
+            option(Action::DominatePreference, &HIGH_LOSS, 0, 0, 2),
+        ];
+        let decision = select_action(Stage::Query, gates, &options).unwrap();
+        assert_eq!(decision.action, Action::IgnorePreference);
+    }
+
+    #[test]
+    fn support_preference_requires_current_canonical_evidence() {
+        let gates = AdmissionSnapshot {
+            source_qualified: true,
+            scope_qualified: true,
+            not_revoked_or_erased: true,
+            freshness_at_use: FreshnessAtUse {
+                evidence_age_at_retrieval_ns: Some(10),
+                evidence_age_at_use_ns: Some(101),
+                max_evidence_age_ns: Some(100),
+                deadline_enforced: Some(false),
+                deadline_slack_at_use_ns: None,
+            },
+            canonical_revalidation_at_use: true,
+            ..AdmissionSnapshot::default()
+        };
+        let options = [
+            option(Action::SupportPreference, &LOW_LOSS, 0, 0, 0),
+            option(Action::IgnorePreference, &HIGH_LOSS, 0, 0, 1),
+        ];
+        let decision = select_action(Stage::Query, gates, &options).unwrap();
+        assert_eq!(decision.action, Action::IgnorePreference);
+    }
+
+    #[test]
+    fn dominate_preference_requires_separate_explicit_authorization() {
+        let gates = AdmissionSnapshot {
+            source_qualified: true,
+            scope_qualified: true,
+            not_revoked_or_erased: true,
+            freshness_at_use: FreshnessAtUse {
+                evidence_age_at_retrieval_ns: Some(10),
+                evidence_age_at_use_ns: Some(20),
+                max_evidence_age_ns: Some(100),
+                deadline_enforced: Some(false),
+                deadline_slack_at_use_ns: None,
+            },
+            canonical_revalidation_at_use: true,
+            dominant_preference_authorized: false,
+            ..AdmissionSnapshot::default()
+        };
+        let options = [
+            option(Action::DominatePreference, &LOW_LOSS, 0, 0, 0),
+            option(Action::SupportPreference, &HIGH_LOSS, 0, 0, 1),
+        ];
+        let decision = select_action(Stage::Query, gates, &options).unwrap();
+        assert_eq!(decision.action, Action::SupportPreference);
+    }
+
+    #[test]
+    fn explicitly_authorized_dominant_preference_can_be_selected() {
+        let gates = AdmissionSnapshot {
+            source_qualified: true,
+            scope_qualified: true,
+            not_revoked_or_erased: true,
+            freshness_at_use: FreshnessAtUse {
+                evidence_age_at_retrieval_ns: Some(10),
+                evidence_age_at_use_ns: Some(20),
+                max_evidence_age_ns: Some(100),
+                deadline_enforced: Some(false),
+                deadline_slack_at_use_ns: None,
+            },
+            canonical_revalidation_at_use: true,
+            dominant_preference_authorized: true,
+            ..AdmissionSnapshot::default()
+        };
+        let options = [
+            option(Action::DominatePreference, &LOW_LOSS, 0, 0, 0),
+            option(Action::SupportPreference, &HIGH_LOSS, 0, 0, 1),
+        ];
+        let decision = select_action(Stage::Query, gates, &options).unwrap();
+        assert_eq!(decision.action, Action::DominatePreference);
     }
 
     #[test]
