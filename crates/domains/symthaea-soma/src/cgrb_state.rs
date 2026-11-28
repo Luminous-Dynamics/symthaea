@@ -372,6 +372,11 @@ pub fn assess_task_outcome_v1(
             if !observation.operation_terminal {
                 return CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::OperationStillInFlight);
             }
+            if observation.state_version == attempt.precondition_state_version
+                || observation.state_digest == attempt.precondition_state_digest
+            {
+                return CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::ContradictoryOracleState);
+            }
             if observation.effect_count != 1 {
                 return CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::DuplicateOrMissingEffect);
             }
@@ -588,6 +593,20 @@ mod tests {
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::UntrustedOracle)
+        );
+    }
+
+    #[test]
+    fn applied_operation_must_advance_state_version_and_digest() {
+        let mut observed = observation();
+        observed.state_version = "v1".into();
+        observed.state_digest = digest('b');
+        let result = assess_task_outcome_v1(
+            &attempt(), &profile(), Some(&observed), "world-clock", 21, 5
+        );
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::ContradictoryOracleState)
         );
     }
 
