@@ -53,3 +53,6 @@ jobs:
         run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json >/dev/null
       - name: Parse decision exposure link schema
         run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/decision-evidence-use-link-v1.schema.json >/dev/null
+
+      - name: Parse complete preference exposure manifest schema
+        run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/preference-exposure-manifest-v1.schema.json >/dev/null
