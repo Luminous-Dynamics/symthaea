@@ -1,0 +1,52 @@
+name: Spatial Fourier encoder qualification
+
+on:
+  push:
+    branches:
+      - research/spatial-hdc-locality-v0
+    paths:
+      - "crates/core/symthaea-core/src/hdc/spatial_fourier_encoder.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - ".github/workflows/spatial-fourier-encoder.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "crates/core/symthaea-core/src/hdc/spatial_fourier_encoder.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - ".github/workflows/spatial-fourier-encoder.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spatial-fourier-encoder-\${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  QUALIFIED_SHA: \${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  exact-head-tests:
+    name: Exact-head metric locality and translation algebra
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ env.QUALIFIED_SHA }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting of new source
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/spatial_fourier_encoder.rs
+
+      - name: Run spatial Fourier property tests
+        run: cargo test --locked -p symthaea-core --no-default-features spatial_fourier_encoder --lib
+
+      - name: Run core-library Clippy
+        run: cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings
