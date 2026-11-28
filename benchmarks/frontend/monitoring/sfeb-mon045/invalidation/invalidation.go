@@ -118,19 +118,19 @@ func validID(s string)bool{return s!=""&&len(s)<=MaxIDLength&&!strings.ContainsA
 func validDigest(s string)bool{if len(s)!=64||s!=strings.ToLower(s){return false};_,e:=hex.DecodeString(s);return e==nil}
 func validKind(k NodeKind)bool{switch k{case Evidence,Capability,Scope,Policy,Claim:return true};return false}
 func validVerdict(v Verdict)bool{switch v{case Qualified,Blocked,Indeterminate:return true};return false}
-func nodeOwnVerdict(n Node,at time.Time,skew int64)Verdict{
+func nodeOwnEvaluation(n Node,at time.Time,skew int64)(Verdict,[]string){
  f:=newFlags()
- if !validID(n.ID)||!validKind(n.Kind)||!validDigest(n.Digest)||!validID(n.IssuerID){f.block("node_identity_or_digest_invalid:"+n.ID)}
- if !validVerdict(n.DeclaredVerdict){f.block("node_declared_verdict_invalid:"+n.ID)}
- if n.IssuedAt.IsZero()||n.ValidUntil.IsZero()||!n.ValidUntil.After(n.IssuedAt){f.hold("node_validity_window_invalid:"+n.ID)}
- if !at.IsZero()&&!n.IssuedAt.IsZero()&&n.IssuedAt.After(at.Add(time.Duration(skew)*time.Second)){f.block("node_issued_in_future:"+n.ID)}
- if !at.IsZero()&&!n.ValidUntil.IsZero()&&!n.ValidUntil.After(at){f.hold("node_expired:"+n.ID)}
- if n.RevokedAt!=nil&&!at.IsZero()&&!n.RevokedAt.After(at){f.block("node_revoked:"+n.ID)}
- if n.RevokedAt!=nil&&!n.IssuedAt.IsZero()&&n.RevokedAt.Before(n.IssuedAt){f.block("node_revocation_precedes_issue:"+n.ID)}
- if !n.Authenticated{f.hold("node_issuer_not_authenticated:"+n.ID)}
- if n.DeclaredVerdict==Blocked{f.block("node_declared_blocked:"+n.ID)}
- if n.DeclaredVerdict==Indeterminate{f.hold("node_declared_indeterminate:"+n.ID)}
- return f.verdict()
+ if !validID(n.ID)||!validKind(n.Kind)||!validDigest(n.Digest)||!validID(n.IssuerID){f.block("node_identity_or_digest_invalid")}
+ if !validVerdict(n.DeclaredVerdict){f.block("node_declared_verdict_invalid")}
+ if n.IssuedAt.IsZero()||n.ValidUntil.IsZero()||!n.ValidUntil.After(n.IssuedAt){f.hold("node_validity_window_invalid")}
+ if !at.IsZero()&&!n.IssuedAt.IsZero()&&n.IssuedAt.After(at.Add(time.Duration(skew)*time.Second)){f.block("node_issued_in_future")}
+ if !at.IsZero()&&!n.ValidUntil.IsZero()&&!n.ValidUntil.After(at){f.hold("node_expired")}
+ if n.RevokedAt!=nil&&!at.IsZero()&&!n.RevokedAt.After(at){f.block("node_revoked")}
+ if n.RevokedAt!=nil&&!n.IssuedAt.IsZero()&&n.RevokedAt.Before(n.IssuedAt){f.block("node_revocation_precedes_issue")}
+ if !n.Authenticated{f.hold("node_issuer_not_authenticated")}
+ if n.DeclaredVerdict==Blocked{f.block("node_declared_blocked")}
+ if n.DeclaredVerdict==Indeterminate{f.hold("node_declared_indeterminate")}
+ return f.verdict(),f.sorted()
 }
 type stringHeap []string
 func(h stringHeap)Len()int{return len(h)}
@@ -207,7 +207,7 @@ func Evaluate(in Input)Result{
   if e.PrerequisiteID==e.DependentID{f.block("self_dependency:"+e.PrerequisiteID)}
   if _,ok:=nodes[e.DependentID];!ok{f.block("dependent_node_missing:"+e.DependentID)}
   if e.Relation!=Requires&&e.Relation!=Context{f.block("edge_relation_invalid")}
-  if e.Relation==Requires&&!validDigest(e.ExpectedSHA256){f.hold("required_edge_expected_digest_missing:"+e.PrerequisiteID+":"+e.DependentID)}
+  if e.Relation==Requires&&!validDigest(e.ExpectedSHA256){/* the dependent claim is held during evaluation */}
   key:=e.PrerequisiteID+"\x00"+e.DependentID+"\x00"+string(e.Relation)
   if _,ok:=edgeKeys[key];ok{f.block("edge_duplicated:"+e.PrerequisiteID+":"+e.DependentID)}
   edgeKeys[key]=struct{}{}
@@ -237,12 +237,10 @@ func Evaluate(in Input)Result{
  reasons:=map[string][]string{}
  nodeResults:=map[string]NodeResult{}
  for _,id:=range order{
-  n:=nodes[id];own:=nodeOwnVerdict(n,in.EvaluatedAt,in.AllowedFutureSkewSeconds)
+  n:=nodes[id]
+  own,ownCodes:=nodeOwnEvaluation(n,in.EvaluatedAt,in.AllowedFutureSkewSeconds)
   combined:=own
-  required:=[]string{};optional:=[]string{};codes:=[]string{}
-  // Preserve own-state reasons in a deterministic local collector.
-  nf:=newFlags()
-  _=nf
+  required:=[]string{};optional:=[]string{};codes:=append([]string(nil),ownCodes...)
   for _,e:=range inbound[id]{
    dependency,exists:=nodes[e.PrerequisiteID]
    if !exists{
@@ -268,16 +266,12 @@ func Evaluate(in Input)Result{
   effective[id]=combined;reasons[id]=codes
   nodeResults[id]=NodeResult{ID:id,Kind:n.Kind,OwnVerdict:own,EffectiveVerdict:combined,RequiredPrerequisites:required,OptionalContext:optional,ReasonCodes:codes}
   if combined!=Qualified{out.InvalidatedNodeIDs=append(out.InvalidatedNodeIDs,id)}
-  for _,code:=range codes{f.hold(id+":"+code)}
-  // A blocked own state or a required dependency mismatch is a known blocker.
-  // Preserve this severity in the graph-level result.
-  if combined==Blocked{f.block("node_not_qualified:"+id)}else if combined==Indeterminate{f.hold("node_not_qualified:"+id)}
+  // Node failures are recorded locally. Only requested root claims contribute
+  // to GraphVerdict; unrelated evidence remains visible without global blast radius.
  }
  for _,id:=range order{out.NodeResults=append(out.NodeResults,nodeResults[id])}
  sort.Strings(out.InvalidatedNodeIDs)
 
- reverse:=map[string][]string{}
- for _,e:=range in.Edges{if e.Relation==Requires&&nodes[e.PrerequisiteID].ID!=""{reverse[e.DependentID]=append(reverse[e.DependentID],e.PrerequisiteID)}}
  claimIDs:=make([]string,0,len(in.RootClaimIDs));for id:=range roots{claimIDs=append(claimIDs,id)};sort.Strings(claimIDs)
  for _,claimID:=range claimIDs{
   visited:=map[string]struct{}{}
@@ -297,9 +291,14 @@ func Evaluate(in Input)Result{
   trace:=[]struct{ID string `json:"id"`;Digest string `json:"digest"`;Verdict Verdict `json:"verdict"`}{}
   for _,dep:=range deps{n:=nodes[dep];trace=append(trace,struct{ID string `json:"id"`;Digest string `json:"digest"`;Verdict Verdict `json:"verdict"`}{dep,n.Digest,effective[dep]})}
   traceDigest:=digestJSON(trace)
-  cr:=ClaimResult{ClaimID:claimID,Verdict:effective[claimID],DependencyNodeIDs:deps,InvalidatingNodeIDs:invalidating,DependencyTraceSHA256:traceDigest,ReasonCodes:append([]string(nil),reasons[claimID]...)}
+  claimReasons:=append([]string(nil),reasons[claimID]...)
+  for _,dep:=range invalidating{for _,code:=range reasons[dep]{claimReasons=appendUnique(claimReasons,dep+":"+code)}}
+  sort.Strings(claimReasons)
+  cr:=ClaimResult{ClaimID:claimID,Verdict:effective[claimID],DependencyNodeIDs:deps,InvalidatingNodeIDs:invalidating,DependencyTraceSHA256:traceDigest,ReasonCodes:claimReasons}
   out.Claims=append(out.Claims,cr)
   if cr.Verdict==Qualified{out.UnaffectedClaimIDs=append(out.UnaffectedClaimIDs,claimID)}else{out.ImpactedClaimIDs=append(out.ImpactedClaimIDs,claimID)}
+  f.codes["root_claim:"+claimID+":"+string(cr.Verdict)]=struct{}{}
+  if cr.Verdict==Blocked{f.block("root_claim_blocked:"+claimID)}else if cr.Verdict==Indeterminate{f.hold("root_claim_indeterminate:"+claimID)}
  }
  sort.Strings(out.ImpactedClaimIDs);sort.Strings(out.UnaffectedClaimIDs)
  out.GraphVerdict=f.verdict()
