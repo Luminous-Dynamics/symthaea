@@ -648,7 +648,9 @@ mod tests {
         assert_eq!(engine.accepted_update_journal.len(), 2);
         assert_eq!(engine.adapter_state.accepted_update_count, 2);
         assert_ne!(engine.journal_head_sha256, engine.genesis_state_sha256);
-        let report = assess_streaming_revocation_impact_v1(&input(engine.clone(), latest_reports(&engine))).unwrap();
+        let report =
+            assess_streaming_revocation_impact_v1(&input(engine.clone(), latest_reports(&engine)))
+                .unwrap();
         assert_eq!(
             report.status,
             StreamingRevocationImpactStatusV1::CompleteNoReplayRequired
@@ -672,8 +674,14 @@ mod tests {
         assert_eq!(report.first_affected_update_sequence, Some(1));
         assert_eq!(report.directly_invalidated_update_sequences, vec![1]);
         assert_eq!(report.inherited_impacted_update_sequences, vec![2]);
-        assert_eq!(report.entries[0].state, StreamingUpdateImpactStateV1::DirectReplayRequired);
-        assert_eq!(report.entries[1].state, StreamingUpdateImpactStateV1::InheritedReplayRequired);
+        assert_eq!(
+            report.entries[0].state,
+            StreamingUpdateImpactStateV1::DirectReplayRequired
+        );
+        assert_eq!(
+            report.entries[1].state,
+            StreamingUpdateImpactStateV1::InheritedReplayRequired
+        );
         assert!(!report.running_adapter_mutated);
         assert_eq!(engine.adapter_state, original_state);
     }
@@ -742,7 +750,9 @@ mod tests {
     fn duplicate_current_reports_are_rejected() {
         let engine = two_update_engine();
         let report0 = latest_reports(&engine)[0].clone();
-        let report = assess_streaming_revocation_impact_v1(&input(engine, vec![report0.clone(), report0])).unwrap();
+        let report =
+            assess_streaming_revocation_impact_v1(&input(engine, vec![report0.clone(), report0]))
+                .unwrap();
         assert_eq!(report.status, StreamingRevocationImpactStatusV1::Rejected);
     }
 
