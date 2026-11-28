@@ -173,7 +173,7 @@ pub fn build_relation_closure_v1<V: RelationEdgeVerifierV1>(
     max_hops: u32,
     max_nodes: u32,
     verifier: &V,
-) -> Result<RelationClosureReceiptV1, AssistanceRejectV1> {
+) -> Result<VerifiedRelationClosureV1, AssistanceRejectV1> {
     context.validate()?;
     if seeds.is_empty() || max_nodes == 0 || max_hops == 0 || seeds.len() > max_nodes as usize {
         return Err(AssistanceRejectV1::InvalidClosureBudget);
@@ -256,7 +256,7 @@ pub fn build_relation_closure_v1<V: RelationEdgeVerifierV1>(
         closure_sha256: String::new(),
     };
     receipt.closure_sha256 = relation_closure_digest(&receipt)?;
-    Ok(receipt)
+    Ok(VerifiedRelationClosureV1 { receipt })
 }
 
 impl RelationClosureReceiptV1 {
@@ -264,6 +264,40 @@ impl RelationClosureReceiptV1 {
         self.schema_version == SCHEMA_VERSION_V1
             && valid_sha256(&self.context_sha256)
             && relation_closure_digest(self).is_ok_and(|digest| digest == self.closure_sha256)
+    }
+}
+
+/// In-process capability minted only after all traversed edges have passed the
+/// injected verifier. It deliberately has no Serialize/Deserialize support or
+/// public constructor: a re-hashed JSON receipt cannot recreate this capability.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedRelationClosureV1 {
+    receipt: RelationClosureReceiptV1,
+}
+
+impl VerifiedRelationClosureV1 {
+    pub fn receipt(&self) -> &RelationClosureReceiptV1 {
+        &self.receipt
+    }
+
+    pub fn closure_sha256(&self) -> &str {
+        &self.receipt.closure_sha256
+    }
+
+    pub fn context_sha256(&self) -> &str {
+        &self.receipt.context_sha256
+    }
+
+    pub fn evidence_ids(&self) -> &[String] {
+        &self.receipt.evidence_ids
+    }
+
+    pub fn conflict_edges(&self) -> &[RelationConflictV1] {
+        &self.receipt.conflict_edges
+    }
+
+    fn verify_integrity(&self) -> bool {
+        self.receipt.verify_integrity()
     }
 }
 
@@ -570,13 +604,13 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
     response_bytes: &[u8],
     context: &AssistanceContextV1,
     constraints: &[EvidenceResponseConstraintV1],
-    closure: &RelationClosureReceiptV1,
+    closure: &VerifiedRelationClosureV1,
     verifier: &V,
 ) -> Result<VerifiedAssistanceBindingV1, AssistanceRejectV1> {
     context.validate()?;
     if !closure.verify_integrity()
-        || closure.closure_sha256 != context.relation_closure_sha256
-        || closure.context_sha256 != relation_context_digest_from_assistance(context)?
+        || closure.closure_sha256() != context.relation_closure_sha256
+        || closure.context_sha256() != relation_context_digest_from_assistance(context)?
     {
         return Err(AssistanceRejectV1::RelationClosureDigestMismatch);
     }
@@ -590,13 +624,13 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
     let mut by_id = BTreeMap::new();
     for constraint in constraints {
         constraint.validate(context)?;
-        if constraint.relation_closure_sha256 != closure.closure_sha256 {
+        if constraint.relation_closure_sha256 != closure.closure_sha256() {
             return Err(AssistanceRejectV1::ConstraintClosureMismatch);
         }
-        if closure.evidence_ids.binary_search(&constraint.source_evidence_id).is_err() {
+        if closure.evidence_ids().binary_search(&constraint.source_evidence_id).is_err() {
             return Err(AssistanceRejectV1::ConstraintSourceOutsideClosure);
         }
-        if closure.conflict_edges.iter().any(|edge| {
+        if closure.conflict_edges().iter().any(|edge| {
             (edge.left_evidence_id == constraint.source_evidence_id
                 || edge.right_evidence_id == constraint.source_evidence_id)
                 && constraint.action == ResponseConstraintActionV1::MayAssert
@@ -628,7 +662,7 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
     if receipt.constraint_set_sha256 != constraint_set_sha256 {
         return Err(AssistanceRejectV1::ConstraintSetDigestMismatch);
     }
-    if receipt.relation_closure_sha256 != closure.closure_sha256 {
+    if receipt.relation_closure_sha256 != closure.closure_sha256() {
         return Err(AssistanceRejectV1::RelationClosureDigestMismatch);
     }
 
@@ -724,15 +758,15 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
 pub fn seal_assistance_binding_v1(
     context: &AssistanceContextV1,
     constraints: &[EvidenceResponseConstraintV1],
-    closure: &RelationClosureReceiptV1,
+    closure: &VerifiedRelationClosureV1,
     response_bytes: &[u8],
     disposition: ResponseDispositionV1,
     claim_uses: Vec<ResponseClaimUseV1>,
 ) -> Result<AssistanceBindingReceiptV1, AssistanceRejectV1> {
     context.validate()?;
     if !closure.verify_integrity()
-        || context.relation_closure_sha256 != closure.closure_sha256
-        || closure.context_sha256 != relation_context_digest_from_assistance(context)?
+        || context.relation_closure_sha256 != closure.closure_sha256()
+        || closure.context_sha256() != relation_context_digest_from_assistance(context)?
     {
         return Err(AssistanceRejectV1::RelationClosureDigestMismatch);
     }
@@ -741,7 +775,7 @@ pub fn seal_assistance_binding_v1(
         request_sha256: context.request_sha256.clone(),
         response_sha256: digest_bytes(response_bytes),
         context_sha256: digest_serialized(context)?,
-        relation_closure_sha256: closure.closure_sha256.clone(),
+        relation_closure_sha256: closure.closure_sha256().to_owned(),
         constraint_set_sha256: digest_serialized(constraints)?,
         disposition,
         claim_uses,
@@ -827,7 +861,7 @@ mod tests {
         }
     }
 
-    fn closure() -> RelationClosureReceiptV1 {
+    fn closure() -> VerifiedRelationClosureV1 {
         build_relation_closure_v1(
             &vec!["e1".into()],
             &vec![
@@ -849,7 +883,7 @@ mod tests {
         ).unwrap()
     }
 
-    fn assistance_context(closure: &RelationClosureReceiptV1) -> AssistanceContextV1 {
+    fn assistance_context(closure: &VerifiedRelationClosureV1) -> AssistanceContextV1 {
         AssistanceContextV1 {
             request_sha256: sha("request"),
             valid_at_ms: 100,
@@ -858,14 +892,14 @@ mod tests {
             purpose_id: "assist:meeting".into(),
             audience_id: "group:alpha:members".into(),
             policy_sha256: sha("policy"),
-            relation_closure_sha256: closure.closure_sha256.clone(),
+            relation_closure_sha256: closure.closure_sha256().to_owned(),
         }
     }
 
     fn constraint(
         action: ResponseConstraintActionV1,
         required: bool,
-        closure: &RelationClosureReceiptV1,
+        closure: &VerifiedRelationClosureV1,
     ) -> EvidenceResponseConstraintV1 {
         EvidenceResponseConstraintV1 {
             constraint_id: sha("constraint"),
@@ -884,7 +918,7 @@ mod tests {
             evidence_use_receipt_sha256: sha("use"),
             decision_evidence_use_link_sha256: sha("exposure"),
             source_lineage_receipt_sha256: sha("lineage"),
-            relation_closure_sha256: closure.closure_sha256.clone(),
+            relation_closure_sha256: closure.closure_sha256().to_owned(),
             scope_id: "group:alpha".into(),
             purpose_id: "assist:meeting".into(),
             audience_id: "group:alpha:members".into(),
@@ -900,7 +934,7 @@ mod tests {
     fn response_binding(
         context: &AssistanceContextV1,
         constraints: &[EvidenceResponseConstraintV1],
-        closure: &RelationClosureReceiptV1,
+        closure: &VerifiedRelationClosureV1,
         bytes: &[u8],
         disposition: ResponseDispositionV1,
         uses: Vec<ResponseClaimUseV1>,
@@ -928,10 +962,10 @@ mod tests {
     #[test]
     fn relation_closure_is_bounded_deterministic_and_preserves_conflict() {
         let result = closure();
-        assert_eq!(result.evidence_ids, vec!["e1".to_owned(), "e2".to_owned(), "e3".to_owned(), "e4".to_owned()]);
-        assert_eq!(result.traversed_edge_ids, vec!["r1".to_owned(), "r2".to_owned(), "r3".to_owned(), "r4".to_owned()]);
-        assert_eq!(result.conflict_edges.len(), 1);
-        assert!(result.verify_integrity());
+        assert_eq!(result.receipt().evidence_ids, vec!["e1".to_owned(), "e2".to_owned(), "e3".to_owned(), "e4".to_owned()]);
+        assert_eq!(result.receipt().traversed_edge_ids, vec!["r1".to_owned(), "r2".to_owned(), "r3".to_owned(), "r4".to_owned()]);
+        assert_eq!(result.receipt().conflict_edges.len(), 1);
+        assert!(result.receipt().verify_integrity());
     }
 
     #[test]
