@@ -19,6 +19,8 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Validation Studies](#validation-studies) | Empirical validation approaches |
 | [Publications](#publications) | Papers and manuscripts |
 | [Research Roadmap](#research-roadmap) | Future research directions |
+| [Evidence-Qualified Capability Benchmark v0.1](EVIDENCE_QUALIFIED_CAPABILITY_BENCHMARK_V0_1.md) | Cross-domain evaluation of capability, authority, provenance, independent replay and failure containment |
+| [EQC Trusted Observer Architecture](EQC_TRUSTED_OBSERVER_ARCHITECTURE_V0_1.md) | Proposed observer/verifier separation, signed measurements and anti-replay threat model |
 
 ---
 

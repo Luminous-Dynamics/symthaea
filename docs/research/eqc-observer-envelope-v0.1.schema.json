@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/eqc-observer-envelope-v0.1.schema.json",
+  "title": "EQC Signed Observer Envelope v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "algorithm",
+    "key_id",
+    "payload",
+    "signature_hex"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.eqc.signed-observer-envelope.v0.1"
+    },
+    "algorithm": {
+      "const": "Ed25519"
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "run_id",
+        "nonce",
+        "task_id",
+        "task_digest_sha256",
+        "policy_digest_sha256",
+        "sut_system_id",
+        "sut_version",
+        "harness_version",
+        "source_sha256",
+        "image_digest",
+        "environment_sha256",
+        "actor_id",
+        "subject_id",
+        "authorization_decision",
+        "task_success",
+        "input_digests",
+        "observer_id",
+        "observer_version",
+        "workflow_identity",
+        "measurement_profile",
+        "runner_os",
+        "runner_arch",
+        "state_before_sha256",
+        "state_after_sha256",
+        "state_mutation_count",
+        "allowed_mutations_sha256",
+        "action_log_sha256",
+        "artifact_sha256",
+        "network_policy",
+        "network_enforced",
+        "network_bytes_sent",
+        "network_bytes_received",
+        "network_endpoints",
+        "elapsed_ms",
+        "cpu_time_ms",
+        "peak_memory_bytes",
+        "tool_calls",
+        "human_interventions",
+        "energy_millijoules",
+        "cost_microusd",
+        "verifier_id",
+        "verifier_sha256",
+        "verifier_environment_sha256",
+        "replay_status",
+        "replay_result_sha256",
+        "observed_at_utc",
+        "trust_policy_sha256",
+        "observer_sha256"
+      ],
+      "properties": {
+        "schema": {
+          "const": "luminous.eqc.observer-payload.v0.1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nonce": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^eqc-[a-z0-9][a-z0-9._-]{2,95}$"
+        },
+        "task_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "policy_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sut_system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sut_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "harness_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "image_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "environment_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorization_decision": {
+          "enum": [
+            "allow",
+            "deny"
+          ]
+        },
+        "task_success": {
+          "type": "boolean"
+        },
+        "input_digests": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "input_id",
+              "sha256"
+            ],
+            "properties": {
+              "input_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        },
+        "observer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observer_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workflow_identity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_profile": {
+          "const": "linux-cgroup-v2-netns-deny-v1"
+        },
+        "runner_os": {
+          "const": "linux"
+        },
+        "runner_arch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_before_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "state_after_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "state_mutation_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "allowed_mutations_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "action_log_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "network_policy": {
+          "const": "none"
+        },
+        "network_enforced": {
+          "const": true
+        },
+        "network_bytes_sent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "network_bytes_received": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "network_endpoints": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "cpu_time_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "peak_memory_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "tool_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "human_interventions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "energy_millijoules": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "cost_microusd": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifier_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "verifier_environment_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "replay_status": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_run"
+          ]
+        },
+        "replay_result_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "observed_at_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "trust_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "observer_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "signature_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{128}$"
+    }
+  }
+}

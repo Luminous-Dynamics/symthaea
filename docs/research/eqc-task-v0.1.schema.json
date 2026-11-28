@@ -1,0 +1,338 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/eqc-task-v0.1.schema.json",
+  "title": "Evidence-Qualified Capability Task v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "task_id",
+    "domain",
+    "split",
+    "statement",
+    "actor",
+    "subject",
+    "authority_snapshot",
+    "request",
+    "negative_controls",
+    "expected",
+    "resource_budget",
+    "required_provenance",
+    "input_refs"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.eqc.task.v0.1"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^eqc-[a-z0-9][a-z0-9._-]{2,95}$"
+    },
+    "domain": {
+      "enum": [
+        "software_engineering",
+        "healthcare",
+        "simulation",
+        "trust_infrastructure"
+      ]
+    },
+    "split": {
+      "enum": [
+        "public_seed",
+        "development",
+        "held_out"
+      ]
+    },
+    "statement": {
+      "type": "string",
+      "minLength": 20
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_id",
+        "roles"
+      ],
+      "properties": {
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "subject_id"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "input_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "input_id",
+          "artifact_path",
+          "classification",
+          "sha256"
+        ],
+        "properties": {
+          "input_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "artifact_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "classification": {
+            "enum": [
+              "synthetic",
+              "public",
+              "licensed",
+              "restricted"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "authority_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "status",
+        "principal_id",
+        "subject_id",
+        "scopes",
+        "observed_at"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "active",
+            "revoked",
+            "expired",
+            "missing",
+            "unverifiable"
+          ]
+        },
+        "principal_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subject_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "resource_id",
+        "subject_id",
+        "evaluated_at"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "challenge_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "challenge_state": {
+          "enum": [
+            "unused",
+            "consumed",
+            "expired",
+            "missing",
+            "not_applicable"
+          ]
+        },
+        "evaluated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "negative_controls": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "wrong_subject",
+          "wrong_tenant",
+          "revoked_authority",
+          "expired_authority",
+          "missing_authority",
+          "replayed_challenge",
+          "duplicate_delivery",
+          "stale_input",
+          "tampered_input",
+          "tool_injection",
+          "environment_tampering",
+          "partial_commit",
+          "scope_mismatch",
+          "wrong_principal"
+        ]
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "state_mutation_count",
+        "state_must_remain_unchanged"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "allow",
+            "deny",
+            "unresolved"
+          ]
+        },
+        "state_mutation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "state_must_remain_unchanged": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "resource_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timeout_seconds",
+        "max_tool_calls",
+        "network_policy"
+      ],
+      "properties": {
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "network_policy": {
+          "enum": [
+            "none",
+            "declared_endpoints_only",
+            "open"
+          ]
+        },
+        "cpu_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "memory_mib": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "required_provenance": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "task_digest",
+          "input_digests",
+          "actor_identity",
+          "authority_snapshot",
+          "policy_digest",
+          "system_identity",
+          "environment_identity",
+          "action_log",
+          "result_digest",
+          "independent_verifier"
+        ]
+      }
+    }
+  }
+}
