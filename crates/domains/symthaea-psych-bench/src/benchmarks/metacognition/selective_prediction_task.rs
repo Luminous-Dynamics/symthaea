@@ -241,6 +241,8 @@ pub enum SelectivePredictionTaskError {
     UnexpectedClarificationOutcome { index: usize },
     InvalidClarificationObservation { index: usize },
     InvalidPolicyConfidence { index: usize },
+    InvalidPolicyDecision { index: usize },
+    EmptyPolicyName,
     InvalidCostModel,
     Serialization(String),
     Scoring(String),
@@ -274,6 +276,10 @@ impl std::fmt::Display for SelectivePredictionTaskError {
             Self::InvalidPolicyConfidence { index } => {
                 write!(f, "policy confidence for item {index} must be finite and in [0, 1]")
             }
+            Self::InvalidPolicyDecision { index } => {
+                write!(f, "policy returned an information request without a clarification target, or attached a target to a non-request action, for item {index}")
+            }
+            Self::EmptyPolicyName => write!(f, "custom selective-prediction policy name must not be empty"),
             Self::InvalidCostModel => write!(f, "all action costs must be finite and non-negative"),
             Self::Serialization(message) => write!(f, "could not digest task manifest: {message}"),
             Self::Scoring(message) => write!(f, "selective-prediction scoring failed: {message}"),
@@ -414,6 +420,27 @@ pub fn evaluate_policy(
     policy: SelectivePredictionBaseline,
     cost_model: SelectivePredictionCostModel,
 ) -> Result<SelectivePredictionTaskReport, SelectivePredictionTaskError> {
+    evaluate_policy_with(items, policy.name(), |observation| policy.decide(observation), cost_model)
+}
+
+/// Evaluate an external policy adapter over the same evaluator-owned fixture.
+///
+/// The closure receives only public observations; answerability, correctness,
+/// clarification targets and post-clarification outcomes remain hidden. This
+/// is the integration seam for a live Symthaea policy or a black-box model
+/// adapter. The benchmark fixture remains synthetic and is not an external SOTA set.
+pub fn evaluate_policy_with<F>(
+    items: &[SyntheticSelectivePredictionItem],
+    policy_name: &str,
+    decide: F,
+    cost_model: SelectivePredictionCostModel,
+) -> Result<SelectivePredictionTaskReport, SelectivePredictionTaskError>
+where
+    F: Fn(&SelectivePredictionObservation) -> SelectivePolicyDecision,
+{
+    if policy_name.trim().is_empty() {
+        return Err(SelectivePredictionTaskError::EmptyPolicyName);
+    }
     validate_items(items)?;
     cost_model.validate()?;
 
@@ -434,9 +461,14 @@ pub fn evaluate_policy(
     let mut post_clarification_cost_units = 0.0;
 
     for (index, item) in items.iter().enumerate() {
-        let decision = policy.decide(&item.observation);
+        let decision = decide(&item.observation);
         if !decision.confidence.is_finite() || !(0.0..=1.0).contains(&decision.confidence) {
             return Err(SelectivePredictionTaskError::InvalidPolicyConfidence { index });
+        }
+        if (decision.action == DecisionAction::RequestInformation)
+            != decision.clarification_target.is_some()
+        {
+            return Err(SelectivePredictionTaskError::InvalidPolicyDecision { index });
         }
 
         if item.clarification_resolves {
@@ -473,13 +505,18 @@ pub fn evaluate_policy(
                         .post_clarification_observation
                         .as_ref()
                         .expect("validated clarification outcome");
-                    let follow_up = policy.decide(updated_observation);
+                    let follow_up = decide(updated_observation);
                     if !follow_up.confidence.is_finite()
                         || !(0.0..=1.0).contains(&follow_up.confidence)
                     {
                         return Err(SelectivePredictionTaskError::InvalidPolicyConfidence {
                             index,
                         });
+                    }
+                    if (follow_up.action == DecisionAction::RequestInformation)
+                        != follow_up.clarification_target.is_some()
+                    {
+                        return Err(SelectivePredictionTaskError::InvalidPolicyDecision { index });
                     }
 
                     let follow_up_cost = cost_model.charge(follow_up.action);
@@ -508,7 +545,7 @@ pub fn evaluate_policy(
     Ok(SelectivePredictionTaskReport {
         scenario_id: SCENARIO_ID.to_owned(),
         generator_version: GENERATOR_VERSION.to_owned(),
-        policy: policy.name().to_owned(),
+        policy: policy_name.to_owned(),
         manifest_digest,
         items: items.len(),
         clarification_opportunities,
