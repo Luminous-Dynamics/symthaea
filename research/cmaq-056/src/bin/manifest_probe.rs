@@ -27,25 +27,28 @@ fn expert(
     response_map_id: &str,
     covariate_map_id: &str,
     target_id: &str,
-) -> Result<KernelExpertConfig, Box<dyn Error>> {
-    Ok(KernelExpertConfig {
+) -> KernelExpertConfig {
+    KernelExpertConfig {
         expert_id: id.into(),
         response_map: FourierFeatureMap::new(
             1,
             vec![vec![response_frequency]],
             response_map_id.into(),
-        )?,
+        )
+        .expect("fixed response map is valid"),
         covariate_map: FourierFeatureMap::new(
             1,
             vec![vec![0.5]],
             covariate_map_id.into(),
-        )?,
-        target: BoxTarget::new(vec![-0.01; 4], vec![0.01; 4])?,
+        )
+        .expect("fixed covariate map is valid"),
+        target: BoxTarget::new(vec![-0.01; 4], vec![0.01; 4])
+            .expect("fixed zero-containing target is valid"),
         prior_weight: prior,
         target_sha256: target_id.into(),
         response_reference_sha256: SHA_E.into(),
         covariate_reference_sha256: SHA_F.into(),
-    })
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -57,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             SHA_A,
             SHA_B,
             SHA_C,
-        )?,
+        ),
         expert(
             "high-frequency",
             0.5,
@@ -65,7 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             SHA_D,
             SHA_E,
             SHA_F,
-        )?,
+        ),
     ];
 
     let direct = KernelFamilyManifest::build(
