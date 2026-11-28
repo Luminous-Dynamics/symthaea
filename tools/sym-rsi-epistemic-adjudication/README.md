@@ -97,3 +97,28 @@ The production module src/web_research/stratified_risk.rs combines the complete 
 - The risk–coverage curve is updated incrementally across descending confidence groups; each prefix is scored from per-stratum counts rather than rescanning the full cohort.
 
 The standalone harness imports the production source by path. Exact Rust 1.96 formatting, tests and strict Clippy remain required.
+
+
+Fixed-horizon selective-observation weighted risk control (SOWRC)
+
+The production module `src/web_research/sowrc.rs` adds a separate finite-sample selective-risk control lane inspired by Bai, Fang and Chen, *Risk-Controlling Predictive Sets for Time-Series Events Under Selective Observation with Finite-Sample Guarantees*, Axioms 15(9), 706 (2026), DOI 10.3390/axioms15090706.
+
+This is not the same estimator as the propensity-weighted HT point estimate in `selective_observation.rs`, nor the SRSWOR variance estimator in `stratified_risk.rs`.
+
+- The input is a fixed-horizon, ordered cohort. Each event carries its pre-label conditional inclusion probability q_t, the flag that an independent label was observed, and the observed true-label nonconformity score r_t = 1 - p_t(y_true | x_t).
+- The module uses constant predictable weights a_t = 1, deterministic envelopes c_n = 1 and b_n = 1/q_min, and the Horvitz-Thompson loss I_t * 1{r_t > lambda}/q_t.
+- For each threshold lambda on a predeclared nested grid, it computes the observable martingale-mixture E-value and inverts it by log-space bisection to obtain an upper risk bound.
+- The total failure probability delta is split across the fixed threshold grid. The selected rule is the smallest nonterminal threshold whose bound is at most the target alpha.
+- The rule selects the smallest threshold in the complete frozen grid, including lambda = 1, whose mixture bound is at most alpha. If no grid threshold is feasible, lambda = 1 returns the full label space with structurally zero miscoverage; the report distinguishes this safe fallback from a statistical mixture certificate.
+- The betting fractions, mixture weights, q_min, threshold grid, target risk and delta must be frozen in a calibration-protocol manifest separate from the prediction and audit-design manifests.
+- Observed nonconformity scores are sorted once. Suffix weights and a monotone cursor compute the entire grid in O(N log N + N + J), rather than rescanning the complete cohort for each threshold.
+
+Important assumptions and claim boundaries:
+- The q_t supplied to the evaluator must be the actual conditional probability that a label is observed, known from pre-label history. A randomized audit with q_t >= q_min > 0 is the intended design. If alert and audit channels are combined, the caller must supply their correct conditional union probability; the paper's pi + rho - pi*rho formula requires conditional independence.
+- Conditional ignorability (label inclusion independent of the current true label given recorded pre-label history) is external and not mechanically verifiable from selectively observed labels.
+- This v1 controls the weighted calibration population under the fixed-horizon theorem assumptions. It does not certify future deployment risk; that requires a separately certified drift envelope and an additional failure-probability allocation.
+- It does not implement the paper's anytime/time-uniform extension, multiple-risk extension, adaptive budgets or estimated-propensity extension.
+- The fixed-quota SRSWOR audit in stratified_audit.rs is a separate sampling design for design-based point estimates and variance. Its marginal first-order inclusion probabilities must not be substituted for predictable conditional q_t without a valid sequential design derivation.
+- No full theorem proof audit, Rust execution, benchmark, deployment guarantee or SOTA claim is implied by source authoring.
+
+The standalone Rust 1.96 harness imports the exact production source by path. Exact-head rustfmt, locked tests and strict Clippy remain required.
