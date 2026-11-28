@@ -479,6 +479,21 @@ mod tests {
                 for seed in seeds {
                     let enc = GridEncoder::new(dimension, rows, cols, 6, seed);
                     let bundled = enc.encode_grid(&grid);
+                    // Explicit high-memory reference: one unbundled positional
+                    // HV per observed cell, stored for direct indexed retrieval.
+                    let dense_cells: Vec<_> = grid
+                        .iter()
+                        .enumerate()
+                        .flat_map(|(row, values)| {
+                            values
+                                .iter()
+                                .enumerate()
+                                .map(move |(col, &color)| enc.encode_cell(row, col, color as usize))
+                        })
+                        .collect();
+                    let dense_storage_bytes =
+                        dense_cells.len() * dimension * std::mem::size_of::<f32>();
+                    let bundled_storage_bytes = dimension * std::mem::size_of::<f32>();
                     let mut continuous_correct = 0usize;
                     let mut dense_reference_correct = 0usize;
                     let mut total = 0usize;
@@ -489,7 +504,7 @@ mod tests {
                         for (col_index, &actual) in row.iter().enumerate() {
                             let query = enc.query_position(&bundled, row_index, col_index);
                             let true_score = query.similarity(enc.color_hv(actual as usize));
-                            let dense_cell = enc.encode_cell(row_index, col_index, actual as usize);
+                            let dense_cell = &dense_cells[row_index * cols + col_index];
                             let mut dense_best_index = 0usize;
                             let mut dense_best_score = f32::NEG_INFINITY;
                             for candidate in 0..enc.num_colors() {
@@ -554,6 +569,8 @@ mod tests {
                          mean_true_margin={mean_true_margin:.6} \
                          dense_per_cell_top1={dense_reference_correct}/{total} \
                          dense_per_cell_accuracy={dense_reference_accuracy:.6} \
+                         dense_storage_bytes={dense_storage_bytes} \
+                         bundled_grid_bytes={bundled_storage_bytes} \
                          binary_xor_top1={binary_correct}/{total} \
                          binary_xor_accuracy={binary_accuracy:.6}"
                     );
