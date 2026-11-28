@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon-independent-inventory-scenarios-v1.schema.json",
+  "title": "MON Independent Inventory Scenarios v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "scenarios"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon-independent-inventory-scenarios-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "mutation",
+          "expected_verdict",
+          "expected_scope_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_verdict": {
+            "enum": [
+              "qualified",
+              "blocked",
+              "indeterminate"
+            ]
+          },
+          "expected_scope_status": {
+            "enum": [
+              "fully_covered",
+              "incomplete_capture",
+              "qualified_with_explicit_exclusions",
+              "indeterminate"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
