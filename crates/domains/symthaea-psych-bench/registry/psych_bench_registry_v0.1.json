@@ -332,6 +332,32 @@
           "estimand": "simulated confidence/retrieval deliberation ticks",
           "comparison_status": "same_build_and_clock_only",
           "validation_status": "verified_in_code"
+        },
+        {
+          "id": "overconfidence",
+          "key": "overconfidence",
+          "unit": "mean_positive_confidence_minus_accuracy",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "lower",
+          "estimand": "mean confidence-minus-accuracy conditional on confidence exceeding observed accuracy; zero when no overconfident trials",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "resolution",
+          "key": "resolution",
+          "unit": "variance_of_accuracy_across_confidence_bins",
+          "bounds": {
+            "lower": 0,
+            "upper": 0.25
+          },
+          "direction": "higher",
+          "estimand": "weighted variance of per-bin accuracy around overall accuracy; bounded by 0.25 for observations in [0,1]",
+          "comparison_status": "same_protocol_only",
+          "validation_status": "verified_in_code"
         }
       ],
       "controls": {
