@@ -75,7 +75,6 @@ struct SparseExpert {
     covariate_map: FourierFeatureMap,
     response_sha256: String,
     covariate_sha256: String,
-    prior_weight: Rational,
     feature_sum: Vec<f64>,
     selected_count: u64,
 }
@@ -210,7 +209,6 @@ impl SparsePredictableExpertMonitor {
                 covariate_map: config.covariate_map.clone(),
                 response_sha256: config.response_map.map_sha256().to_string(),
                 covariate_sha256: config.covariate_map.map_sha256().to_string(),
-                prior_weight: prior.weight,
                 feature_sum: vec![0.0; dimension],
                 selected_count: 0,
             });
@@ -366,8 +364,18 @@ impl SparsePredictableExpertMonitor {
             .ok_or(SparseBetError::ArithmeticOverflow)?;
         let quarantined = next_log_e >= self.log_threshold;
         let trace = extend_trace(
-            &self.policy_trace_sha256, sequence, pair_id, selected_index,
-            probability, random_draw, projected, factor, reward, &next_log_weights,
+            &self.policy_trace_sha256,
+            sequence,
+            pair_id,
+            selected_index,
+            &expert.response_sha256,
+            &expert.covariate_sha256,
+            probability,
+            random_draw,
+            projected,
+            factor,
+            reward,
+            &next_log_weights,
         );
 
         let update = SparseSelectionUpdate {
@@ -532,16 +540,36 @@ fn policy_digest(
 }
 
 fn extend_trace(
-    prior: &str, sequence: u64, pair_id: &str, selected: usize, probability: f64,
-    draw: f64, projected: f64, factor: f64, reward: f64, next_log_weights: &[f64],
+    prior: &str,
+    sequence: u64,
+    pair_id: &str,
+    selected: usize,
+    response_map_sha256: &str,
+    covariate_map_sha256: &str,
+    probability: f64,
+    draw: f64,
+    projected: f64,
+    factor: f64,
+    reward: f64,
+    next_log_weights: &[f64],
 ) -> String {
     let mut h = Sha256::new();
-    h.update(TRACE_DOMAIN); h.update(prior.as_bytes()); h.update(sequence.to_be_bytes());
-    h.update((pair_id.len() as u64).to_be_bytes()); h.update(pair_id.as_bytes());
-    h.update((selected as u64).to_be_bytes()); h.update(probability.to_bits().to_be_bytes());
-    h.update(draw.to_bits().to_be_bytes()); h.update(projected.to_bits().to_be_bytes());
-    h.update(factor.to_bits().to_be_bytes()); h.update(reward.to_bits().to_be_bytes());
-    for weight in next_log_weights { h.update(weight.to_bits().to_be_bytes()); }
+    h.update(TRACE_DOMAIN);
+    h.update(prior.as_bytes());
+    h.update(sequence.to_be_bytes());
+    h.update((pair_id.len() as u64).to_be_bytes());
+    h.update(pair_id.as_bytes());
+    h.update((selected as u64).to_be_bytes());
+    h.update(response_map_sha256.as_bytes());
+    h.update(covariate_map_sha256.as_bytes());
+    h.update(probability.to_bits().to_be_bytes());
+    h.update(draw.to_bits().to_be_bytes());
+    h.update(projected.to_bits().to_be_bytes());
+    h.update(factor.to_bits().to_be_bytes());
+    h.update(reward.to_bits().to_be_bytes());
+    for weight in next_log_weights {
+        h.update(weight.to_bits().to_be_bytes());
+    }
     hex(&h.finalize())
 }
 
@@ -621,18 +649,19 @@ mod tests {
 
     #[test]
     fn current_pair_does_not_change_pre_pair_selection_or_direction() {
-        let baseline = monitor([9u8;32]);
+        let mut baseline = monitor([9u8; 32]);
+        baseline.observe_pair(1, "history", &[0.1], &[0.0], &[1.0]).unwrap();
         let mut left = baseline.clone();
         let mut right = baseline;
-        let a = left.prepare_pair(1, "a", &[0.1], &[0.0], &[0.1]).unwrap();
-        let b = right.prepare_pair(1, "b", &[0.1], &[3.0], &[-2.0]).unwrap();
+        let a = left.prepare_pair(2, "left", &[0.25], &[0.1], &[0.2]).unwrap();
+        let b = right.prepare_pair(2, "right", &[0.25], &[2.0], &[-1.0]).unwrap();
         assert_eq!(a.update.selected_expert_index, b.update.selected_expert_index);
         assert_eq!(a.update.selection_probability, b.update.selection_probability);
         assert_eq!(a.update.random_draw, b.update.random_draw);
-        assert_eq!(a.update.projected_feature_difference.abs(), 0.0);
-        // A distinct current pair may change factor, but not the selection.
-        assert_eq!(left.observations_seen(), 0);
-        assert_eq!(right.observations_seen(), 0);
+        assert_eq!(a.update.direction_norm, b.update.direction_norm);
+        assert_ne!(a.update.factor, b.update.factor);
+        assert_eq!(left.observations_seen(), 1);
+        assert_eq!(right.observations_seen(), 1);
     }
 
     #[test]
