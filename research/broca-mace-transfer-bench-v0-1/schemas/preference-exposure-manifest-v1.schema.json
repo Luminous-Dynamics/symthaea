@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_preference_exposure_manifest_v1.schema.json",
+  "title": "MACE Preference Exposure Manifest V1",
+  "description": "Complete inventory of memory-origin spans in one frozen model context and exact provider request, bound to an independently verified Ignore/Support/Dominate selection. SHA-256 is an integrity commitment, not a signature.",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "boundedId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selection_id",
+        "run_id",
+        "episode_id",
+        "action_sequence",
+        "subject_id",
+        "scope_id",
+        "purpose_id",
+        "audience_id",
+        "valid_at_ms",
+        "valid_from_ms",
+        "valid_until_ms",
+        "known_at_ms",
+        "known_from_ms",
+        "known_until_ms",
+        "decision_policy_sha256",
+        "selection_authority_receipt_sha256",
+        "mode",
+        "preference_ids",
+        "dominant_preference_authority_receipt_sha256",
+        "canonical_sha256"
+      ],
+      "properties": {
+        "selection_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "action_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "scope_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "purpose_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "audience_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "valid_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_from_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_until_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "known_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_from_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_until_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "decision_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "selection_authority_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mode": {
+          "enum": [
+            "ignore",
+            "support",
+            "dominate"
+          ]
+        },
+        "preference_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "dominant_preference_authority_receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_item_id",
+        "preference_ids",
+        "source_receipt_sha256",
+        "lineage_receipt_sha256",
+        "transformation_chain_sha256"
+      ],
+      "properties": {
+        "memory_item_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "preference_ids": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "source_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "lineage_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "transformation_chain_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "span_id",
+        "byte_start",
+        "byte_end",
+        "representation_sha256",
+        "sources"
+      ],
+      "properties": {
+        "span_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "byte_start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "byte_end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "representation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        }
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_id",
+    "run_id",
+    "episode_id",
+    "action_sequence",
+    "selection_id",
+    "selection_sha256",
+    "subject_id",
+    "scope_id",
+    "purpose_id",
+    "audience_id",
+    "valid_at_ms",
+    "known_at_ms",
+    "model_invocation_id",
+    "model_context_sha256",
+    "provider_request_sha256",
+    "prompt_assembler_build_sha256",
+    "provider_adapter_build_sha256",
+    "prompt_assembly_receipt_sha256",
+    "provider_request_capture_receipt_sha256",
+    "exposure_observed_at_ms",
+    "memory_spans",
+    "canonical_sha256"
+  ],
+  "properties": {
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "action_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selection_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "selection_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "subject_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "scope_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "purpose_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "audience_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "valid_at_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "known_at_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "model_invocation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "model_context_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "provider_request_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "prompt_assembler_build_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "provider_adapter_build_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "prompt_assembly_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "provider_request_capture_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "exposure_observed_at_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "memory_spans": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/span"
+      }
+    },
+    "canonical_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  }
+}
