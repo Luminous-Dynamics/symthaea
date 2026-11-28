@@ -608,14 +608,16 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
         {
             return Err(AssistanceRejectV1::ClaimPropositionMismatch);
         }
+        let response_text = std::str::from_utf8(response_bytes)
+            .map_err(|_| AssistanceRejectV1::InvalidResponseSpan)?;
         let start = usize::try_from(claim_use.start_byte)
             .map_err(|_| AssistanceRejectV1::InvalidResponseSpan)?;
         let end = usize::try_from(claim_use.end_byte)
             .map_err(|_| AssistanceRejectV1::InvalidResponseSpan)?;
         if start >= end
             || end > response_bytes.len()
-            || !response_bytes.is_char_boundary(start)
-            || !response_bytes.is_char_boundary(end)
+            || !response_text.is_char_boundary(start)
+            || !response_text.is_char_boundary(end)
         {
             return Err(AssistanceRejectV1::InvalidResponseSpan);
         }
@@ -1091,8 +1093,8 @@ mod tests {
         let allowed = constraint(ResponseConstraintActionV1::MayAssert, true, &closure);
         let bytes = "The plan is café.".as_bytes();
         let mut invalid = claim_use(&allowed, bytes, None, None);
-        invalid.start_byte = 14; // inside the multi-byte character in UTF-8
-        invalid.end_byte = 17;
+        invalid.start_byte = 17; // inside the two-byte UTF-8 encoding for é
+        invalid.end_byte = 18;
         let receipt = response_binding(
             &context, &vec![allowed.clone()], &closure, bytes,
             ResponseDispositionV1::Answer, vec![invalid]
