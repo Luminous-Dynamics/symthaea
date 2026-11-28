@@ -765,7 +765,7 @@ mod tests {
         let losses = [true, false, true, false, true, false, true, false];
         let q = 0.8_f64;
         let cfg = config(q);
-        let mut failures = 0usize;
+        let mut failure_probability = 0.0_f64;
         let total_masks = 1usize << losses.len();
         for mask in 0..total_masks {
             let rows = losses
@@ -787,14 +787,6 @@ mod tests {
                 .iter()
                 .find(|bound| (bound.lambda - 0.5).abs() < 1e-12)
                 .unwrap();
-            let true_risk = losses
-                .iter()
-                .enumerate()
-                .filter(|(index, loss)| {
-                    let score = if **loss { 0.9 } else { 0.1 };
-                    score > fixed.lambda && (mask & (1usize << index)) != 0
-                })
-                .count();
             let population_risk = losses
                 .iter()
                 .map(|loss| {
@@ -803,12 +795,19 @@ mod tests {
                 })
                 .sum::<usize>() as f64
                 / losses.len() as f64;
-            let _ = true_risk;
             if fixed.upper_risk_bound + 1e-12 < population_risk {
-                failures += 1;
+                let mask_probability = (0..losses.len())
+                    .map(|index| {
+                        if mask & (1usize << index) != 0 {
+                            q
+                        } else {
+                            1.0 - q
+                        }
+                    })
+                    .product::<f64>();
+                failure_probability += mask_probability;
             }
         }
-        let failure_probability = failures as f64 / total_masks as f64;
         assert!(
             failure_probability <= cfg.delta / cfg.threshold_grid.len() as f64 + 1e-12,
             "observed failure probability {failure_probability} exceeded per-threshold delta {}",
