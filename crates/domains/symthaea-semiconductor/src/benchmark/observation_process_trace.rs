@@ -53,6 +53,7 @@ pub enum K1QualificationStateV1 {
 #[serde(rename_all = "snake_case")]
 pub enum ControllerTrackingStateV1 {
     NotSubmitted,
+    NoPhysicalOutcome,
     Pending,
     Retained,
     ReceivedQualified,
@@ -203,6 +204,7 @@ pub struct ObservationProcessTraceReportV1 {
     pub k1_unknown_count: usize,
     pub k1_blocked_count: usize,
     pub controller_not_submitted_count: usize,
+    pub controller_no_physical_outcome_count: usize,
     pub controller_pending_count: usize,
     pub controller_retained_count: usize,
     pub controller_received_qualified_count: usize,
@@ -647,6 +649,27 @@ fn validate_controller(
     }
 
     match controller.tracking_state {
+        ControllerTrackingStateV1::NoPhysicalOutcome => {
+            if !matches!(
+                row.operational.state,
+                OperationalAcquisitionStateV1::Unselected
+                    | OperationalAcquisitionStateV1::MeasurementUnavailable
+            ) || row.k1.state != K1QualificationStateV1::NotApplicable
+                || controller.prediction_receipt_sha256.is_none()
+                || controller.feedback_receipt_sha256.is_some()
+                || controller.update_receipt_sha256.is_some()
+                || controller.controller_state_changed
+                || controller.feedback_received_at_unix_seconds.is_some()
+                || controller.proxy_uniform_draw.is_some()
+                || controller.proxy_delay_steps.is_some()
+                || controller.proxy_survival_probability.is_some()
+            {
+                return Err(ObservationProcessTraceErrorV1(format!(
+                    "round {}: NO_PHYSICAL_OUTCOME requires no operational label, no proxy admission and no controller update",
+                    row.round_id
+                )));
+            }
+        }
         ControllerTrackingStateV1::NotSubmitted => {
             if has_receipts || controller.controller_state_changed {
                 return Err(ObservationProcessTraceErrorV1(format!(
@@ -1198,6 +1221,7 @@ pub fn evaluate_observation_process_trace_v1(
         k1_unknown_count: count(&|row| row.k1.state == K1QualificationStateV1::Unknown),
         k1_blocked_count: count(&|row| row.k1.state == K1QualificationStateV1::Blocked),
         controller_not_submitted_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::NotSubmitted),
+        controller_no_physical_outcome_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::NoPhysicalOutcome),
         controller_pending_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::Pending),
         controller_retained_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::Retained),
         controller_received_qualified_count: count(&|row| row.controller.tracking_state == ControllerTrackingStateV1::ReceivedQualified),
@@ -1738,6 +1762,28 @@ mod tests {
         let report = evaluate_observation_process_trace_v1(&data).unwrap();
         assert_eq!(report.controller_received_qualified_count, 1);
         assert_eq!(report.controller_state_update_count, 1);
+    }
+
+    #[test]
+    fn unselected_prediction_is_no_physical_outcome_not_capacity_denied() {
+        let mut trace = row(1);
+        trace.controller.tracking_state = ControllerTrackingStateV1::NoPhysicalOutcome;
+        trace.controller.prediction_receipt_sha256 = Some(digest('a'));
+        trace.controller.policy_sha256 = Some(digest('b'));
+        trace.controller.delay_contract_sha256 = Some(digest('c'));
+        trace.controller.feedback_delay_contract_steps = Some(4);
+        trace.controller.tracking_capacity = Some(2);
+        trace.controller.tracking_occupancy_after = Some(1);
+        let mut data = input(vec![trace]);
+        data.controller_kind = ObservationControllerKindV1::CaOcrc;
+        data.controller_policy_sha256 = Some(digest('b'));
+        data.controller_delay_contract_sha256 = Some(digest('c'));
+        data.controller_delay_steps = Some(4);
+        data.controller_tracking_capacity = Some(2);
+        let report = evaluate_observation_process_trace_v1(&data).unwrap();
+        assert_eq!(report.controller_no_physical_outcome_count, 1);
+        assert_eq!(report.controller_capacity_denied_count, 0);
+        assert_eq!(report.controller_state_update_count, 0);
     }
 
     #[test]
