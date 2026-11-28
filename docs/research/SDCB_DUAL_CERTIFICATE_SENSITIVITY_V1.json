@@ -181,7 +181,16 @@
     "h_for_exact_one_sided_difference_quotient": "1/10000",
     "left_difference_quotient": "4200/25001",
     "right_difference_quotient": "-4200/25001",
-    "interpretation": "The maximin value has a strict cusp maximum at u=1/2, where both the least-favourable alternative and null switch. The dual certificate is non-unique at the switch."
+    "interpretation": "The maximin value has a strict cusp maximum at u=1/2, where both the least-favourable alternative and null switch. The dual certificate is non-unique at the switch.",
+    "positive_part_kink": {
+      "outcome": "y=1",
+      "subgradient_interval": [
+        "0",
+        "1"
+      ],
+      "kkt_selected_subgradient": "phi(1)=alpha/q_max=2/5 at u=1/2",
+      "interpretation": "the positive-part residual has zero argument at the active outcome; the primal randomized test supplies the KKT-consistent subgradient. Do not force differentiability through the active-set switch."
+    }
   },
   "dual_certificate": {
     "general_value": "alpha*sum_j w_j + sum_k positive(sum_i lambda_i*p_i(k,u) - sum_j w_j*q_j(k,u))",
@@ -194,7 +203,7 @@
   "validation": {
     "independent_python_fraction_replay": "passed",
     "rust_tests": {
-      "authored": 8,
+      "authored": 9,
       "compiled": false,
       "executed": false
     },
