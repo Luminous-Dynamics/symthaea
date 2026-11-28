@@ -19,11 +19,13 @@ The core design principle is **reconcile before retry**. A timeout after a dispa
 
 ## 2. What is new relative to existing benchmarks
 
-- VideoFDB evaluates full-duplex audiovisual perception and generation, not independently verified state-changing outcomes.
-- DIVE evaluates continuous stream engagement, proactive intervention and response timing, not the full lifecycle of authorized external actions.
-- TurnBench evaluates EOT and interruption, with a documented v1 scoring limitation and a revised fixed-hidden-decision v2 direction.
-- Duplex-MPE evaluates multiparty response, silence and human-resolution behaviour.
-- InteractionBench and τ-Voice extend evaluation into spoken tasks and grounded outcomes, but CGRB specifically targets interrupted side effects, state reconciliation, idempotency, compensation and claim/state concordance.
+- **DuplexAct** (arXiv:2610.17738, October 13, 2026) supplies a useful action taxonomy: eight interaction actions across 24 conditions, scored for both immediate execution and subsequent follow-through. It contains 4,691 instances, including 2,531 from real recordings. Its findings show why first action occurrence is insufficient: a system may stop or interrupt correctly but fail to carry the intervention through. CGRB should reuse its interaction-action vocabulary and add externally observed task-state outcomes, not create a competing dialogue-action taxonomy.
+- **StreamEval** evaluates interactive video generation on 300 scripted 15–300 second cases, with task execution, state consistency, visual fidelity and audiovisual coordination. It is an important reference for persistence and request-following, but its state-consistency measures do not replace an independent oracle for external side effects.
+- **VideoFDB** evaluates full-duplex audiovisual perception and generation, including nonverbal interaction, not the full lifecycle of authorized external actions.
+- **DIVE** evaluates continuous stream engagement, proactive intervention and response timing, not the full lifecycle of authorized external actions.
+- **TurnBench** evaluates EOT and interruption, with a documented v1 scoring limitation and a revised fixed-hidden-decision v2 direction.
+- **Duplex-MPE** evaluates multiparty response, silence and human-resolution behaviour.
+- **InteractionBench and τ-Voice** extend evaluation into spoken tasks and grounded outcomes. CGRB specifically targets interrupted side effects, state reconciliation, idempotency, separately authorized compensation and claim/state concordance after independent state observation.
 - The November 2026 survey *Evaluating Real-Time Voice Agents: A Survey from Component Quality to Grounded Outcomes* identifies a broader evidence gap: few evaluations inspect external state/action traces, few grounded outcome benchmarks use real human speech, and few multiparty benchmarks verify state.
 
 CGRB is a complementary integration benchmark, not a substitute or a claim of superiority over these public suites.
