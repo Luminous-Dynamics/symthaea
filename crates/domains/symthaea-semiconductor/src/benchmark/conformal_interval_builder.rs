@@ -56,6 +56,10 @@ pub enum ConformalSetBuildReasonV1 {
     CalibrationPredictionChronologyInvalid,
     CalibrationFeatureEventReused,
     CalibrationLabelRevisionDuplicate,
+    CalibrationSampleDuplicate,
+    CalibrationModelArtifactMismatch,
+    CalibrationScorePolicyMismatch,
+    CalibrationMeasurementContractMismatch,
     CalibrationEventDuplicate,
     CalibrationSourceAuthenticityAssertionMissing,
     UpstreamAuthorityFlagSet,
@@ -86,6 +90,9 @@ pub struct ConformalCalibrationSampleV1 {
     pub label_id: String,
     pub label_revision: u64,
     pub label_payload_sha256: String,
+    pub global_model_artifact_sha256: String,
+    pub score_policy_sha256: String,
+    pub measurement_contract_sha256: String,
     pub event_time_unix_seconds: i64,
     pub prediction_at_unix_seconds: i64,
     pub label_available_at_unix_seconds: i64,
@@ -104,6 +111,7 @@ pub struct ConformalIntervalInputV1 {
     pub prediction_at_unix_seconds: i64,
     pub clock_domain_id: String,
     pub global_model_artifact_sha256: String,
+    pub measurement_contract_sha256: String,
     pub point_prediction: f64,
     pub prediction_scale: f64,
     pub target_miscoverage: f64,
@@ -129,6 +137,7 @@ pub struct ConformalSetReceiptV1 {
     pub clock_domain_id: String,
     pub global_model_artifact_sha256: String,
     pub score_policy_sha256: String,
+    pub measurement_contract_sha256: String,
     pub score_kind: ConformalScoreKindV1,
     pub target_miscoverage: f64,
     pub finite_sample_quantile_rank: usize,
@@ -206,6 +215,8 @@ fn calibration_score(
     used_labels: &mut BTreeSet<String>,
     used_revisions: &mut BTreeSet<String>,
     used_events: &mut BTreeSet<String>,
+    used_samples: &mut BTreeSet<String>,
+    expected_policy_sha256: &str,
 ) -> Result<ConformalCalibrationScoreV1, ConformalSetBuildReasonV1> {
     let report = &sample.eligibility_report;
     if sample.schema != CONFORMAL_CALIBRATION_SAMPLE_SCHEMA_V1
@@ -243,6 +254,26 @@ fn calibration_score(
     {
         return Err(ConformalSetBuildReasonV1::CalibrationPayloadDigestMismatch);
     }
+    if !valid_sha256(&report.measurement_sha256)
+        || !valid_sha256(&report.qualification_report_sha256)
+        || !valid_sha256(&report.requalification_report_sha256)
+        || !valid_sha256(&report.requalification_frontier_sha256)
+    {
+        return Err(ConformalSetBuildReasonV1::CalibrationReportDigestMismatch);
+    }
+    if sample.global_model_artifact_sha256 != prediction.global_model_artifact_sha256
+        || !valid_sha256(&sample.global_model_artifact_sha256)
+    {
+        return Err(ConformalSetBuildReasonV1::CalibrationModelArtifactMismatch);
+    }
+    if sample.score_policy_sha256 != expected_policy_sha256 {
+        return Err(ConformalSetBuildReasonV1::CalibrationScorePolicyMismatch);
+    }
+    if sample.measurement_contract_sha256 != prediction.measurement_contract_sha256
+        || !valid_sha256(&sample.measurement_contract_sha256)
+    {
+        return Err(ConformalSetBuildReasonV1::CalibrationMeasurementContractMismatch);
+    }
     if !report.qualified_corrected_value.is_finite()
         || !report
             .qualified_standard_uncertainty_upper_bound
@@ -269,6 +300,9 @@ fn calibration_score(
         || sample.measurement_event_id == prediction.measurement_event_id
     {
         return Err(ConformalSetBuildReasonV1::CalibrationFeatureEventReused);
+    }
+    if !used_samples.insert(sample.sample_id.clone()) {
+        return Err(ConformalSetBuildReasonV1::CalibrationSampleDuplicate);
     }
     if !used_labels.insert(sample.label_id.clone())
         || !used_events.insert(sample.measurement_event_id.clone())
@@ -320,6 +354,7 @@ pub fn build_conformal_interval_v1(
     require_text(&input.measurement_event_id, "input.measurement_event_id")?;
     require_text(&input.clock_domain_id, "input.clock_domain_id")?;
     if !valid_sha256(&input.global_model_artifact_sha256)
+        || !valid_sha256(&input.measurement_contract_sha256)
         || !input.point_prediction.is_finite()
         || !input.prediction_scale.is_finite()
         || input.prediction_scale <= 0.0
@@ -347,6 +382,7 @@ pub fn build_conformal_interval_v1(
     let mut used_labels = BTreeSet::new();
     let mut used_revisions = BTreeSet::new();
     let mut used_events = BTreeSet::new();
+    let mut used_samples = BTreeSet::new();
     let mut scores = Vec::with_capacity(samples.len());
     let mut reasons = Vec::new();
     for sample in &samples {
@@ -357,6 +393,8 @@ pub fn build_conformal_interval_v1(
             &mut used_labels,
             &mut used_revisions,
             &mut used_events,
+            &mut used_samples,
+            &policy_sha256,
         ) {
             Ok(score) => scores.push(score),
             Err(reason) => reasons.push(reason),
@@ -415,6 +453,7 @@ pub fn build_conformal_interval_v1(
         clock_domain_id: input.clock_domain_id.clone(),
         global_model_artifact_sha256: input.global_model_artifact_sha256.clone(),
         score_policy_sha256: policy_sha256,
+        measurement_contract_sha256: input.measurement_contract_sha256.clone(),
         score_kind: policy.score_kind,
         target_miscoverage: input.target_miscoverage,
         finite_sample_quantile_rank: quantile_rank,
@@ -467,6 +506,7 @@ mod tests {
             prediction_at_unix_seconds: 1_800_100_000,
             clock_domain_id: "fab-clock".into(),
             global_model_artifact_sha256: digest('a'),
+            measurement_contract_sha256: digest('m'),
             point_prediction: 100.0,
             prediction_scale: 2.0,
             target_miscoverage: alpha,
@@ -509,6 +549,12 @@ mod tests {
             label_id,
             label_revision: 1,
             label_payload_sha256: payload,
+            global_model_artifact_sha256: digest('a'),
+            score_policy_sha256: json_sha256(&policy(
+                ConformalScoreKindV1::AbsoluteResidual,
+                50,
+            )).unwrap(),
+            measurement_contract_sha256: digest('m'),
             event_time_unix_seconds: available_at - 120,
             prediction_at_unix_seconds: available_at - 60,
             label_available_at_unix_seconds: available_at,
