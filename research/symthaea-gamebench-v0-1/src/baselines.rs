@@ -231,16 +231,18 @@ mod tests {
     fn seeded_random_candidate_is_reproducible_after_reset() {
         let observation = full_observation();
         let actions = [Action::North, Action::East, Action::South, Action::West];
-        let mut candidate = RandomLegalCandidate::new(7);
+        let mut first_candidate = RandomLegalCandidate::new(7);
+        let mut replay_candidate = RandomLegalCandidate::new(7);
+        first_candidate.reset().expect("first reset");
+        replay_candidate.reset().expect("replay reset");
         let input = CandidateInput {
             observation: &observation,
             legal_actions: &actions,
             remaining_actions: 12,
             episode_step: 0,
         };
-        let first = candidate.decide(input).expect("random action");
-        candidate.reset().expect("reset");
-        let replayed = candidate.decide(input).expect("replayed random action");
+        let first = first_candidate.decide(input).expect("random action");
+        let replayed = replay_candidate.decide(input).expect("replayed random action");
         assert_eq!(first.action, replayed.action);
     }
 
@@ -275,6 +277,28 @@ mod tests {
         assert_eq!(decision.action, Action::East);
         assert_eq!(decision.confidence, None);
         assert_eq!(decision.forecasts[0].outcomes[0].value, ForecastValue::Integer(1));
+    }
+
+    #[test]
+    fn policies_reject_zero_remaining_budget() {
+        let observation = full_observation();
+        let actions = [Action::North, Action::East, Action::South, Action::West];
+        let input = CandidateInput {
+            observation: &observation,
+            legal_actions: &actions,
+            remaining_actions: 0,
+            episode_step: 0,
+        };
+        let mut random = RandomLegalCandidate::new(9);
+        assert_eq!(
+            random.decide(input),
+            Err(BaselineError::NoRemainingBudget)
+        );
+        let mut greedy = GreedyManhattanCandidate;
+        assert_eq!(
+            greedy.decide(input),
+            Err(BaselineError::NoRemainingBudget)
+        );
     }
 
     #[test]
