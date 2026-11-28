@@ -1,0 +1,98 @@
+{
+  "case": {
+    "schema_version": "mel-hear-016-scene-grouping-case-v0.1",
+    "benchmark_id": "MEL-AUDITORY-SCENE-GROUPING",
+    "benchmark_version": "0.1.0",
+    "case_id": "scene-001",
+    "split": "development",
+    "source_audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "rights_manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "components": [
+      {
+        "component_id": "c0",
+        "support": {
+          "start_sample": 0,
+          "end_sample": 80
+        }
+      },
+      {
+        "component_id": "c1",
+        "support": {
+          "start_sample": 100,
+          "end_sample": 180
+        }
+      },
+      {
+        "component_id": "c2",
+        "support": {
+          "start_sample": 200,
+          "end_sample": 280
+        }
+      },
+      {
+        "component_id": "c3",
+        "support": {
+          "start_sample": 300,
+          "end_sample": 380
+        }
+      }
+    ]
+  },
+  "prediction": {
+    "schema_version": "mel-hear-016-scene-grouping-prediction-v0.1",
+    "case_id": "scene-001",
+    "source_audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "model_identity_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "analysis_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "components": [
+      {
+        "component_id": "c0",
+        "predicted_source_group": "x",
+        "assignment_confidence": 0.9
+      },
+      {
+        "component_id": "c1",
+        "predicted_source_group": "x",
+        "assignment_confidence": 0.9
+      },
+      {
+        "component_id": "c2",
+        "predicted_source_group": "y",
+        "assignment_confidence": 0.9
+      },
+      {
+        "component_id": "c3",
+        "predicted_source_group": "y",
+        "assignment_confidence": 0.9
+      }
+    ]
+  },
+  "reference": {
+    "schema_version": "mel-hear-016-scene-grouping-reference-v0.1",
+    "case_id": "scene-001",
+    "source_audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "annotation_manifest_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "components": [
+      {
+        "component_id": "c0",
+        "reference_source_group": "source-A",
+        "disposition": "resolved"
+      },
+      {
+        "component_id": "c1",
+        "reference_source_group": "source-A",
+        "disposition": "resolved"
+      },
+      {
+        "component_id": "c2",
+        "reference_source_group": "source-B",
+        "disposition": "resolved"
+      },
+      {
+        "component_id": "c3",
+        "reference_source_group": "source-B",
+        "disposition": "resolved"
+      }
+    ]
+  }
+}
