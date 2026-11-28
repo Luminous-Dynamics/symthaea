@@ -1,0 +1,19 @@
+{
+  "schema_version": "mel-hear-012-intervention-receipt-v0.1",
+  "case_id": "room-reverb-stay-001",
+  "pair_id": "pair-001",
+  "manifest_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "input_audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "output_audio_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+  "parameter_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "implementation_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "execution_environment_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "seed": 11,
+  "input_sample_rate_hz": 8000,
+  "output_sample_rate_hz": 8000,
+  "input_frame_count": 128,
+  "output_frame_count": 128,
+  "applied_start_sample": 0,
+  "applied_end_sample": 64,
+  "completed": true
+}
