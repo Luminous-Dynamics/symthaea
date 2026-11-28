@@ -34,6 +34,53 @@ pub struct DyadicInclusionProbability {
     /// The value 2^64 represents certainty and cannot be stored in a u64.
     pub numerator: u128,
 }
+/// Frozen pre-label policy that determines each event's audit inclusion chance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PredictableAuditQPolicy {
+    /// The custodian supplies q_t from a separately audited pre-label schedule.
+    ExternallySuppliedPrelabelSchedule,
+    /// Maps a pre-label priority score into a q_t interval with positive support.
+    LinearPrelabelPriority {
+        minimum: DyadicInclusionProbability,
+        maximum: DyadicInclusionProbability,
+    },
+}
+
+impl PredictableAuditQPolicy {
+    /// Score is an integer on [0, 2^53]. q_t is quantized to exact f64 dyadics.
+    pub fn inclusion_probability(
+        self,
+        priority_score_numerator: u64,
+    ) -> Result<DyadicInclusionProbability, PredictableAuditError> {
+        match self {
+            Self::ExternallySuppliedPrelabelSchedule => {
+                Err(PredictableAuditError::QPolicyRequiresExternalSchedule)
+            }
+            Self::LinearPrelabelPriority { minimum, maximum } => {
+                minimum.validate()?;
+                maximum.validate()?;
+                if maximum.numerator < minimum.numerator {
+                    return Err(PredictableAuditError::InvalidQPolicyRange);
+                }
+                if priority_score_numerator > (1_u64 << 53) {
+                    return Err(PredictableAuditError::InvalidPriorityScore(
+                        priority_score_numerator,
+                    ));
+                }
+                let width = maximum.numerator - minimum.numerator;
+                let increment = width * priority_score_numerator as u128
+                    / (1_u128 << 53);
+                let raw = minimum.numerator + increment;
+                let step = DYADIC_NUMERATOR_STEP;
+                let numerator = raw / step * step;
+                let output = DyadicInclusionProbability { numerator };
+                output.validate()?;
+                Ok(output)
+            }
+        }
+    }
+}
 
 impl DyadicInclusionProbability {
     pub fn validate(self) -> Result<(), PredictableAuditError> {
@@ -81,6 +128,8 @@ pub struct PredictableAuditEvent {
     pub prelabel_history_sha256: String,
     /// q_t must be chosen before the current outcome is known.
     pub inclusion_probability: DyadicInclusionProbability,
+    /// Pre-label priority score on [0, 2^53], used by LinearPrelabelPriority.
+    pub prelabel_priority_score_numerator: u64,
     /// Supplied by the external custodian's independent random stream.
     /// This value is not included in the returned selection receipt.
     pub random_word: u64,
@@ -120,6 +169,7 @@ pub struct PredictableAuditReceipt {
     pub random_stream_manifest_sha256: String,
     pub q_policy_id: String,
     pub q_policy_version: String,
+    pub q_policy: PredictableAuditQPolicy,
     pub minimum_inclusion_probability_numerator: u128,
     pub minimum_inclusion_probability_f64_bits: u64,
     pub population_size: usize,
