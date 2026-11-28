@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_groupmembench_protocol_v1.schema.json",
+  "title": "MACE GroupMemBench Protocol V1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "run_binding"
+      ],
+      "properties": {
+        "op": {
+          "const": "reset"
+        },
+        "run_binding": {
+          "$ref": "#/$defs/runBinding"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "run_id",
+        "messages"
+      ],
+      "properties": {
+        "op": {
+          "const": "ingest"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "messages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/message"
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "query"
+      ],
+      "properties": {
+        "op": {
+          "const": "query"
+        },
+        "query": {
+          "$ref": "#/$defs/query"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "run_id"
+      ],
+      "properties": {
+        "op": {
+          "const": "close"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "runBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "benchmark_repository",
+        "benchmark_commit_sha",
+        "dataset_snapshot_sha256",
+        "split_manifest_sha256",
+        "domain",
+        "reader_model_config_sha256",
+        "reader_prompt_sha256",
+        "judge_model_config_sha256",
+        "judge_prompt_sha256",
+        "retrieval_config_sha256",
+        "top_k",
+        "context_budget_tokens",
+        "seed",
+        "binding_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_groupmembench_adapter_v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "benchmark_repository": {
+          "const": "UCSB-NLP-Chang/GroupMemBench"
+        },
+        "benchmark_commit_sha": {
+          "$ref": "#/$defs/gitSha"
+        },
+        "dataset_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "domain": {
+          "enum": [
+            "finance",
+            "technology",
+            "healthcare",
+            "manufacturing"
+          ]
+        },
+        "reader_model_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reader_prompt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "judge_model_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "judge_prompt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "retrieval_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "top_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "context_budget_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "binding_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "msg_node",
+        "content",
+        "author",
+        "role",
+        "timestamp",
+        "reply_to",
+        "channel",
+        "phase_name",
+        "topic"
+      ],
+      "properties": {
+        "msg_node": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content": {
+          "type": "string"
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timestamp": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reply_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "channel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "topic": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "query_invocation_id",
+        "asking_user_id",
+        "question_text",
+        "top_k"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_invocation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "asking_user_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "question_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "top_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        }
+      }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{40}$"
+    }
+  }
+}
