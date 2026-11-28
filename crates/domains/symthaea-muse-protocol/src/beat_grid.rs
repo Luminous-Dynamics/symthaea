@@ -186,42 +186,82 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
     }
 
     if !is_lowercase_sha256(&report.evidence.manifest_sha256) {
-        push(&mut violations, BeatGridViolationCode::InvalidEvidenceManifestSha256, "evidence.manifest_sha256");
+        push(
+            &mut violations,
+            BeatGridViolationCode::InvalidEvidenceManifestSha256,
+            "evidence.manifest_sha256",
+        );
     }
     if report.evidence.source_audio_sha256 != report.source.sha256 {
-        push(&mut violations, BeatGridViolationCode::EvidenceSourceDigestMismatch, "evidence.source_audio_sha256");
+        push(
+            &mut violations,
+            BeatGridViolationCode::EvidenceSourceDigestMismatch,
+            "evidence.source_audio_sha256",
+        );
     }
     if report.evidence.analysis_version.trim().is_empty() {
-        push(&mut violations, BeatGridViolationCode::EmptyAnalysisVersion, "evidence.analysis_version");
+        push(
+            &mut violations,
+            BeatGridViolationCode::EmptyAnalysisVersion,
+            "evidence.analysis_version",
+        );
     }
     let evidence_window = report.evidence.covered_window;
     if !evidence_window.is_non_empty() || evidence_window.end_frame > report.source.total_frames {
-        push(&mut violations, BeatGridViolationCode::InvalidEvidenceWindow, "evidence.covered_window");
+        push(
+            &mut violations,
+            BeatGridViolationCode::InvalidEvidenceWindow,
+            "evidence.covered_window",
+        );
     }
 
     match report.disposition {
         BeatGridDisposition::Resolved => {
             if report.hypotheses.len() != 1 {
-                push(&mut violations, BeatGridViolationCode::ReportDispositionMismatch, "hypotheses");
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::ReportDispositionMismatch,
+                    "hypotheses",
+                );
             }
             if report.abstention_reason.is_some() {
-                push(&mut violations, BeatGridViolationCode::UnexpectedAbstentionReason, "abstention_reason");
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::UnexpectedAbstentionReason,
+                    "abstention_reason",
+                );
             }
         }
         BeatGridDisposition::Ambiguous => {
             if report.hypotheses.len() < 2 {
-                push(&mut violations, BeatGridViolationCode::ReportDispositionMismatch, "hypotheses");
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::ReportDispositionMismatch,
+                    "hypotheses",
+                );
             }
             if report.abstention_reason.is_some() {
-                push(&mut violations, BeatGridViolationCode::UnexpectedAbstentionReason, "abstention_reason");
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::UnexpectedAbstentionReason,
+                    "abstention_reason",
+                );
             }
         }
         BeatGridDisposition::Abstained | BeatGridDisposition::NotEvaluated => {
             if !report.hypotheses.is_empty() {
-                push(&mut violations, BeatGridViolationCode::ReportDispositionMismatch, "hypotheses");
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::ReportDispositionMismatch,
+                    "hypotheses",
+                );
             }
             if report.abstention_reason.as_deref().is_none_or(|reason| reason.trim().is_empty()) {
-                push(&mut violations, BeatGridViolationCode::MissingAbstentionReason, "abstention_reason");
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::MissingAbstentionReason,
+                    "abstention_reason",
+                );
             }
         }
     }
@@ -230,16 +270,32 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
     for (hypothesis_index, hypothesis) in report.hypotheses.iter().enumerate() {
         let base = format!("hypotheses[{hypothesis_index}]");
         if hypothesis.hypothesis_id.trim().is_empty() {
-            push(&mut violations, BeatGridViolationCode::EmptyHypothesisId, format!("{base}.hypothesis_id"));
+            push(
+                &mut violations,
+                BeatGridViolationCode::EmptyHypothesisId,
+                format!("{base}.hypothesis_id"),
+            );
         } else if !hypothesis_ids.insert(hypothesis.hypothesis_id.as_str()) {
-            push(&mut violations, BeatGridViolationCode::DuplicateHypothesisId, format!("{base}.hypothesis_id"));
+            push(
+                &mut violations,
+                BeatGridViolationCode::DuplicateHypothesisId,
+                format!("{base}.hypothesis_id"),
+            );
         }
 
         if hypothesis.confidence_ppm > MAX_CONFIDENCE_PPM {
-            push(&mut violations, BeatGridViolationCode::HypothesisConfidenceOutOfRange, format!("{base}.confidence_ppm"));
+            push(
+                &mut violations,
+                BeatGridViolationCode::HypothesisConfidenceOutOfRange,
+                format!("{base}.confidence_ppm"),
+            );
         }
         if hypothesis.pulse_anchors.len() < 2 {
-            push(&mut violations, BeatGridViolationCode::TooFewPulseAnchors, format!("{base}.pulse_anchors"));
+            push(
+                &mut violations,
+                BeatGridViolationCode::TooFewPulseAnchors,
+                format!("{base}.pulse_anchors"),
+            );
         }
 
         let mut previous_frame = None;
@@ -247,16 +303,32 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
         for (anchor_index, anchor) in hypothesis.pulse_anchors.iter().enumerate() {
             let path = format!("{base}.pulse_anchors[{anchor_index}]");
             if !evidence_window.contains_frame(anchor.frame) {
-                push(&mut violations, BeatGridViolationCode::PulseAnchorOutOfEvidenceWindow, format!("{path}.frame"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::PulseAnchorOutOfEvidenceWindow,
+                    format!("{path}.frame"),
+                );
             }
             if anchor.confidence_ppm > MAX_CONFIDENCE_PPM {
-                push(&mut violations, BeatGridViolationCode::PulseAnchorConfidenceOutOfRange, format!("{path}.confidence_ppm"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::PulseAnchorConfidenceOutOfRange,
+                    format!("{path}.confidence_ppm"),
+                );
             }
             if previous_frame.is_some_and(|previous| anchor.frame <= previous) {
-                push(&mut violations, BeatGridViolationCode::PulseFramesNotStrictlyIncreasing, format!("{path}.frame"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::PulseFramesNotStrictlyIncreasing,
+                    format!("{path}.frame"),
+                );
             }
             if previous_beat_index.is_some_and(|previous| anchor.beat_index <= previous) {
-                push(&mut violations, BeatGridViolationCode::PulseIndexesNotStrictlyIncreasing, format!("{path}.beat_index"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::PulseIndexesNotStrictlyIncreasing,
+                    format!("{path}.beat_index"),
+                );
             }
             previous_frame = Some(anchor.frame);
             previous_beat_index = Some(anchor.beat_index);
@@ -267,19 +339,41 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
         for (anchor_index, anchor) in hypothesis.downbeat_anchors.iter().enumerate() {
             let path = format!("{base}.downbeat_anchors[{anchor_index}]");
             if !evidence_window.contains_frame(anchor.frame) {
-                push(&mut violations, BeatGridViolationCode::DownbeatAnchorOutOfEvidenceWindow, format!("{path}.frame"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::DownbeatAnchorOutOfEvidenceWindow,
+                    format!("{path}.frame"),
+                );
             }
             if anchor.confidence_ppm > MAX_CONFIDENCE_PPM {
-                push(&mut violations, BeatGridViolationCode::DownbeatAnchorConfidenceOutOfRange, format!("{path}.confidence_ppm"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::DownbeatAnchorConfidenceOutOfRange,
+                    format!("{path}.confidence_ppm"),
+                );
             }
             if previous_downbeat_frame.is_some_and(|previous| anchor.frame <= previous) {
-                push(&mut violations, BeatGridViolationCode::DownbeatFramesNotStrictlyIncreasing, format!("{path}.frame"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::DownbeatFramesNotStrictlyIncreasing,
+                    format!("{path}.frame"),
+                );
             }
             if previous_bar_index.is_some_and(|previous| anchor.bar_index <= previous) {
-                push(&mut violations, BeatGridViolationCode::DownbeatIndexesNotStrictlyIncreasing, format!("{path}.bar_index"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::DownbeatIndexesNotStrictlyIncreasing,
+                    format!("{path}.bar_index"),
+                );
             }
-            if !hypothesis.pulse_anchors.iter().any(|pulse| pulse.frame == anchor.frame && pulse.beat_index == anchor.beat_index) {
-                push(&mut violations, BeatGridViolationCode::DownbeatDoesNotMatchPulse, format!("{path}.beat_index"));
+            if !hypothesis.pulse_anchors.iter().any(|pulse| {
+                pulse.frame == anchor.frame && pulse.beat_index == anchor.beat_index
+            }) {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::DownbeatDoesNotMatchPulse,
+                    format!("{path}.beat_index"),
+                );
             }
             previous_downbeat_frame = Some(anchor.frame);
             previous_bar_index = Some(anchor.bar_index);
@@ -289,44 +383,91 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
         for (point_index, point) in hypothesis.tempo_map.iter().enumerate() {
             let path = format!("{base}.tempo_map[{point_index}]");
             if !evidence_window.contains_frame(point.frame) {
-                push(&mut violations, BeatGridViolationCode::TempoPointOutOfEvidenceWindow, format!("{path}.frame"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::TempoPointOutOfEvidenceWindow,
+                    format!("{path}.frame"),
+                );
             }
             if point.confidence_ppm > MAX_CONFIDENCE_PPM {
-                push(&mut violations, BeatGridViolationCode::TempoPointConfidenceOutOfRange, format!("{path}.confidence_ppm"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::TempoPointConfidenceOutOfRange,
+                    format!("{path}.confidence_ppm"),
+                );
             }
             if point.bpm_milli == 0 {
-                push(&mut violations, BeatGridViolationCode::TempoValueMustBePositive, format!("{path}.bpm_milli"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::TempoValueMustBePositive,
+                    format!("{path}.bpm_milli"),
+                );
             }
             if previous_tempo_frame.is_some_and(|previous| point.frame <= previous) {
-                push(&mut violations, BeatGridViolationCode::TempoFramesNotStrictlyIncreasing, format!("{path}.frame"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::TempoFramesNotStrictlyIncreasing,
+                    format!("{path}.frame"),
+                );
             }
             previous_tempo_frame = Some(point.frame);
         }
 
-        let pulse_indexes: BTreeSet<i64> = hypothesis.pulse_anchors.iter().map(|anchor| anchor.beat_index).collect();
+        let pulse_indexes: BTreeSet<i64> = hypothesis
+            .pulse_anchors
+.            iter()
+            .map(|anchor| anchor.beat_index)
+            .collect();
         let mut previous_meter_start = None;
         for (segment_index, segment) in hypothesis.meter_map.iter().enumerate() {
             let path = format!("{base}.meter_map[{segment_index}]");
             if segment.confidence_ppm > MAX_CONFIDENCE_PPM {
-                push(&mut violations, BeatGridViolationCode::MeterSegmentConfidenceOutOfRange, format!("{path}.confidence_ppm"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::MeterSegmentConfidenceOutOfRange,
+                    format!("{path}.confidence_ppm"),
+                );
             }
             if !pulse_indexes.contains(&segment.start_beat_index) {
-                push(&mut violations, BeatGridViolationCode::MeterStartBeatNotInPulseMap, format!("{path}.start_beat_index"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::MeterStartBeatNotInPulseMap,
+                    format!("{path}.start_beat_index"),
+                );
             }
             if previous_meter_start.is_some_and(|previous| segment.start_beat_index <= previous) {
-                push(&mut violations, BeatGridViolationCode::MeterSegmentsNotStrictlyIncreasing, format!("{path}.start_beat_index"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::MeterSegmentsNotStrictlyIncreasing,
+                    format!("{path}.start_beat_index"),
+                );
             }
-            if segment.numerator == 0 || segment.denominator == 0 || !segment.denominator.is_power_of_two() {
-                push(&mut violations, BeatGridViolationCode::InvalidMeterSignature, format!("{path}.numerator_denominator"));
+            if segment.numerator == 0
+                || segment.denominator == 0
+                || !segment.denominator.is_power_of_two()
+            {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::InvalidMeterSignature,
+                    format!("{path}.numerator_denominator"),
+                );
             }
             if segment.grouping.is_empty() {
-                push(&mut violations, BeatGridViolationCode::EmptyMeterGrouping, format!("{path}.grouping"));
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::EmptyMeterGrouping,
+                    format!("{path}.grouping"),
+                );
             } else {
                 let sum = segment.grouping.iter().try_fold(0u16, |total, value| {
                     if *value == 0 { None } else { total.checked_add(u16::from(*value)) }
                 });
                 if sum != Some(u16::from(segment.numerator)) {
-                    push(&mut violations, BeatGridViolationCode::InvalidMeterGrouping, format!("{path}.grouping"));
+                    push(
+                        &mut violations,
+                        BeatGridViolationCode::InvalidMeterGrouping,
+                        format!("{path}.grouping"),
+                    );
                 }
             }
             previous_meter_start = Some(segment.start_beat_index);
@@ -337,10 +478,17 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
 }
 
 fn is_lowercase_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    value.len() == 64
+        && value
+            bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn push(violations: &mut Vec<BeatGridViolation>, code: BeatGridViolationCode, path: impl Into<String>) {
+fn push(
+    violations: &mut Vec<BeatGridViolation>,
+    code: BeatGridViolationCode,
+    path: impl Into<String>,
+) {
     violations.push(BeatGridViolation { code, path: path.into() });
 }
 
@@ -352,12 +500,20 @@ mod tests {
         let source_sha = "1".repeat(64);
         BeatGridReportV1 {
             schema_version: BEAT_GRID_SCHEMA_VERSION,
-            source: AudioSourceRef { sha256: source_sha.clone(), sample_rate_hz: 48_000, channels: 2, total_frames: 100_000 },
+            source: AudioSourceRef {
+                sha256: source_sha.clone(),
+                sample_rate_hz: 48_000,
+                channels: 2,
+                total_frames: 100_000,
+            },
             evidence: AnalysisEvidenceRef {
                 manifest_sha256: "a".repeat(64),
                 source_audio_sha256: source_sha,
                 analysis_version: "auditory-scene-v0.1/config-17".to_string(),
-                covered_window: crate::transition::SampleWindow { start_frame: 0, end_frame: 100_000 },
+                covered_window: crate::transition::SampleWindow {
+                    start_frame: 0,
+                    end_frame: 100_000,
+                },
             },
             disposition: BeatGridDisposition::Resolved,
             hypotheses: vec![hypothesis("grid-a", 850_000)],
@@ -374,13 +530,22 @@ mod tests {
                 PulseAnchor { frame: 24_000, beat_index: 1, confidence_ppm: 920_000 },
                 PulseAnchor { frame: 48_000, beat_index: 2, confidence_ppm: 910_000 },
             ],
-            downbeat_anchors: vec![DownbeatAnchor { frame: 0, beat_index: 0, bar_index: 0, confidence_ppm: 800_000 }],
+            downbeat_anchors: vec![DownbeatAnchor {
+                frame: 0,
+                beat_index: 0,
+                bar_index: 0,
+                confidence_ppm: 800_000,
+            }],
             tempo_map: vec![
                 TempoMapPoint { frame: 0, bpm_milli: 120_000, confidence_ppm: 880_000 },
                 TempoMapPoint { frame: 48_000, bpm_milli: 121_000, confidence_ppm: 810_000 },
             ],
             meter_map: vec![MeterMapSegment {
-                start_beat_index: 0, numerator: 7, denominator: 8, grouping: vec![2, 2, 3], confidence_ppm: 760_000,
+                start_beat_index: 0,
+                numerator: 7,
+                denominator: 8,
+                grouping: vec![2, 2, 3],
+                confidence_ppm: 760_000,
             }],
         }
     }
