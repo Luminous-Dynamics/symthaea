@@ -32,6 +32,9 @@ pub struct TemporalFoveationConfig {
     pub pixel_token_capacity: u64,
     /// Pixel-work tokens replenished per second.
     pub pixel_tokens_per_second: u64,
+    /// Maximum age of a source ROI in the same monotonic clock domain.
+    /// Older frames are rejected rather than presented as current evidence.
+    pub max_roi_age_us: u64,
     /// Maximum in-flight requests permitted under this policy.
     pub max_in_flight: usize,
 }
@@ -45,6 +48,7 @@ impl Default for TemporalFoveationConfig {
             trigger_urgency_threshold: 0.70,
             pixel_token_capacity: 1_000_000,
             pixel_tokens_per_second: 500_000,
+            max_roi_age_us: 500_000,
             max_in_flight: 2,
         }
     }
@@ -60,6 +64,7 @@ impl TemporalFoveationConfig {
             || !(0.0..=1.0).contains(&self.trigger_urgency_threshold)
             || self.pixel_token_capacity == 0
             || self.pixel_tokens_per_second == 0
+            || self.max_roi_age_us == 0
             || self.max_in_flight == 0
         {
             return Err(TemporalFoveationError::InvalidConfig);
@@ -109,6 +114,10 @@ pub enum TemporalBudgetDecision {
         required: u64,
         available: u64,
     },
+    StaleEvidence {
+        age_us: u64,
+        maximum_age_us: u64,
+    },
     ConcurrencyLimited {
         in_flight: usize,
         maximum: usize,
@@ -125,6 +134,7 @@ pub enum TemporalFoveationError {
     TriggerCapacityReached,
     DispatchNotPermitted,
     PixelBudgetExceeded,
+    FutureSourceTimestamp,
 }
 
 #[derive(Debug, Clone)]
@@ -204,10 +214,21 @@ impl TemporalFoveationBudget {
     pub fn decide(
         &mut self,
         now_us: u64,
+        source_timestamp_us: u64,
         roi_pixel_cost: u64,
         in_flight: usize,
     ) -> Result<TemporalBudgetDecision, TemporalFoveationError> {
         self.refill(now_us)?;
+        if source_timestamp_us > now_us {
+            return Err(TemporalFoveationError::FutureSourceTimestamp);
+        }
+        let source_age_us = now_us - source_timestamp_us;
+        if source_age_us > self.config.max_roi_age_us {
+            return Ok(TemporalBudgetDecision::StaleEvidence {
+                age_us: source_age_us,
+                maximum_age_us: self.config.max_roi_age_us,
+            });
+        }
         if in_flight >= self.config.max_in_flight {
             return Ok(TemporalBudgetDecision::ConcurrencyLimited {
                 in_flight,
@@ -270,6 +291,10 @@ impl TemporalFoveationBudget {
 
     pub fn config(&self) -> TemporalFoveationConfig {
         self.config
+    }
+
+    pub fn max_roi_age_us(&self) -> u64 {
+        self.config.max_roi_age_us
     }
 
     fn mode_at(&self, now_us: u64) -> TemporalSamplingMode {
@@ -336,12 +361,12 @@ mod tests {
         let config = TemporalFoveationConfig::default();
         let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
         assert!(matches!(
-            budget.decide(0, 100_000, 0).unwrap(),
+            budget.decide(0, 0, 100_000, 0).unwrap(),
             TemporalBudgetDecision::Dispatch { mode: TemporalSamplingMode::BaselineRoi, .. }
         ));
         budget.record_dispatch(0, 100_000).unwrap();
         assert_eq!(
-            budget.decide(999_999, 100_000, 0).unwrap(),
+            budget.decide(999_999, 0, 100_000, 0).unwrap(),
             TemporalBudgetDecision::Defer {
                 until_us: 1_000_000,
                 mode: TemporalSamplingMode::BaselineRoi
@@ -356,12 +381,12 @@ mod tests {
         assert!(budget.observe_trigger(trigger("turn-1", 100_000, 0.9)).unwrap());
         assert!(budget.burst_active(100_001));
         assert!(matches!(
-            budget.decide(100_000, 100_000, 0).unwrap(),
+            budget.decide(100_000, 100_000, 100_000, 0).unwrap(),
             TemporalBudgetDecision::Dispatch { mode: TemporalSamplingMode::BurstRoi, .. }
         ));
         budget.record_dispatch(100_000, 100_000).unwrap();
         assert_eq!(
-            budget.decide(349_999, 100_000, 0).unwrap(),
+            budget.decide(349_999, 100_000, 100_000, 0).unwrap(),
             TemporalBudgetDecision::Defer {
                 until_us: 350_000,
                 mode: TemporalSamplingMode::BurstRoi
@@ -391,6 +416,32 @@ mod tests {
     }
 
     #[test]
+    fn stale_source_frame_is_not_dispatched() {
+        let config = TemporalFoveationConfig {
+            max_roi_age_us: 100,
+            ..TemporalFoveationConfig::default()
+        };
+        let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
+        assert_eq!(
+            budget.decide(101, 0, 100, 0).unwrap(),
+            TemporalBudgetDecision::StaleEvidence {
+                age_us: 101,
+                maximum_age_us: 100
+            }
+        );
+    }
+
+    #[test]
+    fn future_source_timestamp_is_rejected() {
+        let mut budget =
+            TemporalFoveationBudget::new(TemporalFoveationConfig::default(), 0).unwrap();
+        assert_eq!(
+            budget.decide(100, 101, 100, 0),
+            Err(TemporalFoveationError::FutureSourceTimestamp)
+        );
+    }
+
+    #[test]
     fn trigger_time_regression_is_rejected() {
         let config = TemporalFoveationConfig::default();
         let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
@@ -412,7 +463,7 @@ mod tests {
         budget.observe_trigger(trigger("surprise-1", 0, 1.0)).unwrap();
         budget.record_dispatch(0, 180_000).unwrap();
         assert_eq!(
-            budget.decide(250_000, 100_000, 0).unwrap(),
+            budget.decide(250_000, 0, 100_000, 0).unwrap(),
             TemporalBudgetDecision::BudgetExhausted {
                 required: 100_000,
                 available: 45_000
@@ -429,11 +480,11 @@ mod tests {
         };
         let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
         budget.record_dispatch(0, 10).unwrap();
-        budget.decide(100_000, 0, 0).unwrap();
-        budget.decide(200_000, 0, 0).unwrap();
-        budget.decide(300_000, 0, 0).unwrap();
+        budget.decide(100_000, 0, 0, 0).unwrap();
+        budget.decide(200_000, 0, 0, 0).unwrap();
+        budget.decide(300_000, 0, 0, 0).unwrap();
         assert_eq!(budget.tokens_remaining(), 0);
-        budget.decide(400_000, 0, 0).unwrap();
+        budget.decide(400_000, 0, 0, 0).unwrap();
         assert_eq!(budget.tokens_remaining(), 1);
     }
 
@@ -445,7 +496,7 @@ mod tests {
         };
         let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
         assert_eq!(
-            budget.decide(0, 1, 1).unwrap(),
+            budget.decide(0, 0, 1, 1).unwrap(),
             TemporalBudgetDecision::ConcurrencyLimited {
                 in_flight: 1,
                 maximum: 1
@@ -474,7 +525,7 @@ mod tests {
         let mut budget =
             TemporalFoveationBudget::new(TemporalFoveationConfig::default(), 100).unwrap();
         assert_eq!(
-            budget.decide(99, 100, 0),
+            budget.decide(99, 0, 100, 0),
             Err(TemporalFoveationError::ClockRegression)
         );
     }
