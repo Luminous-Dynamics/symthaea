@@ -535,3 +535,17 @@ No library is selected for production by reputation alone. A candidate must pass
 - comparative listening on matched, held-out, licensed material.
 
 Maintain at least one permissively licensed production candidate and one external reference comparator. If no candidate meets the declared quality/latency/compute envelope, the capability remains unsupported rather than weakening the gate.
+
+
+## 27. Verify transition alignment against the selected pulse hypotheses
+
+The transition contract now includes `max_phase_error_milli` (0–500 milli-beats). This is the declared maximum circular beat-phase difference between source and target alignment anchors. It is not a probability or a quality score.
+
+The stacked MEL-DJ-007 implementation adds `verify_transition_grid_binding`:
+1. Revalidates the transition contract and both beat-grid reports.
+2. Requires each report's exact source reference and analysis manifest to equal the corresponding TrackWindowRef in the contract.
+3. Resolves the selected source and target hypothesis IDs within those reports.
+4. Maps each alignment frame to a beat position using only observed pulse anchors.
+5. Compares circular phase error modulo one beat against the contract's declared tolerance.
+
+The verifier interpolates only between adjacent beat ordinals. It accepts an exact observed pulse anchor directly, but does not interpolate through a multi-beat detection gap or extrapolate outside observed pulse support. Such cases return a typed abstention/violation instead of manufacturing a phase estimate. The verifier establishes a structural link between declared evidence and the transition's beat-phase constraint; it does not prove detector accuracy, calibrated confidence, phrase semantics, perceived transition quality, or playback authority.
