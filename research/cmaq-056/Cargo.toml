@@ -7,6 +7,8 @@ license = "AGPL-3.0-or-later"
 description = "Typed conditional null contracts and canonical evidence manifests"
 
 [dependencies]
+cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
+cmaq-048-fourier-kernel-approachability = { path = "../cmaq-048" }
 cmaq-053-compositional-risk-budget = { path = "../cmaq-053" }
 cmaq-054-evidence-adaptive-kernel-family = { path = "../cmaq-054" }
 sha2 = "=0.10.9"
