@@ -34,6 +34,7 @@ pub mod camera;
 pub mod checkpoint;
 pub mod encoder;
 pub mod manifold;
+pub mod observer;
 pub mod predictive;
 pub mod spectrum;
 pub mod training;
@@ -90,6 +91,13 @@ pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder, StereoDepthEs
 pub use manifold::{
     DelayedHorizonEvaluator, HorizonAccuracy, ObjectMemory, ObjectTrackingResult, SceneMemory,
     TrackedObject, VisionManifold, VisualSceneGraph, VisualWorkingMemory, WorkingMemorySlot,
+};
+pub use observer::{
+    ObserverFrameIdentityV0_1, ObserverOnlyVisionManifold,
+    TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1, TEMPORAL_OBSERVER_PROFILE_ID_V0_1,
+    TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1, TemporalObserverCheckpointV0_1,
+    TemporalObserverFrameGeometryV0_1, TemporalObserverMetricsV0_1, TemporalObserverProfileV0_1,
+    TemporalObserverStatusV0_1, TemporalPerceptionWitnessV0_1,
 };
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use spectrum::{

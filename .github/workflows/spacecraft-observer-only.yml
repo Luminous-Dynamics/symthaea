@@ -1,0 +1,37 @@
+name: Spacecraft observer-only contract
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-vision-manifold/Cargo.toml"
+      - "crates/domains/symthaea-vision-manifold/src/**"
+      - ".github/workflows/spacecraft-observer-only.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "crates/domains/symthaea-vision-manifold/Cargo.toml"
+      - "crates/domains/symthaea-vision-manifold/src/**"
+      - ".github/workflows/spacecraft-observer-only.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observer-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format only the spacecraft observer package
+        run: cargo fmt --manifest-path crates/domains/symthaea-vision-manifold/Cargo.toml --package symthaea-vision-manifold -- --check
+      - name: Observer witness contract tests
+        run: cargo test --manifest-path crates/domains/symthaea-vision-manifold/Cargo.toml --package symthaea-vision-manifold --lib observer::tests -- --test-threads=1
+      - name: Full vision-manifold library tests
+        run: cargo test --manifest-path crates/domains/symthaea-vision-manifold/Cargo.toml --package symthaea-vision-manifold --lib -- --test-threads=1
+      - name: Strict package Clippy
+        run: cargo clippy --manifest-path crates/domains/symthaea-vision-manifold/Cargo.toml --package symthaea-vision-manifold --all-targets -- -D warnings
