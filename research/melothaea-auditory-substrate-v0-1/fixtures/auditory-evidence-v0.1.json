@@ -1,0 +1,75 @@
+{
+  "schema_version": "mel-hear-011-auditory-evidence-v0.1",
+  "record_id": "synthetic-tone-001",
+  "evidence_status": "metadata_fixture_only",
+  "source": {
+    "asset_locator": "fixtures/synthetic-tone-f32le-hex.txt",
+    "artifact_sha256": "ab700eda17976233d33486d1afb8873eaceb840912d3cca56fe8dedb1ba59768",
+    "sample_format": "f32le_hex_ascii_v1",
+    "sample_rate_hz": 8000,
+    "channel_count": 1,
+    "frame_count": 16,
+    "calibration_state": "uncalibrated_digital",
+    "amplitude_unit": "digital_full_scale_ratio"
+  },
+  "analysis": {
+    "analysis_id": "known-tone-analysis-plan-v0",
+    "analysis_version": "0.1.0",
+    "sample_rate_hz": 8000,
+    "window_samples": 8,
+    "hop_samples": 4,
+    "fft_size": 8,
+    "window_function": "rectangular",
+    "centered": false
+  },
+  "views": [
+    {
+      "view_id": "waveform",
+      "kind": "waveform",
+      "status": "planned",
+      "units": "digital_full_scale_ratio",
+      "frequency_scale": "linear",
+      "phase_policy": "not_applicable"
+    },
+    {
+      "view_id": "complex-stft",
+      "kind": "complex_stft",
+      "status": "planned",
+      "units": "complex-amplitude",
+      "frequency_scale": "linear",
+      "phase_policy": "complex_retained"
+    },
+    {
+      "view_id": "erb-energy",
+      "kind": "erb_band_energy",
+      "status": "planned",
+      "units": "relative_band_energy",
+      "frequency_scale": "erb",
+      "phase_policy": "not_applicable"
+    },
+    {
+      "view_id": "log-frequency-energy",
+      "kind": "log_frequency_energy",
+      "status": "planned",
+      "units": "relative_log_frequency_energy",
+      "frequency_scale": "log_frequency",
+      "phase_policy": "not_applicable"
+    }
+  ],
+  "event_hypotheses": [],
+  "scene_hypotheses": [],
+  "query_claims": [],
+  "causal_factor_assessment": {
+    "status": "not_assessed",
+    "factors": [],
+    "residual": null
+  },
+  "identifiability": {
+    "status": "not_assessed",
+    "alternative_explanations": []
+  },
+  "provenance": {
+    "generator": "mel-hear-011-known-signal-fixture",
+    "generator_version": "0.1.0"
+  }
+}
