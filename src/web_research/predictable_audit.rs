@@ -279,7 +279,10 @@ impl std::fmt::Display for PredictableAuditError {
                 maximum_numerator,
             } => write!(
                 formatter,
-                "predictable expected audit workload {expected_numerator}/2^64 exceeds budget {maximum_numerator}/2^64"
+                concat!(
+                    "predictable expected audit workload {expected_numerator}/2^64 ",
+                    "exceeds budget {maximum_numerator}/2^64"
+                )
             ),
             Self::ExpectedAuditBudgetOverflow => {
                 write!(formatter, "predictable expected audit workload numerator overflowed")
