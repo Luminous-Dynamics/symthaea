@@ -823,19 +823,22 @@ mod tests {
 
     #[test]
     fn rejects_unknown_contract_fields_instead_of_silently_ignoring_them() {
-        let json = r#"{
-            "schema_version":1,
-            "transition_id":"t1",
-            "kind":"hard_cut",
-            "source":{},
-            "target":{},
-            "evidence":{},
-            "alignment":null,
-            "protected_regions":[],
-            "gain_envelopes":[],
-            "execution_authorized":true
-        }"#;
-        assert!(serde_json::from_str::<TransitionContract>(json).is_err());
+        let mut value = serde_json::to_value(valid_contract()).unwrap();
+        value.as_object_mut().unwrap().insert(
+            "execution_authorized".to_string(),
+            serde_json::Value::Bool(true),
+        );
+        assert!(serde_json::from_value::<TransitionContract>(value).is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_nested_source_fields() {
+        let mut value = serde_json::to_value(valid_contract()).unwrap();
+        value["source"]["audio"]
+            .as_object_mut()
+            .unwrap()
+            .insert("source_mutated".to_string(), serde_json::Value::Bool(true));
+        assert!(serde_json::from_value::<TransitionContract>(value).is_err());
     }
 
     #[test]
