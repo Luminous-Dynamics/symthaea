@@ -1,17 +1,17 @@
 #![forbid(unsafe_code)]
 
-mod sokoban;
-pub use sokoban::{
-    SokobanGame, SokobanSpec, SokobanSpecError, SokobanState, SokobanStepError,
-    SokobanTransition,
-};
-
 
 //! Standalone, deterministic game-environment primitives for Symthaea GameBench.
 //!
 //! V0.1 implements only the navigation fixture (F1) and structured / local
 //! observations (O1/O2). It is a benchmark substrate, not a Symthaea agent,
 //! game-playing result, or production runtime component.
+
+mod sokoban;
+pub use sokoban::{
+    SokobanGame, SokobanSpec, SokobanSpecError, SokobanState, SokobanStepError,
+    SokobanTransition,
+};
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
