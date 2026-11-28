@@ -261,7 +261,7 @@ pub fn evaluate_episode(
         if !accepted.insert(*id) {
             return Err(format!("{}: duplicate accepted candidate ID {id}", case.id));
         }
-        if !case.candidate_edges.iter().any(|e| e.id.as_deref() == Some(id)) {
+        if !case.candidate_edges.iter().any(|e| e.id.as_deref() == Some(*id)) {
             return Err(format!("{}: unknown candidate edge ID {id}", case.id));
         }
     }
