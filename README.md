@@ -129,13 +129,19 @@ Times and counts are historical internal measurements from the benchmark harness
 
 ```bash
 # Run the Binius benchmark package included in this public repository
-cargo run --manifest-path crates/hdc-zkp-bench/Cargo.toml --release
+cargo run --locked --manifest-path crates/hdc-zkp-bench/Cargo.toml --release
 
 # Run the internal consciousness psych-bench
-cargo run --features psych_bench --example run_all_benchmarks
+cargo run --locked --features psych_bench --example run_all_benchmarks
 ```
 
 On current `main`, the paper-level [`reproduce.sh`](papers/theory-foundations/binius-hdc/reproduce.sh) is still a historical multi-backend script that refers to sibling crates not present in this standalone public checkout; it does **not** reproduce the complete historical paper table from a clean clone. A corrected standalone runner is proposed in [PR #13753](https://github.com/Luminous-Dynamics/symthaea/pull/13753). Until that change is integrated, use the direct manifest command above to run the public Binius benchmark. That package executes a real Binius prover and verifier; its prime-field comparator is analytical, not a measured Winterfell prover.
+### Evidence-Qualified Capability research (prototype status)
+
+Symthaea now has a separate research effort to evaluate complete agent/tool systems on capability, authority, input integrity, provenance, independent replay, and failure containment rather than task success alone. The protocol and signed-observer prototype are under review in [PR #14186](https://github.com/Luminous-Dynamics/symthaea/pull/14186), with threat-model and promotion limits tracked in [issue #14189](https://github.com/Luminous-Dynamics/symthaea/issues/14189).
+
+The current Rust prototype verifies Ed25519 signatures over RFC 8785 canonical JSON and binds observer claims to an out-of-band trust policy and frozen run expectations. **It is not a deployed trusted observer and does not qualify a live system**: it does not yet independently launch/isolate the system under test, verify CI OIDC identity, capture host-side resource/network/state measurements, or operate a durable multi-host replay ledger. Its result remains explicitly unqualified. The benchmark's integrity targets are research goals, not achieved measurements.
+
 ## Rust Workflow
 
 Use the flake shell for day-to-day development:
