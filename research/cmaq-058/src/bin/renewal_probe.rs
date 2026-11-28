@@ -8,13 +8,9 @@ use std::error::Error;
 
 use cmaq_046_convex_target_approachability::BoxTarget;
 use cmaq_048_fourier_kernel_approachability::FourierFeatureMap;
-use cmaq_053_compositional_risk_budget::{
-    FleetBudgetPlan, FleetScope, Rational,
-};
+use cmaq_053_compositional_risk_budget::{FleetBudgetPlan, FleetScope, Rational};
 use cmaq_054_evidence_adaptive_kernel_family::KernelExpertConfig;
-use cmaq_056_typed_null_manifest::{
-    KernelFamilyManifest, NullCalibration, TypedRiskPlan,
-};
+use cmaq_056_typed_null_manifest::{KernelFamilyManifest, NullCalibration, TypedRiskPlan};
 use cmaq_058_exact_restart_renewal::CapitalRestartRenewalMonitor;
 
 const SHA_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -32,8 +28,7 @@ fn configurations() -> Vec<KernelExpertConfig> {
                 .expect("fixed response map is valid"),
             covariate_map: FourierFeatureMap::new(1, vec![vec![0.5]], SHA_B.into())
                 .expect("fixed covariate map is valid"),
-            target: BoxTarget::new(vec![-0.01; 4], vec![0.01; 4])
-                .expect("target contains zero"),
+            target: BoxTarget::new(vec![-0.01; 4], vec![0.01; 4]).expect("target contains zero"),
             prior_weight: Rational::new(1, 2).expect("positive prior"),
             target_sha256: SHA_C.into(),
             response_reference_sha256: SHA_E.into(),
@@ -45,8 +40,7 @@ fn configurations() -> Vec<KernelExpertConfig> {
                 .expect("fixed response map is valid"),
             covariate_map: FourierFeatureMap::new(1, vec![vec![0.5]], SHA_E.into())
                 .expect("fixed covariate map is valid"),
-            target: BoxTarget::new(vec![-0.01; 4], vec![0.01; 4])
-                .expect("target contains zero"),
+            target: BoxTarget::new(vec![-0.01; 4], vec![0.01; 4]).expect("target contains zero"),
             prior_weight: Rational::new(1, 2).expect("positive prior"),
             target_sha256: SHA_F.into(),
             response_reference_sha256: SHA_C.into(),
@@ -59,15 +53,8 @@ fn new_monitor(
     configs: &[KernelExpertConfig],
     horizon: u64,
 ) -> Result<CapitalRestartRenewalMonitor, Box<dyn Error>> {
-    let manifest = KernelFamilyManifest::build(
-        configs,
-        NullCalibration::direct_v1(),
-    )?;
-    let fleet = FleetBudgetPlan::new(
-        Rational::probability(1, 20)?,
-        SHA_A.into(),
-        SHA_B.into(),
-    )?;
+    let manifest = KernelFamilyManifest::build(configs, NullCalibration::direct_v1())?;
+    let fleet = FleetBudgetPlan::new(Rational::probability(1, 20)?, SHA_A.into(), SHA_B.into())?;
     let scope = FleetScope {
         stream_id: "cmaq-058-probe".into(),
         asset_id: "probe-asset".into(),
@@ -78,25 +65,13 @@ fn new_monitor(
         deployment_index: 1,
     };
     let local = fleet.local_alpha_for(&scope)?;
-    let plan = TypedRiskPlan::new(
-        &fleet,
-        scope,
-        local.divided_by_integer(2)?,
-        &manifest,
-    )?;
+    let plan = TypedRiskPlan::new(&fleet, scope, local.divided_by_integer(2)?, &manifest)?;
     Ok(CapitalRestartRenewalMonitor::new(
-        &plan,
-        &manifest,
-        configs,
-        0.5,
-        horizon,
+        &plan, &manifest, configs, 0.5, horizon,
     )?)
 }
 
-fn emit(
-    scenario: &str,
-    update: &cmaq_058_exact_restart_renewal::RenewalUpdate,
-) {
+fn emit(scenario: &str, update: &cmaq_058_exact_restart_renewal::RenewalUpdate) {
     let best = update
         .kernels
         .iter()
