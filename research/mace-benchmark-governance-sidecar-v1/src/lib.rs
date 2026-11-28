@@ -498,7 +498,7 @@ mod tests {
         let gate = compare_runs_v1(&candidate, &other_track).unwrap();
         assert!(!gate.matched);
         assert!(gate.mismatches.contains(&"track_id".to_owned()));
-        assert_eq!(gate.comparison_scope, "same_benchmark_track");
+        assert_eq!(gate.comparison_scope, "cross_benchmark_or_track_not_comparable");
     }
 
     #[test]
