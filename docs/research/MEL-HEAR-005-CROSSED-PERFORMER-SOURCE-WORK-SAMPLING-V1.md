@@ -29,7 +29,7 @@ The comparison wrapper requires exactly one sampling observation for every basel
 
 - **Work-disjoint clusters:** every required identity is present and no performer, session, take or performance realization spans source works.
 - **Nested within work:** multiple performers, sessions, takes or performance realizations occur within a work, but none is reused across works.
-- **Crossed performer, session, or take:** at least one performer, session or take identity occurs across multiple works.
+- **Crossed performer, session, take or performance:** at least one declared identity on these axes occurs across multiple works.
 - **Insufficiently identified:** any required sampling-frame, work, performer, session, take or performance identity is missing.
 
 A multi-performer ensemble recorded within one work is nested, not crossed. Every declared ensemble participant is retained in the membership set; it is not silently assigned to one invented musician or counted as an independent work.
@@ -40,7 +40,7 @@ The first two shapes receive only a **conditional** source-work-bootstrap admiss
 
 The independence declaration and pseudonymous IDs are supplied study metadata. The session axis is particularly limited: unless an independently qualified provenance record binds session IDs to source recordings, it is a declared grouping variable only. They do not authenticate a person, establish that two pseudonyms identify different people, establish that works are independently sampled, prove representativeness, or establish exchangeability. A hash is a locator/commitment, not identity proof.
 
-This v1 therefore always emits false for performer identity authentication, source-work identity authentication, sampling-independence authentication and population generalization. It does not implement crossed-cluster intervals. A crossed design is explicitly marked as requiring crossed inference, and its source-work-only comparison is rejected.
+This v1 therefore always emits false for performer identity authentication, performer-membership authentication, session identity authentication, take identity authentication, performance identity authentication, source-work identity authentication, sampling-independence authentication and population generalization. It does not implement crossed-cluster intervals. A crossed design is explicitly marked as requiring crossed inference, and its source-work-only comparison is rejected.
 
 ## 5. Adversarial controls
 
