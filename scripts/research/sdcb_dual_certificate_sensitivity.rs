@@ -186,13 +186,12 @@ impl DesignPoint {
         let alternatives = self.alternatives();
         let nulls = self.nulls();
         let alt_mix_p = lambda[0].mul(alternatives[0]).add(lambda[1].mul(alternatives[1]));
-        let null_weight = w[0].add(w[1]);
-        ALPHA.mul(null_weight)
-            .add(positive(alt_mix_p.sub(null_weight.mul(self.q_max()))))
-            .add(positive(
-                Q::one().sub(alt_mix_p)
-                    .sub(null_weight.mul(Q::one().sub(self.q_max())))
-            ))
+        let null_mix_one = w[0].mul(nulls[0]).add(w[1].mul(nulls[1]));
+        let null_mix_zero = w[0].mul(Q::one().sub(nulls[0]))
+            .add(w[1].mul(Q::one().sub(nulls[1])));
+        ALPHA.mul(w[0].add(w[1]))
+            .add(positive(alt_mix_p.sub(null_mix_one)))
+            .add(positive(Q::one().sub(alt_mix_p).sub(null_mix_zero)))
     }
 
     fn dual_feasible(self, lambda: [Q; 2], w: [Q; 2]) -> bool {
@@ -356,10 +355,10 @@ mod tests {
         let left_fd = finite_difference_left(h);
         let right_fd = finite_difference_right(h);
         let (left, right) = DesignPoint::one_sided_derivatives_at_switch();
-        assert!(left_fd.cmp(left).unwrap_or(Ordering::Equal) == Ordering::Less);
-        assert!(right_fd.cmp(right).unwrap_or(Ordering::Equal) == Ordering::Greater);
-        assert_eq!(left_fd, r(2100, 12501));
-        assert_eq!(right_fd, r(-2100, 12501));
+        assert!(left_fd.cmp(left) == Ordering::Less);
+        assert!(right_fd.cmp(right) == Ordering::Greater);
+        assert_eq!(left_fd, r(4200, 25001));
+        assert_eq!(right_fd, r(-4200, 25001));
     }
 
     #[test]
