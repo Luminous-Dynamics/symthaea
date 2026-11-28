@@ -14,84 +14,84 @@
       "pair_id": "SFM001-01",
       "control_case_id": "SFM001-01-C",
       "mutation_case_id": "SFM001-01-M",
-      "hypothesis": "A common planar translation changes coordinate values but preserves all pairwise metric and topological relations."
+      "hypothesis": "A common planar translation changes coordinate values but preserves pairwise metric and topological relations."
     },
     {
       "pair_id": "SFM001-02",
       "control_case_id": "SFM001-02-C",
       "mutation_case_id": "SFM001-02-M",
-      "hypothesis": "An arbitrary planar rotation transforms oriented coordinates/poses while preserving Euclidean geometry and topology."
+      "hypothesis": "An arbitrary planar rotation transforms oriented coordinates and poses while preserving Euclidean geometry and topology."
     },
     {
       "pair_id": "SFM001-03",
       "control_case_id": "SFM001-03-C",
       "mutation_case_id": "SFM001-03-M",
-      "hypothesis": "An arbitrary proper 3D rotation changes frame components but leaves rigid-body metric relations and topology unchanged."
+      "hypothesis": "A proper 3D rigid rotation changes frame components but leaves geometric relations and topology unchanged."
     },
     {
       "pair_id": "SFM001-04",
       "control_case_id": "SFM001-04-C",
       "mutation_case_id": "SFM001-04-M",
-      "hypothesis": "Applying two compatible rigid transforms in sequence agrees with their correctly ordered composed transform."
+      "hypothesis": "Sequential rigid transforms must match their correctly ordered composed transform, including non-commuting rotations."
     },
     {
       "pair_id": "SFM001-05",
       "control_case_id": "SFM001-05-C",
       "mutation_case_id": "SFM001-05-M",
-      "hypothesis": "A transform followed by its valid inverse returns points and poses to their source-frame values within declared numerical tolerance."
+      "hypothesis": "A valid transform followed by its inverse returns points and poses to their source-frame values within declared tolerance."
     },
     {
       "pair_id": "SFM001-06",
       "control_case_id": "SFM001-06-C",
       "mutation_case_id": "SFM001-06-M",
-      "hypothesis": "Changing only the observer frame preserves world geometry but requires camera-relative and image-plane relations to be recomputed."
+      "hypothesis": "Changing only the observer frame preserves allocentric geometry but requires camera-relative and image-plane relations to be recomputed."
     },
     {
       "pair_id": "SFM001-07",
       "control_case_id": "SFM001-07-C",
       "mutation_case_id": "SFM001-07-M",
-      "hypothesis": "The correctly declared quaternion storage convention is decoded using the typed contract and reproduces known non-identity rotations."
+      "hypothesis": "Quaternion component order must be explicit; asymmetric non-identity rotations detect WXYZ/XYZW confusion."
     },
     {
       "pair_id": "SFM001-08",
       "control_case_id": "SFM001-08-C",
       "mutation_case_id": "SFM001-08-M",
-      "hypothesis": "A quaternion convention mismatch must be detected by asymmetric non-identity fixtures rather than silently accepted as a plausible pose."
+      "hypothesis": "The declared child-to-parent transform direction must not be silently reversed."
     },
     {
       "pair_id": "SFM001-09",
       "control_case_id": "SFM001-09-C",
       "mutation_case_id": "SFM001-09-M",
-      "hypothesis": "The declared transform direction maps child coordinates into the declared parent frame."
+      "hypothesis": "Values from different frames are comparable only through a valid, current transform chain."
     },
     {
       "pair_id": "SFM001-10",
       "control_case_id": "SFM001-10-C",
       "mutation_case_id": "SFM001-10-M",
-      "hypothesis": "Reversing a non-identity transform direction must fail a known-vector and round-trip control."
+      "hypothesis": "A reflection changes orientation parity and must not be silently accepted as a proper SO(3) rotation."
     },
     {
       "pair_id": "SFM001-11",
       "control_case_id": "SFM001-11-C",
       "mutation_case_id": "SFM001-11-M",
-      "hypothesis": "Values in incompatible frames cannot be directly compared without a valid transform chain."
+      "hypothesis": "Metric geometry is preserved across units only when an explicit, dimensionally valid unit conversion is applied."
     },
     {
       "pair_id": "SFM001-12",
       "control_case_id": "SFM001-12-C",
       "mutation_case_id": "SFM001-12-M",
-      "hypothesis": "A reused frame name with a different generation must not be treated as the same coordinate system."
+      "hypothesis": "A consistent frame graph composes to identity around a cycle; an inconsistent edge must be exposed as a closure conflict."
     }
   ],
   "cases": [
     {
-      "case_id": "SFM001-01-C",
       "pair_id": "SFM001-01",
-      "pair_role": "control",
       "task_family": "planar_translation",
       "dimension": "2d",
       "intervention_lane": "known_transform",
-      "transform_kind": "translation_xy",
+      "case_id": "SFM001-01-C",
+      "pair_role": "control",
+      "transform_kind": "identity_xy",
       "mutation_class": "baseline",
       "candidate_inputs": [
         "source_frame_identity",
@@ -120,26 +120,24 @@
       "negative_control": false
     },
     {
-      "case_id": "SFM001-01-M",
       "pair_id": "SFM001-01",
-      "pair_role": "mutation",
-      "task_family": "planar_rotation",
+      "task_family": "planar_translation",
       "dimension": "2d",
       "intervention_lane": "known_transform",
-      "transform_kind": "arbitrary_rotation_so2",
+      "case_id": "SFM001-01-M",
+      "pair_role": "mutation",
+      "transform_kind": "nonzero_translation_xy",
       "mutation_class": "correct_frame_action",
       "candidate_inputs": [
         "source_frame_identity",
         "target_frame_identity",
         "explicit_transform",
         "spatial_points",
-        "object_poses",
         "relation_query"
       ],
       "expected_equivariants": [
         "point_coordinates",
-        "vector_components",
-        "object_pose"
+        "vector_components"
       ],
       "expected_invariants": [
         "pairwise_distance",
@@ -153,25 +151,133 @@
       ],
       "expected_disposition": "accept_with_equivariance",
       "evaluator_truth_sealed": true,
-      "split_group": "2d_planar_rotation_1",
+      "split_group": "2d_planar_translation_1",
       "negative_control": false
     },
     {
-      "case_id": "SFM001-02-C",
       "pair_id": "SFM001-02",
-      "pair_role": "control",
-      "task_family": "spatial_rotation",
-      "dimension": "3d",
+      "task_family": "planar_rotation",
+      "dimension": "2d",
       "intervention_lane": "known_transform",
-      "transform_kind": "arbitrary_rotation_so3",
+      "case_id": "SFM001-02-C",
+      "pair_role": "control",
+      "transform_kind": "identity_so2",
       "mutation_class": "baseline",
       "candidate_inputs": [
         "source_frame_identity",
         "target_frame_identity",
         "explicit_transform",
         "spatial_points",
-        "object_poses",
-        "relation_query"
+        "relation_query",
+        "object_poses"
+      ],
+      "expected_equivariants": [
+        "point_coordinates",
+        "object_pose"
+      ],
+      "expected_invariants": [
+        "pairwise_distance",
+        "angle",
+        "adjacency",
+        "topology"
+      ],
+      "expected_contextual_relations": [
+        "none"
+      ],
+      "expected_disposition": "accept_with_equivariance",
+      "evaluator_truth_sealed": true,
+      "split_group": "2d_planar_rotation_2",
+      "negative_control": false
+    },
+    {
+      "pair_id": "SFM001-02",
+      "task_family": "planar_rotation",
+      "dimension": "2d",
+      "intervention_lane": "known_transform",
+      "case_id": "SFM001-02-M",
+      "pair_role": "mutation",
+      "transform_kind": "arbitrary_rotation_about_declared_pivot",
+      "mutation_class": "correct_frame_action",
+      "candidate_inputs": [
+        "source_frame_identity",
+        "target_frame_identity",
+        "explicit_transform",
+        "spatial_points",
+        "relation_query",
+        "object_poses"
+      ],
+      "expected_equivariants": [
+        "point_coordinates",
+        "object_pose",
+        "world_direction_vector"
+      ],
+      "expected_invariants": [
+        "pairwise_distance",
+        "angle",
+        "adjacency",
+        "topology"
+      ],
+      "expected_contextual_relations": [
+        "none"
+      ],
+      "expected_disposition": "accept_with_invariance",
+      "evaluator_truth_sealed": true,
+      "split_group": "2d_planar_rotation_2",
+      "negative_control": false
+    },
+    {
+      "pair_id": "SFM001-03",
+      "task_family": "spatial_rotation",
+      "dimension": "3d",
+      "intervention_lane": "known_transform",
+      "case_id": "SFM001-03-C",
+      "pair_role": "control",
+      "transform_kind": "identity_so3",
+      "mutation_class": "baseline",
+      "candidate_inputs": [
+        "source_frame_identity",
+        "target_frame_identity",
+        "explicit_transform",
+        "spatial_points",
+        "relation_query",
+        "object_poses"
+      ],
+      "expected_equivariants": [
+        "point_coordinates",
+        "object_pose"
+      ],
+      "expected_invariants": [
+        "pairwise_distance",
+        "angle",
+        "incidence",
+        "adjacency",
+        "containment",
+        "topology"
+      ],
+      "expected_contextual_relations": [
+        "none"
+      ],
+      "expected_disposition": "accept_with_equivariance",
+      "evaluator_truth_sealed": true,
+      "split_group": "3d_spatial_rotation_3",
+      "negative_control": false
+    },
+    {
+      "pair_id": "SFM001-03",
+      "task_family": "spatial_rotation",
+      "dimension": "3d",
+      "intervention_lane": "known_transform",
+      "case_id": "SFM001-03-M",
+      "pair_role": "mutation",
+      "transform_kind": "arbitrary_rotation_about_non_origin_axis",
+      "mutation_class": "correct_frame_action",
+      "candidate_inputs": [
+        "source_frame_identity",
+        "target_frame_identity",
+        "explicit_transform",
+        "spatial_points",
+        "relation_query",
+        "object_poses"
       ],
       "expected_equivariants": [
         "point_coordinates",
@@ -184,7 +290,6 @@
         "angle",
         "incidence",
         "adjacency",
-        "connectivity",
         "containment",
         "topology",
         "relative_pose"
@@ -194,57 +299,24 @@
       ],
       "expected_disposition": "accept_with_invariance",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_spatial_rotation_2",
+      "split_group": "3d_spatial_rotation_3",
       "negative_control": false
     },
     {
-      "case_id": "SFM001-02-M",
-      "pair_id": "SFM001-02",
-      "pair_role": "mutation",
+      "pair_id": "SFM001-04",
       "task_family": "transform_composition",
       "dimension": "3d",
       "intervention_lane": "known_transform",
-      "transform_kind": "compose_two_se3_actions",
-      "mutation_class": "correct_frame_action",
-      "candidate_inputs": [
-        "source_frame_identity",
-        "target_frame_identity",
-        "explicit_transform",
-        "spatial_points",
-        "object_poses",
-        "relation_query"
-      ],
-      "expected_equivariants": [
-        "point_coordinates",
-        "object_pose"
-      ],
-      "expected_invariants": [
-        "pairwise_distance",
-        "angle",
-        "topology"
-      ],
-      "expected_contextual_relations": [
-        "none"
-      ],
-      "expected_disposition": "accept_with_equivariance",
-      "evaluator_truth_sealed": true,
-      "split_group": "3d_transform_composition_2",
-      "negative_control": false
-    },
-    {
-      "case_id": "SFM001-03-C",
-      "pair_id": "SFM001-03",
+      "case_id": "SFM001-04-C",
       "pair_role": "control",
-      "task_family": "inverse_roundtrip",
-      "dimension": "3d",
-      "intervention_lane": "known_transform",
-      "transform_kind": "inverse_se3_roundtrip",
+      "transform_kind": "direct_composed_transform",
       "mutation_class": "baseline",
       "candidate_inputs": [
         "source_frame_identity",
         "target_frame_identity",
         "explicit_transform",
         "spatial_points",
+        "relation_query",
         "object_poses"
       ],
       "expected_equivariants": [
@@ -261,18 +333,120 @@
       ],
       "expected_disposition": "accept_with_equivariance",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_inverse_roundtrip_3",
+      "split_group": "3d_transform_composition_4",
       "negative_control": false
     },
     {
-      "case_id": "SFM001-03-M",
-      "pair_id": "SFM001-03",
+      "pair_id": "SFM001-04",
+      "task_family": "transform_composition",
+      "dimension": "3d",
+      "intervention_lane": "known_transform",
+      "case_id": "SFM001-04-M",
       "pair_role": "mutation",
+      "transform_kind": "two_non_commuting_transforms_in_declared_order",
+      "mutation_class": "correct_frame_action",
+      "candidate_inputs": [
+        "source_frame_identity",
+        "target_frame_identity",
+        "explicit_transform",
+        "spatial_points",
+        "relation_query",
+        "object_poses"
+      ],
+      "expected_equivariants": [
+        "point_coordinates",
+        "object_pose"
+      ],
+      "expected_invariants": [
+        "pairwise_distance",
+        "relative_pose",
+        "topology"
+      ],
+      "expected_contextual_relations": [
+        "none"
+      ],
+      "expected_disposition": "accept_with_equivariance",
+      "evaluator_truth_sealed": true,
+      "split_group": "3d_transform_composition_4",
+      "negative_control": false
+    },
+    {
+      "pair_id": "SFM001-05",
+      "task_family": "inverse_roundtrip",
+      "dimension": "3d",
+      "intervention_lane": "known_transform",
+      "case_id": "SFM001-05-C",
+      "pair_role": "control",
+      "transform_kind": "identity_roundtrip_reference",
+      "mutation_class": "baseline",
+      "candidate_inputs": [
+        "source_frame_identity",
+        "target_frame_identity",
+        "explicit_transform",
+        "spatial_points",
+        "relation_query",
+        "object_poses"
+      ],
+      "expected_equivariants": [
+        "point_coordinates",
+        "object_pose"
+      ],
+      "expected_invariants": [
+        "pairwise_distance",
+        "relative_pose",
+        "topology"
+      ],
+      "expected_contextual_relations": [
+        "none"
+      ],
+      "expected_disposition": "accept_with_equivariance",
+      "evaluator_truth_sealed": true,
+      "split_group": "3d_inverse_roundtrip_5",
+      "negative_control": false
+    },
+    {
+      "pair_id": "SFM001-05",
+      "task_family": "inverse_roundtrip",
+      "dimension": "3d",
+      "intervention_lane": "known_transform",
+      "case_id": "SFM001-05-M",
+      "pair_role": "mutation",
+      "transform_kind": "transform_then_exact_inverse",
+      "mutation_class": "correct_frame_action",
+      "candidate_inputs": [
+        "source_frame_identity",
+        "target_frame_identity",
+        "explicit_transform",
+        "spatial_points",
+        "relation_query",
+        "object_poses"
+      ],
+      "expected_equivariants": [
+        "point_coordinates",
+        "object_pose"
+      ],
+      "expected_invariants": [
+        "pairwise_distance",
+        "relative_pose",
+        "topology"
+      ],
+      "expected_contextual_relations": [
+        "none"
+      ],
+      "expected_disposition": "accept_with_equivariance",
+      "evaluator_truth_sealed": true,
+      "split_group": "3d_inverse_roundtrip_5",
+      "negative_control": false
+    },
+    {
+      "pair_id": "SFM001-06",
       "task_family": "observer_reframe",
       "dimension": "3d",
       "intervention_lane": "observed_reframe",
-      "transform_kind": "camera_pose_change_world_fixed",
-      "mutation_class": "observer_frame_change",
+      "case_id": "SFM001-06-C",
+      "pair_role": "control",
+      "transform_kind": "camera_at_reference_pose_world_fixed",
+      "mutation_class": "baseline",
       "candidate_inputs": [
         "source_frame_identity",
         "target_frame_identity",
@@ -281,8 +455,7 @@
         "relation_query"
       ],
       "expected_equivariants": [
-        "camera_pose",
-        "world_direction_vector"
+        "camera_pose"
       ],
       "expected_invariants": [
         "pairwise_distance",
@@ -298,17 +471,53 @@
       ],
       "expected_disposition": "recompute_contextual_relation",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_observer_reframe_3",
+      "split_group": "3d_observer_reframe_6",
       "negative_control": false
     },
     {
-      "case_id": "SFM001-04-C",
-      "pair_id": "SFM001-04",
-      "pair_role": "control",
+      "pair_id": "SFM001-06",
+      "task_family": "observer_reframe",
+      "dimension": "3d",
+      "intervention_lane": "observed_reframe",
+      "case_id": "SFM001-06-M",
+      "pair_role": "mutation",
+      "transform_kind": "camera_changed_world_fixed",
+      "mutation_class": "observer_frame_change",
+      "candidate_inputs": [
+        "source_frame_identity",
+        "target_frame_identity",
+        "camera_pose",
+        "spatial_points",
+        "relation_query"
+      ],
+      "expected_equivariants": [
+        "camera_pose"
+      ],
+      "expected_invariants": [
+        "pairwise_distance",
+        "adjacency",
+        "connectivity",
+        "containment",
+        "topology"
+      ],
+      "expected_contextual_relations": [
+        "camera_left_right",
+        "camera_front_back",
+        "image_plane_above_below"
+      ],
+      "expected_disposition": "recompute_contextual_relation",
+      "evaluator_truth_sealed": true,
+      "split_group": "3d_observer_reframe_6",
+      "negative_control": false
+    },
+    {
+      "pair_id": "SFM001-07",
       "task_family": "quaternion_convention",
       "dimension": "3d",
       "intervention_lane": "compatibility_adversary",
-      "transform_kind": "wxyz_vs_xyzw_swap",
+      "case_id": "SFM001-07-C",
+      "pair_role": "control",
+      "transform_kind": "correct_wxyz_quaternion_contract",
       "mutation_class": "baseline",
       "candidate_inputs": [
         "source_frame_identity",
@@ -329,17 +538,17 @@
       ],
       "expected_disposition": "accept_with_equivariance",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_quaternion_convention_4",
+      "split_group": "3d_quaternion_convention_7",
       "negative_control": false
     },
     {
-      "case_id": "SFM001-04-M",
-      "pair_id": "SFM001-04",
-      "pair_role": "mutation",
+      "pair_id": "SFM001-07",
       "task_family": "quaternion_convention",
       "dimension": "3d",
       "intervention_lane": "compatibility_adversary",
-      "transform_kind": "wxyz_misread_as_xyzw",
+      "case_id": "SFM001-07-M",
+      "pair_role": "mutation",
+      "transform_kind": "wxyz_values_misread_as_xyzw",
       "mutation_class": "convention_error",
       "candidate_inputs": [
         "source_frame_identity",
@@ -355,17 +564,17 @@
       ],
       "expected_disposition": "reject_invalid_transform",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_quaternion_convention_4",
+      "split_group": "3d_quaternion_convention_7",
       "negative_control": true
     },
     {
-      "case_id": "SFM001-05-C",
-      "pair_id": "SFM001-05",
-      "pair_role": "control",
+      "pair_id": "SFM001-08",
       "task_family": "transform_direction",
       "dimension": "3d",
       "intervention_lane": "compatibility_adversary",
-      "transform_kind": "reverse_parent_child_transform",
+      "case_id": "SFM001-08-C",
+      "pair_role": "control",
+      "transform_kind": "T_parent_from_child",
       "mutation_class": "baseline",
       "candidate_inputs": [
         "source_frame_identity",
@@ -387,17 +596,17 @@
       ],
       "expected_disposition": "accept_with_equivariance",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_transform_direction_5",
+      "split_group": "3d_transform_direction_8",
       "negative_control": false
     },
     {
-      "case_id": "SFM001-05-M",
-      "pair_id": "SFM001-05",
-      "pair_role": "mutation",
+      "pair_id": "SFM001-08",
       "task_family": "transform_direction",
       "dimension": "3d",
       "intervention_lane": "compatibility_adversary",
-      "transform_kind": "apply_parent_from_child_as_child_from_parent",
+      "case_id": "SFM001-08-M",
+      "pair_role": "mutation",
+      "transform_kind": "apply_child_from_parent_as_parent_from_child",
       "mutation_class": "convention_error",
       "candidate_inputs": [
         "source_frame_identity",
@@ -413,42 +622,49 @@
       ],
       "expected_disposition": "reject_invalid_transform",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_transform_direction_5",
+      "split_group": "3d_transform_direction_8",
       "negative_control": true
     },
     {
-      "case_id": "SFM001-06-C",
-      "pair_id": "SFM001-06",
-      "pair_role": "control",
+      "pair_id": "SFM001-09",
       "task_family": "frame_compatibility",
       "dimension": "3d",
       "intervention_lane": "compatibility_adversary",
-      "transform_kind": "compare_unmapped_frame_ids",
+      "case_id": "SFM001-09-C",
+      "pair_role": "control",
+      "transform_kind": "cross_frame_query_with_valid_transform_chain",
       "mutation_class": "baseline",
       "candidate_inputs": [
         "source_frame_identity",
         "target_frame_identity",
+        "explicit_transform",
         "spatial_points",
         "relation_query"
       ],
-      "expected_equivariants": [],
-      "expected_invariants": [],
+      "expected_equivariants": [
+        "point_coordinates"
+      ],
+      "expected_invariants": [
+        "pairwise_distance",
+        "relative_pose",
+        "topology"
+      ],
       "expected_contextual_relations": [
         "none"
       ],
-      "expected_disposition": "reject_incompatible_frame",
+      "expected_disposition": "accept_with_equivariance",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_frame_compatibility_6",
+      "split_group": "3d_frame_compatibility_9",
       "negative_control": false
     },
     {
-      "case_id": "SFM001-06-M",
-      "pair_id": "SFM001-06",
-      "pair_role": "mutation",
+      "pair_id": "SFM001-09",
       "task_family": "frame_compatibility",
       "dimension": "3d",
       "intervention_lane": "compatibility_adversary",
-      "transform_kind": "silently_drop_frame_generation",
+      "case_id": "SFM001-09-M",
+      "pair_role": "mutation",
+      "transform_kind": "direct_compare_without_mapping_transform",
       "mutation_class": "compatibility_error",
       "candidate_inputs": [
         "source_frame_identity",
@@ -463,17 +679,17 @@
       ],
       "expected_disposition": "reject_incompatible_frame",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_frame_compatibility_6",
+      "split_group": "3d_frame_compatibility_9",
       "negative_control": true
     },
     {
-      "case_id": "SFM001-07-C",
-      "pair_id": "SFM001-07",
-      "pair_role": "control",
+      "pair_id": "SFM001-10",
       "task_family": "handedness_convention",
       "dimension": "3d",
       "intervention_lane": "compatibility_adversary",
-      "transform_kind": "right_handed_reference",
+      "case_id": "SFM001-10-C",
+      "pair_role": "control",
+      "transform_kind": "declared_right_handed_so3",
       "mutation_class": "baseline",
       "candidate_inputs": [
         "source_frame_identity",
@@ -499,17 +715,17 @@
       ],
       "expected_disposition": "accept_with_invariance",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_handedness_convention_7",
+      "split_group": "3d_handedness_convention_10",
       "negative_control": false
     },
     {
-      "case_id": "SFM001-07-M",
-      "pair_id": "SFM001-07",
-      "pair_role": "mutation",
+      "pair_id": "SFM001-10",
       "task_family": "handedness_convention",
       "dimension": "3d",
       "intervention_lane": "compatibility_adversary",
-      "transform_kind": "silent_reflection_as_rotation",
+      "case_id": "SFM001-10-M",
+      "pair_role": "mutation",
+      "transform_kind": "silent_reflection_as_proper_rotation",
       "mutation_class": "convention_error",
       "candidate_inputs": [
         "source_frame_identity",
@@ -525,17 +741,17 @@
       ],
       "expected_disposition": "reject_invalid_transform",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_handedness_convention_7",
+      "split_group": "3d_handedness_convention_10",
       "negative_control": true
     },
     {
-      "case_id": "SFM001-08-C",
-      "pair_id": "SFM001-08",
-      "pair_role": "control",
+      "pair_id": "SFM001-11",
       "task_family": "unit_conversion",
       "dimension": "3d",
-      "intervention_lane": "known_transform",
-      "transform_kind": "meter_to_millimeter_with_scale_conversion",
+      "intervention_lane": "compatibility_adversary",
+      "case_id": "SFM001-11-C",
+      "pair_role": "control",
+      "transform_kind": "meters_to_millimeters_explicit_conversion",
       "mutation_class": "baseline",
       "candidate_inputs": [
         "source_frame_identity",
@@ -560,17 +776,17 @@
       ],
       "expected_disposition": "accept_after_explicit_unit_conversion",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_unit_conversion_8",
+      "split_group": "3d_unit_conversion_11",
       "negative_control": false
     },
     {
-      "case_id": "SFM001-08-M",
-      "pair_id": "SFM001-08",
-      "pair_role": "mutation",
+      "pair_id": "SFM001-11",
       "task_family": "unit_conversion",
       "dimension": "3d",
       "intervention_lane": "compatibility_adversary",
-      "transform_kind": "meter_values_treated_as_millimeters",
+      "case_id": "SFM001-11-M",
+      "pair_role": "mutation",
+      "transform_kind": "meter_values_compared_as_millimeters",
       "mutation_class": "unit_error",
       "candidate_inputs": [
         "source_frame_identity",
@@ -585,202 +801,26 @@
       ],
       "expected_disposition": "reject_incompatible_frame",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_unit_conversion_8",
+      "split_group": "3d_unit_conversion_11",
       "negative_control": true
     },
     {
-      "case_id": "SFM001-09-C",
-      "pair_id": "SFM001-09",
-      "pair_role": "control",
+      "pair_id": "SFM001-12",
       "task_family": "frame_graph_cycle",
       "dimension": "3d",
       "intervention_lane": "known_transform",
-      "transform_kind": "three_frame_cycle_closure",
-      "mutation_class": "baseline",
-      "candidate_inputs": [
-        "source_frame_identity",
-        "target_frame_identity",
-        "explicit_transform",
-        "frame_graph_edges"
-      ],
-      "expected_equivariants": [
-        "point_coordinates",
-        "object_pose"
-      ],
-      "expected_invariants": [
-        "pairwise_distance",
-        "relative_pose",
-        "topology"
-      ],
-      "expected_contextual_relations": [
-        "none"
-      ],
-      "expected_disposition": "accept_with_equivariance",
-      "evaluator_truth_sealed": true,
-      "split_group": "3d_frame_graph_cycle_9",
-      "negative_control": false
-    },
-    {
-      "case_id": "SFM001-09-M",
-      "pair_id": "SFM001-09",
-      "pair_role": "mutation",
-      "task_family": "frame_graph_cycle",
-      "dimension": "3d",
-      "intervention_lane": "compatibility_adversary",
-      "transform_kind": "inconsistent_cycle_edge",
-      "mutation_class": "compatibility_error",
-      "candidate_inputs": [
-        "source_frame_identity",
-        "target_frame_identity",
-        "explicit_transform",
-        "frame_graph_edges"
-      ],
-      "expected_equivariants": [],
-      "expected_invariants": [],
-      "expected_contextual_relations": [
-        "none"
-      ],
-      "expected_disposition": "reject_invalid_transform",
-      "evaluator_truth_sealed": true,
-      "split_group": "3d_frame_graph_cycle_9",
-      "negative_control": true
-    },
-    {
-      "case_id": "SFM001-10-C",
-      "pair_id": "SFM001-10",
-      "pair_role": "control",
-      "task_family": "planar_rotation",
-      "dimension": "2d",
-      "intervention_lane": "known_transform",
-      "transform_kind": "rotation_about_non_origin_pivot",
-      "mutation_class": "baseline",
-      "candidate_inputs": [
-        "source_frame_identity",
-        "target_frame_identity",
-        "explicit_transform",
-        "spatial_points",
-        "relation_query"
-      ],
-      "expected_equivariants": [
-        "point_coordinates",
-        "world_direction_vector"
-      ],
-      "expected_invariants": [
-        "pairwise_distance",
-        "angle",
-        "adjacency",
-        "topology"
-      ],
-      "expected_contextual_relations": [
-        "none"
-      ],
-      "expected_disposition": "accept_with_invariance",
-      "evaluator_truth_sealed": true,
-      "split_group": "2d_planar_rotation_10",
-      "negative_control": false
-    },
-    {
-      "case_id": "SFM001-10-M",
-      "pair_id": "SFM001-10",
-      "pair_role": "mutation",
-      "task_family": "planar_rotation",
-      "dimension": "2d",
-      "intervention_lane": "compatibility_adversary",
-      "transform_kind": "rotate_about_origin_instead_of_declared_pivot",
-      "mutation_class": "convention_error",
-      "candidate_inputs": [
-        "source_frame_identity",
-        "target_frame_identity",
-        "explicit_transform",
-        "spatial_points"
-      ],
-      "expected_equivariants": [],
-      "expected_invariants": [],
-      "expected_contextual_relations": [
-        "none"
-      ],
-      "expected_disposition": "reject_invalid_transform",
-      "evaluator_truth_sealed": true,
-      "split_group": "2d_planar_rotation_10",
-      "negative_control": true
-    },
-    {
-      "case_id": "SFM001-11-C",
-      "pair_id": "SFM001-11",
-      "pair_role": "control",
-      "task_family": "observer_reframe",
-      "dimension": "3d",
-      "intervention_lane": "observed_reframe",
-      "transform_kind": "camera_reframe_with_world_fixed",
-      "mutation_class": "baseline",
-      "candidate_inputs": [
-        "source_frame_identity",
-        "target_frame_identity",
-        "camera_pose",
-        "spatial_points",
-        "relation_query"
-      ],
-      "expected_equivariants": [
-        "camera_pose"
-      ],
-      "expected_invariants": [
-        "pairwise_distance",
-        "connectivity",
-        "containment",
-        "topology"
-      ],
-      "expected_contextual_relations": [
-        "camera_left_right",
-        "camera_front_back"
-      ],
-      "expected_disposition": "recompute_contextual_relation",
-      "evaluator_truth_sealed": true,
-      "split_group": "3d_observer_reframe_11",
-      "negative_control": false
-    },
-    {
-      "case_id": "SFM001-11-M",
-      "pair_id": "SFM001-11",
-      "pair_role": "mutation",
-      "task_family": "observer_reframe",
-      "dimension": "3d",
-      "intervention_lane": "observed_reframe",
-      "transform_kind": "camera_reframe_leaks_into_world_map",
-      "mutation_class": "compatibility_error",
-      "candidate_inputs": [
-        "source_frame_identity",
-        "target_frame_identity",
-        "camera_pose",
-        "spatial_points",
-        "relation_query"
-      ],
-      "expected_equivariants": [],
-      "expected_invariants": [],
-      "expected_contextual_relations": [
-        "camera_left_right",
-        "camera_front_back"
-      ],
-      "expected_disposition": "reject_invalid_transform",
-      "evaluator_truth_sealed": true,
-      "split_group": "3d_observer_reframe_11",
-      "negative_control": true
-    },
-    {
       "case_id": "SFM001-12-C",
-      "pair_id": "SFM001-12",
       "pair_role": "control",
-      "task_family": "transform_composition",
-      "dimension": "3d",
-      "intervention_lane": "known_transform",
-      "transform_kind": "compose_noncommuting_rotations_in_declared_order",
+      "transform_kind": "consistent_three_frame_identity_cycle",
       "mutation_class": "baseline",
       "candidate_inputs": [
         "source_frame_identity",
         "target_frame_identity",
         "explicit_transform",
-        "object_poses"
+        "frame_graph_edges"
       ],
       "expected_equivariants": [
+        "point_coordinates",
         "object_pose"
       ],
       "expected_invariants": [
@@ -793,23 +833,23 @@
       ],
       "expected_disposition": "accept_with_equivariance",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_transform_composition_12",
+      "split_group": "3d_frame_graph_cycle_12",
       "negative_control": false
     },
     {
-      "case_id": "SFM001-12-M",
       "pair_id": "SFM001-12",
-      "pair_role": "mutation",
-      "task_family": "transform_composition",
+      "task_family": "frame_graph_cycle",
       "dimension": "3d",
-      "intervention_lane": "compatibility_adversary",
-      "transform_kind": "reverse_noncommuting_rotation_order",
-      "mutation_class": "convention_error",
+      "intervention_lane": "known_transform",
+      "case_id": "SFM001-12-M",
+      "pair_role": "mutation",
+      "transform_kind": "inconsistent_non_identity_cycle_edge",
+      "mutation_class": "cycle_closure",
       "candidate_inputs": [
         "source_frame_identity",
         "target_frame_identity",
         "explicit_transform",
-        "object_poses"
+        "frame_graph_edges"
       ],
       "expected_equivariants": [],
       "expected_invariants": [],
@@ -818,7 +858,7 @@
       ],
       "expected_disposition": "reject_invalid_transform",
       "evaluator_truth_sealed": true,
-      "split_group": "3d_transform_composition_12",
+      "split_group": "3d_frame_graph_cycle_12",
       "negative_control": true
     }
   ]
