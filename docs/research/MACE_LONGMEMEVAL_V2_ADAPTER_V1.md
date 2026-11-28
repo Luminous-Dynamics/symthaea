@@ -19,7 +19,7 @@ This design avoids modifying the official harness or changing its scoring. It al
 - Query input contains only run ID, opaque invocation ID, question-text digest and optional question-image digest.
 - Pre-query selection records ordered text/image item digests and the MACE use-time and source-lineage receipt digests associated with each item.
 - Final exposure must equal an ordered prefix of the pre-query selection, because the official harness truncates by prefix. Only surviving items receive exposed-evidence links.
-- The final receipt binds the exact post-truncation reader request digest and reader response digest, along with original/final token counts, budget and memory/post-hook latency.
+- The final receipt binds the exact post-truncation reader request digest, reader response digest, fixed reader-model digest and reader-generation-configuration digest, along with original/final token counts, budget and memory/post-hook latency.
 - Image item hashes must cover the image bytes used by the reader, not the filesystem path. The final reader-request hash should cover the fully serialized messages after image-to-data-URL conversion.
 
 No question IDs, question types, gold answers, expected outcomes or evaluator labels are present in the memory-query contract. The evaluator may map the opaque invocation ID back to its private question record after the run.
@@ -44,7 +44,7 @@ The LongMemEval-V2 harness currently truncates after the backend post-query hook
 
 ## Tests
 
-Twelve synthetic Rust tests cover insert order and duplicate trajectory rejection, privacy-minimized query fields, opaque invocation IDs, pre-query binding, exact-prefix exposure, truncation and token-budget consistency, missing reader request/response, omitted tail items, cross-domain insertion, and receipt tampering.
+Thirteen synthetic Rust tests cover insert order and duplicate trajectory rejection, privacy-minimized query fields, opaque invocation IDs, pre-query binding, exact-prefix exposure, truncation and token-budget consistency, missing reader request/response, omitted tail items, cross-domain insertion, identical context bytes from distinct evidence sources, reader configuration binding, and receipt tampering.
 
 ## Validation and claim boundary
 
