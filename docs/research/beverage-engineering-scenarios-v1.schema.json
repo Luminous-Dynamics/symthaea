@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/beverage-engineering-scenarios-v1.schema.json",
+  "title": "Beverage Engineering Synthetic Contract Fixtures",
+  "description": "Synthetic-only fixtures for intake and evaluation contract negative controls. This schema does not encode scientific validity or real process outcomes.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "benchmark",
+    "fixture_class",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "benchmark": {
+      "const": "BEVERAGE_ENGINEERING_BENCHMARK_V1"
+    },
+    "fixture_class": {
+      "const": "SYNTHETIC_CONTRACT_FIXTURES_ONLY"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "scenario": {
+      "type": "object",
+      "required": [
+        "scenario_id",
+        "description",
+        "synthetic",
+        "evidence_class",
+        "asserted_as_measured",
+        "data_integrity",
+        "rights_status",
+        "calibration_status",
+        "split_status",
+        "cutoff_status",
+        "domain_shift",
+        "hard_gate",
+        "expected_disposition"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "pattern": "^BEV-SYN-[0-9]{3}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 12
+        },
+        "synthetic": {
+          "const": true
+        },
+        "evidence_class": {
+          "enum": [
+            "MEASURED",
+            "MODELLED",
+            "SIMULATED",
+            "DECLARED",
+            "UNKNOWN"
+          ]
+        },
+        "asserted_as_measured": {
+          "type": "boolean"
+        },
+        "data_integrity": {
+          "enum": [
+            "valid",
+            "group_leakage",
+            "post_cutoff_feature",
+            "unit_inconsistent"
+          ]
+        },
+        "rights_status": {
+          "enum": [
+            "verified",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "calibration_status": {
+          "enum": [
+            "verified",
+            "missing",
+            "expired",
+            "unknown"
+          ]
+        },
+        "split_status": {
+          "enum": [
+            "batch_grouped",
+            "row_randomized",
+            "unknown"
+          ]
+        },
+        "cutoff_status": {
+          "enum": [
+            "pre_cutoff",
+            "post_cutoff_feature",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "domain_shift": {
+          "enum": [
+            "none",
+            "known_shift",
+            "unknown"
+          ]
+        },
+        "hard_gate": {
+          "enum": [
+            "clear",
+            "violated",
+            "unknown"
+          ]
+        },
+        "expected_disposition": {
+          "enum": [
+            "ELIGIBLE",
+            "REJECT",
+            "INDETERMINATE",
+            "ELIGIBLE_WITH_SHIFT_WARNING"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
