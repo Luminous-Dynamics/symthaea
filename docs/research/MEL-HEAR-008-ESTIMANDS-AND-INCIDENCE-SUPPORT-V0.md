@@ -9,7 +9,7 @@
 
 The same unbalanced observed panel can support several different descriptive means. It does **not** follow that those means estimate the same population quantity.
 
-This increment freezes the first research contract around a simple 3-work × 3-performer panel with seven observed cells. It deliberately contains no missing-cell imputation, no fitted random-effects model and no confidence interval. Its purpose is to make the weighting decision visible before any bootstrap or small-sample correction is compared.
+This increment freezes the first research contract around a complete 3-work × 3-performer incidence panel with seven observed cells and two explicitly `missing_not_sampled` cells. It deliberately contains no missing-cell imputation, no fitted random-effects model and no confidence interval. Its purpose is to make the weighting decision visible before any bootstrap or small-sample correction is compared.
 
 ## Why estimand-first matters
 
@@ -23,7 +23,7 @@ Consider the retained synthetic cell outcomes:
 | Work 2 | 1 | missing | 1 |
 | Work 3 | 0 | 1 | 1 |
 
-The bipartite incidence graph is connected, but two of nine product cells are not observed. Connectivity does not make the missing outcomes observed, nor does it license extrapolation.
+The bipartite incidence graph is connected, but two of nine product cells are explicitly marked `missing_not_sampled`. The supported descriptive estimands use only the seven observed outcomes. The uniform product target assigns 1/9 weight to each of all nine cells, including both missing cells, and is therefore not estimable without an explicit model/transport assumption. Connectivity does not make the missing outcomes observed, nor does it license extrapolation.
 
 ## Exact deterministic results
 
@@ -40,12 +40,12 @@ This is not a performance benchmark or an uncertainty result. It is an executabl
 
 The research directory contains a retained synthetic panel and a draft JSON Schema for the manifest shape.
 
-The contract records:
+The contract records all nine potential single-performer cells, including seven observed cells and two explicit not-sampled records. The contract records:
 - synthetic or digest-shaped work, performer, cell and session locators (never raw performer identities);
 - the work × performer incidence cells and observed/missing status;
 - performer membership weights for a cell, with the sum-to-one rule enforced by a future consumer;
 - distinct estimand kinds and explicit per-cell weights;
-- target work and performer marginals for the declared product-population estimand;
+- target work and performer marginals for the declared product-population estimand; the full target weight vector includes both missing cell records;
 - connected components, isolated nodes, and maximum row/column degree;
 - a fail-closed disposition when target cells are missing and extrapolation is not authorized.
 
