@@ -125,17 +125,19 @@ pub struct ReferenceEnvelopeReceipt {
     pub unconditional_false_alarm_bound: f64,
 }
 
-/// Independent-reference calibrated CMAQ-046 monitor.
+/// Common-conditional-mean martingale calibrated CMAQ-046 monitor.
 ///
 /// Required assumptions:
-/// - reference blocks are mutually independent draws from a single iid null
-///   distribution;
-/// - the test stream is independent of the reference and iid from that same
-///   distribution under the null;
-/// - every reference and test vector has L2 norm at most R.
+/// - reference increments are adapted to their filtration and have one fixed
+///   conditional mean mu at every reference step;
+/// - test increments, conditional on the full reference history and all prior
+///   test observations, have that same fixed conditional mean mu;
+/// - all reference and test vectors have L2 norm at most R.
 ///
-/// The hash fields are shape-checked only. They do not authenticate source
-/// identity or statistical independence.
+/// Independence and identical distribution are not required. This contract
+/// does not cover conditional-mean drift or serial dependence that changes
+/// the conditional mean. Hashes are shape-checked only; they do not
+/// authenticate provenance or establish the stochastic assumptions.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CalibratedReferenceApproachabilityMonitor {
     target: BoxTarget,
