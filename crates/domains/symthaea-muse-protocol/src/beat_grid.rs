@@ -976,11 +976,17 @@ mod tests {
         let mut report = report();
         report.hypotheses[0].pulse_anchors[0].beat_index =
             (MAX_SAFE_JSON_INTEGER as i64) + 1;
+        report.hypotheses[0].downbeat_anchors[0].beat_index =
+            (MAX_SAFE_JSON_INTEGER as i64) + 1;
         report.hypotheses[0].downbeat_anchors[0].bar_index =
+            (MAX_SAFE_JSON_INTEGER as i64) + 1;
+        report.hypotheses[0].meter_map[0].start_beat_index =
             (MAX_SAFE_JSON_INTEGER as i64) + 1;
         let found = codes(&report);
         assert!(found.contains(&BeatGridViolationCode::PulseBeatIndexExceedsJsonSafeInteger));
+        assert!(found.contains(&BeatGridViolationCode::DownbeatBeatIndexExceedsJsonSafeInteger));
         assert!(found.contains(&BeatGridViolationCode::DownbeatBarIndexExceedsJsonSafeInteger));
+        assert!(found.contains(&BeatGridViolationCode::MeterStartBeatExceedsJsonSafeInteger));
     }
 
     #[test]
