@@ -6,6 +6,7 @@ on:
       - "research/symthaea-gamebench-fep-adapter-v0-1/**"
       - "research/symthaea-gamebench-v0-1/**"
       - "crates/core/symthaea-core/**"
+      - "crates/core/symthaea-fep/**"
       - ".github/workflows/gamebench-fep-adapter-v0-1.yml"
   push:
     branches: [main]
