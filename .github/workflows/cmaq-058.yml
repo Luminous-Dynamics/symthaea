@@ -32,7 +32,7 @@ jobs:
       - name: Generate dependency lockfile
         run: cargo +1.100.0 generate-lockfile --manifest-path research/cmaq-058/Cargo.toml
       - name: Check formatting
-        run: cargo +1.100.0 fmt --manifest-path research/cmaq-058/Cargo.toml --all -- --check
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-058/Cargo.toml -- --check
       - name: Run deterministic tests
         run: cargo +1.100.0 test --manifest-path research/cmaq-058/Cargo.toml --locked
       - name: Strict Clippy
