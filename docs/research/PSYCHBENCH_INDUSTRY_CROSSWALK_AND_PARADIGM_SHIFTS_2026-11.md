@@ -19,10 +19,10 @@ The strategic opportunity is not that current industry benchmarks are useless. I
 |---|---|---|---|
 | **AwarenessBench (ACL 2026)** | Four dimensions—metacognition, self-awareness, social awareness, situational awareness—decomposed into 15 cognitive functions. | 14,381 samples; 18 language models; human comparison across 36 participants from three backgrounds. The paper reports that aggregate awareness can hide weaker metacognition and self-awareness. The human cohort is valuable but modest and should not be treated as population norms. | Reproduce compatible behavioural tasks; separate self-report from behaviour; publish a vector of function scores and uncertainty rather than one awareness scalar. |
 | **HumanBaseline (live 2026 collection)** | A versioned collection spanning 25 benchmark families and 129 items, with human distributions and selected published human references. | Approximately one third of items are held out; item versions are tied to the exact text shown; methodology uses partial credit and item-response theory and aims to report percentile distributions. Its AI markers often come from lab-reported results under different harnesses and time limits, so these are not automatically matched comparisons. | Adopt randomized forms, held-out variants, item-level response records and distributional human comparisons. Run AI in the same browser/time-limit setting and separately through APIs; do not mix the two. |
-| **MetaBound** | Knowledge-boundary detection on false-premise or unanswerable questions. | HumanBaseline currently reports a wide spread between the best and worst published AI outcomes; the benchmark is sensitive to prompt and model configuration. | Test whether an agent knows when a premise is invalid, requests provenance, or declines to invent an answer. |
+| **MetaBound** | Knowledge-boundary detection on false-premise or unanswerable questions. | HumanBaseline's current mirrored page reports 100% false-premise detection for the best published model versus 0% for the worst; its mirror has seven items, so this is an illustrative task-specific spread, not a stable population ranking. | Test whether an agent knows when a premise is invalid, requests provenance, or declines to invent an answer. |
 | **GAUGE** | Metacognitive action: bet or fold after solving, exposing whether confidence changes behaviour. | HumanBaseline reports that its most accurate published model did not fold in 270 problems. Accuracy alone therefore does not establish calibrated decision-making. | Add selective-prediction scoring: answer, abstain, request information, counterfactual correctness, risk/coverage and decision cost. |
-| **Turn Bench** | Adaptation after a rule changes without warning. | Current HumanBaseline page reports 80% for the best published re-adaptation result in the benchmark's mirrored comparison; this is a task-specific figure, not a universal executive-function estimate. | Measure change-point detection, adaptation latency, post-shift regret, perseveration and recovery. |
-| **LearningBench / EphLangBench** | Learning a hidden grammar/rule or adapting to an unfamiliar language-like system from examples. | Published AI results are available, but HumanBaseline explicitly distinguishes general-faculty human references from human results on the exact same task. | Track learning curves, examples-to-criterion, held-out generalization and transfer—not only final accuracy. |
+| **Turn Bench** | Adaptation after a rule changes without warning. | Current HumanBaseline page reports 80% for the best published re-adaptation result and 42% for Claude Opus 4.6 in the cited comparison; this is task-specific, not a universal executive-function estimate. | Measure change-point detection, adaptation latency, post-shift regret, perseveration and recovery. |
+| **LearningBench / EphLangBench** | Learning a hidden grammar/rule or adapting to an unfamiliar language-like system from examples. | HumanBaseline reports a best published LearningBench AI score of 0.85 and 11 of 14 compared models below 0.50; the roughly 60% human reference is drawn from classic artificial-grammar studies, not the same LearningBench administration. | Track learning curves, examples-to-criterion, held-out generalization and transfer—not only final accuracy. |
 
 ### 1.2 Interactive and agentic comparators
 
@@ -38,6 +38,19 @@ The strategic opportunity is not that current industry benchmarks are useless. I
 A 2026 systematic review of 15 major agent benchmarks reports, for its selected corpus, that safety/security and cost-efficiency were absent from primary scoring in all 15, while 13/15 relied exclusively on binary success metrics. These are scoped findings about the review's inclusion set, not a universal census of every benchmark.
 
 This is a useful design opening for PsychBench: make safety, trajectory integrity, recovery and measured resource use first-class outputs. A high task score should not compensate for an unauthorized action or an unreplayable evidence record.
+
+### 1.4 Dated industry leaderboard snapshots and evidence quality
+
+These are dated, third-party or provider-reported snapshots as of the review date, not independent head-to-head results by this project.
+
+| Benchmark | Public snapshot | Evidence quality and interpretation |
+|---|---|---|
+| **OSWorld-Verified** | A November 23, 2026 aggregator snapshot lists Qwen3.8 Max at 86.1%. | The same snapshot reports 34 of 36 rows as lab-reported and only 2 benchmark-run. Treat the top score as a provider-reported result until independently reproduced. OSWorld-Verified and OSWorld 2.0 are separate protocols. |
+| **SWE-bench Verified** | A November 28, 2026 fixed bash-only mini-SWE-agent snapshot lists Claude Opus 4.5 (high) at 76.8%. | SWE-bench Verified is a human-screened 500-issue subset. The official project provides a minimal bash-only mini-SWE-agent leaderboard specifically to make model comparisons more controlled; richer harnesses can materially change scores. Keep fixed-harness and any-scaffold tables separate. |
+| **Terminal-Bench** | A November 28 aggregator snapshot lists Copilot Fusion (max) at 71.2% on Terminal-Bench 4.1. Another board reports 84.7% on Terminal-Bench 2.0. | These are different task-set versions and different leaderboard methodologies; do not compare the percentages or infer a simple improvement. Prefer a fixed version/harness, or report each separately. |
+| **ARC-AGI-3** | ARC Prize says the 2026 competition has concluded and final results will be announced 2026-12-04. | On 2026-11-28, public standings are not the final result. Epoch AI's October review flags version, elicitation and score-interpretation concerns. Report exact harness and version, and include sensitivity analyses. |
+
+The broader lesson is that **benchmark performance is conditional on the task set, agent scaffold, memory/reasoning retention, tool permissions, cost accounting and result provenance**. PsychBench comparisons should show those dimensions as metadata, not bury them in footnotes.
 
 ## 2. Paradigm shifts for PsychBench
 
@@ -164,6 +177,11 @@ Only the last three stages support strong claims about robust cognitive capabili
 - HumanBaseline, MetaBound. https://www.humanbaseline.org/benchmarks/metabound/
 - HumanBaseline, GAUGE. https://www.humanbaseline.org/benchmarks/gauge/
 - HumanBaseline, Turn Bench. https://www.humanbaseline.org/benchmarks/turnbench/
+- OSWorld-Verified aggregator snapshot (updated 2026-11-23; explicitly records provider-reporting status). https://benchlm.ai/benchmarks/osworld-verified
+- SWE-bench Verified official methodology and fixed mini-SWE-agent harness. https://www.swebench.com/verified
+- SWE-bench Verified fixed bash-only snapshot (2026-11-28). https://www.benchleader.com/benchmarks/swe_bench_verified
+- Terminal-Bench 4.1 November 2026 snapshot and harness-mixing caveat. https://www.benchleader.com/benchmarks/terminal_bench
+- Terminal-Bench 2.0 November 2026 snapshot; separate task-set version. https://llmbenchmark.ai/benchmarks/terminal-bench-2-0
 - HumanBaseline, LearningBench. https://www.humanbaseline.org/benchmarks/learningbench/
 - ARC Prize, ARC-AGI-3 and official 2026 result notice. https://arcprize.org/arc-agi/3 ; https://arcprize.org/leaderboard
 - Epoch AI, *ARC-AGI-3 Benchmark Review* (2026-10-30). https://epoch.ai/benchmarks/arc-agi-3/review
