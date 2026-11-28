@@ -415,7 +415,7 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
 
         let pulse_indexes: BTreeSet<i64> = hypothesis
             .pulse_anchors
-.            iter()
+            .iter()
             .map(|anchor| anchor.beat_index)
             .collect();
         let mut previous_meter_start = None;
@@ -480,7 +480,7 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
 fn is_lowercase_sha256(value: &str) -> bool {
     value.len() == 64
         && value
-            bytes()
+            .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
