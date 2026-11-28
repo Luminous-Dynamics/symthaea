@@ -14,3 +14,6 @@ serde_json_canonicalizer = "=0.3.2"
 sha2 = "0.10"
 ed25519-dalek = "=2.1.0"
 redb = "=5.0.0"
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "tokio"] }
+tokio = { version = "=1.54.1", features = ["rt-multi-thread", "macros", "net", "signal", "sync"] }
+subtle = "=2.6.1"

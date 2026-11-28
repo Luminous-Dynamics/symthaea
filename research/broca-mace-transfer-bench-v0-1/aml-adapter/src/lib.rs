@@ -21,6 +21,7 @@ pub mod mace_context_exposure_receipt;
 pub mod mace_context_exposure_capture;
 pub mod durable_service;
 pub mod redb_store;
+pub mod http_service;
 
 // Copyright (C) 2026 Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -34,9 +35,11 @@ pub mod redb_store;
 
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+/// Formal external evaluations use a maximum of 100 Search results per track.
 pub const FORMAL_TOP_K: usize = 100;
 pub const TEXTUAL_MAX_MESSAGES: usize = 20;
 pub const TEXTUAL_MAX_WORDS: usize = 2_000;
@@ -51,7 +54,7 @@ pub enum Track {
     Multimodal,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Role {
     User,
     Assistant,
@@ -367,7 +370,10 @@ pub fn validate_search_request_for_track(
     track: Track,
     request: &SearchRequest,
 ) -> Result<(), AmlReject> {
-    validate_search_request(request)?;
+    validate_search_request_common(request)?;
+    if request.top_k > FORMAL_TOP_K {
+        return Err(AmlReject::InvalidTopK);
+    }
     if track != Track::Multimodal
         && !matches!(&request.query, MessageContent::Text(_))
     {
@@ -779,11 +785,11 @@ impl AddIdempotencyLedger {
     }
 }
 
-pub fn validate_search_request(request: &SearchRequest) -> Result<(), AmlReject> {
+fn validate_search_request_common(request: &SearchRequest) -> Result<(), AmlReject> {
     if request.user_id.trim().is_empty() {
         return Err(AmlReject::EmptySearchUserId);
     }
-    if request.top_k == 0 || request.top_k > FORMAL_TOP_K {
+    if request.top_k == 0 {
         return Err(AmlReject::InvalidTopK);
     }
     match &request.query {
@@ -802,6 +808,16 @@ pub fn validate_search_request(request: &SearchRequest) -> Result<(), AmlReject>
         if options.iter().any(|option| option.trim().is_empty()) {
             return Err(AmlReject::EmptyOption);
         }
+    }
+    Ok(())
+}
+
+/// Legacy/default Search validation uses the Textual/Multimodal ceiling.
+/// Call validate_search_request_for_track for a track-aware contract.
+pub fn validate_search_request(request: &SearchRequest) -> Result<(), AmlReject> {
+    validate_search_request_common(request)?;
+    if request.top_k > FORMAL_TOP_K {
+        return Err(AmlReject::InvalidTopK);
     }
     Ok(())
 }
@@ -1541,6 +1557,26 @@ mod tests {
         );
         response.data.truncate(1);
         assert_eq!(validate_search_response(&request, &response), Ok(()));
+    }
+
+    #[test]
+    fn formal_search_top_k_is_capped_at_one_hundred_for_every_track() {
+        for track in [Track::Textual, Track::Coding, Track::Multimodal] {
+            let valid = SearchRequest {
+                query: MessageContent::Text("query".into()),
+                options: None,
+                user_id: "user".into(),
+                top_k: FORMAL_TOP_K,
+            };
+            assert_eq!(validate_search_request_for_track(track, &valid), Ok(()));
+
+            let mut over_limit = valid;
+            over_limit.top_k = FORMAL_TOP_K + 1;
+            assert_eq!(
+                validate_search_request_for_track(track, &over_limit),
+                Err(AmlReject::InvalidTopK)
+            );
+        }
     }
 
     #[test]

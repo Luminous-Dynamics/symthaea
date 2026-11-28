@@ -58,8 +58,11 @@ pub enum DurableAddReconciliationV1 {
 pub struct DurableMemoryRecordV1 {
     pub id: String,
     pub user_id: String,
+    pub session_id: String,
     pub origin_request_id: String,
     pub source_request_payload_digest: String,
+    pub role: super::Role,
+    pub timestamp_ms: Option<i64>,
     pub content: MessageContent,
 }
 
@@ -302,8 +305,7 @@ where
             .map_err(map_store_error)?;
         verify_visible_records(
             track,
-            &request.user_id,
-            &request.request_id,
+            request,
             verified.request_payload_digest(),
             verified.visible_memory_ids(),
             &records,
@@ -329,13 +331,18 @@ fn map_store_error(error: DurableStoreErrorV1) -> DurableAmlServiceErrorV1 {
 
 fn verify_visible_records(
     track: Track,
-    expected_user_id: &str,
-    expected_request_id: &str,
+    request: &AddRequest,
     expected_payload_digest: &str,
     expected_ids: &[String],
     records: &[DurableMemoryRecordV1],
 ) -> Result<(), DurableAmlServiceErrorV1> {
-    if expected_ids.is_empty() || records.len() != expected_ids.len() {
+    // The first durable backend stores one searchable record per source
+    // message. Require exact ordered correspondence; a future chunking
+    // backend must publish an explicit source-message mapping contract.
+    if expected_ids.is_empty()
+        || expected_ids.len() != request.messages.len()
+        || records.len() != expected_ids.len()
+    {
         return Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch);
     }
     let expected: BTreeSet<&str> = expected_ids.iter().map(String::as_str).collect();
@@ -343,24 +350,38 @@ fn verify_visible_records(
         return Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch);
     }
 
-    let mut found = BTreeMap::<&str, usize>::new();
+    let mut by_id = BTreeMap::<&str, &DurableMemoryRecordV1>::new();
     let mut total_image_bytes = 0usize;
     for record in records {
-        if record.user_id != expected_user_id
-            || record.origin_request_id != expected_request_id
+        if record.user_id != request.user_id
+            || record.session_id != request.session_id
+            || record.origin_request_id != request.request_id
             || record.source_request_payload_digest != expected_payload_digest
             || !expected.contains(record.id.as_str())
+            || by_id.insert(record.id.as_str(), record).is_some()
         {
-            return Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch);
-        }
-        if found.insert(record.id.as_str(), 1).is_some() {
             return Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch);
         }
         let image_bytes = super::validate_content(track, &record.content)
             .map_err(DurableAmlServiceErrorV1::Contract)?;
         total_image_bytes = total_image_bytes.saturating_add(image_bytes);
     }
-    if found.len() != expected.len()
+
+    // The receipt's ordered ID list maps back to the exact ordered Add
+    // messages. Revalidate role, source timestamp and content after read-back.
+    for (memory_id, message) in expected_ids.iter().zip(&request.messages) {
+        let Some(record) = by_id.get(memory_id.as_str()) else {
+            return Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch);
+        };
+        if record.role != message.role
+            || record.timestamp_ms != message.timestamp_ms
+            || record.content != message.content
+        {
+            return Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch);
+        }
+    }
+
+    if by_id.len() != expected.len()
         || (track == Track::Multimodal && total_image_bytes > MAX_SEARCH_RESPONSE_IMAGE_BYTES)
     {
         return Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch);
@@ -438,6 +459,7 @@ mod tests {
         unknown_reconcile: bool,
         hide_visibility: bool,
         inject_cross_user_search_result: bool,
+        tamper_source_metadata: bool,
         fail_write_before_commit: bool,
     }
 
@@ -460,8 +482,11 @@ mod tests {
                 .map(|(index, message)| DurableMemoryRecordV1 {
                     id: format!("{}:{}:{index}", request.user_id, request.request_id),
                     user_id: request.user_id.clone(),
+                    session_id: request.session_id.clone(),
                     origin_request_id: request.request_id.clone(),
                     source_request_payload_digest: add_payload_digest(key.track, request),
+                    role: message.role,
+                    timestamp_ms: message.timestamp_ms,
                     content: message.content.clone(),
                 })
                 .collect();
@@ -576,12 +601,18 @@ mod tests {
                 return Ok(Vec::new());
             }
             let wanted: BTreeSet<&str> = memory_ids.iter().map(String::as_str).collect();
-            Ok(self
+            let mut records: Vec<DurableMemoryRecordV1> = self
                 .visible
                 .iter()
                 .filter(|record| record.user_id == user_id && wanted.contains(record.id.as_str()))
                 .cloned()
-                .collect())
+                .collect();
+            if self.tamper_source_metadata {
+                if let Some(record) = records.first_mut() {
+                    record.timestamp_ms = Some(record.timestamp_ms.unwrap_or_default().saturating_add(1));
+                }
+            }
+            Ok(records)
         }
 
         fn release_uncommitted_add(
@@ -752,6 +783,19 @@ mod tests {
             service.add(Track::Textual, &request),
             Err(DurableAmlServiceErrorV1::CommitOutcomeUnknown)
         );
+    }
+
+    #[test]
+    fn changed_source_timestamp_blocks_success_acknowledgement() {
+        let mut store = FakeDurableStore::default();
+        store.tamper_source_metadata = true;
+        let mut service = service(store);
+        let request = add_request("durable-source-metadata", "user-a", "source timestamp matters");
+        assert_eq!(
+            service.add(Track::Textual, &request),
+            Err(DurableAmlServiceErrorV1::SearchVisibilityMismatch)
+        );
+        assert!(service.store.entries.values().all(|entry| !entry.finalized));
     }
 
     #[test]
