@@ -110,7 +110,7 @@ impl PredictableAuditSelection {
 /// Custodian-private receipt. Do not send this object or its selected flags to
 /// the candidate researcher; its purpose is post-prediction audit execution
 /// and independent evaluation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PredictableAuditReceipt {
     pub receipt_version: String,
     pub design_id: String,
@@ -381,11 +381,33 @@ pub fn build_predictable_audit_receipt(
         selected_fraction: selected_count as f64 / events.len() as f64,
         selections,
         limitations: vec![
-            "Random words are supplied by an external custodian; this module does not generate entropy or authenticate the random stream.".to_owned(),
-            "The q-policy and its dependence on the committed pre-label history must be audited externally; the receipt cannot prove predictability.".to_owned(),
-            "Selection is a request for an independent label. Selected-label nonresponse is a separate observation mechanism and invalidates direct use of q_t unless modelled.".to_owned(),
-            "The candidate must not receive selected status or the random stream before its predictions are frozen.".to_owned(),
-            "This is an independent Bernoulli-per-event audit design, not fixed-quota SRSWOR. q_t may be history-adaptive; cross-event inclusion probabilities are not summarized by a simple product when q_t depends on prior observations.".to_owned(),
+            concat!(
+                "Random words are supplied by an external custodian; this module does ",
+                "not generate entropy or authenticate the random stream."
+            )
+            .to_owned(),
+            concat!(
+                "The q-policy and its dependence on the committed pre-label history ",
+                "must be audited externally; the receipt cannot prove predictability."
+            )
+            .to_owned(),
+            concat!(
+                "Selection is a request for an independent label. Selected-label ",
+                "nonresponse is a separate observation mechanism and invalidates direct ",
+                "use of q_t unless modelled."
+            )
+            .to_owned(),
+            concat!(
+                "The candidate must not receive selected status or the random stream ",
+                "before its predictions are frozen."
+            )
+            .to_owned(),
+            concat!(
+                "This is an independent Bernoulli-per-event audit design, not fixed-quota ",
+                "SRSWOR. q_t may be history-adaptive; cross-event inclusion probabilities ",
+                "are not summarized by a simple product when q_t depends on prior observations."
+            )
+            .to_owned(),
         ],
     })
 }
@@ -625,7 +647,13 @@ mod tests {
             event(1, 3_u128 << 62, 0),
             event(2, 1_u128 << 62, 0),
         ];
-        let receipt = build_predictable_audit_receipt(&events, &design()).unwrap();
+        let low_floor_design = PredictableAuditDesign {
+            minimum_inclusion_probability: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+            ..design()
+        };
+        let receipt = build_predictable_audit_receipt(&events, &low_floor_design).unwrap();
         assert_eq!(
             receipt
                 .selections
