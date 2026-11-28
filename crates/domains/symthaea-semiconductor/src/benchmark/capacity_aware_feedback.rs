@@ -210,6 +210,7 @@ pub struct CaOcrcEngineV1 {
     pub next_round: u64,
     pub current_round: Option<u64>,
     pub tracked_rounds: BTreeMap<u64, CaOcrcTrackedRoundV1>,
+    pub accepted_label_revisions: std::collections::BTreeSet<String>,
     pub guarantee_state: CaOcrcGuaranteeStateV1,
     pub suspension_reasons: Vec<String>,
     pub capacity_saturation_count: u64,
@@ -357,6 +358,7 @@ pub fn create_ca_ocrc_engine_v1(
         next_round: 0,
         current_round: None,
         tracked_rounds: BTreeMap::new(),
+        accepted_label_revisions: std::collections::BTreeSet::new(),
         guarantee_state: CaOcrcGuaranteeStateV1::ActiveUnderBoundedDelayAndUnderload,
         suspension_reasons: Vec::new(),
         capacity_saturation_count: 0,
@@ -519,6 +521,33 @@ pub fn receive_ca_ocrc_feedback_v1(
     }
     let current = engine.current_round.ok_or_else(|| CaOcrcErrorV1("no CA-OCRC round is active".into()))?;
     let before = engine.threshold;
+    let revision_key = format!("{}:{}", feedback.label_id, feedback.label_revision);
+    if engine.accepted_label_revisions.contains(&revision_key) {
+        let mut receipt = CaOcrcFeedbackReceiptV1 {
+            schema: CA_OCRC_UPDATE_RECEIPT_SCHEMA_V1.into(),
+            engine_id: engine.engine_id.clone(),
+            origin_round: feedback.origin_round,
+            current_round: feedback.current_round,
+            label_id: feedback.label_id.clone(),
+            label_revision: feedback.label_revision,
+            disposition: CaOcrcTrackingDispositionV1::FeedbackNotTracked,
+            reasons: Vec::new(),
+            observed_loss: None,
+            proxy_survival_probability: None,
+            inverse_probability_weight: None,
+            threshold_before: before,
+            threshold_after: before,
+            active_tracking_count: engine.tracked_rounds.len(),
+            guarantee_state_before: engine.guarantee_state,
+            guarantee_state_after: engine.guarantee_state,
+            threshold_mutated: false,
+            physical_source_authenticity_proven: false,
+            equipment_control_authority: false,
+            receipt_sha256: String::new(),
+        };
+        receipt.receipt_sha256 = feedback_digest(&receipt)?;
+        return Ok(receipt);
+    }
     let guarantee_before = engine.guarantee_state;
     let tracked = engine.tracked_rounds.get(&feedback.origin_round).cloned();
     let mut reasons = Vec::new();
@@ -595,7 +624,9 @@ pub fn receive_ca_ocrc_feedback_v1(
     }
     if !feedback.label_value.is_finite()
         || !report.qualified_corrected_value.is_finite()
-        || report.qualified_standard_uncertainty_upper_bound.is_none()
+        || report.qualified_standard_uncertainty_upper_bound
+            .is_none_or(|value| !value.is_finite() || value < 0.0)
+        || feedback.label_revision == 0
     {
         reasons.push(CaOcrcReasonV1::ReportNumericValueInvalid);
     }
@@ -727,6 +758,7 @@ pub fn receive_ca_ocrc_feedback_v1(
     };
     receipt.receipt_sha256 = feedback_digest(&receipt)?;
     engine.threshold = after;
+    engine.accepted_label_revisions.insert(revision_key);
     engine.tracked_rounds.remove(&feedback.origin_round);
     Ok(receipt)
 }
@@ -895,6 +927,7 @@ mod tests {
     #[test]
     fn known_empty_and_full_sets_apply_immediate_known_loss_without_tracking() {
         let mut engine = create_ca_ocrc_engine_v1("e", "fab-clock", policy(2, 4, 0.50)).unwrap();
+        engine.threshold = -0.01;
         let mut empty = round(0, 0.0);
         empty.prediction_kind = CaOcrcPredictionKindV1::KnownEmpty;
         empty.lower_bound = None; empty.upper_bound = None;
@@ -902,6 +935,7 @@ mod tests {
         assert_eq!(decision.immediate_loss, Some(1.0));
         assert_eq!(decision.threshold_after_round, 0.5 + 0.1 * 0.95);
 
+        engine.threshold = 1.01;
         let mut full = round(1, 0.0);
         full.prediction_kind = CaOcrcPredictionKindV1::KnownFull;
         full.lower_bound = None; full.upper_bound = None;
@@ -924,8 +958,15 @@ mod tests {
 
     #[test]
     fn capacity_full_round_is_not_admitted_and_feedback_is_not_used() {
-        let mut engine = create_ca_ocrc_engine_v1("e", "fab-clock", policy(1, 4, 0.50)).unwrap_err();
-        let _ = &mut engine;
+        let mut engine = create_ca_ocrc_engine_v1("e", "fab-clock", policy(1, 4, 0.25)).unwrap();
+        let first = start_ca_ocrc_round_v1(&mut engine, &round(0, 0.9)).unwrap();
+        assert!(first.admitted);
+        let second = start_ca_ocrc_round_v1(&mut engine, &round(1, 0.9)).unwrap();
+        assert!(!second.admitted);
+        assert_eq!(engine.capacity_saturation_count, 1);
+        let result = receive_ca_ocrc_feedback_v1(&mut engine, &feedback(1, 2, 0.5)).unwrap();
+        assert_eq!(result.disposition, CaOcrcTrackingDispositionV1::FeedbackNotTracked);
+        assert_eq!(engine.threshold, 0.5);
     }
 
     #[test]
