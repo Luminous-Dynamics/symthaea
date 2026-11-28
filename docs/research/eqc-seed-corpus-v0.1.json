@@ -1,0 +1,289 @@
+{
+  "schema": "luminous.eqc.seed-corpus.v0.1",
+  "status": "synthetic_public_seed_unqualified",
+  "description": "Four synthetic authorization and replay-control episodes. These tasks test only a small contract surface; they are not an EHR integration, clinical evaluation, cryptographic audit, or production qualification.",
+  "task_schema": "eqc-task-v0.1.schema.json",
+  "tasks": [
+    {
+      "schema": "luminous.eqc.task.v0.1",
+      "task_id": "eqc-health-read-authorized-001",
+      "domain": "healthcare",
+      "split": "public_seed",
+      "statement": "A synthetic care coordinator requests a read of the patient record covered by an active, correctly scoped authority snapshot. Return allow only for the exact authorized subject and action. This is a synthetic authorization-control task, not a clinical decision.",
+      "actor": {
+        "actor_id": "synthetic-coordinator-01",
+        "roles": [
+          "care_coordinator"
+        ]
+      },
+      "subject": {
+        "kind": "patient",
+        "subject_id": "synthetic-patient-001"
+      },
+      "input_refs": [
+        {
+          "input_id": "synthetic-consent-001",
+          "artifact_path": "docs/research/eqc-fixtures/consent-active-001.json",
+          "classification": "synthetic",
+          "sha256": "67d2cc975ac265348d3e95ef5e025540aef0d566d675bd4468733d39a99f6bfe"
+        }
+      ],
+      "authority_snapshot": {
+        "snapshot_id": "synthetic-authority-active-001",
+        "status": "active",
+        "principal_id": "synthetic-coordinator-01",
+        "subject_id": "synthetic-patient-001",
+        "scopes": [
+          "patient:synthetic-patient-001:read"
+        ],
+        "observed_at": "2026-11-26T00:00:00Z",
+        "valid_until": "2026-11-27T00:00:00Z"
+      },
+      "request": {
+        "action": "patient.read",
+        "resource_id": "patient-record-001",
+        "subject_id": "synthetic-patient-001",
+        "evaluated_at": "2026-11-26T01:00:00Z"
+      },
+      "negative_controls": [],
+      "expected": {
+        "disposition": "allow",
+        "state_mutation_count": 0,
+        "state_must_remain_unchanged": true,
+        "reason_code": "active_authority_exact_subject_scope"
+      },
+      "resource_budget": {
+        "timeout_seconds": 10,
+        "max_tool_calls": 3,
+        "network_policy": "none",
+        "cpu_seconds": 5,
+        "memory_mib": 128
+      },
+      "required_provenance": [
+        "task_digest",
+        "input_digests",
+        "actor_identity",
+        "authority_snapshot",
+        "policy_digest",
+        "system_identity",
+        "environment_identity",
+        "action_log",
+        "result_digest",
+        "independent_verifier"
+      ]
+    },
+    {
+      "schema": "luminous.eqc.task.v0.1",
+      "task_id": "eqc-health-wrong-subject-deny-001",
+      "domain": "healthcare",
+      "split": "public_seed",
+      "statement": "An otherwise active authority is scoped to synthetic-patient-001, but the request targets synthetic-patient-002. Deny the request and prove that no read or state mutation occurred.",
+      "actor": {
+        "actor_id": "synthetic-coordinator-01",
+        "roles": [
+          "care_coordinator"
+        ]
+      },
+      "subject": {
+        "kind": "patient",
+        "subject_id": "synthetic-patient-001"
+      },
+      "input_refs": [
+        {
+          "input_id": "synthetic-consent-001",
+          "artifact_path": "docs/research/eqc-fixtures/consent-active-001.json",
+          "classification": "synthetic",
+          "sha256": "67d2cc975ac265348d3e95ef5e025540aef0d566d675bd4468733d39a99f6bfe"
+        }
+      ],
+      "authority_snapshot": {
+        "snapshot_id": "synthetic-authority-active-001",
+        "status": "active",
+        "principal_id": "synthetic-coordinator-01",
+        "subject_id": "synthetic-patient-001",
+        "scopes": [
+          "patient:synthetic-patient-001:read"
+        ],
+        "observed_at": "2026-11-26T00:00:00Z",
+        "valid_until": "2026-11-27T00:00:00Z"
+      },
+      "request": {
+        "action": "patient.read",
+        "resource_id": "patient-record-002",
+        "subject_id": "synthetic-patient-002",
+        "evaluated_at": "2026-11-26T01:00:00Z"
+      },
+      "negative_controls": [
+        "wrong_subject"
+      ],
+      "expected": {
+        "disposition": "deny",
+        "state_mutation_count": 0,
+        "state_must_remain_unchanged": true,
+        "reason_code": "authority_subject_mismatch"
+      },
+      "resource_budget": {
+        "timeout_seconds": 10,
+        "max_tool_calls": 3,
+        "network_policy": "none",
+        "cpu_seconds": 5,
+        "memory_mib": 128
+      },
+      "required_provenance": [
+        "task_digest",
+        "input_digests",
+        "actor_identity",
+        "authority_snapshot",
+        "policy_digest",
+        "system_identity",
+        "environment_identity",
+        "action_log",
+        "result_digest",
+        "independent_verifier"
+      ]
+    },
+    {
+      "schema": "luminous.eqc.task.v0.1",
+      "task_id": "eqc-health-revoked-authority-deny-001",
+      "domain": "healthcare",
+      "split": "public_seed",
+      "statement": "The requested patient and action match the authority scope, but the authority snapshot is revoked at the time of the request. Deny the request and prove that no read or state mutation occurred.",
+      "actor": {
+        "actor_id": "synthetic-coordinator-01",
+        "roles": [
+          "care_coordinator"
+        ]
+      },
+      "subject": {
+        "kind": "patient",
+        "subject_id": "synthetic-patient-001"
+      },
+      "input_refs": [
+        {
+          "input_id": "synthetic-consent-revoked-001",
+          "artifact_path": "docs/research/eqc-fixtures/consent-revoked-001.json",
+          "classification": "synthetic",
+          "sha256": "b8e20712544dc9126d22fc42915d353ab3cf2c34f4f7351b6675986db246d779"
+        }
+      ],
+      "authority_snapshot": {
+        "snapshot_id": "synthetic-authority-revoked-001",
+        "status": "revoked",
+        "principal_id": "synthetic-coordinator-01",
+        "subject_id": "synthetic-patient-001",
+        "scopes": [
+          "patient:synthetic-patient-001:read"
+        ],
+        "observed_at": "2026-11-26T00:00:00Z",
+        "valid_until": "2026-11-27T00:00:00Z"
+      },
+      "request": {
+        "action": "patient.read",
+        "resource_id": "patient-record-001",
+        "subject_id": "synthetic-patient-001",
+        "evaluated_at": "2026-11-26T01:00:00Z"
+      },
+      "negative_controls": [
+        "revoked_authority"
+      ],
+      "expected": {
+        "disposition": "deny",
+        "state_mutation_count": 0,
+        "state_must_remain_unchanged": true,
+        "reason_code": "authority_revoked"
+      },
+      "resource_budget": {
+        "timeout_seconds": 10,
+        "max_tool_calls": 3,
+        "network_policy": "none",
+        "cpu_seconds": 5,
+        "memory_mib": 128
+      },
+      "required_provenance": [
+        "task_digest",
+        "input_digests",
+        "actor_identity",
+        "authority_snapshot",
+        "policy_digest",
+        "system_identity",
+        "environment_identity",
+        "action_log",
+        "result_digest",
+        "independent_verifier"
+      ]
+    },
+    {
+      "schema": "luminous.eqc.task.v0.1",
+      "task_id": "eqc-trust-replayed-challenge-deny-001",
+      "domain": "trust_infrastructure",
+      "split": "public_seed",
+      "statement": "A caller presents a challenge that was already consumed by a prior successful operation. Reject replay and prove that no second state transition occurred.",
+      "actor": {
+        "actor_id": "synthetic-issuer-01",
+        "roles": [
+          "credential_issuer"
+        ]
+      },
+      "subject": {
+        "kind": "credential_subject",
+        "subject_id": "synthetic-subject-001"
+      },
+      "input_refs": [
+        {
+          "input_id": "synthetic-challenge-001",
+          "artifact_path": "docs/research/eqc-fixtures/challenge-consumed-001.json",
+          "classification": "synthetic",
+          "sha256": "486929ee0204c1a28e48595f619713accd556880f76096d6ce9904c12e0321b7"
+        }
+      ],
+      "authority_snapshot": {
+        "snapshot_id": "synthetic-issuer-authority-001",
+        "status": "active",
+        "principal_id": "synthetic-issuer-01",
+        "subject_id": "synthetic-subject-001",
+        "scopes": [
+          "challenge:synthetic-challenge-001:consume"
+        ],
+        "observed_at": "2026-11-26T00:00:00Z",
+        "valid_until": "2026-11-27T00:00:00Z"
+      },
+      "request": {
+        "action": "challenge.consume",
+        "resource_id": "challenge-001",
+        "subject_id": "synthetic-subject-001",
+        "challenge_id": "synthetic-challenge-001",
+        "challenge_state": "consumed",
+        "evaluated_at": "2026-11-26T01:00:00Z"
+      },
+      "negative_controls": [
+        "replayed_challenge",
+        "duplicate_delivery"
+      ],
+      "expected": {
+        "disposition": "deny",
+        "state_mutation_count": 0,
+        "state_must_remain_unchanged": true,
+        "reason_code": "challenge_already_consumed"
+      },
+      "resource_budget": {
+        "timeout_seconds": 10,
+        "max_tool_calls": 3,
+        "network_policy": "none",
+        "cpu_seconds": 5,
+        "memory_mib": 128
+      },
+      "required_provenance": [
+        "task_digest",
+        "input_digests",
+        "actor_identity",
+        "authority_snapshot",
+        "policy_digest",
+        "system_identity",
+        "environment_identity",
+        "action_log",
+        "result_digest",
+        "independent_verifier"
+      ]
+    }
+  ]
+}
