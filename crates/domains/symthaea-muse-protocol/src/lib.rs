@@ -34,6 +34,8 @@
 /// `MUSE_152_STYLE_CATALOG_2026-07-18.md` described the registry as
 /// shipped. Declaring it is step 4a of making that document true.
 pub mod catalog;
+/// Audio-derived pulse and beat-grid hypotheses (MEL-DJ-007).
+pub mod beat_grid;
 
 use serde::{Deserialize, Serialize};
 
