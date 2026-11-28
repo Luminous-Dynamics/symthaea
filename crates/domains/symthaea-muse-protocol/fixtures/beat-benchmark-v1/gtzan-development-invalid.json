@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "suite_id": "mel-dj-007-known-answer",
+  "protocol_id": "mirex-2026-audio-beat-tracking",
+  "manifest_revision": "manifest-v1",
+  "tracks": [
+    {
+      "track_id": "gtzan-0001",
+      "dataset_id": "gtzan",
+      "dataset_revision": "MIREX-2026-locked-test",
+      "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_master_family_id": "master-gtzan-0001",
+      "split": "development",
+      "purpose": "model_selection",
+      "rights_status": "approved",
+      "rights_reference": "https://example.org/rights/gtzan-test-record-1",
+      "annotation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "annotation_provenance": "human_adjudicated",
+      "annotation_revision": "mirex-2026-v1",
+      "overlap_audit": "clear",
+      "sample_rate_hz": 44100,
+      "channels": 1,
+      "total_frames": 100000,
+      "valid_segments": [
+        {
+          "start_frame": 0,
+          "end_frame": 100000
+        }
+      ],
+      "beat_frames": [
+        0,
+        22050,
+        44100,
+        66150,
+        88200
+      ],
+      "downbeat_annotations_available": true,
+      "downbeat_frames": [
+        0,
+        44100,
+        88200
+      ]
+    }
+  ]
+}
