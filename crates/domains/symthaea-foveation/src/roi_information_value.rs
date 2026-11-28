@@ -309,6 +309,7 @@ mod tests {
         let score = evaluate_roi_information_value(
             &estimate("roi-1", 0.8, 0.5, 10_000),
             1_100,
+            "clock:camera-1",
             RoiInformationValueConfig::default(),
         ).unwrap();
         assert!((score.expected_loss_reduction - 0.3).abs() < 1e-6);
@@ -325,6 +326,7 @@ mod tests {
         let ranking = rank_roi_information_value(
             &candidates,
             1_100,
+            "clock:camera-1",
             RoiInformationValueConfig::default(),
         ).unwrap();
         assert_eq!(ranking.ranked[0].candidate_id, "roi-high");
@@ -392,6 +394,7 @@ mod tests {
         let ranking = rank_roi_information_value(
             &[good, bad],
             1_100,
+            "clock:camera-1",
             RoiInformationValueConfig::default(),
         ).unwrap();
         assert_eq!(ranking.ranked.len(), 1);
@@ -404,6 +407,7 @@ mod tests {
         let ranking = rank_roi_information_value(
             &[estimate("roi-1", 0.8, 0.5, 10_000), estimate("roi-1", 0.7, 0.5, 10_000)],
             1_100,
+            "clock:camera-1",
             RoiInformationValueConfig::default(),
         ).unwrap();
         assert!(ranking.ranked.is_empty());
@@ -416,6 +420,7 @@ mod tests {
         let ranking = rank_roi_information_value(
             &[estimate("roi-b", 0.8, 0.5, 10_000), estimate("roi-a", 0.8, 0.5, 10_000)],
             1_100,
+            "clock:camera-1",
             RoiInformationValueConfig::default(),
         ).unwrap();
         assert_eq!(ranking.ranked[0].candidate_id, "roi-a");
