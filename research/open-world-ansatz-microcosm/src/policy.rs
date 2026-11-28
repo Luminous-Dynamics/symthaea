@@ -21,9 +21,7 @@ fn next_unobserved_numeric_input(log: &numeric::ObservationLog) -> Option<i64> {
 
 /// Return an unobserved factorial pair. A singleton interaction fit is not
 /// treated as adequate until the finite intervention domain is challenged.
-fn next_unobserved_interaction_input(
-    log: &interaction::ObservationLog,
-) -> Option<[i64; 2]> {
+fn next_unobserved_interaction_input(log: &interaction::ObservationLog) -> Option<[i64; 2]> {
     interaction::FACTORIAL_DESIGN
         .into_iter()
         .find(|input| !log.interventions.contains(input))
@@ -310,8 +308,7 @@ impl StrategyEnumeratorBaseline {
                 if !log.interventions.is_empty()
                     && (view.remaining_probe_actions == 0
                         || models.is_empty()
-                        || (models.len() == 1
-                            && next_unobserved_interaction_input(&log).is_none()))
+                        || (models.len() == 1 && next_unobserved_interaction_input(&log).is_none()))
                 {
                     let count = models.len();
                     return Ok((
@@ -389,10 +386,7 @@ fn disposition(model_count: usize) -> ClaimDisposition {
 
 /// A singleton is only identified after the declared intervention domain has
 /// been challenged. Otherwise the finite candidate grammar remains provisional.
-fn disposition_with_adequacy(
-    model_count: usize,
-    challenge_complete: bool,
-) -> ClaimDisposition {
+fn disposition_with_adequacy(model_count: usize, challenge_complete: bool) -> ClaimDisposition {
     if model_count == 1 && !challenge_complete {
         ClaimDisposition::Abstain
     } else {
@@ -598,9 +592,11 @@ mod tests {
         assert!(score.generating_model_in_version_space);
         let final_log = interaction_log(&episode.view().unwrap()).unwrap();
         assert_eq!(score.probe_count, interaction::FACTORIAL_DESIGN.len());
-        assert!(interaction::FACTORIAL_DESIGN
-            .iter()
-            .all(|input| final_log.interventions.contains(input)));
+        assert!(
+            interaction::FACTORIAL_DESIGN
+                .iter()
+                .all(|input| final_log.interventions.contains(input))
+        );
     }
 
     #[test]
@@ -711,9 +707,11 @@ mod tests {
             let final_log = numeric_log(&episode.view().unwrap()).unwrap();
             assert!(score.probe_count >= numeric::INPUT_LEVELS.len());
             assert!(score.probe_count <= 6);
-            assert!(numeric::INPUT_LEVELS
-                .iter()
-                .all(|input| final_log.interventions.contains(input)));
+            assert!(
+                numeric::INPUT_LEVELS
+                    .iter()
+                    .all(|input| final_log.interventions.contains(input))
+            );
             assert!(!score.generating_model_in_version_space);
             assert!(!score.generating_truth_behaviorally_represented);
             assert_eq!(score.set_score.oracle_model_count, 0);
