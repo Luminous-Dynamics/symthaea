@@ -26,9 +26,9 @@ This runtime is a research/development integration, not yet a validated AML subm
 | `MACE_AML_BIND_ADDR` | no | Defaults to `127.0.0.1:3000`. |
 | `MACE_AML_TLS_TERMINATED` | non-loopback only | Must be `1` when bound beyond loopback; asserts a trusted HTTPS reverse proxy terminates TLS. |
 | `MACE_AML_ENABLE_PUBLIC_SMOKE` | public Smoke only | Must be `1` to permit `MACE_AML_AUTH_MODE=public-smoke`. Never set in a production deployment. |
-| `MACE_AML_MAX_BODY_BYTES` | no | Defaults to 50,331,648 bytes (48 MiB); requests above the limit receive 413, never silent truncation. |
+| `MACE_AML_MAX_BODY_BYTES` | no | Defaults to 50,331,648 bytes (48 MiB); allowed range is 1 KiB through 67,108,864 bytes (64 MiB). Requests above the configured limit receive 413; values outside the allowed configuration range fail startup. No silent truncation. |
 
-The process has no implicit no-auth default. If the authentication mode is omitted, startup fails.
+The process has no implicit no-auth default. If the authentication mode is omitted, startup fails. HTTP authentication scheme names are accepted case-insensitively; credential bytes remain exact and are compared using fixed-length secret digests. Reusing a request ID with a different payload is a permanent 422 contract error (no Retry-After); an in-flight or unknown commit outcome is a retryable 409 with bounded Retry-After.
 
 ## Build and run
 
