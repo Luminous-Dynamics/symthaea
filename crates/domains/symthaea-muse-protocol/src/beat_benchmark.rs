@@ -989,6 +989,75 @@ mod tests {
     }
 
     #[test]
+    fn accepts_private_external_cohort_with_explicit_publication_ceiling() {
+        let mut track = valid_track(
+            "private-external-0001",
+            "private-external-corpus",
+            BeatDatasetSplit::PrivateExternal,
+            BeatDatasetPurpose::ExternalValidation,
+            &"f".repeat(64),
+            "master-private-0001",
+        );
+        track.publication_ceiling =
+            Some("aggregate metrics only; no audio or labels".to_string());
+        assert!(validate_beat_benchmark_manifest(&manifest(vec![track])).is_empty());
+    }
+
+    #[test]
+    fn reports_auto_only_annotations_as_unqualified_not_rejected() {
+        let mut track = valid_track(
+            "auto-only-0001",
+            "development-corpus",
+            BeatDatasetSplit::Development,
+            BeatDatasetPurpose::Development,
+            &"a".repeat(64),
+            "master-auto-0001",
+        );
+        track.annotation_provenance = BeatAnnotationProvenance::AutoOnly;
+        let result = validate_beat_benchmark_manifest(&manifest(vec![track]));
+        assert!(result.iter().any(|violation| {
+            violation.code == BeatBenchmarkViolationCode::AutoOnlyAnnotationsUnqualified
+                && violation.severity == BeatBenchmarkViolationSeverity::Unqualified
+        }));
+    }
+
+    #[test]
+    fn rejects_split_and_purpose_mismatch() {
+        let track = valid_track(
+            "wrong-purpose-0001",
+            "development-corpus",
+            BeatDatasetSplit::Train,
+            BeatDatasetPurpose::Development,
+            &"b".repeat(64),
+            "master-wrong-purpose",
+        );
+        assert!(codes(&manifest(vec![track]))
+            .contains(&BeatBenchmarkViolationCode::SplitPurposeMismatch));
+    }
+
+    #[test]
+    fn detects_source_master_family_case_collisions_across_splits() {
+        let train = valid_track(
+            "master-case-train",
+            "private-corpus",
+            BeatDatasetSplit::Train,
+            BeatDatasetPurpose::Training,
+            &"c".repeat(64),
+            "MASTER-FAMILY-ONE",
+        );
+        let test = valid_track(
+            "master-case-test",
+            "private-corpus",
+            BeatDatasetSplit::LockedTest,
+            BeatDatasetPurpose::BenchmarkEvaluation,
+            &"d".repeat(64),
+            "master-family-one",
+        );
+        assert!(codes(&manifest(vec![train, test]))
+            .contains(&BeatBenchmarkViolationCode::SourceMasterFamilyCrossesSplits));
+    }
+
+    #[test]
     fn rejects_non_approved_rights_and_unknown_annotation_provenance() {
         let mut track = valid_track(
             "rights-unknown",
