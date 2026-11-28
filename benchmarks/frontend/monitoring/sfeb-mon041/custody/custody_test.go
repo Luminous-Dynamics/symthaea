@@ -42,7 +42,19 @@ func TestUsedNonceBlocks(t testing.TB){in:=validInput(t);in.UsedNonces=[]string{
 func TestDuplicateNonceBlocks(t testing.TB){in:=validInput(t);p:=ed25519.NewKeyFromSeed(seedFixture);in.Receipts[1].Nonce=in.Receipts[0].Nonce;resignTest(&in.Receipts[1],p);if got:=Evaluate(in);got.CustodyVerdict!=Blocked{t.Fatalf("duplicate nonce must block: %+v",got)}}
 func TestExpiredReceiptBlocks(t testing.TB){in:=validInput(t);p:=ed25519.NewKeyFromSeed(seedFixture);in.Receipts[0].ExpiresAt=nowFixture.Add(-time.Second);resignTest(&in.Receipts[0],p);if got:=Evaluate(in);got.CustodyVerdict!=Blocked{t.Fatalf("expired receipt must block: %+v",got)}}
 func TestStaleReceiptBlocks(t testing.TB){in:=validInput(t);p:=ed25519.NewKeyFromSeed(seedFixture);in.Receipts[0].CapturedAt=nowFixture.Add(-2*time.Hour);resignTest(&in.Receipts[0],p);if got:=Evaluate(in);got.CustodyVerdict!=Blocked{t.Fatalf("stale receipt must block: %+v",got)}}
-func TestRevokedKeyBlocks(t testing.TB){in:=validInput(t);revoked:=nowFixture.Add(-time.Second);in.TrustedKeys[0].RevokedAt=&revoked;if got:=Evaluate(in);got.CustodyVerdict!=Blocked{t.Fatalf("revoked key must block: %+v",got)}}
+func TestRevokedKeyBlocksWhenRevocationPredatesCapture(t testing.TB){
+ in:=validInput(t)
+ revoked:=in.Receipts[0].CapturedAt.Add(-time.Second)
+ in.TrustedKeys[0].RevokedAt=&revoked
+ if got:=Evaluate(in);got.CustodyVerdict!=Blocked{t.Fatalf("receipt captured after effective revocation must block: %+v",got)}
+}
+func TestRevocationAfterCapturePreservesHistoricalReceipt(t testing.TB){
+ in:=validInput(t)
+ revoked:=in.Receipts[0].CapturedAt.Add(time.Second)
+ in.TrustedKeys[0].RevokedAt=&revoked
+ if got:=Evaluate(in);got.CustodyVerdict!=Qualified{t.Fatalf("later revocation must not invalidate a receipt captured before its effective time: %+v",got)}
+ if got:=Evaluate(in);got.CampaignVerdict!=Indeterminate||got.ProductionActionPermitted{t.Fatalf("historical custody preflight cannot authorize campaign: %+v",got)}
+}
 func TestUnknownSignerHoldsIndeterminate(t testing.TB){in:=validInput(t);in.TrustedKeys=nil;if got:=Evaluate(in);got.CustodyVerdict!=Indeterminate{t.Fatalf("missing trust root must hold: %+v",got)}}
 func TestMissingRequiredEvidenceHolds(t testing.TB){in:=validInput(t);in.Receipts=in.Receipts[:1];if got:=Evaluate(in);got.CustodyVerdict!=Indeterminate{t.Fatalf("incomplete evidence must hold: %+v",got)}}
 func TestBrokenChainBlocks(t testing.TB){in:=validInput(t);p:=ed25519.NewKeyFromSeed(seedFixture);in.Receipts[1].PreviousReceiptSHA256=testDigest("wrong-parent");resignTest(&in.Receipts[1],p);if got:=Evaluate(in);got.CustodyVerdict!=Blocked{t.Fatalf("broken receipt chain must block: %+v",got)}}
