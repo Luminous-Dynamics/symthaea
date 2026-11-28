@@ -410,13 +410,37 @@ impl EpisodeRuntimeState {
             return Err("tick_not_strictly_increasing".to_string());
         }
 
-        let demand_schedule = self
+        let scheduled_step = self
             .episode
             .demand_schedule
             .iter()
-            .filter(|step| step.time <= tick)
-            .max_by_key(|step| step.time)
-            .ok_or_else(|| "no_demand_schedule_at_or_before_tick".to_string())?;
+            .filter(|step| {
+                step.time <= tick
+                    && self.current_tick.map_or(true, |previous| step.time > previous)
+            })
+            .max_by_key(|step| step.time);
+
+        if let Some(previous) = self.current_tick {
+            if self.episode.demand_schedule.iter().any(|step| {
+                step.time > previous && step.time < tick
+            }) || self.episode.interventions.iter().any(|event| {
+                event.time > previous && event.time < tick
+            }) {
+                return Err("tick_skips_fixture_event_time".to_string());
+            }
+        } else if let Some(first_schedule) =
+            self.episode.demand_schedule.iter().map(|step| step.time).min()
+        {
+            if tick != first_schedule {
+                return Err("initial_tick_must_match_first_demand_schedule".to_string());
+            }
+        }
+
+        let mut demands = match scheduled_step {
+            Some(step) => step.sinks.clone(),
+            None if self.current_tick.is_some() => self.demands.clone(),
+            None => return Err("no_demand_schedule_at_or_before_tick".to_string()),
+        };
 
         let mut events = external_events.to_vec();
         for (index, intervention) in self.episode.interventions.iter().enumerate() {
@@ -452,7 +476,11 @@ impl EpisodeRuntimeState {
         let mut event_ids = self.applied_event_ids.clone();
         let mut changed_resources = BTreeSet::new();
         let mut active_edges = self.active_edges.clone();
-        let mut demands = demand_schedule.sinks.clone();
+        if let Some(step) = scheduled_step {
+            for sink in self.demands.iter().chain(step.sinks.iter()) {
+                changed_resources.insert(format!("sink-demand:{}", sink.node));
+            }
+        }
 
         for event in &events {
             if event.event_id.trim().is_empty() {
@@ -508,8 +536,12 @@ impl EpisodeRuntimeState {
         }
 
         demands.sort_by_key(|sink| sink.node);
-        let payload = serde_json::to_vec(&events)
-            .map_err(|error| format!("event_digest_serialize:{error}"))?;
+        let payload = serde_json::to_vec(&(
+            scheduled_step.map(|step| step.time),
+            &demands,
+            &events,
+        ))
+        .map_err(|error| format!("event_digest_serialize:{error}"))?;
         let event_batch_digest = blake3::hash(&payload).to_hex().to_string();
 
         Ok(PreparedTick {
@@ -632,7 +664,7 @@ fn digest_episode_context(episode: &Episode, semantics: &GraphSemantics) -> Stri
     }
 
     for edges in [&episode.active_edges, &episode.candidate_edges] {
-        let mut canonical = edges.clone();
+        let mut canonical = edges.to_vec();
         canonical.sort_by(|left, right| {
             (left.from, left.to, left.id.as_deref()).cmp(&(
                 right.from,
