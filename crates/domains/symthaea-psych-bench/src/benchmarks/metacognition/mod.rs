@@ -8,8 +8,9 @@
 //! - **FeelingOfKnowing** — Tests metamemory: after failed recall, can the
 //!   system predict whether it would recognize the correct answer?
 //! - **ChangeBlindness** — Tests attention-dependent scene-change detection.
-//! - **SelectivePrediction** — Scores answer, abstain and request-information
-//!   policies using counterfactual correctness, calibration, risk and cost.
+//! - **SelectivePrediction** — Scores answer, abstain and targeted request-information
+//!   policies, including one-cycle clarification recovery, counterfactual
+//!   correctness, calibration, risk and cost.
 
 pub mod calibration;
 pub mod change_blindness;
