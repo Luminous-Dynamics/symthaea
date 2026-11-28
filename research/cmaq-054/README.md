@@ -48,7 +48,7 @@ The e-value and posterior are necessarily evaluated in floating-point log space.
 
 ## Tests and deterministic probe
 
-The dependency-free Rust crate tests:
+The Rust crate has no third-party dependencies and tests:
 - exact rational prior normalization and member-alpha derivation;
 - duplicate expert IDs, dimension mismatches and inventory-binding mismatch;
 - initial wealth normalization and posterior sum;
