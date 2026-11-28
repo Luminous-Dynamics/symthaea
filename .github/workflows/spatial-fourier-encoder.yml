@@ -7,6 +7,7 @@ on:
     paths:
       - "crates/core/symthaea-core/src/hdc/spatial_fourier_encoder.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "Cargo.toml"
       - ".github/workflows/spatial-fourier-encoder.yml"
   pull_request:
     branches: [main]
