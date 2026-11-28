@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "source": {
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "sample_rate_hz": 48000,
+    "channels": 2,
+    "total_frames": 100000
+  },
+  "evidence": {
+    "manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "analysis_version": "auditory-scene-v0.1/config-17",
+    "covered_window": {
+      "start_frame": 0,
+      "end_frame": 100000
+    }
+  },
+  "disposition": "abstained",
+  "hypotheses": [],
+  "abstention_reason": "tempo_and_meter_not_identifiable"
+}
