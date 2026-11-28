@@ -650,9 +650,10 @@ where
                             index,
                         });
                     }
-                    if (follow_up.action == DecisionAction::RequestInformation)
-                        != follow_up.clarification_target.is_some()
+                    if follow_up.action == DecisionAction::RequestInformation
+                        || follow_up.clarification_target.is_some()
                     {
+                        // v0.1 allows one evaluator-mediated clarification only.
                         return Err(SelectivePredictionTaskError::InvalidPolicyDecision { index });
                     }
 
@@ -869,8 +870,8 @@ pub fn verify_report_receipts(
                 || !follow_up.confidence.is_finite()
                 || !(0.0..=1.0).contains(&follow_up.confidence)
                 || !close(follow_up.cost_units, cost_model.charge(follow_up.action))
-                || (follow_up.action == DecisionAction::RequestInformation)
-                    != follow_up.clarification_target.is_some()
+                || follow_up.action == DecisionAction::RequestInformation
+                || follow_up.clarification_target.is_some()
             {
                 return Ok(false);
             }
@@ -1012,6 +1013,31 @@ mod tests {
         assert_eq!(report.items, 14);
         assert_eq!(report.resolved_clarifications, 4);
         assert_eq!(report.post_clarification_accuracy, Some(1.0));
+    }
+
+    #[test]
+    fn receipt_verifier_reconciles_reports_even_after_digest_recomputation() {
+        let items = fixture_items();
+        let costs = SelectivePredictionCostModel::default();
+        for report in run_reference_suite().expect("suite") {
+            assert!(verify_report_receipts(&items, &report, costs).expect("receipt check"));
+        }
+
+        let mut tampered = evaluate_policy(
+            &items,
+            SelectivePredictionBaseline::PremiseAndFreshnessAware,
+            costs,
+        )
+        .expect("report");
+        tampered.receipts[7]
+            .follow_up
+            .as_mut()
+            .expect("resolved clarification follow-up")
+            .cost_units += 1.0;
+        tampered.report_integrity_digest =
+            report_integrity_digest(&tampered).expect("rehash altered report");
+
+        assert!(!verify_report_receipts(&items, &tampered, costs).expect("receipt check"));
     }
 
     #[test]
