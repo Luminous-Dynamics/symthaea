@@ -11,8 +11,7 @@ use crate::manifold::VisionManifold;
 use crate::types::{ManifoldState, VisionConfig, VisionTelemetry, VisualModality};
 
 /// Stable observer profile identifier for this wire-contract revision.
-pub const TEMPORAL_OBSERVER_PROFILE_ID_V0_1: &str =
-    "symthaea-spacecraft-temporal-observer-v0.1";
+pub const TEMPORAL_OBSERVER_PROFILE_ID_V0_1: &str = "symthaea-spacecraft-temporal-observer-v0.1";
 /// Current serialized temporal observer checkpoint schema.
 pub const TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1: u32 = 1;
 /// Current emitted temporal witness schema.
@@ -70,7 +69,12 @@ impl TemporalObserverProfileV0_1 {
         match (self.frame_width, self.frame_height) {
             (None, None) => {}
             (Some(width), Some(height)) if width > 0 && height > 0 => {}
-            _ => return Err("observer fixed frame width/height must be both absent or both non-zero".to_string()),
+            _ => {
+                return Err(
+                    "observer fixed frame width/height must be both absent or both non-zero"
+                        .to_string(),
+                );
+            }
         }
         Ok(())
     }
@@ -127,7 +131,9 @@ impl ObserverFrameIdentityV0_1 {
             ("preprocessing_sha256", &self.preprocessing_sha256),
         ] {
             if !is_sha256_hex(digest) {
-                return Err(format!("observer identity {name} is not lowercase SHA-256 hex"));
+                return Err(format!(
+                    "observer identity {name} is not lowercase SHA-256 hex"
+                ));
             }
         }
         Ok(())
@@ -257,10 +263,16 @@ impl ObserverOnlyVisionManifold {
         if width == 0 || height == 0 {
             return Err("observer constructor dimensions must be non-zero".to_string());
         }
-        if profile.frame_width.is_some_and(|expected| expected != width)
-            || profile.frame_height.is_some_and(|expected| expected != height)
+        if profile
+            .frame_width
+            .is_some_and(|expected| expected != width)
+            || profile
+                .frame_height
+                .is_some_and(|expected| expected != height)
         {
-            return Err("observer profile frame geometry conflicts with constructor dimensions".to_string());
+            return Err(
+                "observer profile frame geometry conflicts with constructor dimensions".to_string(),
+            );
         }
         profile.frame_width = Some(width);
         profile.frame_height = Some(height);
@@ -315,7 +327,10 @@ impl ObserverOnlyVisionManifold {
         if checkpoint.profile.frame_width != Some(width)
             || checkpoint.profile.frame_height != Some(height)
         {
-            return Err("observer checkpoint constructor geometry does not match committed profile".to_string());
+            return Err(
+                "observer checkpoint constructor geometry does not match committed profile"
+                    .to_string(),
+            );
         }
         if let Some(geometry) = checkpoint.frame_geometry {
             if geometry.width != width || geometry.height != height {
@@ -334,11 +349,8 @@ impl ObserverOnlyVisionManifold {
         if frozen_model_sha256 != checkpoint.frozen_model_sha256 {
             return Err("observer checkpoint frozen-model digest mismatch".to_string());
         }
-        let observer_profile_sha256 = profile_sha256(
-            &checkpoint.profile,
-            &config_sha256,
-            &frozen_model_sha256,
-        )?;
+        let observer_profile_sha256 =
+            profile_sha256(&checkpoint.profile, &config_sha256, &frozen_model_sha256)?;
         if observer_profile_sha256 != checkpoint.observer_profile_sha256 {
             return Err("observer checkpoint profile digest mismatch".to_string());
         }
@@ -350,12 +362,8 @@ impl ObserverOnlyVisionManifold {
             checkpoint.manifold_state.frame_count,
         )?;
 
-        let mut observer = Self::try_new_with_profile(
-            config.clone(),
-            width,
-            height,
-            checkpoint.profile.clone(),
-        )?;
+        let mut observer =
+            Self::try_new_with_profile(config.clone(), width, height, checkpoint.profile.clone())?;
         observer.inner.load_state(&checkpoint.manifold_state)?;
         validate_observer_state(&observer.inner.save_state())?;
         if model_sha256(&observer.inner.save_state())? != checkpoint.frozen_model_sha256 {
@@ -398,13 +406,19 @@ impl ObserverOnlyVisionManifold {
             .observe_frame_checked(pixels, width, height, channels, dt)
         {
             Ok(telemetry) => telemetry,
-            Err(error) => return Err(format!("observer rejected frame without state advance: {error}")),
+            Err(error) => {
+                return Err(format!(
+                    "observer rejected frame without state advance: {error}"
+                ));
+            }
         };
 
         let state = self.inner.save_state();
         if let Err(error) = validate_observer_state(&state) {
             self.poisoned = true;
-            return Err(format!("observer invariant failure after observation: {error}"));
+            return Err(format!(
+                "observer invariant failure after observation: {error}"
+            ));
         }
         let model_digest_after = match model_sha256(&state) {
             Ok(digest) => digest,
@@ -427,13 +441,16 @@ impl ObserverOnlyVisionManifold {
             TemporalObserverStatusV0_1::Observed
         };
         let prediction_valid = status == TemporalObserverStatusV0_1::Observed;
-        let metrics = match quantize_telemetry(&telemetry, prediction_valid, self.cross_scale_enabled) {
-            Ok(metrics) => metrics,
-            Err(error) => {
-                self.poisoned = true;
-                return Err(format!("observer telemetry could not be represented: {error}"));
-            }
-        };
+        let metrics =
+            match quantize_telemetry(&telemetry, prediction_valid, self.cross_scale_enabled) {
+                Ok(metrics) => metrics,
+                Err(error) => {
+                    self.poisoned = true;
+                    return Err(format!(
+                        "observer telemetry could not be represented: {error}"
+                    ));
+                }
+            };
 
         self.first_timestamp_us = Some(first_timestamp_us);
         self.last_identity = Some(identity.clone());
@@ -489,7 +506,9 @@ impl ObserverOnlyVisionManifold {
                     channels,
                 })
             {
-                return Err("observer frame geometry changed within the fixed episode profile".to_string());
+                return Err(
+                    "observer frame geometry changed within the fixed episode profile".to_string(),
+                );
             }
         }
         let expected_bytes = (width as usize)
@@ -516,13 +535,18 @@ impl ObserverOnlyVisionManifold {
             }
             Some(previous) => {
                 if !previous.same_episode_context(identity) {
-                    return Err("observer episode, target, sensor, clock or calibration scope changed".to_string());
+                    return Err(
+                        "observer episode, target, sensor, clock or calibration scope changed"
+                            .to_string(),
+                    );
                 }
                 if previous.frame_id == identity.frame_id {
                     return Err("observer frame_id must not repeat within an episode".to_string());
                 }
                 if previous.source_evidence_id == identity.source_evidence_id {
-                    return Err("observer source_evidence_id must not repeat within an episode".to_string());
+                    return Err(
+                        "observer source_evidence_id must not repeat within an episode".to_string(),
+                    );
                 }
                 let expected_sequence = previous
                     .sequence
@@ -648,9 +672,10 @@ fn validate_observer_state(state: &ManifoldState) -> Result<(), String> {
         || state.last_imagination.is_some()
         || !state.last_object_hypotheses.is_empty()
         || !state.last_geodesic.is_empty()
-        || state.last_intent_hv.as_ref().is_some_and(|intent| {
-            intent.iter().any(|value| *value != 0.0)
-        })
+        || state
+            .last_intent_hv
+            .as_ref()
+            .is_some_and(|intent| intent.iter().any(|value| *value != 0.0))
         || state.modality_contexts.iter().any(|context| {
             context.object_memory.is_some()
                 || context.working_memory.is_some()
@@ -770,13 +795,8 @@ mod tests {
             max_interframe_gap_us: 50_000,
             ..TemporalObserverProfileV0_1::default()
         };
-        ObserverOnlyVisionManifold::try_new_with_profile(
-            VisionConfig::default(),
-            32,
-            32,
-            profile,
-        )
-        .unwrap()
+        ObserverOnlyVisionManifold::try_new_with_profile(VisionConfig::default(), 32, 32, profile)
+            .unwrap()
     }
 
     #[test]
@@ -825,18 +845,8 @@ mod tests {
 
     #[test]
     fn frame_geometry_is_committed_in_profile_digest() {
-        let first = ObserverOnlyVisionManifold::try_new(
-            VisionConfig::default(),
-            32,
-            32,
-        )
-        .unwrap();
-        let second = ObserverOnlyVisionManifold::try_new(
-            VisionConfig::default(),
-            16,
-            64,
-        )
-        .unwrap();
+        let first = ObserverOnlyVisionManifold::try_new(VisionConfig::default(), 32, 32).unwrap();
+        let second = ObserverOnlyVisionManifold::try_new(VisionConfig::default(), 16, 64).unwrap();
         assert_ne!(first.profile_sha256(), second.profile_sha256());
     }
 
@@ -850,15 +860,19 @@ mod tests {
 
         let mut duplicate_frame = identity(1, 1_033_000);
         duplicate_frame.frame_id = "frame-0".to_string();
-        assert!(observer
-            .observe_frame(duplicate_frame, &frame, 32, 32, 1)
-            .is_err());
+        assert!(
+            observer
+                .observe_frame(duplicate_frame, &frame, 32, 32, 1)
+                .is_err()
+        );
 
         let mut duplicate_evidence = identity(1, 1_033_000);
         duplicate_evidence.source_evidence_id = "evidence-0".to_string();
-        assert!(observer
-            .observe_frame(duplicate_evidence, &frame, 32, 32, 1)
-            .is_err());
+        assert!(
+            observer
+                .observe_frame(duplicate_evidence, &frame, 32, 32, 1)
+                .is_err()
+        );
 
         assert_eq!(observer.frame_count(), 1);
     }
@@ -873,9 +887,11 @@ mod tests {
         let count = observer.frame_count();
 
         let changed_shape = vec![64_u8; 16 * 64];
-        assert!(observer
-            .observe_frame(identity(1, 1_033_000), &changed_shape, 16, 64, 1)
-            .is_err());
+        assert!(
+            observer
+                .observe_frame(identity(1, 1_033_000), &changed_shape, 16, 64, 1)
+                .is_err()
+        );
         assert_eq!(observer.frame_count(), count);
 
         let checkpoint = observer.save_checkpoint().unwrap();
@@ -912,7 +928,10 @@ mod tests {
             .unwrap();
         assert_eq!(second.status, TemporalObserverStatusV0_1::Observed);
         assert!(second.metrics.prediction_error_q16_16.is_some());
-        assert_eq!(first.observer_profile_sha256, second.observer_profile_sha256);
+        assert_eq!(
+            first.observer_profile_sha256,
+            second.observer_profile_sha256
+        );
         assert_eq!(first.frozen_model_sha256, second.frozen_model_sha256);
 
         let state = observer.save_checkpoint().unwrap();
@@ -928,16 +947,20 @@ mod tests {
             .unwrap();
         let count = observer.frame_count();
 
-        assert!(observer
-            .observe_frame(identity(2, 1_033_000), &frame, 32, 32, 1)
-            .is_err());
+        assert!(
+            observer
+                .observe_frame(identity(2, 1_033_000), &frame, 32, 32, 1)
+                .is_err()
+        );
         assert_eq!(observer.frame_count(), count);
 
         let mut changed_calibration = identity(1, 1_033_000);
         changed_calibration.calibration_sha256 = "5".repeat(64);
-        assert!(observer
-            .observe_frame(changed_calibration, &frame, 32, 32, 1)
-            .is_err());
+        assert!(
+            observer
+                .observe_frame(changed_calibration, &frame, 32, 32, 1)
+                .is_err()
+        );
         assert_eq!(observer.frame_count(), count);
     }
 
@@ -945,18 +968,22 @@ mod tests {
     fn invalid_bytes_or_timestamp_are_rejected_before_mutation() {
         let mut observer = observer();
         let wrong_size = vec![1_u8; 3];
-        assert!(observer
-            .observe_frame(identity(0, 1_000_000), &wrong_size, 32, 32, 1)
-            .is_err());
+        assert!(
+            observer
+                .observe_frame(identity(0, 1_000_000), &wrong_size, 32, 32, 1)
+                .is_err()
+        );
         assert_eq!(observer.frame_count(), 0);
 
         let frame = vec![64_u8; 32 * 32];
         observer
             .observe_frame(identity(0, 1_000_000), &frame, 32, 32, 1)
             .unwrap();
-        assert!(observer
-            .observe_frame(identity(1, 1_000_000), &frame, 32, 32, 1)
-            .is_err());
+        assert!(
+            observer
+                .observe_frame(identity(1, 1_000_000), &frame, 32, 32, 1)
+                .is_err()
+        );
         assert_eq!(observer.frame_count(), 1);
     }
 
@@ -1005,13 +1032,15 @@ mod tests {
             .unwrap();
         let checkpoint = observer.save_checkpoint().unwrap();
 
-        assert!(ObserverOnlyVisionManifold::from_checkpoint(
-            VisionConfig::default(),
-            16,
-            64,
-            &checkpoint,
-        )
-        .is_err());
+        assert!(
+            ObserverOnlyVisionManifold::from_checkpoint(
+                VisionConfig::default(),
+                16,
+                64,
+                &checkpoint,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1019,12 +1048,14 @@ mod tests {
         let observer = observer();
         let mut checkpoint = observer.save_checkpoint().unwrap();
         checkpoint.observer_profile_sha256 = "f".repeat(64);
-        assert!(ObserverOnlyVisionManifold::from_checkpoint(
-            VisionConfig::default(),
-            32,
-            32,
-            &checkpoint,
-        )
-        .is_err());
+        assert!(
+            ObserverOnlyVisionManifold::from_checkpoint(
+                VisionConfig::default(),
+                32,
+                32,
+                &checkpoint,
+            )
+            .is_err()
+        );
     }
 }
