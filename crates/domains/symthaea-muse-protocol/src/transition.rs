@@ -19,6 +19,9 @@ use serde::{Deserialize, Serialize};
 /// Current schema version understood by this crate.
 pub const TRANSITION_CONTRACT_SCHEMA_VERSION: u16 = 1;
 
+/// Largest integer exactly representable by ECMAScript Number / JSON consumers.
+pub const MAX_SAFE_JSON_INTEGER: u64 = 9_007_199_254_740_991;
+
 /// Gain values are milli-decibels relative to the deck's declared unity gain.
 /// The structural envelope is intentionally generous; a runtime may impose a
 /// narrower device-specific range, but must not silently rewrite this contract.
@@ -237,6 +240,7 @@ pub enum TransitionViolationCode {
     InvalidSourceSampleRate,
     InvalidSourceChannelCount,
     EmptySourceAsset,
+    SourceFrameCountExceedsJsonSafeInteger,
     EmptySourceWindow,
     SourceWindowOutOfBounds,
     InvalidSourceAnalysisSha256,
@@ -248,6 +252,7 @@ pub enum TransitionViolationCode {
     InvalidTargetSampleRate,
     InvalidTargetChannelCount,
     EmptyTargetAsset,
+    TargetFrameCountExceedsJsonSafeInteger,
     EmptyTargetWindow,
     TargetWindowOutOfBounds,
     InvalidTargetAnalysisSha256,
@@ -260,6 +265,7 @@ pub enum TransitionViolationCode {
     EmptySourceGridHypothesisId,
     EmptyTargetGridHypothesisId,
     AlignmentPhaseToleranceOutOfRange,
+    AlignmentBeatOrdinalExceedsJsonSafeInteger,
     AlignmentConfidenceOutOfRange,
     EmptyProtectedRegionReason,
     EmptyProtectedRegionWindow,
@@ -340,6 +346,13 @@ pub fn validate_transition_contract(
                 &mut violations,
                 TransitionViolationCode::AlignmentPhaseToleranceOutOfRange,
                 "alignment.max_phase_error_milli",
+            );
+        }
+        if alignment.beat_ordinal_milli.unsigned_abs() > MAX_SAFE_JSON_INTEGER {
+            push_violation(
+                &mut violations,
+                TransitionViolationCode::AlignmentBeatOrdinalExceedsJsonSafeInteger,
+                "alignment.beat_ordinal_milli",
             );
         }
         if alignment.confidence_ppm > 1_000_000 {
@@ -508,6 +521,21 @@ fn validate_track_window(
         push_violation(
             violations,
             empty_asset,
+            format!("{prefix}.audio.total_frames"),
+        );
+    }
+    if track.audio.total_frames > MAX_SAFE_JSON_INTEGER {
+        let code = match side {
+            TrackSide::Source => {
+                TransitionViolationCode::SourceFrameCountExceedsJsonSafeInteger
+            }
+            TrackSide::Target => {
+                TransitionViolationCode::TargetFrameCountExceedsJsonSafeInteger
+            }
+        };
+        push_violation(
+            violations,
+            code,
             format!("{prefix}.audio.total_frames"),
         );
     }
@@ -720,6 +748,29 @@ mod tests {
         let found = codes(&contract);
         assert!(found.contains(&TransitionViolationCode::InvalidSourceSha256));
         assert!(found.contains(&TransitionViolationCode::SourceAnalysisDigestMismatch));
+    }
+
+    #[test]
+    fn rejects_frame_count_above_exact_json_integer_range() {
+        let mut contract = valid_contract();
+        contract.source.audio.total_frames = MAX_SAFE_JSON_INTEGER + 1;
+        contract.target.audio.total_frames = MAX_SAFE_JSON_INTEGER + 1;
+        let found = codes(&contract);
+        assert!(found.contains(
+            &TransitionViolationCode::SourceFrameCountExceedsJsonSafeInteger
+        ));
+        assert!(found.contains(
+            &TransitionViolationCode::TargetFrameCountExceedsJsonSafeInteger
+        ));
+    }
+
+    #[test]
+    fn rejects_alignment_ordinal_above_exact_json_integer_range() {
+        let mut contract = valid_contract();
+        contract.alignment.as_mut().unwrap().beat_ordinal_milli =
+            (MAX_SAFE_JSON_INTEGER as i64) + 1;
+        assert!(codes(&contract)
+            .contains(&TransitionViolationCode::AlignmentBeatOrdinalExceedsJsonSafeInteger));
     }
 
     #[test]
