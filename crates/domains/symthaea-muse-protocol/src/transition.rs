@@ -140,16 +140,19 @@ pub struct TransitionEvidenceAssessment {
 }
 
 /// An optional alignment hypothesis. Frame anchors are source-local, and the
-/// two sides are validated against their own clocks independently.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// two sides are validated against their own clocks independently. Hypothesis
+/// IDs resolve within the corresponding source/target analysis evidence manifests.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TransitionAlignment {
     pub source_anchor_frame: u64,
     pub target_anchor_frame: u64,
+    pub source_grid_hypothesis_id: String,
+    pub target_grid_hypothesis_id: String,
     /// Shared musical beat ordinal in milli-beats; integer-only for portability.
     pub beat_ordinal_milli: i64,
-    /// Probability-like confidence in parts per million, 0..=1,000,000.
-    /// It is not a calibrated probability unless the producer says so elsewhere.
+    /// Producer-supplied score in parts per million, 0..=1,000,000.
+    /// It is not a calibrated probability unless a separate calibration record says so.
     pub confidence_ppm: u32,
 }
 
@@ -251,6 +254,8 @@ pub enum TransitionViolationCode {
     TargetAnalysisDoesNotCoverWindow,
     SourceAlignmentAnchorOutOfWindow,
     TargetAlignmentAnchorOutOfWindow,
+    EmptySourceGridHypothesisId,
+    EmptyTargetGridHypothesisId,
     AlignmentConfidenceOutOfRange,
     EmptyProtectedRegionReason,
     EmptyProtectedRegionWindow,
@@ -297,7 +302,7 @@ pub fn validate_transition_contract(
     validate_track_window(&contract.source, TrackSide::Source, &mut violations);
     validate_track_window(&contract.target, TrackSide::Target, &mut violations);
 
-    if let Some(alignment) = contract.alignment {
+    if let Some(alignment) = contract.alignment.as_ref() {
         if !contract.source.window.contains_frame(alignment.source_anchor_frame) {
             push_violation(
                 &mut violations,
@@ -310,6 +315,20 @@ pub fn validate_transition_contract(
                 &mut violations,
                 TransitionViolationCode::TargetAlignmentAnchorOutOfWindow,
                 "alignment.target_anchor_frame",
+            );
+        }
+        if alignment.source_grid_hypothesis_id.trim().is_empty() {
+            push_violation(
+                &mut violations,
+                TransitionViolationCode::EmptySourceGridHypothesisId,
+                "alignment.source_grid_hypothesis_id",
+            );
+        }
+        if alignment.target_grid_hypothesis_id.trim().is_empty() {
+            push_violation(
+                &mut violations,
+                TransitionViolationCode::EmptyTargetGridHypothesisId,
+                "alignment.target_grid_hypothesis_id",
             );
         }
         if alignment.confidence_ppm > 1_000_000 {
@@ -600,6 +619,8 @@ mod tests {
             alignment: Some(TransitionAlignment {
                 source_anchor_frame: 400,
                 target_anchor_frame: 600,
+                source_grid_hypothesis_id: "source-grid-primary".to_string(),
+                target_grid_hypothesis_id: "target-grid-primary".to_string(),
                 beat_ordinal_milli: 16_000,
                 confidence_ppm: 850_000,
             }),
@@ -725,6 +746,17 @@ mod tests {
         let found = codes(&contract);
         assert!(found.contains(&TransitionViolationCode::SourceAlignmentAnchorOutOfWindow));
         assert!(found.contains(&TransitionViolationCode::TargetAlignmentAnchorOutOfWindow));
+    }
+
+    #[test]
+    fn rejects_empty_grid_hypothesis_references() {
+        let mut contract = valid_contract();
+        let alignment = contract.alignment.as_mut().unwrap();
+        alignment.source_grid_hypothesis_id = " ".to_string();
+        alignment.target_grid_hypothesis_id.clear();
+        let found = codes(&contract);
+        assert!(found.contains(&TransitionViolationCode::EmptySourceGridHypothesisId));
+        assert!(found.contains(&TransitionViolationCode::EmptyTargetGridHypothesisId));
     }
 
     #[test]
