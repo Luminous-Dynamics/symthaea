@@ -5,3 +5,8 @@ pub mod music_edit_benchmark_adapter;
 pub mod music_edit_metamorphic_benchmark;
 
 pub use music_edit_metamorphic_benchmark::*;
+
+#[path = "music_edit_metamorphic_composition.rs"]
+pub mod music_edit_metamorphic_composition;
+
+pub use music_edit_metamorphic_composition::*;

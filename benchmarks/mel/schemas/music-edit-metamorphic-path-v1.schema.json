@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-metamorphic-path-v1.schema.json",
+  "title": "Melothaea compositional music-edit metamorphic path v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "path_id", "steps"],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-metamorphic-path-v1"
+    },
+    "path_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pair", "transform_receipt", "property_mapping"],
+        "properties": {
+          "pair": {
+            "$ref": "music-edit-metamorphic-pair-v1.schema.json"
+          },
+          "transform_receipt": {
+            "$ref": "music-edit-metamorphic-transform-receipt-v1.schema.json"
+          },
+          "property_mapping": {
+            "$ref": "music-edit-metamorphic-property-map-v1.schema.json"
+          }
+        }
+      }
+    }
+  }
+}

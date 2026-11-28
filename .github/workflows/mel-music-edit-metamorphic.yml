@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "crates/domains/symthaea-muse/src/music_edit_metamorphic_benchmark.rs"
+      - "crates/domains/symthaea-muse/src/music_edit_metamorphic_composition.rs"
+      - "benchmarks/mel/schemas/music-edit-metamorphic-path-v1.schema.json"
+      - "benchmarks/mel/schemas/music-edit-metamorphic-commutator-case-v1.schema.json"
       - "crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "tools/mel-music-edit-metamorphic-harness/**"
@@ -51,6 +54,7 @@ jobs:
           cp tools/mel-music-edit-metamorphic-harness/src/lib.rs "$staged/src/lib.rs"
           cp crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs "$staged/src/music_edit_benchmark_adapter.rs"
           cp crates/domains/symthaea-muse/src/music_edit_metamorphic_benchmark.rs "$staged/src/music_edit_metamorphic_benchmark.rs"
+          cp crates/domains/symthaea-muse/src/music_edit_metamorphic_composition.rs "$staged/src/music_edit_metamorphic_composition.rs"
           cp tools/mel-music-edit-metamorphic-harness/examples/validate_fixtures.rs "$staged/examples/validate_fixtures.rs"
           cp benchmarks/mel/registry/synthetic-music-edit-metamorphic-pairs-v1.json "$staged/fixtures/"
           echo "MEL_METAMORPHIC_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
@@ -73,6 +77,9 @@ jobs:
           evidence="$RUNNER_TEMP/mel-metamorphic-evidence"
           mkdir -p "$evidence"
           sha256sum crates/domains/symthaea-muse/src/music_edit_metamorphic_benchmark.rs > "$evidence/production-module.sha256"
+          sha256sum crates/domains/symthaea-muse/src/music_edit_metamorphic_composition.rs > "$evidence/composition-module.sha256"
+          sha256sum benchmarks/mel/schemas/music-edit-metamorphic-path-v1.schema.json > "$evidence/path-schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-edit-metamorphic-commutator-case-v1.schema.json > "$evidence/commutator-case-schema.sha256"
           sha256sum crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs > "$evidence/adapter-module.sha256"
           sha256sum benchmarks/mel/schemas/music-edit-metamorphic-pair-v1.schema.json > "$evidence/pair-schema.sha256"
           sha256sum benchmarks/mel/schemas/music-edit-metamorphic-observation-v1.schema.json > "$evidence/observation-schema.sha256"

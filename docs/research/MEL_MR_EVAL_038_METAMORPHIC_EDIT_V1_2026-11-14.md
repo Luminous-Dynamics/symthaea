@@ -71,3 +71,40 @@ The rebase intentionally inherits the corrected EVAL-037 implementation from the
 Before qualification, the workflow must pass on the exact current head. A JSON-schema parse, source inspection, or a successful parent-branch validity workflow is not a substitute for the metamorphic tests and Clippy result.
 
 The initial fixture registry is synthetic and serves only as a deterministic known-answer contract set. It does not establish transformation correctness on recorded music, listening quality, equivalence under real renderers, or rights to use any external corpus.
+
+
+## EVAL-045 — compositional and commutator qualification (28 November 2026)
+
+Tracking: [Issue #14143](https://github.com/Luminous-Dynamics/symthaea/issues/14143); implementation is stacked in [PR #14144](https://github.com/Luminous-Dynamics/symthaea/pull/14144).
+
+The pair evaluator above answers whether one transformation relation holds. EVAL-045 adds the algebraic layer for a **sequence** of already validated transformations. It consumes the exact pair, transform-receipt and property-map types from this module; it does not add a second pair verifier or execute audio transforms.
+
+### Composition rules
+
+- Numeric affine maps compose in execution order. If the first step is (f_1(x)=a_1x+b_1) and the next is (f_2(x)=a_2x+b_2), the composition is (f_2(f_1(x))=(a_2a_1)x+(a_2b_1+b_2)).
+- A numeric tolerance bound propagates conservatively as (|a_2|t_1+t_2).
+- Category maps compose only when each intermediate category is explicitly present in the next map.
+- Boolean identity composes only with boolean identity.
+- Every step must cover the same canonical property set. Missing properties are not silently treated as identity.
+
+### Path continuity
+
+Each step is revalidated through the existing pair and transform-receipt authorities. Exact adjacency requires the prior output sample ID, audio digest, instruction digest and validity-envelope digest to equal the next step's input fields. Dataset revision, benchmark track, operation, source lineage and split are fixed across the path. NonInvariant and AbstainExpected steps are rejected from ordinary path composition.
+
+### Commutator contract
+
+The new two-path comparator starts from the same exact sample/audio/instruction/validity state and compares the composed property maps and terminal instruction/validity commitments. The expected commuting/non-commuting result is not passed as a loose evaluation-time boolean: a versioned commutator case binds both exact path digests, evaluation split, preregistration artifact digest, rationale and expected relation into a domain-separated commitment. Changing the expectation or substituting either path invalidates the case. The comparator deliberately does **not** require terminal waveform hashes to match: symbolic path commutation is not acoustic equivalence. That remains a later materialized-audio and human-calibration obligation.
+
+### Deterministic controls authored
+
+- Affine composition order and conservative uncertainty propagation.
+- Independent transposition and tempo mappings that commute.
+- Scale and offset on one numeric property that do not commute.
+- Inverse transpositions that compose to identity.
+- Category-map composition and missing-intermediate rejection.
+- Boolean identity composition.
+- Broken audio-chain rejection.
+- NonInvariant-step rejection.
+- Repeated deterministic path and mapping digests.
+
+The exact-head harness must still pass Rust 1.96 formatting, tests and warnings-denied Clippy. These authored tests are not yet a runner pass. The current contract is symbolic and provenance-bound; it does not execute actual music transformations, compare edited waveforms, establish listening quality or replace #12327's cumulative audible-drift evaluator.
