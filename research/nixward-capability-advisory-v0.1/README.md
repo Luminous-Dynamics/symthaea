@@ -156,6 +156,21 @@ The internal plan should use typed operations and desired-state predicates, not 
 
 The plan should show alternatives and trade-offs. For example, a service can be private, VPN-only, reverse-proxied or directly public; these are different architectures with different operational costs and threat surfaces. NixWard should not silently choose a public endpoint because it is the easiest configuration.
 
+### 3.6 Current implementation gaps identified on the audited main head
+
+The following are source-audit findings, not assumptions about unmerged research branches. They are tracked separately in [#14235](https://github.com/Luminous-Dynamics/symthaea/issues/14235):
+
+- The current NixOptionSchema has no target host, NixOS release, nixpkgs revision, flake-lock digest or source-origin field.
+- load_options_with_fallback returns the same vector shape for live and bundled catalogs. The documented bundled set is approximately 180 common options, not the evaluated option universe for a user's flake.
+- OptionSchemaCache::refresh updates its freshness timestamp whenever the fallback vector is non-empty, even if the live lookup failed. This can make an old reference catalog look recently refreshed.
+- The parser discards readOnly and does not retain the full structured option-documentation fields (including loc, example and structured relatedPackages).
+- HDC semantic search ranks supplied option paths but does not establish target membership, type compatibility or writeability.
+- SovereignConfigGenerator's source comments acknowledge that some generated choices remain hard-coded rather than using its seeded causal graph.
+
+The preferred target-bound source is the evaluated option set for the exact target configuration. Nixpkgs provides generated option documentation JSON through nixosOptionsDoc; its documented output preserves option declarations, locations, read-only status, type, default, example and related packages. For a flake target, the option set must be evaluated against the selected nixosConfiguration and its locked inputs. Home Manager and third-party module namespaces require their own evaluated option outputs. See [Nixpkgs option-documentation generator](https://github.com/NixOS/nixpkgs/blob/master/nixos/lib/make-options-doc/default.nix) and [nixd's flake option-set examples](https://github.com/nix-community/nixd/blob/main/nixd/docs/configuration.md).
+
+This implies a strict two-stage API: HDC search returns **candidates**; a deterministic resolver then checks exact target membership, type, namespace, read-only status, module/overlay context and source revision. A bundled or local catalog may help discovery, but must never silently become authoritative for a remote host.
+
 ## 4. Security-advisory contract
 
 ### 4.1 Two independent tracks
