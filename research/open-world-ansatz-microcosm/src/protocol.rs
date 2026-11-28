@@ -216,9 +216,12 @@ pub struct BlindEpisode {
     /// Only explicit open-support episodes may treat omitted generating truth
     /// as a valid "no compatible model" outcome.
     allow_outside_candidate_grammar: bool,
-    /// Evaluator-only coefficient for the F2 structural-support control.
-    /// Zero for ordinary closed/open parameter-support worlds.
+    /// Evaluator-only coefficient for the F2 numeric structural-support control.
+    /// Zero for ordinary closed/open numeric parameter-support worlds.
     numeric_quadratic_term: i64,
+    /// Evaluator-only coefficient for the two-input interaction support control.
+    /// The candidate interaction grammar has no u² term.
+    interaction_quadratic_u_term: i64,
     observations: Vec<ObservationRecord>,
     submission: Option<AgentSubmission>,
 }
@@ -234,6 +237,7 @@ struct EpisodeInit {
     generating_truth: GeneratingTruth,
     allow_outside_candidate_grammar: bool,
     numeric_quadratic_term: i64,
+    interaction_quadratic_u_term: i64,
 }
 
 impl BlindEpisode {
@@ -270,6 +274,7 @@ impl BlindEpisode {
             generating_truth: GeneratingTruth::Boolean(truth),
             allow_outside_candidate_grammar: false,
             numeric_quadratic_term: 0,
+            interaction_quadratic_u_term: 0,
         })
     }
 
@@ -348,6 +353,7 @@ impl BlindEpisode {
             generating_truth: GeneratingTruth::Numeric(truth),
             allow_outside_candidate_grammar,
             numeric_quadratic_term: quadratic_term,
+            interaction_quadratic_u_term: 0,
         })
     }
 
@@ -358,6 +364,45 @@ impl BlindEpisode {
         access: StructureAccess,
         max_probe_actions: usize,
     ) -> Result<Self, ProtocolError> {
+        Self::new_interaction_with_support(
+            episode_id,
+            truth,
+            access,
+            max_probe_actions,
+            false,
+            0,
+        )
+    }
+
+    /// Evaluator-only interaction model-adequacy control. Adds a nonzero u²
+    /// term outside the agent-visible bilinear candidate grammar.
+    pub fn new_interaction_structural_shift(
+        episode_id: impl Into<String>,
+        truth: interaction::ModelHypothesis,
+        quadratic_u_term: i64,
+        max_probe_actions: usize,
+    ) -> Result<Self, ProtocolError> {
+        if quadratic_u_term == 0 {
+            return Err(ProtocolError::InvalidManifest);
+        }
+        Self::new_interaction_with_support(
+            episode_id,
+            truth,
+            StructureAccess::InteractionWithheld,
+            max_probe_actions,
+            true,
+            quadratic_u_term,
+        )
+    }
+
+    fn new_interaction_with_support(
+        episode_id: impl Into<String>,
+        truth: interaction::ModelHypothesis,
+        access: StructureAccess,
+        max_probe_actions: usize,
+        allow_outside_candidate_grammar: bool,
+        quadratic_u_term: i64,
+    ) -> Result<Self, ProtocolError> {
         match access {
             StructureAccess::InteractionWithheld => {}
             StructureAccess::InteractionSupplied(supplied) if supplied == truth.structure => {}
@@ -366,8 +411,11 @@ impl BlindEpisode {
             }
             _ => return Err(ProtocolError::AccessFamilyMismatch),
         }
-        let world = interaction::InteractionWorld::new(truth)
-            .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
+        let world = interaction::InteractionWorld::new_with_quadratic_u_term(
+            truth,
+            quadratic_u_term,
+        )
+        .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
         Self::new_internal(EpisodeInit {
             episode_id: episode_id.into(),
             world_family: WorldFamily::TwoInputResponse,
@@ -379,8 +427,9 @@ impl BlindEpisode {
             max_probe_actions,
             world: WorldState::Interaction(world),
             generating_truth: GeneratingTruth::Interaction(truth),
-            allow_outside_candidate_grammar: false,
+            allow_outside_candidate_grammar,
             numeric_quadratic_term: 0,
+            interaction_quadratic_u_term: quadratic_u_term,
         })
     }
 
@@ -396,6 +445,7 @@ impl BlindEpisode {
             generating_truth,
             allow_outside_candidate_grammar,
             numeric_quadratic_term,
+            interaction_quadratic_u_term,
         } = init;
 
         if episode_id.trim().is_empty() || max_probe_actions == 0 {
@@ -417,6 +467,7 @@ impl BlindEpisode {
             generating_truth,
             allow_outside_candidate_grammar,
             numeric_quadratic_term,
+            interaction_quadratic_u_term,
             observations: Vec::new(),
             submission: None,
         })
@@ -794,7 +845,8 @@ impl BlindEpisode {
             };
 
         let generating_truth_behaviorally_represented = match &self.generating_truth {
-            GeneratingTruth::Boolean(_) | GeneratingTruth::Interaction(_) => true,
+            GeneratingTruth::Boolean(_) => true,
+            GeneratingTruth::Interaction(_) => self.interaction_quadratic_u_term == 0,
             GeneratingTruth::Numeric(truth) => {
                 let access = match self.manifest.structure_access {
                     StructureAccess::NumericWithheld => numeric::StructureAccess::Withheld,
