@@ -135,11 +135,14 @@ available as `registry::PsychBenchRegistry::pilot()` and validates the bundled
 definitions (stable/unique IDs, crate-local implementation paths, explicit
 metric selectors, bounds, evidence classes and human-norm claim boundaries).
 Unit tests cover those fail-closed rules and check that the listed implementation
-files exist. The JSON Schema is stored alongside the registry, but a standards-
-compliant JSON Schema validator, metric-key-to-code cross-check, runner
-integration, generated paper/README tables and full inventory coverage remain
-pending. Unknown/uncalibrated metrics are marked ineligible rather than assigned
-guessed human norms.
+files exist. A source-level test also checks all 28 pilot metric selectors
+against their registered implementation files. Selected pilot metrics now call
+`MetricValue::from_samples_with_bounds`, which validates observations against
+declared support and computes intervals in the metric's original units. The JSON
+Schema is stored alongside the registry, but a standards-compliant JSON Schema
+validator, registry-driven runner integration, generated paper/README tables
+and full inventory coverage remain pending. Unknown/uncalibrated metrics are
+marked ineligible rather than assigned guessed human norms.
 
 ## Dependencies
 
