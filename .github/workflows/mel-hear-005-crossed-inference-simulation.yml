@@ -23,7 +23,7 @@ permissions:
 jobs:
   replay:
     name: Exact research simulation replay
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout exact head
