@@ -52,18 +52,6 @@ impl Rational {
         })
     }
 
-    pub fn integer(value: i128) -> Result<Self, ArithmeticError> {
-        Self::new(value, 1)
-    }
-
-    pub fn numerator(self) -> i128 {
-        self.numerator
-    }
-
-    pub fn denominator(self) -> i128 {
-        self.denominator
-    }
-
     pub fn checked_add(self, other: Self) -> Result<Self, ArithmeticError> {
         let left = self
             .numerator
