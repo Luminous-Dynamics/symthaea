@@ -46,7 +46,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "reference_final_state_digest": reference.final_state_digest,
             "recovery_final_state_digest": recovery.final_state_digest,
             "observation_only_final_state_digest": observation_only.final_state_digest,
-            "observation_only_recovery_final_state_digest": observation_only_recovery.final_state_digest,
+            "observation_only_recovery_final_state_digest": observation_only_recovery
+                .final_state_digest,
             "random_final_state_digest": random.final_state_digest,
             "oracle_final_state_digest": oracle.final_state_digest,
             "cost_oracle_final_state_digest": cost_oracle.final_state_digest,
