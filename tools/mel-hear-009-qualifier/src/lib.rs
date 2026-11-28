@@ -545,6 +545,15 @@ mod tests {
     }
 
     #[test]
+    fn client_or_provider_input_claims_require_external_trusted_stage_verification() {
+        let mut panel = fixture();
+        panel.conditions[0].evidence_stage = EvidenceStage::ProviderInputAttested;
+        assert!(audit_panel(&panel).is_err());
+        panel.conditions[0].evidence_stage = EvidenceStage::ClientRequestBound;
+        assert!(audit_panel(&panel).is_err());
+    }
+
+    #[test]
     fn missing_condition_is_rejected() {
         let mut panel = fixture();
         panel.conditions.pop();
