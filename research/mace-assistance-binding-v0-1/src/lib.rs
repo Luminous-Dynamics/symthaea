@@ -872,7 +872,11 @@ mod tests {
             source_evidence_id: "e1".into(),
             subject_id: "participant:alice".into(),
             source_speaker_id: Some("speaker:alice".into()),
-            provenance_kind: ClaimProvenanceKindV1::SpeakerAssertion,
+            provenance_kind: if action == ResponseConstraintActionV1::MustAttribute {
+                ClaimProvenanceKindV1::SpeakerAssertion
+            } else {
+                ClaimProvenanceKindV1::FirstHandObservation
+            },
             action,
             required,
             proposition_sha256: sha("proposition"),
@@ -1145,6 +1149,25 @@ mod tests {
                 &receipt, b"request", bytes, &context, &vec![forbidden], &closure, &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ForbiddenConstraintUsed)
+        );
+    }
+
+    #[test]
+    fn response_constraint_source_must_belong_to_relation_closure() {
+        let closure = closure();
+        let context = assistance_context(&closure);
+        let mut outside = constraint(ResponseConstraintActionV1::MayAssert, true, &closure);
+        outside.source_evidence_id = "not-in-closure".into();
+        let bytes = b"Some statement.";
+        let receipt = response_binding(
+            &context, &vec![outside.clone()], &closure, bytes,
+            ResponseDispositionV1::Answer, Vec::new()
+        );
+        assert_eq!(
+            verify_assistance_binding_v1(
+                &receipt, b"request", bytes, &context, &vec![outside], &closure, &FixtureVerifier
+            ),
+            Err(AssistanceRejectV1::ConstraintSourceOutsideClosure)
         );
     }
 
