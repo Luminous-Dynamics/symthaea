@@ -20,6 +20,8 @@ Keep these methods separate; do not merge their guarantees or silently borrow th
 | CMAQ-046 | Predictable OCO witness × convex-target support residual × conditional-mean e-process | Exploratory conditional-mean arm; fixed-bet subset, distinct null contract |
 | CMAQ-047 | Controlled Blackwell action selection with action-conditional null mean sets | Exploratory active diagnostic arm; selected action must satisfy current support-halfspace contract |
 | CMAQ-048 | Fixed Fourier-feature kernel mean embedding monitored by CMAQ-046 | Exploratory distributional arm; finite feature bank and frozen conditional-mean embedding envelope |
+| CMAQ-049 | Context-blocked paired Fourier kernel discrepancy e-process | Conditional paired-distribution equality in frozen discrete pre-response contexts; finite map and context partition |
+| CMAQ-050 | Continuous-covariate product Fourier paired conditional e-process | Conditional paired-distribution equality via frozen product Fourier maps; no hard bins, finite product dimension |
 
 For every method, freeze source revision, dependencies, score mapping, reference set, ties, warm-up, alpha, horizon and stopping rule. The CCTM/PF-CCTM arms operate on their own stated score/p-value contracts; a PRM result cannot be presented as a reproduction of either.
 
@@ -67,6 +69,32 @@ A smaller smoke run may test wiring but cannot estimate a five-percent false-ala
 **Recoverability shifts:** increasing residual variance, decreasing barrier/recoverability margin, delayed actuation, fallback degradation, and simultaneous sensor/control disturbances. Ground-truth deadlines must come from independent plant/scenario evaluation, not from the detector.
 
 For every generator, store its source, parameters, seed, split, effective block ID, rank/score receipt and exact build digest.
+
+### Paired conditional distribution benchmarks (CMAQ-049 and CMAQ-050)
+
+Run these as a separate paired-response family. The null is conditional equality, not marginal equality:
+
+    Law(X_t | Z_t, F_(t-1)) = Law(Y_t | Z_t, F_(t-1)).
+
+SCPT (Zheng & Zhang, 17 Nov 2026) is the primary external comparator on paired covariate streams. Reproduce its native characteristic-kernel conditional discrepancy, sequential KNN conditional-embedding estimation, betting policy, pair assumptions and time-uniform risk guarantee. Do not claim CMAQ049/050 reproduce or inherit SCPT.
+
+CMAQ-049 uses a finite Fourier response embedding difference multiplied by a one-hot pre-response context block. It gives explicit per-context coverage and prevents opposite context discrepancies from cancelling globally. It is appropriate for a low-cardinality, externally defined safety mode inventory.
+
+CMAQ-050 uses a fixed product Fourier feature map over continuous covariates and paired response differences. It avoids hard bin edges and can detect smooth covariate-response interactions, but its finite product feature map has approximation gaps and dimension/latency costs.
+
+Preregister the common covariate-pair protocol, response and covariate map digests, bandwidths, reference receipts, targets, alpha, horizon, common-cause block inventory and pair matching. Context assignment in CMAQ049 must be a pre-response function of covariates only. CMAQ050 must use only covariates available before or alongside both paired responses.
+
+Primary stress families:
+- exact conditional paired null with varying/stochastic covariate distribution;
+- conditional mismatch with identical marginal X and Y mixtures;
+- opposing discrepancy signs across discrete strata;
+- smooth conditional regression/scale/tail changes;
+- rare and low-frequency covariate regions;
+- covariate-only distribution shift with unchanged conditional response law (negative control);
+- finite feature/product-feature null-space alternatives and within-stratum hidden alternatives;
+- serial and heteroskedastic covariates covered by the declared null assumptions.
+
+Compare SCPT, CMAQ049, CMAQ050, pooled CMAQ048 response-only features, raw paired mean differences and a pooled one-context CMAQ049 ablation. Report full-horizon null alarms with Wilson/Clopper-Pearson intervals, unconditional power/misses, H+1-penalized delay, p50/p90/p95 detection delays, worst context/covariate region, pair coverage, feature count, p99 update latency, memory and approximation error. Use at least 10,000 null streams and 5,000 alternatives per primary cell and CMAQ044 paired effective-block inference.
 
 ### Fixed Fourier-feature kernel mean embedding experiments (CMAQ-048)
 
