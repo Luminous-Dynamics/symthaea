@@ -1,0 +1,44 @@
+name: CMAQ-061 Previsible learned representations
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-061/**"
+      - ".github/workflows/cmaq-061.yml"
+  push:
+    branches:
+      - "research/cmaq-061-previsible-learned-representations-v0-1-20261128"
+    paths:
+      - "research/cmaq-061/**"
+      - ".github/workflows/cmaq-061.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-061-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.100.0
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Generate lockfile
+        run: cargo +1.100.0 generate-lockfile --manifest-path research/cmaq-061/Cargo.toml
+      - name: Format
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-061/Cargo.toml -- --check
+      - name: Tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-061/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-061/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Upload lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-061-lockfile
+          path: research/cmaq-061/Cargo.lock
