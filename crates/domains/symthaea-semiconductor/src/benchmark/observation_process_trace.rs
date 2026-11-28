@@ -180,6 +180,8 @@ pub struct ObservationProcessTraceInputV1 {
     pub controller_tracking_capacity: Option<usize>,
     pub operational_measurement_budget: usize,
     pub independent_audit_budget: usize,
+    /// Exact population-round inventory committed before the trace is collected.
+    pub expected_population_round_ids: Vec<u64>,
     pub audit_design: Option<SelectionAuditDesignV1>,
     pub rounds: Vec<ObservationRoundTraceV1>,
 }
@@ -318,7 +320,8 @@ fn validate_operational(
             }
         }
         OperationalAcquisitionStateV1::SelectedPending => {
-            if evidence.design_sha256.is_none()
+            if evidence.inclusion_probability == Some(0.0)
+                || evidence.design_sha256.is_none()
                 || evidence.measured_at_unix_seconds.is_some()
                 || evidence.measurement_system_sha256.is_some()
                 || row.k1.state != K1QualificationStateV1::NotApplicable
@@ -358,7 +361,8 @@ fn validate_operational(
             }
         }
         OperationalAcquisitionStateV1::MeasurementUnavailable => {
-            if evidence.design_sha256.is_none()
+            if evidence.inclusion_probability == Some(0.0)
+                || evidence.design_sha256.is_none()
                 || evidence.measured_at_unix_seconds.is_some()
                 || evidence.measurement_system_sha256.is_some()
                 || row.k1.state != K1QualificationStateV1::NotApplicable
@@ -690,6 +694,7 @@ fn validate_controller(
         }
         ControllerTrackingStateV1::ImmediateTrivial => {
             if controller.immediate_trivial_loss.is_none()
+                || controller.prediction_receipt_sha256.is_none()
                 || controller.update_receipt_sha256.is_none()
                 || !controller.controller_state_changed
                 || row.k1.state != K1QualificationStateV1::NotApplicable
@@ -748,6 +753,12 @@ fn validate_controller(
         if actual_delay > input.controller_delay_steps.unwrap_or(0) {
             return Err(ObservationProcessTraceErrorV1(format!(
                 "round {}: actual CA-OCRC delay exceeds the declared d_max",
+                row.round_id
+            )));
+        }
+        if controller.feedback_round != Some(row.round_id.saturating_add(actual_delay)) {
+            return Err(ObservationProcessTraceErrorV1(format!(
+                "round {}: CA-OCRC feedback round differs from actual delay",
                 row.round_id
             )));
         }
@@ -831,10 +842,7 @@ fn validate_audit(
                 || audit.audit_measurement_cost.is_none()
                 || audit.audit_measurement_receipt_sha256.is_none()
                 || audit.audit_loss.is_none()
-                || !matches!(
-                    audit.retention,
-                    AuditRetentionStateV1::OfflineArchive | AuditRetentionStateV1::Both
-                )
+                || audit.retention == AuditRetentionStateV1::Neither
                 || row.k1.state == K1QualificationStateV1::Eligible
             {
                 return Err(ObservationProcessTraceErrorV1(format!(
@@ -934,12 +942,22 @@ pub fn evaluate_observation_process_trace_v1(
             }
         }
     }
-    if input.rounds.is_empty() {
+    if input.rounds.is_empty() || input.expected_population_round_ids.is_empty() {
         return Err(ObservationProcessTraceErrorV1(
-            "observation trace must contain at least one population round".into(),
+            "observation trace and committed population inventory must be non-empty".into(),
         ));
     }
     let mut canonical = input.clone();
+    canonical.expected_population_round_ids.sort_unstable();
+    if canonical
+        .expected_population_round_ids
+        .windows(2)
+        .any(|pair| pair[0] == pair[1])
+    {
+        return Err(ObservationProcessTraceErrorV1(
+            "committed population inventory contains duplicate round IDs".into(),
+        ));
+    }
     canonical.rounds.sort_by_key(|row| row.round_id);
     let mut round_ids = BTreeSet::new();
     let mut sample_ids = BTreeSet::new();
@@ -974,8 +992,14 @@ pub fn evaluate_observation_process_trace_v1(
         validate_audit(&canonical, row)?;
     }
 
-    let population_round_ids: Vec<u64> =
+    let observed_round_ids: Vec<u64> =
         canonical.rounds.iter().map(|row| row.round_id).collect();
+    if observed_round_ids != canonical.expected_population_round_ids {
+        return Err(ObservationProcessTraceErrorV1(
+            "observed trace rounds do not exactly match the committed population inventory".into(),
+        ));
+    }
+    let population_round_ids = observed_round_ids;
     let qualified_round_ids: Vec<u64> = canonical
         .rounds
         .iter()
@@ -1240,6 +1264,7 @@ mod tests {
             controller_tracking_capacity: None,
             operational_measurement_budget: 10,
             independent_audit_budget: 10,
+            expected_population_round_ids: rounds.iter().map(|row| row.round_id).collect(),
             audit_design: None,
             rounds,
         }
@@ -1445,6 +1470,7 @@ mod tests {
         };
         trace.controller.tracking_state = ControllerTrackingStateV1::ReceivedQualified;
         trace.controller.policy_sha256 = Some(digest('7'));
+        trace.controller.feedback_delay_contract_steps = Some(2);
         trace.controller.prediction_receipt_sha256 = Some(digest('8'));
         trace.controller.feedback_receipt_sha256 = Some(digest('9'));
         trace.controller.update_receipt_sha256 = Some(digest('a'));
@@ -1468,6 +1494,7 @@ mod tests {
         trace.controller.policy_sha256 = Some(digest('a'));
         trace.controller.delay_contract_sha256 = Some(digest('b'));
         trace.controller.tracking_capacity = Some(2);
+        trace.controller.feedback_delay_contract_steps = Some(2);
         trace.controller.tracking_occupancy_after = Some(3);
         trace.controller.proxy_uniform_draw = Some(0.5);
         trace.controller.proxy_delay_steps = Some(2);
