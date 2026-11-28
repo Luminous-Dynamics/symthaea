@@ -13,9 +13,10 @@
 //! than raw surprise or uncalibrated confidence. It reports value per 1,000
 //! source pixels so candidate selection can be compared under matched compute.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RoiCalibrationEvidence {
     pub calibration_id: String,
     pub model_digest: String,
@@ -26,7 +27,7 @@ pub struct RoiCalibrationEvidence {
     pub expected_calibration_error: f32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RoiValueEstimate {
     pub candidate_id: String,
     pub task_id: String,
@@ -51,7 +52,7 @@ pub struct RoiValueEstimate {
     pub calibration: RoiCalibrationEvidence,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub struct RoiInformationValueConfig {
     pub maximum_source_age_us: u64,
     pub minimum_calibration_samples: u64,
@@ -93,7 +94,7 @@ impl RoiInformationValueConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RoiInformationValueScore {
     pub candidate_id: String,
     pub task_id: String,
@@ -105,7 +106,7 @@ pub struct RoiInformationValueScore {
     pub source_pixel_cost: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum RoiInformationValueError {
     InvalidConfig,
     InvalidIdentifier,
@@ -219,13 +220,13 @@ pub fn evaluate_roi_information_value(
     })
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RoiCandidateRejection {
     pub candidate_id: String,
     pub reason: RoiInformationValueError,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RoiInformationRanking {
     /// Highest benefit per 1,000 source pixels first. Candidate ID breaks ties.
     pub ranked: Vec<RoiInformationValueScore>,
