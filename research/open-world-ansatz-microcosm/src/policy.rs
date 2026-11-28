@@ -234,7 +234,7 @@ impl StrategyEnumeratorBaseline {
                 if !log.interventions.is_empty()
                     && (view.remaining_probe_actions == 0
                         || models.is_empty()
-                        || next_unobserved_numeric_input(&log).is_none())
+                        || (models.len() == 1 && next_unobserved_numeric_input(&log).is_none()))
                 {
                     let count = models.len();
                     return Ok((
@@ -247,6 +247,14 @@ impl StrategyEnumeratorBaseline {
                         ),
                         ProbeScoringWork::default(),
                     ));
+                }
+                if models.len() == 1 {
+                    if let Some(input) = next_unobserved_numeric_input(&log) {
+                        return Ok((
+                            probe(AgentIntervention::Numeric(input)),
+                            ProbeScoringWork::default(),
+                        ));
+                    }
                 }
             }
             crate::protocol::WorldFamily::TwoInputResponse => {
