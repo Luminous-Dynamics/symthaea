@@ -258,6 +258,7 @@ fn simulate(spec: &SokobanSpec, state: SokobanState, action: Action) -> SokobanT
 /// Exact BFS diagnostic for the evaluator on small deterministic fixtures.
 /// This function is crate-private so an agent linked against the library
 /// cannot call the oracle as part of its policy.
+#[allow(dead_code)]
 pub(crate) fn optimal_sokoban_path(spec: &SokobanSpec) -> Option<Vec<Action>> {
     const ACTIONS: [Action; 4] = [Action::North, Action::East, Action::South, Action::West];
 
@@ -283,7 +284,7 @@ pub(crate) fn optimal_sokoban_path(spec: &SokobanSpec) -> Option<Vec<Action>> {
         for action in ACTIONS {
             let transition = simulate(spec, state, action);
             let next = transition.state;
-            if next == state || !seen.insert(next) {
+            if !transition.player_moved || !seen.insert(next) {
                 continue;
             }
             parents.insert(next, (state, action));
