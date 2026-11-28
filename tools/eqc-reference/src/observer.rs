@@ -41,6 +41,7 @@ pub struct ObserverPayload {
     pub input_digests: Vec<ObserverInputDigest>,
     pub observer_id: String,
     pub observer_version: String,
+    pub observer_sha256: String,
     pub workflow_identity: String,
     pub measurement_profile: String,
     pub runner_os: String,
@@ -88,6 +89,8 @@ pub struct SignedObserverEnvelope {
 pub struct TrustedObserverKey {
     pub key_id: String,
     pub observer_id: String,
+    pub observer_version: String,
+    pub observer_sha256: String,
     pub public_key_hex: String,
     pub workflow_identity: String,
     pub measurement_profile: String,
@@ -232,6 +235,19 @@ pub fn verify_envelope(
     if trust_policy.schema != POLICY_SCHEMA || trust_policy.policy_id.trim().is_empty() {
         bail!("invalid out-of-band observer trust policy");
     }
+    let mut key_ids = HashSet::new();
+    for entry in &trust_policy.trusted_observers {
+        if entry.key_id.trim().is_empty()
+            || entry.observer_id.trim().is_empty()
+            || entry.observer_version.trim().is_empty()
+            || entry.workflow_identity.trim().is_empty()
+            || !is_sha256(&entry.observer_sha256)
+            || !is_sha256(&entry.public_key_hex)
+            || !key_ids.insert(entry.key_id.as_str())
+        {
+            bail!("observer trust policy contains an invalid or duplicate trust entry");
+        }
+    }
     if expectation.schema != EXPECTATION_SCHEMA {
         bail!("unsupported observer run expectation schema");
     }
@@ -247,6 +263,8 @@ pub fn verify_envelope(
         bail!("observer key is inactive");
     }
     if trusted.observer_id != envelope.payload.observer_id
+        || trusted.observer_version != envelope.payload.observer_version
+        || trusted.observer_sha256 != envelope.payload.observer_sha256
         || trusted.workflow_identity != envelope.payload.workflow_identity
         || trusted.measurement_profile != envelope.payload.measurement_profile
     {
@@ -446,6 +464,7 @@ fn validate_payload_shape(payload: &ObserverPayload) -> anyhow::Result<()> {
         ("task_digest_sha256", &payload.task_digest_sha256),
         ("policy_digest_sha256", &payload.policy_digest_sha256),
         ("trust_policy_sha256", &payload.trust_policy_sha256),
+        ("observer_sha256", &payload.observer_sha256),
         ("source_sha256", &payload.source_sha256),
         ("environment_sha256", &payload.environment_sha256),
         ("state_before_sha256", &payload.state_before_sha256),
@@ -638,6 +657,7 @@ mod tests {
             }],
             observer_id: "trusted-observer-linux".into(),
             observer_version: "0.1.0".into(),
+            observer_sha256: "ab".repeat(32),
             workflow_identity: concat!(
                 "repo:Luminous-Dynamics/symthaea:workflow:eqc-observer.yml:",
                 "ref:refs/heads/test"
@@ -680,6 +700,8 @@ mod tests {
             trusted_observers: vec![TrustedObserverKey {
                 key_id: "test-observer-key-01".into(),
                 observer_id: "trusted-observer-linux".into(),
+                observer_version: "0.1.0".into(),
+                observer_sha256: "ab".repeat(32),
                 public_key_hex: encode_hex(key.verifying_key().as_bytes()),
                 workflow_identity: concat!(
                 "repo:Luminous-Dynamics/symthaea:workflow:eqc-observer.yml:",
