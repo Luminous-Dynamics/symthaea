@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "suite_id": "mel-dj-007-known-answer",
+  "protocol_id": "mirex-2026-audio-beat-tracking",
+  "manifest_revision": "synthetic-fixture-only-no-audio",
+  "tracks": [
+    {
+      "track_id": "synthetic-gtzan-policy-fixture",
+      "dataset_id": "gtzan",
+      "dataset_revision": "synthetic-policy-example-only",
+      "audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_master_family_id": "master-gtzan-0001",
+      "split": "locked_test",
+      "purpose": "benchmark_evaluation",
+      "rights_status": "approved",
+      "rights_reference": "urn:fixture:synthetic-example-not-a-license",
+      "annotation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "annotation_provenance": "synthetic_known_answer",
+      "annotation_revision": "synthetic-event-coordinate-v1",
+      "overlap_audit": "clear",
+      "sample_rate_hz": 44100,
+      "channels": 1,
+      "total_frames": 100000,
+      "valid_segments": [
+        {
+          "start_frame": 0,
+          "end_frame": 100000
+        }
+      ],
+      "beat_frames": [
+        0,
+        22050,
+        44100,
+        66150,
+        88200
+      ],
+      "downbeat_annotations_available": true,
+      "downbeat_frames": [
+        0,
+        44100,
+        88200
+      ],
+      "publication_ceiling": null,
+      "dataset_reference": "urn:fixture:synthetic-dataset",
+      "collection_process_reference": "urn:fixture:synthetic-collection-process"
+    }
+  ]
+}

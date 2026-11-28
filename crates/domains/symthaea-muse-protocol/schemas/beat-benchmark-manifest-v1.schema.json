@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-dj/beat-benchmark-manifest-v1.schema.json",
+  "title": "Melothaea Beat Benchmark Manifest V1",
+  "description": "Rights, split, source-master, annotation and valid-segment admission manifest. Cross-record leakage and MIREX locked-test rules are checked by validate_beat_benchmark_manifest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite_id",
+    "protocol_id",
+    "manifest_revision",
+    "tracks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manifest_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/track"
+      },
+      "maxItems": 10000
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "split": {
+      "enum": [
+        "train",
+        "validation",
+        "development",
+        "locked_test",
+        "private_external"
+      ]
+    },
+    "purpose": {
+      "enum": [
+        "training",
+        "validation",
+        "model_selection",
+        "parameter_tuning",
+        "development",
+        "benchmark_evaluation",
+        "external_validation"
+      ]
+    },
+    "rights_status": {
+      "enum": [
+        "approved",
+        "restricted",
+        "unknown"
+      ]
+    },
+    "annotation_provenance": {
+      "enum": [
+        "human_adjudicated",
+        "auto_then_corrected",
+        "auto_only",
+        "unknown",
+        "synthetic_known_answer"
+      ],
+      "description": "Auto-only reference labels are accepted only as unqualified exploratory material; synthetic_known_answer is reserved for generated fixtures."
+    },
+    "overlap_audit": {
+      "enum": [
+        "clear",
+        "known_overlap",
+        "unknown"
+      ]
+    },
+    "valid_segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_frame",
+        "end_frame"
+      ],
+      "properties": {
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "end_frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_id",
+        "dataset_id",
+        "dataset_revision",
+        "dataset_reference",
+        "collection_process_reference",
+        "audio_sha256",
+        "source_master_family_id",
+        "split",
+        "purpose",
+        "rights_status",
+        "rights_reference",
+        "publication_ceiling",
+        "annotation_sha256",
+        "annotation_provenance",
+        "annotation_revision",
+        "overlap_audit",
+        "sample_rate_hz",
+        "channels",
+        "total_frames",
+        "valid_segments",
+        "beat_frames",
+        "downbeat_annotations_available",
+        "downbeat_frames"
+      ],
+      "properties": {
+        "track_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_master_family_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "split": {
+          "$ref": "#/$defs/split"
+        },
+        "purpose": {
+          "$ref": "#/$defs/purpose"
+        },
+        "rights_status": {
+          "$ref": "#/$defs/rights_status"
+        },
+        "rights_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "annotation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "annotation_provenance": {
+          "$ref": "#/$defs/annotation_provenance"
+        },
+        "annotation_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overlap_audit": {
+          "$ref": "#/$defs/overlap_audit"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "total_frames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "valid_segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/valid_segment"
+          },
+          "maxItems": 4096
+        },
+        "beat_frames": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "maxItems": 200000
+        },
+        "downbeat_annotations_available": {
+          "type": "boolean"
+        },
+        "downbeat_frames": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "maxItems": 200000
+        },
+        "publication_ceiling": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dataset_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "collection_process_reference": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

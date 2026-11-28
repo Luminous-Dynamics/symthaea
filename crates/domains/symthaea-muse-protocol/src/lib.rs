@@ -36,6 +36,8 @@
 pub mod catalog;
 /// DJ transition contracts and deterministic validation (MEL-DJ-002).
 pub mod transition;
+/// Leakage-safe beat benchmark manifests (MEL-DJ-009).
+pub mod beat_benchmark;
 
 use serde::{Deserialize, Serialize};
 
