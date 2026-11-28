@@ -246,7 +246,7 @@ impl PredictableAuditReceipt {
             if !self
                 .selections
                 .iter()
-                .any(|selection| selection.record_id == *id)
+                .any(|selection| selection.record_id.as_str() == id.as_str())
             {
                 return Err(PredictableAuditError::UnknownAdjudicationRecord(id.clone()));
             }
