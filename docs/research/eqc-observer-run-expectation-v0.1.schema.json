@@ -19,7 +19,8 @@
     "max_cpu_time_ms",
     "max_peak_memory_bytes",
     "max_tool_calls",
-    "network_policy"
+    "network_policy",
+    "max_human_interventions"
   ],
   "properties": {
     "schema": {
@@ -101,6 +102,11 @@
     },
     "network_policy": {
       "const": "none"
+    },
+    "max_human_interventions": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
     }
   }
 }
