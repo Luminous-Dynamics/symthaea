@@ -28,7 +28,7 @@ Groups form an explicit parent tree. Parent data include examples assigned to de
 2. Distribution shift: suspend the certificate and acquire or abstain.
 3. No certificate, insufficient support or risk above target: acquire or abstain.
 4. Score below the certified threshold: retrieve more, acquire, or abstain.
-5. Only a matching usable group certificate, adequate score and passing hard gates permit accept-and-act.
+5. Only a matching usable group certificate, its integrity-verified calibration manifest, adequate score and passing hard gates permit accept-and-act.
 
 ## Guarantee assumptions and limits
 
@@ -45,7 +45,7 @@ No guarantee transfers automatically to a new policy, score, hierarchy, source d
 
 ## Synthetic tests
 
-Nineteen deterministic tests cover the exact zero-violation bound and sample-size consequence, multiplicity conservatism, safe threshold selection, hard-gate dominance, risk-exceeds-target status, explicit parent fallback, shift and exchangeability suspension, hierarchy cycle/digest rejection, retrieve-more behavior, certificate-gated acceptance and tamper rejection.
+Twenty-one deterministic tests cover the exact zero- and nonzero-violation bounds against independent Beta-quantile references, multiplicity conservatism, safe threshold selection, hard-gate dominance, risk-exceeds-target status, explicit parent fallback, shift and exchangeability suspension, hierarchy cycle/digest rejection, retrieve-more behavior, certificate-gated acceptance, manifest linkage/tamper rejection, three-level split overlap, label sealing, candidate isolation and inventory-to-row commitment equality.
 
 ## Run
 
