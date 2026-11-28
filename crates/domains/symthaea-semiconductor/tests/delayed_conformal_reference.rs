@@ -13,7 +13,7 @@ use symthaea_semiconductor::benchmark::{
     LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
     ca_ocrc_proxy_survival_v1, ca_ocrc_risk_gap_bound_v1,
     create_ca_ocrc_engine_v1, create_delayed_aci_engine_v1,
-    deliver_ca_ocrc_feedback_v1, deliver_delayed_aci_label_v1,
+    deliver_delayed_aci_label_v1,
     register_delayed_aci_prediction_v1, start_ca_ocrc_round_v1,
 };
 
