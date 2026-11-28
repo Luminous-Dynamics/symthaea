@@ -1,0 +1,25 @@
+name: MACE Paired Benchmark Frontier
+on:
+  pull_request:
+    paths:
+      - "research/mace-paired-benchmark-frontier-v0-1/**"
+      - "data/schemas/mace_paired_benchmark_frontier_v1.schema.json"
+      - "docs/research/MACE_PAIRED_BENCHMARK_FRONTIER_V0_1.md"
+      - ".github/workflows/mace-paired-benchmark-frontier.yml"
+  push:
+    branches:
+      - "research/mace-paired-benchmark-frontier-v0-1"
+jobs:
+  frontier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Parse paired frontier evaluator
+        run: rustfmt --edition 2024 --emit stdout --config skip_children=true research/mace-paired-benchmark-frontier-v0-1/src/lib.rs >/dev/null
+      - name: Test paired frontier evaluator
+        run: cargo test --manifest-path research/mace-paired-benchmark-frontier-v0-1/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/mace-paired-benchmark-frontier-v0-1/Cargo.toml --all-targets -- -D warnings
+      - name: Parse paired frontier schema
+        run: python3 -m json.tool data/schemas/mace_paired_benchmark_frontier_v1.schema.json >/dev/null

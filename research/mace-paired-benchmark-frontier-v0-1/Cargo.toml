@@ -1,0 +1,15 @@
+[package]
+name = "mace-paired-benchmark-frontier"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Cluster-paired outcome analysis and Pareto frontier evaluation for MACE benchmark arms"
+
+[workspace]
+
+[dependencies]
+mace-matched-benchmark-contract = { path = "../mace-matched-benchmark-contract-v0-1" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
