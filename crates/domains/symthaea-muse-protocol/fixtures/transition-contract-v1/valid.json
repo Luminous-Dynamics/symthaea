@@ -55,7 +55,9 @@
     "source_anchor_frame": 400,
     "target_anchor_frame": 600,
     "beat_ordinal_milli": 16000,
-    "confidence_ppm": 850000
+    "confidence_ppm": 850000,
+    "source_grid_hypothesis_id": "source-grid-primary",
+    "target_grid_hypothesis_id": "target-grid-primary"
   },
   "protected_regions": [
     {
