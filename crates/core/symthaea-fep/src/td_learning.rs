@@ -718,8 +718,10 @@ mod tests {
 
     /// Helper: create TD learner without eligibility traces
     fn make_learner_no_traces() -> TemporalDifferenceLearner {
-        let mut config = TemporalDifferenceLearningConfig::default();
-        config.use_eligibility_traces = false;
+        let config = TemporalDifferenceLearningConfig {
+            use_eligibility_traces: false,
+            ..Default::default()
+        };
         TemporalDifferenceLearner::new(config, NUM_ACTIONS, STATE_DIM, OBS_DIM)
     }
 
@@ -1000,8 +1002,10 @@ mod tests {
 
     #[test]
     fn test_transition_history_respects_max_capacity() {
-        let mut config = TemporalDifferenceLearningConfig::default();
-        config.max_transition_history = 5;
+        let config = TemporalDifferenceLearningConfig {
+            max_transition_history: 5,
+            ..Default::default()
+        };
         let mut learner = TemporalDifferenceLearner::new(config, NUM_ACTIONS, STATE_DIM, OBS_DIM);
         let model = GenerativeModel::new(STATE_DIM, OBS_DIM, NUM_ACTIONS);
         let old = state_from(&[0.5, 0.3, 0.1, 0.1]);
@@ -1240,8 +1244,10 @@ mod tests {
 
     #[test]
     fn test_discount_factor_zero() {
-        let mut config = TemporalDifferenceLearningConfig::default();
-        config.gamma = 0.0; // No discounting of future
+        let config = TemporalDifferenceLearningConfig {
+            gamma: 0.0, // No discounting of future
+            ..Default::default()
+        };
         let mut learner = TemporalDifferenceLearner::new(config, NUM_ACTIONS, STATE_DIM, OBS_DIM);
         let model = GenerativeModel::new(STATE_DIM, OBS_DIM, NUM_ACTIONS);
         let old = state_from(&[0.5, 0.3, 0.1, 0.1]);
@@ -1255,14 +1261,19 @@ mod tests {
 
     #[test]
     fn test_high_learning_rate_effect() {
-        let mut config = TemporalDifferenceLearningConfig::default();
-        config.initial_learning_rate = 0.9;
+        let high_config = TemporalDifferenceLearningConfig {
+            initial_learning_rate: 0.9,
+            ..Default::default()
+        };
         let mut learner_high =
-            TemporalDifferenceLearner::new(config.clone(), NUM_ACTIONS, STATE_DIM, OBS_DIM);
+            TemporalDifferenceLearner::new(high_config, NUM_ACTIONS, STATE_DIM, OBS_DIM);
 
-        config.initial_learning_rate = 0.01;
+        let low_config = TemporalDifferenceLearningConfig {
+            initial_learning_rate: 0.01,
+            ..Default::default()
+        };
         let mut learner_low =
-            TemporalDifferenceLearner::new(config, NUM_ACTIONS, STATE_DIM, OBS_DIM);
+            TemporalDifferenceLearner::new(low_config, NUM_ACTIONS, STATE_DIM, OBS_DIM);
 
         let mut model_high = GenerativeModel::new(STATE_DIM, OBS_DIM, NUM_ACTIONS);
         let mut model_low = GenerativeModel::new(STATE_DIM, OBS_DIM, NUM_ACTIONS);
