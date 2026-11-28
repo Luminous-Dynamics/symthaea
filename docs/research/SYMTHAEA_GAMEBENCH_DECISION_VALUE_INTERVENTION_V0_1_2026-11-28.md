@@ -40,24 +40,24 @@ The isolated crate is:
 For hypotheses h in H, decisions a in A, prior/posterior p(h), and an intervention I with possible outcomes o in O_I:
 
 \[
-V_0(p)=\\max_{a\\in A}\\sum_h p(h)U_0(a,h)
+V_0(p)=\max_{a\in A}\sum_h p(h)U_0(a,h)
 \]
 
 \[
-V_I(p)=\\sum_o P(o\\mid p,I)
-\\max_{a\\in A}\\sum_h P(h\\mid o,p,I)U_{I,o}(a,h)
+V_I(p)=\sum_o P(o\mid p,I)
+\max_{a\in A}\sum_h P(h\mid o,p,I)U_{I,o}(a,h)
 \]
 
 \[
-\\mathrm{GrossDelta}(I\\mid p)=V_I(p)-V_0(p)
+\mathrm{GrossDelta}(I\mid p)=V_I(p)-V_0(p)
 \]
 
 \[
-\\mathrm{NetValue}(I\\mid p)=\\mathrm{GrossDelta}(I\\mid p)-c(I)
+\mathrm{NetValue}(I\mid p)=\mathrm{GrossDelta}(I\mid p)-c(I)
 \]
 
 \[
-\\mathrm{IG}(I\\mid p)=H(p)-\\sum_o P(o\\mid p,I)H(P(h\\mid o,p,I))
+\mathrm{IG}(I\mid p)=H(p)-\sum_o P(o\mid p,I)H(P(h\mid o,p,I))
 \]
 
 Here, U_I,o is the utility of each downstream decision after the intervention and its observation. It can encode physical side effects. For a purely informational probe, set every U_I,o = U_0. The two score families remain separate: information gain is a diagnostic; net decision value is the decision criterion.
