@@ -1,0 +1,50 @@
+name: CMAQ-060 sparse predictable expert selection
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-060/**"
+      - "research/cmaq-059/**"
+      - "research/cmaq-056/**"
+      - "research/cmaq-054/**"
+      - "research/cmaq-053/**"
+      - "research/cmaq-048/**"
+      - "research/cmaq-046/**"
+      - ".github/workflows/cmaq-060.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-060-sparse-predictable-expert
+  cancel-in-progress: true
+
+jobs:
+  sparse-predictable-expert:
+    name: sparse-predictable-expert
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-060-sparse-expert-selection-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Generate dependency lockfile
+        run: cargo +1.100.0 generate-lockfile --manifest-path research/cmaq-060/Cargo.toml
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-060/Cargo.toml -- --check
+      - name: Run deterministic sparse-selector tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-060/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-060/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Run paired-stream sparse-selector probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-060/Cargo.toml --locked --bin sparse_probe > cmaq-060-sparse-probe.csv
+      - name: Preserve sparse-selector receipts and lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-060-sparse-selector-probe
+          path: |
+            cmaq-060-sparse-probe.csv
+            research/cmaq-060/Cargo.lock
+          if-no-files-found: error
