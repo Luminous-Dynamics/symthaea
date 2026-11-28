@@ -1,0 +1,26 @@
+name: MACE AML Add/Search Service
+on:
+  pull_request:
+    paths:
+      - "research/broca-mace-transfer-bench-v0-1/aml-adapter/**"
+      - ".github/workflows/mace-aml-add-search-service.yml"
+  push:
+    branches:
+      - "research/mace-axum-http-runtime-v0-1"
+      - "research/mace-redb-durable-store-v0-1"
+permissions:
+  contents: read
+jobs:
+  service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Formatting
+        run: cargo fmt --manifest-path research/broca-mace-transfer-bench-v0-1/aml-adapter/Cargo.toml -- --check
+      - name: Compile
+        run: cargo check --manifest-path research/broca-mace-transfer-bench-v0-1/aml-adapter/Cargo.toml --all-targets
+      - name: Tests
+        run: cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/aml-adapter/Cargo.toml --all-targets
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/broca-mace-transfer-bench-v0-1/aml-adapter/Cargo.toml --all-targets -- -D warnings
