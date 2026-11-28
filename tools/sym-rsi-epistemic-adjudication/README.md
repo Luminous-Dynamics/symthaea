@@ -122,3 +122,6 @@ Important assumptions and claim boundaries:
 - No full theorem proof audit, Rust execution, benchmark, deployment guarantee or SOTA claim is implied by source authoring.
 
 The standalone Rust 1.96 harness imports the exact production source by path. Exact-head rustfmt, locked tests and strict Clippy remain required.
+
+
+A further negative-control test deliberately violates conditional ignorability by making actual adjudication probability depend on the hidden current outcome while declaring a constant q_t to the evaluator. Exact audit-mask enumeration shows that the nominal bound can under-cover under this invalid design. This does not weaken the theorem; it demonstrates why q_t and the independent custodian design must be externally audited.
