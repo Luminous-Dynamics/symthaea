@@ -165,7 +165,7 @@ Only the first item can be qualified by this adapter crate. The rest require an 
 ## Qualification state
 
 - The shared decision-evaluator library's previous exact-head pass is its own qualification and does not qualify this adapter.
-- The new bridge has six authored Rust tests. No local Rust toolchain is available; this crate has not been locally formatted, compiled, tested or Clippy-checked.
+- The new bridge has twelve authored Rust tests. They include post-observation posterior/terminal-decision known answers, nuisance observation non-effect, episode-bound receipt validation, pre-registration timing, result delay, budget and deadline rejection, forecast scoring, and rejection of world-mutating probes. No local Rust toolchain is available; this crate has not been locally formatted, compiled, tested or Clippy-checked.
 - Its exact-head CI is required before any Rust qualification claim.
 - The GameBench agent adapter and candidate campaign remain future integration work.
 - No agent capability, transfer, physical validity, or SOTA superiority is claimed.
