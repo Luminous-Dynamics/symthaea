@@ -97,3 +97,27 @@ The production module src/web_research/stratified_risk.rs combines the complete 
 - The risk–coverage curve is updated incrementally across descending confidence groups; each prefix is scored from per-stratum counts rather than rescanning the full cohort.
 
 The standalone harness imports the production source by path. Exact Rust 1.96 formatting, tests and strict Clippy remain required.
+
+
+## Fixed-horizon selective-observation weighted risk control (SOWRC)
+
+The production module `src/web_research/sowrc.rs` adds a separate fixed-horizon finite-sample selective-risk control lane, inspired by Bai, Fang and Chen, *Risk-Controlling Predictive Sets for Time-Series Events Under Selective Observation with Finite-Sample Guarantees*, Axioms 15(9), 706 (2026), DOI 10.3390/axioms15090706.
+
+It differs from the adjudicated-cohort risk/coverage evaluator, the inverse-propensity population point estimator, and the fixed-quota SRSWOR variance estimator.
+
+- Each chronological event carries the pre-label conditional label-inclusion probability q_t, independent-label-observed flag, and the evaluator-only true-label nonconformity score.
+- The v1 restriction is constant predictable weights a_t=1, deterministic envelopes c_n=1 and b_n=1/q_min, and HT loss I_t * 1{r_t > lambda}/q_t.
+- It uses fixed betting fractions and mixture weights, computes the observable martingale-mixture E-value, and inverts by log-space bisection for every threshold on a predeclared nested grid.
+- The total failure budget delta is split across the fixed threshold grid. The selection rule chooses the smallest grid threshold with upper bound <= alpha; if none qualifies, lambda=1 returns the full label space with structurally zero miscoverage.
+- Calibration protocol, inclusion design, and prediction artifact each have separate frozen manifest references and validated 64-character lowercase SHA-256 digest commitments, echoed into the report. The evaluator does not fetch or authenticate signatures over those manifests.
+- Observed nonconformity scores are sorted once; suffix weights and a monotone cursor compute all threshold totals in O(N log N + N + J).
+- Fixed-quota SRSWOR marginal pi_i values are not substituted for predictable q_t. Sequential design assumptions must be justified separately.
+
+Assumptions/limitations:
+- Requires predictable q_t known before labels, conditional ignorability, q_min positivity, bounded scores, fixed horizon/envelopes, frozen predictor and precommitted grid/mixture.
+- The module cannot authenticate the custodian/randomization or prove conditional ignorability.
+- The risk control applies to the weighted calibration population under those assumptions. Future deployment risk under drift needs a separate certified drift envelope and failure-probability allocation.
+- It is not an anytime/time-uniform, adaptive-budget, estimated-propensity or multi-risk implementation.
+- No accuracy, scientific truth, live benchmark or SOTA claim follows from this evaluator.
+
+The production source currently contains **18 authored tests**, including exact Bernoulli mask enumeration weighted by the actual design probabilities, a Markov outcome process with history-adaptive predictable audit probabilities, and a deliberately invalid outcome-dependent selection negative control showing why conditional ignorability is necessary. The negative control is not a theorem proof. Exact Rust 1.96 formatting, tests and strict Clippy remain required.
