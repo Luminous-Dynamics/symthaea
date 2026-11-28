@@ -7,7 +7,7 @@ use std::error::Error;
 use std::time::{Duration, Instant};
 
 use symthaea_gamebench::{
-    Action, Cell, F1EpisodeReport, Game, GreedyManhattanCandidate, GridSpec,
+    Action, Cell, F1EpisodeReport, GreedyManhattanCandidate, GridSpec,
     InteractiveCandidate, Observation, Position, RandomLegalCandidate, evaluate_f1,
 };
 use symthaea_gamebench_fep_adapter::{
