@@ -9,6 +9,9 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+mod hdc_candidate;
+pub use hdc_candidate::{HdcCandidateError, HdcSpatialCandidate};
+
 use symthaea_fep::{
     ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation as FepObservation,
 };
