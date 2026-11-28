@@ -231,6 +231,12 @@ fn canonicalize_trace(input: &JointRiskTraceInputV1) -> JointRiskTraceInputV1 {
             }
             JointControllerEvidenceV1::BoundedDelayCaOcrc(evidence) => {
                 evidence.round_inputs.sort_by_key(|entry| entry.prediction.round);
+                for round_input in &mut evidence.round_inputs {
+                    round_input.feedbacks.sort_by(|left, right| {
+                        (left.sample_id.as_str(), left.label_id.as_str(), left.label_revision)
+                            .cmp(&(right.sample_id.as_str(), right.label_id.as_str(), right.label_revision))
+                    });
+                }
                 evidence.round_reports.sort_by_key(|entry| entry.round);
                 for report in &mut evidence.round_reports {
                     report.feedback_results.sort_by(|left, right| {
@@ -461,27 +467,47 @@ fn eligibility_report_digest(
     json_sha256(&canonical)
 }
 
+fn expected_label_eligibility(
+    state: PopulationOutcomeStateV1,
+) -> Option<super::label_consumption_guard::LabelConsumptionEligibilityV1> {
+    match state {
+        PopulationOutcomeStateV1::Qualified => {
+            Some(super::label_consumption_guard::LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy)
+        }
+        PopulationOutcomeStateV1::Unknown => {
+            Some(super::label_consumption_guard::LabelConsumptionEligibilityV1::Unknown)
+        }
+        PopulationOutcomeStateV1::Blocked => {
+            Some(super::label_consumption_guard::LabelConsumptionEligibilityV1::Blocked)
+        }
+        PopulationOutcomeStateV1::Unmeasured => None,
+    }
+}
+
 fn validate_aci_delivery(
     delivery: &DelayedAciLabelDeliveryV1,
     prediction: &DelayedAciPredictionReceiptV1,
     row: &JointPopulationRowV1,
 ) -> Result<(), JointRiskTraceErrorV1> {
     let report = &delivery.eligibility_report;
-    if delivery.sample_id != row.sample_id
+    let expected_eligibility = expected_label_eligibility(row.outcome_state);
+    if expected_eligibility.is_none()
+        || delivery.sample_id != row.sample_id
         || delivery.measurement_event_id != row.measurement_event_id
         || delivery.label_id != row.label_id.as_deref().unwrap_or_default()
         || Some(delivery.label_revision) != row.label_revision
         || Some(delivery.label_payload_sha256.as_str()) != row.label_payload_sha256.as_deref()
         || Some(report.report_sha256.as_str()) != row.k1_report_sha256.as_deref()
-        || delivery.label_value != row.label_value.unwrap_or(f64::NAN)
+        || row.label_value.is_some_and(|value| delivery.label_value != value)
         || report.label_id != delivery.label_id
         || report.label_revision != delivery.label_revision
         || report.measurement_event_id != delivery.measurement_event_id
         || report.label_sha256 != delivery.label_payload_sha256
         || report.qualified_corrected_value != delivery.label_value
         || report.frontier != super::label_consumption_guard::LabelEvidenceFrontierV1::CurrentAtK1
-        || report.eligibility != super::label_consumption_guard::LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
-        || !report.downstream_consumption_allowed
+        || Some(report.eligibility) != expected_eligibility
+        || report.downstream_consumption_allowed
+            != (row.outcome_state == PopulationOutcomeStateV1::Qualified)
         || eligibility_report_digest(report)? != report.report_sha256
         || delivery.delivered_round != prediction.expected_delivery_round
         || delivery.delivered_at_unix_seconds < delivery.label_available_at_unix_seconds
@@ -522,25 +548,16 @@ fn validate_ca_feedback_input(
             "CA-OCRC feedback input for round {current_round} does not match shared label ledger"
         )));
     }
-    let expected_eligibility = match row.outcome_state {
-        PopulationOutcomeStateV1::Qualified => {
-            super::label_consumption_guard::LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
-        }
-        PopulationOutcomeStateV1::Unknown => {
-            super::label_consumption_guard::LabelConsumptionEligibilityV1::Unknown
-        }
-        PopulationOutcomeStateV1::Blocked => {
-            super::label_consumption_guard::LabelConsumptionEligibilityV1::Blocked
-        }
-        PopulationOutcomeStateV1::Unmeasured => {
-            return Err(JointRiskTraceErrorV1(
-                "CA-OCRC feedback input exists for an unmeasured row".into(),
-            ));
-        }
+    let Some(expected_eligibility) = expected_label_eligibility(row.outcome_state) else {
+        return Err(JointRiskTraceErrorV1(
+            "CA-OCRC feedback input exists for an unmeasured row".into(),
+        ));
     };
     if report.eligibility != expected_eligibility
         || report.frontier
             != super::label_consumption_guard::LabelEvidenceFrontierV1::CurrentAtK1
+        || report.downstream_consumption_allowed
+            != (row.outcome_state == PopulationOutcomeStateV1::Qualified)
     {
         return Err(JointRiskTraceErrorV1(format!(
             "CA-OCRC feedback K1 state disagrees with shared row {}",
