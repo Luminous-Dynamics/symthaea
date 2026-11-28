@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_onpolicy_candidate_event_v1.schema.json",
+  "title": "MACE On-Policy Candidate-Visible Interaction Event v1",
+  "description": "Strict allowlist for an already-observed event delivered to candidate code. Evaluator-only latent state, future observations and scoring labels are not representable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "run_id",
+    "episode_id",
+    "event_sequence",
+    "event_time_ms",
+    "event_type",
+    "visibility",
+    "payload",
+    "payload_sha256",
+    "previous_event_sha256",
+    "source"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_onpolicy_candidate_event_v1"
+    },
+    "record_type": {
+      "const": "candidate_event"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "event_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_time_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_type": {
+      "enum": [
+        "task_prompt",
+        "user_message",
+        "assistant_message",
+        "tool_observation",
+        "memory_action",
+        "environment_observation"
+      ]
+    },
+    "visibility": {
+      "const": "candidate"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "content"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "system_task",
+            "user",
+            "assistant",
+            "tool",
+            "environment"
+          ]
+        },
+        "content": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "type",
+                      "text"
+                    ],
+                    "properties": {
+                      "type": {
+                        "const": "text"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "type",
+                      "media_sha256",
+                      "media_type",
+                      "source_locator"
+                    ],
+                    "properties": {
+                      "type": {
+                        "enum": [
+                          "image",
+                          "video",
+                          "document",
+                          "audio"
+                        ]
+                      },
+                      "media_sha256": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "media_type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "source_locator": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "timestamp_ms": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "consent_scope": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "purpose_scope": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "payload_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "previous_event_sha256": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "issuer_id",
+        "authority_profile_sha256",
+        "rights_profile_sha256"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "issuer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "authority_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rights_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

@@ -17,3 +17,5 @@ pub use conflict_resolution::ConflictResolutionBenchmark;
 pub use long_range::LongRangeBenchmark;
 pub use prospective_memory::ProspectiveMemoryBenchmark;
 pub use test_time_learning::TestTimeLearningBenchmark;
+
+pub mod on_policy;

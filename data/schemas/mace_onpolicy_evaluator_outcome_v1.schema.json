@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_onpolicy_evaluator_outcome_v1.schema.json",
+  "title": "MACE On-Policy Evaluator-Only Episode Outcome v1",
+  "description": "Sealed evaluator record. This schema is not part of any candidate-visible envelope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "run_id",
+    "episode_id",
+    "policy_assignment_sha256",
+    "latent_state_sha256",
+    "simulator_revision_sha256",
+    "candidate_trace_sha256",
+    "outcome_receipt_sha256",
+    "task_success",
+    "utility",
+    "regret",
+    "interaction",
+    "memory_quality",
+    "privacy_and_authority",
+    "evaluation_validity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_onpolicy_evaluator_outcome_v1"
+    },
+    "record_type": {
+      "const": "evaluator_outcome"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "policy_assignment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "latent_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "simulator_revision_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_trace_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "outcome_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "task_success": {
+      "type": "boolean"
+    },
+    "utility": {
+      "type": "number"
+    },
+    "regret": {
+      "type": "number",
+      "minimum": 0
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "turn_count",
+        "assistant_question_count",
+        "unnecessary_question_count",
+        "refusal_count",
+        "disengagement"
+      ],
+      "properties": {
+        "turn_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "assistant_question_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unnecessary_question_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "refusal_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "disengagement": {
+          "type": "boolean"
+        },
+        "interaction_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "memory_quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_acquisition_precision",
+        "state_acquisition_recall",
+        "correction_applied",
+        "stale_state_used",
+        "unsupported_inference_count"
+      ],
+      "properties": {
+        "state_acquisition_precision": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "state_acquisition_recall": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "correction_applied": {
+          "type": "boolean"
+        },
+        "stale_state_used": {
+          "type": "boolean"
+        },
+        "unsupported_inference_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provenance_drop_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "privacy_and_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unauthorized_state_access_count",
+        "purpose_violation_count",
+        "retention_violation_count",
+        "sensitive_unnecessary_elicitation_count"
+      ],
+      "properties": {
+        "unauthorized_state_access_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "purpose_violation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retention_violation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sensitive_unnecessary_elicitation_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "resource_use": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "memory_bytes",
+        "tool_calls",
+        "latency_ns"
+      ],
+      "properties": {
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cpu_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "energy_microwatt_hours": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "evaluation_validity": {
+      "enum": [
+        "valid",
+        "invalid",
+        "diagnostic_only"
+      ]
+    },
+    "invalidity_reason": {
+      "type": "string",
+      "maxLength": 1024
+    }
+  }
+}
