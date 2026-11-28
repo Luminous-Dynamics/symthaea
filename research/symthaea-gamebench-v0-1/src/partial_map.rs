@@ -295,7 +295,7 @@ mod tests {
             Position::new(6, 0),
             max_actions,
             1,
-            2,
+            4,
         )
         .expect("valid partially observable fixture")
     }
