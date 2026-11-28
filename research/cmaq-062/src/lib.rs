@@ -627,9 +627,21 @@ fn policy_digest(nodes: &[ContextNode], alpha: Rational, lambda: f64) -> String 
         h.update(node.prior_weight.denominator().to_be_bytes());
         node.region.encode(&mut h);
         h.update(node.response_map.map_sha256().as_bytes());
+        encode_frequency_map(&mut h, &node.response_map);
         h.update(node.covariate_map.map_sha256().as_bytes());
+        encode_frequency_map(&mut h, &node.covariate_map);
     }
     hex(&h.finalize())
+}
+fn encode_frequency_map(hasher: &mut Sha256, map: &FourierFeatureMap) {
+    hasher.update((map.input_dimension() as u64).to_be_bytes());
+    hasher.update((map.frequency_count() as u64).to_be_bytes());
+    for frequency in map.frequencies() {
+        hasher.update((frequency.len() as u64).to_be_bytes());
+        for value in frequency {
+            hasher.update((if *value == 0.0 { 0.0f64 } else { *value }).to_bits().to_be_bytes());
+        }
+    }
 }
 fn extend_trace(prior: &str, sequence: u64, pair_id: &str, staged: &[StagedNode], nodes: &[ContextNode]) -> String {
     let mut h = Sha256::new();
