@@ -16,6 +16,7 @@ on:
     branches: [main]
     paths:
       - "crates/core/nixward/tests/security_advisory_corpus.rs"
+      - "crates/core/nixward/tests/goal_corpus.rs"
       - "research/nixward-capability-advisory-v0.1/**"
       - ".github/workflows/nixward-security-advisory.yml"
       - "crates/core/nixward/Cargo.toml"
@@ -47,6 +48,6 @@ jobs:
         with:
           components: rustfmt
       - name: Check Rust test formatting
-        run: rustfmt +1.96.0 --check --edition 2024 crates/core/nixward/tests/security_advisory_corpus.rs
+        run: rustfmt +1.96.0 --check --edition 2024 crates/core/nixward/tests/security_advisory_corpus.rs crates/core/nixward/tests/goal_corpus.rs
       - name: Run NixWard corpus semantic guards
         run: cargo +1.96.0 test --locked -p nixward --test security_advisory_corpus --test goal_corpus
