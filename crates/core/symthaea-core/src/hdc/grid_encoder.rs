@@ -480,6 +480,7 @@ mod tests {
                     let enc = GridEncoder::new(dimension, rows, cols, 6, seed);
                     let bundled = enc.encode_grid(&grid);
                     let mut continuous_correct = 0usize;
+                    let mut dense_reference_correct = 0usize;
                     let mut total = 0usize;
                     let mut true_score_sum = 0.0_f64;
                     let mut true_margin_sum = 0.0_f64;
@@ -488,6 +489,20 @@ mod tests {
                         for (col_index, &actual) in row.iter().enumerate() {
                             let query = enc.query_position(&bundled, row_index, col_index);
                             let true_score = query.similarity(enc.color_hv(actual as usize));
+                            let dense_cell = enc.encode_cell(row_index, col_index, actual as usize);
+                            let mut dense_best_index = 0usize;
+                            let mut dense_best_score = f32::NEG_INFINITY;
+                            for candidate in 0..enc.num_colors() {
+                                let candidate_cell = enc.encode_cell(row_index, col_index, candidate);
+                                let score = dense_cell.similarity(&candidate_cell);
+                                if score > dense_best_score {
+                                    dense_best_index = candidate;
+                                    dense_best_score = score;
+                                }
+                            }
+                            if dense_best_index == actual as usize {
+                                dense_reference_correct += 1;
+                            }
                             let mut best_index = 0usize;
                             let mut best_score = f32::NEG_INFINITY;
                             let mut best_alternative = f32::NEG_INFINITY;
@@ -525,6 +540,7 @@ mod tests {
                     assert_eq!(total, rows * cols);
                     assert_eq!(binary_decoded.len(), rows);
                     let continuous_accuracy = continuous_correct as f64 / total as f64;
+                    let dense_reference_accuracy = dense_reference_correct as f64 / total as f64;
                     let binary_accuracy = binary_correct as f64 / total as f64;
                     let mean_true_score = true_score_sum / total as f64;
                     let mean_true_margin = true_margin_sum / total as f64;
@@ -535,6 +551,8 @@ mod tests {
                          continuous_accuracy={continuous_accuracy:.6} \
                          mean_true_cosine={mean_true_score:.6} \
                          mean_true_margin={mean_true_margin:.6} \
+                         dense_per_cell_top1={dense_reference_correct}/{total} \
+                         dense_per_cell_accuracy={dense_reference_accuracy:.6} \
                          binary_xor_top1={binary_correct}/{total} \
                          binary_xor_accuracy={binary_accuracy:.6}"
                     );
