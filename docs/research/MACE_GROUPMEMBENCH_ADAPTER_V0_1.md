@@ -14,7 +14,7 @@ The release covers four synthetic domains (Finance, Technology, Healthcare and M
 
 Upstream retrieval behavior deliberately indexes message content only. At answer time, it formats each retrieved message with its speaker, role, channel, phase, topic, timestamp, reply target and message ID. When asking_user_id is present, the query passed to retrieval is exactly asking_user_id followed by one space and question_text; otherwise it is question_text. This adapter reproduces that projection and header ordering.
 
-The upstream shared conversation loader collects channel messages and sorts by (channel, timestamp, msg_node). Input is validated against that order. Timestamps are compared as strings, matching the upstream loader; the adapter does not reinterpret timezone or calendar semantics.
+The upstream shared conversation loader collects channel messages and sorts by (channel, timestamp, msg_node). Input is validated against that order. Timestamps are compared as strings, with an absent timestamp treated as the empty string and omitted from the reader header, matching the upstream loader; the adapter does not reinterpret timezone or calendar semantics.
 
 ## Candidate / evaluator boundary
 
