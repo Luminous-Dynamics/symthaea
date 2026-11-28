@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-workspace-targets.sh — fail if any workspace member lacks a build target.
+# check-workspace-targets.sh — fail on missing workspace manifests or build targets.
 #
 # WHY: a member Cargo.toml with no `src/lib.rs`, `src/main.rs`, `src/bin/*.rs`,
 # `[lib]`, or `[[bin]]` makes `cargo` refuse to load the ENTIRE workspace
@@ -24,12 +24,43 @@ MEMBER_GLOBS=(crates/core/* crates/domains/* crates/bridges/*)
 
 # Excluded members — must mirror [workspace].exclude in Cargo.toml.
 EXCLUDES=(
+  "crates/core/nixward-web"
+  "crates/core/symthaea"
+  "crates/core/symthaea-observation-attestation"
+  "crates/core/symthaea-iit"
   "crates/core/symthaea-zkproof/methods"
   "crates/core/symthaea-zkproof/host"
   "crates/domains/symthaea-spore/fuzz"
   "crates/domains/spark-engine"
   "crates/domains/symthaea-lab"
+  "crates/domains/symthaea-perception"
 )
+
+# Guard the mirror itself: a script-only exclusion could hide a real workspace
+# member, while a manifest-only exclusion would make this diagnostic disagree
+# with Cargo's actual package discovery.
+manifest_excludes=()
+while IFS= read -r path; do
+  [[ -n "$path" ]] && manifest_excludes+=("$path")
+done < <(
+  awk '
+    /^exclude[[:space:]]*=[[:space:]]*\[/ { in_exclude = 1; next }
+    in_exclude && /^[[:space:]]*\]/ { exit }
+    in_exclude && /^[[:space:]]*"/ {
+      value = $0
+      sub(/^[[:space:]]*"/, "", value)
+      sub(/",[[:space:]]*(#.*)?$/, "", value)
+      print value
+    }
+  ' Cargo.toml
+)
+if [[ "${manifest_excludes[*]}" != "${EXCLUDES[*]}" ]]; then
+  echo "WORKSPACE EXCLUSION MIRROR MISMATCH:"
+  echo "  Cargo.toml: ${manifest_excludes[*]}"
+  echo "  script:     ${EXCLUDES[*]}"
+  echo "Keep the diagnostic mirror exactly aligned with [workspace].exclude."
+  exit 1
+fi
 
 is_excluded() {
   local d="$1" e
@@ -47,10 +78,16 @@ has_target() {
 }
 
 fail=0
+missing_manifest=0
 for glob in "${MEMBER_GLOBS[@]}"; do
   for dir in $glob; do
-    [[ -f "$dir/Cargo.toml" ]] || continue
+    [[ -d "$dir" ]] || continue
     is_excluded "$dir" && continue
+    if [[ ! -f "$dir/Cargo.toml" ]]; then
+      echo "MISSING MANIFEST: $dir  (directory matched a workspace member glob but has no Cargo.toml; add a real package or explicitly exclude it)"
+      missing_manifest=1
+      continue
+    fi
     if ! has_target "$dir"; then
       echo "MISSING TARGET: $dir  (Cargo.toml but no src/lib.rs, src/main.rs, src/bin/*.rs, [lib], or [[bin]])"
       fail=1
@@ -141,6 +178,12 @@ for glob in "${MEMBER_GLOBS[@]}"; do
 done
 [[ -s "$ORPHAN_FLAG" ]] && declared_fail=1
 
+if [[ $missing_manifest -ne 0 ]]; then
+  echo ""
+  echo "Every non-excluded directory matched by a workspace member glob must have"
+  echo "a real Cargo.toml. Add the actual crate manifest or explicitly document"
+  echo "and exclude a source-only/examples-only directory; do not create a stub."
+fi
 if [[ $fail -ne 0 ]]; then
   echo ""
   echo "The member(s) above break 'cargo' for the ENTIRE workspace. Fix by adding a"
@@ -154,5 +197,5 @@ if [[ $declared_fail -ne 0 ]]; then
   echo "whose working tree still has the untracked file. Stage the file, or remove the"
   echo "declaration, before committing."
 fi
-(( fail != 0 || declared_fail != 0 )) && exit 1
-echo "OK: all workspace members have a build target, and all declared targets are tracked."
+(( missing_manifest != 0 || fail != 0 || declared_fail != 0 )) && exit 1
+echo "OK: all non-excluded workspace-glob directories have Cargo.toml files, all members have build targets, and all declared targets are tracked."

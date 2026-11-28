@@ -89,6 +89,9 @@ jobs:
       - name: Every workspace member has a build target
         run: bash scripts/check-workspace-targets.sh
 
+      - name: Workspace manifest glob negative controls
+        run: bash scripts/tests/check-workspace-targets-fixtures.sh
+
       # This job was bash-only until 2026-07-30. The two cargo steps below need the SAME pinned
       # toolchain every other cargo-running job uses; without this they would run against
       # whatever Rust the runner image happens to ship.

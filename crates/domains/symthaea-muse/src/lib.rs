@@ -33,6 +33,11 @@
 #![deny(unsafe_code)]
 
 #[cfg(feature = "theory")]
+mod symbolic_import;
+#[cfg(feature = "theory")]
+mod teaching_corpus;
+
+#[cfg(feature = "theory")]
 pub mod adaptive_experiment;
 #[cfg(feature = "theory")]
 pub mod adaptive_prediction;
