@@ -47,12 +47,13 @@ Scale/Reflection's September 22, 2026 SWE-Bench Pro V2 update has 642 public tas
 LADDER comprises 145 tasks across three suites, eight categories, two embodiments, one to ten subgoals and 2,024 simulated episodes per system. Its research page reports that an un-orchestrated low-level policy drops from 85.4% success on one-subgoal tasks to 0% on five-subgoal tasks. Orchestration improves results, but the study still identifies physical execution as a limiting factor.
 
 The current project leaderboard separates the full 145-task suite from **LADDER-Lite**, a 10-task quick-check subset:
-- Full LADDER (145 tasks): GPT-6 Astra via GPT-Policy reports **63.3% tasks completed**, **$6.49 API/tool cost per completed task**.
+- Full LADDER (145 tasks across three suites): GPT-6 Astra via GPT-Policy reports **62.0% pooled overall success (±2.1 pp)** and **63.3% equally weighted suite mean**; API cost is **$6.49 per successful episode**. The project's headline leaderboard uses the suite-mean metric.
 - LADDER-Lite (10 tasks): Gemini 4 Carbon Lite via GPT-Policy reports **71.5%**, **$1.73 per completed task**; Claude Fable 5.2 Lite reports **66.0%**, **$7.85 per completed task**.
 
 The 71.5% / $1.73 figure is therefore a Lite-subset result, not the full-suite leader. Keep the two denominators separate in every comparison; use the 145-task suite as the primary challenge and Lite only as a fast development diagnostic.
 
-- Research/methodology: https://ladderrobotics.ai/research
+- Research/methodology and separate pooled/suite-mean metrics: https://ladderrobotics.ai/research
+- Project leaderboard and LADDER-Lite distinction: https://ladderrobotics.ai/
 - Current leaderboard: https://ladderrobotics.ai/
 - Snapshot: accessed 2026-11-28.
 - Interpretation: compare by suite, embodiment, policy, horizon and simulation/real setting. Report task completion, subgoal completion, cost, execution failures, intervention, recovery and transfer. API cost per benchmark task is not industrial total cost of ownership.
@@ -177,7 +178,7 @@ The following are stretch goals only when the exact external task set, release, 
 | OSWorld 2.0 full workflow | 20.6% binary end-to-end completion at the reported 500-step budget; 54.8% partial score | At least **25.6% binary completion** at the same 500-step budget, with no deterioration in grader-audited correctness or action safety | Do not compare partial score to binary completion; OSWorld 2.1 grading audit is an independent evaluator warning, not a corrected score |
 | ITBench-AA diagnosis | 56.2% average precision at full recall on its 59 Kubernetes root-cause tasks | At least **61.2%** on the identical task set and metric, without reducing the required recall | This is root-cause entity attribution—not remediation, restoration or safe action |
 | SWEOps-Bench verified recovery | 52.7% highest reported end-to-end recovery across six configurations; detection 72.7–90.9% | At least **60% independently verified recovery** on the same 55 incident tasks, while reporting detection and repair separately | Requires the same operator repositories, injected faults, workload, source repair process, functional checks and environment—not a new easier SRE suite |
-| LADDER full suite (145 tasks) | 63.3% completion; $6.49 API/tool cost per completed task for GPT-6 Astra via GPT-Policy | At least **68.3% completion** at no more than $6.49 per completed task on the same 145 tasks, policy and embodiment | Primary long-horizon comparator; simulated completion is not field reliability or safety qualification; API cost is not industrial TCO |
+| LADDER full suite (145 tasks) | 63.3% equally weighted suite mean; 62.0% pooled overall (±2.1 pp); $6.49 API cost per successful episode for GPT-6 Astra via GPT-Policy | At least **68.3% suite mean** at no more than $6.49 per successful episode on the same 145 tasks, suites and embodiment; also report pooled overall and per-suite intervals | Primary long-horizon comparator; suite mean and pooled overall are distinct; simulation is not field reliability or safety qualification; API cost is not industrial TCO |
 | LADDER-Lite (10 tasks) | 71.5% completion; $1.73 API/tool cost per completed task for Gemini 4 Carbon Lite via GPT-Policy | At least **76.5%** at no more than $1.73 on the identical 10-task subset | Development-only quick diagnostic; must not be substituted for the 145-task full-suite result |
 | Finance Agent v2.1 | 69.47% partial-credit accuracy at $4.83/test for the leading listed entry | At least **74.5% partial-credit accuracy** at no more than $4.83/test on the identical v2.1 set and harness | Does not qualify accounting truth, point-in-time investment decisions, alpha, return or authority |
 
