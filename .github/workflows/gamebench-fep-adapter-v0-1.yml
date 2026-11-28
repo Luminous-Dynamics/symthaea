@@ -1,0 +1,36 @@
+name: GameBench FEP Adapter v0.1
+
+on:
+  pull_request:
+    paths:
+      - "research/symthaea-gamebench-fep-adapter-v0-1/**"
+      - "research/symthaea-gamebench-v0-1/**"
+      - ".github/workflows/gamebench-fep-adapter-v0-1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/symthaea-gamebench-fep-adapter-v0-1/**"
+      - "research/symthaea-gamebench-v0-1/**"
+      - ".github/workflows/gamebench-fep-adapter-v0-1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  standalone-fep-adapter:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/symthaea-gamebench-fep-adapter-v0-1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run tests
+        run: cargo test --all-targets
+      - name: Run strict Clippy
+        run: cargo clippy --all-targets -- -D warnings
