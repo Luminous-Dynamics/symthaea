@@ -45,6 +45,8 @@ A repeated query invocation ID is rejected. Unknown retrieval IDs, duplicate IDs
 - The adapter does not independently prove that the injected runtime persisted all messages, that the actual reader received every returned passage, or that the declared model/prompt configuration was used.
 - The GroupMemBench asking-user field is an identity cue for the task, not a universal authorization grant. The official benchmark does not supply real-world consent/ACL ground truth. MACE's permission-aware sharing and no-cross-audience disclosure properties require a separate adversarial extension, not invented labels or modified official scores.
 - The release uses synthetic conversations. Results on it do not establish performance on real workplace or family group chats.
+- GroupAssistBench is a separate, real-chat research-only lane. Its dataset is licensed CC BY-NC 4.0, and its upstream reference code is separately licensed for academic purposes only and expressly excludes commercial or production use. Do not port, copy, or depend on those upstream scripts in commercial MACE products. This PR's Rust GroupMemBench adapter is independently authored and does not embed GroupAssistBench assets or code.
+- GroupAssistBench main was inspected at commit `851911b391ac1e91a929ca709cd48da3e3576bf7`; the versioned run protocol and license terms must be pinned again before any evaluation. Keep the real-chat corpus out of public fixtures, production, commercial training, and product demonstrations absent separate written permission.
 
 ## Companion benchmark: GroupAssistBench
 
