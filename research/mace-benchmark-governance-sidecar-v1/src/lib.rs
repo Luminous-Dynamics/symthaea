@@ -54,6 +54,9 @@ pub struct OpportunityDenominatorsV1 {
     pub influence_assessment_opportunities: u64,
     pub lifecycle_transition_opportunities: u64,
     pub authorization_opportunities: u64,
+    pub provenance_claim_opportunities: u64,
+    pub proactive_disclosure_opportunities: u64,
+    pub privacy_sensitive_opportunities: u64,
     pub erasure_verification_opportunities: u64,
 }
 
@@ -218,6 +221,9 @@ impl BenchmarkGovernanceSidecarV1 {
             || violations.wrong_scope_exposures > denom.evidence_use_opportunities
             || violations.unauthorized_actions > denom.authorization_opportunities
             || violations.cross_scope_disclosures > denom.authorization_opportunities
+            || violations.unsupported_provenance_claims > denom.provenance_claim_opportunities
+            || violations.prohibited_proactive_disclosures > denom.proactive_disclosure_opportunities
+            || violations.privacy_violations > denom.privacy_sensitive_opportunities
             || violations.erasure_resurrections > denom.erasure_verification_opportunities {
             return Err(SidecarRejectV1::InvalidDenominator);
         }
@@ -238,9 +244,14 @@ impl BenchmarkGovernanceSidecarV1 {
             && (self.verification.evaluator_output_sha256.is_none() || self.verification.raw_trace_receipt_sha256.is_none()) {
             return Err(SidecarRejectV1::MissingInstrumentedEvidence);
         }
+        if matches!(
+            self.influence_evidence_level,
+            InfluenceEvidenceLevelV1::IndependentlyVerified | InfluenceEvidenceLevelV1::CausallyQualified
+        ) && self.verification.independent_verifier_id.as_deref().is_none_or(str::is_empty) {
+            return Err(SidecarRejectV1::MissingIndependentInfluenceCustody);
+        }
         if self.influence_evidence_level == InfluenceEvidenceLevelV1::CausallyQualified
-            && (self.verification.independent_verifier_id.as_deref().is_none_or(str::is_empty)
-                || self.verification.influence_report_sha256.is_none()
+            && (self.verification.influence_report_sha256.is_none()
                 || self.verification.randomization_receipt_sha256.is_none()
                 || self.verification.split_audit_receipt_sha256.is_none()) {
             return Err(SidecarRejectV1::MissingIndependentInfluenceCustody);
@@ -390,7 +401,8 @@ mod tests {
                 evidence_use_opportunities: 100, decision_opportunities: 80,
                 citation_opportunities: 80, influence_assessment_opportunities: 60,
                 lifecycle_transition_opportunities: 30, authorization_opportunities: 80,
-                erasure_verification_opportunities: 20,
+                provenance_claim_opportunities: 20, proactive_disclosure_opportunities: 20,
+                privacy_sensitive_opportunities: 20, erasure_verification_opportunities: 20,
             },
             violations: GovernanceViolationCountsV1::default(),
             costs: GovernanceCostV1 {
@@ -536,6 +548,43 @@ mod tests {
         let mut baseline = comparison_identity("baseline-run");
         baseline.grader_sha256 = "not-a-digest".into();
         assert_eq!(compare_runs_v1(&candidate, &baseline), Err(SidecarRejectV1::InvalidDigest));
+    }
+
+
+    #[test]
+    fn independently_verified_influence_requires_verifier_identity() {
+        let capsule = capsule();
+        let mut value = sidecar();
+        value.influence_evidence_level = InfluenceEvidenceLevelV1::IndependentlyVerified;
+        value.verification.evaluator_output_sha256 = Some(digest("evaluator"));
+        value.verification.raw_trace_receipt_sha256 = Some(digest("trace"));
+        assert_eq!(
+            value.validate_against(&capsule),
+            Err(SidecarRejectV1::MissingIndependentInfluenceCustody)
+        );
+        value.verification.independent_verifier_id = Some("external-evaluator-1".into());
+        value.sidecar_sha256.clear();
+        let sealed = seal_sidecar_v1(value, &capsule).unwrap();
+        assert!(sealed.verify_integrity());
+    }
+
+    #[test]
+    fn provenance_proactive_disclosure_and_privacy_violations_have_explicit_denominators() {
+        let capsule = capsule();
+        let mut value = sidecar();
+        value.violations.unsupported_provenance_claims = 1;
+        value.denominators.provenance_claim_opportunities = 0;
+        assert_eq!(value.validate_against(&capsule), Err(SidecarRejectV1::InvalidDenominator));
+
+        let mut proactive = sidecar();
+        proactive.violations.prohibited_proactive_disclosures = 1;
+        proactive.denominators.proactive_disclosure_opportunities = 0;
+        assert_eq!(proactive.validate_against(&capsule), Err(SidecarRejectV1::InvalidDenominator));
+
+        let mut privacy = sidecar();
+        privacy.violations.privacy_violations = 1;
+        privacy.denominators.privacy_sensitive_opportunities = 0;
+        assert_eq!(privacy.validate_against(&capsule), Err(SidecarRejectV1::InvalidDenominator));
     }
 
 }
