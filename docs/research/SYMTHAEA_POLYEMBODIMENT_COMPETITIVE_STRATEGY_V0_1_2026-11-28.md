@@ -44,6 +44,12 @@ Duplex-MPE (September 25, 2026) contains 2,000 three- or four-person interaction
 
 **New Symthaea challenge:** require the agent to identify speaker/addressee scope, avoid responding to implicit requests not directed to it, preserve silence, and stop when another human resolves the question. Track false activation and silence preservation separately from response recall.
 
+### MultiPartyTurnBench — end-of-turn versus selective floor takeover
+
+MultiPartyTurnBench presents 240 synthetic channel-separated conversations with two to five speakers and six interaction types. It separately evaluates end-of-turn (EOT) detection and interruption detection. The published results show 82.5–92.6% EOT recall at 4.3–11.8% false-positive rates, while five evaluated full-duplex agents achieve only 46.9–54.7% balanced accuracy on selective interruption handling.
+
+This is a key diagnostic: turn-entry accuracy can look strong while the system still cannot distinguish a genuine floor takeover from a confusable non-event. Symthaea should report EOT and interruption as separate tasks at an explicitly fixed FPR, plus threshold-free AUROC and signed detection latency.
+
 ### TurnBench — turn transfer and interruption
 
 The official TurnBench v1 page shows Kuroko at 0.983 end-of-turn recall / 0.065 FPR / 619 ms median and OpenYap Turn at 0.978 / 0.077 / 298 ms. But the benchmark authors explicitly document a v1 scoring flaw: repeated late predictions can obtain high recall, a prediction can be detected after the other speaker begins, late fallbacks up to three seconds are accepted, and ranking uses recall rather than a joint latency/false-positive objective. They are preparing a v2 with fixed hidden decision points and threshold-free metrics.
@@ -119,6 +125,7 @@ All values below are **targets, not results**. Targets should be frozen before a
 | VideoFDB perception | Best listed 3.87/5 cascaded; 3.85/5 full-duplex | >=4.0/5, TOR >=93%, median <=150 ms; publish full-duplex and cascaded separately |
 | VideoFDB generation | 4.44/5 cascaded; 4.20/5 full-duplex | >=4.35/5, TOR >=60%, median <=900 ms; compare same architecture/track |
 | Turn transfer | TurnBench v1 0.983 recall at 0.065 FPR, but v1 is known flawed | On fixed hidden decision points: EOT and interruption recall >=0.98 at FPR <=0.05; median <=200 ms; p95 <=500 ms |
+| Multi-party floor transitions | MPTB EOT recall 82.5–92.6% at FPR 4.3–11.8%; selective interruption balanced accuracy 46.9–54.7% | EOT recall >=95% at FPR <=5%; selective interruption balanced accuracy >=80% at FPR <=5%; AUROC >=0.90 |
 | Streaming avatar following | StreamEval leader following 36.90; sync 99.60 | Following >=45; sync/stability >=98; show quality-only and following separately |
 | DIVE continuous engagement | Published response-window rates <=53.77% despite sub-second average reaction latency | >=75% response-window rate; p95 reaction latency <=500 ms; response quality >=4.0/5, reported separately |
 | Realistic voice task execution | τ-Voice voice agents 26–38% under realistic noise/accents; evaluated text baseline 85% | >=50% realistic-audio task completion; >=65% clean-audio task completion; report voice/text capability gap |
@@ -144,6 +151,7 @@ For each task family, include:
 - best available full-duplex baseline;
 - best available cascaded baseline;
 - multi-party speech baseline evaluated on explicit versus implicit addressing (Duplex-MPE);
+- multi-party EOT versus selective interruption baseline (MultiPartyTurnBench);
 - continuous engagement/intervention baseline (DIVE);
 - realistic-audio, grounded task-completion baseline ($\\tau$-Voice);
 - overlap-specific full-duplex behavior baseline (Full-Duplex-Bench v1.5);
@@ -201,6 +209,7 @@ Source contracts, docs and authored tests exist on the research branch. They are
 - [$\\tau$-Voice ICML 2026](https://proceedings.mlr.press/v306/ray26a.html) — grounded task completion with full-duplex audio, policies and realistic acoustic conditions.
 - [Full-Duplex-Bench v1.5](https://github.com/vtrinh-nvidia/Full-Duplex-Bench) — interruption, backchannel, other-directed speech, ambient speech and stop latency.
 - [Duplex-MPE paper](https://arxiv.org/abs/2609.31948) — multi-party interaction, explicit/implicit addressee and silence/stopping conditions.
+- [MultiPartyTurnBench](https://multipartyturnbench.github.io/) — event-conditioned EOT/INT scoring with false-positive-constrained recall.
 - [TurnBench paper](https://arxiv.org/abs/2608.25218) — dyadic turn-taking reference; interpret the currently documented v1 ranking limitation conservatively.
 
 The InteractionBench and Duplex-MPE data/code usage rights must be checked through the benchmark provenance/license gate before inclusion in any commercial model training or derived-media workflow. External evaluation rights do not imply training or redistribution rights.
