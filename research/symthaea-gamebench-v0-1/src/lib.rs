@@ -144,7 +144,7 @@ impl GridSpec {
         self.max_actions
     }
 
-    pub fn cell_at(&self, position: Position) -> Option<Cell> {
+    fn cell_at(&self, position: Position) -> Option<Cell> {
         if position.x >= self.width || position.y >= self.height {
             return None;
         }
@@ -450,7 +450,7 @@ impl Error for ReplayError {}
 
 /// Exact breadth-first shortest-path oracle for the deterministic navigation
 /// fixture. This is evaluator-only reference logic, not an agent action API.
-pub fn optimal_path(spec: &GridSpec) -> Option<Vec<Action>> {
+pub(crate) fn optimal_path(spec: &GridSpec) -> Option<Vec<Action>> {
     let start = State {
         position: spec.start,
         elapsed_actions: 0,
