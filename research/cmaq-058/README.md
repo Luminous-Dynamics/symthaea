@@ -35,6 +35,8 @@ with log-domain log-add-exp for A and E. This is algebraically equivalent to the
 
 The exact rational dyadic start prior and future mass come from CMAQ-055. Kernel prior weights are the exact fixed weights in the CMAQ-056 canonical manifest. The reference-failure mode is not supported in this first implementation: the factor producer and typed risk plan must use direct conditional paired equality.
 
+The full conditional-supermartingale derivation, dyadic-prior argument, log-domain recurrence and assumptions are recorded in [RENEWAL_PROOF.md](RENEWAL_PROOF.md).
+
 ## Critical scope boundary: capital restart, not policy-state restart
 
 CMAQ-058 uses one shared CMAQ-057 policy state per expert for the entire stream. Each start-time component begins its wealth at one at its own start, but its future factors use the shared prequential policy state, which may include observations before that start.
