@@ -348,7 +348,10 @@ mod tests {
             (3, 3)
         );
         assert!((stats.family.conditional_false_unique_risk().unwrap() - 1.0).abs() < 1e-12);
-        assert_ne!(stats.structural.singleton_count, stats.family.singleton_count);
+        assert_ne!(
+            stats.structural.singleton_count,
+            stats.family.singleton_count
+        );
     }
 
     #[test]
