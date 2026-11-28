@@ -223,7 +223,8 @@ func Evaluate(in Input)Result{
   for name,values:=range counts{for value,n:=range values{if n>1{build.shared[name+"="+value]=struct{}{}}}}
  }
  ordered:=make([]*clusterBuild,0,len(builds));for _,b:=range builds{ordered=append(ordered,b)}
- sort.Slice(ordered,func(i,j int)bool{return in.Units[ordered[i].indices[0]].UnitID<in.Units[ordered[j].indices[0]].UnitID})
+ clusterKey:=func(build *clusterBuild)string{key:=in.Units[build.indices[0]].UnitID;for _,idx:=range build.indices[1:]{if in.Units[idx].UnitID<key{key=in.Units[idx].UnitID}};return key}
+ sort.Slice(ordered,func(i,j int)bool{return clusterKey(ordered[i])<clusterKey(ordered[j])})
  clusterSuccesses:=0
  for index,build:=range ordered{
   ids:=make([]string,0,len(build.indices));success:=true;requiredRuns,observedRuns,matches:=0,0,0
@@ -243,13 +244,14 @@ func Evaluate(in Input)Result{
  uniformClusterSize:=true
  if len(ordered)>1{baseSize:=len(ordered[0].indices);for _,build:=range ordered[1:]{if len(build.indices)!=baseSize{uniformClusterSize=false}}}
  if !uniformClusterSize{f.hold("unequal_dependency_cluster_sizes_require_stratified_analysis")}
+ // Structural design admissibility is distinct from meeting the reliability threshold.
+ out.DesignVerdict=f.verdict()
  if len(ordered)==in.RequiredIndependentClusters&&len(in.Units)==in.ExpectedUnitCount&&uniformClusterSize{
   out.OneSidedConfidenceLowerBound=OneSidedClopperPearsonLower(clusterSuccesses,len(ordered),in.ConfidenceLevel)
   if out.OneSidedConfidenceLowerBound>=in.MinimumReliability&&!f.blocked&&!f.unknown{out.StatisticalVerdict=Qualified}else if !f.unknown&&out.OneSidedConfidenceLowerBound<in.MinimumReliability{out.StatisticalVerdict=Blocked;f.block("cluster_reproducibility_below_preregistered_threshold")}else{out.StatisticalVerdict=Indeterminate}
  }else{out.StatisticalVerdict=Indeterminate}
  // DesignVerdict describes the supplied dependency graph and preregistered
  // geometry only. It does not authenticate the domain evidence.
- out.DesignVerdict=f.verdict()
  // Domain inventories and outcome receipts are only hash-bound here. MON-041
  // must authenticate origins, key state, and nonce/attestation ledgers.
  f.hold("dependency_domain_custody_not_authenticated")
