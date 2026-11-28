@@ -121,8 +121,12 @@ impl ContextualPairedKernelMonitor {
             "null_reference_receipt_sha256",
         )?;
 
-        let monitor =
-            ConvexTargetApproachabilityMonitor::new(target, 1.0, alpha_numerator, alpha_denominator)?;
+        let monitor = ConvexTargetApproachabilityMonitor::new(
+            target,
+            1.0,
+            alpha_numerator,
+            alpha_denominator,
+        )?;
         Ok(Self {
             feature_map,
             context_count,
@@ -174,8 +178,7 @@ impl ContextualPairedKernelMonitor {
         let x_features = self.feature_map.transform(x)?;
         let y_features = self.feature_map.transform(y)?;
         let feature_dimension = self.feature_map.feature_dimension();
-        let mut contextual_feature_difference =
-            vec![0.0; self.context_count * feature_dimension];
+        let mut contextual_feature_difference = vec![0.0; self.context_count * feature_dimension];
         let offset = context_id * feature_dimension;
         for index in 0..feature_dimension {
             contextual_feature_difference[offset + index] =
@@ -235,9 +238,7 @@ impl ContextualPairedKernelMonitor {
         self.monitor.is_quarantined()
     }
 
-    pub fn mean_contextual_feature_difference(
-        &self,
-    ) -> Result<Vec<f64>, ApproachabilityError> {
+    pub fn mean_contextual_feature_difference(&self) -> Result<Vec<f64>, ApproachabilityError> {
         self.monitor.mean_observation()
     }
 
@@ -259,9 +260,7 @@ fn validate_digest(value: &str, label: &'static str) -> Result<(), PairedKernelE
 }
 
 fn l2_norm(values: &[f64]) -> f64 {
-    values
-        .iter()
-        .fold(0.0f64, |norm, value| norm.hypot(*value))
+    values.iter().fold(0.0f64, |norm, value| norm.hypot(*value))
 }
 
 #[cfg(test)]
@@ -303,7 +302,9 @@ mod tests {
     #[test]
     fn contextual_pair_difference_is_bounded_by_one() {
         let mut monitor = monitor(2);
-        let update = monitor.observe_pair(1, "pair-1", 0, &[0.2], &[0.8]).unwrap();
+        let update = monitor
+            .observe_pair(1, "pair-1", 0, &[0.2], &[0.8])
+            .unwrap();
         assert!(l2_norm(&update.contextual_feature_difference) <= 1.0 + 1e-12);
         assert_eq!(update.contextual_feature_difference.len(), 8);
     }
@@ -311,11 +312,15 @@ mod tests {
     #[test]
     fn identical_pair_produces_zero_feature_difference_and_no_evidence_growth() {
         let mut monitor = monitor(2);
-        let update = monitor.observe_pair(1, "pair-1", 1, &[0.2], &[0.2]).unwrap();
-        assert!(update
-            .contextual_feature_difference
-            .iter()
-            .all(|value| value.abs() < 1e-12));
+        let update = monitor
+            .observe_pair(1, "pair-1", 1, &[0.2], &[0.2])
+            .unwrap();
+        assert!(
+            update
+                .contextual_feature_difference
+                .iter()
+                .all(|value| value.abs() < 1e-12)
+        );
         assert_eq!(monitor.log_e_value(), 0.0);
     }
 
@@ -323,8 +328,12 @@ mod tests {
     fn pair_reversal_negates_the_contextual_feature_vector() {
         let mut forward = monitor(2);
         let mut reverse = monitor(2);
-        let a = forward.observe_pair(1, "pair-a", 0, &[0.2], &[0.8]).unwrap();
-        let b = reverse.observe_pair(1, "pair-b", 0, &[0.8], &[0.2]).unwrap();
+        let a = forward
+            .observe_pair(1, "pair-a", 0, &[0.2], &[0.8])
+            .unwrap();
+        let b = reverse
+            .observe_pair(1, "pair-b", 0, &[0.8], &[0.2])
+            .unwrap();
         for (left, right) in a
             .contextual_feature_difference
             .iter()
@@ -369,7 +378,13 @@ mod tests {
                 (1, 0.8, 0.2)
             };
             let update = monitor
-                .observe_pair(index as u64 + 1, &format!("pair-{index}"), context, &[x], &[y])
+                .observe_pair(
+                    index as u64 + 1,
+                    &format!("pair-{index}"),
+                    context,
+                    &[x],
+                    &[y],
+                )
                 .unwrap();
             if update.evidence.quarantined {
                 quarantined_at = Some(index + 1);
@@ -384,7 +399,9 @@ mod tests {
     #[test]
     fn duplicate_pair_and_wrong_sequence_do_not_mutate_evidence() {
         let mut monitor = monitor(2);
-        monitor.observe_pair(1, "pair-1", 0, &[0.2], &[0.2]).unwrap();
+        monitor
+            .observe_pair(1, "pair-1", 0, &[0.2], &[0.2])
+            .unwrap();
         let before = monitor.clone();
         assert_eq!(
             monitor.observe_pair(2, "pair-1", 0, &[0.2], &[0.2]),
