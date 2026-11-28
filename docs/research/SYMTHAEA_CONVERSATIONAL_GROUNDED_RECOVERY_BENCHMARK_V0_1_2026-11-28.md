@@ -248,7 +248,7 @@ The verifier is not an executor, permission issuer, oracle authenticator, transa
 
 `crates/domains/symthaea-soma/src/cgrb_world.rs` adds a deterministic in-memory reference world for scenario mechanics. It uses typed cells, canonical ordered maps, stable state digests, version-checked prepare/apply, explicit preconditions, Set/AppendText/Remove mutations, operation-ID and keyed-idempotency replay protection, and append-only in-memory audit events. Mutations are applied to a candidate state and committed only after validation and digest construction succeed.
 
-The module provides 13 authored regression tests covering version conflicts, precondition failure/success, non-idempotent append deduplication through stable operation keys, key/action conflicts, target binding, unsupported mutation types, seed closure, deterministic digest order, and atomic rejection.
+The module provides 16 authored regression tests covering version conflicts, precondition failure/success, non-idempotent append deduplication through stable operation keys, key/action conflicts, target binding, unsupported mutation types, seed closure, deterministic digest order, atomic rejection, apply-then-lost-acknowledgement, drop-before-apply, and duplicate delivery.
 
 **Critical boundary:** this is a reference model, not a separate process or independent oracle. Its `reference_snapshot` must not be promoted to independent state evidence. The pure state-outcome verifier and reference world are composable test mechanics. A harness-pinned read-only oracle trait is now present; the missing layers are an actual separately operated oracle service, scenario runner, and fault-injection executor. The Rust tests remain uncompiled and unexecuted.
  
