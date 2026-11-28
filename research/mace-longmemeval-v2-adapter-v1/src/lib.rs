@@ -208,7 +208,7 @@ fn digest_bytes(bytes: &[u8]) -> String {
         .collect()
 }
 
-fn digest_serialized<T: Serialize>(value: &T) -> Result<String, AdapterRejectV1> {
+fn digest_serialized<T: Serialize + ?Sized>(value: &T) -> Result<String, AdapterRejectV1> {
     serde_json::to_vec(value)
         .map(|bytes| digest_bytes(&bytes))
         .map_err(|_| AdapterRejectV1::SerializationFailure)
@@ -554,7 +554,6 @@ mod tests {
 
     #[test]
     fn token_budget_and_truncation_flags_must_match_observed_counts() {
-        let selected = selection();
         let items = vec![];
         assert_eq!(finalize(items.clone(), 10, 100, 20, true), Err(AdapterRejectV1::InvalidTokenBudget));
         assert_eq!(finalize(items, 100, 100, 100, true), Err(AdapterRejectV1::InvalidTruncationFlag));
@@ -592,7 +591,7 @@ mod tests {
         assert_eq!(
             finalize_reader_exposure_v1(
                 &query(), &invalid, &[], 10, 0, 0, false,
-                digest("request"), digest("response"), 0, 0
+                digest("request"), digest("response"), digest("reader"), digest("generation"), 0, 0
             ),
             Err(AdapterRejectV1::QueryInputMismatch)
         );
