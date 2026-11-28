@@ -18,6 +18,7 @@ use crate::music_edit_metamorphic_benchmark::{
     MusicEditMetamorphicRelationV1,
     MusicEditMetamorphicTransformReceiptV1,
 };
+use crate::music_edit_benchmark_adapter::MusicEditSplitV1;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -142,6 +143,14 @@ pub struct MusicEditMetamorphicCommutatorReportV1 {
 
 fn approximately_equal(left: f64, right: f64) -> bool {
     (left - right).abs() <= EPSILON
+}
+
+fn canonical_split_label(split: MusicEditSplitV1) -> &'static str {
+    match split {
+        MusicEditSplitV1::Train => "train",
+        MusicEditSplitV1::Development => "development",
+        MusicEditSplitV1::Test => "test",
+    }
 }
 
 fn compose_numeric_affine(
@@ -591,7 +600,7 @@ pub fn compose_music_edit_metamorphic_path_v1(
         benchmark_track_id: first.benchmark_track_id.clone(),
         operation: format!("{:?}", first.operation),
         source_lineage_sha256: first.base_source_lineage_sha256.clone(),
-        split: format!("{:?}", first.base_split),
+        split: canonical_split_label(first.base_split).to_owned(),
         start_sample_id: first.base_sample_id.clone(),
         end_sample_id: last.transformed_sample_id.clone(),
         start_audio_sha256: first.base_source_audio_sha256.clone(),
@@ -889,7 +898,7 @@ mod tests {
             schema_version: MUSIC_EDIT_METAMORPHIC_COMMUTATOR_CASE_SCHEMA_V1.to_owned(),
             case_id: case_id.to_owned(),
             preregistration_sha256: d(29),
-            evaluation_split: "Development".to_owned(),
+            evaluation_split: canonical_split_label(left.steps[0].pair.base_split).to_owned(),
             left_path_sha256: left_report.path_sha256,
             right_path_sha256: right_report.path_sha256,
             expected_to_commute,
