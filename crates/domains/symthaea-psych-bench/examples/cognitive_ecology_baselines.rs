@@ -26,8 +26,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let random = run_random_policy(&manifest)?;
 
         let summary = json!({
-            "scenario_id": manifest.scenario_id,
-            "generator_version": manifest.generator_version,
+            "scenario_id": manifest.scenario_id.clone(),
+            "generator_version": manifest.generator_version.clone(),
             "seed": seed,
             "layout": format!("{:?}", manifest.layout().filter_location),
             "manifest_digest": manifest.digest()?,
