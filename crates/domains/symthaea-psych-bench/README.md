@@ -102,7 +102,7 @@ cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines
 cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines -- --jsonl
 ```
 
-The generator still has only two hand-authored layouts. The benchmark-internal
+The generator still has only two hand-authored layouts. The observation-only policy has no layout/inventory oracle access, but its current decision tree is hand-written for this task and is not a general planner. The benchmark-internal
 cost units (including an unsafe-action surcharge of 8) are not joules,
 wall-clock latency, tokens or currency. These runs are environment smoke
 baselines, not evidence of general cognitive capability or state-of-the-art
