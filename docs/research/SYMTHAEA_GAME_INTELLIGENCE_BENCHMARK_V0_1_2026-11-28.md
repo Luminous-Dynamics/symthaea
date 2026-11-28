@@ -545,7 +545,7 @@ The current FEP action model is intentionally simple and structured. It has not 
 
 ### 16.4 Current test inventory and qualification status
 
-The current branch contains **65 authored tests** in the environment/candidate/evaluator crate (F1–F6: 47, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 6), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **80 authored Rust tests**. These are source counts only, not observed passes.
+The current branch contains **68 authored tests** in the environment/candidate/evaluator crate (F1–F6: 47, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 6, memory-frontier candidate: 3), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **80 authored Rust tests**. These are source counts only, not observed passes.
 
 Two dedicated GitHub workflows are configured:
 - `GameBench Rust v0.1`: deterministic environment, candidate contract, and policy baseline crate.
@@ -610,7 +610,7 @@ The adapter crate contains:
 - 5 spatial HDC candidate tests;
 - 5 HDC-LTC candidate tests.
 
-Total: **81 authored Rust tests**. These are not observed test executions. Both focused workflows must pass rustfmt, Cargo tests, and strict Clippy on the exact PR head. The main GameBench and adapter workspaces are isolated; adapter CI also watches changes to the sibling `symthaea-core` and `symthaea-fep` source paths because it compiles those actual components.
+Total: **84 authored Rust tests**. These are not observed test executions. Both focused workflows must pass rustfmt, Cargo tests, and strict Clippy on the exact PR head. The main GameBench and adapter workspaces are isolated; adapter CI also watches changes to the sibling `symthaea-core` and `symthaea-fep` source paths because it compiles those actual components.
 
 ### 17.5 Proposed first comparative campaign
 
@@ -673,3 +673,19 @@ This is an executable smoke/pilot harness, **not a completed experiment result**
 The exact BFS reference is used only inside the evaluator. Candidates never receive the oracle route or path values. The harness does not yet capture calibrated physical energy or peak resident memory, and its latency values are local process wall-clock measurements rather than hardware-independent claims.
 
 Before a competitive claim, expand the held-out map families, freeze the generator and candidate configs, use paired cluster-aware uncertainty, publish every failed/incomplete episode, and independently replay the result capsule. This pilot should first be used to discover engineering defects and establish realistic baselines, not to claim SOTA.
+
+
+### 18.3 Candidate-side memory and frontier exploration
+
+The F4 track now contains a candidate-side `ExploreMemory` primitive and a `MemoryFrontierCandidate` baseline.
+
+The memory store:
+- merges only observed cells;
+- never interprets unknown cells as floor;
+- rejects duplicate cells within one observation, missing/blocked agent position, contradictory re-observations, and geometry mismatches;
+- tracks visited cells, observation count and map coverage;
+- exposes known traversable frontier positions adjacent to unknown cells.
+
+The frontier candidate plans only through known traversable cells, moves toward a reachable frontier, uses paid scans when appropriate, and routes to a visible goal once observed. The F4 fixture is now a 7×3 map with a blocked direct corridor and a viable lower route. The candidate test carries the exact scan observation into the next decision, rather than replacing it with a fresh default local view.
+
+This is a generic GameBench memory policy, not yet Symthaea's production episodic-memory subsystem. It creates the matched memory-on/off seam needed for later component ablations.
