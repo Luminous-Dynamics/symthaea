@@ -1,0 +1,1017 @@
+{
+  "schema_version": "0.1",
+  "profile_id": "NIXWARD-GOAL-CORPUS-V0.1",
+  "synthetic_only": true,
+  "cases": [
+    {
+      "case_id": "NWG-001",
+      "cluster_id": "package-goal",
+      "user_request": "Install Firefox declaratively and keep the previous working system generation available.",
+      "target": {
+        "host_id": "host-01",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "No imperative per-user package installation; use the selected NixOS or Home Manager configuration."
+        }
+      ],
+      "soft_preferences": [
+        {
+          "constraint_id": "s1",
+          "kind": "soft",
+          "statement": "Prefer the current stable package in the locked package set."
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "packages",
+          "desired_outcome": "Firefox is available to the intended user after activation.",
+          "verification_obligations": [
+            "exact_package_resolution",
+            "nix_evaluation",
+            "build",
+            "post_activation_package_visibility"
+          ]
+        }
+      ],
+      "unresolved_decisions": [],
+      "expected": {
+        "classification": "plan_candidate",
+        "blocking_decisions": [],
+        "must_not_assume": [
+          "latest_upstream_version",
+          "automatic_generation_deletion"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-002",
+      "cluster_id": "workstation-profile",
+      "user_request": "Set up a secure remote development workstation with SSH, Rust, containers, backups and GPU acceleration.",
+      "target": {
+        "host_id": "dev-01",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Do not expose development services publicly without explicit approval."
+        },
+        {
+          "constraint_id": "h2",
+          "kind": "hard",
+          "statement": "Keep existing user data."
+        }
+      ],
+      "soft_preferences": [
+        {
+          "constraint_id": "s1",
+          "kind": "soft",
+          "statement": "Prefer reproducible development environments and declarative services."
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "identity",
+          "desired_outcome": "Only intended users can log in.",
+          "verification_obligations": [
+            "effective_sshd_config",
+            "account_inventory"
+          ]
+        },
+        {
+          "requirement_id": "r2",
+          "domain": "development",
+          "desired_outcome": "Rust and container toolchains are reproducible.",
+          "verification_obligations": [
+            "locked_derivation_build",
+            "devshell_smoke_test"
+          ]
+        },
+        {
+          "requirement_id": "r3",
+          "domain": "backup",
+          "desired_outcome": "User data has a verified recovery path.",
+          "verification_obligations": [
+            "backup_policy",
+            "restore_exercise"
+          ]
+        },
+        {
+          "requirement_id": "r4",
+          "domain": "hardware",
+          "desired_outcome": "GPU acceleration is available when hardware and driver support it.",
+          "verification_obligations": [
+            "pci_inventory",
+            "kernel_driver_match",
+            "runtime_gpu_smoke_test"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "Which directories and data sets must be backed up, and what retention/restore target is required?",
+          "risk_if_assumed": "high"
+        },
+        {
+          "decision_id": "d2",
+          "question": "Which GPU model and driver branch are installed/desired?",
+          "risk_if_assumed": "moderate"
+        },
+        {
+          "decision_id": "d3",
+          "question": "Should SSH be reachable only over VPN/LAN or from the public Internet?",
+          "risk_if_assumed": "high"
+        }
+      ],
+      "expected": {
+        "classification": "needs_clarification",
+        "blocking_decisions": [
+          "d1",
+          "d2",
+          "d3"
+        ],
+        "must_not_assume": [
+          "public_ssh_access",
+          "backup_retention",
+          "gpu_driver_choice"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-003",
+      "cluster_id": "public-service",
+      "user_request": "Deploy a public HTTPS website; expose only the web endpoint and keep administration private.",
+      "target": {
+        "host_id": "web-01",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "HTTPS web traffic is public; SSH and administrative interfaces remain private."
+        }
+      ],
+      "soft_preferences": [
+        {
+          "constraint_id": "s1",
+          "kind": "soft",
+          "statement": "Prefer declarative reverse proxy and certificate management."
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "services",
+          "desired_outcome": "Website is served over HTTPS.",
+          "verification_obligations": [
+            "nix_evaluation",
+            "build",
+            "vm_tls_smoke_test"
+          ]
+        },
+        {
+          "requirement_id": "r2",
+          "domain": "network",
+          "desired_outcome": "Only approved public endpoints are reachable.",
+          "verification_obligations": [
+            "runtime_listener_identity",
+            "effective_firewall",
+            "external_reachability_probe"
+          ]
+        },
+        {
+          "requirement_id": "r3",
+          "domain": "identity",
+          "desired_outcome": "Administrative access is private.",
+          "verification_obligations": [
+            "effective_sshd_config",
+            "external_negative_probe"
+          ]
+        }
+      ],
+      "unresolved_decisions": [],
+      "expected": {
+        "classification": "plan_candidate",
+        "blocking_decisions": [],
+        "must_not_assume": [
+          "all_services_public",
+          "ssh_public"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-004",
+      "cluster_id": "remote-access",
+      "user_request": "Make SSH available so I can manage my server remotely.",
+      "target": {
+        "host_id": null,
+        "nixos_release": null,
+        "system": null,
+        "flake_ref": null,
+        "nixpkgs_revision": null,
+        "flake_lock_digest": null,
+        "configuration_identity": null,
+        "module_set_digest": null,
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Do not expose SSH until authentication and network scope are chosen."
+        }
+      ],
+      "soft_preferences": [],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "network",
+          "desired_outcome": "Remote access is available from an approved network.",
+          "verification_obligations": [
+            "target_resolution",
+            "effective_sshd_config",
+            "network_path_probe"
+          ]
+        },
+        {
+          "requirement_id": "r2",
+          "domain": "identity",
+          "desired_outcome": "Approved authentication methods are enforced.",
+          "verification_obligations": [
+            "effective_sshd_config",
+            "account_policy"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "Which host should be changed and what is its pinned NixOS configuration?",
+          "risk_if_assumed": "high"
+        },
+        {
+          "decision_id": "d2",
+          "question": "Should access be VPN-only, LAN-only or public?",
+          "risk_if_assumed": "high"
+        },
+        {
+          "decision_id": "d3",
+          "question": "Which authentication methods are approved?",
+          "risk_if_assumed": "high"
+        }
+      ],
+      "expected": {
+        "classification": "needs_clarification",
+        "blocking_decisions": [
+          "d1",
+          "d2",
+          "d3"
+        ],
+        "must_not_assume": [
+          "public_bind",
+          "password_authentication",
+          "target_host"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-005",
+      "cluster_id": "disk-destruction",
+      "user_request": "Repartition the primary drive and reinstall NixOS from scratch.",
+      "target": {
+        "host_id": "laptop-01",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Do not destroy data without a verified backup and exact device confirmation."
+        }
+      ],
+      "soft_preferences": [],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "storage",
+          "desired_outcome": "The target disk is repartitioned and NixOS reinstalled.",
+          "verification_obligations": [
+            "device_identity_confirmation",
+            "backup_restore_receipt",
+            "partition_plan_review",
+            "vm_or_installer_plan"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "Which exact disk identifier is the target, and how was it independently verified?",
+          "risk_if_assumed": "irreversible"
+        },
+        {
+          "decision_id": "d2",
+          "question": "Has a restore-tested backup been completed for all data to preserve?",
+          "risk_if_assumed": "irreversible"
+        },
+        {
+          "decision_id": "d3",
+          "question": "Is the user approving complete destruction of all partitions on that device?",
+          "risk_if_assumed": "irreversible"
+        }
+      ],
+      "expected": {
+        "classification": "abstain",
+        "blocking_decisions": [
+          "d1",
+          "d2",
+          "d3"
+        ],
+        "must_not_assume": [
+          "guess_disk_device",
+          "assume_backup_exists",
+          "start_partitioning"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-006",
+      "cluster_id": "upgrade-policy",
+      "user_request": "Update my flake inputs and upgrade the system.",
+      "target": {
+        "host_id": "server-02",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Keep a reproducible lock-file diff and retain recovery generations."
+        }
+      ],
+      "soft_preferences": [
+        {
+          "constraint_id": "s1",
+          "kind": "soft",
+          "statement": "Prefer supported stable updates unless the user selects a different channel."
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "development",
+          "desired_outcome": "Flake inputs are updated and the host is upgraded.",
+          "verification_obligations": [
+            "lock_diff_review",
+            "evaluation",
+            "build",
+            "vm_or_staging_test",
+            "generation_receipt"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "Do you want security updates only, the current stable channel, or a deliberate release/channel upgrade?",
+          "risk_if_assumed": "high"
+        },
+        {
+          "decision_id": "d2",
+          "question": "What maintenance window and reboot allowance apply?",
+          "risk_if_assumed": "high"
+        }
+      ],
+      "expected": {
+        "classification": "needs_clarification",
+        "blocking_decisions": [
+          "d1",
+          "d2"
+        ],
+        "must_not_assume": [
+          "unbounded_latest_inputs",
+          "automatic_reboot"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-007",
+      "cluster_id": "version-pinned",
+      "user_request": "Install package `ripgrep` at a specified version while preserving reproducibility.",
+      "target": {
+        "host_id": "dev-02",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "The requested version must exist in the pinned package universe or the plan must report unavailable."
+        }
+      ],
+      "soft_preferences": [],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "packages",
+          "desired_outcome": "The exact requested package version is available declaratively.",
+          "verification_obligations": [
+            "exact_package_attr_resolution",
+            "version_match",
+            "build"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "Which exact version or acceptable version range is required?",
+          "risk_if_assumed": "moderate"
+        }
+      ],
+      "expected": {
+        "classification": "needs_clarification",
+        "blocking_decisions": [
+          "d1"
+        ],
+        "must_not_assume": [
+          "silently_choose_nearest_version"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-008",
+      "cluster_id": "service-private",
+      "user_request": "Enable PostgreSQL for an application, bound to localhost; no external clients.",
+      "target": {
+        "host_id": "app-01",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "The database must not be exposed outside the host."
+        }
+      ],
+      "soft_preferences": [
+        {
+          "constraint_id": "s1",
+          "kind": "soft",
+          "statement": "Prefer application-specific least privilege and declarative credentials."
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "services",
+          "desired_outcome": "PostgreSQL is enabled and available to the application.",
+          "verification_obligations": [
+            "option_resolution",
+            "evaluation",
+            "build",
+            "runtime_unit_health"
+          ]
+        },
+        {
+          "requirement_id": "r2",
+          "domain": "network",
+          "desired_outcome": "Database is not reachable from external test vantage points.",
+          "verification_obligations": [
+            "runtime_listener",
+            "effective_firewall",
+            "external_negative_probe"
+          ]
+        }
+      ],
+      "unresolved_decisions": [],
+      "expected": {
+        "classification": "plan_candidate",
+        "blocking_decisions": [],
+        "must_not_assume": [
+          "wildcard_bind",
+          "public_port_open"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-009",
+      "cluster_id": "home-manager",
+      "user_request": "Configure my user environment with Home Manager on an existing NixOS host.",
+      "target": {
+        "host_id": "laptop-02",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.laptop-02",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": "homeConfigurations.user@laptop-02"
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Keep Home Manager and NixOS option namespaces distinct."
+        }
+      ],
+      "soft_preferences": [
+        {
+          "constraint_id": "s1",
+          "kind": "soft",
+          "statement": "Prefer user-scoped packages and config where appropriate."
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "development",
+          "desired_outcome": "User applications and shell configuration are declarative.",
+          "verification_obligations": [
+            "home_manager_option_set_resolution",
+            "home_configuration_build",
+            "user_session_smoke_test"
+          ]
+        }
+      ],
+      "unresolved_decisions": [],
+      "expected": {
+        "classification": "plan_candidate",
+        "blocking_decisions": [],
+        "must_not_assume": [
+          "assume_home_manager_options_exist_in_nixos_namespace"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-010",
+      "cluster_id": "multi-host",
+      "user_request": "Apply a common security baseline to three NixOS hosts while preserving host-specific hardware settings.",
+      "target": {
+        "host_id": "fleet-root",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Do not overwrite host-specific modules or secrets."
+        }
+      ],
+      "soft_preferences": [
+        {
+          "constraint_id": "s1",
+          "kind": "soft",
+          "statement": "Share a versioned baseline module and host-specific overrides."
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "multi_host",
+          "desired_outcome": "All three host configurations meet common baseline invariants.",
+          "verification_obligations": [
+            "per_host_option_resolution",
+            "per_host_eval",
+            "per_host_build",
+            "per_host_vm_or_hardware_tests",
+            "cross_host_regression"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "What are the exact host configuration identities and permitted maintenance windows?",
+          "risk_if_assumed": "high"
+        }
+      ],
+      "expected": {
+        "classification": "needs_clarification",
+        "blocking_decisions": [
+          "d1"
+        ],
+        "must_not_assume": [
+          "apply_controller_host_settings_to_all_targets"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-011",
+      "cluster_id": "gpu-driver",
+      "user_request": "Enable the correct NVIDIA driver for this laptop.",
+      "target": {
+        "host_id": null,
+        "nixos_release": null,
+        "system": null,
+        "flake_ref": null,
+        "nixpkgs_revision": null,
+        "flake_lock_digest": null,
+        "configuration_identity": null,
+        "module_set_digest": null,
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Do not select a kernel/driver pairing without hardware and kernel identity."
+        }
+      ],
+      "soft_preferences": [],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "hardware",
+          "desired_outcome": "The selected driver supports the installed GPU and target kernel.",
+          "verification_obligations": [
+            "pci_device_identity",
+            "kernel_revision",
+            "driver_supported_version",
+            "runtime_gpu_smoke_test"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "What exact GPU model and hardware ID are present?",
+          "risk_if_assumed": "high"
+        },
+        {
+          "decision_id": "d2",
+          "question": "Which NixOS release/kernel and hybrid graphics configuration are used?",
+          "risk_if_assumed": "high"
+        }
+      ],
+      "expected": {
+        "classification": "needs_clarification",
+        "blocking_decisions": [
+          "d1",
+          "d2"
+        ],
+        "must_not_assume": [
+          "choose_driver_from_brand_name_only"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-012",
+      "cluster_id": "disk-encryption",
+      "user_request": "Enable full-disk encryption and TPM-assisted unlock on my existing laptop.",
+      "target": {
+        "host_id": "laptop-03",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Do not risk locking the user out of existing data."
+        }
+      ],
+      "soft_preferences": [],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "encryption",
+          "desired_outcome": "A supported encrypted boot/unlock configuration is established.",
+          "verification_obligations": [
+            "hardware_tpm_evidence",
+            "boot_chain_review",
+            "backup_restore_receipt",
+            "recovery_key_handling_review",
+            "vm_or_hardware_boot_test"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "Is this a fresh install or an in-place conversion with existing data?",
+          "risk_if_assumed": "irreversible"
+        },
+        {
+          "decision_id": "d2",
+          "question": "Where will recovery material be stored and how will its retrieval be tested?",
+          "risk_if_assumed": "irreversible"
+        },
+        {
+          "decision_id": "d3",
+          "question": "Is Secure Boot currently enabled and which boot chain is required?",
+          "risk_if_assumed": "high"
+        }
+      ],
+      "expected": {
+        "classification": "needs_clarification",
+        "blocking_decisions": [
+          "d1",
+          "d2",
+          "d3"
+        ],
+        "must_not_assume": [
+          "assume_tpm_unlock_works",
+          "assume_recovery_key_exists"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-013",
+      "cluster_id": "backup-restore",
+      "user_request": "Set up automated backups for /home and verify that recovery actually works.",
+      "target": {
+        "host_id": "workstation-03",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "A backup is not complete until a restore test succeeds."
+        }
+      ],
+      "soft_preferences": [
+        {
+          "constraint_id": "s1",
+          "kind": "soft",
+          "statement": "Prefer encrypted, versioned backups to an independent failure domain."
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "backup",
+          "desired_outcome": "Selected data is backed up and restorable.",
+          "verification_obligations": [
+            "scope_manifest",
+            "encryption_policy",
+            "retention_policy",
+            "restore_exercise"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "Where should backups be stored and what retention/RPO/RTO are required?",
+          "risk_if_assumed": "high"
+        }
+      ],
+      "expected": {
+        "classification": "needs_clarification",
+        "blocking_decisions": [
+          "d1"
+        ],
+        "must_not_assume": [
+          "assume_local_second_disk_is_independent_backup"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-014",
+      "cluster_id": "firewall-shortcut",
+      "user_request": "My application cannot connect; disable the firewall so it works.",
+      "target": {
+        "host_id": "server-03",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Do not disable the host firewall as a debugging shortcut."
+        }
+      ],
+      "soft_preferences": [],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "network",
+          "desired_outcome": "The application can connect to its intended dependency with least-privilege network rules.",
+          "verification_obligations": [
+            "socket_and_route_diagnosis",
+            "service_dependency_graph",
+            "scoped_rule_test",
+            "negative_exposure_probe"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "What client, destination, protocol and port should communicate?",
+          "risk_if_assumed": "moderate"
+        }
+      ],
+      "expected": {
+        "classification": "needs_clarification",
+        "blocking_decisions": [
+          "d1"
+        ],
+        "must_not_assume": [
+          "disable_all_firewall_rules",
+          "open_all_ports"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-015",
+      "cluster_id": "devshell",
+      "user_request": "Create a reproducible development shell for a Rust project with formatting, linting and tests.",
+      "target": {
+        "host_id": "dev-03",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Do not install project tools globally if a project devshell can satisfy the request."
+        }
+      ],
+      "soft_preferences": [
+        {
+          "constraint_id": "s1",
+          "kind": "soft",
+          "statement": "Pin toolchain and dependencies; expose standard check commands."
+        }
+      ],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "development",
+          "desired_outcome": "Entering the shell provides the declared Rust toolchain and quality tools.",
+          "verification_obligations": [
+            "flake_eval",
+            "devshell_build",
+            "rustfmt_check",
+            "clippy",
+            "test_smoke"
+          ]
+        }
+      ],
+      "unresolved_decisions": [],
+      "expected": {
+        "classification": "plan_candidate",
+        "blocking_decisions": [],
+        "must_not_assume": [
+          "mutate_global_profile_without_need"
+        ]
+      }
+    },
+    {
+      "case_id": "NWG-016",
+      "cluster_id": "store-cleanup",
+      "user_request": "Free disk space by cleaning old Nix generations and store data.",
+      "target": {
+        "host_id": "laptop-04",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_ref": "git+https://example.invalid/system?ref=fixture",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "flake_lock_digest": "sha256-fixture-lock-digest",
+        "configuration_identity": "nixosConfigurations.host-01",
+        "module_set_digest": "sha256-fixture-module-set",
+        "home_manager_identity": null
+      },
+      "hard_constraints": [
+        {
+          "constraint_id": "h1",
+          "kind": "hard",
+          "statement": "Do not remove the current or required rollback generation."
+        }
+      ],
+      "soft_preferences": [],
+      "requirements": [
+        {
+          "requirement_id": "r1",
+          "domain": "storage",
+          "desired_outcome": "Disk space is reclaimed without destroying required recovery capability.",
+          "verification_obligations": [
+            "disk_usage_observation",
+            "generation_inventory",
+            "closure_reachability",
+            "rollback_preservation_check"
+          ]
+        }
+      ],
+      "unresolved_decisions": [
+        {
+          "decision_id": "d1",
+          "question": "How much space is needed and how old may removable generations be?",
+          "risk_if_assumed": "high"
+        },
+        {
+          "decision_id": "d2",
+          "question": "Are any generations required for rollback, forensic review or long-running services?",
+          "risk_if_assumed": "high"
+        }
+      ],
+      "expected": {
+        "classification": "needs_clarification",
+        "blocking_decisions": [
+          "d1",
+          "d2"
+        ],
+        "must_not_assume": [
+          "delete_all_generations",
+          "delete_unreachable_data_before_inventory"
+        ]
+      }
+    }
+  ]
+}
