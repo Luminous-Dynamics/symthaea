@@ -1,0 +1,48 @@
+name: CMAQ-062 localized context tree
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-062/**"
+      - "research/cmaq-059/**"
+      - "research/cmaq-058/**"
+      - "research/cmaq-053/**"
+      - "research/cmaq-048/**"
+      - ".github/workflows/cmaq-062.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-062-localized-context-tree
+  cancel-in-progress: true
+
+jobs:
+  localized-context-tree:
+    name: localized-context-tree
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-062-localized-context-tree-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Generate dependency lockfile
+        run: cargo +1.100.0 generate-lockfile --manifest-path research/cmaq-062/Cargo.toml
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-062/Cargo.toml -- --check
+      - name: Run deterministic context-tree tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-062/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-062/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Run seeded context-tree probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-062/Cargo.toml --locked --bin context_probe > cmaq-062-context-probe.csv
+      - name: Preserve context-tree receipt and lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-062-context-tree-probe
+          path: |
+            cmaq-062-context-probe.csv
+            research/cmaq-062/Cargo.lock
+          if-no-files-found: error
