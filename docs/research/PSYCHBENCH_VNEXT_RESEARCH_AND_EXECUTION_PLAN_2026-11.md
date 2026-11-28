@@ -224,6 +224,8 @@ Prioritize a smaller set with strong task grounding and useful mechanism hooks. 
 
 This anchor set should contain both externally validated tasks and explicitly synthetic mechanism probes. The report must never aggregate them into one "psychological score."
 
+The first new ecological benchmark family is specified separately in `docs/research/PSYCHBENCH_COGNITIVE_ECOLOGY_SPEC_v0.1.md`. PCE supplies a shared interactive world with partial observability, latent causal rules, persistent goals, social information asymmetry, regime shifts, and replayable event oracles. Its first implementation slice is the deterministic Rust world kernel, not an LLM wrapper.
+
 ### 4.2 External comparators to adopt carefully
 
 - **CogBench (ICML 2024):** 10 behavioral metrics from seven cognitive experiments, evaluated over 40 LLMs with multilevel analyses. Use it as a direct behavioral phenotyping comparator and reproduce its core task conditions where licensing/data availability permit. Add Symthaea's mechanism measurements as a separate layer, not as a replacement score.
@@ -343,6 +345,7 @@ A benchmark that is insensitive to the negative control or fails to distinguish 
 6. Make the human reference comparison fail closed on missing sample/population/protocol metadata; do not interpret an unweighted z-score mean as global cognitive ability.
 7. Replace the MetacognitiveIgnition common-input ROC with an independent metacognitive readout or report it only as a shared-input thresholding diagnostic; add counterfactual same-evidence/different-competition tests.
 8. Keep the legacy CognitiveProfile as a triage visualization only; replace its unvalidated global composite with an explicitly descriptive dashboard and define calibrated metric metadata before building a true latent cognitive profile.
+9. Build the first PCE kernel from the standalone v0.1 spec: deterministic state transitions, event receipts/replay, scripted/random/oracle baselines, then the hidden-resource/persistent-goal/regime-shift scenario.
 7. Quarantine planted-HDC creativity tasks from claims; keep them as algebraic unit tests.
 8. Unify Butlin indicator evaluation and paper examples; maintain the architectural/live/causal evidence separation.
 9. Recompute all published data from the current exact head. If it cannot be reproduced, withdraw the affected claim rather than preserving the number.
