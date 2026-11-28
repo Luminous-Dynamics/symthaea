@@ -93,7 +93,7 @@ Each step is revalidated through the existing pair and transform-receipt authori
 
 ### Commutator contract
 
-The new two-path comparator starts from the same exact sample/audio/instruction/validity state and compares the composed property maps and terminal instruction/validity commitments. It can qualify a declared commuting or non-commuting transformation pair. It deliberately does **not** require terminal waveform hashes to match: symbolic path commutation is not acoustic equivalence. That remains a later materialized-audio and human-calibration obligation.
+The new two-path comparator starts from the same exact sample/audio/instruction/validity state and compares the composed property maps and terminal instruction/validity commitments. The expected commuting/non-commuting result is not passed as a loose evaluation-time boolean: a versioned commutator case binds both exact path digests, evaluation split, preregistration artifact digest, rationale and expected relation into a domain-separated commitment. Changing the expectation or substituting either path invalidates the case. The comparator deliberately does **not** require terminal waveform hashes to match: symbolic path commutation is not acoustic equivalence. That remains a later materialized-audio and human-calibration obligation.
 
 ### Deterministic controls authored
 
