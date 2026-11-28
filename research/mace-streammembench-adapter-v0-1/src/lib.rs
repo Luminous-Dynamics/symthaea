@@ -865,7 +865,6 @@ mod tests {
     }
 
     fn episode(with_revision: bool) -> StreamMemEpisodeReceiptV1 {
-        let b = binding();
         let (b, timeline) = timeline();
         let initial_request = "initial request";
         let followup_request = "follow-up request";
