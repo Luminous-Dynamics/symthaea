@@ -1,7 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Run the 7-benchmark Qualia Confidence Matrix and print the composite report.
+//! Run seven theory-inspired synthetic probes and print their heuristic conformance summary.
+//! This summary is not a measure or probability estimate of consciousness.
 //!
 //! Usage:
 //!   cargo run -p symthaea-psych-bench --example qualia_confidence_report
@@ -33,7 +34,7 @@ fn main() {
         ..Default::default()
     };
 
-    eprintln!("Running Qualia Confidence Matrix (seed={seed})...\n");
+    eprintln!("Running theory-probe diagnostics (seed={seed})...\n");
 
     let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
         Box::new(GwtAsphyxiationBenchmark),
@@ -51,6 +52,11 @@ fn main() {
     if json_output {
         println!("{{");
         println!("  \"seed\": {seed},");
+        println!("  \"summary_type\": \"theory_probe_heuristic_index\",");
+        println!("  \"consciousness_measure\": false,");
+        println!("  \"theory_probe_heuristic_index\": {:.4},", score.composite);
+        println!("  \"heuristic_bucket\": \"{}\",", score.level);
+        // Deprecated compatibility fields: retain until downstream consumers migrate.
         println!("  \"composite\": {:.4},", score.composite);
         println!("  \"level\": \"{}\",", score.level);
         println!(
