@@ -39,6 +39,7 @@ event contract.
 - [Scene frame fixtures](SYMTHAEA_EMBODIMENT_SCENE_FIXTURES_V1_2026-11-27.json)
 - [Phase-anchored action timeline](SYMTHAEA_PHASE_ANCHORED_ACTION_TIMELINE_V0_1_2026-11-28.md)
 - [ROI calibration report verifier](SYMTHAEA_ROI_CALIBRATION_REPORT_V1_2026-11-28.md)
+- [ROI calibration report schema](SYMTHAEA_ROI_CALIBRATION_REPORT_SCHEMA_V1_2026-11-28.json)
 - [Typed scene-graph renderer bridge](SYMTHAEA_TYPED_SCENE_GRAPH_RENDERER_BRIDGE_V0_1_2026-11-28.md)
 - [Competitive strategy and qualification scorecard](SYMTHAEA_POLYEMBODIMENT_COMPETITIVE_STRATEGY_V0_1_2026-11-28.md)
 - [Multi-party addressee and silence benchmark](SYMTHAEA_MULTIPARTY_CONTROL_BENCHMARK_V1_2026-11-28.md)
