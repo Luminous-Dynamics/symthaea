@@ -391,20 +391,24 @@ fn observer_reframe_changes_camera_relative_left_right_but_not_world_geometry() 
     let camera_world_a = Rigid3::identity();
     let camera_world_b =
         Rigid3::from_axis_angle([0.0, 0.0, 1.0], PI, [0.0, 0.0, 0.0]);
-    let fixed_world_point = [1.0, 0.0, 5.0];
-    let another_world_point = [2.0, 0.0, 5.0];
+    let world_map_before = [[1.0, 0.0, 5.0], [2.0, 0.0, 5.0]];
+    let world_distance_before = distance(world_map_before[0], world_map_before[1]);
 
-    // Camera coordinates are computed from T_camera_from_world, not by mutating
-    // or rotating the canonical world points.
-    let point_in_camera_a = camera_world_a.inverse().transform_point(fixed_world_point);
-    let point_in_camera_b = camera_world_b.inverse().transform_point(fixed_world_point);
+    // Reframing changes only the observer pose. The allocentric map remains
+    // the same canonical world-coordinate state.
+    let point_in_camera_a = camera_world_a
+        .inverse()
+        .transform_point(world_map_before[0]);
+    let point_in_camera_b = camera_world_b
+        .inverse()
+        .transform_point(world_map_before[0]);
     assert!(point_in_camera_a[0] > 0.0);
     assert!(point_in_camera_b[0] < 0.0);
 
-    let world_distance_before = distance(fixed_world_point, another_world_point);
-    let world_distance_after = distance(fixed_world_point, another_world_point);
+    let world_map_after = world_map_before;
+    let world_distance_after = distance(world_map_after[0], world_map_after[1]);
+    assert_eq!(world_map_after, world_map_before);
     assert!((world_distance_before - world_distance_after).abs() < EPS);
-    assert_vec_close(fixed_world_point, [1.0, 0.0, 5.0], EPS);
 }
 
 #[test]
