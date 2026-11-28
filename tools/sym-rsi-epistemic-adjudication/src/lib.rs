@@ -29,6 +29,9 @@ pub mod stratified_risk;
 #[path = "../../../src/web_research/sowrc.rs"]
 pub mod sowrc;
 
+#[path = "../../../src/web_research/predictable_audit.rs"]
+pub mod predictable_audit;
+
 #[cfg(test)]
 mod compatibility_tests {
     use super::types::{ResearchSource, VerificationOutcome};
