@@ -169,6 +169,89 @@ pub struct MirexDownbeatEventScoresV1 {
     pub scoring_receipt: MirexBeatScoringReceiptV1,
 }
 
+/// How valid annotated time was applied before the scorer received event arrays.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MirexValidSegmentPolicy {
+    FullTrack,
+    DeclaredValidSegments,
+}
+
+/// Content-addressed evidence binding a score to the benchmark manifest and exact inputs.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MirexBeatScoreEvidenceV1 {
+    pub track_id: String,
+    pub benchmark_manifest_sha256: String,
+    pub source_audio_sha256: String,
+    pub reference_annotation_sha256: String,
+    pub estimated_event_output_sha256: String,
+    pub source_master_family_id: String,
+    pub valid_segment_policy: MirexValidSegmentPolicy,
+    pub valid_segment_manifest_sha256: Option<String>,
+}
+
+/// A beat score paired with exact source, annotation and estimator-output provenance.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MirexQualifiedBeatTrackReportV1 {
+    pub report: MirexBeatTrackReportV1,
+    pub evidence: MirexBeatScoreEvidenceV1,
+}
+
+/// Validate exact evidence bindings before allowing a score into a benchmark report.
+pub fn validate_mirex_beat_score_evidence(
+    evidence: &MirexBeatScoreEvidenceV1,
+) -> Result<(), MirexBeatMetricError> {
+    if evidence.track_id.trim().is_empty()
+        || evidence.source_master_family_id.trim().is_empty()
+    {
+        return Err(MirexBeatMetricError::InvalidScoreEvidenceIdentity);
+    }
+    for digest in [
+        evidence.benchmark_manifest_sha256.as_str(),
+        evidence.source_audio_sha256.as_str(),
+        evidence.reference_annotation_sha256.as_str(),
+        evidence.estimated_event_output_sha256.as_str(),
+    ] {
+        if !is_lowercase_sha256(digest) {
+            return Err(MirexBeatMetricError::InvalidScoreEvidenceDigest);
+        }
+    }
+    match (
+        evidence.valid_segment_policy,
+        evidence.valid_segment_manifest_sha256.as_deref(),
+    ) {
+        (MirexValidSegmentPolicy::FullTrack, None) => {}
+        (MirexValidSegmentPolicy::DeclaredValidSegments, Some(digest))
+            if is_lowercase_sha256(digest) => {}
+        _ => return Err(MirexBeatMetricError::InvalidValidSegmentEvidence),
+    }
+    Ok(())
+}
+
+/// Score a track and bind the result to its benchmark manifest and exact inputs.
+///
+/// The caller must pass events already filtered according to the declared
+/// valid-segment policy. The evidence receipt records the policy and digest;
+/// it does not independently load or transform annotations.
+pub fn score_mirex_beat_track_with_evidence(
+    reference_frames: &[u64],
+    estimated_frames: &[u64],
+    sample_rate_hz: u32,
+    total_frames: u64,
+    evidence: MirexBeatScoreEvidenceV1,
+) -> Result<MirexQualifiedBeatTrackReportV1, MirexBeatMetricError> {
+    validate_mirex_beat_score_evidence(&evidence)?;
+    let report = score_mirex_beat_track(
+        reference_frames,
+        estimated_frames,
+        sample_rate_hz,
+        total_frames,
+    )?;
+    Ok(MirexQualifiedBeatTrackReportV1 { report, evidence })
+}
+
 /// Errors from invalid event arrays or unsupported source clocks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -181,6 +264,9 @@ pub enum MirexBeatMetricError {
     EstimatedFrameOutOfBounds,
     ReferenceEventsDecreasing,
     EstimatedEventsDecreasing,
+    InvalidScoreEvidenceIdentity,
+    InvalidScoreEvidenceDigest,
+    InvalidValidSegmentEvidence,
 }
 
 /// Score one beat track using the pinned MIREX/mir_eval semantics.
@@ -393,6 +479,13 @@ pub fn aggregate_mirex_beat_scores(
         total_weight_frames: aggregate_weight_frames as u64,
         scores,
     })
+}
+
+fn is_lowercase_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn validate_event_inputs(
@@ -1026,6 +1119,62 @@ mod tests {
         );
         assert_eq!(beat.initial_trim_seconds, 5);
         assert_eq!(downbeat.initial_trim_seconds, 0);
+    }
+
+    fn valid_score_evidence() -> MirexBeatScoreEvidenceV1 {
+        MirexBeatScoreEvidenceV1 {
+            track_id: "synthetic-track-0001".to_string(),
+            benchmark_manifest_sha256: "1".repeat(64),
+            source_audio_sha256: "2".repeat(64),
+            reference_annotation_sha256: "3".repeat(64),
+            estimated_event_output_sha256: "4".repeat(64),
+            source_master_family_id: "master-synthetic-0001".to_string(),
+            valid_segment_policy: MirexValidSegmentPolicy::FullTrack,
+            valid_segment_manifest_sha256: None,
+        }
+    }
+
+    #[test]
+    fn binds_score_to_exact_input_and_benchmark_digests() {
+        let evidence = valid_score_evidence();
+        let report = score_mirex_beat_track_with_evidence(
+            &[5_000, 6_000, 7_000],
+            &[5_000, 6_000, 7_000],
+            1_000,
+            10_000,
+            evidence.clone(),
+        )
+        .unwrap();
+        assert_eq!(report.evidence, evidence);
+        assert_eq!(report.report.scoring_receipt.reference_library_version, "0.8.2");
+    }
+
+    #[test]
+    fn requires_valid_segment_digest_when_scoring_declared_segments() {
+        let mut evidence = valid_score_evidence();
+        evidence.valid_segment_policy = MirexValidSegmentPolicy::DeclaredValidSegments;
+        assert_eq!(
+            validate_mirex_beat_score_evidence(&evidence),
+            Err(MirexBeatMetricError::InvalidValidSegmentEvidence)
+        );
+        evidence.valid_segment_manifest_sha256 = Some("5".repeat(64));
+        assert!(validate_mirex_beat_score_evidence(&evidence).is_ok());
+    }
+
+    #[test]
+    fn rejects_bad_score_input_digests_and_identity() {
+        let mut evidence = valid_score_evidence();
+        evidence.estimated_event_output_sha256 = "bad".to_string();
+        assert_eq!(
+            validate_mirex_beat_score_evidence(&evidence),
+            Err(MirexBeatMetricError::InvalidScoreEvidenceDigest)
+        );
+        evidence.estimated_event_output_sha256 = "4".repeat(64);
+        evidence.track_id.clear();
+        assert_eq!(
+            validate_mirex_beat_score_evidence(&evidence),
+            Err(MirexBeatMetricError::InvalidScoreEvidenceIdentity)
+        );
     }
 
     #[test]
