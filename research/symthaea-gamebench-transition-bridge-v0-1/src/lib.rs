@@ -503,10 +503,14 @@ pub fn score_candidate_claim(
         ActionEquivalence::ActionEquivalent
     };
 
-    let selected_action_is_common_optimal = claim
-        .selected_action_id
-        .as_ref()
-        .map(|action_id| common_optimal_action_ids.contains(action_id));
+    let selected_action_is_common_optimal = if out_of_family_possible {
+        None
+    } else {
+        claim
+            .selected_action_id
+            .as_ref()
+            .map(|action_id| common_optimal_action_ids.contains(action_id))
+    };
 
     let (worst_case_action_regret, mean_action_regret) =
         if out_of_family_possible || per_world_regret.is_empty() {
@@ -548,6 +552,8 @@ pub struct InterventionContract {
     pub cost_ceiling_units: u64,
     pub minimum_result_delay_steps: u64,
     pub decision_deadline_step: u64,
+    /// Candidate-visible outcome vocabulary for this intervention.
+    pub allowed_outcome_ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -624,6 +630,27 @@ pub fn validate_and_apply_transition(
     )?;
     require_nonempty("event.invocation_id", &event.invocation_id)?;
     require_nonempty("event.outcome_id", &event.outcome_id)?;
+    if contract.allowed_outcome_ids.is_empty() {
+        return Err(ProtocolError::InvalidManifest(
+            "intervention outcome vocabulary must not be empty",
+        ));
+    }
+    let mut allowed_outcomes = BTreeSet::new();
+    for outcome_id in &contract.allowed_outcome_ids {
+        require_nonempty("contract.allowed_outcome_id", outcome_id)?;
+        if !allowed_outcomes.insert(outcome_id.as_str()) {
+            return Err(ProtocolError::DuplicateIdentifier {
+                field: "intervention_outcome",
+                id: outcome_id.clone(),
+            });
+        }
+    }
+    if !allowed_outcomes.contains(event.outcome_id.as_str()) {
+        return Err(ProtocolError::UnknownIdentifier {
+            field: "intervention_outcome",
+            id: event.outcome_id.clone(),
+        });
+    }
     require_nonempty(
         "event.before_observation_digest",
         &event.before_observation_digest,
@@ -808,6 +835,7 @@ mod tests {
             cost_ceiling_units: 2,
             minimum_result_delay_steps: 1,
             decision_deadline_step: 8,
+            allowed_outcome_ids: ids(&["north-gate-open", "east-gate-open"]),
         }
     }
 
@@ -927,6 +955,7 @@ mod tests {
         .expect("score open-world support");
         assert_eq!(score.action_equivalence, ActionEquivalence::Unresolved);
         assert!(score.false_unique_claim);
+        assert_eq!(score.selected_action_is_common_optimal, None);
         assert_eq!(score.worst_case_action_regret, None);
     }
 
@@ -1130,6 +1159,19 @@ mod tests {
         assert!(matches!(
             validate_and_apply_transition(&contract(), &low_budget, &event()),
             Err(ProtocolError::CostOverBudget { .. })
+        ));
+    }
+
+    #[test]
+    fn transition_rejects_outcome_outside_declared_vocabulary() {
+        let mut unexpected = event();
+        unexpected.outcome_id = "hidden-world-id".into();
+        assert!(matches!(
+            validate_and_apply_transition(&contract(), &progress(), &unexpected),
+            Err(ProtocolError::UnknownIdentifier {
+                field: "intervention_outcome",
+                ..
+            })
         ));
     }
 
