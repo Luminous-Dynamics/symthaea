@@ -18,15 +18,34 @@
     "schema": {
       "const": "mel-music-performance-identity-sampling-design-v1"
     },
-    "sampling_frame_id": { "type": "string" },
-    "target_population": { "type": "string" },
-    "inclusion_exclusion_policy": { "type": "string" },
-    "pseudonymization_scope": { "type": "string" },
-    "independent_source_work_sampling_claimed": { "type": "boolean" },
-    "independence_basis": { "type": "string" },
+    "sampling_frame_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_population": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inclusion_exclusion_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pseudonymization_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "independent_source_work_sampling_claimed": {
+      "type": "boolean"
+    },
+    "independence_basis": {
+      "type": "string"
+    },
     "observations": {
       "type": "array",
-      "items": { "$ref": "#/$defs/observation" }
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
     }
   },
   "$defs": {
@@ -45,15 +64,25 @@
         "performance_identity_sha256"
       ],
       "properties": {
-        "performer_identity_sha256": { "type": "string" },
+        "performer_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
         "performer_membership_sha256": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/digest" }
+          "items": {
+            "$ref": "#/$defs/digest"
+          }
         },
-        "session_identity_sha256": { "type": "string" },
-        "take_identity_sha256": { "type": "string" },
-        "performance_identity_sha256": { "type": "string" }
+        "session_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "take_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "performance_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        }
       }
     },
     "observation": {
@@ -68,12 +97,26 @@
         "musical_flip"
       ],
       "properties": {
-        "item_id": { "type": "string" },
-        "pair_id": { "type": "string" },
-        "source_work_lineage_sha256": { "type": "string" },
-        "clean": { "$ref": "#/$defs/arm" },
-        "performance_stay": { "$ref": "#/$defs/arm" },
-        "musical_flip": { "$ref": "#/$defs/arm" }
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_work_lineage_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "clean": {
+          "$ref": "#/$defs/arm"
+        },
+        "performance_stay": {
+          "$ref": "#/$defs/arm"
+        },
+        "musical_flip": {
+          "$ref": "#/$defs/arm"
+        }
       }
     }
   }
