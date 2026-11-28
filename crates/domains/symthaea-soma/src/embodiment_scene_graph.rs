@@ -105,6 +105,7 @@ pub enum SceneGraphV2Error {
     MetadataMismatch,
     InvalidIntensity,
     MissingCoreNode,
+    InvalidNodeSet,
     DuplicateNodeId,
     DuplicateRelationId,
     DuplicateLayoutAttachment,
@@ -173,7 +174,7 @@ pub fn compile_scene_graph_v2(
             role,
             glyph,
             weight: None,
-            motion: if dynamic { SceneMotion::Static } else { SceneMotion::Static },
+            motion: if dynamic { child_motion(&cue.semantic) } else { SceneMotion::Static },
             layout_anchor: LayoutAnchor::AttachedTo {
                 node_id: 0,
                 slot: 0,
@@ -331,6 +332,53 @@ pub fn verify_scene_graph_v2(
         return Err(SceneGraphV2Error::MissingCoreNode);
     }
 
+    let (expected_core_glyph, expected_marker_glyph) = glyphs_for_form(graph.form);
+    let expected_child_role = match &cue.semantic {
+        SemanticCue::Listening { .. } | SemanticCue::Speaking { .. } => None,
+        SemanticCue::TurnState { .. } => Some(SceneRole::TurnState),
+        SemanticCue::Backchannel { .. } => Some(SceneRole::Backchannel),
+        SemanticCue::AttentionFocus { .. } => Some(SceneRole::Attention),
+        SemanticCue::ExpressionIntent { .. } => Some(SceneRole::Expression),
+        SemanticCue::Uncertainty { .. } => Some(SceneRole::Alternative),
+        SemanticCue::EvidenceStatus { .. } => Some(SceneRole::Evidence),
+        SemanticCue::UserControl { .. } => Some(SceneRole::UserControl),
+    };
+    let core = graph.nodes.iter().find(|node| node.id == 0)
+        .ok_or(SceneGraphV2Error::MissingCoreNode)?;
+    if core.glyph != expected_core_glyph {
+        return Err(SceneGraphV2Error::InvalidNodeSet);
+    }
+    match expected_child_role {
+        None => {
+            if graph.nodes.len() != 1 || !graph.layout_attachments.is_empty() {
+                return Err(SceneGraphV2Error::InvalidNodeSet);
+            }
+        }
+        Some(role) => {
+            if graph.nodes.len() != 2 {
+                return Err(SceneGraphV2Error::InvalidNodeSet);
+            }
+            let child = graph.nodes.iter().find(|node| node.id == 1)
+                .ok_or(SceneGraphV2Error::InvalidNodeSet)?;
+            let expected_glyph = if role == SceneRole::Alternative {
+                SceneGlyph::Branch
+            } else {
+                expected_marker_glyph
+            };
+            if child.role != role
+                || child.glyph != expected_glyph
+                || child.layout_anchor != LayoutAnchor::AttachedTo { node_id: 0, slot: 0 }
+                || graph.layout_attachments.as_slice() != [SceneLayoutAttachmentV2 {
+                    source_node_id: 0,
+                    target_node_id: 1,
+                    slot: 0,
+                }]
+            {
+                return Err(SceneGraphV2Error::InvalidNodeSet);
+            }
+        }
+    }
+
     let mut relation_ids = HashSet::with_capacity(graph.relations.len());
     for relation in &graph.relations {
         if !relation_ids.insert(relation.id) {
@@ -381,6 +429,13 @@ pub fn verify_scene_graph_v2(
     if expected_relation_count > 1 || graph.relations.len() > expected_relation_count {
         return Err(SceneGraphV2Error::DuplicateSemanticRelation);
     }
+    if expected_relation_count == 1
+        && (graph.relations[0].id != 0
+            || graph.relations[0].source_node_id != 0
+            || graph.relations[0].target_node_id != 1)
+    {
+        return Err(SceneGraphV2Error::InvalidRelationForSemanticCue);
+    }
 
     let mut attachment_keys = HashSet::with_capacity(graph.layout_attachments.len());
     for attachment in &graph.layout_attachments {
@@ -414,6 +469,22 @@ pub fn verify_scene_graph_v2(
         return Err(SceneGraphV2Error::SceneGraphDigestMismatch);
     }
     Ok(())
+}
+
+fn child_motion(semantic: &SemanticCue) -> SceneMotion {
+    match semantic {
+        SemanticCue::Listening { .. } | SemanticCue::Speaking { .. } => SceneMotion::Static,
+        SemanticCue::TurnState { state, .. } => match state {
+            TurnState::Wait => SceneMotion::Static,
+            TurnState::Respond => SceneMotion::Pulse,
+            TurnState::Continue => SceneMotion::Flow,
+            TurnState::Yield => SceneMotion::Radiate,
+        },
+        SemanticCue::Backchannel { .. } | SemanticCue::AttentionFocus { .. }
+        | SemanticCue::ExpressionIntent { .. } => SceneMotion::Pulse,
+        SemanticCue::Uncertainty { .. } | SemanticCue::EvidenceStatus { .. }
+        | SemanticCue::UserControl { .. } => SceneMotion::Static,
+    }
 }
 
 fn glyphs_for_form(form: EmbodimentForm) -> (SceneGlyph, SceneGlyph) {
@@ -642,6 +713,51 @@ mod tests {
         assert!(!serialized.contains(secret_target));
         assert!(!graph.accessible_description.contains(secret_target));
         verify_scene_graph_v2(&graph, &cue, &permit).unwrap();
+    }
+
+    #[test]
+    fn orphaned_child_node_is_rejected_even_when_digest_is_recomputed() {
+        let (cue, permit) = fixture(
+            EmbodimentForm::LivingConstellation,
+            PrivacyClass::Public,
+            SemanticCue::AttentionFocus {
+                target: "target-a".to_owned(),
+                strength: None,
+            },
+        );
+        let mut graph = compile_scene_graph_v2(&cue, &permit).unwrap();
+        graph.nodes.push(SceneNodeV2 {
+            id: 2,
+            role: SceneRole::Evidence,
+            glyph: SceneGlyph::Marker,
+            weight: None,
+            motion: SceneMotion::Static,
+            layout_anchor: LayoutAnchor::Periphery { slot: 1 },
+        });
+        graph.scene_graph_digest = compute_scene_graph_v2_digest(&graph).unwrap();
+        assert_eq!(
+            verify_scene_graph_v2(&graph, &cue, &permit),
+            Err(SceneGraphV2Error::InvalidNodeSet)
+        );
+    }
+
+    #[test]
+    fn missing_layout_attachment_is_rejected() {
+        let (cue, permit) = fixture(
+            EmbodimentForm::PuppetTheatre,
+            PrivacyClass::Public,
+            SemanticCue::AttentionFocus {
+                target: "target-a".to_owned(),
+                strength: None,
+            },
+        );
+        let mut graph = compile_scene_graph_v2(&cue, &permit).unwrap();
+        graph.layout_attachments.clear();
+        graph.scene_graph_digest = compute_scene_graph_v2_digest(&graph).unwrap();
+        assert_eq!(
+            verify_scene_graph_v2(&graph, &cue, &permit),
+            Err(SceneGraphV2Error::InvalidNodeSet)
+        );
     }
 
     #[test]
