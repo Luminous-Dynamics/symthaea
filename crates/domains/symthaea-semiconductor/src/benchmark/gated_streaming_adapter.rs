@@ -1280,14 +1280,11 @@ mod tests {
         let receipt = deliver_qualified_stream_label_v1(
             &mut engine,
             &delivery(
-                "sample-1",
-                "event-1",
-                "label-1",
+                ("sample-1", "event-1", "label-1"),
                 1,
                 LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
                 LabelEvidenceFrontierV1::CurrentAtK1,
-                110,
-                112,
+                (110, 112),
             ),
         )
         .unwrap();
@@ -1309,14 +1306,11 @@ mod tests {
         )
         .unwrap();
         let mut candidate = delivery(
-            "sample-1",
-            "event-1",
-            "label-1",
+            ("sample-1", "event-1", "label-1"),
             1,
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
-            110,
-            115,
+            (110, 115),
         );
         candidate.eligibility_report_available_at_unix_seconds = 113;
         let receipt = deliver_qualified_stream_label_v1(&mut engine, &candidate).unwrap();
