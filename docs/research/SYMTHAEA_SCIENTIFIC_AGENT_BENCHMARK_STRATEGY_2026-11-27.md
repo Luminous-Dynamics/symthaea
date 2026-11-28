@@ -250,6 +250,24 @@ Integrate these estimands with #11060/#11171's open-world episode metrics. In pa
 - Keep evaluator-only compatibility sets, hidden mechanisms and sampling probabilities outside the agent process.
 - Any sequential confidence bound must reuse the pinned SOWRC theorem implementation and its predictable audit design; the reference script is arithmetic validation, not a replacement theorem.
 
+### Add established-discovery and broad science suites to the external validation ladder
+
+Two additional external resources should be used as complementary tracks rather than replacements for the controlled Symthaea-specific tests:
+
+- **AstaBench** is an evolving suite with thousands of scientific research problems across literature understanding and other scientific task categories. It is useful for measuring breadth and retrieval/workflow competence, but its component leaderboards and task-specific metrics must remain separate. [Official AstaBench suite](https://allenai.org/asta/bench).
+- **FIRE-Bench** evaluates full-cycle rediscovery of established, non-trivial findings from recent machine-learning literature. Its emphasis on rediscovery is valuable because a candidate must recover a known result through empirical work rather than merely produce a plausible novelty claim. Treat its paper-reported results as benchmark-specific and pin the task/harness version. [FIRE-Bench paper](https://firebench.github.io/static/FIRE_Bench.pdf).
+
+The external evaluation ladder should therefore distinguish:
+1. **Breadth:** AstaBench and selected SCI-AGENT-EXAM tasks.
+2. **Deep synthesis:** DeepResearch Bench II and live research tasks.
+3. **Trajectory choice:** Taste-Bench-inspired held-out forks and RD-Bench.
+4. **Rediscovery:** FIRE-Bench and selected known-answer scientific tasks.
+5. **Reproduction / engineering:** PaperBench, RE-Bench and MLE-bench.
+6. **Experimental improvement:** TasteVal, Scientist World and Autonomous Science Bench.
+7. **Scientific integrity:** Symthaea's false-unique, provenance, correction, authorization and replay contracts.
+
+The recent lifecycle survey also cautions that retrieval-grounded research and machine-learning engineering have more repeatable benchmark gains than open-ended ideation and end-to-end discovery; it reports persistent fabrication, mis-citation and overclaiming risks. Use this as a maturity warning, not a leaderboard source. [2026 lifecycle survey](https://www.mdpi.com/3043-0097/1/2/8).
+
 ### Correction propagation: measure both damage containment and recovery speed
 
 The MON-045 scoped-invalidation work proposes a typed dependency DAG with required digest-pinned edges, optional context edges, expiry/revocation semantics and three-valued verdicts. This is directly relevant to scientific evidence graphs: retracting one required source should invalidate every dependent claim, but must not damage unrelated claims. It also makes a key missing metric explicit: stale-claim exposure time after a source correction.
