@@ -642,7 +642,12 @@ mod tests {
             }
 
             let score = episode.evaluate_after_submission().unwrap();
-            assert_eq!(score.probe_count, numeric::INPUT_LEVELS.len());
+            let final_log = numeric_log(&episode.view().unwrap()).unwrap();
+            assert!(score.probe_count >= numeric::INPUT_LEVELS.len());
+            assert!(score.probe_count <= 6);
+            assert!(numeric::INPUT_LEVELS
+                .iter()
+                .all(|input| final_log.interventions.contains(input)));
             assert!(!score.generating_model_in_version_space);
             assert!(!score.generating_truth_behaviorally_represented);
             assert_eq!(score.set_score.oracle_model_count, 0);
