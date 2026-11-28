@@ -10,7 +10,7 @@
 //! and audited independently of the agent implementation.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
 
 /// Versioned benchmark-internal cost units. These are task costs, not joules,
 /// wall-clock latency, API tokens, or monetary cost.
@@ -99,7 +99,7 @@ pub enum Item {
 }
 
 /// The evaluator's gate state. Agents see it only after inspecting the crossing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GateState {
     Closed,
     Open,
@@ -249,6 +249,7 @@ pub enum TransitionError {
     ManifestMismatch,
     Serialization(String),
     ReplayMismatch,
+    PlannerExhausted,
 }
 
 impl std::fmt::Display for TransitionError {
@@ -268,6 +269,7 @@ impl std::fmt::Display for TransitionError {
             Self::ManifestMismatch => write!(f, "world state belongs to a different scenario manifest"),
             Self::Serialization(message) => write!(f, "could not serialize transition evidence: {message}"),
             Self::ReplayMismatch => write!(f, "recorded receipts do not match deterministic replay"),
+            Self::PlannerExhausted => write!(f, "search oracle found no valid plan within the step budget"),
         }
     }
 }
@@ -543,6 +545,96 @@ pub struct EvaluatedTrace {
     pub score: ScenarioScore,
 }
 
+/// Minimal behavioral state used by the search oracle. Event history and
+/// timestamps are intentionally omitted: BFS reaches equivalent states first
+/// by the shortest action sequence, and a shorter path dominates a longer one.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct PlannerKey {
+    location: Site,
+    inventory: BTreeSet<Item>,
+    items_at: BTreeSet<(Site, Item)>,
+    inspected_sites: BTreeSet<Site>,
+    known_clues: BTreeSet<Clue>,
+    gate_state: GateState,
+    delivered: bool,
+    observation_budget_remaining: u32,
+}
+
+impl From<&WorldState> for PlannerKey {
+    fn from(state: &WorldState) -> Self {
+        Self {
+            location: state.location,
+            inventory: state.inventory.clone(),
+            items_at: state.items_at.clone(),
+            inspected_sites: state.inspected_sites.clone(),
+            known_clues: state.known_clues.clone(),
+            gate_state: state.gate_state,
+            delivered: state.delivered,
+            observation_budget_remaining: state.observation_budget_remaining,
+        }
+    }
+}
+
+/// Breadth-first search for a shortest valid action sequence in the current
+/// fully specified world. This is an evaluator-only oracle and must never be
+/// exposed to the agent being evaluated.
+fn shortest_action_plan(manifest: &ScenarioManifest) -> Option<Vec<Action>> {
+    let initial = WorldState::initial(manifest).ok()?;
+    let mut frontier = VecDeque::from([(initial, Vec::<Action>::new())]);
+    let mut visited = BTreeSet::new();
+    visited.insert(PlannerKey::from(&frontier.front()?.0));
+
+    let actions = [
+        Action::Inspect,
+        Action::Move(Site::Depot),
+        Action::Move(Site::Crossing),
+        Action::Move(Site::Outpost),
+        Action::Collect(Item::WaterFilter),
+        Action::Collect(Item::ValveKey),
+        Action::UseValveKey,
+        Action::Deliver,
+        Action::Wait,
+    ];
+
+    while let Some((state, plan)) = frontier.pop_front() {
+        if state.delivered {
+            return Some(plan);
+        }
+        if state.tick >= manifest.max_steps {
+            continue;
+        }
+
+        for action in &actions {
+            let Ok((next, _receipt)) = step(manifest, &state, action.clone()) else {
+                continue;
+            };
+            let key = PlannerKey::from(&next);
+            if !visited.insert(key) {
+                continue;
+            }
+            let mut next_plan = plan.clone();
+            next_plan.push(action.clone());
+            frontier.push_back((next, next_plan));
+        }
+    }
+
+    None
+}
+
+/// Search-based evaluator baseline for the current environment specification.
+/// It has access to full evaluator state and is a ceiling/oracle, not a fair
+/// black-box competitor.
+pub fn run_search_oracle(
+    manifest: &ScenarioManifest,
+) -> Result<EvaluatedTrace, TransitionError> {
+    let plan = shortest_action_plan(manifest).ok_or(TransitionError::PlannerExhausted)?;
+    let commands = plan
+        .into_iter()
+        .map(RecordedCommand::Agent)
+        .collect::<Vec<_>>();
+    evaluate_trace(manifest, &commands)
+}
+
 fn score_replayed_state(
     manifest: &ScenarioManifest,
     state: &WorldState,
@@ -581,11 +673,9 @@ fn score_replayed_state(
         }
     }
 
-    let optimal_agent_steps = if manifest.layout().filter_location == Site::Depot {
-        8
-    } else {
-        9
-    };
+    let optimal_agent_steps = shortest_action_plan(manifest)
+        .map(|plan| plan.len() as u32)
+        .unwrap_or(0);
     let resource_cost_units = state.event_log.iter().map(|event| {
         let model = manifest.cost_model;
         match &event.kind {
@@ -608,7 +698,7 @@ fn score_replayed_state(
         }
     }).sum::<u64>();
 
-    let action_efficiency = if state.delivered && agent_attempts > 0 {
+    let action_efficiency = if state.delivered && agent_attempts > 0 && optimal_agent_steps > 0 {
         (optimal_agent_steps as f64 / agent_attempts as f64).min(1.0)
     } else {
         0.0
@@ -1012,6 +1102,29 @@ mod tests {
         assert!(matches!(receipt.event.kind, EventKind::ActionRejected { .. }));
         assert_eq!(receipt.step_index, 1);
         assert_ne!(receipt.before_state_digest, receipt.after_state_digest);
+    }
+
+    #[test]
+    fn search_oracle_matches_shortest_reference_action_counts() {
+        for seed in [42, 43] {
+            let manifest = ScenarioManifest { seed, ..ScenarioManifest::default() };
+            let oracle = run_search_oracle(&manifest).expect("search oracle");
+            let reference = run_reference_policy(&manifest, false).expect("reference policy");
+            assert!(oracle.score.goal_completed);
+            assert_eq!(
+                oracle.score.agent_attempts,
+                reference.score.agent_attempts,
+                "scripted policy should match shortest plan for seed {seed}"
+            );
+            assert_eq!(
+                oracle.score.optimal_agent_steps,
+                oracle.score.agent_attempts
+            );
+            assert_eq!(
+                oracle.score.resource_cost_units,
+                reference.score.resource_cost_units
+            );
+        }
     }
 
     #[test]
