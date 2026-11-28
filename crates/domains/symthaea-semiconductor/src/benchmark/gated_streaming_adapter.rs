@@ -66,6 +66,8 @@ pub enum StreamingUpdateReasonV1 {
     DuplicateAcceptedLabelRevision,
     InvalidStreamingNumericInput,
     FeatureDimensionMismatch,
+    SourceAuthenticityNotProven,
+    PendingPredictionReceiptDigestMismatch,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -87,6 +89,8 @@ pub struct StreamingAdapterPolicyV1 {
     pub minimum_context_support: u64,
     pub temporal_ema_alpha: f64,
     pub temporal_activation_threshold: f64,
+    /// Require a separately verified upstream source-authenticity assertion.
+    pub require_source_authenticity_assertion: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -199,6 +203,11 @@ pub struct StreamingUpdateReceiptV1 {
     pub eligibility_report_sha256: Option<String>,
     pub policy_sha256: String,
     pub label_payload_sha256: String,
+    pub label_available_at_unix_seconds: i64,
+    pub eligibility_report_available_at_unix_seconds: i64,
+    pub delivered_at_unix_seconds: i64,
+    pub clock_domain_id: String,
+    pub idempotency_key: String,
     pub adapter_state_before_sha256: String,
     pub adapter_state_after_sha256: String,
     pub update_sequence: Option<u64>,
@@ -591,6 +600,12 @@ fn update_receipt(
         eligibility_report_sha256: Some(delivery.eligibility_report.report_sha256.clone()),
         policy_sha256: engine.policy_sha256.clone(),
         label_payload_sha256: delivery.label_payload_sha256.clone(),
+        label_available_at_unix_seconds: delivery.label_available_at_unix_seconds,
+        eligibility_report_available_at_unix_seconds: delivery
+            .eligibility_report_available_at_unix_seconds,
+        delivered_at_unix_seconds: delivery.delivered_at_unix_seconds,
+        clock_domain_id: delivery.clock_domain_id.clone(),
+        idempotency_key: delivery.idempotency_key.clone(),
         adapter_state_before_sha256: state_digests.0.into(),
         adapter_state_after_sha256: state_digests.1.into(),
         update_sequence,
@@ -680,6 +695,11 @@ pub fn deliver_qualified_stream_label_v1(
     if report.frontier != LabelEvidenceFrontierV1::CurrentAtK1 {
         reasons.push(StreamingUpdateReasonV1::LabelNotCurrentK1);
     }
+    if engine.policy.require_source_authenticity_assertion
+        && !report.source_authenticity_proven
+    {
+        reasons.push(StreamingUpdateReasonV1::SourceAuthenticityNotProven);
+    }
     match report.eligibility {
         LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
             if report.downstream_consumption_allowed => {}
@@ -709,6 +729,15 @@ pub fn deliver_qualified_stream_label_v1(
         reasons.push(StreamingUpdateReasonV1::IdempotencyKeyMismatch);
     }
     if let Some(prediction) = prediction {
+        if prediction_receipt_digest(prediction)? != prediction.receipt_sha256 {
+            reasons.push(StreamingUpdateReasonV1::PendingPredictionReceiptDigestMismatch);
+        }
+        if prediction.global_model_artifact_sha256 != engine.global_model_artifact_sha256
+            || prediction.feature_schema_sha256 != engine.feature_schema_sha256
+            || prediction.policy_sha256 != engine.policy_sha256
+        {
+            reasons.push(StreamingUpdateReasonV1::FeatureSchemaMismatch);
+        }
         if prediction.measurement_event_id != delivery.measurement_event_id {
             reasons.push(StreamingUpdateReasonV1::MeasurementEventMismatch);
         }
@@ -929,6 +958,7 @@ mod tests {
             minimum_context_support: 2,
             temporal_ema_alpha: 0.20,
             temporal_activation_threshold: 0.05,
+            require_source_authenticity_assertion: true,
         }
     }
 
@@ -995,7 +1025,7 @@ mod tests {
             qualification_report_sha256: digest('d'),
             requalification_report_sha256: digest('e'),
             requalification_frontier_sha256: digest('f'),
-            source_authenticity_proven: false,
+            source_authenticity_proven: true,
             training_snapshot_mutated: false,
             equipment_control_authority: false,
             report_sha256: String::new(),
@@ -1202,6 +1232,101 @@ mod tests {
         assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Blocked);
         assert!(!receipt.adapter_state_mutated);
         assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+    }
+
+    #[test]
+    fn source_authenticity_assertion_is_required_by_policy() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        let mut candidate = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            112,
+        );
+        candidate.eligibility_report.source_authenticity_proven = false;
+        candidate.eligibility_report.report_sha256 =
+            eligibility_report_digest(&candidate.eligibility_report).unwrap();
+
+        let receipt = deliver_qualified_stream_label_v1(&mut engine, &candidate).unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
+        assert!(
+            receipt
+                .reasons
+                .contains(&StreamingUpdateReasonV1::SourceAuthenticityNotProven)
+        );
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+    }
+
+    #[test]
+    fn tampered_pending_prediction_receipt_is_rejected_without_update() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let before = adapter_state_digest(&engine.adapter_state).unwrap();
+        let pending = engine.pending_predictions.get_mut("sample-1").unwrap();
+        pending.prediction_value += 0.5;
+
+        let receipt = deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                "sample-1",
+                "event-1",
+                "label-1",
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                110,
+                112,
+            ),
+        )
+        .unwrap();
+        assert_eq!(receipt.disposition, StreamingUpdateDispositionV1::Rejected);
+        assert!(
+            receipt
+                .reasons
+                .contains(&StreamingUpdateReasonV1::PendingPredictionReceiptDigestMismatch)
+        );
+        assert_eq!(adapter_state_digest(&engine.adapter_state).unwrap(), before);
+    }
+
+    #[test]
+    fn update_receipt_preserves_all_feedback_availability_times() {
+        let mut engine = engine();
+        predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 1.0]),
+        )
+        .unwrap();
+        let mut candidate = delivery(
+            "sample-1",
+            "event-1",
+            "label-1",
+            1,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+            110,
+            115,
+        );
+        candidate.eligibility_report_available_at_unix_seconds = 113;
+        let receipt = deliver_qualified_stream_label_v1(&mut engine, &candidate).unwrap();
+        assert_eq!(receipt.label_available_at_unix_seconds, 110);
+        assert_eq!(receipt.eligibility_report_available_at_unix_seconds, 113);
+        assert_eq!(receipt.delivered_at_unix_seconds, 115);
+        assert_eq!(receipt.clock_domain_id, "fab-clock");
+        assert_eq!(receipt.idempotency_key, "label-1:1");
     }
 
     #[test]
