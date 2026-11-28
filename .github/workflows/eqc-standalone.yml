@@ -54,7 +54,7 @@ jobs:
           cargo metadata --locked --manifest-path "$manifest" --format-version 1 \
             > "$RUNNER_TEMP/eqc-cargo-metadata.json"
           jq -e '
-            .packages | any(.[]; .name == "eqc-reference")
+            .packages | any(.[]; .name == "luminous-eqc-reference")
           ' "$RUNNER_TEMP/eqc-cargo-metadata.json" >/dev/null
 
       - name: Validate JSON source artifacts
