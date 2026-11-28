@@ -1,0 +1,297 @@
+{
+  "fixture_version": "symthaea-acoustic-output-observer-fixtures-v1",
+  "valid": [
+    {
+      "case_id": "physical-acoustic-absence-complete",
+      "observation": {
+        "schema_version": "symthaea-acoustic-output-observer-v1",
+        "run_id": "pilot-001",
+        "observation_id": "obs-0001",
+        "observation_sequence": 1,
+        "output_lane": "physical_acoustic",
+        "observer": {
+          "observer_id": "external-recorder-a",
+          "software_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "process_boundary": "external_recorder",
+          "host_identity_digest": null
+        },
+        "sensor": {
+          "sensor_id": "mic-a",
+          "sensor_type": "measurement_microphone",
+          "model": "calibrated-measurement-mic",
+          "position": "0.5 m on axis from speaker",
+          "sample_rate_hz": 48000,
+          "channel_count": 1,
+          "measurement_metric": "laeq",
+          "measurement_window_ms": 20,
+          "calibration_record_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "calibration_status": "valid",
+          "calibration_valid_until_utc": "2027-01-01T00:00:00Z",
+          "detection_rule_id": "acoustic-rule-001"
+        },
+        "clock": {
+          "clock_id": "recorder-monotonic-01",
+          "timebase": "monotonic",
+          "ticks_per_second": 1000000000,
+          "uncertainty_ns": 300000,
+          "drift_bound_ppm": 2,
+          "mapping_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "interval": {
+          "start_tick": 1200000000,
+          "end_tick": 1380000000,
+          "sample_count": 8640
+        },
+        "signal": {
+          "state": "absent",
+          "metric": "laeq",
+          "value": 23.1,
+          "unit": "dB(A)",
+          "threshold": 28,
+          "attribution_method": "cross_correlation",
+          "attribution_confidence": 0.92,
+          "clipped": false,
+          "quiet_dwell_ms": 180
+        },
+        "coverage": {
+          "status": "complete",
+          "dropped_samples": 0,
+          "overrun_count": 0,
+          "noise_floor_valid": true,
+          "clock_continuity": true
+        },
+        "binding": {
+          "event_id": "evt-10",
+          "action_id": "act-4",
+          "segment_id": "seg-2",
+          "stop_trigger_id": "stop-8",
+          "output_stream_id": "stream-1",
+          "canonical_cue_digest": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_version": 7
+        },
+        "raw_window_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "previous_record_digest": null
+      }
+    },
+    {
+      "case_id": "software-loopback-present",
+      "observation": {
+        "schema_version": "symthaea-acoustic-output-observer-v1",
+        "run_id": "pilot-001",
+        "observation_id": "obs-0002",
+        "observation_sequence": 2,
+        "output_lane": "software_loopback",
+        "observer": {
+          "observer_id": "loopback-observer",
+          "software_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "process_boundary": "separate_process_same_host",
+          "host_identity_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        },
+        "sensor": {
+          "sensor_id": "pipewire-monitor-1",
+          "sensor_type": "pipewire_sink_monitor",
+          "model": "PipeWire sink monitor",
+          "position": "post-mixer monitor",
+          "sample_rate_hz": 48000,
+          "channel_count": 2,
+          "measurement_metric": "pcm_rms",
+          "measurement_window_ms": 10,
+          "calibration_record_digest": null,
+          "calibration_status": "not_applicable",
+          "calibration_valid_until_utc": null,
+          "detection_rule_id": "loopback-rule-001"
+        },
+        "clock": {
+          "clock_id": "pipewire-monotonic-01",
+          "timebase": "monotonic",
+          "ticks_per_second": 1000000000,
+          "uncertainty_ns": 100000,
+          "drift_bound_ppm": 3,
+          "mapping_digest": null
+        },
+        "interval": {
+          "start_tick": 2000000000,
+          "end_tick": 2010000000,
+          "sample_count": 960
+        },
+        "signal": {
+          "state": "present",
+          "metric": "pcm_rms",
+          "value": 0.14,
+          "unit": "normalized_pcm",
+          "threshold": 0.001,
+          "attribution_method": "direct_pcm_match",
+          "attribution_confidence": 1,
+          "clipped": false,
+          "quiet_dwell_ms": 0
+        },
+        "coverage": {
+          "status": "complete",
+          "dropped_samples": 0,
+          "overrun_count": 0,
+          "noise_floor_valid": true,
+          "clock_continuity": true
+        },
+        "binding": {
+          "event_id": "evt-10",
+          "action_id": "act-4",
+          "segment_id": "seg-2",
+          "stop_trigger_id": null,
+          "output_stream_id": "stream-1",
+          "canonical_cue_digest": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_version": 7
+        },
+        "raw_window_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "previous_record_digest": null
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "case_id": "absent-with-partial-coverage",
+      "expected_reason": "An absent-state claim with partial coverage must be rejected.",
+      "observation": {
+        "schema_version": "symthaea-acoustic-output-observer-v1",
+        "run_id": "pilot-001",
+        "observation_id": "bad-0001",
+        "observation_sequence": 3,
+        "output_lane": "physical_acoustic",
+        "observer": {
+          "observer_id": "external-recorder-a",
+          "software_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "process_boundary": "external_recorder",
+          "host_identity_digest": null
+        },
+        "sensor": {
+          "sensor_id": "mic-a",
+          "sensor_type": "measurement_microphone",
+          "model": "calibrated-measurement-mic",
+          "position": "0.5 m on axis from speaker",
+          "sample_rate_hz": 48000,
+          "channel_count": 1,
+          "measurement_metric": "laeq",
+          "measurement_window_ms": 20,
+          "calibration_record_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "calibration_status": "valid",
+          "calibration_valid_until_utc": "2027-01-01T00:00:00Z",
+          "detection_rule_id": "acoustic-rule-001"
+        },
+        "clock": {
+          "clock_id": "recorder-monotonic-01",
+          "timebase": "monotonic",
+          "ticks_per_second": 1000000000,
+          "uncertainty_ns": 300000,
+          "drift_bound_ppm": 2,
+          "mapping_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "interval": {
+          "start_tick": 1200000000,
+          "end_tick": 1380000000,
+          "sample_count": 8640
+        },
+        "signal": {
+          "state": "absent",
+          "metric": "laeq",
+          "value": 23.1,
+          "unit": "dB(A)",
+          "threshold": 28,
+          "attribution_method": "cross_correlation",
+          "attribution_confidence": 0.92,
+          "clipped": false,
+          "quiet_dwell_ms": 180
+        },
+        "coverage": {
+          "status": "partial",
+          "dropped_samples": 4,
+          "overrun_count": 0,
+          "noise_floor_valid": true,
+          "clock_continuity": true
+        },
+        "binding": {
+          "event_id": "evt-10",
+          "action_id": "act-4",
+          "segment_id": "seg-2",
+          "stop_trigger_id": "stop-8",
+          "output_stream_id": "stream-1",
+          "canonical_cue_digest": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_version": 7
+        },
+        "raw_window_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "previous_record_digest": null
+      }
+    },
+    {
+      "case_id": "physical-lane-from-same-process",
+      "expected_reason": "Physical acoustic evidence requires a separate device or external recorder boundary.",
+      "observation": {
+        "schema_version": "symthaea-acoustic-output-observer-v1",
+        "run_id": "pilot-001",
+        "observation_id": "bad-0002",
+        "observation_sequence": 4,
+        "output_lane": "physical_acoustic",
+        "observer": {
+          "observer_id": "adapter-callback",
+          "software_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "process_boundary": "same_process",
+          "host_identity_digest": null
+        },
+        "sensor": {
+          "sensor_id": "mic-a",
+          "sensor_type": "measurement_microphone",
+          "model": "calibrated-measurement-mic",
+          "position": "0.5 m on axis from speaker",
+          "sample_rate_hz": 48000,
+          "channel_count": 1,
+          "measurement_metric": "laeq",
+          "measurement_window_ms": 20,
+          "calibration_record_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "calibration_status": "valid",
+          "calibration_valid_until_utc": "2027-01-01T00:00:00Z",
+          "detection_rule_id": "acoustic-rule-001"
+        },
+        "clock": {
+          "clock_id": "recorder-monotonic-01",
+          "timebase": "monotonic",
+          "ticks_per_second": 1000000000,
+          "uncertainty_ns": 300000,
+          "drift_bound_ppm": 2,
+          "mapping_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "interval": {
+          "start_tick": 1200000000,
+          "end_tick": 1380000000,
+          "sample_count": 8640
+        },
+        "signal": {
+          "state": "absent",
+          "metric": "laeq",
+          "value": 23.1,
+          "unit": "dB(A)",
+          "threshold": 28,
+          "attribution_method": "cross_correlation",
+          "attribution_confidence": 0.92,
+          "clipped": false,
+          "quiet_dwell_ms": 180
+        },
+        "coverage": {
+          "status": "complete",
+          "dropped_samples": 0,
+          "overrun_count": 0,
+          "noise_floor_valid": true,
+          "clock_continuity": true
+        },
+        "binding": {
+          "event_id": "evt-10",
+          "action_id": "act-4",
+          "segment_id": "seg-2",
+          "stop_trigger_id": "stop-8",
+          "output_stream_id": "stream-1",
+          "canonical_cue_digest": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_version": 7
+        },
+        "raw_window_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "previous_record_digest": null
+      }
+    }
+  ]
+}
