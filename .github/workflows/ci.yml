@@ -9,6 +9,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   schedule:
     # Weekly psych-bench regression run: Sundays at 04:00 UTC
@@ -319,6 +320,9 @@ jobs:
       # legitimately does not use it.
       - name: Clippy (theory)
         run: cargo clippy -p symthaea-muse --lib --features theory -- -D warnings
+
+      - name: Test shared protocol contracts
+        run: cargo test -p symthaea-muse-protocol --lib
 
       - name: Clippy (protocol + wasm UI)
         run: |

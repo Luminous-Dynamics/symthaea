@@ -1,0 +1,348 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/melothaea/research-style-profile-v1.schema.json",
+  "title": "Melothaea Research Style Profile v1",
+  "description": "Research-only style identity record. Not a runtime recipe, composer route, cultural-authenticity certificate, or training-data authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "record_kind",
+    "profile_id",
+    "display_name",
+    "status",
+    "current_catalog_reference",
+    "scope",
+    "historical_context",
+    "candidate_identity_axes",
+    "nearest_neighbour_questions",
+    "non_inferences",
+    "implementation_readiness",
+    "required_next_evidence",
+    "source_ids",
+    "sources"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "org.luminousdynamics.melothaea.research-style-profile"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "record_kind": {
+      "const": "research_profile_not_runtime_recipe"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "research_only"
+    },
+    "current_catalog_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog_id",
+        "meaning"
+      ],
+      "properties": {
+        "catalog_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "meaning": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 20
+    },
+    "historical_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "claims"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/historicalClaim"
+          }
+        }
+      }
+    },
+    "candidate_identity_axes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/identityAxis"
+      }
+    },
+    "nearest_neighbour_questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "comparison",
+          "question"
+        ],
+        "properties": {
+          "comparison": {
+            "type": "string",
+            "minLength": 1
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "non_inferences": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "implementation_readiness": {
+      "$ref": "#/$defs/researchOnlyReadiness"
+    },
+    "required_next_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "source_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    }
+  },
+  "not": {
+    "required": [
+      "composer_style"
+    ]
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "url",
+        "source_kind",
+        "supports",
+        "limitations"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "author": {
+          "type": "string"
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 1900
+        },
+        "publication": {
+          "type": "string"
+        },
+        "doi": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "source_kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supports": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "historicalClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "statement",
+        "source_ids",
+        "limit"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "limit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "identityAxis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "axis",
+        "observation",
+        "operational_hypothesis",
+        "source_ids",
+        "status",
+        "disconfirming_case"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "axis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operational_hypothesis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disconfirming_case": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "researchOnlyReadiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executable_composer_route",
+        "runtime_style_profile",
+        "qualified_renderer_profile",
+        "licensed_audio_corpus",
+        "practitioner_review",
+        "human_listening_qualification",
+        "allowed_now",
+        "prohibited_claims"
+      ],
+      "properties": {
+        "executable_composer_route": {
+          "const": false
+        },
+        "runtime_style_profile": {
+          "const": false
+        },
+        "qualified_renderer_profile": {
+          "const": false
+        },
+        "licensed_audio_corpus": {
+          "const": false
+        },
+        "practitioner_review": {
+          "const": false
+        },
+        "human_listening_qualification": {
+          "const": false
+        },
+        "allowed_now": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "prohibited_claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

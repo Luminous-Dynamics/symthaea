@@ -1,0 +1,156 @@
+{
+  "schema_id": "org.luminousdynamics.melothaea.research-style-profile",
+  "schema_version": 1,
+  "record_kind": "research_profile_not_runtime_recipe",
+  "profile_id": "south-african-gqom",
+  "display_name": "Gqom",
+  "status": "research_only",
+  "current_catalog_reference": {
+    "catalog_id": 110,
+    "meaning": "existing taxonomy identity; not an executable composer route"
+  },
+  "scope": "Source-grounded research profile for Gqom as a historically situated, evolving South African electronic dance-music practice. Not a universal rhythmic template or an authenticity claim.",
+  "historical_context": {
+    "summary": "Published work treats Gqom as a post-Kwaito phenomenon that is historically connected to Kwaito while distinguishing Gqom's own production, rhythmic, social and self-definitional practices. The cited article focuses on Gqom's emergence, dissemination, production, gender discourse, party spaces and musical characteristics.",
+    "claims": [
+      {
+        "id": "GQ-HIST-01",
+        "statement": "Gqom developed in a musical and social landscape significantly shaped by Kwaito, while becoming a distinct form with its own mode of self-definition.",
+        "source_ids": [
+          "GQ-SRC-01"
+        ],
+        "limit": "Do not reduce Gqom to a Kwaito substyle or represent influence as a one-way lineage."
+      },
+      {
+        "id": "GQ-HIST-02",
+        "statement": "The cited study discusses Gqom's emergence and dissemination in relation to Durban, production practices and party spaces.",
+        "source_ids": [
+          "GQ-SRC-01"
+        ],
+        "limit": "Use more than one practitioner and historical source before asserting a complete origin account."
+      }
+    ]
+  },
+  "candidate_identity_axes": [
+    {
+      "id": "GQ-RHY-01",
+      "axis": "rhythm_and_groove",
+      "observation": "The cited musicological account identifies a strongly foregrounded rhythmic beat and a raw, dark sound as distinguishing characteristics in the examples it analyzes.",
+      "operational_hypothesis": "The composer should model rhythmic identity as a foregrounded, layered event system; do not reduce it to a generic four-on-the-floor house pattern.",
+      "source_ids": [
+        "GQ-SRC-01"
+      ],
+      "status": "literature_supported_candidate_not_universal",
+      "disconfirming_case": "Practitioner-selected Gqom examples whose rhythmic organization or production texture differs from the cited description."
+    },
+    {
+      "id": "GQ-ARR-01",
+      "axis": "arrangement_and_form",
+      "observation": "The cited account describes a slow-burn structure in the Gqom examples discussed and notes that these characteristics change in more recent releases.",
+      "operational_hypothesis": "Represent gradual accumulation, withholding, breaks and energy trajectories as explicit arrangement possibilities; make the arc variable and not a fixed template.",
+      "source_ids": [
+        "GQ-SRC-01"
+      ],
+      "status": "literature_supported_candidate_not_universal",
+      "disconfirming_case": "A practitioner-identified Gqom track with a different formal/energy trajectory."
+    },
+    {
+      "id": "GQ-HARM-01",
+      "axis": "pitch_and_harmony",
+      "observation": "The article describes subordination of harmony and melody to rhythmic emphasis in the musical examples it analyzes.",
+      "operational_hypothesis": "Permit sparse, static or subordinate melodic/harmonic layers while preserving space for rhythmic identity; do not interpret 'subordinate' as 'absent'.",
+      "source_ids": [
+        "GQ-SRC-01"
+      ],
+      "status": "literature_supported_candidate_not_universal",
+      "disconfirming_case": "Practitioner-selected examples where melodic or harmonic material is prominent."
+    },
+    {
+      "id": "GQ-PROD-01",
+      "axis": "production_and_timbre",
+      "observation": "The cited account uses 'raw' and 'dark' as qualitative descriptors of the sound it studies and explicitly discusses changes in later releases.",
+      "operational_hypothesis": "Treat rawness/darkness as source-attributed perceptual descriptors to investigate with producers; do not translate them into a single spectral preset or permanent EQ curve.",
+      "source_ids": [
+        "GQ-SRC-01"
+      ],
+      "status": "qualitative_candidate_requires_practitioner_definition",
+      "disconfirming_case": "Newer Gqom production styles or practitioner-defined variants that do not fit the early descriptor."
+    }
+  ],
+  "nearest_neighbour_questions": [
+    {
+      "comparison": "kwaito",
+      "question": "Which historical continuities are accepted, and which rhythmic, production, arrangement and scene distinctions are necessary to avoid treating Gqom as merely slowed or darkened Kwaito?"
+    },
+    {
+      "comparison": "amapiano",
+      "question": "How do rhythmic foregrounding, keyboard/harmonic roles, low-frequency patterns and arrangement trajectories differ across selected examples?"
+    },
+    {
+      "comparison": "house_and_techno",
+      "question": "Which pulse, kick, syncopation, density and formal characteristics distinguish the selected Gqom examples from generic electronic-dance controls?"
+    },
+    {
+      "comparison": "local_durban_and_south_african_electronic_variants",
+      "question": "Which variant names and distinctions are practitioner-recognized, historically situated and useful for composition?"
+    }
+  ],
+  "non_inferences": [
+    "Do not assume one fixed BPM, meter, kick pattern, syncopation profile, bass timbre or arrangement arc.",
+    "Do not translate 'raw' or 'dark' into a generic lo-fi filter, distortion amount or spectral target without producer review.",
+    "Do not assume harmony and melody are absent; the source describes relative subordination in analyzed examples.",
+    "Do not treat every Gqom track as identical or freeze early characteristics as timeless requirements.",
+    "Do not infer artist identity, region, language, audience or cultural authenticity from audio features."
+  ],
+  "implementation_readiness": {
+    "executable_composer_route": false,
+    "runtime_style_profile": false,
+    "qualified_renderer_profile": false,
+    "licensed_audio_corpus": false,
+    "practitioner_review": false,
+    "human_listening_qualification": false,
+    "allowed_now": [
+      "research",
+      "synthetic counterfactual design",
+      "source review",
+      "practitioner consultation planning"
+    ],
+    "prohibited_claims": [
+      "implemented Gqom composer",
+      "authentic Gqom rendering",
+      "SOTA performance",
+      "community approval"
+    ]
+  },
+  "required_next_evidence": [
+    "Practitioner review across historical and contemporary Gqom variants, including differences in production and arrangement.",
+    "A source-cleared example set with origin, producer, performer and recording rights recorded independently.",
+    "Contrastive examples against Kwaito, Amapiano, house and techno selected with practitioners.",
+    "A symbolic description of rhythm, arrangement and texture that retains uncertainty where conventions vary.",
+    "A controlled style-identity study under renderer and instrumentation variation."
+  ],
+  "source_ids": [
+    "GQ-SRC-01"
+  ],
+  "sources": [
+    {
+      "id": "GQ-SRC-01",
+      "title": "Historicising gqom as a post-kwaito phenomenon",
+      "author": "Dion Malcolm Eaby-Lomas",
+      "year": 2022,
+      "publication": "Journal of the Musical Arts in Africa, 18(1), 101–116",
+      "doi": "10.2989/18121004.2021.2020964",
+      "url": "https://doi.org/10.2989/18121004.2021.2020964",
+      "source_kind": "peer_reviewed_article",
+      "supports": [
+        "Gqom's relation to and distinction from Kwaito",
+        "historical emergence and dissemination",
+        "production, gender discourse and party-space context",
+        "rhythmic foregrounding, described raw/dark sound and slow-burn structures in analyzed examples"
+      ],
+      "limitations": [
+        "do not generalize analyzed examples to every contemporary Gqom variant; article notes changes over time"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,223 @@
+{
+  "schema_id": "org.luminousdynamics.melothaea.research-style-profile",
+  "schema_version": 1,
+  "record_kind": "research_profile_not_runtime_recipe",
+  "profile_id": "south-african-amapiano",
+  "display_name": "Amapiano",
+  "status": "research_only",
+  "current_catalog_reference": {
+    "catalog_id": 109,
+    "meaning": "existing taxonomy identity; not an executable composer route"
+  },
+  "scope": "Source-grounded research profile for a family of South African electronic dance-music practices. Not a single prescriptive formula, genre classifier, or claim of cultural authenticity.",
+  "historical_context": {
+    "summary": "Published scholarship situates Amapiano in South African township dance-music histories and discusses relationships with earlier forms including marabi, mbaqanga, bubblegum and kwaito. Accounts differ on origin dates, places, naming and influence; preserve multiple attributed histories rather than a single origin story.",
+    "claims": [
+      {
+        "id": "AMA-HIST-01",
+        "statement": "Amapiano emerged in South African township contexts around the early 2010s; one scholarly account places its emergence around 2012.",
+        "source_ids": [
+          "AMA-SRC-01"
+        ],
+        "limit": "Do not turn an approximate scholarly framing into a definitive origin date or single-place origin."
+      },
+      {
+        "id": "AMA-HIST-02",
+        "statement": "Its histories are connected to older South African township music, including marabi, mbaqanga, bubblegum and kwaito, alongside international musical influences and new production technologies.",
+        "source_ids": [
+          "AMA-SRC-01"
+        ],
+        "limit": "Influence is not a linear family tree and does not make these traditions interchangeable."
+      },
+      {
+        "id": "AMA-HIST-03",
+        "statement": "Some early Amapiano examples discussed in the literature predate the log drum and shaker becoming characteristic; the sound evolved through experimentation and later producer innovations.",
+        "source_ids": [
+          "AMA-SRC-01",
+          "AMA-SRC-03"
+        ],
+        "limit": "This is a period-specific account of selected early material, not a claim that every early recording lacks these elements or that later Amapiano requires them."
+      }
+    ]
+  },
+  "candidate_identity_axes": [
+    {
+      "id": "AMA-ARR-01",
+      "axis": "arrangement_and_form",
+      "observation": "One article describes early Amapiano sounds around 2014 with instrumental passages lasting up to two to three minutes before vocals and gradual addition of elements in the examples discussed.",
+      "operational_hypothesis": "Represent intro length, vocal-entry timing, layer-entry order and section/energy trajectory as independent variables so a composer can reproduce practitioner-selected early examples and also express later or contrasting forms.",
+      "source_ids": [
+        "AMA-SRC-02",
+        "AMA-SRC-03"
+      ],
+      "status": "period_specific_literature_finding_not_universal",
+      "disconfirming_case": "Practitioner-identified Amapiano examples whose arrangement does not use extended instrumental introductions."
+    },
+    {
+      "id": "AMA-TIM-01",
+      "axis": "timbre_and_instrumentation",
+      "observation": "The literature describes piano prominence in early Amapiano and later producer innovations around the log drum and synthesizer palette; some earliest examples predate the log drum becoming characteristic.",
+      "operational_hypothesis": "Represent piano/keyboard, low-frequency melodic-percussive roles, pads and producer-specific timbral variants independently, with historical-era provenance instead of one mandatory palette.",
+      "source_ids": [
+        "AMA-SRC-01",
+        "AMA-SRC-03"
+      ],
+      "status": "literature_supported_evolution_candidate_not_universal",
+      "disconfirming_case": "Practitioner-identified examples with reduced piano/log-drum presence or alternative instrumentation."
+    },
+    {
+      "id": "AMA-RHY-01",
+      "axis": "rhythm_and_groove",
+      "observation": "Sources connect Amapiano to dance-oriented practice and discuss low-frequency/log-drum elements, but do not establish one universal pulse, subdivision, cycle or accent grammar.",
+      "operational_hypothesis": "Use practitioner-nominated examples to identify pulse, bass/log-drum phrasing, percussion, syncopation, swing and phrase-density relationships; retain multiple valid groove profiles.",
+      "source_ids": [
+        "AMA-SRC-02",
+        "AMA-SRC-03"
+      ],
+      "status": "candidate_requires_practitioner_specification",
+      "disconfirming_case": "A single quantized pattern or one fixed BPM/meter fails to explain practitioner-selected examples."
+    },
+    {
+      "id": "AMA-HARM-01",
+      "axis": "pitch_and_harmony",
+      "observation": "A 2026 scholarly account describes the early sound as deep-house-related with a pronounced, jazz-inflected piano line; this is a period- and account-specific description.",
+      "operational_hypothesis": "Model keyboard voicings and harmonic movement as optional, profile-scoped characteristics; do not impose a jazz chord vocabulary or fixed progression on every Amapiano composition.",
+      "source_ids": [
+        "AMA-SRC-03"
+      ],
+      "status": "historical_candidate_requires_practitioner_specification",
+      "disconfirming_case": "Amapiano examples where harmony is sparse, static or not keyboard-led."
+    },
+    {
+      "id": "AMA-ROLE-01",
+      "axis": "production_and_collaboration",
+      "observation": "The sources document collaborative production/performance and a producer-led history of sonic experimentation in selected Amapiano contexts.",
+      "operational_hypothesis": "Keep producer/DJ, instrumental, vocal and performance roles representable without assuming every recording uses the same division of labour.",
+      "source_ids": [
+        "AMA-SRC-02",
+        "AMA-SRC-03"
+      ],
+      "status": "research_context_not_implementation_evidence",
+      "disconfirming_case": "Practitioner accounts that reject the proposed role decomposition for a given scene or substyle."
+    }
+  ],
+  "nearest_neighbour_questions": [
+    {
+      "comparison": "deep_house_and_soulful_house",
+      "question": "Which keyboard, bass, groove, arrangement and scene-context relationships are considered identity-bearing by practitioners, rather than merely shared electronic-dance conventions?"
+    },
+    {
+      "comparison": "kwaito",
+      "question": "Which rhythmic, arrangement and production continuities are historically related, and which traits distinguish Amapiano in particular?"
+    },
+    {
+      "comparison": "gqom",
+      "question": "How do melody/harmony prominence, low-frequency roles, rhythmic organization and arrangement trajectory differ across practitioner-selected examples?"
+    },
+    {
+      "comparison": "bacardi_and_other_local_dance_forms",
+      "question": "Which local production and rhythmic exchanges are influence, hybridization, shared practice or explicit distinction? Preserve multiple attributed accounts."
+    }
+  ],
+  "non_inferences": [
+    "Do not require every Amapiano composition to contain a log drum, piano lead, vocalist, fixed intro length, fixed BPM, fixed chord progression or identical drum grid.",
+    "Do not treat Amapiano as a single homogeneous style or erase scene, era, producer and substyle variation.",
+    "Do not infer artist, ethnicity, language, community membership or provenance from audio features.",
+    "Do not infer historical influence or cultural authenticity from musical feature similarity.",
+    "Do not use commercial recordings for training, public fixture redistribution or commercial evaluation without rights appropriate to each purpose.",
+    "Do not require the log drum or shaker for early Amapiano: scholarship describes early examples that predate these becoming characteristic.",
+    "Do not treat an early instrumental-opening pattern or slow-burn arrangement as a timeless requirement for all Amapiano variants."
+  ],
+  "implementation_readiness": {
+    "executable_composer_route": false,
+    "runtime_style_profile": false,
+    "qualified_renderer_profile": false,
+    "licensed_audio_corpus": false,
+    "practitioner_review": false,
+    "human_listening_qualification": false,
+    "allowed_now": [
+      "research",
+      "synthetic counterfactual design",
+      "source review",
+      "practitioner consultation planning"
+    ],
+    "prohibited_claims": [
+      "implemented Amapiano composer",
+      "authentic Amapiano rendering",
+      "SOTA performance",
+      "community approval"
+    ]
+  },
+  "required_next_evidence": [
+    "Practitioner-reviewed vocabulary and identity-bearing dimensions across more than one Amapiano scene/substyle.",
+    "Rights-cleared examples with composition, recording, performer, producer and usage scope kept distinct.",
+    "Contrastive examples against Kwaito, deep/soulful house, Gqom and locally nominated neighbours.",
+    "A symbolic profile contract that marks observed, inferred, inherited and unresolved fields separately.",
+    "A controlled style-identity study under performer, instrumentation and renderer variation."
+  ],
+  "source_ids": [
+    "AMA-SRC-01",
+    "AMA-SRC-02",
+    "AMA-SRC-03"
+  ],
+  "sources": [
+    {
+      "id": "AMA-SRC-01",
+      "title": "Kwaito as history: Complicating contemporary historiographies",
+      "author": "Dion Malcolm Eaby-Lomas",
+      "year": 2023,
+      "publication": "African Music, 12(1), 21–36",
+      "doi": "10.21504/amj.v12i1.2529",
+      "url": "https://doi.org/10.21504/amj.v12i1.2529",
+      "source_kind": "peer_reviewed_article",
+      "supports": [
+        "historical relationships and ambiguities among South African popular-music forms including Kwaito and Amapiano",
+        "reported early experimentation across musical influences rather than one fixed style",
+        "the log drum and shaker were not yet characteristic of some early Amapiano examples discussed in the article",
+        "contested township-origin narratives and the value some practitioners place on ongoing evolution over origin claims"
+      ],
+      "limitations": [
+        "the article's title and central focus are Kwaito historiography; use it as historical context and an account of early experimentation, not as a comprehensive Amapiano technical manual",
+        "accounts of origin remain multivocal; no single township or person should be asserted as the definitive origin"
+      ]
+    },
+    {
+      "id": "AMA-SRC-02",
+      "title": "Understanding amapiano and the South African city through the music videos of Big Flexa and Bhebha",
+      "year": 2024,
+      "doi": "10.1080/02533952.2024.2526251",
+      "url": "https://doi.org/10.1080/02533952.2024.2526251",
+      "source_kind": "peer_reviewed_article",
+      "supports": [
+        "the article describes early Amapiano sounds around 2014 with instrumental passages that could last two to three minutes before vocals",
+        "the same passage describes gradual addition of musical elements in those early examples",
+        "the article documents collaborative production and performance among multiple named artists on the selected Bhebha example",
+        "youth culture, dance, urbanity and digital circulation around the two selected music videos"
+      ],
+      "limitations": [
+        "the paper analyses two selected videos and a bounded cultural context; its description of early Amapiano arrangements is not a universal requirement for all eras or substyles",
+        "the article is primarily a cultural/urban analysis, not a comprehensive music-theory grammar or quantitative corpus study",
+        "its use of slow-burn language references earlier Gqom scholarship; do not treat the term as proof that Amapiano and Gqom share the same formal grammar"
+      ]
+    },
+    {
+      "id": "AMA-SRC-03",
+      "title": "Ase trap tse ke pina tsa ko kasi — Sonics After the Struggle: Mapping Amapiano and Black Aesthetics in Post-Apartheid South Africa",
+      "year": 2026,
+      "doi": "10.1080/13696815.2026.2634896",
+      "url": "https://doi.org/10.1080/13696815.2026.2634896",
+      "source_kind": "scholarly_article",
+      "supports": [
+        "a situated genealogy from Kwaito and township musical histories",
+        "a pronounced piano presence in early Amapiano accounts",
+        "the development of the log drum as a central sonic element through producer innovation",
+        "the role of synths, low-frequency sound, producer histories and the later entry of looped vocal material"
+      ],
+      "limitations": [
+        "this is a situated cultural-historical and critical interpretation, not a universal technical recipe or statistical survey of Amapiano recordings",
+        "specific producer and lineage claims should remain attributed to the author's account and be cross-checked with practitioners",
+        "it does not establish fixed meter, tempo, rhythmic cycle, chord progression or required instrumentation"
+      ]
+    }
+  ]
+}
