@@ -239,11 +239,11 @@
           "key_pattern": "{congruent,incongruent,neutral}::rt_ticks",
           "unit": "simulation_ticks",
           "bounds": {
-            "lower": 0,
-            "upper": null
+            "lower": 8,
+            "upper": 20
           },
           "direction": "lower",
-          "estimand": "condition-specific simulated deliberation ticks",
+          "estimand": "condition-specific simulated deliberation ticks computed from target-versus-best-competitor margin; current implementation is bounded to [8,20]",
           "comparison_status": "same_build_and_clock_only",
           "validation_status": "verified_in_code"
         }
