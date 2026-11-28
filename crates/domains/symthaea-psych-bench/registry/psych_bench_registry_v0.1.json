@@ -831,14 +831,15 @@
       "domain": "metacognition",
       "construct_card": {
         "construct": "Choosing to answer, abstain, or request relevant information under incomplete, false-premised, stale, or difficult evidence.",
-        "operationalization": "Apply four fixed decision-policy controls to a shared 14-item synthetic fixture; score answer coverage, false nonanswers, inappropriate answers, clarification quality and evaluator-charged relative cost.",
+        "operationalization": "Apply four fixed decision-policy controls to a shared 14-item synthetic fixture; score answer coverage, false nonanswers, inappropriate answers, clarification quality and evaluator-charged relative cost. External adapters can create evaluator-annotated items with the public from_evaluator_annotation constructor; policy callbacks see only the observation.",
         "exclusions": [
           "The fixture is hand-authored and synthetic; it is not a validated psychometric instrument or human norm.",
           "The baseline policies are transparent controls, not trained Symthaea agents or external foundation-model competitors.",
           "Relative action-cost units are not wall-clock latency, tokens, energy or monetary cost.",
           "The expected-value-of-information control uses hand-authored probability estimates and a normalized decision-risk request burden; it is not calibrated empirical EVSI.",
           "The task supports only one targeted clarification and one follow-up decision per item; it is not a general multi-turn dialogue benchmark.",
-          "The optional Symthaea snapshot helper transfers CognitiveLoopService prediction_confidence as an instrumentation signal, but that global signal has not been validated as calibrated answer-specific confidence."
+          "The optional Symthaea snapshot helper transfers CognitiveLoopService prediction_confidence as an instrumentation signal, but that global signal has not been validated as calibrated answer-specific confidence.",
+          "The one-cycle task adapter's public constructor does not implement a public-data loader or enforce source-specific licensing/split semantics; those remain adapter responsibilities."
         ]
       },
       "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/metacognition/selective_prediction_task.rs",
