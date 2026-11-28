@@ -602,8 +602,8 @@ mod tests {
         memory.remember(&later).expect("remember later view");
 
         assert!(memory.known_cell(Position::new(0, 0)).is_some());
-        assert!(memory.known_cell(Position::new(4, 0)).is_some());
-        assert!(memory.known_cell(Position::new(6, 0)).is_none());
+        assert!(memory.known_cell(Position::new(3, 1)).is_some());
+        assert!(memory.known_cell(Position::new(6, 1)).is_none());
         assert!(later.visible_cells.iter().all(|cell| cell.position.x != 0));
         assert_eq!(memory.observation_count(), 3);
         assert!(memory.coverage() > 0.0);
