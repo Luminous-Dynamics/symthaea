@@ -161,7 +161,8 @@ fn build_scenario_energy_estimate(
         system_label: scenario_label.to_string(),
         measurement_status: "SCENARIO_ESTIMATE_NOT_MEASURED".to_string(),
         physical_scope: "assumed CPU-power input only; no sensor coverage".to_string(),
-        claim_ceiling: "not comparable to another system and not a hardware energy receipt".to_string(),
+        claim_ceiling: "not comparable to another system and not a hardware energy receipt"
+            .to_string(),
         assumed_power_watts,
         observed_pipeline_latency_ms,
         scenario_energy_joules_not_measured: scenario_energy_from_assumed_power(
@@ -173,7 +174,10 @@ fn build_scenario_energy_estimate(
 
 fn print_scenario_energy_estimate(estimate: &ScenarioEnergyEstimate) {
     println!("  Scenario: {}", estimate.system_label);
-    println!("  Assumed CPU power: {:.1} W (scenario input, not measured)", estimate.assumed_power_watts);
+    println!(
+        "  Assumed CPU power: {:.1} W (scenario input, not measured)",
+        estimate.assumed_power_watts
+    );
     println!(
         "  Observed pipeline latency: {:.3} ms",
         estimate.observed_pipeline_latency_ms
@@ -455,7 +459,6 @@ fn main() {
     );
 }
 
-
 #[cfg(test)]
 mod scenario_energy_tests {
     use super::*;
@@ -474,7 +477,10 @@ mod scenario_energy_tests {
     #[test]
     fn output_labels_the_energy_as_unmeasured() {
         let estimate = build_scenario_energy_estimate(100.0, 65.0, "test scenario");
-        assert_eq!(estimate.measurement_status, "SCENARIO_ESTIMATE_NOT_MEASURED");
+        assert_eq!(
+            estimate.measurement_status,
+            "SCENARIO_ESTIMATE_NOT_MEASURED"
+        );
         assert!(estimate.physical_scope.contains("no sensor coverage"));
         assert!(estimate.claim_ceiling.contains("not comparable"));
         assert_eq!(estimate.scenario_energy_joules_not_measured, 6.5);
