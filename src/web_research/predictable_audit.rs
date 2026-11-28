@@ -117,6 +117,10 @@ pub struct PredictableAuditDesign {
     pub minimum_inclusion_probability: DyadicInclusionProbability,
     /// Frozen machine-readable rule for eventwise q_t.
     pub q_policy: PredictableAuditQPolicy,
+    /// Optional upper bound on sum_t q_t, represented in units of 2^-64.
+    /// This bounds expected audit workload on the realized pre-label path,
+    /// not the number of Bernoulli selections on an individual run.
+    pub maximum_expected_selection_numerator: Option<u128>,
     /// Documents how the q-policy is computed from pre-label history.
     pub q_policy_id: String,
     pub q_policy_version: String,
@@ -178,6 +182,11 @@ pub struct PredictableAuditReceipt {
     pub population_size: usize,
     pub selected_count: usize,
     pub selected_fraction: f64,
+    /// Exact sum_t q_t numerator on the shared 2^64 denominator.
+    pub predictable_expected_selection_numerator: u128,
+    /// Predictable expected number of audit selections on this realized
+    /// pre-label path. Not a hard cap on the realized selected_count.
+    pub predictable_expected_selected_count: f64,
     /// Complete cohort; nonselected records remain present.
     pub selections: Vec<PredictableAuditSelection>,
     pub limitations: Vec<String>,
@@ -202,6 +211,8 @@ pub enum PredictableAuditError {
     InvalidQPolicyRange,
     QPolicyRequiresExternalSchedule,
     QPolicyMismatch { sequence_number: usize },
+    ExpectedAuditBudgetExceeded { expected_numerator: u128, maximum_numerator: u128 },
+    ExpectedAuditBudgetOverflow,
     MissingSelectedAdjudication(String),
     NonSelectedRecordAdjudicated(String),
     UnknownAdjudicationRecord(String),
@@ -263,6 +274,16 @@ impl std::fmt::Display for PredictableAuditError {
                     "at sequence {sequence_number}"
                 )
             ),
+            Self::ExpectedAuditBudgetExceeded {
+                expected_numerator,
+                maximum_numerator,
+            } => write!(
+                formatter,
+                "predictable expected audit workload {expected_numerator}/2^64 exceeds budget {maximum_numerator}/2^64"
+            ),
+            Self::ExpectedAuditBudgetOverflow => {
+                write!(formatter, "predictable expected audit workload numerator overflowed")
+            }
             Self::MissingSelectedAdjudication(id) => {
                 write!(formatter, "selected audit event has no independent label: {id}")
             }
@@ -396,6 +417,7 @@ pub fn build_predictable_audit_receipt(
     let mut record_ids = HashSet::with_capacity(events.len());
     let mut selections = Vec::with_capacity(events.len());
     let mut selected_count = 0usize;
+    let mut predictable_expected_selection_numerator = 0_u128;
 
     for (index, event) in events.iter().enumerate() {
         if event.sequence_number != index {
@@ -442,6 +464,18 @@ pub fn build_predictable_audit_receipt(
             }
         }
 
+        predictable_expected_selection_numerator = predictable_expected_selection_numerator
+            .checked_add(event.inclusion_probability.numerator)
+            .ok_or(PredictableAuditError::ExpectedAuditBudgetOverflow)?;
+        if let Some(maximum) = design.maximum_expected_selection_numerator {
+            if predictable_expected_selection_numerator > maximum {
+                return Err(PredictableAuditError::ExpectedAuditBudgetExceeded {
+                    expected_numerator: predictable_expected_selection_numerator,
+                    maximum_numerator: maximum,
+                });
+            }
+        }
+
         let selected = event.inclusion_probability.selects(event.random_word);
         if selected {
             selected_count += 1;
@@ -479,6 +513,9 @@ pub fn build_predictable_audit_receipt(
         population_size: events.len(),
         selected_count,
         selected_fraction: selected_count as f64 / events.len() as f64,
+        predictable_expected_selection_numerator,
+        predictable_expected_selected_count:
+            predictable_expected_selection_numerator as f64 / DYADIC_DENOMINATOR as f64,
         selections,
         limitations: vec![
             concat!(
@@ -531,6 +568,7 @@ mod tests {
                 numerator: 1_u128 << 63,
             },
             q_policy: PredictableAuditQPolicy::ExternallySuppliedPrelabelSchedule,
+            maximum_expected_selection_numerator: None,
             q_policy_id: "risk-stratum-policy".to_owned(),
             q_policy_version: "1".to_owned(),
         }
@@ -654,6 +692,38 @@ mod tests {
             build_predictable_audit_receipt(&duplicate, &design()),
             Err(PredictableAuditError::DuplicateRecordId(_))
         ));
+    }
+
+    #[test]
+    fn predictable_expected_audit_budget_is_exact_and_fails_closed() {
+        let events = vec![
+            event(0, 1_u128 << 63, 0),
+            event(1, 3_u128 << 62, u64::MAX),
+            event(2, DYADIC_DENOMINATOR, u64::MAX),
+        ];
+        let exact_budget = (1_u128 << 63) + (3_u128 << 62) + DYADIC_DENOMINATOR;
+        let within_budget = PredictableAuditDesign {
+            maximum_expected_selection_numerator: Some(exact_budget),
+            ..design()
+        };
+        let receipt = build_predictable_audit_receipt(&events, &within_budget).unwrap();
+        assert_eq!(
+            receipt.predictable_expected_selection_numerator,
+            exact_budget
+        );
+        assert_eq!(receipt.predictable_expected_selected_count, 2.25);
+
+        let too_small = PredictableAuditDesign {
+            maximum_expected_selection_numerator: Some(exact_budget - 1),
+            ..design()
+        };
+        assert_eq!(
+            build_predictable_audit_receipt(&events, &too_small).unwrap_err(),
+            PredictableAuditError::ExpectedAuditBudgetExceeded {
+                expected_numerator: exact_budget,
+                maximum_numerator: exact_budget - 1,
+            }
+        );
     }
 
     #[test]
