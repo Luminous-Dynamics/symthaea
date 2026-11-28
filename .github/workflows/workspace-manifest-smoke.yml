@@ -1,0 +1,32 @@
+name: Workspace manifest smoke
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "scripts/check-workspace-targets.sh"
+      - ".github/workflows/workspace-manifest-smoke.yml"
+  push:
+    paths:
+      - "Cargo.toml"
+      - ".github/workflows/workspace-manifest-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  workspace-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Install repository Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Reject unexcluded source-only workspace glob directories
+        run: bash scripts/check-workspace-targets.sh
+      - name: Resolve complete workspace metadata
+        run: cargo metadata --no-deps --format-version 1 > workspace-metadata.json
+      - name: Format root packages
+        run: cargo fmt --manifest-path Cargo.toml -p symthaea-stt -p symthaea -- --check
