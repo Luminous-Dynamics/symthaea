@@ -316,7 +316,7 @@ pub enum ConfigCommand {
     SetOption {
         /// Option path (e.g. `services.openssh.enable`).
         option_path: String,
-        /// Boolean, integer, null, or JSON-quoted string. Arbitrary Nix source is rejected (e.g. `true`, `512`, or `"\\"my-hostname\\"`).
+        /// Boolean, integer, null, or JSON string literal (including its double quotes). Arbitrary Nix source is rejected.
         value: String,
         #[arg(long)]
         staging: Option<String>,
