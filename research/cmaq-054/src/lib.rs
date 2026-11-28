@@ -778,6 +778,36 @@ mod tests {
     }
 
     #[test]
+    fn parent_prior_scales_family_and_member_thresholds_exactly() {
+        let weights = vec![
+            RepresentationWeight {
+                member_id: "low-frequency".into(),
+                weight: weight(1, 2),
+            },
+            RepresentationWeight {
+                member_id: "high-frequency".into(),
+                weight: weight(1, 2),
+            },
+        ];
+        let risk = risk_plan(weights);
+        let scale = weight(1, 8);
+        let family = KernelFamilyPortfolio::new_with_threshold_scale(
+            &risk,
+            scale,
+            SHA_1.into(),
+            two_expert_configs(),
+        )
+        .unwrap();
+
+        assert_eq!(family.threshold_scale(), scale);
+        assert_eq!(family.alpha_portfolio(), weight(1, 2_560));
+        assert!((family.log_threshold() - (2_560.0f64).ln()).abs() < 1e-12);
+        let posterior = family.posterior_weights().unwrap();
+        assert_eq!(posterior[0].member_alpha, (1, 5_120));
+        assert_eq!(posterior[1].member_alpha, (1, 5_120));
+    }
+
+    #[test]
     fn initial_mixture_is_unit_wealth_and_posterior_equals_prior() {
         let family = portfolio();
         assert_eq!(family.expert_count(), 2);
