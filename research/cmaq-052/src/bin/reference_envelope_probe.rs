@@ -32,6 +32,7 @@ const TARGET_SHA: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Scenario {
     IidNull,
+    HeteroskedasticMartingaleNull,
     MeanShift,
 }
 
@@ -39,6 +40,7 @@ impl Scenario {
     fn name(self) -> &'static str {
         match self {
             Self::IidNull => "iid_null",
+            Self::HeteroskedasticMartingaleNull => "heteroskedastic_martingale_null",
             Self::MeanShift => "mean_shift",
         }
     }
@@ -106,14 +108,22 @@ fn parse_config() -> Result<Config, String> {
     })
 }
 
-fn references(rng: &mut SplitMix64, seed: u64) -> Vec<ReferenceBlock> {
-    (0..REFERENCE_COUNT)
-        .map(|index| ReferenceBlock {
+fn references(rng: &mut SplitMix64, seed: u64) -> (Vec<ReferenceBlock>, f64) {
+    let mut previous_sign = rng.sign();
+    let mut blocks = Vec::with_capacity(REFERENCE_COUNT);
+    for index in 0..REFERENCE_COUNT {
+        // The conditional variance depends on the prior sign; the fresh sign
+        // remains symmetric, so the conditional mean is exactly zero.
+        let amplitude = if previous_sign > 0.0 { 0.6 } else { 0.2 };
+        let sign = rng.sign();
+        blocks.push(ReferenceBlock {
             block_id: format!("reference-{seed}-{index}"),
             trace_sha256: format!("{:064x}", seed.wrapping_add(index as u64 + 1)),
-            value: vec![0.2 * rng.sign()],
-        })
-        .collect()
+            value: vec![amplitude * sign],
+        });
+        previous_sign = sign;
+    }
+    (blocks, previous_sign)
 }
 
 fn calibrated_monitor(
@@ -190,7 +200,7 @@ fn run_replication(
         });
     let mut reference_rng = SplitMix64::new(base_seed ^ 0xA11C_E001);
     let mut test_rng = SplitMix64::new(base_seed ^ 0x7E57_0002);
-    let reference_blocks = references(&mut reference_rng, base_seed);
+    let (reference_blocks, mut previous_sign) = references(&mut reference_rng, base_seed);
     let mut calibrated = calibrated_monitor(reference_blocks.clone())?;
 
     let reference_mean = reference_blocks
@@ -210,9 +220,20 @@ fn run_replication(
     for time in 1..=config.horizon {
         let sample = match scenario {
             Scenario::IidNull => 0.2 * test_rng.sign(),
-            Scenario::MeanShift if time <= config.shift_after => 0.2 * test_rng.sign(),
-            Scenario::MeanShift => 0.6 + 0.1 * test_rng.sign(),
+            Scenario::HeteroskedasticMartingaleNull => {
+                let amplitude = if previous_sign > 0.0 { 0.6 } else { 0.2 };
+                amplitude * test_rng.sign()
+            }
+            Scenario::MeanShift if time <= config.shift_after => {
+                let amplitude = if previous_sign > 0.0 { 0.6 } else { 0.2 };
+                amplitude * test_rng.sign()
+            }
+            Scenario::MeanShift => {
+                let amplitude = if previous_sign > 0.0 { 0.6 } else { 0.2 };
+                0.3 + amplitude * test_rng.sign()
+            }
         };
+        previous_sign = if sample >= 0.0 { 1.0 } else { -1.0 };
 
         if calibrated_alarm.is_none() && !calibrated.is_quarantined() {
             let update = calibrated
@@ -262,7 +283,11 @@ fn main() -> Result<(), String> {
     let mut csv = String::from(
         "scenario,replication,reference_target_covers_true_mean,arm,first_alarm_time_one_based\n",
     );
-    for scenario in [Scenario::IidNull, Scenario::MeanShift] {
+    for scenario in [
+        Scenario::IidNull,
+        Scenario::HeteroskedasticMartingaleNull,
+        Scenario::MeanShift,
+    ] {
         let mut coverage_count = 0;
         let mut alarms: [Vec<Option<usize>>; 3] = [Vec::new(), Vec::new(), Vec::new()];
         for replication in 0..config.replications {
@@ -280,9 +305,12 @@ fn main() -> Result<(), String> {
             .iter()
             .map(|arm| arm.iter().filter(|alarm| alarm.is_some()).count())
             .collect::<Vec<_>>();
-        if scenario == Scenario::IidNull {
+        if scenario == Scenario::IidNull
+            || scenario == Scenario::HeteroskedasticMartingaleNull
+        {
             eprintln!(
-                "iid_null: reps={} reference_coverage={}/{} calibrated_false_alarms={} naive_invalid_false_alarms={} oracle_false_alarms={}",
+                "{}: reps={} reference_coverage={}/{} calibrated_false_alarms={} naive_invalid_false_alarms={} oracle_false_alarms={}",
+                scenario.name(),
                 config.replications,
                 coverage_count,
                 config.replications,
