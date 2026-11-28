@@ -17,6 +17,7 @@ pub mod secom_missingness;
 pub mod secom_observation_drift;
 pub mod secom_raw;
 pub mod secom_tabular_baselines;
+pub mod selection_risk_bounds;
 pub mod split_manifest;
 pub mod stratified_repeat;
 pub mod vm_snapshot_dependency_impact;
@@ -148,4 +149,11 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+};
+
+pub use selection_risk_bounds::{
+    IndependentAuditEstimateV1, IndependentAuditLossObservationV1, PopulationOutcomeStateV1,
+    QualifiedLossObservationV1, SELECTION_AUDIT_DESIGN_SCHEMA_V1, SELECTION_RISK_INPUT_SCHEMA_V1,
+    SELECTION_RISK_REPORT_SCHEMA_V1, SelectionAuditDesignV1, SelectionRiskErrorV1,
+    SelectionRiskInputV1, SelectionRiskReportV1, evaluate_selection_adjusted_population_risk_v1,
 };
