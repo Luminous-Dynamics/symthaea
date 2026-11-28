@@ -1,8 +1,8 @@
 # Digital IT Operations Pilot — Incident to Verified Restoration — v0.1
 
 **Status:** design-only synthetic pilot blueprint; no task is admitted, no agent run has been executed, and no operational system was accessed.
-**Parent:** ECON-CAPABILITY-001 #14200 and Economic Capability v0.1 PR #14251.
-**Composition:** CEB task profile #10115; task admission/oracle custody #10607; benchmark receipt/accounting #10314; CEB DSSE primary/pristine-regrade verifier #10167/#10212; evidence composition #10370; evaluator integrity #10138; causal investigation #10366/#10387; evidence continuity #10630; execution-isolation prerequisite #10064.
+**Canonical domain owner:** [Mycelix ITOPS-CAP-001 #6846](https://github.com/Luminous-Dynamics/mycelix/issues/6846), child of [CIV-IMPACT-001 #5046](https://github.com/Luminous-Dynamics/mycelix/issues/5046). This document is a candidate scenario-adapter contribution under those owners, not a parallel IT-operations benchmark contract.
+**Cross-cutting composition:** Mycelix CIV-CORE-003 #4835 (candidate/evaluator/oracle separation); AGENT-010 #830 (offline independent reconstruction of agent authority/effect evidence); SOV-AI-AUTH-018 #4785 (decision/effect-intent/capability-use/effect-attempt identity conservation); MYC-AUTH-CONVERGE-001 #2686 (authority/capability/effect ownership map); LEX-NET-035 #1293 (partial effects, compensation and reconciliation where applicable). Symthaea causal diagnosis #10366/#10387 and benchmark-integrity/evaluator methods #10138/#10314/#10370 are supporting comparators, not replacement task, authority, or receipt owners.
 
 ## 1. Research question
 
@@ -79,6 +79,25 @@ This case provides production-like symptoms and evidence that might support a ro
 
 The correct result is an accepted **safe escalation**, not an accepted restoration. The accounting contract must keep these terminal dispositions separate.
 
+## 3a. Required scenario population beyond the three anchor cases
+
+OPS-01 to OPS-03 are three anchor patterns for task-authoring and oracle-polarity review, not a complete admitted benchmark. The parent ITOPS-CAP-001 proposes an initial target of 40–60 frozen scenarios across at least eight incident families. Extend these anchors with:
+
+1. Code/configuration regressions, including symptom in one service and cause in another.
+2. Dependency, DNS, certificate and network-policy faults.
+3. Capacity exhaustion, concurrency/connection-pool pressure and autoscaling errors.
+4. Telemetry gaps, stale dashboards, conflicting sources and incorrect clocks.
+5. Data-integrity faults where dashboards remain green but application invariants fail.
+6. Backup/restore, recovery-point and post-restore functional checks.
+7. Multi-system service requests and ticket workflows with approval/precondition dependencies.
+8. Authorization revocation, wrong-target, wrong-environment and stale-capability cases.
+
+Include compound faults, intermittent symptoms, partial outage, agent/tool outage, restart-after-mutation, failed rollback and unknown external outcome. Use scenario-family holdouts, not only new random seeds from familiar incidents. For stochastic agents, preregister at least five repeats per confirmatory task where feasible; repeated seeds do not substitute for independent scenario families. Every task/run must bind environment image, initial state, fault injection, observation timeline, model/harness, permissions, evaluator/oracle and result artifacts.
+
+The three anchor cases should be expanded into independently authored positive, negative and indeterminate variants. Keep cause labels, answer keys and exact expected mutations outside the agent-visible package until custody and evaluator qualification are in place.
+
+
+
 ## 4. Matched treatment arms
 
 Evaluate the same case revisions, event order, source evidence, permission profile and resource budget with:
@@ -105,6 +124,16 @@ Where the underlying model is shared, pin its exact version and decoding setting
 - operator, reviewer, approver and recovery minutes;
 - time spent gathering context, checking evidence, correcting the agent and restoring a failed action;
 - human judgment and authorization that remain necessary.
+
+**Human capability dividend/debt** (from #6846):
+- qualified operator performance on an unaided baseline before tool exposure;
+- immediate post-assistance AI-off challenge on an equivalent task;
+- delayed retention after a preregistered interval;
+- transfer to a genuinely novel incident family;
+- recovery performance when the agent, toolchain or observability system is unavailable;
+- whether the operator can explain and safely execute the workflow without dependence on the assistant.
+
+Report capability dividend (retained/transferable skill) and capability debt (loss of independent performance or increased reliance) separately. Do not claim human learning or deskilling from synthetic agent-only fixtures. Human-subject testing requires ethics, consent, privacy controls and preregistration.
 
 **Fully burdened resource cost**
 - inference/API and tool cost;
@@ -135,7 +164,11 @@ Keep the denominators for OPS-01 restoration and OPS-03 safe escalation separate
 
 ## 7. Evaluator qualification and evidence
 
-Reuse the CEB task contract and task-admission protocol (#10115/#10607), canonical task accounting (#10314), evidence/attestation composition (#10370), DSSE primary/pristine-regrade verifier (#10167/#10212), evaluator integrity lane (#10138) and judge/reference metrology (#9022/#9081/#9123).
+The authoritative task and scenario owner is Mycelix #6846, with cross-domain incremental-economic evaluation under #5046 and independent candidate/evaluator/oracle separation under #4835. Do not import CEB #10115 as an IT-operations task schema: it owns the Computational Engineering Bench profile. Reuse generic benchmark accounting/anti-score-laundering (#10314) and evaluator attack methods (#10138/#10370) only as composable assurance patterns where their exact contracts apply; do not force ITOPS into a duplicate receipt or DSSE profile.
+
+For effect safety, preserve the Mycelix ownership boundaries: authority is domain/profile-specific (#2686); the exact handoff must conserve decision, intent, capability-use, target, adapter and invocation identity (#4785); AGENT-010 #830 is an offline evidence reconstruction report, not a runtime capability; an effect receipt is evidence of an attempt/outcome, not new authority. The benchmark's mock adapter should expose the distinctions and must not claim that these issue-level contracts are qualified production runtime integration. Unknown outcome triggers reconciliation before retry; compensation/rollback is a new separately authorized effect where the profile requires it.
+
+Compose Symthaea's causal-debugging/experiment-selection semantics (#10366/#10387) for the OPS-01/OPS-02 discriminating intervention, but do not clone its generic scheduler or causal evidence ledger.
 
 For every case:
 - a valid reference workflow must pass its intended oracle;
