@@ -1,6 +1,7 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
+pub mod delayed_conformal_aci;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod label_consumption_guard;
@@ -136,4 +137,17 @@ pub use vm_snapshot_dependency_impact::{
     VmSnapshotDependencyGraphV1, VmSnapshotImpactEntryV1, VmSnapshotImpactStateV1,
     compute_vm_snapshot_impact_closure_v1, seal_vm_snapshot_dependency_edge_v1,
     seal_vm_snapshot_dependency_graph_v1,
+};
+
+pub use delayed_conformal_aci::{
+    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_ENGINE_SCHEMA_V1,
+    DELAYED_ACI_POLICY_SCHEMA_V1, DELAYED_ACI_PREDICTION_RECEIPT_SCHEMA_V1,
+    DELAYED_ACI_PREDICTION_SCHEMA_V1, DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1,
+    DelayToMemoryDiagnosticV1, DelayedAciDispositionV1, DelayedAciEngineV1,
+    DelayedAciErrorV1, DelayedAciGuaranteeStateV1, DelayedAciLabelDeliveryV1,
+    DelayedAciPolicyV1, DelayedAciPredictionInputV1, DelayedAciPredictionReceiptV1,
+    DelayedAciReasonV1, DelayedAciUpdateReceiptV1, ResidualMemoryBasisV1,
+    create_delayed_aci_engine_v1, delayed_aci_alpha_for_round_v1,
+    deliver_delayed_aci_label_v1, estimate_delay_to_memory_v1,
+    register_delayed_aci_prediction_v1,
 };
