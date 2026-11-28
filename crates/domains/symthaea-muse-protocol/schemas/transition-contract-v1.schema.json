@@ -231,12 +231,12 @@
         "source_anchor_frame": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 18446744073709552000
+          "maximum": 9007199254740991
         },
         "target_anchor_frame": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 18446744073709552000
+          "maximum": 9007199254740991
         },
         "beat_ordinal_milli": {
           "type": "integer",
@@ -314,7 +314,7 @@
         "frame": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 18446744073709552000
+          "maximum": 9007199254740991
         },
         "gain_millidecibels": {
           "type": "integer",
