@@ -158,8 +158,7 @@
         },
         "cemgil": {
           "type": "number",
-          "minimum": 0,
-          "maximum": 1
+          "minimum": 0
         },
         "goto": {
           "type": "number",
@@ -194,8 +193,7 @@
         },
         "cemgil_best_metric_level": {
           "type": "number",
-          "minimum": 0,
-          "maximum": 1
+          "minimum": 0
         }
       }
     },
