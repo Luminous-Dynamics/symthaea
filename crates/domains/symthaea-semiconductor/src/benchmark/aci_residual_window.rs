@@ -306,6 +306,68 @@ fn validate_window(window: &AciResidualWindowV1) -> Result<(), AciResidualWindow
             "ACI residual-window state digest, capacity or numeric invariant failed".into(),
         ));
     }
+
+    let mut previous_sequence = None;
+    let mut retained_revisions = BTreeSet::new();
+    for observation in &window.observations {
+        if previous_sequence.is_some_and(|previous| observation.sequence <= previous)
+            || observation.sequence >= window.next_sequence
+        {
+            return Err(AciResidualWindowErrorV1(
+                "ACI residual observations are not in strict sequence order".into(),
+            ));
+        }
+        previous_sequence = Some(observation.sequence);
+        match observation.source {
+            AciResidualObservationSourceV1::InitialSeed => {
+                if observation.sample_id.is_some()
+                    || observation.measurement_event_id.is_some()
+                    || observation.label_id.is_some()
+                    || observation.label_revision.is_some()
+                    || observation.prediction_receipt_sha256.is_some()
+                    || observation.update_receipt_sha256.is_some()
+                    || observation.label_payload_sha256.is_some()
+                    || observation.qualification_report_sha256.is_some()
+                {
+                    return Err(AciResidualWindowErrorV1(
+                        "initial seed observation must not claim online label lineage".into(),
+                    ));
+                }
+            }
+            AciResidualObservationSourceV1::QualifiedK1Update => {
+                let (Some(sample), Some(event), Some(label), Some(revision),
+                    Some(prediction_sha), Some(update_sha), Some(payload_sha), Some(report_sha)) = (
+                    observation.sample_id.as_deref(),
+                    observation.measurement_event_id.as_deref(),
+                    observation.label_id.as_deref(),
+                    observation.label_revision,
+                    observation.prediction_receipt_sha256.as_deref(),
+                    observation.update_receipt_sha256.as_deref(),
+                    observation.label_payload_sha256.as_deref(),
+                    observation.qualification_report_sha256.as_deref(),
+                ) else {
+                    return Err(AciResidualWindowErrorV1(
+                        "qualified residual observation is missing K1 lineage".into(),
+                    ));
+                };
+                if sample.trim().is_empty()
+                    || event.trim().is_empty()
+                    || label.trim().is_empty()
+                    || revision == 0
+                    || !valid_sha256(prediction_sha)
+                    || !valid_sha256(update_sha)
+                    || !valid_sha256(payload_sha)
+                    || !valid_sha256(report_sha)
+                    || !retained_revisions.insert(format!("{label}:{revision}"))
+                    || !window.accepted_label_revisions.contains(&format!("{label}:{revision}"))
+                {
+                    return Err(AciResidualWindowErrorV1(
+                        "qualified residual observation has invalid/duplicate K1 lineage".into(),
+                    ));
+                }
+            }
+        }
+    }
     Ok(())
 }
 
@@ -682,15 +744,14 @@ pub fn deliver_and_append_aci_residual_v1(
     delivery: &DelayedAciLabelDeliveryV1,
 ) -> Result<AciResidualDeliveryOutcomeV1, AciResidualWindowErrorV1> {
     validate_window(window)?;
-    let before_aci = engine.clone();
-    let before_window = window.clone();
     let mut next_engine = engine.clone();
     let mut next_window = window.clone();
 
     let update = deliver_delayed_aci_label_v1(&mut next_engine, delivery)
         .map_err(|error| AciResidualWindowErrorV1(error.to_string()))?;
     let mut append_receipt = None;
-    if update.disposition == AciUpdateDispositionV1::Updated {
+    let accepted = update.disposition == AciUpdateDispositionV1::Updated;
+    if accepted {
         let (candidate_window, append) = append_residual_candidate(
             &next_window,
             binding,
@@ -701,26 +762,23 @@ pub fn deliver_and_append_aci_residual_v1(
         )?;
         next_window = candidate_window;
         append_receipt = Some(append);
-        *engine = next_engine;
-        *window = next_window;
     }
 
     let mut outcome = AciResidualDeliveryOutcomeV1 {
         schema: ACI_RESIDUAL_DELIVERY_OUTCOME_SCHEMA_V1.into(),
         update_receipt: update.clone(),
         residual_append_receipt: append_receipt,
-        aci_engine_mutated: update.disposition == AciUpdateDispositionV1::Updated,
-        residual_window_mutated: update.disposition == AciUpdateDispositionV1::Updated,
+        aci_engine_mutated: accepted,
+        residual_window_mutated: accepted,
         outcome_sha256: String::new(),
     };
-    if update.disposition != AciUpdateDispositionV1::Updated
-        && (*engine != before_aci || *window != before_window)
-    {
-        return Err(AciResidualWindowErrorV1(
-            "no-update delivery mutated ACI or residual-window state".into(),
-        ));
-    }
     outcome.outcome_sha256 = outcome_digest(&outcome)?;
+
+    // Commit both state machines only after the paired receipts are sealed.
+    if accepted {
+        *engine = next_engine;
+        *window = next_window;
+    }
     Ok(outcome)
 }
 
