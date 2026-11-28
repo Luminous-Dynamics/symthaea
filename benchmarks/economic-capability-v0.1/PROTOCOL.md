@@ -199,7 +199,9 @@ External benchmarks are versioned comparators with different task sets and scori
 | Benchmark | Appropriate use | Important limit |
 |---|---|---|
 | GDPval | Professional deliverable quality across occupations/industries | Does not by itself measure physical work, full deployment economics or net employment |
-| OSWorld 2.0 | End-to-end computer-use workflows in real desktop/web applications | A specific release, task set, step budget and grading method are required |
+| OSWorld 2.0 / 2.1 | End-to-end computer-use workflows in real desktop/web applications | Release, task set, binary-vs-partial metric and grader audit must be pinned; v2.1 has an independent evaluator-quality warning |
+| SWE-Bench Pro V2 | Multi-file software engineering, repository repair and regression avoidance | Full/HARD split, coding-agent harness, network boundary, turn/cost cap and regrade mode must be pinned; near-ceiling public scores do not prove a general workflow contribution |
+| ITBench-AA / SWEOps-Bench | Distinguish Kubernetes root-cause attribution from end-to-end source repair and verified service recovery | Diagnosis and recovery are separate outcomes on different task sets; do not use RCA precision as a restoration rate |
 | LADDER | Long-horizon manipulation, subgoal composition and physical execution | Embodiment/suite/simulation-vs-real differences matter |
 | Finance Agent Benchmark | Financial analyst research/tool-use tasks | Edition scores are not interchangeable; not a live-trading or portfolio-return guarantee |
 | CEB | Engineering/repository comprehension, review, security and correctness | A design-only task catalogue or schema pass is not agent performance |
