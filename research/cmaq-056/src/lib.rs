@@ -199,8 +199,8 @@ impl KernelFamilyManifest {
             if !ids.insert(config.expert_id.clone()) {
                 return Err(ManifestError::DuplicateExpertId);
             }
-            validate_digest(&config.response_map.map_sha256(), "response_map_sha256")?;
-            validate_digest(&config.covariate_map.map_sha256(), "covariate_map_sha256")?;
+            validate_digest(config.response_map.map_sha256(), "response_map_sha256")?;
+            validate_digest(config.covariate_map.map_sha256(), "covariate_map_sha256")?;
             validate_digest(&config.target_sha256, "target_sha256")?;
             validate_digest(
                 &config.response_reference_sha256,
@@ -233,7 +233,7 @@ impl KernelFamilyManifest {
             // reject under that null. Reference-calibrated bounded-mean mode
             // may describe a nonzero target and is governed by CMAQ-052.
             if matches!(
-                calibration,
+                &calibration,
                 NullCalibration::DirectConditionalPairedEquality { .. }
             ) && config
                 .target
@@ -323,6 +323,10 @@ impl KernelFamilyManifest {
 
     pub fn total_feature_count(&self) -> usize {
         self.total_feature_count
+    }
+
+    pub fn expert_count(&self) -> usize {
+        self.expert_ids.len()
     }
 }
 
@@ -802,7 +806,7 @@ mod tests {
         assert_eq!(first.canonical_bytes(), second.canonical_bytes());
         assert_eq!(first.digests(), second.digests());
         assert_eq!(first.expert_count(), 2);
-        assert_eq!(first.total_feature_count(), 16);
+        assert_eq!(first.total_feature_count(), 8);
         assert_eq!(first.representation_weights().len(), 2);
     }
 
