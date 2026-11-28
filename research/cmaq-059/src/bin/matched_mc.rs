@@ -18,7 +18,8 @@ use cmaq_054_evidence_adaptive_kernel_family::KernelExpertConfig;
 use cmaq_056_typed_null_manifest::{KernelFamilyManifest, NullCalibration, TypedRiskPlan};
 use cmaq_058_exact_restart_renewal::CapitalRestartRenewalMonitor;
 use cmaq_059_finite_sample_calibration::{
-    clopper_pearson, summarize_detection_trials, DetectionTrial,
+    clopper_pearson, summarize_detection_trials, summarize_null_family,
+    DetectionTrial, NullCalibrationCell,
 };
 use cmaq_059_finite_sample_calibration::scenarios::{
     generate_stream, ScenarioConfig, ScenarioKind,
@@ -53,6 +54,7 @@ struct ArmOutcome {
     feature_coordinates: u64,
     kernel_evaluations: u64,
     update_latencies_ns: Vec<u64>,
+    update_latency_p99_ns: u64,
 }
 
 fn configs() -> Result<Vec<KernelExpertConfig>, Box<dyn Error>> {
@@ -183,6 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     let scenarios = ScenarioKind::ALL;
+    let mut null_family_cells = Vec::new();
     for kind in scenarios {
         let config = scenario_config(kind, horizon);
         let change_point = config.change_point;
@@ -256,12 +259,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 feature_coordinates: c058_coordinates,
                 kernel_evaluations: 0,
                 update_latencies_ns: c058_latencies,
+                update_latency_p99_ns: c058_p99,
             };
             let scpt_outcome = ArmOutcome {
                 first_alarm: scpt_alarm,
                 feature_coordinates: 0,
                 kernel_evaluations: scpt_kernel_evaluations,
                 update_latencies_ns: scpt_latencies,
+                update_latency_p99_ns: scpt_p99,
             };
 
             if kind.is_null() {
@@ -295,7 +300,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 };
                 let first_alarm = outcome.first_alarm.map_or(String::new(), |x| x.to_string());
                 let is_false_alarm = kind.is_null() && outcome.first_alarm.is_some();
-                let latency_p99 = outcome.update_latencies_ns.first().copied().unwrap_or(0);
+                let latency_p99 = outcome.update_latency_p99_ns;
                 writeln!(
                     raw,
                     "{EXPERIMENT_ID},{},{replicate},{},{horizon},{change_point},{},{},{},{},{},{},{},{},{}",
@@ -338,6 +343,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Arm::ScptFixedBandwidth => false_alarms_scpt,
                 };
                 let interval = clopper_pearson(false_alarms, replicates, 0.95)?;
+                null_family_cells.push(NullCalibrationCell {
+                    cell_id: format!("{}-H{horizon}-alpha-{}", kind.id(), alpha_test.numerator()),
+                    arm_id: arm.name().to_string(),
+                    nominal_alpha: alpha,
+                    false_alarms,
+                    trials: replicates,
+                });
                 let fields = vec![
                     EXPERIMENT_ID.to_string(),
                     kind.id().to_string(),
@@ -395,8 +407,33 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    let family_report = summarize_null_family(&null_family_cells, 0.95, 0.01)?;
+    let family_file = File::create("cmaq-059-matched-mc-null-family.csv")?;
+    let mut family_writer = BufWriter::new(family_file);
+    writeln!(
+        family_writer,
+        "cell_id,arm,alpha,false_alarms,trials,observed_rate,pointwise_lower,pointwise_upper,simultaneous_upper,within_tolerance,family_size"
+    )?;
+    for cell in &family_report.cells {
+        writeln!(
+            family_writer,
+            "{},{},{:.12},{},{},{:.12},{:.12},{:.12},{:.12},{},{}",
+            cell.cell_id,
+            cell.arm_id,
+            cell.nominal_alpha,
+            cell.pointwise_interval.successes,
+            cell.pointwise_interval.trials,
+            cell.observed_rate,
+            cell.pointwise_interval.lower,
+            cell.pointwise_interval.upper,
+            cell.simultaneous_upper,
+            cell.within_tolerance,
+            family_report.family_size,
+        )?;
+    }
     raw.flush()?;
     summary.flush()?;
+    family_writer.flush()?;
     eprintln!(
         "completed experiment={} replicates={} horizon={} alpha={} sigma={} calibration_stream={}",
         EXPERIMENT_ID, replicates, horizon, alpha, sigma, calibration_stream_sha256
