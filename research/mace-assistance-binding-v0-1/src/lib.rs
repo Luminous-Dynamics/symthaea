@@ -113,7 +113,8 @@ impl EvidenceRelationEdgeV1 {
             return Err(AssistanceRejectV1::RelationScopeMismatch);
         }
         if !(self.valid_from_ms <= context.valid_at_ms && context.valid_at_ms < self.valid_until_ms)
-            || !(self.known_from_ms <= context.known_at_ms && context.known_at_ms < self.known_until_ms)
+            || !(self.known_from_ms <= context.known_at_ms
+                && context.known_at_ms < self.known_until_ms)
         {
             return Err(AssistanceRejectV1::RelationNotCurrentAtSnapshot);
         }
@@ -154,7 +155,9 @@ pub struct RelationClosureReceiptV1 {
     pub closure_sha256: String,
 }
 
-fn relation_closure_digest(receipt: &RelationClosureReceiptV1) -> Result<String, AssistanceRejectV1> {
+fn relation_closure_digest(
+    receipt: &RelationClosureReceiptV1,
+) -> Result<String, AssistanceRejectV1> {
     let mut unsigned = receipt.clone();
     unsigned.closure_sha256.clear();
     digest_serialized(&unsigned)
@@ -196,7 +199,10 @@ pub fn build_relation_closure_v1<V: RelationEdgeVerifierV1>(
             return Err(AssistanceRejectV1::DuplicateRelationEdge);
         }
         if selected.contains(&edge.kind) {
-            adjacency.entry(edge.from_evidence_id.clone()).or_default().push(edge);
+            adjacency
+                .entry(edge.from_evidence_id.clone())
+                .or_default()
+                .push(edge);
         }
     }
     for outgoing in adjacency.values_mut() {
@@ -210,7 +216,9 @@ pub fn build_relation_closure_v1<V: RelationEdgeVerifierV1>(
     let mut conflicts = BTreeSet::new();
 
     while let Some(current) = queue.pop_front() {
-        let depth = *distance.get(&current).ok_or(AssistanceRejectV1::ClosureInternalInvariant)?;
+        let depth = *distance
+            .get(&current)
+            .ok_or(AssistanceRejectV1::ClosureInternalInvariant)?;
         if depth >= max_hops {
             continue;
         }
@@ -243,13 +251,14 @@ pub fn build_relation_closure_v1<V: RelationEdgeVerifierV1>(
         selected_relation_kinds: selected.into_iter().collect(),
         evidence_ids: distance.into_keys().collect(),
         traversed_edge_ids: traversed_edges.into_iter().collect(),
-        conflict_edges: conflicts.into_iter().map(|(left, right, relation_edge_id)| {
-            RelationConflictV1 {
+        conflict_edges: conflicts
+            .into_iter()
+            .map(|(left, right, relation_edge_id)| RelationConflictV1 {
                 left_evidence_id: left,
                 right_evidence_id: right,
                 relation_edge_id,
-            }
-        }).collect(),
+            })
+            .collect(),
         context_sha256,
         max_hops,
         max_nodes,
@@ -371,18 +380,25 @@ impl EvidenceResponseConstraintV1 {
             return Err(AssistanceRejectV1::ConstraintContextMismatch);
         }
         if !(self.valid_from_ms <= context.valid_at_ms && context.valid_at_ms < self.valid_until_ms)
-            || !(self.known_from_ms <= context.known_at_ms && context.known_at_ms < self.known_until_ms)
+            || !(self.known_from_ms <= context.known_at_ms
+                && context.known_at_ms < self.known_until_ms)
         {
             return Err(AssistanceRejectV1::ConstraintNotCurrentAtSnapshot);
         }
         match self.action {
             ResponseConstraintActionV1::MustAttribute
-                if self.source_speaker_id.as_deref().is_none_or(|value| !nonempty(value)) =>
+                if self
+                    .source_speaker_id
+                    .as_deref()
+                    .is_none_or(|value| !nonempty(value)) =>
             {
                 return Err(AssistanceRejectV1::MissingRequiredSpeaker);
             }
             ResponseConstraintActionV1::MustQualify
-                if self.required_qualification_sha256.as_deref().is_none_or(|value| !valid_sha256(value)) =>
+                if self
+                    .required_qualification_sha256
+                    .as_deref()
+                    .is_none_or(|value| !valid_sha256(value)) =>
             {
                 return Err(AssistanceRejectV1::MissingRequiredQualification);
             }
@@ -478,7 +494,9 @@ pub struct AssistanceBindingReceiptV1 {
     pub binding_sha256: String,
 }
 
-fn relation_context_digest_from_assistance(context: &AssistanceContextV1) -> Result<String, AssistanceRejectV1> {
+fn relation_context_digest_from_assistance(
+    context: &AssistanceContextV1,
+) -> Result<String, AssistanceRejectV1> {
     digest_serialized(&RelationContextV1 {
         valid_at_ms: context.valid_at_ms,
         known_at_ms: context.known_at_ms,
@@ -489,7 +507,9 @@ fn relation_context_digest_from_assistance(context: &AssistanceContextV1) -> Res
     })
 }
 
-fn assistance_binding_digest(receipt: &AssistanceBindingReceiptV1) -> Result<String, AssistanceRejectV1> {
+fn assistance_binding_digest(
+    receipt: &AssistanceBindingReceiptV1,
+) -> Result<String, AssistanceRejectV1> {
     let mut unsigned = receipt.clone();
     unsigned.binding_sha256.clear();
     digest_serialized(&unsigned)
@@ -564,7 +584,9 @@ impl AssistanceRejectV1 {
             Self::DuplicateConstraintId => "duplicate_constraint_id",
             Self::ConstraintClosureMismatch => "constraint_closure_mismatch",
             Self::ConstraintSourceOutsideClosure => "constraint_source_outside_closure",
-            Self::ConflictedEvidenceCannotBeUnqualified => "conflicted_evidence_cannot_be_unqualified",
+            Self::ConflictedEvidenceCannotBeUnqualified => {
+                "conflicted_evidence_cannot_be_unqualified"
+            }
             Self::EvidenceVerifierRejected => "evidence_verifier_rejected",
             Self::InvalidResponseSpan => "invalid_response_span",
             Self::ResponseSpanDigestMismatch => "response_span_digest_mismatch",
@@ -627,7 +649,11 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
         if constraint.relation_closure_sha256 != closure.closure_sha256() {
             return Err(AssistanceRejectV1::ConstraintClosureMismatch);
         }
-        if closure.evidence_ids().binary_search(&constraint.source_evidence_id).is_err() {
+        if closure
+            .evidence_ids()
+            .binary_search(&constraint.source_evidence_id)
+            .is_err()
+        {
             return Err(AssistanceRejectV1::ConstraintSourceOutsideClosure);
         }
         if closure.conflict_edges().iter().any(|edge| {
@@ -637,9 +663,13 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
         }) {
             return Err(AssistanceRejectV1::ConflictedEvidenceCannotBeUnqualified);
         }
-        verifier.verify_constraint_evidence(constraint, context)
+        verifier
+            .verify_constraint_evidence(constraint, context)
             .map_err(|_| AssistanceRejectV1::EvidenceVerifierRejected)?;
-        if by_id.insert(constraint.constraint_id.as_str(), constraint).is_some() {
+        if by_id
+            .insert(constraint.constraint_id.as_str(), constraint)
+            .is_some()
+        {
             return Err(AssistanceRejectV1::DuplicateConstraintId);
         }
     }
@@ -683,7 +713,8 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
     // claim-to-evidence attribution.
     let mut spans: BTreeSet<(usize, usize, String)> = BTreeSet::new();
     for claim_use in &receipt.claim_uses {
-        let constraint = by_id.get(claim_use.constraint_id.as_str())
+        let constraint = by_id
+            .get(claim_use.constraint_id.as_str())
             .ok_or(AssistanceRejectV1::UnknownConstraint)?;
         if !valid_sha256(&claim_use.proposition_sha256)
             || claim_use.proposition_sha256 != constraint.proposition_sha256
@@ -735,12 +766,13 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
 
     if receipt.disposition == ResponseDispositionV1::Answer {
         for constraint in constraints.iter().filter(|constraint| {
-            constraint.required && matches!(
-                constraint.action,
-                ResponseConstraintActionV1::MayAssert
-                    | ResponseConstraintActionV1::MustAttribute
-                    | ResponseConstraintActionV1::MustQualify
-            )
+            constraint.required
+                && matches!(
+                    constraint.action,
+                    ResponseConstraintActionV1::MayAssert
+                        | ResponseConstraintActionV1::MustAttribute
+                        | ResponseConstraintActionV1::MustQualify
+                )
         }) {
             if !used_required.contains(constraint.constraint_id.as_str()) {
                 return Err(AssistanceRejectV1::RequiredConstraintMissing);
@@ -752,7 +784,9 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
     if !valid_sha256(&claimed) || assistance_binding_digest(receipt)? != claimed {
         return Err(AssistanceRejectV1::BindingDigestMismatch);
     }
-    Ok(VerifiedAssistanceBindingV1 { binding_sha256: claimed })
+    Ok(VerifiedAssistanceBindingV1 {
+        binding_sha256: claimed,
+    })
 }
 
 pub fn seal_assistance_binding_v1(
@@ -880,7 +914,8 @@ mod tests {
             3,
             8,
             &FixtureVerifier,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn assistance_context(closure: &VerifiedRelationClosureV1) -> AssistanceContextV1 {
@@ -962,8 +997,24 @@ mod tests {
     #[test]
     fn relation_closure_is_bounded_deterministic_and_preserves_conflict() {
         let result = closure();
-        assert_eq!(result.receipt().evidence_ids, vec!["e1".to_owned(), "e2".to_owned(), "e3".to_owned(), "e4".to_owned()]);
-        assert_eq!(result.receipt().traversed_edge_ids, vec!["r1".to_owned(), "r2".to_owned(), "r3".to_owned(), "r4".to_owned()]);
+        assert_eq!(
+            result.receipt().evidence_ids,
+            vec![
+                "e1".to_owned(),
+                "e2".to_owned(),
+                "e3".to_owned(),
+                "e4".to_owned()
+            ]
+        );
+        assert_eq!(
+            result.receipt().traversed_edge_ids,
+            vec![
+                "r1".to_owned(),
+                "r2".to_owned(),
+                "r3".to_owned(),
+                "r4".to_owned()
+            ]
+        );
         assert_eq!(result.receipt().conflict_edges.len(), 1);
         assert!(result.receipt().verify_integrity());
     }
@@ -974,8 +1025,13 @@ mod tests {
         bad.scope_id = "group:other".into();
         assert_eq!(
             build_relation_closure_v1(
-                &vec!["e1".into()], &vec![bad], &vec![RelationKindV1::SameDecision],
-                &relation_context(), 2, 4, &FixtureVerifier
+                &vec!["e1".into()],
+                &vec![bad],
+                &vec![RelationKindV1::SameDecision],
+                &relation_context(),
+                2,
+                4,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::RelationScopeMismatch)
         );
@@ -983,8 +1039,13 @@ mod tests {
         untrusted.authority_receipt_sha256 = sha("untrusted");
         assert_eq!(
             build_relation_closure_v1(
-                &vec!["e1".into()], &vec![untrusted], &vec![RelationKindV1::SameDecision],
-                &relation_context(), 2, 4, &FixtureVerifier
+                &vec!["e1".into()],
+                &vec![untrusted],
+                &vec![RelationKindV1::SameDecision],
+                &relation_context(),
+                2,
+                4,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::EvidenceVerifierRejected)
         );
@@ -996,8 +1057,13 @@ mod tests {
         stale.valid_until_ms = 50;
         assert_eq!(
             build_relation_closure_v1(
-                &vec!["e1".into()], &vec![stale], &vec![RelationKindV1::SameDecision],
-                &relation_context(), 2, 4, &FixtureVerifier
+                &vec!["e1".into()],
+                &vec![stale],
+                &vec![RelationKindV1::SameDecision],
+                &relation_context(),
+                2,
+                4,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::RelationNotCurrentAtSnapshot)
         );
@@ -1005,8 +1071,13 @@ mod tests {
         future.known_from_ms = 150;
         assert_eq!(
             build_relation_closure_v1(
-                &vec!["e1".into()], &vec![future], &vec![RelationKindV1::SameDecision],
-                &relation_context(), 2, 4, &FixtureVerifier
+                &vec!["e1".into()],
+                &vec![future],
+                &vec![RelationKindV1::SameDecision],
+                &relation_context(),
+                2,
+                4,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::RelationNotCurrentAtSnapshot)
         );
@@ -1020,8 +1091,13 @@ mod tests {
         ];
         assert_eq!(
             build_relation_closure_v1(
-                &vec!["e1".into()], &edges, &vec![RelationKindV1::SameDecision],
-                &relation_context(), 3, 2, &FixtureVerifier
+                &vec!["e1".into()],
+                &edges,
+                &vec![RelationKindV1::SameDecision],
+                &relation_context(),
+                3,
+                2,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ClosureNodeBudgetExceeded)
         );
@@ -1035,12 +1111,23 @@ mod tests {
         let bytes = b"Alice said the delivery date is Friday.";
         let use_row = claim_use(&allowed, bytes, Some("speaker:alice"), None);
         let receipt = response_binding(
-            &context, &vec![allowed.clone()], &closure, bytes,
-            ResponseDispositionV1::Answer, vec![use_row]
+            &context,
+            &vec![allowed.clone()],
+            &closure,
+            bytes,
+            ResponseDispositionV1::Answer,
+            vec![use_row],
         );
         let verified = verify_assistance_binding_v1(
-            &receipt, b"request", bytes, &context, &vec![allowed], &closure, &FixtureVerifier
-        ).unwrap();
+            &receipt,
+            b"request",
+            bytes,
+            &context,
+            &vec![allowed],
+            &closure,
+            &FixtureVerifier,
+        )
+        .unwrap();
         assert_eq!(verified.binding_sha256(), receipt.binding_sha256.as_str());
     }
 
@@ -1051,13 +1138,22 @@ mod tests {
         let allowed = constraint(ResponseConstraintActionV1::MustAttribute, true, &closure);
         let bytes = b"The delivery date is Friday.";
         let receipt = response_binding(
-            &context, &vec![allowed.clone()], &closure, bytes,
+            &context,
+            &vec![allowed.clone()],
+            &closure,
+            bytes,
             ResponseDispositionV1::Answer,
-            vec![claim_use(&allowed, bytes, Some("speaker:bob"), None)]
+            vec![claim_use(&allowed, bytes, Some("speaker:bob"), None)],
         );
         assert_eq!(
             verify_assistance_binding_v1(
-                &receipt, b"request", bytes, &context, &vec![allowed], &closure, &FixtureVerifier
+                &receipt,
+                b"request",
+                bytes,
+                &context,
+                &vec![allowed],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ClaimSpeakerMismatch)
         );
@@ -1070,13 +1166,22 @@ mod tests {
         let qualified = constraint(ResponseConstraintActionV1::MustQualify, true, &closure);
         let bytes = b"The revised estimate may be about 20 units.";
         let receipt = response_binding(
-            &context, &vec![qualified.clone()], &closure, bytes,
+            &context,
+            &vec![qualified.clone()],
+            &closure,
+            bytes,
             ResponseDispositionV1::Answer,
-            vec![claim_use(&qualified, bytes, None, Some(sha("wrong")))]
+            vec![claim_use(&qualified, bytes, None, Some(sha("wrong")))],
         );
         assert_eq!(
             verify_assistance_binding_v1(
-                &receipt, b"request", bytes, &context, &vec![qualified], &closure, &FixtureVerifier
+                &receipt,
+                b"request",
+                bytes,
+                &context,
+                &vec![qualified],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ClaimQualificationMismatch)
         );
@@ -1102,15 +1207,18 @@ mod tests {
                 claim_use(&second, bytes, None, None),
             ],
         );
-        assert!(verify_assistance_binding_v1(
-            &receipt,
-            b"request",
-            bytes,
-            &context,
-            &vec![first, second],
-            &closure,
-            &FixtureVerifier,
-        ).is_ok());
+        assert!(
+            verify_assistance_binding_v1(
+                &receipt,
+                b"request",
+                bytes,
+                &context,
+                &vec![first, second],
+                &closure,
+                &FixtureVerifier,
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -1121,7 +1229,11 @@ mod tests {
         assert_eq!(
             seal_assistance_binding_v1(
                 &changed_context,
-                &vec![constraint(ResponseConstraintActionV1::MayAssert, false, &closure)],
+                &vec![constraint(
+                    ResponseConstraintActionV1::MayAssert,
+                    false,
+                    &closure
+                )],
                 &closure,
                 b"claim",
                 ResponseDispositionV1::Answer,
@@ -1138,12 +1250,22 @@ mod tests {
         let required = constraint(ResponseConstraintActionV1::MayAssert, true, &closure);
         let bytes = b"Here is the answer.";
         let receipt = response_binding(
-            &context, &vec![required.clone()], &closure, bytes,
-            ResponseDispositionV1::Answer, Vec::new()
+            &context,
+            &vec![required.clone()],
+            &closure,
+            bytes,
+            ResponseDispositionV1::Answer,
+            Vec::new(),
         );
         assert_eq!(
             verify_assistance_binding_v1(
-                &receipt, b"request", bytes, &context, &vec![required], &closure, &FixtureVerifier
+                &receipt,
+                b"request",
+                bytes,
+                &context,
+                &vec![required],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::RequiredConstraintMissing)
         );
@@ -1156,12 +1278,22 @@ mod tests {
         let must_abstain = constraint(ResponseConstraintActionV1::MustAbstain, true, &closure);
         let bytes = b"Here is the answer.";
         let receipt = response_binding(
-            &context, &vec![must_abstain.clone()], &closure, bytes,
-            ResponseDispositionV1::Answer, Vec::new()
+            &context,
+            &vec![must_abstain.clone()],
+            &closure,
+            bytes,
+            ResponseDispositionV1::Answer,
+            Vec::new(),
         );
         assert_eq!(
             verify_assistance_binding_v1(
-                &receipt, b"request", bytes, &context, &vec![must_abstain], &closure, &FixtureVerifier
+                &receipt,
+                b"request",
+                bytes,
+                &context,
+                &vec![must_abstain],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::MustAbstain)
         );
@@ -1174,13 +1306,22 @@ mod tests {
         let forbidden = constraint(ResponseConstraintActionV1::MustNotAssert, false, &closure);
         let bytes = b"The project has already been approved.";
         let receipt = response_binding(
-            &context, &vec![forbidden.clone()], &closure, bytes,
+            &context,
+            &vec![forbidden.clone()],
+            &closure,
+            bytes,
             ResponseDispositionV1::Answer,
-            vec![claim_use(&forbidden, bytes, None, None)]
+            vec![claim_use(&forbidden, bytes, None, None)],
         );
         assert_eq!(
             verify_assistance_binding_v1(
-                &receipt, b"request", bytes, &context, &vec![forbidden], &closure, &FixtureVerifier
+                &receipt,
+                b"request",
+                bytes,
+                &context,
+                &vec![forbidden],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ForbiddenConstraintUsed)
         );
@@ -1194,12 +1335,22 @@ mod tests {
         outside.source_evidence_id = "not-in-closure".into();
         let bytes = b"Some statement.";
         let receipt = response_binding(
-            &context, &vec![outside.clone()], &closure, bytes,
-            ResponseDispositionV1::Answer, Vec::new()
+            &context,
+            &vec![outside.clone()],
+            &closure,
+            bytes,
+            ResponseDispositionV1::Answer,
+            Vec::new(),
         );
         assert_eq!(
             verify_assistance_binding_v1(
-                &receipt, b"request", bytes, &context, &vec![outside], &closure, &FixtureVerifier
+                &receipt,
+                b"request",
+                bytes,
+                &context,
+                &vec![outside],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ConstraintSourceOutsideClosure)
         );
@@ -1213,7 +1364,11 @@ mod tests {
         assert_eq!(
             seal_assistance_binding_v1(
                 &changed_context,
-                &vec![constraint(ResponseConstraintActionV1::MayAssert, false, &closure)],
+                &vec![constraint(
+                    ResponseConstraintActionV1::MayAssert,
+                    false,
+                    &closure
+                )],
                 &closure,
                 b"claim",
                 ResponseDispositionV1::Answer,
@@ -1231,12 +1386,22 @@ mod tests {
         disputed.source_evidence_id = "e2".into();
         let bytes = b"The decision is final.";
         let receipt = response_binding(
-            &context, &vec![disputed.clone()], &closure, bytes,
-            ResponseDispositionV1::Answer, Vec::new()
+            &context,
+            &vec![disputed.clone()],
+            &closure,
+            bytes,
+            ResponseDispositionV1::Answer,
+            Vec::new(),
         );
         assert_eq!(
             verify_assistance_binding_v1(
-                &receipt, b"request", bytes, &context, &vec![disputed], &closure, &FixtureVerifier
+                &receipt,
+                b"request",
+                bytes,
+                &context,
+                &vec![disputed],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ConflictedEvidenceCannotBeUnqualified)
         );
@@ -1250,9 +1415,20 @@ mod tests {
         inference.provenance_kind = ClaimProvenanceKindV1::DerivedInference;
         assert_eq!(
             verify_assistance_binding_v1(
-                &response_binding(&context, &vec![inference.clone()], &closure, b"claim",
-                    ResponseDispositionV1::Answer, Vec::new()),
-                b"request", b"claim", &context, &vec![inference], &closure, &FixtureVerifier
+                &response_binding(
+                    &context,
+                    &vec![inference.clone()],
+                    &closure,
+                    b"claim",
+                    ResponseDispositionV1::Answer,
+                    Vec::new()
+                ),
+                b"request",
+                b"claim",
+                &context,
+                &vec![inference],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ProvenanceRequiresQualification)
         );
@@ -1261,9 +1437,20 @@ mod tests {
         speaker_claim.provenance_kind = ClaimProvenanceKindV1::SpeakerAssertion;
         assert_eq!(
             verify_assistance_binding_v1(
-                &response_binding(&context, &vec![speaker_claim.clone()], &closure, b"claim",
-                    ResponseDispositionV1::Answer, Vec::new()),
-                b"request", b"claim", &context, &vec![speaker_claim], &closure, &FixtureVerifier
+                &response_binding(
+                    &context,
+                    &vec![speaker_claim.clone()],
+                    &closure,
+                    b"claim",
+                    ResponseDispositionV1::Answer,
+                    Vec::new()
+                ),
+                b"request",
+                b"claim",
+                &context,
+                &vec![speaker_claim],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ProvenanceRequiresAttribution)
         );
@@ -1277,9 +1464,20 @@ mod tests {
         wrong_audience.audience_id = "private:alice".into();
         assert_eq!(
             verify_assistance_binding_v1(
-                &response_binding(&context, &vec![wrong_audience.clone()], &closure, b"claim",
-                    ResponseDispositionV1::Answer, Vec::new()),
-                b"request", b"claim", &context, &vec![wrong_audience], &closure, &FixtureVerifier
+                &response_binding(
+                    &context,
+                    &vec![wrong_audience.clone()],
+                    &closure,
+                    b"claim",
+                    ResponseDispositionV1::Answer,
+                    Vec::new()
+                ),
+                b"request",
+                b"claim",
+                &context,
+                &vec![wrong_audience],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ConstraintContextMismatch)
         );
@@ -1287,9 +1485,20 @@ mod tests {
         stale.known_until_ms = 50;
         assert_eq!(
             verify_assistance_binding_v1(
-                &response_binding(&context, &vec![stale.clone()], &closure, b"claim",
-                    ResponseDispositionV1::Answer, Vec::new()),
-                b"request", b"claim", &context, &vec![stale], &closure, &FixtureVerifier
+                &response_binding(
+                    &context,
+                    &vec![stale.clone()],
+                    &closure,
+                    b"claim",
+                    ResponseDispositionV1::Answer,
+                    Vec::new()
+                ),
+                b"request",
+                b"claim",
+                &context,
+                &vec![stale],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ConstraintNotCurrentAtSnapshot)
         );
@@ -1302,13 +1511,22 @@ mod tests {
         let allowed = constraint(ResponseConstraintActionV1::MayAssert, false, &closure);
         let bytes = b"Clarify please.";
         let receipt = response_binding(
-            &context, &vec![allowed.clone()], &closure, bytes,
+            &context,
+            &vec![allowed.clone()],
+            &closure,
+            bytes,
             ResponseDispositionV1::Clarify,
-            vec![claim_use(&allowed, bytes, None, None)]
+            vec![claim_use(&allowed, bytes, None, None)],
         );
         assert_eq!(
             verify_assistance_binding_v1(
-                &receipt, b"request", bytes, &context, &vec![allowed], &closure, &FixtureVerifier
+                &receipt,
+                b"request",
+                bytes,
+                &context,
+                &vec![allowed],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::NonAnswerDispositionHasClaimUses)
         );
@@ -1324,12 +1542,22 @@ mod tests {
         invalid.start_byte = 16; // inside the two-byte UTF-8 encoding for é
         invalid.end_byte = 17;
         let receipt = response_binding(
-            &context, &vec![allowed.clone()], &closure, bytes,
-            ResponseDispositionV1::Answer, vec![invalid]
+            &context,
+            &vec![allowed.clone()],
+            &closure,
+            bytes,
+            ResponseDispositionV1::Answer,
+            vec![invalid],
         );
         assert_eq!(
             verify_assistance_binding_v1(
-                &receipt, b"request", bytes, &context, &vec![allowed], &closure, &FixtureVerifier
+                &receipt,
+                b"request",
+                bytes,
+                &context,
+                &vec![allowed],
+                &closure,
+                &FixtureVerifier
             ),
             Err(AssistanceRejectV1::InvalidResponseSpan)
         );
