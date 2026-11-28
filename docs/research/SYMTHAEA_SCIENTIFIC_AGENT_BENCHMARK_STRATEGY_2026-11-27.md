@@ -16,20 +16,22 @@ The benchmark programme should therefore optimize a vector:
 
 No single scalar should conceal a severe failure in another dimension. Publish the Pareto frontier and per-domain/per-task results.
 
-## Current external comparison (snapshot 2026-11-27)
+## Current external comparison (snapshot 2026-11-28)
 
 All results below are snapshots from public benchmark pages, not Symthaea measurements. Harness, model, effort, trial count, task version, and scoring rules differ. They are not interchangeable.
 
 | Benchmark | Public reference | What it measures | Interpretation for Symthaea |
 |---|---|---|---|
-| Terminal-Bench-Science | Official Snorkel page reports 70 tasks across five domains; GPT-6 Astra/Codex 68.1% ±3.2 and Opus 5.5/Claude Code 63.3% ±3.3. [Leaderboard](https://snorkel.ai/leaderboard/terminal-bench-science/) | Long-horizon executable research workflows with task verifiers | Primary external task-completion target; match the exact harness/version and report uncertainty, cost and time |
-| Terminal-Bench-Science cost frontier | Vals AI's Nov 19 snapshot reports GPT-6.2 Astra 71.43%, Gemini 4 Neon 62.86%, GPT-6 Astra 62.86%, with per-test cost/tokens/duration. [Results](https://vals-ai.com/benchmarks/terminal-bench-science) | Completion plus resource consumption | Optimize cost-quality-time Pareto frontier, not raw success alone |
+| Terminal-Bench-Science | The public official-board snapshot still lists 70 tasks and GPT-6 Astra/Codex at 68.1% ±3.2, with Opus 5.5/Claude Code at 63.3% ±3.3. The Nov 28 OpenResearch mirror separately displays model-reported GPT-6.2 Astra 77.1% and Mythos 5.2 75.3%, explicitly not yet on the official board; Vals AI's Nov 19 harness-specific snapshot reports GPT-6.2 Astra 71.43% and GPT-6 Astra 62.86%. Keep these as three distinct snapshots/harness claims. [Official board](https://snorkel.ai/leaderboard/terminal-bench-science/) · [Nov 28 mirror and reported results](https://openresearch.sh/evals) · [Vals snapshot](https://vals-ai.com/benchmarks/terminal-bench-science) | Long-horizon executable research workflows with task verifiers | Primary external task-completion target; match exact task/harness/trial rules; never substitute vendor-reported results for official runs |
+| Terminal-Bench-Science cost frontier | Vals AI's Nov 19 snapshot reports GPT-6.2 Astra 71.43%, Gemini 4 Neon 62.86%, GPT-6 Astra 62.86%, with per-test cost/tokens/duration. These are Vals harness results, not the official-board denominator above. [Results](https://vals-ai.com/benchmarks/terminal-bench-science) | Completion plus resource consumption | Optimize cost-quality-time Pareto frontier, not raw success alone |
 | ASI-Bench | 60 tasks, 11 domains, progressive methodological-guidance removal (B1–B4); leaderboard lists GPT-6.1 Sol/Codex at 63.90 and GPT-6 Astra/Codex at 62.23. [Leaderboard](https://asibench.apexin.ai/) | Project-level research, method reconstruction, robustness to missing guidance | Essential test of whether the system can reconstruct executable methods rather than follow a supplied recipe |
 | Autonomous Science Bench 0.1 | Six pilot tasks; ten configurations × three trials per task. GPT-6 Astra/Codex 72.2%, Opus 5.5/Claude Code 66.7%. Authors explicitly caution that small differences are not meaningful at three trials. [Leaderboard](https://asb.open-ssi.org/leaderboard) · [Methodology](https://asb.open-ssi.org/about) | Real laboratory workflow planning, observation interpretation, iterative improvement | Use as a laboratory campaign target, but require a larger confirmatory evaluation before superiority claims |
 | SCI-AGENT-EXAM | 120 tasks, 11 fields, seven workflow task types; paper reports GPT-6 Astra 80.9 overall, with only 26% of runs above 0.95 success threshold. [Paper](https://arxiv.org/abs/2610.32441) | Executable and textual scientific outputs; progress and stability | Track run-level reliability and threshold success, not only average score |
 | SciAgentArena | Approximately 200 tasks with stepwise verification across scientific contexts. [Project and benchmark](https://sciagentarena.github.io/) | Agent-agnostic real-world scientific analysis and open-ended work | Use to measure domain unevenness and novel-insight limitations; do not substitute narrow coding success |
 | AstaBench | Stanford AI Index summarizes over 2,400 problems and a best agent score around 0.53 at roughly $3.40/problem in its cited 2025 evaluation. [AI Index science chapter](https://hai.stanford.edu/assets/files/ai_index_report_2026_chapter_5_science.pdf) | Broad end-to-end scientific workflow capability | Broad coverage and cost-per-problem anchor; align to the exact benchmark release before comparing |
 | OpenScience claims | OpenScience reports 75.7% Terminal-Bench-Science and other leading results, but its page also notes evaluation issues and planned reruns after comparison/scoring problems. [Benchmark page](https://www.openscience.sh/benchmark) | Vendor-reported system results | Treat as a hypothesis to reproduce, not a settled leaderboard fact |
+
+**FrontierPhysics snapshot conflict (28 November 2026):** public leaderboard mirrors do not currently agree on the reported pass-rate aggregation. Benchmark Almanac's capture of the benchmark's own leaderboard reports Claude Opus 5.5 at 27.4% and GPT-6 Astra at 23.2%; Priors currently reports Opus 5.5 at 45.8% and GPT-6 Astra at 39.3%, describing its score as the verifier pass rate averaged across three trials per task. The task set is 56 tasks across nine domains in both descriptions, but the denominators/aggregation snapshots are not reconciled. Preserve both captures and do not choose a winner or set a superiority target from this discrepancy until the exact run IDs, trial denominator, verifier version and scoring aggregation are matched. [Benchmark Almanac, 28 Nov capture](https://www.benchmarkalmanac.com/benchmarks/frontierphysics/) · [Priors, 28 Nov capture](https://www.mypriors.com/benchmarks/bg-frontierphysics).
 
 ### Comparison discipline
 
@@ -92,7 +94,7 @@ Targets should be revised only after a baseline run and preregistration. A high 
 
 ## Immediate execution sequence
 
-1. **Close the calibration loop:** PR #13969 now has a passing focused Rust 1.96 gate (strict rustfmt, 20/20 standalone production-source tests, strict Clippy) at exact head `37e67653b22001dd4b6a97302c1527a1337ae3cb`. This does not yet validate the entire web-research runtime or prove independent adjudicator quality.
+1. **Close the calibration loop:** PR #13969 had a focused Rust 1.96 pass (20/20 standalone production-source tests, formatting and strict Clippy) at an earlier head `37e67653b22001dd4b6a97302c1527a1337ae3cb`. Its current head `e1401580f683dd8887148bc481770d04b96f17ab` contains subsequent benchmark-strategy additions and its focused adjudication workflow was queued in the 28 Nov audit; do not project the earlier pass onto the current head. Neither head validates the entire web-research runtime or proves external adjudicator quality.
 2. **Complete decision custody:** integrate the proposed offer/context digest contracts with the upstream AgentView owner; then add prefix-only candidate replay and process-level separation.
 3. **Make time semantics explicit:** asynchronous experiments need event time, observation/availability time, and decision time. Simulation tick alone is not enough for delayed or censored evidence.
 4. **Add selective-risk reporting:** calibration is not sufficient if the agent cannot abstain safely. Evaluate risk-coverage and decision utility.
@@ -249,6 +251,18 @@ Integrate these estimands with #11060/#11171's open-world episode metrics. In pa
 - Report joint false-unique risk, conditional-on-singleton risk, commitment rate and coverage separately.
 - Keep evaluator-only compatibility sets, hidden mechanisms and sampling probabilities outside the agent process.
 - Any sequential confidence bound must reuse the pinned SOWRC theorem implementation and its predictable audit design; the reference script is arithmetic validation, not a replacement theorem.
+
+### Robust experiment design under model misspecification: add R-IDeA
+
+The 2026 AISTATS paper *Representative, Informative, and De-Amplifying* shows why maximizing expected information gain can amplify generalization error when the candidate model is misspecified and the experiment distribution shifts away from the deployment/test distribution. Its R-IDeA acquisition function explicitly combines representativeness, informativeness and error de-amplification; its reported experiments outperform acquisition rules that optimize only informativeness, only representativeness, or their combination. [PMLR 300 paper](https://proceedings.mlr.press/v300/tang26d.html).
+
+Add R-IDeA as a named policy-tournament arm; do not reimplement or claim it as Symthaea's invention. The minimum controlled comparison is:
+- matched model, action menu, evidence prefix and vector budget across random, fixed-grid, greedy EIG, calibrated EVSI, prior-free minimax, R-IDeA and the production candidate;
+- separate in-support, covariate-shift, structural-misspecification, measurement-process-shift and combined-shift strata;
+- evaluate decision regret, held-out predictive error, proper-score calibration, false-unique rate, coverage, representativeness of sampled designs, total inclusive cost and wall-clock latency;
+- report paired task-level contrasts and worst-stratum regressions, not a pooled average that lets in-support gains conceal shifted-support failures.
+
+**Proposed qualification target:** on preregistered shift/misspecification strata, the candidate should reduce paired decision regret by at least 10% relative to greedy EIG and be non-inferior to EIG within a predeclared 2% margin on in-support tasks, while meeting the same calibration, integrity and replay gates. This is an aspirational target, not a Symthaea result. If R-IDeA wins, adopt it as a baseline or component only after reproducing the paper's conditions; the differentiator should then be the end-to-end evidence/authorization/decision/replay contract, not an unsupported claim of a novel acquisition formula.
 
 ### Add established-discovery and broad science suites to the external validation ladder
 
