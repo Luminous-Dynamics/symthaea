@@ -74,8 +74,7 @@
       "observation": "Published accounts describe piano and jazz-influenced harmonic colour among Amapiano's resources.",
       "operational_hypothesis": "Support keyboard voicings and harmonic motion as optional identity-bearing dimensions without imposing one chord loop or treating jazz influence as a sufficient genre definition.",
       "source_ids": [
-        "AMA-SRC-02",
-        "AMA-SRC-03"
+        "AMA-SRC-02"
       ],
       "status": "candidate_requires_practitioner_specification",
       "disconfirming_case": "Amapiano examples where harmony is sparse, static or not keyboard-led."
