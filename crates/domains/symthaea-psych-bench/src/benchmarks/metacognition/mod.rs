@@ -7,8 +7,9 @@
 //!   covaries with actual accuracy across difficulty levels.
 //! - **FeelingOfKnowing** — Tests metamemory: after failed recall, can the
 //!   system predict whether it would recognize the correct answer?
-//! - **ChangeBlindness** — Tests attention-dependent conscious perception:
-//!   large scene changes go undetected when accompanied by disruption.
+//! - **ChangeBlindness** — Tests attention-dependent scene-change detection.
+//! - **SelectivePrediction** — Scores answer, abstain and request-information
+//!   policies using counterfactual correctness, calibration, risk and cost.
 
 pub mod calibration;
 pub mod change_blindness;
