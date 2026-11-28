@@ -399,8 +399,9 @@ mod tests {
             3
         );
         assert_eq!(
-            schema["$defs"]["segment_result"]["properties"]["segment_index"]["maximum"],
-            u32::MAX
+            schema["$defs"]["segment_result"]["properties"]["segment_index"]["maximum"]
+                .as_u64(),
+            Some(u64::from(u32::MAX))
         );
     }
 
