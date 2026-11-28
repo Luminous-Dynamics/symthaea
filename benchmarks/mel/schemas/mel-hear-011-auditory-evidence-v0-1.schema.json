@@ -221,6 +221,7 @@
             "waveform",
             "complex_stft",
             "erb_band_energy",
+            "gammatone_band_energy",
             "constant_q",
             "log_frequency_energy",
             "modulation_spectrum",
