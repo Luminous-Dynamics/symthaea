@@ -127,22 +127,22 @@ pub use meta_learning::{
     VerificationStrategy,
 };
 pub use researcher::WebResearcher;
-pub use selective_prediction::{
-    evaluate_risk_coverage, CoreRiskCoverageReport, CoverageOperatingPoint, DecisionCosts,
-    RiskCoverageConfig, RiskCoverageError, RiskCoverageReport, SelectivePredictionRecord,
-};
 pub use selective_observation::{
-    evaluate_selective_observation, AdjudicationSamplingDesign,
-    AdjudicationSamplingMechanism, PropensitySupportDiagnostics,
+    AdjudicationSamplingDesign, AdjudicationSamplingMechanism, PropensitySupportDiagnostics,
     PropensityWeightedReport, SelectiveObservationEvaluation, SelectiveObservationRecord,
+    evaluate_selective_observation,
+};
+pub use selective_prediction::{
+    CoreRiskCoverageReport, CoverageOperatingPoint, DecisionCosts, RiskCoverageConfig,
+    RiskCoverageError, RiskCoverageReport, SelectivePredictionRecord, evaluate_risk_coverage,
 };
 pub use stratified_audit::{
-    build_stratified_random_audit_plan, AuditCandidate, AuditSelection,
-    AuditStratumPlan, AuditStratumQuota, StratifiedAuditError, StratifiedAuditPlan,
+    AuditCandidate, AuditSelection, AuditStratumPlan, AuditStratumQuota, StratifiedAuditError,
+    StratifiedAuditPlan, build_stratified_random_audit_plan,
 };
 pub use stratified_risk::{
-    evaluate_stratified_audit_risk, ApproximateRiskInterval, DesignBasedRiskEstimate,
-    StratifiedRiskError, StratifiedRiskReport,
+    ApproximateRiskInterval, DesignBasedRiskEstimate, StratifiedRiskError, StratifiedRiskReport,
+    evaluate_stratified_audit_risk,
 };
 pub use types::*;
 pub use verifier::{
