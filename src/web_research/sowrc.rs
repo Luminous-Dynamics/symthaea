@@ -763,6 +763,7 @@ mod tests {
 
         fn enumerate(
             time: usize,
+            horizon: usize,
             probability: f64,
             current_risk: f64,
             last_observed_label: Option<bool>,
@@ -773,7 +774,7 @@ mod tests {
             failure_probability: &mut f64,
             nontrivial_probability: &mut f64,
         ) {
-            if time == HORIZON {
+            if time == horizon {
                 *total_probability += probability;
                 let report = evaluate_sowrc(observations, config).unwrap();
                 let bound = report.threshold_bounds[0].upper_risk_bound;
@@ -803,6 +804,7 @@ mod tests {
             });
             enumerate(
                 time + 1,
+                horizon,
                 probability * (1.0 - q),
                 0.2 + 0.6 * current_risk,
                 last_observed_label,
@@ -825,6 +827,7 @@ mod tests {
             });
             enumerate(
                 time + 1,
+                horizon,
                 probability * q * (1.0 - current_risk),
                 0.2,
                 Some(false),
@@ -847,6 +850,7 @@ mod tests {
             });
             enumerate(
                 time + 1,
+                horizon,
                 probability * q * current_risk,
                 0.8,
                 Some(true),
@@ -865,6 +869,7 @@ mod tests {
         let mut nontrivial_probability = 0.0;
         enumerate(
             0,
+            HORIZON,
             1.0,
             0.3,
             None,
