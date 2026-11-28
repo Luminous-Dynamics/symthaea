@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use crate::{
     Action, CandidateFeedback, CandidateInput, Game, GridSpec, InteractiveCandidate, Observation,
-    ObservationMode, Position, State, TerminalStatus, Trace, validate_decision,
+    ObservationMode, State, TerminalStatus, Trace, validate_decision,
 };
 
 const F1_ACTIONS: [Action; 4] = [Action::North, Action::East, Action::South, Action::West];
@@ -128,7 +128,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Cell, GreedyManhattanCandidate, GridSpec};
+    use crate::{Cell, GreedyManhattanCandidate, GridSpec, Position};
 
     fn open_fixture() -> GridSpec {
         GridSpec::new(
@@ -201,15 +201,12 @@ mod tests {
     }
 
     #[derive(Debug)]
-    struct FeedbackFailureCandidate {
-        pending: Option<Action>,
-    }
+    struct FeedbackFailureCandidate;
 
     impl InteractiveCandidate<Observation, Action> for FeedbackFailureCandidate {
         type Error = std::io::Error;
 
         fn reset(&mut self) -> Result<(), Self::Error> {
-            self.pending = None;
             Ok(())
         }
 
@@ -218,7 +215,6 @@ mod tests {
             _input: CandidateInput<'_, Observation, Action>,
         ) -> Result<crate::CandidateDecision<Action>, Self::Error> {
             let action = Action::East;
-            self.pending = Some(action);
             Ok(crate::CandidateDecision {
                 action,
                 confidence: None,
@@ -237,7 +233,7 @@ mod tests {
     #[test]
     fn failed_feedback_is_reported_and_does_not_count_as_success() {
         let spec = open_fixture();
-        let mut candidate = FeedbackFailureCandidate { pending: None };
+        let mut candidate = FeedbackFailureCandidate;
         let report = evaluate_f1(spec, &mut candidate);
         assert!(!report.success);
         assert!(!report.candidate_protocol_valid);
