@@ -32,6 +32,14 @@ func validInput()Input{
   RequiredScopeSourceID:"independent-db-catalog-export",RequiredScopeProvenanceSHA256:sha("source-inventory-receipt"),
   RequiredItems:req,Manifest:manifest}
 }
+
+func TestEmptyManifestCanonicalDigestUsesEmptyArray(t *testing.T){
+ manifest:=Manifest{Identity:testIdentity(),Items:[]CapabilityItem{}}
+ got:=ManifestDigest(manifest)
+ want:="f80e9e2ffa04ca7938688042974ce89fbb5083ddd37037f42d4f364dfd3c4d5e"
+ if got!=want{t.Fatalf("empty manifest must hash canonical [] not null: got %s want %s",got,want)}
+}
+
 func TestFullyCoveredRequiredScopeQualifiesOfflineCoverageOnly(t *testing.T){
  got:=Evaluate(validInput())
  if got.CapabilityVerdict!=Qualified||got.CoverageVerdict!=Qualified{t.Fatalf("expected offline scope coverage: %+v",got)}
