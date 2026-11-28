@@ -366,14 +366,29 @@ mod tests {
             ..Default::default()
         };
         let result = StroopBenchmark.run(&config);
-        for key in ["congruent::rt_ticks", "incongruent::rt_ticks", "neutral::rt_ticks"] {
+        for key in [
+            "congruent::rt_ticks",
+            "incongruent::rt_ticks",
+            "neutral::rt_ticks",
+        ] {
             let metric = &result.metrics[key];
-            assert!(metric.mean >= 8.0, "{key} mean below proxy floor: {}", metric.mean);
-            assert!(metric.mean <= 20.0, "{key} mean above proxy ceiling: {}", metric.mean);
+            assert!(
+                metric.mean >= 8.0,
+                "{key} mean below proxy floor: {}",
+                metric.mean
+            );
+            assert!(
+                metric.mean <= 20.0,
+                "{key} mean above proxy ceiling: {}",
+                metric.mean
+            );
         }
-        assert!(result.trial_trace.iter().all(|trial| {
-            (8.0..=20.0).contains(&trial.rt_ticks)
-        }));
+        assert!(
+            result
+                .trial_trace
+                .iter()
+                .all(|trial| (8.0..=20.0).contains(&trial.rt_ticks))
+        );
     }
 
     #[test]
