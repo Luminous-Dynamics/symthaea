@@ -370,6 +370,11 @@
         "name": "Reconfigurable manufacturing digital twin",
         "doi": "10.1016/j.procir.2025.02.246",
         "status": "research demonstration, not an industry standard"
+      },
+      {
+        "name": "Decentralised grid architectures for electricity distribution networks: A survey",
+        "doi": "10.1016/j.compeleceng.2026.111279",
+        "status": "2026 survey; recommends tiered/multi-timescale/federated architectures and load-served/recovery-time/communication/economic-fairness metrics"
       }
     ],
     "task_families": [
@@ -377,7 +382,8 @@
       "maintenance decisions: inspect, continue, derate, repair, replace, abstain",
       "configuration identity and repair provenance",
       "function-preserving asset recovery",
-      "reconfigurable production-cell adaptation"
+      "reconfigurable production-cell adaptation",
+      "distribution-grid reconfiguration and network restoration under DER variability and contingencies (separate power-system benchmark with validated AC/DC power flow, voltage/thermal, radiality, protection and switching constraints)"
     ],
     "baselines": [
       "statistical process control and classical signal-processing baselines",
@@ -409,7 +415,33 @@
       "recommendation mode only after calibration/human-factors review",
       "actuation only after separate safety engineering and operational authorization"
     ],
-    "claim_boundary": "No cross-domain transfer claim: predictive maintenance, industrial robotic repair, and biological morphogenesis remain separate evidence lanes."
+    "claim_boundary": "No cross-domain transfer claim: predictive maintenance, industrial robotic repair, and biological morphogenesis remain separate evidence lanes.",
+    "distribution_grid_lane": {
+      "status": "candidate_future_industry_transfer",
+      "baselines": [
+        "qualified distribution-system reconfiguration and optimal-power-flow solvers",
+        "MILP/MIQP/MISOCP topology/switching/capacity formulations where applicable",
+        "branch-exchange and rule-based DSO reconfiguration",
+        "GA/PSO and published metaheuristics",
+        "safety-constrained learned graph or DRL controllers with matched observability and contingencies"
+      ],
+      "metrics": [
+        "criticality-weighted load served and unserved energy",
+        "voltage and thermal violations",
+        "radiality/islanding/protection feasibility",
+        "switching count, wear and restoration time",
+        "network losses and DER/contingency uncertainty",
+        "communication overhead and customer fairness"
+      ],
+      "promotion": [
+        "offline power-system/digital-twin evaluation",
+        "independent power-flow validation",
+        "shadow mode with no control authority",
+        "human/operator review before any recommendation",
+        "live operation excluded from this benchmark"
+      ],
+      "claim_limit": "Generic max-flow topology benchmark does not establish power-system feasibility, grid safety or authorization for live switching."
+    }
   },
   "separate_biological_mycelium_lane": {
     "status": "existing_repository_workstream; distinct from Levin animal somatic-cell bioelectric evidence",
