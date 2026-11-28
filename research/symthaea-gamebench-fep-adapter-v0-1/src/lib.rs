@@ -58,6 +58,7 @@ pub struct FepNavigationCandidate {
     width: u16,
     height: u16,
     seed: u64,
+    episode_counter: u64,
     agent: ActiveInferenceAgent,
     belief_is_current: bool,
     pending_action: Option<Action>,
@@ -73,6 +74,7 @@ impl FepNavigationCandidate {
             width,
             height,
             seed,
+            episode_counter: 0,
             agent,
             belief_is_current: false,
             pending_action: None,
@@ -176,7 +178,10 @@ impl InteractiveCandidate<Observation, Action> for FepNavigationCandidate {
     type Error = FepAdapterError;
 
     fn reset(&mut self) -> Result<(), Self::Error> {
-        self.agent = build_agent(self.width, self.height, self.seed);
+        self.episode_counter = self.episode_counter.wrapping_add(1);
+        let episode_seed = self.seed
+            ^ self.episode_counter.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        self.agent = build_agent(self.width, self.height, episode_seed);
         self.belief_is_current = false;
         self.pending_action = None;
         Ok(())
@@ -426,6 +431,7 @@ mod tests {
     fn reset_restores_a_fresh_fep_agent_with_declared_seed() {
         let mut candidate = FepNavigationCandidate::new(3, 3, 1).expect("candidate");
         assert!(candidate.reset().is_ok());
+        assert_eq!(candidate.episode_counter, 1);
         assert!(candidate.pending_action.is_none());
         assert!(!candidate.belief_is_current);
     }
