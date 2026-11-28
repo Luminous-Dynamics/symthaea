@@ -62,6 +62,7 @@ event contract.
 - [Deterministic seven-form Bevy layout](../../renderers/symthaea-soma-bevy/src/visual_grammar.rs)
 - [Event-triggered temporal foveation research](SYMTHAEA_EVENT_TRIGGERED_TEMPORAL_FOVEATION_V0_1_2026-11-28.md)
 - [Temporal pixel-budget foveation scheduler](../../crates/domains/symthaea-foveation/src/temporal_budget.rs)
+- [Calibrated ROI expected-value ranking](../../crates/domains/symthaea-foveation/src/roi_information_value.rs)
 - [Foveation manager integration](../../crates/domains/symthaea-foveation/src/manager.rs)
 - [Interaction trace schema](SYMTHAEA_INTERACTION_TRACE_SCHEMA_V1_2026-11-27.json)
 - [Interaction trace fixtures](SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json)
@@ -83,7 +84,7 @@ The renderer-independent event, projection, policy, receipt, scene, scene-graph,
 `crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs`; it checks causal relationships but is not a JSON Schema validator.
 A standalone Bevy 0.20.1 adapter has transition-aware source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
-All 213 tracked polyembodiment and temporal-foveation regression tests are authored but unexecuted; this inventory excludes pre-existing tests elsewhere in the foveation package, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
+All 225 tracked polyembodiment and temporal-foveation regression tests are authored but unexecuted; this inventory excludes pre-existing tests elsewhere in the foveation package, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
 
 ## Theoretical Foundations
 
