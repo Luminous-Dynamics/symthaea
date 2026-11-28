@@ -22,6 +22,8 @@ pub use change_blindness::ChangeBlindnessBenchmark;
 pub use feeling_of_knowing::FeelingOfKnowingBenchmark;
 
 pub use selective_prediction_task::{
-    SelectivePredictionBaseline, SelectivePredictionTaskReport,
+    ClarificationTarget, SelectivePolicyDecision, SelectivePredictionBaseline,
+    SelectivePredictionCostModel, SelectivePredictionObservation, SelectivePredictionTaskReport,
+    SyntheticSelectivePredictionItem, evaluate_policy_with,
     run_reference_suite as run_selective_prediction_reference_suite,
 };
