@@ -18,6 +18,7 @@ pub struct ScenarioManifest {
     pub schema_version: u16,
     pub scenario_id: String,
     pub generator_version: String,
+    /// Reserved for the future scenario generator; the current fixed fixture ignores it.
     pub seed: u64,
     pub max_steps: u32,
     pub observation_budget: u32,
@@ -189,6 +190,9 @@ pub struct StepReceipt {
     pub observation: Observation,
 }
 
+/// Rejected transitions are transactional and do not advance the world. A
+/// future agent-facing runner must separately log and charge rejected attempts
+/// so invalid-action probing cannot become a free oracle.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransitionError {
     StepLimitReached,
@@ -540,6 +544,35 @@ mod tests {
         let before = state.digest().expect("digest");
         assert!(step(&manifest, &state, Action::Deliver).is_err());
         assert_eq!(state.digest().expect("digest"), before);
+    }
+
+    #[test]
+    fn observation_budget_is_enforced() {
+        let manifest = ScenarioManifest {
+            observation_budget: 1,
+            ..ScenarioManifest::default()
+        };
+        let state = WorldState::initial(&manifest).expect("initial state");
+        let observed = run_action(&state, &manifest, Action::Inspect);
+        assert_eq!(observed.observation_budget_remaining, 0);
+        assert_eq!(
+            step(&manifest, &observed, Action::Inspect),
+            Err(TransitionError::ObservationBudgetExhausted)
+        );
+    }
+
+    #[test]
+    fn scenario_step_limit_is_enforced() {
+        let manifest = ScenarioManifest {
+            max_steps: 1,
+            ..ScenarioManifest::default()
+        };
+        let state = WorldState::initial(&manifest).expect("initial state");
+        let state = run_action(&state, &manifest, Action::Wait);
+        assert_eq!(
+            step(&manifest, &state, Action::Wait),
+            Err(TransitionError::StepLimitReached)
+        );
     }
 
     #[test]
