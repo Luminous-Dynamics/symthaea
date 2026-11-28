@@ -652,7 +652,7 @@ mod tests {
             SemanticCue::Listening { active: true },
         );
         let mut graph = compile_scene_graph_v2(&cue, &permit).unwrap();
-        graph.scene_graph_digest.replace_range(0..1, "0");
+        graph.scene_graph_digest = "0".repeat(64);
         assert_eq!(
             verify_scene_graph_v2(&graph, &cue, &permit),
             Err(SceneGraphV2Error::SceneGraphDigestMismatch)
