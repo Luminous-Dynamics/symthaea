@@ -1,0 +1,40 @@
+name: CMAQ-059 finite-sample calibration
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-059/**"
+      - ".github/workflows/cmaq-059.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-059-finite-sample-calibration
+  cancel-in-progress: true
+
+jobs:
+  finite-sample-calibration:
+    name: finite-sample-calibration
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-059-finite-sample-calibration-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Generate dependency lockfile
+        run: cargo +1.100.0 generate-lockfile --manifest-path research/cmaq-059/Cargo.toml
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-059/Cargo.toml --all -- --check
+      - name: Run deterministic calibration tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-059/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-059/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Preserve calibration test evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-059-calibration-test-evidence
+          path: research/cmaq-059/Cargo.lock
+          if-no-files-found: error
