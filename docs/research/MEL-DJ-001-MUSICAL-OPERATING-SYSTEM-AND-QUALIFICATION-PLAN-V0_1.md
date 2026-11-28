@@ -257,3 +257,32 @@ The late-2026 incumbent feature set means parity and interoperability need to be
 These are source-backed product capabilities, not evidence that all products have equivalent quality or that every feature works on every hardware profile. Maintain a dated capability matrix, record product/version/hardware/subscription context, and validate each interoperability claim with lawful fixture-based round trips.
 
 The defensible route beyond incumbent systems is not a raw feature count. It is a reproducible advantage on: (1) property-relative musical judgment under nuisance transformations; (2) transition success across more than smooth EDM-style blends; (3) calibrated abstention when beat, structure, or stem evidence is ambiguous; (4) set-level intent attainment without homogenizing taste; (5) measurable reduction in DJ workload with preserved agency; and (6) auditable portability with explicit metadata-loss accounting. A claim of state of the art requires protocol-matched data, frozen baselines, held-out DJs and source tracks, uncertainty intervals, and public failure slices. Closed competitors should be compared in controlled user studies or exported artifacts where feasible, not by inventing internal benchmark numbers.
+
+
+## 14. Proposed target ladder for a genuine SOTA claim
+
+All figures in this section are **research targets, not achieved results**. Freeze the test protocol and comparator versions before measuring them. Report every slice and confidence interval; no overall score may compensate for a failed hard gate.
+
+| Capability | Trustworthy floor | Leadership target |
+|---|---|---|
+| Contract validator | Exhaustive finite fixture grid: all valid contracts accepted, all known-invalid contracts rejected; zero source-window, authorization, or replay-invariant violations | Mutation testing must show that deleting or weakening each hard validator causes a fixture failure |
+| Beat / downbeat | Separate stable-tempo, variable-tempo, swung, live, edited, non-4/4 and half/double-time slices; calibration and abstention reported | On the declared stable electronic subset, target beat/downbeat F-measure >= 0.95 and p95 beat-phase error <= 20 ms; no universal claim outside the supported subset |
+| Musical property FLIP/STAY | Per-property FLIP and STAY scores, false-flip and missed-flip rates, real-recording holdout, calibrated abstention | Target >= 92% balanced accuracy on held-out real recordings for each supported property, false flips <= 10%, missed flips <= 10%, ECE <= 0.05 at >= 80% coverage; also measure human performance on the identical cohort |
+| Transition preference | Zero hard-constraint violations; matched fixed-crossfade, heuristic, rule-based and MixWeaver baselines | Target >= 60% pairwise preference against each matched baseline with lower 95% confidence bound > 55%, separately by transition type and DJ-experience stratum; power the study using crossed DJ/track/session simulations |
+| Stem / role evidence | SDR/SI-SDR plus Bleedless, Fullness, residual, phase and transient diagnostics; reject unsupported role claims | Beat a matched incumbent on the joint quality/latency/compute Pareto frontier, not on a single separation score |
+| Live audio runtime | Per-device/configuration deadline, xrun, dropout and latency distributions | Zero xruns in a two-hour soak per declared supported configuration; p99 callback execution <= 50% of the audio-block deadline; publish end-to-end output and headphone-cue latency |
+| Controller safety | Full mapping inventory, sequence and authority tests, reconnect and stale-event fault injection | 100% deterministic behavior for declared supported mappings; p99 input-to-control response <= 10 ms under the declared test rig |
+| Library portability | Round-trip field inventory and explicit unsupported-field/loss report | Zero unexplained loss for fields declared supported across every declared source/export pair |
+| Set planning | Expert rating of intent attainment, novelty, diversity and coherence | At least +5 percentage points in held-out DJ intent-attainment rating over a queue/preference baseline, with no material loss of diversity; test Pareto alternatives, not one scalar |
+| Copilot | Treatment/sham/yoked comparison; workload, agency, calibration and override/undo measured | Target >= 0.3 SD improvement in predeclared task outcome with workload and agency non-inferior within 0.2 SD; acceptance rate is not the endpoint |
+
+The numeric leadership targets are intentionally falsifiable. If power simulation, expert annotation reliability, device capability or held-out data do not support a target, downgrade the claim or mark that slice unsupported rather than weakening the test after seeing results.
+
+### Minimum benchmark governance
+
+- Keep source-track, DJ, transition-pair, session, venue/device, and rater identities crossed where possible. No random clip split that leaks tracks or performances across train and test.
+- Use at least one real-recording test cohort and one controlled, known-truth cohort. Synthetic data establishes causal ground truth; it cannot substitute for the real-world cohort.
+- For initial transition preference studies, plan a pilot with at least 20 DJs, 300 distinct held-out transition pairs and three independent judgments per pair; determine the final sample using a preregistered power simulation and cluster-aware estimator checks.
+- Report paired effect sizes, confidence intervals, calibration, coverage, subgroup performance, missingness, and all exclusions. Do not promote descriptive-only or underpowered cohorts to leaderboard claims.
+- Freeze analysis model/checkpoint hashes, transition search budgets, separation compute budgets, sample rates, buffers, loudness normalization, preview mastering and playback conditions for each comparison.
+- Publish a failure taxonomy: bad beatgrid, wrong phrase boundary, harmonic/melodic clash, vocal collision, transient damage, stem bleed, missing target content, energy discontinuity, wrong set intent, unsafe command, dropout, and portability loss.
