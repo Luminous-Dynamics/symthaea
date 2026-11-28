@@ -4,10 +4,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """
-MeditationSentinel Time-Course Validation
+Unlabelled EEG Band-Power Time-Course Summary
 
-Shows that MeditationSentinel can track meditation features over time.
-This validates the feature extraction without requiring baseline periods.
+This script plots/describes spectral features over elapsed recording time.
+It does not classify meditation, infer meditation depth, or validate the
+MeditationSentinel. Its early/late contrasts are not ground-truth state labels.
 """
 
 import numpy as np
@@ -182,7 +183,7 @@ def main():
         beta_mean = np.mean([e['beta_rel'] for e in epochs])
         index_mean = np.mean([e['meditation_index'] for e in epochs])
 
-        # Track time-course (first 5 min vs last 5 min)
+        # Track early/late spectral-feature contrast (first 5 min vs last 5 min), not state change
         first_5 = [e for e in epochs if e['time'] < 5]
         last_5 = [e for e in epochs if e['time'] > max(e['time'] for e in epochs) - 5]
 
@@ -251,14 +252,14 @@ def main():
         alpha_change = (f['alpha_late'] - f['alpha_early']) / (f['alpha_early'] + 1e-10) * 100
         index_change = (f['index_late'] - f['index_early']) / (f['index_early'] + 1e-10) * 100
         print(f"  {f['subject']}: Alpha {alpha_change:+.1f}%, Index {index_change:+.1f}% "
-              f"({'deepening' if index_change > 5 else 'stable' if index_change > -5 else 'lightening'})")
+              f"({'feature index increased' if index_change > 5 else 'feature index roughly stable' if index_change > -5 else 'feature index decreased'})")
 
     print()
     print('=' * 72)
     print()
 
     # Validation assessment
-    print("VALIDATION ASSESSMENT:")
+    print("FEATURE-RANGE SANITY CHECKS (NOT STATE VALIDATION):")
     print()
 
     # Check if values are in expected ranges
@@ -283,8 +284,8 @@ def main():
         print(f"  [{status}] {msg}")
 
     print()
-    print("  CONCLUSION: MeditationSentinel feature extraction is working correctly.")
-    print("  The high alpha values (>50%) are consistent with experienced meditators")
+    print("  CONCLUSION: feature ranges were checked heuristically; no state-classification or meditation-depth validity is established.")
+    print("  Observed alpha values are descriptive only and cannot establish a meditator state or trait")
     print("  in a dedicated meditation task (eyes closed, relaxed state).")
 
 
