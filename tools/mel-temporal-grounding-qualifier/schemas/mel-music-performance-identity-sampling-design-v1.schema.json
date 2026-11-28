@@ -72,7 +72,8 @@
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/digest"
-          }
+          },
+          "minItems": 1
         },
         "session_identity_sha256": {
           "$ref": "#/$defs/digest"
@@ -119,5 +120,26 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "independent_source_work_sampling_claimed": {
+            "const": true
+          }
+        },
+        "required": [
+          "independent_source_work_sampling_claimed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "independence_basis": {
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
 }
