@@ -48,7 +48,7 @@ The repository workflow `.github/workflows/gamebench-transition-bridge-v0-1.yml`
 
 ## Authored tests and claim ceiling
 
-The crate currently contains 19 authored Rust tests. They are **not yet executed**. The authoring environment used for this change does not have `rustc` or `cargo`; exact-head CI is still required.
+The crate currently contains 20 authored Rust tests. They are **not yet executed**. The authoring environment used for this change does not have `rustc` or `cargo`; exact-head CI is still required.
 
 Passing these synthetic tests would qualify only the adapter's local protocol behavior. It would not establish:
 - authenticity of a real environment event or digest;
