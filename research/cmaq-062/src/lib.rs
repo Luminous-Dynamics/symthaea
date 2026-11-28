@@ -635,7 +635,7 @@ fn policy_digest(nodes: &[ContextNode], alpha: Rational, lambda: f64) -> String 
 }
 fn encode_frequency_map(hasher: &mut Sha256, map: &FourierFeatureMap) {
     hasher.update((map.input_dimension() as u64).to_be_bytes());
-    hasher.update((map.frequency_count() as u64).to_be_bytes());
+    hasher.update((map.frequencies().len() as u64).to_be_bytes());
     for frequency in map.frequencies() {
         hasher.update((frequency.len() as u64).to_be_bytes());
         for value in frequency {
