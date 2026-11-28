@@ -1,0 +1,47 @@
+name: CMAQ-057 predictable adaptive kernel betting
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-057/**"
+      - "research/cmaq-056/**"
+      - "research/cmaq-054/**"
+      - "research/cmaq-053/**"
+      - ".github/workflows/cmaq-057.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-057-predictable-adaptive-betting
+  cancel-in-progress: true
+
+jobs:
+  predictable-adaptive-betting:
+    name: predictable-adaptive-betting
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-057-predictable-adaptive-kernel-betting-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Generate dependency lockfile
+        run: cargo +1.100.0 generate-lockfile --manifest-path research/cmaq-057/Cargo.toml
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-057/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-057/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-057/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Prequential adaptive betting probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-057/Cargo.toml --locked --bin adaptive_betting_probe > cmaq-057-adaptive-betting-smoke.csv
+      - name: Preserve adaptive betting artifact and lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-057-adaptive-betting-smoke
+          path: |
+            cmaq-057-adaptive-betting-smoke.csv
+            research/cmaq-057/Cargo.lock
+          if-no-files-found: error
