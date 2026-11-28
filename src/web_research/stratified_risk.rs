@@ -398,7 +398,7 @@ pub fn evaluate_stratified_audit_risk(
             plan,
             config.minimum_sample_size,
         );
-        if let Some(risk) = estimate.estimated_risk {
+        if estimate.estimated_risk.is_some() {
             let previous_end = index;
             let group_size = end - index;
             let previous_error_total = if let Some(previous) = curve.last() {
@@ -413,7 +413,6 @@ pub fn evaluate_stratified_audit_risk(
                 let accepted_at_rank = previous_end + rank;
                 aurc_area += (expected_error_total / accepted_at_rank as f64) / total as f64;
             }
-            let _ = risk;
         } else {
             aurc_supported = false;
         }
@@ -558,7 +557,9 @@ fn estimate_for_acceptance(
         estimated_error_total += stratum_estimated_error;
         accepted_audit_count += accepted_sample.len();
 
-        let sample_error_variance = if n_population == n {
+        let sample_error_variance = if accepted_population_count == 0 || n_population == n {
+            // If the frozen candidate accepts no units in this stratum, the
+            // loss is identically zero even when the audit quota is one.
             Some(0.0)
         } else if n >= 2 {
             let sample_mean = sample_sum / n as f64;
