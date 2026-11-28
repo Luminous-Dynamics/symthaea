@@ -278,6 +278,113 @@ fn update_receipt_digest(
     json_sha256(&canonical)
 }
 
+/// Independently verifies the immutable prediction receipt and its read-only
+/// state invariant.
+pub fn verify_streaming_prediction_receipt_v1(
+    receipt: &StreamingPredictionReceiptV1,
+) -> Result<(), GatedStreamingAdapterErrorV1> {
+    if receipt.schema != STREAMING_PREDICTION_RECEIPT_SCHEMA_V1 {
+        return Err(GatedStreamingAdapterErrorV1(
+            "streaming prediction receipt schema is unsupported".into(),
+        ));
+    }
+    require_text(&receipt.sample_id, "receipt.sample_id")?;
+    require_text(&receipt.measurement_event_id, "receipt.measurement_event_id")?;
+    if !valid_sha256(&receipt.global_model_artifact_sha256)
+        || !valid_sha256(&receipt.feature_schema_sha256)
+        || !valid_sha256(&receipt.policy_sha256)
+        || !valid_sha256(&receipt.feature_vector_sha256)
+        || !valid_sha256(&receipt.adapter_state_before_sha256)
+        || !valid_sha256(&receipt.adapter_state_after_sha256)
+    {
+        return Err(GatedStreamingAdapterErrorV1(
+            "prediction receipt contains a malformed digest".into(),
+        ));
+    }
+    if receipt.adapter_state_before_sha256 != receipt.adapter_state_after_sha256 {
+        return Err(GatedStreamingAdapterErrorV1(
+            "prediction receipt violates read-only adapter state invariant".into(),
+        ));
+    }
+    if receipt.selected_feature_indices.is_empty()
+        || receipt.selected_feature_indices.len() != receipt.selected_feature_vector.len()
+        || receipt.selected_feature_vector.iter().any(|value| !value.is_finite())
+        || !receipt.global_baseline_prediction.is_finite()
+        || !receipt.feature_adapter_prediction.is_finite()
+        || !receipt.context_correction.is_finite()
+        || !receipt.temporal_correction.is_finite()
+        || !receipt.base_prediction.is_finite()
+        || !receipt.prediction_value.is_finite()
+        || (receipt.base_prediction - (receipt.global_baseline_prediction
+            + receipt.feature_adapter_prediction
+            + receipt.context_correction)).abs()
+            > f64::EPSILON * 8.0
+        || (receipt.prediction_value - (receipt.base_prediction + receipt.temporal_correction)).abs()
+            > f64::EPSILON * 8.0
+    {
+        return Err(GatedStreamingAdapterErrorV1(
+            "prediction receipt contains inconsistent numeric fields".into(),
+        ));
+    }
+    if prediction_receipt_digest(receipt)? != receipt.receipt_sha256 {
+        return Err(GatedStreamingAdapterErrorV1(
+            "prediction receipt digest does not match its content".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Independently verifies the update receipt, including the invariant that
+/// denied/duplicate attempts cannot claim a state mutation.
+pub fn verify_streaming_update_receipt_v1(
+    receipt: &StreamingUpdateReceiptV1,
+) -> Result<(), GatedStreamingAdapterErrorV1> {
+    if receipt.schema != STREAMING_UPDATE_RECEIPT_SCHEMA_V1 {
+        return Err(GatedStreamingAdapterErrorV1(
+            "streaming update receipt schema is unsupported".into(),
+        ));
+    }
+    require_text(&receipt.engine_id, "receipt.engine_id")?;
+    require_text(&receipt.sample_id, "receipt.sample_id")?;
+    require_text(&receipt.label_id, "receipt.label_id")?;
+    require_text(&receipt.measurement_event_id, "receipt.measurement_event_id")?;
+    if !valid_sha256(&receipt.policy_sha256)
+        || !valid_sha256(&receipt.label_payload_sha256)
+        || !valid_sha256(&receipt.adapter_state_before_sha256)
+        || !valid_sha256(&receipt.adapter_state_after_sha256)
+        || receipt
+            .eligibility_report_sha256
+            .as_deref()
+            .is_some_and(|digest| !valid_sha256(digest))
+        || receipt
+            .prediction_receipt_sha256
+            .as_deref()
+            .is_some_and(|digest| !valid_sha256(digest))
+    {
+        return Err(GatedStreamingAdapterErrorV1(
+            "update receipt contains a malformed digest".into(),
+        ));
+    }
+    let is_update = receipt.disposition == StreamingUpdateDispositionV1::Updated;
+    if receipt.adapter_state_mutated != is_update
+        || receipt.update_sequence.is_some() != is_update
+        || (!is_update
+            && receipt.adapter_state_before_sha256 != receipt.adapter_state_after_sha256)
+        || receipt.retraining_executed
+        || receipt.equipment_control_authority
+    {
+        return Err(GatedStreamingAdapterErrorV1(
+            "update receipt violates mutation or authority invariants".into(),
+        ));
+    }
+    if update_receipt_digest(receipt)? != receipt.receipt_sha256 {
+        return Err(GatedStreamingAdapterErrorV1(
+            "update receipt digest does not match its content".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn validate_policy(policy: &StreamingAdapterPolicyV1) -> Result<(), GatedStreamingAdapterErrorV1> {
     if policy.schema != STREAMING_ADAPTER_POLICY_SCHEMA_V1 {
         return Err(GatedStreamingAdapterErrorV1(
@@ -1084,6 +1191,59 @@ mod tests {
         assert_eq!(receipt.selected_feature_vector, vec![1.0, 2.0]);
         assert_eq!(receipt.context_key.as_deref(), Some("eqp-1/ch-1"));
         assert_eq!(receipt.prediction_value, 10.0);
+    }
+
+    #[test]
+    fn independent_receipt_verifiers_accept_valid_prediction_and_update_receipts() {
+        let mut engine = engine();
+        let prediction_receipt = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 2.0]),
+        )
+        .unwrap();
+        verify_streaming_prediction_receipt_v1(&prediction_receipt).unwrap();
+
+        let update = deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                ("sample-1", "event-1", "label-1"),
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                (102, 102),
+            ),
+        )
+        .unwrap();
+        verify_streaming_update_receipt_v1(&update).unwrap();
+    }
+
+    #[test]
+    fn independent_receipt_verifiers_reject_tampered_or_falsely_mutating_receipts() {
+        let mut engine = engine();
+        let prediction_receipt = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 2.0]),
+        )
+        .unwrap();
+        let mut tampered_prediction = prediction_receipt.clone();
+        tampered_prediction.prediction_value += 0.5;
+        assert!(verify_streaming_prediction_receipt_v1(&tampered_prediction).is_err());
+
+        let held = deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                ("sample-1", "event-1", "label-1"),
+                1,
+                LabelConsumptionEligibilityV1::Blocked,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                (110, 112),
+            ),
+        )
+        .unwrap();
+        let mut falsely_mutating = held;
+        falsely_mutating.adapter_state_mutated = true;
+        falsely_mutating.update_sequence = Some(1);
+        assert!(verify_streaming_update_receipt_v1(&falsely_mutating).is_err());
     }
 
     #[test]
