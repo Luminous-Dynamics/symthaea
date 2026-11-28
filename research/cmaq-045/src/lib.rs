@@ -745,9 +745,17 @@ mod tests {
 
         let mut low_monitor = monitor();
         low_monitor.observe_rank(1).unwrap();
-        assert!(!low_monitor.active_context_names().contains(&"previous_low_run"));
+        assert!(
+            !low_monitor
+                .active_context_names()
+                .contains(&"previous_low_run")
+        );
         low_monitor.observe_rank(1).unwrap();
-        assert!(low_monitor.active_context_names().contains(&"previous_low_run"));
+        assert!(
+            low_monitor
+                .active_context_names()
+                .contains(&"previous_low_run")
+        );
     }
 
     #[test]
