@@ -376,9 +376,10 @@ impl FoveationManager {
     pub fn notify_temporal_trigger(
         &mut self,
         trigger: TemporalTrigger,
+        now_us: u64,
     ) -> Result<bool, TemporalFoveationError> {
         match self.temporal_budget.as_mut() {
-            Some(budget) => budget.observe_trigger(trigger),
+            Some(budget) => budget.observe_trigger(trigger, now_us),
             None => Ok(false),
         }
     }
@@ -516,7 +517,7 @@ mod tests {
             timestamp_us: 1_150_000,
             kind: TemporalTriggerKind::TurnBoundaryCandidate,
             urgency: 0.95,
-        }).unwrap();
+        }, 1_150_000).unwrap();
         mgr.tick(1_249_999);
         assert_eq!(mgr.total_dispatched, 1);
         mgr.tick(1_250_000);
