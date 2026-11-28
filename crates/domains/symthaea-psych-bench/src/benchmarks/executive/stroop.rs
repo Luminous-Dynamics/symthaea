@@ -33,6 +33,14 @@ use symthaea_core::hdc::ContinuousHV;
 /// Stroop Color-Word Interference benchmark.
 pub struct StroopBenchmark;
 
+fn metric_with_bounds(samples: &[f64], lower: f64, upper: Option<f64>) -> MetricValue {
+    MetricValue::from_samples_with_bounds(
+        samples,
+        crate::registry::MetricBounds { lower, upper },
+    )
+    .expect("Stroop metric observations must satisfy declared support")
+}
+
 #[derive(Clone, Copy)]
 enum Condition {
     Congruent,
@@ -298,21 +306,21 @@ impl PsychBenchmark for StroopBenchmark {
             all_neut_rt.extend_from_slice(&r.neutral_rt);
         }
 
-        result.insert("congruent_accuracy", MetricValue::from_samples(&cong));
-        result.insert("incongruent_accuracy", MetricValue::from_samples(&incong));
-        result.insert("neutral_accuracy", MetricValue::from_samples(&neutral));
-        result.insert("stroop_effect", MetricValue::from_samples(&effect));
+        result.insert("congruent_accuracy", metric_with_bounds(&cong, 0.0, Some(1.0)));
+        result.insert("incongruent_accuracy", metric_with_bounds(&incong, 0.0, Some(1.0)));
+        result.insert("neutral_accuracy", metric_with_bounds(&neutral, 0.0, Some(1.0)));
+        result.insert("stroop_effect", metric_with_bounds(&effect, -1.0, Some(1.0)));
 
         // RT metrics (tick-based)
         result.insert(
             "congruent::rt_ticks",
-            MetricValue::from_samples(&all_cong_rt),
+            metric_with_bounds(&all_cong_rt, 0.0, None),
         );
         result.insert(
             "incongruent::rt_ticks",
-            MetricValue::from_samples(&all_incong_rt),
+            metric_with_bounds(&all_incong_rt, 0.0, None),
         );
-        result.insert("neutral::rt_ticks", MetricValue::from_samples(&all_neut_rt));
+        result.insert("neutral::rt_ticks", metric_with_bounds(&all_neut_rt, 0.0, None));
 
         if config.trial_trace {
             result.trial_trace = trace;
