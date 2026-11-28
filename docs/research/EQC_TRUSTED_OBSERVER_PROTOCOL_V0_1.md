@@ -32,6 +32,7 @@ The signed payload binds:
 - task ID, run ID, one-use challenge, issue and expiry time;
 - SHA-256 of the exact frozen task-corpus bytes and exact adapter-observation bytes;
 - observer ID, key ID, observer binary digest and observer environment digest;
+- system ID, system version and harness version, in addition to source and environment digests;
 - actor, subject, authorization decision, system source/environment and authority snapshot digests;
 - input digests, state-before/state-after commitments, mutation count and conditional effect witness;
 - resource usage, network bytes and endpoint observations;
@@ -59,6 +60,8 @@ The evaluator/harness supplies a fresh 256-bit challenge nonce bound to one task
 - exact observation digest;
 - issue, expiry and verification times;
 - observer key validity/revocation state.
+
+Receipt validity uses a half-open interval: `issued_at ≤ verification_time < expires_at`, and observer key validity uses `valid_from ≤ issued_at` with `verification_time < valid_until`. The operator trust store sets `max_receipt_lifetime_seconds` (1–600 seconds), and the verifier rejects receipts whose declared lifetime exceeds that cap.
 
 After every schema, binding, trust and signature check succeeds, the verifier atomically creates a `<sha256(challenge)>.consumed` marker with create-new semantics, writes the run/task/payload binding, fsyncs the marker and fsyncs the ledger directory. Duplicate consumption fails.
 
