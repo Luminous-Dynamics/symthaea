@@ -475,11 +475,11 @@ The standalone Rust research crate now contains deterministic environment fixtur
 | F1 Navigation | Rectangular grid, bounded moves, full and local observation, ordered trace/replay, private exact shortest-path oracle | Invalid geometry, blocked movement, action limit, tampered transition and non-contiguous event sequence |
 | F2 Pushing | Single-box Sokoban-like movement and push mechanics, private exact reachability oracle | Blocked push, wall-trapped box, duplicate walls, overlapping objects |
 | F3 Prerequisites | Single-use keys, explicit collected-key and current-inventory state, persistent unlocked doors, private exact planner | No-key locked door, no key respawn, duplicate IDs, unknown key reference, key/door overlap |
-| F4 Partial map | Current field-of-view observations and paid one-step scan; environment does not retain observation history | Hidden distant cells, scan cost, previous cells absent from later views, blocked action costs |
+| F4 Partial map | Current field-of-view observations and paid one-step scan; candidate-owned ExploreMemory stores only observed cells | Hidden distant cells, scan cost, previous cells absent from later views, unknown-not-floor, contradictory observation and geometry controls |
 | F5 Resource chain | Scarce gatherable piles, typed recipes, workbench, acyclic recipe dependency validation, depletion and private exact planner | Zero resource pile, recipe cycle, missing station/input, depleted pile cannot be gathered |
 | F6 Hidden mechanics | Two rule variants with identical initial observations; paid lever intervention; route determined by the revealed gate state | No-probe negative control, action budget, single-use switch, hidden rule omitted from observations and debug output |
 
-The current branch contains **59 authored Rust unit tests** across F1–F6, candidate output validation, policy baselines, and the evaluator-owned F1 runner. Test count is a source inventory only: it is not a test pass. A dedicated GitHub Actions workflow is configured for formatting, tests, and strict Clippy. No local Rust toolchain is available in the current work environment, and no exact-head CI result is claimed until that workflow completes.
+The current branch contains **64 authored Rust unit tests** across F1–F6, candidate output validation, policy baselines, and the evaluator-owned F1 runner. Test count is a source inventory only: it is not a test pass. A dedicated GitHub Actions workflow is configured for formatting, tests, and strict Clippy. No local Rust toolchain is available in the current work environment, and no exact-head CI result is claimed until that workflow completes.
 
 ### 15.1 Important implementation boundary
 
@@ -545,7 +545,7 @@ The current FEP action model is intentionally simple and structured. It has not 
 
 ### 16.4 Current test inventory and qualification status
 
-The current branch contains **59 authored tests** in the environment/candidate/evaluator crate (F1–F6: 41, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 6), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **75 authored Rust tests**. These are source counts only, not observed passes.
+The current branch contains **59 authored tests** in the environment/candidate/evaluator crate (F1–F6: 41, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 6), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **80 authored Rust tests**. These are source counts only, not observed passes.
 
 Two dedicated GitHub workflows are configured:
 - `GameBench Rust v0.1`: deterministic environment, candidate contract, and policy baseline crate.
@@ -602,6 +602,7 @@ The adapter workspace now has three real Symthaea-component candidates:
 The candidate/environment crate now contains:
 - 41 F1–F6 environment tests;
 - 7 candidate-output contract tests;
+- 5 candidate-side F4 map-memory tests;
 - 5 random / greedy baseline tests.
 
 The adapter crate contains:
