@@ -79,11 +79,7 @@ pub fn clopper_pearson(
     let lower = if successes == 0 {
         0.0
     } else {
-        beta_quantile(
-            successes as f64,
-            (trials - successes + 1) as f64,
-            tail,
-        )?
+        beta_quantile(successes as f64, (trials - successes + 1) as f64, tail)?
     };
     let upper = if successes == trials {
         1.0
@@ -155,13 +151,9 @@ fn validate_confidence(confidence: f64) -> Result<(), CalibrationError> {
     Ok(())
 }
 
-fn beta_quantile(
-    shape_a: f64,
-    shape_b: f64,
-    probability: f64,
-) -> Result<f64, CalibrationError> {
-    let distribution = Beta::new(shape_a, shape_b)
-        .map_err(|_| CalibrationError::InvalidDistributionParameters)?;
+fn beta_quantile(shape_a: f64, shape_b: f64, probability: f64) -> Result<f64, CalibrationError> {
+    let distribution =
+        Beta::new(shape_a, shape_b).map_err(|_| CalibrationError::InvalidDistributionParameters)?;
     let value = distribution
         .try_inverse_cdf(probability)
         .map_err(|_| CalibrationError::QuantileFailure)?;
@@ -233,9 +225,7 @@ pub fn summarize_null_family(
         if !seen.insert((cell.cell_id.clone(), cell.arm_id.clone())) {
             return Err(CalibrationError::DuplicateNullCell);
         }
-        if !cell.nominal_alpha.is_finite()
-            || cell.nominal_alpha <= 0.0
-            || cell.nominal_alpha >= 1.0
+        if !cell.nominal_alpha.is_finite() || cell.nominal_alpha <= 0.0 || cell.nominal_alpha >= 1.0
         {
             return Err(CalibrationError::InvalidNominalAlpha);
         }
@@ -299,9 +289,7 @@ impl DetectionTrial {
     pub fn restricted_delay(&self) -> Result<u64, CalibrationError> {
         self.validate()?;
         match self.first_alarm {
-            Some(sequence) if sequence > self.change_point => {
-                Ok(sequence - self.change_point)
-            }
+            Some(sequence) if sequence > self.change_point => Ok(sequence - self.change_point),
             _ => self
                 .horizon
                 .checked_add(1)
@@ -523,9 +511,12 @@ mod tests {
         let report = summarize_null_family(&cells, 0.95, 0.01).unwrap();
         assert_eq!(report.family_size, 2);
         assert!(report.all_cells_within_tolerance);
-        assert!(report.cells.iter().all(|cell| {
-            cell.simultaneous_upper >= cell.pointwise_interval.upper - 1e-12
-        }));
+        assert!(
+            report
+                .cells
+                .iter()
+                .all(|cell| { cell.simultaneous_upper >= cell.pointwise_interval.upper - 1e-12 })
+        );
     }
 
     #[test]
