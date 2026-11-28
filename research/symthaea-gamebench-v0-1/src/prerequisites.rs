@@ -33,6 +33,7 @@ pub enum PrerequisiteSpecError {
     DuplicateDoorId,
     DuplicateKeyPosition,
     DuplicateDoorPosition,
+    KeyDoorPositionOverlap,
     KeyIdOutOfRange(u8),
     DoorIdOutOfRange(u8),
     DoorReferencesUnknownKey(u8),
@@ -52,6 +53,7 @@ impl Display for PrerequisiteSpecError {
             Self::DuplicateDoorId => write!(f, "door IDs must be unique"),
             Self::DuplicateKeyPosition => write!(f, "key positions must be unique"),
             Self::DuplicateDoorPosition => write!(f, "door positions must be unique"),
+            Self::KeyDoorPositionOverlap => write!(f, "a key and door cannot occupy the same position"),
             Self::KeyIdOutOfRange(id) => write!(f, "key ID {id} must be below 64"),
             Self::DoorIdOutOfRange(id) => write!(f, "door ID {id} must be below 64"),
             Self::DoorReferencesUnknownKey(id) => {
@@ -133,6 +135,13 @@ impl PrerequisiteSpec {
             if doors_by_position.insert(door.position, door).is_some() {
                 return Err(PrerequisiteSpecError::DuplicateDoorPosition);
             }
+        }
+
+        if keys_by_position
+            .keys()
+            .any(|position| doors_by_position.contains_key(position))
+        {
+            return Err(PrerequisiteSpecError::KeyDoorPositionOverlap);
         }
 
         for (name, position) in [("player", player_start), ("goal", goal)]
