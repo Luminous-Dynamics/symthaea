@@ -112,3 +112,14 @@ This is why #14226 requires set-valued sensitivities at active-set changes and n
 An independent Python `Fraction` replay confirmed all five operating points, the exact one-sided derivatives, finite-difference quotients and active-set switch. Rust tests are authored but **not compiled or executed** because `rustc` is unavailable in the authoring environment.
 
 This is a one-dimensional exact finite-law sensitivity fixture. It is not a general robust-LP sensitivity solver, continuous waveform optimizer, physical experiment result, or SOTA claim.
+
+
+### Positive-part kink and KKT subgradient
+
+At the active outcome \(y=1\), the dual residual is exactly zero. Its positive-part subgradient is set-valued in \([0,1]\). The KKT-consistent selection is the primal randomization probability
+
+\[
+s=\phi(1)=\alpha/q_{\max}=2/5
+\]
+
+at \(u=1/2\). This value lies inside the full kink interval and is the correct selection for the local envelope derivative. The nine authored Rust tests include this subgradient check; they remain uncompiled/unexecuted.
