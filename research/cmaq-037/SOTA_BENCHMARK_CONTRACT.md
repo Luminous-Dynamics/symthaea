@@ -19,6 +19,7 @@ Keep these methods separate; do not merge their guarantees or silently borrow th
 | CMAQ-045 | Rank spectrum × predictable history contexts | Exploratory CMAQ arm |
 | CMAQ-046 | Predictable OCO witness × convex-target support residual × conditional-mean e-process | Exploratory conditional-mean arm; fixed-bet subset, distinct null contract |
 | CMAQ-047 | Controlled Blackwell action selection with action-conditional null mean sets | Exploratory active diagnostic arm; selected action must satisfy current support-halfspace contract |
+| CMAQ-048 | Fixed Fourier-feature kernel mean embedding monitored by CMAQ-046 | Exploratory distributional arm; finite feature bank and frozen conditional-mean embedding envelope |
 
 For every method, freeze source revision, dependencies, score mapping, reference set, ties, warm-up, alpha, horizon and stopping rule. The CCTM/PF-CCTM arms operate on their own stated score/p-value contracts; a PRM result cannot be presented as a reproduction of either.
 
@@ -66,6 +67,36 @@ A smaller smoke run may test wiring but cannot estimate a five-percent false-ala
 **Recoverability shifts:** increasing residual variance, decreasing barrier/recoverability margin, delayed actuation, fallback degradation, and simultaneous sensor/control disturbances. Ground-truth deadlines must come from independent plant/scenario evaluation, not from the detector.
 
 For every generator, store its source, parameters, seed, split, effective block ID, rank/score receipt and exact build digest.
+
+### Fixed Fourier-feature kernel mean embedding experiments (CMAQ-048)
+
+This is a separate distributional-shape family. It is not an extension of the raw-mean null by assertion: the null is explicitly the conditional-mean embedding contract for the *frozen finite feature map*.
+
+For the fixed frequency bank omega_j, use
+
+    phi(x) = M^(-1/2) [cos(omega_1'x), sin(omega_1'x), ..., cos(omega_M'x), sin(omega_M'x)].
+
+The feature observation has L2 norm one. The null target S_phi must be frozen before test data and must cover E[phi(X_t)|F_(t-1)] for every allowed history. For an iid null distribution, it may be a reference kernel-mean envelope. For dependent nulls, an unconditional reference mean is not enough: the target must cover the conditional feature means.
+
+Preregister independently:
+- feature frequencies, bandwidth, feature ordering and map digest;
+- the distribution/reference receipt used to establish the target feature mean;
+- the target box, target digest, alpha, norm bounds and horizon;
+- train/calibration/tuning/validation/final-holdout separation by effective common-cause blocks.
+
+Primary scale-only test: compare raw-mean CMAQ-046 against CMAQ-048 on symmetric +/-a versus symmetric +/-b streams with identical zero raw mean but distinct kernel embeddings. Extend to tail weight, skewness, multimodality, equal-first-moment mixture changes and conditional shape shifts. Include negative controls whose feature conditional means remain within S_phi, especially dependence-only changes invisible to this fixed embedding target.
+
+Sweep M, bandwidth/lengthscale, raw dimension, effective reference blocks and target tolerance. Report approximation error and frequency-bank storage in addition to full-horizon null false alarms, power, H+1-penalized delay/misses, p50/p95/p99 update time and memory. Include feature-bank null-space alternatives as explicit failure cases.
+
+Comparison arms:
+- faithful NeurIPS 2025 random-Fourier-feature online change detector (different no-pre-change-reference construction);
+- SCPT (Zheng & Zhang, 17 Nov 2026) on paired conditional distribution equality with common covariates;
+- PF-CCTM (ICML 2026) under its fixed-reference conformal assumptions;
+- non-partitioned e-detectors (Saha & Ramdas, July 2026) on matched point-null/changepoint settings;
+- sequential energy-statistic detector (Njuki & Ning, Sep 2026), with its native false-alarm criterion;
+- CMAQ-046 raw moments and CMAQ-038/045 rank-spectrum arms where the score/rank contract applies.
+
+Do not compare methods with different null hypotheses, reference access or risk criteria as if their guarantees were interchangeable. Faithful paper reproduction, full null confidence intervals, paired effective-block inference and an untouched final holdout are prerequisites to superiority claims.
 
 ### Controlled action-selection experiments (CMAQ-047)
 
