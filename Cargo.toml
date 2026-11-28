@@ -31,6 +31,24 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Examples-only namespace; the root package is the actual symthaea crate.
+    "crates/core/symthaea",
+    # Test-only tree; not an independently buildable package.
+    "crates/core/symthaea-iit",
+    # Source-only prototype; retain for design, but do not promote to a package before its API and consumers exist.
+    "crates/core/symthaea-observation-attestation",
+    # Source-only staging tree; package ownership, dependencies and test contract remain to be decided.
+    "crates/domains/symthaea-architecture-engineering",
+    # Research/docs staging tree; not yet a qualified Cargo package.
+    "crates/domains/symthaea-dishwasher-design",
+    # Documentation-only research tree; not a Cargo package.
+    "crates/domains/symthaea-experiment-design",
+    # Source-only staging tree; package ownership, dependencies and test contract remain to be decided.
+    "crates/domains/symthaea-marine-geometry",
+    # Source-only compatibility staging tree; no package manifest or verified integration contract.
+    "crates/domains/symthaea-rea-compat",
+    # README-only research placeholder; no package manifest or build target.
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",
