@@ -38,7 +38,8 @@ where
 {
     // Exact shortest-path answer is evaluator-private and never passed to the
     // candidate. It is used only to compute the final path-cost regret.
-    let optimal_actions = u32::try_from(super::optimal_path(&spec).map(|path| path.len()).unwrap_or(usize::MAX)).ok();
+    let optimal_actions = super::optimal_path(&spec)
+        .and_then(|path| u32::try_from(path.len()).ok());
 
     let mut game = Game::new(spec.clone());
     let mut trace = Trace::default();
@@ -147,9 +148,9 @@ mod tests {
     }
 
     #[derive(Debug)]
-    struct InvalidCandidate;
+    struct DecisionFailureCandidate;
 
-    impl InteractiveCandidate<Observation, Action> for InvalidCandidate {
+    impl InteractiveCandidate<Observation, Action> for DecisionFailureCandidate {
         type Error = std::io::Error;
 
         fn reset(&mut self) -> Result<(), Self::Error> {
@@ -160,11 +161,7 @@ mod tests {
             &mut self,
             _input: CandidateInput<'_, Observation, Action>,
         ) -> Result<crate::CandidateDecision<Action>, Self::Error> {
-            Ok(crate::CandidateDecision {
-                action: Action::East,
-                confidence: None,
-                forecasts: Vec::new(),
-            })
+            Err(std::io::Error::other("synthetic decision failure"))
         }
 
         fn observe_transition(
@@ -176,15 +173,14 @@ mod tests {
     }
 
     #[test]
-    fn invalid_candidate_output_fails_closed_before_environment_mutation() {
+    fn candidate_decision_failure_is_preserved_before_environment_mutation() {
         let spec = open_fixture();
-        let mut candidate = InvalidCandidate;
-        // East is offered, so this is valid. Use a separate wrapper with no
-        // offered action only in the validator tests; evaluator always offers
-        // all four F1 movement attempts.
+        let mut candidate = DecisionFailureCandidate;
         let report = evaluate_f1(spec, &mut candidate);
-        assert_eq!(report.actions_attempted, 4);
-        assert!(report.success);
+        assert!(!report.success);
+        assert_eq!(report.actions_attempted, 0);
+        assert!(report.events.is_empty());
+        assert!(report.candidate_error.is_some());
     }
 
     #[derive(Debug)]
