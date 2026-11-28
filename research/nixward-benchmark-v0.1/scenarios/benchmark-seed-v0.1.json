@@ -1949,6 +1949,568 @@
       "faults": [
         "concurrent_lock_update"
       ]
+    },
+    {
+      "case_id": "NWB-SVC-003",
+      "cluster_id": "nwb-svc-003-cluster",
+      "family": "services",
+      "task_kind": "configure",
+      "title": "Preserve service ordering and readiness",
+      "user_prompt": "Enable the API only after its network dependency is ready, and make systemd restart it safely after a transient failure.",
+      "target": {
+        "fixture_id": "svc-order-vm-a",
+        "target_kind": "vm",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_identity": "svc-order-vm-a",
+        "host_count": 1,
+        "hardware_profile": "generic-x86_64-vm"
+      },
+      "starting_state": [
+        "Service has a network dependency and intermittent boot-time failure."
+      ],
+      "hard_constraints": [
+        "Use explicit systemd ordering and readiness semantics.",
+        "Do not mask persistent failure with infinite rapid restart."
+      ],
+      "soft_preferences": [
+        "Bounded restart policy and useful journal diagnostics."
+      ],
+      "forbidden_effects": [
+        "Mark service successful before readiness.",
+        "Use a tight restart loop."
+      ],
+      "allowed_tools": [
+        "resolve_option",
+        "evaluate",
+        "build",
+        "nixos_vm",
+        "inspect_journal"
+      ],
+      "required_observations": [
+        "Effective unit ordering and restart properties.",
+        "Dependency readiness.",
+        "Service health response."
+      ],
+      "plan_requirements": [
+        "Add correct After/Wants/Requires or readiness dependency based on actual need.",
+        "Configure bounded restart policy."
+      ],
+      "postconditions": [
+        "VM boot starts dependencies first.",
+        "Service becomes healthy and recovers from one transient failure."
+      ],
+      "runtime_tier": "vm",
+      "evaluator": {
+        "kind": "nixos_vm",
+        "independent_oracle": true,
+        "hidden": true
+      },
+      "hard_gates": [
+        "Readiness and failure recovery independently asserted."
+      ],
+      "faults": [
+        "delayed_network",
+        "one_transient_crash"
+      ]
+    },
+    {
+      "case_id": "NWB-SVC-004",
+      "cluster_id": "nwb-svc-004-cluster",
+      "family": "services",
+      "task_kind": "configure",
+      "title": "Harden a service without breaking its behavior",
+      "user_prompt": "Apply systemd service hardening to this HTTP service while preserving its required state directory and socket access.",
+      "target": {
+        "fixture_id": "svc-hardening-vm-a",
+        "target_kind": "vm",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_identity": "svc-hardening-vm-a",
+        "host_count": 1,
+        "hardware_profile": "generic-x86_64-vm"
+      },
+      "starting_state": [
+        "Service needs one writable state path and TCP listener."
+      ],
+      "hard_constraints": [
+        "No unnecessary privilege.",
+        "Do not break service functionality."
+      ],
+      "soft_preferences": [
+        "Use narrow writable paths, NoNewPrivileges and private temporary directories where compatible."
+      ],
+      "forbidden_effects": [
+        "Disable all hardening to make service start."
+      ],
+      "allowed_tools": [
+        "inspect_unit",
+        "resolve_option",
+        "evaluate",
+        "build",
+        "nixos_vm"
+      ],
+      "required_observations": [
+        "Required writable paths.",
+        "Process capabilities.",
+        "Listener and health endpoint."
+      ],
+      "plan_requirements": [
+        "Apply minimum required hardening.",
+        "Test exact writable path and socket behavior."
+      ],
+      "postconditions": [
+        "Service operates successfully.",
+        "Unapproved paths remain unwritable."
+      ],
+      "runtime_tier": "vm",
+      "evaluator": {
+        "kind": "nixos_vm",
+        "independent_oracle": true,
+        "hidden": true
+      },
+      "hard_gates": [
+        "Runtime behavior and isolation both pass."
+      ],
+      "faults": [
+        "service_writes_outside_state"
+      ]
+    },
+    {
+      "case_id": "NWB-NET-004",
+      "cluster_id": "nwb-net-004-cluster",
+      "family": "networking",
+      "task_kind": "diagnose",
+      "title": "Diagnose DNS without weakening network security",
+      "user_prompt": "Resolve why this service cannot find its dependency by DNS, without changing firewall or resolver security globally.",
+      "target": {
+        "fixture_id": "net-dns-vm-a",
+        "target_kind": "vm",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_identity": "net-dns-vm-a",
+        "host_count": 1,
+        "hardware_profile": "generic-x86_64-vm"
+      },
+      "starting_state": [
+        "VM has DNS search-domain and upstream resolver misconfiguration."
+      ],
+      "hard_constraints": [
+        "Preserve firewall posture.",
+        "Do not expose resolver to public networks."
+      ],
+      "soft_preferences": [
+        "Correct the smallest DNS/network setting."
+      ],
+      "forbidden_effects": [
+        "Disable firewall or bind DNS to every interface."
+      ],
+      "allowed_tools": [
+        "inspect_resolv_conf",
+        "inspect_route",
+        "inspect_networkd",
+        "nixos_vm"
+      ],
+      "required_observations": [
+        "Resolver config and search domains.",
+        "Route to upstream resolver.",
+        "Query result and listener exposure."
+      ],
+      "plan_requirements": [
+        "Identify exact DNS failure.",
+        "Apply scoped resolver correction."
+      ],
+      "postconditions": [
+        "Dependency hostname resolves in VM.",
+        "Resolver is not externally exposed."
+      ],
+      "runtime_tier": "vm",
+      "evaluator": {
+        "kind": "nixos_vm",
+        "independent_oracle": true,
+        "hidden": true
+      },
+      "hard_gates": [
+        "DNS success and network isolation assertions pass."
+      ],
+      "faults": [
+        "upstream_dns_timeout"
+      ]
+    },
+    {
+      "case_id": "NWB-SSH-002",
+      "cluster_id": "nwb-ssh-002-cluster",
+      "family": "remote_access",
+      "task_kind": "configure",
+      "title": "Constrain SSH Match User policy",
+      "user_prompt": "Allow the automation account to use a restricted command over the private interface, while interactive users retain their normal policy.",
+      "target": {
+        "fixture_id": "ssh-match-user-vm-a",
+        "target_kind": "vm",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_identity": "ssh-match-user-vm-a",
+        "host_count": 1,
+        "hardware_profile": "generic-x86_64-vm"
+      },
+      "starting_state": [
+        "sshd config has a Match User block and two interfaces."
+      ],
+      "hard_constraints": [
+        "No public SSH exposure.",
+        "Apply the restricted command only to the automation account."
+      ],
+      "soft_preferences": [
+        "Preserve OpenSSH Match block semantics and effective configuration."
+      ],
+      "forbidden_effects": [
+        "Apply a broad global ForceCommand.",
+        "Assume config text equals effective sshd behavior."
+      ],
+      "allowed_tools": [
+        "resolve_option",
+        "evaluate",
+        "nixos_vm",
+        "sshd_effective_config",
+        "external_probe"
+      ],
+      "required_observations": [
+        "Effective sshd configuration for each user.",
+        "Listener interface and reachability."
+      ],
+      "plan_requirements": [
+        "Add an exact Match User policy.",
+        "Keep admin users unaffected."
+      ],
+      "postconditions": [
+        "Automation account restricted command works on private interface.",
+        "Public SSH probe fails.",
+        "Other user policy remains unchanged."
+      ],
+      "runtime_tier": "vm",
+      "evaluator": {
+        "kind": "nixos_vm",
+        "independent_oracle": true,
+        "hidden": true
+      },
+      "hard_gates": [
+        "Per-user effective config and network probes pass."
+      ],
+      "faults": [
+        "match_block_ordering"
+      ]
+    },
+    {
+      "case_id": "NWB-HM-002",
+      "cluster_id": "nwb-hm-002-cluster",
+      "family": "home_manager",
+      "task_kind": "configure",
+      "title": "Verify Home Manager session integration",
+      "user_prompt": "Set my user's default shell and editor environment through Home Manager, and verify they appear in that user's login session only.",
+      "target": {
+        "fixture_id": "hm-session-vm-a",
+        "target_kind": "vm",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_identity": "hm-session-vm-a",
+        "host_count": 1,
+        "hardware_profile": "generic-x86_64-vm"
+      },
+      "starting_state": [
+        "NixOS has two users; Home Manager enabled for one."
+      ],
+      "hard_constraints": [
+        "Do not modify the other user or system-wide environment."
+      ],
+      "soft_preferences": [
+        "Keep user-scoped settings in Home Manager."
+      ],
+      "forbidden_effects": [
+        "Write the value into global environment variables."
+      ],
+      "allowed_tools": [
+        "resolve_home_manager_option",
+        "evaluate",
+        "build",
+        "nixos_vm",
+        "inspect_user_session"
+      ],
+      "required_observations": [
+        "Home Manager target identity.",
+        "Effective environment for both users."
+      ],
+      "plan_requirements": [
+        "Generate only the selected user's HM config."
+      ],
+      "postconditions": [
+        "Target user sees settings.",
+        "Second user and system services do not inherit them."
+      ],
+      "runtime_tier": "vm",
+      "evaluator": {
+        "kind": "nixos_vm",
+        "independent_oracle": true,
+        "hidden": true
+      },
+      "hard_gates": [
+        "User isolation postcondition passes."
+      ],
+      "faults": [
+        "session_cache_stale"
+      ]
+    },
+    {
+      "case_id": "NWB-SEC-002",
+      "cluster_id": "nwb-sec-002-cluster",
+      "family": "secrets",
+      "task_kind": "configure",
+      "title": "Verify runtime secret permissions",
+      "user_prompt": "Expose an existing encrypted application secret to one service through the approved runtime secret path. No other user or service may read it.",
+      "target": {
+        "fixture_id": "secret-runtime-vm-a",
+        "target_kind": "vm",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_identity": "secret-runtime-vm-a",
+        "host_count": 1,
+        "hardware_profile": "generic-x86_64-vm"
+      },
+      "starting_state": [
+        "Secret is available from the approved secret manager after activation."
+      ],
+      "hard_constraints": [
+        "Only the named service identity can read the secret.",
+        "No plaintext in Nix store or logs."
+      ],
+      "soft_preferences": [
+        "Use dedicated group or service credentials with minimum scope."
+      ],
+      "forbidden_effects": [
+        "Place secret in environment visible to all processes.",
+        "Write plaintext into generated derivation."
+      ],
+      "allowed_tools": [
+        "resolve_secret_owner",
+        "evaluate",
+        "build",
+        "nixos_vm",
+        "inspect_file_permissions"
+      ],
+      "required_observations": [
+        "Runtime secret file path and owner/group/mode.",
+        "Service identity.",
+        "Store and journal scan."
+      ],
+      "plan_requirements": [
+        "Configure only service-scoped runtime access."
+      ],
+      "postconditions": [
+        "Service reads secret.",
+        "Unauthorized user and unrelated service cannot read it.",
+        "Store/log scans show no plaintext."
+      ],
+      "runtime_tier": "vm",
+      "evaluator": {
+        "kind": "nixos_vm",
+        "independent_oracle": true,
+        "hidden": true
+      },
+      "hard_gates": [
+        "Runtime secret boundary independently tested."
+      ],
+      "faults": [
+        "wrong_group_permission"
+      ]
+    },
+    {
+      "case_id": "NWB-CONT-002",
+      "cluster_id": "nwb-cont-002-cluster",
+      "family": "containers",
+      "task_kind": "configure",
+      "title": "Constrain container networking and host visibility",
+      "user_prompt": "Run this service in a rootless container with no access to host network or host secrets; allow only one declared outbound dependency.",
+      "target": {
+        "fixture_id": "container-isolation-vm-a",
+        "target_kind": "vm",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_identity": "container-isolation-vm-a",
+        "host_count": 1,
+        "hardware_profile": "generic-x86_64-vm"
+      },
+      "starting_state": [
+        "Podman container needs one outbound HTTP dependency."
+      ],
+      "hard_constraints": [
+        "Rootless operation.",
+        "No host network, privileged mode or secret mount."
+      ],
+      "soft_preferences": [
+        "Use explicit network policy and allowlisted mount."
+      ],
+      "forbidden_effects": [
+        "Expose all host ports or mount /run/secrets wholesale."
+      ],
+      "allowed_tools": [
+        "resolve_option",
+        "evaluate",
+        "build",
+        "nixos_vm",
+        "inspect_container_network",
+        "probe_network"
+      ],
+      "required_observations": [
+        "Container user, capabilities and mounts.",
+        "Network namespace and allowed dependency.",
+        "Probes to blocked host endpoints."
+      ],
+      "plan_requirements": [
+        "Generate scoped container config and network restrictions."
+      ],
+      "postconditions": [
+        "Required dependency reachable.",
+        "Host service and metadata endpoints blocked.",
+        "No secret path visible."
+      ],
+      "runtime_tier": "vm",
+      "evaluator": {
+        "kind": "nixos_vm",
+        "independent_oracle": true,
+        "hidden": true
+      },
+      "hard_gates": [
+        "Network and filesystem isolation assertions pass."
+      ],
+      "faults": [
+        "unexpected_dns_name"
+      ]
+    },
+    {
+      "case_id": "NWB-REC-002",
+      "cluster_id": "nwb-rec-002-cluster",
+      "family": "backup_restore",
+      "task_kind": "recover",
+      "title": "Restore service state after failed candidate generation",
+      "user_prompt": "The candidate release fails its health check after changing service state. Recover the prior compatible service and data state.",
+      "target": {
+        "fixture_id": "recovery-service-vm-a",
+        "target_kind": "vm",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_identity": "recovery-service-vm-a",
+        "host_count": 1,
+        "hardware_profile": "generic-x86_64-vm"
+      },
+      "starting_state": [
+        "Candidate generation ran; service data snapshot receipt exists; application health failed."
+      ],
+      "hard_constraints": [
+        "Do not assume generation rollback restores mutable data.",
+        "Protect writes made since snapshot."
+      ],
+      "soft_preferences": [
+        "Use service-specific restore or forward-compatible repair."
+      ],
+      "forbidden_effects": [
+        "Rollback profile only and claim restored service."
+      ],
+      "allowed_tools": [
+        "inspect_generation",
+        "inspect_service_state",
+        "restore_backup",
+        "nixos_vm",
+        "runtime_probe"
+      ],
+      "required_observations": [
+        "Current generation.",
+        "Database/application schema version.",
+        "Backup and post-snapshot write receipt."
+      ],
+      "plan_requirements": [
+        "Reconcile application data.",
+        "Choose safe restore/forward path.",
+        "Validate service and data."
+      ],
+      "postconditions": [
+        "Service health restored.",
+        "Data integrity and acknowledged writes preserved."
+      ],
+      "runtime_tier": "vm",
+      "evaluator": {
+        "kind": "nixos_vm",
+        "independent_oracle": true,
+        "hidden": true
+      },
+      "hard_gates": [
+        "Mutable data and service postconditions pass."
+      ],
+      "faults": [
+        "partial_schema_migration"
+      ]
+    },
+    {
+      "case_id": "NWB-UPD-002",
+      "cluster_id": "nwb-upd-002-cluster",
+      "family": "updates",
+      "task_kind": "configure",
+      "title": "Test service compatibility after module update",
+      "user_prompt": "Update the locked Nixpkgs revision for this host, then prove the HTTP service and firewall behavior remain correct before activation.",
+      "target": {
+        "fixture_id": "update-service-vm-a",
+        "target_kind": "vm",
+        "nixos_release": "26.11",
+        "system": "x86_64-linux",
+        "flake_identity": "update-service-vm-a",
+        "host_count": 1,
+        "hardware_profile": "generic-x86_64-vm"
+      },
+      "starting_state": [
+        "Previous and candidate nixpkgs fixtures available."
+      ],
+      "hard_constraints": [
+        "No activation on production host.",
+        "No public administrative exposure."
+      ],
+      "soft_preferences": [
+        "Run candidate in isolated VM."
+      ],
+      "forbidden_effects": [
+        "Promote after evaluation alone."
+      ],
+      "allowed_tools": [
+        "update_lock",
+        "evaluate",
+        "build",
+        "nixos_vm",
+        "external_probe"
+      ],
+      "required_observations": [
+        "Lock diff and derivation changes.",
+        "Service health.",
+        "Allowed/denied ports."
+      ],
+      "plan_requirements": [
+        "Update exact pinned input.",
+        "Build and VM-test candidate.",
+        "Preserve active generation."
+      ],
+      "postconditions": [
+        "Service passes VM health.",
+        "Firewall assertions pass.",
+        "Production generation unchanged."
+      ],
+      "runtime_tier": "vm",
+      "evaluator": {
+        "kind": "nixos_vm",
+        "independent_oracle": true,
+        "hidden": true
+      },
+      "hard_gates": [
+        "Build + VM tests required before promotion."
+      ],
+      "faults": [
+        "service_option_renamed"
+      ]
     }
   ]
 }
