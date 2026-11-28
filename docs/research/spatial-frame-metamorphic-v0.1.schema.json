@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/spatial-frame-metamorphic-v0.1.schema.json",
+  "title": "Spatial Frame Metamorphic Matrix v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "issue",
+    "rights_status",
+    "claim_ceiling",
+    "pairs",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "const": "spatial-frame-metamorphic-v0.1"
+    },
+    "issue": {
+      "const": 14246
+    },
+    "rights_status": {
+      "const": "synthetic_metadata_only"
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pair_id",
+          "control_case_id",
+          "mutation_case_id",
+          "hypothesis"
+        ],
+        "properties": {
+          "pair_id": {
+            "type": "string",
+            "pattern": "^SFM001-[0-9]{2}$"
+          },
+          "control_case_id": {
+            "type": "string",
+            "pattern": "^SFM001-[0-9]{2}-C$"
+          },
+          "mutation_case_id": {
+            "type": "string",
+            "pattern": "^SFM001-[0-9]{2}-M$"
+          },
+          "hypothesis": {
+            "type": "string",
+            "minLength": 12
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "pair_id",
+          "pair_role",
+          "task_family",
+          "dimension",
+          "intervention_lane",
+          "transform_kind",
+          "mutation_class",
+          "candidate_inputs",
+          "expected_equivariants",
+          "expected_invariants",
+          "expected_contextual_relations",
+          "expected_disposition",
+          "evaluator_truth_sealed",
+          "split_group",
+          "negative_control"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^SFM001-[0-9]{2}-[CM]$"
+          },
+          "pair_id": {
+            "type": "string",
+            "pattern": "^SFM001-[0-9]{2}$"
+          },
+          "pair_role": {
+            "enum": [
+              "control",
+              "mutation"
+            ]
+          },
+          "task_family": {
+            "enum": [
+              "planar_translation",
+              "planar_rotation",
+              "spatial_rotation",
+              "transform_composition",
+              "inverse_roundtrip",
+              "observer_reframe",
+              "quaternion_convention",
+              "transform_direction",
+              "frame_compatibility",
+              "handedness_convention",
+              "unit_conversion",
+              "frame_graph_cycle"
+            ]
+          },
+          "dimension": {
+            "enum": [
+              "2d",
+              "3d"
+            ]
+          },
+          "intervention_lane": {
+            "enum": [
+              "known_transform",
+              "observed_reframe",
+              "compatibility_adversary"
+            ]
+          },
+          "transform_kind": {
+            "type": "string",
+            "minLength": 2
+          },
+          "mutation_class": {
+            "enum": [
+              "baseline",
+              "correct_frame_action",
+              "observer_frame_change",
+              "convention_error",
+              "compatibility_error",
+              "unit_error",
+              "cycle_closure"
+            ]
+          },
+          "candidate_inputs": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "source_frame_identity",
+                "target_frame_identity",
+                "explicit_transform",
+                "spatial_points",
+                "object_poses",
+                "camera_pose",
+                "relation_query",
+                "coordinate_unit_identity",
+                "quaternion_convention",
+                "frame_graph_edges"
+              ]
+            }
+          },
+          "expected_equivariants": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "point_coordinates",
+                "vector_components",
+                "object_pose",
+                "camera_pose",
+                "world_direction_vector"
+              ]
+            }
+          },
+          "expected_invariants": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "pairwise_distance",
+                "angle",
+                "incidence",
+                "adjacency",
+                "connectivity",
+                "containment",
+                "topology",
+                "relative_pose"
+              ]
+            }
+          },
+          "expected_contextual_relations": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "camera_left_right",
+                "camera_front_back",
+                "image_plane_above_below",
+                "gravity_relative_above_below",
+                "none"
+              ]
+            }
+          },
+          "expected_disposition": {
+            "enum": [
+              "accept_with_equivariance",
+              "accept_with_invariance",
+              "recompute_contextual_relation",
+              "reject_invalid_transform",
+              "reject_incompatible_frame",
+              "accept_after_explicit_unit_conversion"
+            ]
+          },
+          "evaluator_truth_sealed": {
+            "const": true
+          },
+          "split_group": {
+            "type": "string",
+            "minLength": 4
+          },
+          "negative_control": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
