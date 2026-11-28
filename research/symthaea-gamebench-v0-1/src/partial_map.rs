@@ -4,6 +4,7 @@
 //! not carry the agent's observation history; candidate-side memory must do so.
 //! A scan consumes one action and temporarily widens the current observation.
 
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
@@ -134,6 +135,8 @@ pub struct ObservedCell {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExploreObservation {
+    pub width: u16,
+    pub height: u16,
     pub position: Position,
     pub visible_cells: Vec<ObservedCell>,
     pub remaining_actions: u32,
@@ -264,11 +267,197 @@ impl ExploreGame {
         }
 
         ExploreObservation {
+            width: self.spec.width,
+            height: self.spec.height,
             position: self.state.position,
             visible_cells,
             remaining_actions: self.spec.max_actions - self.state.elapsed_actions,
             scan_was_used_for_this_observation: scan_was_used,
         }
+    }
+}
+
+/// Candidate-side map memory. It stores only cells that arrived in observations;
+/// unknown locations remain absent and are never converted to floor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExploreMemory {
+    width: u16,
+    height: u16,
+    known_cells: HashMap<Position, Cell>,
+    visited_positions: HashSet<Position>,
+    observation_count: u64,
+    current_position: Option<Position>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExploreMemoryError {
+    ZeroDimension,
+    GeometryMismatch {
+        expected_width: u16,
+        expected_height: u16,
+        actual_width: u16,
+        actual_height: u16,
+    },
+    PositionOutOfBounds(&'static str),
+    ConflictingObservation {
+        position: Position,
+        previous: Cell,
+        observed: Cell,
+    },
+    ObservationCountOverflow,
+}
+
+impl Display for ExploreMemoryError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ZeroDimension => write!(f, "map-memory dimensions must be nonzero"),
+            Self::GeometryMismatch {
+                expected_width,
+                expected_height,
+                actual_width,
+                actual_height,
+            } => write!(
+                f,
+                "observation geometry {actual_width}x{actual_height} does not match memory {expected_width}x{expected_height}"
+            ),
+            Self::PositionOutOfBounds(name) => {
+                write!(f, "observed {name} position is outside remembered map")
+            }
+            Self::ConflictingObservation {
+                position,
+                previous,
+                observed,
+            } => write!(
+                f,
+                "conflicting cell at ({}, {}): remembered {previous:?}, observed {observed:?}",
+                position.x, position.y
+            ),
+            Self::ObservationCountOverflow => write!(f, "map-memory observation counter overflowed"),
+        }
+    }
+}
+
+impl Error for ExploreMemoryError {}
+
+impl ExploreMemory {
+    pub fn new(width: u16, height: u16) -> Result<Self, ExploreMemoryError> {
+        if width == 0 || height == 0 {
+            return Err(ExploreMemoryError::ZeroDimension);
+        }
+        Ok(Self {
+            width,
+            height,
+            known_cells: HashMap::new(),
+            visited_positions: HashSet::new(),
+            observation_count: 0,
+            current_position: None,
+        })
+    }
+
+    pub fn reset(&mut self) {
+        self.known_cells.clear();
+        self.visited_positions.clear();
+        self.observation_count = 0;
+        self.current_position = None;
+    }
+
+    /// Merge a candidate-visible observation into episodic map memory.
+    /// Contradictory observations fail closed rather than silently replacing
+    /// prior knowledge; a future belief-state variant can model uncertainty.
+    pub fn remember(
+        &mut self,
+        observation: &ExploreObservation,
+    ) -> Result<(), ExploreMemoryError> {
+        if observation.width != self.width || observation.height != self.height {
+            return Err(ExploreMemoryError::GeometryMismatch {
+                expected_width: self.width,
+                expected_height: self.height,
+                actual_width: observation.width,
+                actual_height: observation.height,
+            });
+        }
+
+        if observation.position.x >= self.width || observation.position.y >= self.height {
+            return Err(ExploreMemoryError::PositionOutOfBounds("agent"));
+        }
+        for visible in &observation.visible_cells {
+            if visible.position.x >= self.width || visible.position.y >= self.height {
+                return Err(ExploreMemoryError::PositionOutOfBounds("cell"));
+            }
+            if let Some(previous) = self.known_cells.get(&visible.position) {
+                if *previous != visible.cell {
+                    return Err(ExploreMemoryError::ConflictingObservation {
+                        position: visible.position,
+                        previous: *previous,
+                        observed: visible.cell,
+                    });
+                }
+            }
+        }
+
+        let next_count = self
+            .observation_count
+            .checked_add(1)
+            .ok_or(ExploreMemoryError::ObservationCountOverflow)?;
+
+        for visible in &observation.visible_cells {
+            self.known_cells.insert(visible.position, visible.cell);
+        }
+        self.visited_positions.insert(observation.position);
+        self.current_position = Some(observation.position);
+        self.observation_count = next_count;
+        Ok(())
+    }
+
+    pub fn known_cell(&self, position: Position) -> Option<Cell> {
+        self.known_cells.get(&position).copied()
+    }
+
+    pub fn known_cells(&self) -> &HashMap<Position, Cell> {
+        &self.known_cells
+    }
+
+    pub fn visited_positions(&self) -> &HashSet<Position> {
+        &self.visited_positions
+    }
+
+    pub const fn current_position(&self) -> Option<Position> {
+        self.current_position
+    }
+
+    pub const fn observation_count(&self) -> u64 {
+        self.observation_count
+    }
+
+    pub fn coverage(&self) -> f64 {
+        let total = usize::from(self.width) * usize::from(self.height);
+        self.known_cells.len() as f64 / total as f64
+    }
+
+    /// Known traversable cells adjacent to at least one unknown in-bounds
+    /// cell. These are candidate exploration frontiers, not guaranteed routes.
+    pub fn frontier_positions(&self) -> Vec<Position> {
+        let mut frontier = Vec::new();
+        for (position, cell) in &self.known_cells {
+            if *cell == Cell::Wall {
+                continue;
+            }
+            let neighbors = [
+                position.y.checked_sub(1).map(|y| Position::new(position.x, y)),
+                position.x.checked_add(1).map(|x| Position::new(x, position.y)),
+                position.y.checked_add(1).map(|y| Position::new(position.x, y)),
+                position.x.checked_sub(1).map(|x| Position::new(x, position.y)),
+            ];
+            let touches_unknown = neighbors.into_iter().flatten().any(|neighbor| {
+                neighbor.x < self.width && neighbor.y < self.height
+                    && !self.known_cells.contains_key(&neighbor)
+            });
+            if touches_unknown {
+                frontier.push(*position);
+            }
+        }
+        frontier.sort_unstable();
+        frontier
     }
 }
 
@@ -356,6 +545,116 @@ mod tests {
         assert_eq!(transition.state.position, Position::new(0, 0));
         assert_eq!(transition.state.elapsed_actions, 2);
         assert_eq!(transition.status, TerminalStatus::ActionLimit);
+    }
+
+    fn one_cell_observation(
+        position: Position,
+        cell: Cell,
+        width: u16,
+        height: u16,
+    ) -> ExploreObservation {
+        ExploreObservation {
+            width,
+            height,
+            position,
+            visible_cells: vec![ObservedCell { position, cell }],
+            remaining_actions: 5,
+            scan_was_used_for_this_observation: false,
+        }
+    }
+
+    #[test]
+    fn candidate_memory_accumulates_cells_that_environment_views_discard() {
+        let mut game = ExploreGame::new(fixture(12));
+        let mut memory = ExploreMemory::new(7, 1).expect("memory");
+        let first = game.observe();
+        memory.remember(&first).expect("remember first view");
+        let after_scan = game.step(ExploreAction::Scan).expect("scan");
+        memory.remember(&after_scan.observation).expect("remember scan view");
+        game.step(ExploreAction::Move(Action::East)).expect("move east");
+        let later = game.observe();
+        memory.remember(&later).expect("remember later view");
+
+        assert!(memory.known_cell(Position::new(0, 0)).is_some());
+        assert!(memory.known_cell(Position::new(4, 0)).is_some());
+        assert!(memory.known_cell(Position::new(6, 0)).is_none());
+        assert!(later.visible_cells.iter().all(|cell| cell.position.x != 0));
+        assert_eq!(memory.observation_count(), 3);
+        assert!(memory.coverage() > 0.0);
+    }
+
+    #[test]
+    fn unknown_cells_remain_unknown_not_implicitly_floor() {
+        let mut memory = ExploreMemory::new(7, 1).expect("memory");
+        memory
+            .remember(&one_cell_observation(Position::new(0, 0), Cell::Floor, 7, 1))
+            .expect("remember visible cell");
+        assert_eq!(memory.known_cell(Position::new(1, 0)), None);
+        assert_eq!(memory.known_cell(Position::new(0, 0)), Some(Cell::Floor));
+    }
+
+    #[test]
+    fn map_memory_rejects_conflicting_reobservation() {
+        let mut memory = ExploreMemory::new(3, 1).expect("memory");
+        memory
+            .remember(&one_cell_observation(Position::new(1, 0), Cell::Wall, 3, 1))
+            .expect("remember wall");
+        assert_eq!(
+            memory.remember(&one_cell_observation(
+                Position::new(1, 0),
+                Cell::Floor,
+                3,
+                1
+            )),
+            Err(ExploreMemoryError::ConflictingObservation {
+                position: Position::new(1, 0),
+                previous: Cell::Wall,
+                observed: Cell::Floor,
+            })
+        );
+        assert_eq!(memory.known_cell(Position::new(1, 0)), Some(Cell::Wall));
+    }
+
+    #[test]
+    fn map_memory_rejects_geometry_mismatch_and_out_of_bounds_cells() {
+        let mut memory = ExploreMemory::new(3, 1).expect("memory");
+        assert!(matches!(
+            memory.remember(&one_cell_observation(
+                Position::new(0, 0),
+                Cell::Floor,
+                4,
+                1
+            )),
+            Err(ExploreMemoryError::GeometryMismatch { .. })
+        ));
+        assert_eq!(
+            memory.remember(&one_cell_observation(
+                Position::new(3, 0),
+                Cell::Floor,
+                3,
+                1
+            )),
+            Err(ExploreMemoryError::PositionOutOfBounds("agent"))
+        );
+    }
+
+    #[test]
+    fn map_memory_frontiers_are_known_traversable_cells_adjacent_to_unknown() {
+        let mut memory = ExploreMemory::new(3, 1).expect("memory");
+        memory
+            .remember(&ExploreObservation {
+                width: 3,
+                height: 1,
+                position: Position::new(0, 0),
+                visible_cells: vec![
+                    ObservedCell { position: Position::new(0, 0), cell: Cell::Floor },
+                    ObservedCell { position: Position::new(1, 0), cell: Cell::Wall },
+                ],
+                remaining_actions: 4,
+                scan_was_used_for_this_observation: false,
+            })
+            .expect("remember two cells");
+        assert_eq!(memory.frontier_positions(), vec![Position::new(0, 0)]);
     }
 
     #[test]
