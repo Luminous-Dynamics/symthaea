@@ -524,6 +524,28 @@ mod tests {
     }
 
     #[test]
+    fn calibration_intervals_respect_metric_specific_support() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            trials_per_condition: 5,
+            ..Default::default()
+        };
+        let result = MetacognitiveCalibrationBenchmark.run(&config);
+
+        let overconfidence = &result.metrics["overconfidence"];
+        assert!(overconfidence.ci_lower >= 0.0);
+        assert!(overconfidence.ci_upper <= 1.0);
+
+        let resolution = &result.metrics["resolution"];
+        assert!(resolution.ci_lower >= 0.0);
+        assert!(resolution.ci_upper <= 0.25);
+
+        let gamma = &result.metrics["discrimination_gamma"];
+        assert!(gamma.ci_lower >= -1.0);
+        assert!(gamma.ci_upper <= 1.0);
+    }
+
+    #[test]
     fn test_calibration_nonzero_with_spread() {
         // Verify the multi-cue confidence model produces non-degenerate metrics.
         // Human baseline: ECE=0.10-0.20, gamma=0.40-0.60 (Fleming & Lau 2014).
