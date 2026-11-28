@@ -31,8 +31,11 @@ No floating-point comparison is used for the Bernoulli decision, and the returne
 Every event records:
 - contiguous sequence number and stable record ID;
 - SHA-256 of the exact pre-label history used by the q-policy;
+- an integer pre-label priority score on [0, 2^53];
 - exact dyadic q_t;
 - external random-word index.
+
+The optional `LinearPrelabelPriority` q-policy maps the pre-label priority score to a frozen interval [q_min, q_max] and verifies the event q_t matches. This provides deterministic risk-stratified audit intensity while retaining q_min support. The score itself is a custodian-side pre-label value; the module cannot prove it excludes current-outcome leakage. The policy rule, score source and history digest must all be included in the audit manifest.
 
 The custodian-only output records whether the audit request was selected, the inclusion probability, history digest and random-stream index. It does not serialize the raw random word. The receipt binds the audit-design and random-stream manifest references and SHA-256 digests.
 
@@ -59,4 +62,4 @@ The adapter cannot authenticate the label adjudicator or prove conditional ignor
 
 ## Tests authored
 
-11 production-source tests cover dyadic probability exactness, half-probability selection boundaries, q=1 certainty, invalid dyadic numerators, q_min enforcement, manifest/history digest validation, sequence and duplicate-ID protection, non-disclosure of raw random words, history-adaptive q_t, and successful/failing SOWRC adapter cases. They are imported by path into the Rust 1.96 standalone harness and remain authored until exact-head workflow qualification.
+14 production-source tests cover dyadic probability exactness, half-probability selection boundaries, q=1 certainty, invalid dyadic numerators, q_min enforcement, manifest/history digest validation, sequence and duplicate-ID protection, non-disclosure of raw random words, history-adaptive q_t, and successful/failing SOWRC adapter cases. They are imported by path into the Rust 1.96 standalone harness and remain authored until exact-head workflow qualification.
