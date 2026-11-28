@@ -549,3 +549,22 @@ The stacked MEL-DJ-007 implementation adds `verify_transition_grid_binding`:
 5. Compares circular phase error modulo one beat against the contract's declared tolerance.
 
 The verifier interpolates only between adjacent beat ordinals. It accepts an exact observed pulse anchor directly, but does not interpolate through a multi-beat detection gap or extrapolate outside observed pulse support. Such cases return a typed abstention/violation instead of manufacturing a phase estimate. The verifier establishes a structural link between declared evidence and the transition's beat-phase constraint; it does not prove detector accuracy, calibrated confidence, phrase semantics, perceived transition quality, or playback authority.
+
+
+## 28. Exact JSON integer boundary for source clocks and beat indices
+
+The Rust protocol uses integer frame coordinates and signed beat/bar ordinals so that source clocks are deterministic and no floating-point drift is introduced by the wire representation. However, ordinary browser JavaScript consumers parse JSON numbers as IEEE-754 Number values and cannot exactly represent every 64-bit integer.
+
+The protocol therefore caps every numeric field that represents a frame position/count or beat/bar ordinal to:
+
+`MAX_SAFE_JSON_INTEGER = 9,007,199,254,740,991` (`2^53 - 1`).
+
+The shared transition validator rejects source frame totals and transition-local beat ordinals above this boundary. Its v1 JSON Schema also caps source/target sample-window frames, source frame totals, alignment anchors and gain-point frame coordinates. The beat-grid validator applies the same constant to source frame totals, pulse/downbeat/tempo frame positions (through the covered source window), signed pulse/downbeat beat ordinals, bar indices and meter segment beat positions; the beat-grid schema encodes the same bounds.
+
+This is a wire-compatibility bound, not a physical audio limit. At 48 kHz it is many orders of magnitude beyond any realistic track duration. It prevents a browser or JSON intermediary from silently rounding a valid Rust coordinate to a different frame and preserves deterministic comparison across native and WASM clients. Any future need for larger counters must introduce a new schema version with decimal-string or explicitly structured wide-integer encoding; it must not quietly widen the JSON integer fields.
+
+The current PR stack is:
+- #14267 transition contract, exact head `1f8b30267576d7fade2c2abdb977a1efc5ea80b1`.
+- #14302 beat-grid contract and phase verifier, exact head `4c2f4f166a0e382cb51e5a26883685f44ff6161e`, based on #14267's exact head.
+
+At the latest check, #14267 had CI and PR Governance queued, Showroom Integrity pending, and five skipped entries; #14302 had CI and governance queued and two skipped entries. These are not passes. The local execution container still lacks `rustc` and `cargo`, so local formatting, compilation, tests and Clippy remain unrun.
