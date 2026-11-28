@@ -133,6 +133,34 @@ Any claim must name graph generator, state distribution, action set, disturbance
 6. Approximate methods expose false-viable rates and selective coverage on held-out graph families.
 7. Industrial claims require domain-specific SIL/HIL/field evidence; software-level proofs do not cross that boundary.
 
+## 9. Proposed numerical promotion targets
+
+These are ambitious preregistration targets for the next benchmark version, not achieved results or universal certification thresholds.
+
+| Gate | Proposed target | Interpretation |
+|---|---:|---|
+| Exact-oracle agreement | 100% | Match a separately implemented recursive/game-tree reference on every enumerated state, time and budget in the admitted small-instance suite. |
+| Exact false-viable labels | 0 | No state is marked viable when the independent exact reference says non-viable. Mutation tests must demonstrate that broken safety, budget, reserve and disturbance gates are detected. |
+| Approximate-shield false-viable risk | One-sided 95% upper confidence bound ≤ 10⁻⁴ | Require at least 29,956 independent held-out decisions certified as viable with zero false-viable outcomes; use the exact binomial bound, not only a point estimate. Cluster dependence by graph/episode must be handled explicitly and cannot be hidden by counting correlated ticks as independent. |
+| Approximate-shield coverage | ≥ 80% | Among the predeclared in-support held-out decisions, at least 80% should receive a non-abstaining viability decision while meeting the false-viable bound. Always-abstain is safe but not useful. Report the risk/coverage curve, not only this operating point. |
+| Matched-cost policy value | ≥ 10% improvement target | Target at least 10% lower worst-decile service-deficit area or higher deadline recovery success than the strongest non-clairvoyant baseline at matched full lifecycle resource cost. Require paired 95% uncertainty intervals and the improvement to survive at least three held-out graph families and two unseen scales. This is a minimum-practical-effect target to preregister, not a prediction. |
+| Operational safety | 0 false-safe committed actions | Every accepted action is checked against the exact domain operator and current certificate assumptions; stale, incomplete, model-mismatched or revoked evidence means abstain / no mutation. |
+| Measurement completeness | 100% episode accounting | Every started episode terminates in a declared outcome: success, failure, infeasible, abstain, timeout or censored/unknown. Missing, queued and skipped runs are not successes. |
+
+For zero events among n independent Bernoulli trials, the one-sided 95% exact upper bound is 1 − 0.05^(1/n). At n = 29,956 it is just below 10⁻⁴. This statistical result applies only to the sampled decision distribution and its independence assumptions; it is not a proof for arbitrary future systems. If events are clustered by graph family, simulator seed, or episode, increase the design effect / sample size or use a cluster-aware analysis. Count independent episode-level decisions, not every repeated tick as an independent sample.
+
+## 10. Matched SOTA tournament and transfer
+
+The strongest comparators are not interchangeable, so run three separate tournaments:
+
+1. **Design-time topology and capacity:** reproduce the RBNDO PSDA/MILP and GA comparison on its recover-mode and chance-constrained design objective. Compare topology, installed capacity, stochastic recovered flow, lifecycle cost and solve time. Where aleatory distributions are unavailable or misspecified, add interval/robust uncertainty as a distinct treatment; do not relabel it as the paper's stochastic protocol.
+2. **Joint operations recovery:** reproduce the 2026 manufacturing O&M HMA-PPO setting against MAPPO, ACO, SA and ALNS, and exact enumeration on small instances. Preserve the coupling between network reconfiguration and downstream resource scheduling. The paper reports exact optima on three small instances and approximately 0.24 s post-training online decisions in its setting; those are reproduction targets, not results transferable to our benchmark.
+3. **Routing/communication reconfiguration:** for OSPF metric sequencing, compare against GNN-PMU and its serialized min-margin greedy fallback using exact Dijkstra/ECMP on every intermediate route state. For safety-certified communication switching, compare always-connected, periodic, threshold-only, centralized barrier and decentralized certificate strategies on the same plant and disturbance support. Keep switched communication topology separate from fixed physical plant topology.
+
+The proposed Luminous advantage is a composable pipeline: Symthaea proposes and can abstain; Mycelix binds principal, grant, epoch, scope and provenance; a domain-specific independent verifier checks the state transition and certificate assumptions; the runtime commits only a verified action and reconciles the postcondition. This requires explicit integration with existing authorization/revocation owners and does not exist merely because this oracle computes a viability set.
+
+Use two fairness views when necessary: capacity-matched and lifecycle-work/communication-matched. Publish both where one cannot satisfy the other. Include training/tuning budgets, inference latency, verification latency, communication, memory, sensing and maintenance. Compare fixed-manifest performance separately from graph-family generalization. A learned proposal can be faster than an optimizer while still being rejected by exact safety checks; report proposal quality, validator rejection, fallback, and end-to-end outcome separately.
+
 ## References
 
 - Zaman, Sharmin & Mahmud, “Resilience-based network design optimization under aleatory uncertainty,” Computers & Industrial Engineering, article 112478, DOI 10.1016/j.cie.2026.112478.
