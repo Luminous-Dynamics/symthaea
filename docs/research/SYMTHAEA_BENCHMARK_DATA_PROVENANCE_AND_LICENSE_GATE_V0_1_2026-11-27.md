@@ -145,7 +145,7 @@ For a requested use, operation, transformation, and caller-supplied canonical UT
 - exact schema version and dataset/manifest/license identifiers;
 - digest shape, source URI and UTC timestamp validity;
 - access status, opaque grant reference, approval reference and grant expiry;
-- requested use against the manifest's intended and approved use scopes;
+- requested use against the manifest's intended and approved use scopes; commercial operations must use a commercial intended-use category, and training operations must explicitly declare training as the intended use;
 - required operation against permitted operations and explicit commercial/training/derivative/redistribution/publication flags;
 - transformation permission and derivative-media authority;
 - uniqueness of use, operation, and transformation lists;
