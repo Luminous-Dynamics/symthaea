@@ -26,6 +26,12 @@ pub const MIREX_2026_BEAT_PROTOCOL_ID: &str = "mirex-2026-audio-beat-tracking";
 /// The MIREX 2026 locked-test datasets that may not be used for development.
 pub const MIREX_2026_LOCKED_DATASETS: [&str; 2] = ["gtzan", "smc"];
 
+/// Defensive input limits for the portable benchmark manifest.
+pub const MAX_BENCHMARK_TRACKS: usize = 10_000;
+pub const MAX_VALID_SEGMENTS_PER_TRACK: usize = 4_096;
+pub const MAX_REFERENCE_EVENTS_PER_TRACK: usize = 200_000;
+pub const MAX_TOTAL_REFERENCE_EVENTS: usize = 5_000_000;
+
 /// Dataset partition represented by one source record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -156,6 +162,10 @@ pub enum BeatBenchmarkViolationCode {
     EmptyProtocolId,
     EmptyManifestRevision,
     EmptyTrackSet,
+    TooManyTracks,
+    TooManyValidSegments,
+    TooManyReferenceEventsPerTrack,
+    TooManyReferenceEventsInManifest,
     EmptyTrackId,
     DuplicateTrackId,
     EmptyDatasetId,
@@ -251,6 +261,14 @@ pub fn validate_beat_benchmark_manifest(
             "tracks",
         );
     }
+    if manifest.tracks.len() > MAX_BENCHMARK_TRACKS {
+        push(
+            &mut violations,
+            BeatBenchmarkViolationCode::TooManyTracks,
+            BeatBenchmarkViolationSeverity::Reject,
+            "tracks",
+        );
+    }
 
     let is_mirex_2026 = manifest
         .protocol_id
@@ -259,6 +277,7 @@ pub fn validate_beat_benchmark_manifest(
     let mut audio_splits: BTreeMap<String, BTreeSet<BeatDatasetSplit>> = BTreeMap::new();
     let mut source_master_splits: BTreeMap<String, BTreeSet<BeatDatasetSplit>> =
         BTreeMap::new();
+    let mut total_reference_events = 0usize;
 
     for (index, track) in manifest.tracks.iter().enumerate() {
         let base = format!("tracks[{index}]");
@@ -489,7 +508,30 @@ pub fn validate_beat_benchmark_manifest(
             .or_default()
             .insert(track.split);
 
+        let reference_events = track
+            .beat_frames
+            .len()
+            .saturating_add(track.downbeat_frames.len());
+        if reference_events > MAX_REFERENCE_EVENTS_PER_TRACK {
+            push(
+                &mut violations,
+                BeatBenchmarkViolationCode::TooManyReferenceEventsPerTrack,
+                BeatBenchmarkViolationSeverity::Reject,
+                format!("{base}.beat_frames"),
+            );
+        }
+        total_reference_events = total_reference_events.saturating_add(reference_events);
+
         validate_track_annotations(track, &base, &mut violations);
+    }
+
+    if total_reference_events > MAX_TOTAL_REFERENCE_EVENTS {
+        push(
+            &mut violations,
+            BeatBenchmarkViolationCode::TooManyReferenceEventsInManifest,
+            BeatBenchmarkViolationSeverity::Reject,
+            "tracks",
+        );
     }
 
     for (audio_sha256, splits) in audio_splits {
@@ -525,6 +567,14 @@ fn validate_track_annotations(
         push(
             violations,
             BeatBenchmarkViolationCode::EmptyValidSegments,
+            BeatBenchmarkViolationSeverity::Reject,
+            format!("{base}.valid_segments"),
+        );
+    }
+    if track.valid_segments.len() > MAX_VALID_SEGMENTS_PER_TRACK {
+        push(
+            violations,
+            BeatBenchmarkViolationCode::TooManyValidSegments,
             BeatBenchmarkViolationSeverity::Reject,
             format!("{base}.valid_segments"),
         );
@@ -739,6 +789,50 @@ mod tests {
             "master-gtzan-0001",
         );
         assert!(validate_beat_benchmark_manifest(&manifest(vec![track])).is_empty());
+    }
+
+    #[test]
+    fn rejects_too_many_valid_segments_before_processing_them() {
+        let mut track = valid_track(
+            "too-many-segments",
+            "private-corpus",
+            BeatDatasetSplit::Development,
+            BeatDatasetPurpose::Development,
+            &"f".repeat(64),
+            "master-segments",
+        );
+        track.valid_segments = vec![
+            BeatValidSegment {
+                start_frame: 0,
+                end_frame: 1,
+            };
+            MAX_VALID_SEGMENTS_PER_TRACK + 1
+        ];
+        assert!(codes(&manifest(vec![track]))
+            .contains(&BeatBenchmarkViolationCode::TooManyValidSegments));
+    }
+
+    #[test]
+    fn rejects_too_many_reference_events_per_track() {
+        let mut track = valid_track(
+            "too-many-events",
+            "private-corpus",
+            BeatDatasetSplit::Development,
+            BeatDatasetPurpose::Development,
+            &"e".repeat(64),
+            "master-events",
+        );
+        track.beat_frames = (0..=MAX_REFERENCE_EVENTS_PER_TRACK as u64)
+            .collect();
+        track.valid_segments = vec![BeatValidSegment {
+            start_frame: 0,
+            end_frame: MAX_REFERENCE_EVENTS_PER_TRACK as u64 + 1,
+        }];
+        track.total_frames = MAX_REFERENCE_EVENTS_PER_TRACK as u64 + 1;
+        track.downbeat_annotations_available = false;
+        track.downbeat_frames.clear();
+        assert!(codes(&manifest(vec![track]))
+            .contains(&BeatBenchmarkViolationCode::TooManyReferenceEventsPerTrack));
     }
 
     #[test]
