@@ -212,11 +212,13 @@ fn evaluate_point(episodes: &[Episode], point: usize) -> PointStats {
     }
 }
 
+#[cfg(test)]
 fn joint_loss(episode: &Episode, point: usize, endpoint: Endpoint) -> bool {
     let candidate = candidate_set(episode, endpoint, point);
     is_substantive_singleton(candidate) && !evaluator_set(episode, endpoint).is_subset(candidate)
 }
 
+#[cfg(test)]
 fn exact_mask_weight(episodes: &[Episode], mask: u64) -> u128 {
     episodes
         .iter()
@@ -232,6 +234,7 @@ fn exact_mask_weight(episodes: &[Episode], mask: u64) -> u128 {
         })
 }
 
+#[cfg(test)]
 fn enumerate_expected_ht(
     episodes: &[Episode],
     point: usize,
