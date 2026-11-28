@@ -36,6 +36,14 @@ pub enum RiskBudgetError {
     ScopeIdentityMismatch,
 }
 
+impl std::fmt::Display for RiskBudgetError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
+impl std::error::Error for RiskBudgetError {}
+
 /// A reduced positive rational in (0,1]. All authoritative risk arithmetic
 /// uses this type; no floating-point approximation participates in a policy
 /// decision.
@@ -866,15 +874,14 @@ mod tests {
         assert_eq!(plan.receipt().representation_weights.len(), 3);
         assert_eq!(plan.receipt().alpha_test, alpha_test);
         assert_eq!(plan.receipt().delta_reference_failure, delta);
-        assert_eq!(
-            plan.receipt()
-                .representation_weights
-                .iter()
-                .map(|member| member.weight)
-                .try_fold(Rational::new(1, 4).unwrap(), |_, _| Ok::<_, RiskBudgetError>(Rational::one()))
-                .unwrap(),
-            Rational::one()
-        );
+        let weight_sum = plan
+            .receipt()
+            .representation_weights
+            .iter()
+            .map(|member| member.weight)
+            .reduce(|left, right| left.checked_add(right).unwrap())
+            .unwrap();
+        assert_eq!(weight_sum, Rational::one());
     }
 
     #[test]
