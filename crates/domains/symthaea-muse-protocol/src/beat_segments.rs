@@ -386,6 +386,25 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_segment_score_schema_parses_and_pins_bounded_region_modes() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/mirex-valid-segment-score-v1.schema.json"
+        ))
+        .unwrap();
+        assert_eq!(schema["properties"]["schema_version"]["const"], 1);
+        assert_eq!(schema["$defs"]["score_evidence"]["properties"]["valid_segment_policy"]["const"],
+            "declared_valid_segments");
+        assert_eq!(
+            schema["$defs"]["config"]["properties"]["beat_trim_policy"]["enum"].as_array().unwrap().len(),
+            3
+        );
+        assert_eq!(
+            schema["$defs"]["segment_result"]["properties"]["segment_index"]["maximum"],
+            u32::MAX
+        );
+    }
+
+    #[test]
     fn scores_each_region_independently_without_creating_cross_gap_intervals() {
         let result = score_mirex_valid_segments(
             &[5_000, 6_000, 7_000, 20_000, 21_000, 22_000],
