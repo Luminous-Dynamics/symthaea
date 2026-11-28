@@ -162,7 +162,8 @@
         "reference_visibility_audit_sha256",
         "reference_label_exposed",
         "prediction",
-        "prediction_confidence"
+        "prediction_confidence",
+        "question_sha256"
       ],
       "properties": {
         "kind": {
@@ -275,6 +276,9 @@
               "maximum": 1
             }
           ]
+        },
+        "question_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     }
