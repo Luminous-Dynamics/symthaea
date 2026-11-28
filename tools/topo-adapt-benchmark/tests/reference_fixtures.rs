@@ -178,7 +178,8 @@ fn malformed_graphs_and_costs_fail_closed() {
     let original = fixture();
 
     let mut duplicate_node = episode(&original, "stationary_demand_control").clone();
-    duplicate_node.nodes[1].id = duplicate_node.nodes[0].id;
+    let duplicate_id = duplicate_node.nodes[0].id;
+    duplicate_node.nodes[1].id = duplicate_id;
     assert!(Fixture {
         schema_version: original.schema_version.clone(),
         graph_semantics: original.graph_semantics.clone(),
