@@ -17,8 +17,8 @@ The script does not use those self-ratings as prediction labels.
 
 Features summarized (not validated as state markers):
 - Alpha power (8-13 Hz) for relaxed focus
-- Theta power (4-8 Hz) for deep meditation
-- Alpha/Beta ratio as meditation index
+- Theta power (4-8 Hz) as an exploratory spectral feature
+- Alpha/Beta ratio as a legacy band-power index (not a validated construct)
 
 Dataset: OpenNeuro ds001787 - Meditation EEG
 - 24 subjects, 64 channels BioSemi, 256 Hz
@@ -169,15 +169,15 @@ def band_power(data, srate, fmin, fmax):
 
 
 def extract_meditation_features(data, srate):
-    """Extract features for meditation detection."""
-    theta = band_power(data, srate, 4, 8)    # Deep meditation
+    """Extract exploratory band-power features; not a state detector."""
+    theta = band_power(data, srate, 4, 8)    # Exploratory theta-band feature
     alpha = band_power(data, srate, 8, 13)   # Relaxed focus
     beta = band_power(data, srate, 13, 30)   # Active thinking
     gamma = band_power(data, srate, 30, 45)  # High cognitive
 
     total = theta + alpha + beta + gamma + 1e-10
 
-    # Meditation indices
+    # Legacy band-power indices, not validated psychological scales
     alpha_beta_ratio = alpha / (beta + 1e-10)
     theta_alpha_ratio = theta / (alpha + 1e-10)
 
@@ -249,7 +249,7 @@ def validate_subject(bdf_path, events_path):
             meditation_features.append(extract_meditation_features(epoch_data, srate))
 
     if len(baseline_features) < 2 or len(meditation_features) < 5:
-        return None, f"Not enough epochs (baseline={len(baseline_features)}, meditation={len(meditation_features)})"
+        return None, f"Not enough epochs (early_segment={len(baseline_features)}, late_segment={len(meditation_features)})"
 
     # Calculate statistics
     baseline_alpha = np.mean([f['alpha_rel'] for f in baseline_features])
@@ -272,7 +272,7 @@ def validate_subject(bdf_path, events_path):
 
     return {
         'n_baseline': len(baseline_features),
-        'n_meditation': len(meditation_features),
+        'n_late_segment': len(meditation_features),
         'baseline_alpha': baseline_alpha,
         'meditation_alpha': meditation_alpha,
         'alpha_change': alpha_change,
@@ -313,7 +313,7 @@ def main():
             except:
                 pass
 
-    print(f"Found {len(subjects)} subjects with meditation EEG data")
+    print(f"Found {len(subjects)} recordings with meditation-protocol EEG data")
     print()
 
     if len(subjects) == 0:
@@ -322,7 +322,7 @@ def main():
 
     results = []
     print('-' * 72)
-    print(f"{'Subject':<10} {'Ch':<6} {'B-Alpha':>8} {'M-Alpha':>8} {'ΔAlpha':>8} {'M-Index':>8} {'ΔIndex':>8}")
+    print(f"{'Recording':<10} {'Ch':<6} {'Early-A':>8} {'Late-A':>8} {'ΔAlpha':>8} {'EarlyIdx':>8} {'ΔIndex':>8}")
     print('-' * 72)
 
     for subj_id, bdf_path, events_path in subjects:
@@ -354,8 +354,8 @@ def main():
     print()
 
     print(f"Subjects analyzed: {len(results)}")
-    total_epochs = sum(r['n_meditation'] for r in results)
-    print(f"Total meditation epochs: {total_epochs}")
+    total_epochs = sum(r['n_late_segment'] for r in results)
+    print(f"Later-segment epochs summarized: {total_epochs}")
     print()
 
     # Mean changes
@@ -366,7 +366,7 @@ def main():
     print("EARLY vs LATE FEATURE CONTRASTS (NOT BASELINE vs MEDITATION):")
     print(f"  Alpha power:      {mean_alpha_change:+.1f}%")
     print(f"  Theta power:      {mean_theta_change:+.1f}%")
-    print(f"  Meditation Index: {mean_index_change:+.1f}%")
+    print(f"  Legacy band-power index: {mean_index_change:+.1f}%")
     print()
 
     # Mean values
@@ -376,10 +376,10 @@ def main():
     mean_meditation_index = np.mean([r['meditation_index'] for r in results])
 
     print("ABSOLUTE VALUES:")
-    print(f"  Baseline alpha:   {mean_baseline_alpha:.1f}%")
-    print(f"  Meditation alpha: {mean_meditation_alpha:.1f}%")
-    print(f"  Baseline index:   {mean_baseline_index:.2f}")
-    print(f"  Meditation index: {mean_meditation_index:.2f}")
+    print(f"  Early-segment alpha:   {mean_baseline_alpha:.1f}%")
+    print(f"  Later-segment alpha: {mean_meditation_alpha:.1f}%")
+    print(f"  Early-segment index:   {mean_baseline_index:.2f}")
+    print(f"  Later-segment index: {mean_meditation_index:.2f}")
     print()
 
     # Summary
@@ -392,8 +392,8 @@ def main():
     pos_index = sum(1 for r in results if r['index_change'] > 0)
 
     print("EXPLORATORY FEATURE SUMMARY:")
-    print(f"  Subjects with increased alpha during meditation: {pos_alpha}/{len(results)}")
-    print(f"  Subjects with increased theta during meditation: {pos_theta}/{len(results)}")
+    print(f"  Recordings with higher later-segment alpha: {pos_alpha}/{len(results)}")
+    print(f"  Recordings with higher later-segment theta: {pos_theta}/{len(results)}")
     print(f"  Subjects with increased meditation index:        {pos_index}/{len(results)}")
     print()
 
@@ -401,9 +401,7 @@ def main():
         print("  The chosen feature thresholds/contrasts were observed; this is not predictive validation.")
         print()
         print("  Do not interpret these summaries as evidence of meditation depth or detector accuracy.")
-        print("  - Alpha increase during meditation: 5-20% typical")
-        print("  - Theta increase during deep meditation: 10-30% typical")
-        print("  - Frontal alpha enhancement: Well-documented marker")
+        print("  These feature contrasts do not identify meditation state, depth, or skill.")
     else:
         print("  The chosen feature thresholds were not met; the analysis remains exploratory.")
         print("  Review event/self-rating alignment, channel mapping, artifacts and the study protocol before any supervised evaluation.")
