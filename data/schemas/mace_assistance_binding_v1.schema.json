@@ -468,5 +468,28 @@
         }
       }
     }
-  }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/relationContext"
+    },
+    {
+      "$ref": "#/$defs/relationEdge"
+    },
+    {
+      "$ref": "#/$defs/relationClosure"
+    },
+    {
+      "$ref": "#/$defs/assistanceContext"
+    },
+    {
+      "$ref": "#/$defs/constraint"
+    },
+    {
+      "$ref": "#/$defs/claimUse"
+    },
+    {
+      "$ref": "#/$defs/binding"
+    }
+  ]
 }
