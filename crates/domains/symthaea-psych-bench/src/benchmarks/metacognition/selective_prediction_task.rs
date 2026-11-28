@@ -29,6 +29,11 @@ pub struct SelectivePredictionObservation {
     pub source_is_current: bool,
     /// Whether a clarification or evidence request can obtain relevant context.
     pub clarification_available: bool,
+    /// Policy-side estimate of the probability that a targeted request resolves
+    /// the information gap. This is an observation, not evaluator truth.
+    pub estimated_clarification_resolution_probability: f64,
+    /// Policy-side estimate of direct-answer correctness after useful clarification.
+    pub estimated_post_clarification_accuracy: f64,
 }
 
 /// Which missing fact the policy is requesting. The target is observable to
@@ -85,6 +90,7 @@ pub enum SelectivePredictionBaseline {
     AlwaysAbstain,
     EvidenceThreshold,
     PremiseAndFreshnessAware,
+    ExpectedValueOfInformation,
 }
 
 impl SelectivePredictionBaseline {
@@ -94,6 +100,7 @@ impl SelectivePredictionBaseline {
             Self::AlwaysAbstain => "always_abstain",
             Self::EvidenceThreshold => "evidence_threshold",
             Self::PremiseAndFreshnessAware => "premise_freshness_aware",
+            Self::ExpectedValueOfInformation => "expected_value_of_information",
         }
     }
 
@@ -150,6 +157,40 @@ impl SelectivePredictionBaseline {
                 SelectivePolicyDecision {
                     action,
                     confidence,
+                    clarification_target: (action == DecisionAction::RequestInformation)
+                        .then(|| target_for_observation(observation)),
+                }
+            }
+            Self::ExpectedValueOfInformation => {
+                // Expected loss reduction minus a fixed request burden, all in
+                // normalized decision-risk units. This is a declared heuristic
+                // baseline, not an empirically calibrated VOI model.
+                const REQUEST_BURDEN: f64 = 0.12;
+                const MINIMUM_NET_VALUE: f64 = 0.05;
+                let direct_answer_probability = if !observation.premise_consistent {
+                    0.05
+                } else if !observation.source_is_current {
+                    0.20
+                } else {
+                    observation.evidence_strength
+                };
+                let expected_information_value = observation
+                    .estimated_clarification_resolution_probability
+                    * (observation.estimated_post_clarification_accuracy
+                        - direct_answer_probability)
+                    - REQUEST_BURDEN;
+                let action = if observation.clarification_available
+                    && expected_information_value > MINIMUM_NET_VALUE
+                {
+                    DecisionAction::RequestInformation
+                } else if direct_answer_probability >= 0.75 {
+                    DecisionAction::Answer
+                } else {
+                    DecisionAction::Abstain
+                };
+                SelectivePolicyDecision {
+                    action,
+                    confidence: direct_answer_probability,
                     clarification_target: (action == DecisionAction::RequestInformation)
                         .then(|| target_for_observation(observation)),
                 }
@@ -310,6 +351,12 @@ pub fn fixture_items() -> Vec<SyntheticSelectivePredictionItem> {
                 premise_consistent,
                 source_is_current,
                 clarification_available,
+                estimated_clarification_resolution_probability: if clarification_available {
+                    0.75
+                } else {
+                    0.0
+                },
+                estimated_post_clarification_accuracy: 0.94,
             },
             answerable_now,
             answer_correct_if_given,
@@ -328,7 +375,9 @@ pub fn fixture_items() -> Vec<SyntheticSelectivePredictionItem> {
                     evidence_strength: 0.94,
                     premise_consistent: true,
                     source_is_current: true,
-                    clarification_available: false,
+                        clarification_available: false,
+                    estimated_clarification_resolution_probability: 0.0,
+                    estimated_post_clarification_accuracy: 0.94,
                 },
             ),
             answer_correct_after_clarification: clarification_resolves,
@@ -374,6 +423,22 @@ fn validate_items(
         if !evidence.is_finite() || !(0.0..=1.0).contains(&evidence) {
             return Err(SelectivePredictionTaskError::InvalidEvidenceStrength { index });
         }
+        if !item
+            .observation
+            .estimated_clarification_resolution_probability
+            .is_finite()
+            || !(0.0..=1.0).contains(
+                &item
+                    .observation
+                    .estimated_clarification_resolution_probability,
+            )
+            || !item.observation.estimated_post_clarification_accuracy.is_finite()
+            || !(0.0..=1.0).contains(
+                &item.observation.estimated_post_clarification_accuracy,
+            )
+        {
+            return Err(SelectivePredictionTaskError::InvalidClarificationObservation { index });
+        }
         if !item.answerable_now && item.answer_correct_if_given {
             return Err(SelectivePredictionTaskError::UnanswerableItemMarkedCorrect { index });
         }
@@ -391,6 +456,16 @@ fn validate_items(
                     || observation.clarification_available
                     || !observation.premise_consistent
                     || !observation.source_is_current
+                    || !observation
+                        .estimated_clarification_resolution_probability
+                        .is_finite()
+                    || !(0.0..=1.0).contains(
+                        &observation.estimated_clarification_resolution_probability,
+                    )
+                    || !observation.estimated_post_clarification_accuracy.is_finite()
+                    || !(0.0..=1.0).contains(
+                        &observation.estimated_post_clarification_accuracy,
+                    )
                 {
                     return Err(SelectivePredictionTaskError::InvalidClarificationObservation {
                         index,
@@ -584,6 +659,7 @@ pub fn run_reference_suite(
         SelectivePredictionBaseline::AlwaysAbstain,
         SelectivePredictionBaseline::EvidenceThreshold,
         SelectivePredictionBaseline::PremiseAndFreshnessAware,
+        SelectivePredictionBaseline::ExpectedValueOfInformation,
     ]
     .into_iter()
     .map(|policy| evaluate_policy(&items, policy, cost_model))
@@ -597,7 +673,7 @@ mod tests {
     #[test]
     fn all_controls_share_one_frozen_manifest() {
         let reports = run_reference_suite().expect("fixture should score");
-        assert_eq!(reports.len(), 4);
+        assert_eq!(reports.len(), 5);
         assert!(reports.windows(2).all(|pair| {
             pair[0].manifest_digest == pair[1].manifest_digest
                 && pair[0].items == pair[1].items
@@ -646,6 +722,22 @@ mod tests {
         assert_eq!(report.policy, "external_observation_policy");
         assert_eq!(report.items, 14);
         assert_eq!(report.resolved_clarifications, 4);
+        assert_eq!(report.post_clarification_accuracy, Some(1.0));
+    }
+
+    #[test]
+    fn expected_value_policy_requests_information_when_expected_gain_exceeds_burden() {
+        let report = evaluate_policy(
+            &fixture_items(),
+            SelectivePredictionBaseline::ExpectedValueOfInformation,
+            SelectivePredictionCostModel::default(),
+        )
+        .expect("expected-value policy should score");
+
+        assert_eq!(report.total_information_requests, 4);
+        assert_eq!(report.useful_information_requests, 4);
+        assert_eq!(report.clarification_precision, Some(1.0));
+        assert_eq!(report.clarification_recall, Some(1.0));
         assert_eq!(report.post_clarification_accuracy, Some(1.0));
     }
 
