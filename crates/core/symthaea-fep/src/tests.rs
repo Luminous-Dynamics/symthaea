@@ -923,9 +923,13 @@ fn test_enhanced_fep_bridge_cycle() {
     let result = bridge.cycle(0.5, 0.6, 0.7, 0.4);
 
     assert!(result.fep_result.free_energy.is_finite());
-    assert!(result.motor_command.is_meaningful() || !result.motor_command.is_meaningful());
+    assert_eq!(
+        result.motor_command.command_type,
+        MotorCommandType::from_action_index(result.fep_result.recommended_action)
+    );
+    assert!((0.0..=1.0).contains(&result.motor_command.intensity));
     assert!(result.learning_signal >= 0.0);
-    assert!(result.action_outcome_coupling >= 0.0 && result.action_outcome_coupling <= 1.0);
+    assert!((0.0..=1.0).contains(&result.action_outcome_coupling));
 }
 
 #[test]
