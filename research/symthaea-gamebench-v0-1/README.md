@@ -1,24 +1,25 @@
 # Symthaea GameBench v0.1 — deterministic environment core
 
-This is a **standalone research crate** and a first executable slice of issue [#14137](https://github.com/Luminous-Dynamics/symthaea/issues/14137).
+This is a **standalone research crate** and an executable fixture suite for [#14137](https://github.com/Luminous-Dynamics/symthaea/issues/14137).
 
-## Implemented in this slice
+## Implemented task families
 
-- validated deterministic rectangular grid specification;
-- four-direction actions with explicit wall-collision and action-budget semantics;
-- full-map and Manhattan-radius observations;
-- deterministic episode state and terminal transitions for navigation and Sokoban-like pushing;
-- ordered event trace recording and replay for navigation episodes;
-- crate-private exact breadth-first shortest-path references for navigation and box-pushing tasks;
-- known-answer and negative-control unit tests.
+- **F1 Navigation:** validated deterministic rectangular grid, four-direction actions, blocked-move/action-budget semantics, full and Manhattan-radius observations, ordered action traces, deterministic replay, and an evaluator-only shortest-path reference.
+- **F2 Sokoban-like pushing:** validated walls and object placement, crate pushing, blocked pushes, terminal/action-limit semantics, and evaluator-only exact search for solvability/deadlock controls.
+- **F3 Keys and doors:** unique key/door identities, single-use keys, persistent unlocked doors, explicit inventory state, prerequisite validation, and evaluator-only exact path search.
+- **F4 Partial-map exploration:** current-field-of-view observations, unknown cells omitted rather than treated as floor, explicit scan actions that consume budget, and no environment-side observation-history accumulation. Candidate-side memory must preserve prior observations.
 
-The crate is its own Cargo workspace and is intentionally not a member of the production Symthaea workspace. It has no external dependencies and forbids unsafe Rust.
+All four families have deterministic transition rules. Exact search routines are crate-private evaluator references; they are not exported to external candidate crates.
+
+## Isolation and dependencies
+
+The crate is its own Cargo workspace and is intentionally not a member of the production Symthaea workspace. It has no external dependencies, forbids unsafe Rust, and does not change the production runtime.
 
 ## Deliberate limits
 
-The first implementation contains F1 navigation and F2 Sokoban-like pushing. It does **not** yet implement keys/doors and inventory prerequisites, partial-map exploration actions, resource chains, hidden-rule discovery, Sokoban event receipts, visual input, agent integration, signed receipts, benchmark aggregation, or any of the external BALROG/Procgen/GameWorld adapters.
+This is an environment/fixture layer, not an integrated Symthaea game-playing agent. It does not yet implement multi-object Sokoban, complex multi-key logic (beyond the defined reusable key-ID schema), resource chains, hidden-rule discovery, candidate-side memory adapters, visual perception, signed evaluator receipts, benchmark aggregation, or external BALROG/Procgen/Crafter/GameWorld adapters.
 
-The exact BFS routine is an evaluator reference only. It must not be exposed to the candidate agent.
+The F4 environment returns only the current observation. It does not demonstrate that Symthaea remembers anything; that must be tested by the later candidate adapter and memory ablations.
 
 ## Validation
 
@@ -30,4 +31,4 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 ```
 
-No execution result is claimed until the exact branch head passes these commands. A passing fixture contract would establish only these deterministic environment mechanics, not Symthaea game-playing capability.
+No execution result is claimed until the exact branch head passes these commands. Passing fixture tests establish only the stated environment mechanics, not Symthaea cognitive capability, game-playing performance, visual competence, or SOTA.
