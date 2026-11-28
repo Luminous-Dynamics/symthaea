@@ -14,7 +14,7 @@ The pinned upstream README states that benchmark code is MIT-licensed and conver
 
 ## Official benchmark surface
 
-The release covers four synthetic domains (Finance, Technology, Healthcare and Manufacturing), with six separate question types: multi-hop, knowledge update, temporal, user-implicit, term ambiguity and abstention. The published release contains 715 questions.
+The pinned release covers four synthetic domains (Finance, Technology, Healthcare and Manufacturing), with six separate question types: multi-hop, knowledge update, temporal, user-implicit, term ambiguity and abstention. The paper and this pinned release contain 715 questions. Some later third-party evaluations report 745 questions and explicitly note that their inventory is not the exact 715-question paper subset; treat that as a separate dataset snapshot, not a matched reproduction.
 
 Upstream retrieval behavior deliberately indexes message content only. At answer time, it formats each retrieved message with its speaker, role, channel, phase, topic, timestamp, reply target and message ID. When asking_user_id is present, the query passed to retrieval is exactly asking_user_id followed by one space and question_text; otherwise it is question_text. This adapter reproduces that projection and header ordering.
 
@@ -85,7 +85,7 @@ Do not claim superiority from comparing a MACE answerer against a different read
 
 These are research targets, not current measurements:
 - First reproduce upstream GroupMemBench BM25 within 1 percentage point on each domain × question type cell with the same reader/judge.
-- Then exceed the published 43.22% BM25 average by at least 5 absolute points on the same weighted aggregation, while separately improving knowledge-update and term-ambiguity results.
+- Then target at least 51.1% overall on the pinned 715-question evaluation: approximately 5 percentage points above the published strongest 46.0% result (Hindsight) and 7.9 points above BM25's 43.22%, while separately improving knowledge-update and term-ambiguity results.
 - Target at least 55% GroupMemBench overall as a stretch objective, but do not treat this as comparable without matched official evaluation.
 - On GroupAssistBench, target L2 above the best published retrieval baseline (0.370) and close at least half the gap to same-backbone full context (0.431), with no hidden trade-off in M1/M2/M3. These targets are aspirational, not MACE measurements.
 - Zero stale-known correction use, zero wrong-speaker attribution on deterministic adversarial fixtures, zero candidate access to evaluator labels, and zero unauthorized cross-audience disclosure in the separate assurance suite.
