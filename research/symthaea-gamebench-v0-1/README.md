@@ -54,9 +54,9 @@ The separate package `research/symthaea-gamebench-fep-adapter-v0-1/` implements 
 
 ## Authored tests and qualification status
 
-- Environment, candidate contract, and policy baseline: **52 unit tests authored** (F1–F6: 41; candidate contract: 7; random/greedy policies: 4).
+- Environment, candidate contract, policy baselines, and evaluator runner: **58 unit tests authored** (F1–F6: 41; candidate contract: 7; random/greedy policies: 5; evaluator runner: 5).
 - FEP navigation adapter: **6 unit tests authored**.
-- Total: **58 authored tests**. These counts are source inventory, not observed test results.
+- Total: **74 authored tests**. These counts are source inventory, not observed test results.
 - Two isolated workflows run rustfmt, Cargo tests, and strict Clippy.
 - No test/format/Clippy pass is claimed until both workflows pass on the exact branch head.
 
@@ -82,7 +82,7 @@ Candidate policy baselines in the core crate:
 - Random and greedy policy baselines: 5 tests.
 - Core crate total: **58 authored tests**.
 - Separate candidate-adapter workspace: 6 FEP tests, 5 spatial HDC tests, 5 HDC-LTC tests (**16 authored tests**).
-- Combined source inventory: **69 authored Rust tests**.
+- Combined source inventory: **74 authored Rust tests**.
 
 These are authored counts, not observed execution results. Dedicated workflows run formatting, Cargo tests, and strict Clippy for each workspace. No pass is claimed until each exact-head workflow completes successfully.
 
