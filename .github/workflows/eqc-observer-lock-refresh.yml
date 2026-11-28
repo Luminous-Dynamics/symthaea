@@ -1,0 +1,46 @@
+name: EQC Observer Dependency Lock Refresh
+
+on:
+  push:
+    branches: [feat/eqc-trusted-observer-attestation-v0.1-2026-11-28]
+    paths:
+      - "tools/eqc-reference/Cargo.toml"
+      - ".github/workflows/eqc-observer-lock-refresh.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: eqc-observer-lock-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout owned observer branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/eqc-trusted-observer-attestation-v0.1-2026-11-28
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Resolve standalone EQC graph and commit lockfile
+        run: |
+          set -euo pipefail
+          cargo metadata --manifest-path tools/eqc-reference/Cargo.toml --format-version 1 > "$RUNNER_TEMP/eqc-metadata.json"
+          jq -e '.packages | length > 0' "$RUNNER_TEMP/eqc-metadata.json" >/dev/null
+          git add tools/eqc-reference/Cargo.lock
+          if ! git diff --cached --quiet -- tools/eqc-reference/Cargo.lock; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore(eqc): lock strict Ed25519 observer verifier"
+            git push origin HEAD:feat/eqc-trusted-observer-attestation-v0.1-2026-11-28
+          else
+            echo "The standalone EQC lockfile is already current."
+          fi
