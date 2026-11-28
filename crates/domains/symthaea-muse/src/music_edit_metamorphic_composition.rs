@@ -1077,16 +1077,149 @@ mod tests {
 
     #[test]
     fn noninvariant_and_abstain_relations_are_not_composable() {
-        let mut step = step(
+        let mut noninvariant = step(
             "noninvariant", "origin", "changed", &d(2), &d(3), &d(4), &d(5), &d(6), &d(7),
             MusicEditMetamorphicTransformFamilyV1::AbsolutePitchShift,
             mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
         );
-        step.pair.expected_relation = MusicEditMetamorphicRelationV1::NonInvariant;
-        step.pair.admissibility_reason = Some("absolute target changed".to_owned());
-        let error = compose_music_edit_metamorphic_path_v1(&path("noninvariant", vec![step]))
+        noninvariant.pair.expected_relation = MusicEditMetamorphicRelationV1::NonInvariant;
+        noninvariant.pair.admissibility_reason = Some("absolute target changed".to_owned());
+        let error = compose_music_edit_metamorphic_path_v1(&path(
+            "noninvariant",
+            vec![noninvariant],
+        ))
+        .unwrap_err();
+        assert!(error.contains(&MusicEditMetamorphicCompositionIssueV1::NonComposableRelation));
+
+        let mut abstain = step(
+            "abstain", "origin", "changed", &d(2), &d(3), &d(4), &d(5), &d(6), &d(7),
+            MusicEditMetamorphicTransformFamilyV1::TargetMasking,
+            mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+        );
+        abstain.pair.expected_relation = MusicEditMetamorphicRelationV1::AbstainExpected;
+        abstain.pair.admissibility_reason =
+            Some("target is masked and the property is not estimable".to_owned());
+        let error = compose_music_edit_metamorphic_path_v1(&path("abstain", vec![abstain]))
             .unwrap_err();
         assert!(error.contains(&MusicEditMetamorphicCompositionIssueV1::NonComposableRelation));
+    }
+
+    #[test]
+    fn property_set_mismatch_is_rejected() {
+        let first = mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+        let mut second = first.clone();
+        second.properties.pop();
+        assert_eq!(
+            compose_music_edit_metamorphic_property_mappings_v1(&[first, second]),
+            Err(MusicEditMetamorphicCompositionIssueV1::PropertySetMismatch)
+        );
+    }
+
+    #[test]
+    fn numeric_unit_mismatch_is_rejected() {
+        let first = mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+        let mut second = mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+        let MusicEditMetamorphicPropertyRuleV1::NumericAffine { unit, .. } =
+            &mut second.properties[1].rule
+        else {
+            panic!("pitch property must be numeric");
+        };
+        *unit = "hertz".to_owned();
+        assert_eq!(
+            compose_music_edit_metamorphic_property_mappings_v1(&[first, second]),
+            Err(MusicEditMetamorphicCompositionIssueV1::NumericUnitMismatch(
+                "pitch_midi".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn broken_sample_instruction_and_validity_chains_are_rejected() {
+        let first_mapping = mapping(1.0, 1.0, 0.0, 1.0, 0.0, 0.0);
+        let second_mapping = mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+
+        let first = step(
+            "sample-1", "origin", "middle", &d(2), &d(3),
+            &d(4), &d(5), &d(6), &d(7),
+            MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+            first_mapping.clone(),
+        );
+        let wrong_sample = step(
+            "sample-2", "wrong-middle", "end", &d(3), &d(8),
+            &d(5), &d(9), &d(7), &d(10),
+            MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
+            second_mapping.clone(),
+        );
+        let error = compose_music_edit_metamorphic_path_v1(&path(
+            "broken-sample",
+            vec![first.clone(), wrong_sample],
+        ))
+        .unwrap_err();
+        assert!(error.contains(&MusicEditMetamorphicCompositionIssueV1::BrokenSampleChain));
+
+        let wrong_instruction = step(
+            "instruction-2", "middle", "end", &d(3), &d(8),
+            &d(55), &d(9), &d(7), &d(10),
+            MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
+            second_mapping.clone(),
+        );
+        let error = compose_music_edit_metamorphic_path_v1(&path(
+            "broken-instruction",
+            vec![first.clone(), wrong_instruction],
+        ))
+        .unwrap_err();
+        assert!(error.contains(
+            &MusicEditMetamorphicCompositionIssueV1::BrokenInstructionChain
+        ));
+
+        let wrong_envelope = step(
+            "envelope-2", "middle", "end", &d(3), &d(8),
+            &d(5), &d(9), &d(77), &d(10),
+            MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
+            second_mapping,
+        );
+        let error = compose_music_edit_metamorphic_path_v1(&path(
+            "broken-validity-envelope",
+            vec![first, wrong_envelope],
+        ))
+        .unwrap_err();
+        assert!(error.contains(
+            &MusicEditMetamorphicCompositionIssueV1::BrokenValidityEnvelopeChain
+        ));
+    }
+
+    #[test]
+    fn duplicate_pair_identity_is_rejected() {
+        let first = step(
+            "duplicate", "origin", "middle", &d(2), &d(3),
+            &d(4), &d(5), &d(6), &d(7),
+            MusicEditMetamorphicTransformFamilyV1::GlobalTransposition,
+            mapping(1.0, 1.0, 0.0, 1.0, 0.0, 0.0),
+        );
+        let mut second = step(
+            "unique", "middle", "end", &d(3), &d(8),
+            &d(5), &d(9), &d(7), &d(10),
+            MusicEditMetamorphicTransformFamilyV1::GainHeadroom,
+            mapping(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+        );
+        second.pair.pair_id = first.pair.pair_id.clone();
+        second.transform_receipt.pair_id = second.pair.pair_id.clone();
+        second.transform_receipt.receipt_sha256.clear();
+        second.transform_receipt.receipt_sha256 =
+            music_edit_metamorphic_transform_receipt_digest_v1(
+                &second.transform_receipt,
+            )
+            .unwrap();
+        second.pair.transform_receipt_sha256 =
+            second.transform_receipt.receipt_sha256.clone();
+        let error = compose_music_edit_metamorphic_path_v1(&path(
+            "duplicate-pair-identity",
+            vec![first, second],
+        ))
+        .unwrap_err();
+        assert!(error.contains(
+            &MusicEditMetamorphicCompositionIssueV1::DuplicatePairIdentity
+        ));
     }
 
     #[test]
