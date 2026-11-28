@@ -24,8 +24,13 @@ fn stationary_demand_prefers_no_edit() {
     )
     .unwrap();
 
-    assert_eq!(no_edit, FlowResult { max_flow: 6, min_cut: 6, requested_flow: 6 });
-    assert_eq!(unnecessary_edit, no_edit);
+    assert_eq!(no_edit, FlowResult { max_flow: 6, min_cut: 6, requested_flow: 6, accepted_edge_additions: 0, edit_cost_units: 0, edge_maintenance_cost_units: 5 });
+    assert_eq!(unnecessary_edit.max_flow, no_edit.max_flow);
+    assert_eq!(unnecessary_edit.min_cut, no_edit.min_cut);
+    assert_eq!(unnecessary_edit.accepted_edge_additions, 1);
+    assert_eq!(unnecessary_edit.edit_cost_units, 1);
+    assert_eq!(unnecessary_edit.edge_maintenance_cost_units, 6);
+    assert!(unnecessary_edit.edit_cost_units > no_edit.edit_cost_units);
 }
 
 #[test]
@@ -43,9 +48,12 @@ fn useful_new_sink_edge_restores_full_capacity_feasible_service() {
     .unwrap();
     let decoy = evaluate_episode(case, &fixture.graph_semantics, 1, &["decoy_dead_end_7"]).unwrap();
 
-    assert_eq!(no_edit, FlowResult { max_flow: 6, min_cut: 6, requested_flow: 8 });
-    assert_eq!(useful, FlowResult { max_flow: 8, min_cut: 8, requested_flow: 8 });
-    assert_eq!(decoy, no_edit);
+    assert_eq!(no_edit, FlowResult { max_flow: 6, min_cut: 6, requested_flow: 8, accepted_edge_additions: 0, edit_cost_units: 0, edge_maintenance_cost_units: 5 });
+    assert_eq!(useful, FlowResult { max_flow: 8, min_cut: 8, requested_flow: 8, accepted_edge_additions: 1, edit_cost_units: 1, edge_maintenance_cost_units: 6 });
+    assert_eq!(decoy.max_flow, no_edit.max_flow);
+    assert_eq!(decoy.min_cut, no_edit.min_cut);
+    assert_eq!(decoy.edit_cost_units, 1);
+    assert_eq!(decoy.edge_maintenance_cost_units, 6);
 }
 
 #[test]
@@ -57,9 +65,12 @@ fn alternate_edge_restores_service_after_bridge_failure() {
     let useful = evaluate_episode(case, &fixture.graph_semantics, 1, &["restore_sink_route"]).unwrap();
     let decoy = evaluate_episode(case, &fixture.graph_semantics, 1, &["decoy_dead_end_4"]).unwrap();
 
-    assert_eq!(no_edit, FlowResult { max_flow: 0, min_cut: 0, requested_flow: 4 });
-    assert_eq!(useful, FlowResult { max_flow: 4, min_cut: 4, requested_flow: 4 });
-    assert_eq!(decoy, no_edit);
+    assert_eq!(no_edit, FlowResult { max_flow: 0, min_cut: 0, requested_flow: 4, accepted_edge_additions: 0, edit_cost_units: 0, edge_maintenance_cost_units: 3 });
+    assert_eq!(useful, FlowResult { max_flow: 4, min_cut: 4, requested_flow: 4, accepted_edge_additions: 1, edit_cost_units: 1, edge_maintenance_cost_units: 4 });
+    assert_eq!(decoy.max_flow, no_edit.max_flow);
+    assert_eq!(decoy.min_cut, no_edit.min_cut);
+    assert_eq!(decoy.edit_cost_units, 1);
+    assert_eq!(decoy.edge_maintenance_cost_units, 4);
 }
 
 #[test]
@@ -84,7 +95,7 @@ fn node_relabeling_preserves_flow_and_cut() {
     }
 
     let result = evaluate_episode(&case, &fixture.graph_semantics, 1, &["connect_new_sink_path"]).unwrap();
-    assert_eq!(result, FlowResult { max_flow: 8, min_cut: 8, requested_flow: 8 });
+    assert_eq!(result, FlowResult { max_flow: 8, min_cut: 8, requested_flow: 8, accepted_edge_additions: 1, edit_cost_units: 1, edge_maintenance_cost_units: 6 });
 }
 
 #[test]
@@ -138,7 +149,12 @@ fn uniform_capacity_scaling_scales_flow_and_cut() {
         &["connect_new_sink_path"],
     )
     .unwrap();
-    assert_eq!(result, FlowResult { max_flow: 16, min_cut: 16, requested_flow: 16 });
+    assert_eq!(result.max_flow, 16);
+    assert_eq!(result.min_cut, 16);
+    assert_eq!(result.requested_flow, 16);
+    assert_eq!(result.accepted_edge_additions, 1);
+    assert_eq!(result.edit_cost_units, 1);
+    assert_eq!(result.edge_maintenance_cost_units, 12);
 }
 
 #[test]
