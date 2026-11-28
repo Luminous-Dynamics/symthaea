@@ -45,6 +45,10 @@ The environment correction shrinks local estimates toward the global correction 
 
 NLMS uses a finite norm floor, maximum feature/error limits and bounded per-coordinate weight deltas. Zero feature norm is safe and does not divide by zero or cause unbounded updates.
 
+## Independent receipt verification
+
+The public `verify_streaming_prediction_receipt_v1` function checks schema, model/feature/policy/input/state digests, finite and internally consistent prediction decomposition, and the invariant that prediction did not mutate adapter state. The public `verify_streaming_update_receipt_v1` function checks schema and digest integrity, state-digest shape, disposition/update-sequence consistency, and that no receipt claims retraining or equipment authority. These verifiers let downstream consumers validate receipts without trusting the original engine call.
+
 ## Evidence and availability gate
 
 A label delivery is accepted only when:
@@ -97,8 +101,10 @@ The module currently includes tests for:
 14. unavailable K1 eligibility report cannot be used before report availability;
 15. prediction sequence overflow does not partially register a sample;
 16. context-support overflow leaves the entire update transaction unchanged;
-17. K1 report cannot predate label availability;
-18. delivery revision must match the revision attested by the K1 report.
+17. independent verifiers accept valid prediction/update receipts;
+18. independent verifiers reject tampered prediction and falsely mutating update receipts;
+19. K1 report cannot predate label availability;
+20. delivery revision must match the revision attested by the K1 report.
 
 These tests are authored, not yet reported as passing. Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 reference runs are required.
 
