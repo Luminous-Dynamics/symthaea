@@ -1,0 +1,48 @@
+name: NixWard typed ConfigWriter qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/core/nixward/src/action/config_writer.rs"
+      - "crates/core/nixward/src/typed_nix.rs"
+      - "crates/core/nixward/src/bin/nixward_daemon.rs"
+      - "crates/core/nixward/src/cli/commands.rs"
+      - "crates/core/nixward/src/parser/nix_parser.rs"
+      - "crates/core/nixward/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/nixward-config-writer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nixward-config-writer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  config-writer:
+    name: config-writer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: 0
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check ConfigWriter and caller formatting
+        run: rustfmt +1.96.0 --check --edition 2024 crates/core/nixward/src/action/config_writer.rs crates/core/nixward/src/bin/nixward_daemon.rs crates/core/nixward/src/cli/commands.rs
+      - name: Run ConfigWriter adversarial tests
+        run: cargo +1.96.0 test --locked -p nixward --lib action::config_writer::tests
+      - name: Check CLI integration
+        run: cargo +1.96.0 check --locked -p nixward --bin nixward --features cli
+      - name: Check daemon typed-writer integration
+        run: cargo +1.96.0 check --locked -p nixward --bin nixward-daemon --features daemon

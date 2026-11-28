@@ -13,6 +13,9 @@
 //! does NOT execute system commands, it only produces modified config text
 //! and backup/restore operations.
 
+use crate::parser::nix_parser::NixParser;
+use crate::typed_nix::{NixAttributePath, NixExpr, NixPackageRef};
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -119,26 +122,52 @@ impl ConfigWriter {
         self
     }
 
+    fn contains_package_reference(source: &str, package_attr: &str) -> bool {
+        let needle = format!("pkgs.{package_attr}");
+        let mut search_from = 0usize;
+        while let Some(relative) = source[search_from..].find(&needle) {
+            let start = search_from + relative;
+            let end = start + needle.len();
+            let preceding = source[..start].chars().next_back();
+            let following = source[end..].chars().next();
+            let left_boundary = preceding.is_none_or(|ch| {
+                ch.is_whitespace() || matches!(ch, '[' | ',' | '(')
+            });
+            let right_boundary = following.is_none_or(|ch| {
+                ch.is_whitespace() || matches!(ch, ']' | ',' | ';' | ')')
+            });
+            if left_boundary && right_boundary {
+                return true;
+            }
+            search_from = end;
+        }
+        false
+    }
+
     /// Add a package to `environment.systemPackages`.
     ///
     /// Returns a patch that, when applied, adds the package to the config.
     pub fn add_system_package(&self, package: &str) -> Result<ConfigPatch, std::io::Error> {
+        let package = NixPackageRef::new(package).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+        let package_attr = package.attribute().as_nix();
         let config_path = self.config_root.join("configuration.nix");
         let original = std::fs::read_to_string(&config_path)?;
 
-        let pkg_entry = format!("    pkgs.{package}");
+        let pkg_entry = format!("    pkgs.{package_attr}");
 
         // Check if already present
-        if original.contains(&format!("pkgs.{package}")) {
+        if Self::contains_package_reference(&original, &package_attr) {
             return Ok(ConfigPatch {
                 target: config_path,
                 original: original.clone(),
                 modified: original,
-                description: format!("{package} is already in systemPackages"),
+                description: format!("{package_attr} is already in systemPackages"),
             });
         }
 
-        // Find the systemPackages list and insert
+        // Find the systemPackages list and insert a validated package attribute.
         let modified = if let Some(pos) = original.find("environment.systemPackages") {
             if let Some(bracket_pos) = original[pos..].find('[') {
                 let insert_at = pos + bracket_pos + 1;
@@ -165,81 +194,247 @@ impl ConfigWriter {
             target: config_path,
             original,
             modified,
-            description: format!("Add pkgs.{package} to environment.systemPackages"),
+            description: format!("Add pkgs.{package_attr} to environment.systemPackages"),
         })
     }
 
     /// Remove a package from `environment.systemPackages`.
     pub fn remove_system_package(&self, package: &str) -> Result<ConfigPatch, std::io::Error> {
+        let package = NixPackageRef::new(package).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+        let package_attr = package.attribute().as_nix();
         let config_path = self.config_root.join("configuration.nix");
         let original = std::fs::read_to_string(&config_path)?;
 
-        let patterns = [
-            format!("    pkgs.{package}\n"),
-            format!("    pkgs.{package}"),
-            format!("pkgs.{package}\n"),
-            format!("pkgs.{package}"),
-        ];
-
+        let target = format!("pkgs.{package_attr}");
         let mut modified = original.clone();
-        for pattern in &patterns {
-            modified = modified.replace(pattern, "");
+        let mut search_from = 0usize;
+        while let Some(relative) = modified[search_from..].find(&target) {
+            let start = search_from + relative;
+            let end = start + target.len();
+            let preceding = modified[..start].chars().next_back();
+            let following = modified[end..].chars().next();
+
+            let left_boundary = preceding.is_none_or(|ch| {
+                ch.is_whitespace() || matches!(ch, '[' | ',' | '(')
+            });
+            let right_boundary = following.is_none_or(|ch| {
+                ch.is_whitespace() || matches!(ch, ']' | ',' | ';' | ')')
+            });
+
+            if left_boundary && right_boundary {
+                modified.replace_range(start..end, "");
+                search_from = start;
+            } else {
+                search_from = end;
+            }
         }
 
         Ok(ConfigPatch {
             target: config_path,
             original,
             modified,
-            description: format!("Remove pkgs.{package} from environment.systemPackages"),
+            description: format!("Remove pkgs.{package_attr} from environment.systemPackages"),
         })
     }
 
-    /// Set a NixOS option to a value.
+    /// Set a NixOS option to a restricted typed literal.
     ///
-    /// This is a simple text-based approach — for complex modifications,
-    /// use the parser layer to produce a proper AST edit.
+    /// This compatibility API accepts only booleans, integers, null, and
+    /// JSON-quoted strings. Arbitrary Nix source is rejected. Use
+    /// `set_option_expr` when a caller already has a typed expression.
     pub fn set_option(
         &self,
         option_path: &str,
         value: &str,
     ) -> Result<ConfigPatch, std::io::Error> {
+        let expression = Self::parse_restricted_literal(value)?;
+        self.set_option_expr(option_path, &expression)
+    }
+
+    /// Parse a deliberately small CLI literal language.
+    ///
+    /// This does not parse general Nix. It accepts only bool, signed integer,
+    /// null and JSON string literals, so a syntactically valid Nix function,
+    /// attribute set, interpolation or extra assignment cannot pass through.
+    fn parse_restricted_literal(value: &str) -> Result<NixExpr, std::io::Error> {
+        let value = value.trim();
+        match value {
+            "true" => return Ok(NixExpr::Bool(true)),
+            "false" => return Ok(NixExpr::Bool(false)),
+            "null" => return Ok(NixExpr::Null),
+            _ => {}
+        }
+
+        if let Ok(integer) = value.parse::<i64>() {
+            return Ok(NixExpr::Int(integer));
+        }
+
+        if value.starts_with('"') {
+            let string = serde_json::from_str::<String>(value).map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("String values must be valid JSON double-quoted strings: {error}"),
+                )
+            })?;
+            return Ok(NixExpr::String(string));
+        }
+
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Unsupported value expression. Use true, false, null, an integer, or a JSON-quoted string; arbitrary Nix source is not accepted.",
+        ))
+    }
+
+    /// Construct a patch using a validated static option path and typed value.
+    ///
+    /// The value is rendered from NixExpr, never copied from user source. The
+    /// existing file is parsed and exact option paths are matched before a
+    /// source line is replaced. This is still a limited source edit: target
+    /// option existence/type/writeability and package membership require the
+    /// separate target resolver.
+    pub fn set_option_expr(
+        &self,
+        option_path: &str,
+        value: &NixExpr,
+    ) -> Result<ConfigPatch, std::io::Error> {
+        let option_path = NixAttributePath::parse(option_path).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+        let rendered_path = option_path.as_nix();
+        let rendered_value = value.as_nix().map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+
         let config_path = self.config_root.join("configuration.nix");
         let original = std::fs::read_to_string(&config_path)?;
+        let mut parser = NixParser::new();
+        let parsed = parser.parse(&original).map_err(|error| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Existing configuration did not parse: {}", error.message),
+            )
+        })?;
+        if !parsed.errors.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Existing configuration contains parse errors: {:?}", parsed.errors),
+            ));
+        }
 
-        let option_line = format!("  {option_path} = {value};");
+        let matching: Vec<_> = parsed
+            .options
+            .iter()
+            .filter(|option| option.path == rendered_path)
+            .collect();
+        if matching.len() > 1 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Refusing ambiguous patch: {rendered_path} has multiple definitions"),
+            ));
+        }
 
-        let modified = if let Some(pos) = original.find(option_path) {
-            // Find the end of this line (semicolon)
-            if let Some(semi) = original[pos..].find(';') {
-                let line_start = original[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
-                let line_end = pos + semi + 1;
-                let mut result = String::with_capacity(original.len());
-                result.push_str(&original[..line_start]);
-                result.push_str(&option_line);
-                result.push_str(&original[line_end..]);
-                result
-            } else {
-                original.clone()
+        let option_line = format!("  {rendered_path} = {rendered_value};");
+        let modified = if let Some(existing) = matching.first() {
+            let same_line_sibling = parsed.options.iter().any(|option| {
+                option.line == existing.line && option.path != rendered_path
+            });
+            if same_line_sibling
+                || existing.raw_value.contains('\n')
+                || existing.raw_value.contains('\r')
+            {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "Refusing line-based edit for {rendered_path}: its source line contains another binding or a multi-line value"
+                    ),
+                ));
             }
+
+            let mut lines = original.lines().map(str::to_string).collect::<Vec<_>>();
+            let line_index = existing.line.saturating_sub(1);
+            if line_index >= lines.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Parser returned an invalid source line for {rendered_path}"),
+                ));
+            }
+            let source_line = lines[line_index].trim_start();
+            if !source_line.starts_with(&format!("{rendered_path} =")) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "Refusing nested/computed edit for {rendered_path}; only direct dotted assignments are supported"
+                    ),
+                ));
+            }
+
+            let indentation = lines[line_index]
+                .chars()
+                .take_while(|character| character.is_whitespace())
+                .collect::<String>();
+            lines[line_index] = format!("{indentation}{rendered_path} = {rendered_value};");
+            let mut content = lines.join("\n");
+            if original.ends_with('\n') {
+                content.push('\n');
+            }
+            content
         } else {
-            // Option not found — insert before the closing brace
-            if let Some(pos) = original.rfind('}') {
-                let mut result = String::with_capacity(original.len() + option_line.len() + 2);
-                result.push_str(&original[..pos]);
-                result.push_str(&option_line);
-                result.push('\n');
-                result.push_str(&original[pos..]);
-                result
-            } else {
-                original.clone()
+            let segments = rendered_path.split('.').collect::<Vec<_>>();
+            let parent_is_defined = (1..segments.len()).any(|end| {
+                let parent = segments[..end].join(".");
+                parsed.options.iter().any(|option| option.path == parent)
+            });
+            let child_is_defined = parsed
+                .options
+                .iter()
+                .any(|option| option.path.starts_with(&format!("{rendered_path}.")));
+            if parent_is_defined || child_is_defined {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "Refusing to add {rendered_path}: existing nested/parent definitions require an AST-aware edit"
+                    ),
+                ));
             }
+
+            let Some(position) = original.rfind('}') else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Could not locate the final module attribute-set brace",
+                ));
+            };
+            let mut result = String::with_capacity(original.len() + option_line.len() + 2);
+            result.push_str(&original[..position]);
+            if !result.ends_with('\n') {
+                result.push('\n');
+            }
+            result.push_str(&option_line);
+            result.push('\n');
+            result.push_str(&original[position..]);
+            result
         };
+
+        // Reject any output that the structural parser cannot read.
+        let reparsed = parser.parse(&modified).map_err(|error| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Generated configuration did not parse: {}", error.message),
+            )
+        })?;
+        if !reparsed.errors.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Generated configuration contains parse errors: {:?}", reparsed.errors),
+            ));
+        }
 
         Ok(ConfigPatch {
             target: config_path,
             original,
             modified,
-            description: format!("Set {option_path} = {value}"),
+            description: format!("Set {rendered_path} = {rendered_value}"),
         })
     }
 
@@ -299,10 +494,44 @@ impl ConfigWriter {
             });
         }
 
-        // Structural validation (always runs, even in dry-run)
+        // Structural validation (always runs, even in dry-run).
         Self::validate_content_structure(&patch.original, &patch.modified)?;
 
+        let expected_target = self.config_root.join("configuration.nix");
+        if patch.target != expected_target {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Patch target does not match this ConfigWriter's configuration root",
+            ));
+        }
+
+        // Bind the preview to the exact on-disk pre-state. A stale diff must
+        // never overwrite a concurrent edit.
+        let current = std::fs::read_to_string(&patch.target)?;
+        if current != patch.original {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Configuration changed after this patch was created; rebuild and review the patch",
+            ));
+        }
+
         if self.dry_run {
+            // Use the bundled parser for previews so dry-run remains usable on
+            // machines without nix-instantiate; it still must be valid Nix syntax.
+            let mut parser = NixParser::new();
+            let parsed = parser.parse(&patch.modified).map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Dry-run Nix parsing failed: {}", error.message),
+                )
+            })?;
+            if !parsed.errors.is_empty() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Dry-run Nix parsing reported errors: {:?}", parsed.errors),
+                ));
+            }
+
             return Ok(WriteResult {
                 path: patch.target.clone(),
                 backup_path: None,
@@ -311,7 +540,7 @@ impl ConfigWriter {
             });
         }
 
-        // Validate syntax
+        // Validate syntax with the Nix evaluator/parser before writing.
         if self.validate {
             Self::validate_nix_syntax(&patch.modified)?;
         }
@@ -326,7 +555,23 @@ impl ConfigWriter {
         // Atomic write: write to temp file, then rename
         let temp_path = patch.target.with_extension("nix.tmp");
         std::fs::write(&temp_path, &patch.modified)?;
-        std::fs::rename(&temp_path, &patch.target)?;
+
+        // Re-check immediately before rename to narrow the read/modify/write
+        // race. This is not a substitute for a cross-process file lock, but it
+        // prevents overwriting a target that changed during validation/backup.
+        let latest = std::fs::read_to_string(&patch.target)?;
+        if latest != patch.original {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Configuration changed while the patch was being prepared; no write was performed",
+            ));
+        }
+
+        if let Err(error) = std::fs::rename(&temp_path, &patch.target) {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(error);
+        }
 
         Ok(WriteResult {
             path: patch.target.clone(),
@@ -470,6 +715,21 @@ mod tests {
     }
 
     #[test]
+    fn add_package_does_not_confuse_longer_attribute_prefix() {
+        let config = r#"{ config, pkgs, ... }:
+{
+  environment.systemPackages = [
+    pkgs.github-cli
+  ];
+}
+"#;
+        let (_dir, writer) = setup_temp_config(config);
+        let patch = writer.add_system_package("git").unwrap();
+        assert!(patch.modified.contains("pkgs.git"));
+        assert!(patch.modified.contains("pkgs.github-cli"));
+    }
+
+    #[test]
     fn test_add_existing_package_noop() {
         let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
         let patch = writer.add_system_package("firefox").unwrap();
@@ -512,6 +772,128 @@ mod tests {
         let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
         let patch = writer.set_option("services.nginx.enable", "true").unwrap();
         assert!(patch.modified.contains("services.nginx.enable = true;"));
+    }
+
+    #[test]
+    fn arbitrary_nix_expressions_are_rejected_by_legacy_set_option() {
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let injection = "true; services.openssh.enable = true";
+        let error = writer
+            .set_option("networking.firewall.enable", injection)
+            .expect_err("arbitrary Nix source must not be accepted");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+
+        let error = writer
+            .set_option("networking.firewall.enable; services.openssh.enable", "true")
+            .expect_err("an injected attribute path must not be accepted");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn json_string_values_are_escaped_as_nix_literals() {
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let payload = concat!("$", "{builtins.abort \"not executable\"}");
+        let raw = serde_json::to_string(&payload).unwrap();
+        let patch = writer.set_option("networking.hostName", &raw).unwrap();
+
+        assert!(patch.modified.contains(&concat!("\\", "$", "{builtins.abort")));
+        let unescaped = patch.modified.replace(&concat!("\\", "$", "{"), "");
+        assert!(!unescaped.contains(&concat!("$", "{")));
+    }
+
+    #[test]
+    fn package_attribute_paths_reject_expression_injection() {
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        for candidate in [
+            "git; builtins.abort",
+            "git ) ; services.openssh.enable = true",
+            "python3Packages..numpy",
+            "pkgs.git",
+            "git with builtins",
+        ] {
+            let error = writer
+                .add_system_package(candidate)
+                .expect_err("invalid package attribute must be rejected");
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        }
+    }
+
+    #[test]
+    fn package_removal_does_not_remove_a_longer_prefix_match() {
+        let config = r#"{ config, pkgs, ... }:
+{
+  environment.systemPackages = [
+    pkgs.git
+    pkgs.github-cli
+  ];
+}
+"#;
+        let (_dir, writer) = setup_temp_config(config);
+        let patch = writer.remove_system_package("git").unwrap();
+        assert!(!patch.modified.contains("pkgs.git\n"));
+        assert!(patch.modified.contains("pkgs.github-cli"));
+    }
+
+    #[test]
+    fn stale_patch_is_rejected_without_overwriting_concurrent_edit() {
+        let (dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let patch = writer.set_option("services.openssh.enable", "false").unwrap();
+
+        let changed = format!("{SAMPLE_CONFIG}\n# concurrent operator edit\n");
+        fs::write(dir.path().join("configuration.nix"), &changed).unwrap();
+
+        let error = writer
+            .apply_patch(&patch)
+            .expect_err("patch created from a stale pre-state must be rejected");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        assert_eq!(
+            fs::read_to_string(dir.path().join("configuration.nix")).unwrap(),
+            changed
+        );
+    }
+
+    #[test]
+    fn nested_and_composed_option_bindings_are_not_rewritten_as_flat_paths() {
+        let nested = r#"{ config, pkgs, ... }:
+{
+  services = {
+    openssh = {
+      enable = true;
+    };
+  };
+}
+"#;
+        let (_dir, writer) = setup_temp_config(nested);
+        let error = writer
+            .set_option("services.openssh.enable", "false")
+            .expect_err("nested binding must require an AST-aware rewrite");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+
+        let composed = r#"{ config, pkgs, ... }:
+{
+  services.openssh.enable = true; services.nginx.enable = true;
+}
+"#;
+        let (_dir, writer) = setup_temp_config(composed);
+        let error = writer
+            .set_option("services.openssh.enable", "false")
+            .expect_err("same-line sibling definitions must not be removed");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn duplicate_option_definitions_are_not_textually_replaced() {
+        let duplicate = r#"{ config, pkgs, ... }:
+{
+  services.openssh.enable = true;
+  services.openssh.enable = false;
+}
+"#;
+        let (_dir, writer) = setup_temp_config(duplicate);
+        let error = writer
+            .set_option("services.openssh.enable", "true")
+            .expect_err("ambiguous duplicate definitions must fail closed");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
     }
 
     #[test]
