@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon-temporal-boundaries-v1.schema.json",
+  "title": "MON Temporal Boundaries v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "revocation_effective_at",
+    "cases"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon-temporal-boundaries-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "revocation_effective_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "capture_earliest",
+          "capture_latest",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capture_earliest": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "capture_latest": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expected": {
+            "enum": [
+              "qualified",
+              "blocked",
+              "indeterminate"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

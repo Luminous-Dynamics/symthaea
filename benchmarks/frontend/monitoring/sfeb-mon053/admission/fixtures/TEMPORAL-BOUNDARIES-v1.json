@@ -1,0 +1,49 @@
+{
+  "profile": "mon-temporal-boundaries-v1",
+  "version": "1.0.0",
+  "revocation_effective_at": "2026-11-28T12:00:10Z",
+  "cases": [
+    {
+      "id": "T01-certainly-before",
+      "capture_earliest": "2026-11-28T12:00:00Z",
+      "capture_latest": "2026-11-28T12:00:09Z",
+      "expected": "qualified"
+    },
+    {
+      "id": "T02-overlap",
+      "capture_earliest": "2026-11-28T12:00:09Z",
+      "capture_latest": "2026-11-28T12:00:11Z",
+      "expected": "indeterminate"
+    },
+    {
+      "id": "T03-upper-equality",
+      "capture_earliest": "2026-11-28T12:00:08Z",
+      "capture_latest": "2026-11-28T12:00:10Z",
+      "expected": "indeterminate"
+    },
+    {
+      "id": "T04-lower-equality",
+      "capture_earliest": "2026-11-28T12:00:10Z",
+      "capture_latest": "2026-11-28T12:00:12Z",
+      "expected": "blocked"
+    },
+    {
+      "id": "T05-certainly-after",
+      "capture_earliest": "2026-11-28T12:00:11Z",
+      "capture_latest": "2026-11-28T12:00:12Z",
+      "expected": "blocked"
+    },
+    {
+      "id": "T06-point-at-revocation",
+      "capture_earliest": "2026-11-28T12:00:10Z",
+      "capture_latest": "2026-11-28T12:00:10Z",
+      "expected": "blocked"
+    },
+    {
+      "id": "T07-point-before",
+      "capture_earliest": "2026-11-28T12:00:09Z",
+      "capture_latest": "2026-11-28T12:00:09Z",
+      "expected": "qualified"
+    }
+  ]
+}
