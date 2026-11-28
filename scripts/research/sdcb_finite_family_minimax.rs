@@ -11,7 +11,7 @@
 //!   rustc --edition=2024 scripts/research/sdcb_finite_family_minimax.rs -o /tmp/sdcb-minimax
 //!   /tmp/sdcb-minimax
 
-use std::f64::consts::{LN_2, PI, SQRT_2, TAU};
+use std::f64::consts::{LN_2, SQRT_2, TAU};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct NormalLaw {
