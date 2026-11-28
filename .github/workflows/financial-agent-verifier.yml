@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - main
+      - research/fin-research-semantic-verifier-v0-1
     paths:
       - "benchmarks/financial-agent-verifier/**"
       - "benchmarks/financial-agent-v1/**"
@@ -37,5 +38,7 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
       - name: Format check
         run: cargo fmt --manifest-path benchmarks/financial-agent-verifier/Cargo.toml --check
+      - name: Resolve and record dependency graph
+        run: cargo generate-lockfile --manifest-path benchmarks/financial-agent-verifier/Cargo.toml
       - name: Schema, byte-binding and semantic negative-control tests
-        run: cargo test --manifest-path benchmarks/financial-agent-verifier/Cargo.toml
+        run: cargo test --locked --manifest-path benchmarks/financial-agent-verifier/Cargo.toml
