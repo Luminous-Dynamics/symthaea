@@ -11,6 +11,8 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::time::Instant;
 
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use cmaq_046_convex_target_approachability::BoxTarget;
 use cmaq_048_fourier_kernel_approachability::FourierFeatureMap;
 use cmaq_053_compositional_risk_budget::{FleetBudgetPlan, FleetScope, Rational};
@@ -18,7 +20,7 @@ use cmaq_054_evidence_adaptive_kernel_family::KernelExpertConfig;
 use cmaq_056_typed_null_manifest::{KernelFamilyManifest, NullCalibration, TypedRiskPlan};
 use cmaq_058_exact_restart_renewal::CapitalRestartRenewalMonitor;
 use cmaq_059_finite_sample_calibration::{
-    clopper_pearson, summarize_detection_trials, summarize_null_family,
+    clopper_pearson, paired_stream_seed, summarize_detection_trials, summarize_null_family,
     DetectionTrial, NullCalibrationCell,
 };
 use cmaq_059_finite_sample_calibration::scenarios::{
@@ -126,6 +128,49 @@ fn nearest_rank(values: &mut [u64], quantile: f64) -> u64 {
     values[rank - 1]
 }
 
+fn percentile(values: &[f64], quantile: f64) -> f64 {
+    if values.is_empty() { return f64::NAN; }
+    let index = ((quantile * values.len() as f64).ceil() as usize)
+        .max(1)
+        .min(values.len()) - 1;
+    values[index]
+}
+
+fn paired_bootstrap_mean_ci(
+    values: &[f64],
+    scenario_id: &str,
+    metric: &str,
+) -> Result<(f64, f64, f64), Box<dyn Error>> {
+    if values.is_empty() { return Err("cannot bootstrap an empty paired sample".into()); }
+    let seed = paired_stream_seed(
+        "cmaq-059-paired-bootstrap-v1",
+        &format!("{scenario_id}-{metric}"),
+        values.len() as u64,
+    )?;
+    let mut rng = ChaCha20Rng::from_seed(seed);
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    let mut bootstrap = Vec::with_capacity(2_000);
+    for _ in 0..2_000 {
+        let sample_mean = (0..values.len())
+            .map(|_| values[rng.random_range(0..values.len())])
+            .sum::<f64>() / values.len() as f64;
+        bootstrap.push(sample_mean);
+    }
+    bootstrap.sort_by(f64::total_cmp);
+    Ok((mean, percentile(&bootstrap, 0.025), percentile(&bootstrap, 0.975)))
+}
+
+fn restricted_delay(first_alarm: Option<u64>, change_point: u64, horizon: u64) -> u64 {
+    match first_alarm {
+        Some(sequence) if sequence > change_point => sequence - change_point,
+        _ => horizon.saturating_add(1),
+    }
+}
+
+fn is_detection(first_alarm: Option<u64>, change_point: u64) -> bool {
+    first_alarm.is_some_and(|sequence| sequence > change_point)
+}
+
 fn calibration_sigma() -> Result<(f64, String), Box<dyn Error>> {
     // Separate calibration stream: it is never used as a scored test stream.
     let mut config = ScenarioConfig::standard(ScenarioKind::EqualConditionalIid, 50);
@@ -172,8 +217,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let raw_file = File::create("cmaq-059-matched-mc-raw.csv")?;
     let summary_file = File::create("cmaq-059-matched-mc-summary.csv")?;
+    let paired_file = File::create("cmaq-059-matched-mc-paired-differences.csv")?;
     let mut raw = BufWriter::new(raw_file);
     let mut summary = BufWriter::new(summary_file);
+    let mut paired = BufWriter::new(paired_file);
 
     writeln!(
         raw,
@@ -182,6 +229,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     writeln!(
         summary,
         "experiment,scenario,arm,horizon,replicates,alpha,false_alarms,false_alarm_rate,false_alarm_lower,false_alarm_upper,detections,early_alarms,unconditional_power,power_lower,power_upper,restricted_mean_delay,delay_p50,delay_p90,delay_p95,feature_coordinates_total,kernel_evaluations_total,update_latency_p50_ns,update_latency_p99_ns,bandwidth,bandwidth_calibration_stream_sha256"
+    )?;
+    writeln!(
+        paired,
+        "experiment,scenario,metric,contrast,replicates,mean_difference,bootstrap_lower_95,bootstrap_upper_95,bootstrap_replicates"
     )?;
 
     let scenarios = ScenarioKind::ALL;
@@ -322,6 +373,51 @@ fn main() -> Result<(), Box<dyn Error>> {
             scpt_outcomes.push(scpt_outcome);
         }
 
+        if kind.is_null() {
+            let differences = c058_outcomes.iter()
+                .zip(&scpt_outcomes)
+                .map(|(c058, scpt)| {
+                    f64::from(c058.first_alarm.is_some()) - f64::from(scpt.first_alarm.is_some())
+                })
+                .collect::<Vec<_>>();
+            let (mean, lower, upper) =
+                paired_bootstrap_mean_ci(&differences, kind.id(), "false-alarm-delta")?;
+            writeln!(
+                paired,
+                "{EXPERIMENT_ID},{},paired_false_alarm_rate_delta,C058-minus-SCPT,{replicates},{mean:.12},{lower:.12},{upper:.12},2000",
+                kind.id()
+            )?;
+        } else {
+            let detection_differences = c058_outcomes.iter()
+                .zip(&scpt_outcomes)
+                .map(|(c058, scpt)| {
+                    f64::from(is_detection(c058.first_alarm, change_point))
+                        - f64::from(is_detection(scpt.first_alarm, change_point))
+                })
+                .collect::<Vec<_>>();
+            let delay_differences = c058_outcomes.iter()
+                .zip(&scpt_outcomes)
+                .map(|(c058, scpt)| {
+                    restricted_delay(c058.first_alarm, change_point, horizon) as f64
+                        - restricted_delay(scpt.first_alarm, change_point, horizon) as f64
+                })
+                .collect::<Vec<_>>();
+            let (power_mean, power_lower, power_upper) =
+                paired_bootstrap_mean_ci(&detection_differences, kind.id(), "power-delta")?;
+            let (delay_mean, delay_lower, delay_upper) =
+                paired_bootstrap_mean_ci(&delay_differences, kind.id(), "delay-delta")?;
+            writeln!(
+                paired,
+                "{EXPERIMENT_ID},{},unconditional_power_delta,C058-minus-SCPT,{replicates},{power_mean:.12},{power_lower:.12},{power_upper:.12},2000",
+                kind.id()
+            )?;
+            writeln!(
+                paired,
+                "{EXPERIMENT_ID},{},restricted_delay_delta,C058-minus-SCPT,{replicates},{delay_mean:.12},{delay_lower:.12},{delay_upper:.12},2000",
+                kind.id()
+            )?;
+        }
+
         for (arm, outcomes) in [
             (Arm::Cmaq058, &c058_outcomes),
             (Arm::ScptFixedBandwidth, &scpt_outcomes),
@@ -433,6 +529,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     raw.flush()?;
     summary.flush()?;
+    paired.flush()?;
     family_writer.flush()?;
     eprintln!(
         "completed experiment={} replicates={} horizon={} alpha={} sigma={} calibration_stream={}",
