@@ -144,6 +144,36 @@ validator, registry-driven runner integration, generated paper/README tables
 and full inventory coverage remain pending. Unknown/uncalibrated metrics are
 marked ineligible rather than assigned guessed human norms.
 
+### Explicit metric support and confidence intervals
+
+Registered metric implementations should use the support declared by the pilot
+registry instead of guessing bounds from the observed sample values.
+
+```rust
+use symthaea_psych_bench::harness::MetricValue;
+use symthaea_psych_bench::registry::MetricBounds;
+
+let proportion = MetricValue::from_samples_with_bounds(
+    &[1.0, 1.0, 0.0, 1.0],
+    MetricBounds { lower: 0.0, upper: Some(1.0) },
+)?;
+
+let signed_index = MetricValue::from_samples_with_bounds(
+    &[-0.2, 0.0, 0.2],
+    MetricBounds { lower: -1.0, upper: Some(1.0) },
+)?;
+```
+
+This API validates every observation against the declared support. Endpoint-only
+binary samples use Wilson intervals; other finite bounded metrics use a BCa
+bootstrap in normalized coordinates and transform the interval back to the
+metric's units. Lower-bounded, upper-unbounded measures use a lower-clipped
+t interval. Out-of-support and non-finite observations return an error; do not
+silently clamp invalid data. Selected N-back, Stroop, metacognition, false-belief,
+causal-intervention and HOT/GWT shared-input metrics now use this path. Other
+benchmarks remain on the legacy estimator until their metric semantics and
+support have been registered.
+
 ## Dependencies
 
 This crate depends on:
