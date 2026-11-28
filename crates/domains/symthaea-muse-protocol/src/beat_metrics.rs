@@ -352,24 +352,33 @@ fn event_f_measure(
     if reference.is_empty() || estimated.is_empty() {
         return 0.0;
     }
-    let tolerance_left = u128::from(sample_rate_hz) * u128::from(tolerance_ms);
-    let mut reference_index = 0usize;
-    let mut estimated_index = 0usize;
-    let mut matching_count = 0usize;
+    let sample_rate = f64::from(sample_rate_hz);
+    let tolerance_seconds = tolerance_ms as f64 / 1_000.0;
+    let reference_seconds: Vec<f64> = reference
+        .iter()
+        .map(|frame| *frame as f64 / sample_rate)
+        .collect();
 
-    while reference_index < reference.len() && estimated_index < estimated.len() {
-        let reference_frame = reference[reference_index];
-        let estimated_frame = estimated[estimated_index];
-        let delta = reference_frame.abs_diff(estimated_frame);
-        let within = u128::from(delta) * 1_000
-            <= tolerance_left;
-        if within {
-            matching_count += 1;
+    // mir_eval.util._fast_hit_windows builds each estimate's interval as
+    // [estimate - window, estimate + window], then maximum-matches the
+    // resulting monotone interval graph. Preserve the exact operation order
+    // because replacing it with an integer delta can change floating ULP
+    // boundary behavior for source clocks such as 2.014s versus 2.084s.
+    let mut reference_index = 0usize;
+    let mut matching_count = 0usize;
+    for estimated_frame in estimated {
+        let estimate_seconds = *estimated_frame as f64 / sample_rate;
+        let low = estimate_seconds - tolerance_seconds;
+        let high = estimate_seconds + tolerance_seconds;
+        while reference_index < reference_seconds.len()
+            && reference_seconds[reference_index] < low
+        {
             reference_index += 1;
-            estimated_index += 1;
-        } else if estimated_frame < reference_frame {
-            estimated_index += 1;
-        } else {
+        }
+        if reference_index < reference_seconds.len()
+            && reference_seconds[reference_index] <= high
+        {
+            matching_count += 1;
             reference_index += 1;
         }
     }
@@ -581,11 +590,14 @@ fn p_score(
 }
 
 fn quantize_10ms_bins(frames: &[u64], offset: u64, sample_rate_hz: u32) -> Vec<u64> {
+    let sample_rate = f64::from(sample_rate_hz);
+    let offset_seconds = offset as f64 / sample_rate;
     let mut bins = Vec::with_capacity(frames.len());
     for frame in frames {
-        let numerator = u128::from(*frame - offset) * 100;
-        let denominator = u128::from(sample_rate_hz);
-        let bin = numerator.div_ceil(denominator) as u64;
+        let seconds = *frame as f64 / sample_rate;
+        // Keep mir_eval's operation order: subtract the first-event offset in
+        // seconds, then multiply by 100 and apply ceil.
+        let bin = ((seconds - offset_seconds) * 100.0).ceil() as u64;
         if bins.last().copied() != Some(bin) {
             bins.push(bin);
         }
@@ -939,6 +951,16 @@ mod tests {
         .unwrap();
         assert!((arithmetic.scores.f_measure - 0.5).abs() < 1e-12);
         assert!((weighted.scores.f_measure - 0.9).abs() < 1e-12);
+    }
+
+    #[test]
+    fn f_measure_reproduces_mir_eval_float_window_boundary_operation_order() {
+        let reference = [7_663, 8_362, 9_413, 10_470, 10_723, 12_285];
+        let estimated = [6_051, 6_677, 10_624, 14_012, 14_372, 14_684, 14_846, 14_860];
+        // 2.084 - 0.07 is represented just above 2.014 in binary64;
+        // mir_eval's estimate-centered window excludes that edge.
+        let score = event_f_measure(&reference, &estimated, 1_000, 70);
+        assert_eq!(score, 0.0);
     }
 
     #[test]
