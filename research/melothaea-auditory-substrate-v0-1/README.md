@@ -25,3 +25,10 @@ The `dsp` module now provides a deterministic CPU reference pipeline:
 - Triangular log-frequency power partition of the same STFT bins.
 
 The ERB implementation is not a gammatone cochlear model. The log-frequency view is not a true constant-Q transform: it inherits the fixed linear-frequency STFT grid. A separate multi-resolution CQT implementation remains future work. These baseline algorithms expose their assumptions so later implementations can be compared fairly.
+
+
+## True variable-window constant-Q analysis
+
+The `dsp` module now also includes a direct complex CQT reference. It uses logarithmically spaced frequency centres and the conventional Q factor, with a distinct odd-length Hann window per bin. Every bin records its own exact half-open sample support and complex coefficient. Frames are emitted only when every bin window is fully supported; the reference implementation does not pad the source edges.
+
+This implementation is intentionally a transparent CPU reference, not an optimized production kernel. It has a declared upper bound on sample accumulations. The log-frequency re-binning remains a separate feature, so evaluations can measure whether CQT provides complementary pitch and interval evidence.
