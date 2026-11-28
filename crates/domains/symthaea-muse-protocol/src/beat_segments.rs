@@ -118,7 +118,6 @@ pub enum MirexValidSegmentError {
     ZeroSampleRate,
     EmptySourceClock,
     SourceClockExceedsJsonSafeInteger,
-    SourceDurationExceedsMirEvalLimit,
     InvalidEventOrder,
     EventOutOfSourceBounds,
     ReferenceDownbeatNotInReferenceBeatSequence,
@@ -167,11 +166,6 @@ pub fn score_mirex_valid_segments(
     }
     if total_source_frames > MAX_SAFE_JSON_INTEGER {
         return Err(MirexValidSegmentError::SourceClockExceedsJsonSafeInteger);
-    }
-    if u128::from(total_source_frames.saturating_sub(1))
-        > u128::from(sample_rate_hz) * 30_000u128
-    {
-        return Err(MirexValidSegmentError::SourceDurationExceedsMirEvalLimit);
     }
     let event_limit = crate::beat_benchmark::MAX_REFERENCE_EVENTS_PER_TRACK;
     if reference_beat_frames.len() > event_limit
@@ -724,6 +718,28 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error, MirexValidSegmentError::TooManyEvents);
+    }
+
+    #[test]
+    fn accepts_long_source_when_each_scored_valid_region_is_within_mir_eval_limit() {
+        let long_source_frames = 30_000_001;
+        let result = score_mirex_valid_segments(
+            &[5_000, 6_000, 7_000],
+            &[5_000, 6_000, 7_000],
+            &[],
+            &[],
+            1_000,
+            long_source_frames,
+            &[BeatValidSegment {
+                start_frame: 5_000,
+                end_frame: 8_000,
+            }],
+            config(MirexSegmentBeatTrimPolicy::SourceGlobalFiveSeconds),
+            evidence(),
+        )
+        .unwrap();
+        assert_eq!(result.segments.len(), 1);
+        assert_eq!(result.segments[0].beat_report.scores.f_measure, 1.0);
     }
 
     #[test]
