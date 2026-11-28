@@ -34,6 +34,8 @@ jobs:
         run: cargo +1.100.0 clippy --manifest-path research/cmaq-059/Cargo.toml --locked --all-targets -- -D warnings
       - name: Run SCPT wiring probe
         run: cargo +1.100.0 run --release --manifest-path research/cmaq-059/Cargo.toml --locked --bin scpt_probe > cmaq-059-scpt-probe.csv
+      - name: Run matched C058 versus SCPT smoke Monte Carlo
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-059/Cargo.toml --locked --bin matched_mc -- --replicates 16 --horizon 128
       - name: Preserve calibration test evidence
         uses: actions/upload-artifact@v4
         with:
