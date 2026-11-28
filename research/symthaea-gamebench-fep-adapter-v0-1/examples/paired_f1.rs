@@ -45,7 +45,6 @@ struct Aggregate {
     missing_optimum: u64,
     forecast_brier_sum: f64,
     scored_forecast_features: u64,
-    forecast_features: u64,
     expected_forecast_features: u64,
 }
 
@@ -176,7 +175,6 @@ where
         aggregate.expected_forecast_features += expected_features;
         if let Some(brier) = record.forecast_brier {
             aggregate.forecast_brier_sum += brier * scored_features as f64;
-            aggregate.forecast_features += scored_features;
         }
         if record.success {
             aggregate.successful_episodes += 1;
@@ -235,10 +233,10 @@ fn print_summary(name: &str, aggregate: &mut Aggregate) {
     let p50_decision_ns = percentile(&aggregate.decision_latencies_ns, 0.50);
     let p95_decision_ns = percentile(&aggregate.decision_latencies_ns, 0.95);
     let p95_episode_ns = percentile(&aggregate.wall_times_ns, 0.95);
-    let mean_forecast_brier = if aggregate.forecast_features == 0 {
+    let mean_forecast_brier = if aggregate.scored_forecast_features == 0 {
         f64::NAN
     } else {
-        aggregate.forecast_brier_sum / aggregate.forecast_features as f64
+        aggregate.forecast_brier_sum / aggregate.scored_forecast_features as f64
     };
     let mean_forecast_coverage = if aggregate.expected_forecast_features == 0 {
         0.0
