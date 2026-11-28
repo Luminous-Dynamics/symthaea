@@ -561,6 +561,9 @@ pub enum TransitionGridBindingViolationCode {
     SourceAnchorOutsidePulseSupport,
     TargetAnchorOutsidePulseSupport,
     BeatPhaseMismatch,
+    SourceTempoUnavailable,
+    TargetTempoUnavailable,
+    TempoDeltaExceeded,
 }
 
 /// A typed, stable result from transition-to-beat-grid evidence binding.
@@ -576,8 +579,9 @@ pub struct TransitionGridBindingViolation {
 ///
 /// This is stronger than checking that hypothesis ID strings are non-empty.
 /// It also verifies that both frame anchors are bracketed by pulse anchors in
-/// their respective hypotheses and that their circular beat-phase error is no
-/// greater than the transition's declared tolerance.
+/// their respective hypotheses, that circular beat-phase error is within its
+/// declared tolerance, and that selected tempo-map values differ by no more
+/// than the declared absolute milli-BPM tolerance.
 ///
 /// This function does not establish probability calibration, musical quality,
 /// detector accuracy, or execution authority. The caller must retain the
@@ -711,7 +715,80 @@ pub fn verify_transition_grid_binding(
         );
     }
 
+    let source_tempo = tempo_at_frame(
+        source_hypothesis,
+        alignment.source_anchor_frame,
+    );
+    let target_tempo = tempo_at_frame(
+        target_hypothesis,
+        alignment.target_anchor_frame,
+    );
+    if source_tempo.is_none() {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::SourceTempoUnavailable,
+            "source_report.hypotheses.tempo_map",
+        );
+    }
+    if target_tempo.is_none() {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::TargetTempoUnavailable,
+            "target_report.hypotheses.tempo_map",
+        );
+    }
+    if let (Some(source_tempo), Some(target_tempo)) = (source_tempo, target_tempo) {
+        let tempo_delta = source_tempo.abs_diff(target_tempo);
+        if tempo_delta > alignment.max_tempo_delta_milli_bpm {
+            push_binding(
+                &mut violations,
+                TransitionGridBindingViolationCode::TempoDeltaExceeded,
+                "alignment.max_tempo_delta_milli_bpm",
+            );
+        }
+    }
+
     violations
+}
+
+/// Evaluate a tempo map at a source-local frame using its declared interpolation.
+/// Exact tempo anchors are accepted; interpolation is confined to observed
+/// adjacent tempo-map points and never extrapolates beyond their support.
+fn tempo_at_frame(hypothesis: &BeatGridHypothesis, frame: u64) -> Option<u32> {
+    if let Some(point) = hypothesis
+        .tempo_map
+        .iter()
+        .find(|point| point.frame == frame)
+    {
+        return Some(point.bpm_milli);
+    }
+
+    let interpolation = hypothesis.tempo_interpolation?;
+    for pair in hypothesis.tempo_map.windows(2) {
+        let left = pair[0];
+        let right = pair[1];
+        if frame <= left.frame || frame >= right.frame {
+            continue;
+        }
+        let frame_span = i128::from(right.frame) - i128::from(left.frame);
+        if frame_span <= 0 {
+            return None;
+        }
+        let elapsed_frames = i128::from(frame) - i128::from(left.frame);
+        let left_bpm = i128::from(left.bpm_milli);
+        let right_bpm = i128::from(right.bpm_milli);
+        let bpm = match interpolation {
+            TempoInterpolation::StepwiseConstant => left_bpm,
+            TempoInterpolation::LinearInFrameTime => {
+                left_bpm + (right_bpm - left_bpm) * elapsed_frames / frame_span
+            }
+        };
+        if bpm <= 0 || bpm > i128::from(u32::MAX) {
+            return None;
+        }
+        return Some(bpm as u32);
+    }
+    None
 }
 
 /// Estimate a source-local beat position in milli-beats using the two
@@ -1078,8 +1155,9 @@ mod tests {
                 target_anchor_frame: 600,
                 source_grid_hypothesis_id: "source-grid".to_string(),
                 target_grid_hypothesis_id: "target-grid".to_string(),
-                beat_ordinal_milli: 16_000,
+                transition_beat_ordinal_milli: 16_000,
                 max_phase_error_milli: 100,
+                max_tempo_delta_milli_bpm: 1_000,
                 confidence_ppm: 850_000,
             }),
             protected_regions: Vec::new(),
@@ -1114,8 +1192,19 @@ mod tests {
                     },
                 ],
                 downbeat_anchors: Vec::new(),
-                tempo_interpolation: None,
-                tempo_map: Vec::new(),
+                tempo_interpolation: Some(TempoInterpolation::LinearInFrameTime),
+                tempo_map: vec![
+                    TempoMapPoint {
+                        frame: first_frame,
+                        bpm_milli: 120_000,
+                        confidence_ppm: 900_000,
+                    },
+                    TempoMapPoint {
+                        frame: second_frame,
+                        bpm_milli: 120_000,
+                        confidence_ppm: 900_000,
+                    },
+                ],
                 meter_map: Vec::new(),
             }],
             abstention_reason: None,
@@ -1135,6 +1224,57 @@ mod tests {
             &target_report,
         )
         .is_empty());
+    }
+
+    #[test]
+    fn rejects_same_phase_when_source_and_target_tempos_exceed_tolerance() {
+        let contract = transition_contract();
+        let source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        let mut target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        for point in &mut target_report.hypotheses[0].tempo_map {
+            point.bpm_milli = 90_000;
+        }
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        );
+        assert_eq!(
+            found[0].code,
+            TransitionGridBindingViolationCode::TempoDeltaExceeded
+        );
+    }
+
+    #[test]
+    fn rejects_aligned_pulse_reports_without_tempo_map_support() {
+        let contract = transition_contract();
+        let mut source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        source_report.hypotheses[0].tempo_map.clear();
+        source_report.hypotheses[0].tempo_interpolation = None;
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        );
+        assert_eq!(
+            found[0].code,
+            TransitionGridBindingViolationCode::SourceTempoUnavailable
+        );
+    }
+
+    #[test]
+    fn tempo_interpolation_obeys_declared_semantics() {
+        let mut hypothesis = hypothesis("tempo-grid", 900_000);
+        hypothesis.tempo_interpolation = Some(TempoInterpolation::StepwiseConstant);
+        assert_eq!(tempo_at_frame(&hypothesis, 12_000), Some(120_000));
+        hypothesis.tempo_interpolation = Some(TempoInterpolation::LinearInFrameTime);
+        assert_eq!(tempo_at_frame(&hypothesis, 12_000), Some(120_250));
+        assert_eq!(tempo_at_frame(&hypothesis, 60_000), None);
     }
 
     #[test]
