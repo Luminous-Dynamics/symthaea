@@ -395,7 +395,7 @@ The controller must not grade its own repair. The proposal, authorization, execu
 
 ## References
 
-- Hartl, Levin & Pio-Lopez (2026), “Neural cellular automata: Applications to biology and beyond classical AI,” *Physics of Life Reviews*. https://doi.org/10.1016/j.plrev.2026.01.002
+- Hartl, Levin & Pio-Lopez (2026), “Neural cellular automata: Applications to biology and beyond classical AI,” *Physics of Life Reviews*. https://doi.org/10.1016/j.plrev.2025.11.010
 - Moreno et al. (2026), “Smart cellular bricks for decentralized shape classification and damage recovery,” *Nature Communications*. https://doi.org/10.1038/s41467-026-75166-7
 - Attali et al. (2026), “Graph Rewiring in GNNs to Mitigate Over-Squashing and Over-Smoothing: A Survey,” IJCAI 2026. https://doi.org/10.24963/ijcai.2026/861
 - “Lifetime imaging reveals long-distance non-neural bioelectric patterns on timescales from seconds to hours” (November 2026), *Developmental Biology*. https://www.sciencedirect.com/science/article/pii/S0012160626001661
