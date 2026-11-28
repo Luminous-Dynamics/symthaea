@@ -1,0 +1,12 @@
+[package]
+name = "cmaq-048-fourier-kernel-approachability"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Fixed Fourier-feature kernel mean embedding monitored by convex-target e-processes"
+
+[dependencies]
+cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
+
+[workspace]
