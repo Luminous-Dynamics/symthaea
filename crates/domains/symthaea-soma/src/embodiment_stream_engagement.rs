@@ -52,7 +52,13 @@ pub struct StreamOpportunityV1 {
 impl StreamOpportunityV1 {
     pub fn expected_action(&self) -> StreamAction {
         match self.kind {
-            StreamOpportunityKind::ProactiveVisualCue => StreamAction::Intervene,
+            StreamOpportunityKind::ProactiveVisualCue => {
+                if self.agent_was_speaking {
+                    StreamAction::AdaptOutput
+                } else {
+                    StreamAction::Intervene
+                }
+            },
             StreamOpportunityKind::IncomingNewInformation => {
                 if self.agent_was_speaking {
                     StreamAction::AdaptOutput
@@ -467,6 +473,17 @@ mod tests {
             &[prediction(&item, StreamAction::StopOutput, 100)],
         ).unwrap();
         assert_eq!(result.stop_compliance_rate, Some(1.0));
+    }
+
+    #[test]
+    fn proactive_visual_cue_adapts_an_already_active_response() {
+        let item = opportunity("op-1", StreamOpportunityKind::ProactiveVisualCue, true);
+        assert_eq!(item.expected_action(), StreamAction::AdaptOutput);
+        let result = score_stream_engagement(
+            &[item.clone()],
+            &[prediction(&item, StreamAction::AdaptOutput, 120)],
+        ).unwrap();
+        assert_eq!(result.response_window_rate, Some(1.0));
     }
 
     #[test]
