@@ -226,7 +226,7 @@ Prioritize a smaller set with strong task grounding and useful mechanism hooks. 
 
 This anchor set should contain both externally validated tasks and explicitly synthetic mechanism probes. The report must never aggregate them into one "psychological score."
 
-The first new ecological benchmark family is specified separately in `docs/research/PSYCHBENCH_COGNITIVE_ECOLOGY_SPEC_v0.1.md`. PCE supplies a shared interactive world with partial observability, latent causal rules, persistent goals, social information asymmetry, regime shifts, and replayable event oracles. Its first implementation slice is the deterministic Rust world kernel, not an LLM wrapper.
+The first new ecological benchmark family is specified separately in `docs/research/PSYCHBENCH_COGNITIVE_ECOLOGY_SPEC_v0.1.md`. PCE supplies a shared interactive world with partial observability, latent causal rules, persistent goals, social information asymmetry, regime shifts, and replayable event oracles. A first Rust kernel now exists on this branch: agent-visible observations are separated from evaluator state; actions and evaluator perturbations produce BLAKE3-digested receipts; traces replay deterministically; manifest mismatches fail closed; and a hidden-resource delivery/gate-recovery scenario has tests. Rust execution and CI validation remain pending.
 
 ### 4.2 External comparators to adopt carefully
 
@@ -348,7 +348,7 @@ A benchmark that is insensitive to the negative control or fails to distinguish 
 7. Replace the MetacognitiveIgnition common-input ROC with an independent metacognitive readout or report it only as a shared-input thresholding diagnostic; add counterfactual same-evidence/different-competition tests.
 8. Keep the legacy CognitiveProfile as a triage visualization only; replace its unvalidated global composite with an explicitly descriptive dashboard and define calibrated metric metadata before building a true latent cognitive profile.
 9. Rebuild the Qualia output as evidence-tiered theory probes with missing/not-run/invalid/failed distinctions; retire the legacy geometric-mean “confidence” interpretation.
-10. Build the first PCE kernel from the standalone v0.1 spec: deterministic state transitions, event receipts/replay, scripted/random/oracle baselines, then the hidden-resource/persistent-goal/regime-shift scenario.
+10. Extend and qualify the initial PCE kernel: add JSONL receipt export and an independent verifier, a scenario generator/oracle, distractor and delayed-transfer stages, scripted/random/oracle baselines, and preregistered controls. The hidden-resource/persistent-goal/gate-regime-shift vertical slice is already present on the research branch.
 7. Quarantine planted-HDC creativity tasks from claims; keep them as algebraic unit tests.
 8. Unify Butlin indicator evaluation and paper examples; maintain the architectural/live/causal evidence separation.
 9. Recompute all published data from the current exact head. If it cannot be reproduced, withdraw the affected claim rather than preserving the number.
