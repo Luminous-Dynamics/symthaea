@@ -69,6 +69,32 @@ pub struct SourceEvidence {
     pub credibility: f32,
 }
 
+impl SourceEvidence {
+    /// Construct retrieved evidence without asserting claim-specific support.
+    ///
+    /// Retrieval relevance and source credibility are ranking metadata, not a
+    /// support/refutation judgment. A later claim-scoped classifier may replace
+    /// `supports: None` only when it supplies an attributable relation.
+    pub fn unclassified(
+        url: impl Into<String>,
+        domain: impl Into<String>,
+        source_type: ResearchSource,
+        relevant_text: impl Into<String>,
+        similarity: f32,
+        credibility: f32,
+    ) -> Self {
+        Self {
+            url: url.into(),
+            domain: domain.into(),
+            source_type,
+            relevant_text: relevant_text.into(),
+            supports: None,
+            similarity,
+            credibility,
+        }
+    }
+}
+
 /// Result of verifying a claim
 #[derive(Debug, Clone)]
 pub struct VerificationResult {
@@ -370,6 +396,22 @@ mod tests {
 
         let result = verifier.verify_claim("Rust is memory safe", &context);
         assert_eq!(result.status, EpistemicStatus::InsufficientEvidence);
+    }
+
+    #[test]
+    fn production_retrieval_constructor_keeps_support_unclassified() {
+        let source = SourceEvidence::unclassified(
+            "https://example.org/result",
+            "example.org",
+            ResearchSource::Academic,
+            "A highly query-relevant passage without claim adjudication",
+            1.0,
+            1.0,
+        );
+
+        assert_eq!(source.supports, None);
+        assert_eq!(source.similarity, 1.0);
+        assert_eq!(source.credibility, 1.0);
     }
 
     #[test]
