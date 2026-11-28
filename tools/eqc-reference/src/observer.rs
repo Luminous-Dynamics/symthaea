@@ -805,6 +805,36 @@ mod tests {
     }
 
     #[test]
+    fn observer_binary_version_and_digest_are_pinned_out_of_band() {
+        let key = signing_key();
+        let envelope = signed_envelope(&key);
+        let mut policy = trust_policy(&key);
+        policy.trusted_observers[0].observer_version = "0.0.9".into();
+        let mut ledger = ObserverNonceLedger::default();
+        assert!(
+            verify_envelope(&envelope, &policy, &expectation(), &mut ledger).is_err()
+        );
+
+        let mut policy = trust_policy(&key);
+        policy.trusted_observers[0].observer_sha256 = "fe".repeat(32);
+        assert!(
+            verify_envelope(&envelope, &policy, &expectation(), &mut ledger).is_err()
+        );
+    }
+
+    #[test]
+    fn duplicate_observer_key_ids_are_rejected() {
+        let key = signing_key();
+        let mut policy = trust_policy(&key);
+        policy.trusted_observers.push(policy.trusted_observers[0].clone());
+        let envelope = signed_envelope(&key);
+        let mut ledger = ObserverNonceLedger::default();
+        assert!(
+            verify_envelope(&envelope, &policy, &expectation(), &mut ledger).is_err()
+        );
+    }
+
+    #[test]
     fn nonce_replay_is_rejected_within_the_evaluation_ledger() {
         let key = signing_key();
         let envelope = signed_envelope(&key);
