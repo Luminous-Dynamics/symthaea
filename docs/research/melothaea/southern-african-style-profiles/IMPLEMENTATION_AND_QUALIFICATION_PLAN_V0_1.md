@@ -24,14 +24,14 @@ This tranche supplies style-specific, machine-readable research records that can
 ### Amapiano
 
 1. Eaby-Lomas, D. M. (2023), “Kwaito as history: Complicating contemporary historiographies,” *African Music*, 12(1), 21–36. [DOI: 10.21504/amj.v12i1.2529](https://doi.org/10.21504/amj.v12i1.2529). This situates Amapiano within a longer South African township-music history and discusses links with marabi, mbaqanga, bubblegum and kwaito. It treats histories and origins as multivocal and ambiguous.
-2. “Understanding amapiano and the South African city through the music videos of Big Flexa and Bhebha” (2024). [DOI: 10.1080/02533952.2024.2526251](https://doi.org/10.1080/02533952.2024.2526251). Its discussion includes piano/keyboard, smooth-jazz and other genre influences, the log drum, extended instrumental openings, gradual entry of layers and local-language dissemination. These are candidate observations, not requirements for every Amapiano track.
-3. “Ase trap tse ke pina tsa ko kasi — Sonics After the Struggle: Mapping Amapiano and Black Aesthetics in Post-Apartheid South Africa” (2026). [DOI: 10.1080/13696815.2026.2634896](https://doi.org/10.1080/13696815.2026.2634896). This provides newer scene and historical context. Read with practitioner discussion before making narrower production claims.
+2. Oloruntoba, A. O. (2024), “Understanding amapiano and the South African city through the music videos of Big Flexa and Bhebha,” *Social Dynamics*, 50(3), 416–432. [DOI: 10.1080/02533952.2024.2526251](https://doi.org/10.1080/02533952.2024.2526251). This is primarily a cultural/urban analysis of two videos. It reports that some early Amapiano sounds around 2014 used instrumental passages lasting up to two or three minutes before vocals and gradual addition of other elements, and documents collaborative production in the selected Bhebha example. These are period- and example-bounded observations, not universal requirements or a complete technical grammar.
+3. Mdlalose, S. T. (2026), “‘Ase trap tse ke pina tsa ko kasi’ — Sonics After the Struggle: Mapping Amapiano and Black Aesthetics in Post-Apartheid South Africa.” [DOI: 10.1080/13696815.2026.2634896](https://doi.org/10.1080/13696815.2026.2634896). This situated cultural-historical account traces Amapiano's relationship to Kwaito and discusses early piano presence, the development of the log drum through producer innovation, synths and looped vocal material. Retain these as attributed historical observations, not fixed recipe requirements.
 
 ### Gqom
 
 1. Eaby-Lomas, D. M. (2022), “Historicising gqom as a post-kwaito phenomenon,” *Journal of the Musical Arts in Africa*, 18(1), 101–116. [DOI: 10.2989/18121004.2021.2020964](https://doi.org/10.2989/18121004.2021.2020964). The article discusses Gqom's emergence, dissemination, production, gender discourse and party spaces, and describes rhythmic foregrounding, a raw/dark sound and slow-burn structure in the examples studied. It also notes that these traits have changed in newer releases.
 
-The source set is sufficient to define research questions and avoid obvious generic approximations. It is not sufficient to freeze a universal grammar or claim community authority.
+The source set supports a small number of period-specific observations, but it does not establish a universal Amapiano grammar. In particular, early examples predate the log drum and shaker becoming characteristic; a 2014-era instrumental-opening description must not be generalized to every contemporary Amapiano track. The current sources are sufficient to scope falsifiable research questions, not to freeze a complete technical recipe or claim community authority.
 
 ## Profile architecture
 
@@ -63,7 +63,7 @@ Compose and evaluate the score, performance and renderer as separate causal laye
 
 ### 3. A style profile is not a frozen loop
 
-Model a constrained space of valid arrangements and performance variations. The objective is to preserve identity-bearing relationships while allowing within-style diversity. Fixed BPMs, one drum grid, one chord progression, one timbre or one template cannot be accepted as a universal genre definition without evidence.
+Model a historically versioned and practitioner-qualified space of valid arrangements and performance variations. The Amapiano research already illustrates why: some early examples are described as long instrumental passages with gradual layer entry, while the characteristic log drum and shaker were not present in some early examples and emerged through later producer experimentation. Preserve era, scene and producer provenance; do not convert one early or contemporary configuration into a timeless definition. Fixed BPMs, one drum grid, one chord progression, one timbre or one template cannot be accepted as a universal genre definition without evidence.
 
 ### 4. A hybrid is a new recipe, not a historical claim
 
@@ -199,3 +199,14 @@ The industry strategy in #10678 and the instrumental preference programme in #94
 3. Create a source-cleared example manifest only after rights review.
 4. Reuse the current #13947 property-relative evaluator and #9397 factorial identity design for the pilot.
 5. After the M1 exit evidence exists, make a narrow executable profile adapter PR against the then-current #7417 schema.
+
+
+## Source-audit correction — 28 November 2026
+
+A closer source check narrowed the Amapiano claims rather than expanding them:
+
+- Oloruntoba (2024) specifically reports early Amapiano examples around 2014 with two-to-three-minute instrumental passages before vocals and gradual addition of elements. Its analysis is based on two music videos and youth/urban culture; this finding is period- and example-bounded.
+- Mdlalose (2026) discusses early piano-heavy sounds, the log drum's later centrality through producer experimentation, and looped vocal material.
+- Eaby-Lomas (2023) documents early experimentation and warns against a single definitive origin account; the early sound had not yet universally acquired the later log-drum/shaker identity.
+
+Accordingly, the profile now separates **early instrumental-opening evidence**, **later log-drum/timbre evolution**, and **unresolved groove grammar**. The log drum, shaker, extended intro and one harmonic vocabulary are not mandatory requirements. The machine-readable profile and its source links were updated to preserve these distinctions.
