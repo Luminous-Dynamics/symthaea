@@ -1194,6 +1194,59 @@ mod tests {
     }
 
     #[test]
+    fn independent_receipt_verifiers_accept_valid_prediction_and_update_receipts() {
+        let mut engine = engine();
+        let prediction_receipt = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 2.0]),
+        )
+        .unwrap();
+        verify_streaming_prediction_receipt_v1(&prediction_receipt).unwrap();
+
+        let update = deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                ("sample-1", "event-1", "label-1"),
+                1,
+                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                (102, 102),
+            ),
+        )
+        .unwrap();
+        verify_streaming_update_receipt_v1(&update).unwrap();
+    }
+
+    #[test]
+    fn independent_receipt_verifiers_reject_tampered_or_falsely_mutating_receipts() {
+        let mut engine = engine();
+        let prediction_receipt = predict_and_register_stream_sample_v1(
+            &mut engine,
+            &prediction("sample-1", "event-1", 100, 102, None, vec![1.0, 2.0]),
+        )
+        .unwrap();
+        let mut tampered_prediction = prediction_receipt.clone();
+        tampered_prediction.prediction_value += 0.5;
+        assert!(verify_streaming_prediction_receipt_v1(&tampered_prediction).is_err());
+
+        let held = deliver_qualified_stream_label_v1(
+            &mut engine,
+            &delivery(
+                ("sample-1", "event-1", "label-1"),
+                1,
+                LabelConsumptionEligibilityV1::Blocked,
+                LabelEvidenceFrontierV1::CurrentAtK1,
+                (110, 112),
+            ),
+        )
+        .unwrap();
+        let mut falsely_mutating = held;
+        falsely_mutating.adapter_state_mutated = true;
+        falsely_mutating.update_sequence = Some(1);
+        assert!(verify_streaming_update_receipt_v1(&falsely_mutating).is_err());
+    }
+
+    #[test]
     fn qualified_zero_delay_label_updates_adapter_once() {
         let mut engine = engine();
         let prediction = predict_and_register_stream_sample_v1(
