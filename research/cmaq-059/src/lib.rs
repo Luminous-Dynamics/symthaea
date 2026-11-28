@@ -42,6 +42,7 @@ pub enum CalibrationError {
     MixedDetectionCells,
     InvalidDistributionParameters,
     QuantileFailure,
+    InvalidScenarioConfig,
 }
 
 impl std::fmt::Display for CalibrationError {
