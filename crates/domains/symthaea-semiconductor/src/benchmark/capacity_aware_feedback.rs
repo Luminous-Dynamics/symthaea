@@ -738,7 +738,7 @@ pub fn receive_ca_ocrc_feedback_v1(
             current_round: feedback.current_round,
             label_id: feedback.label_id.clone(),
             label_revision: feedback.label_revision,
-            prediction_set_sha256: None,
+            prediction_set_sha256: Some(tracked.prediction_set_sha256.clone()),
             disposition,
             reasons,
             observed_loss: None,
@@ -1130,12 +1130,10 @@ mod tests {
     #[test]
     fn observed_delay_beyond_declared_bound_suspends_even_when_outcome_was_not_tracked() {
         let mut engine = create_ca_ocrc_engine_v1("e", "fab-clock", policy(2, 4, 0.50)).unwrap();
-        start_ca_ocrc_round_v1(&mut engine, &round(0, 0.1)).unwrap();
-        start_ca_ocrc_round_v1(&mut engine, &round(1, 0.1)).unwrap();
-        start_ca_ocrc_round_v1(&mut engine, &round(2, 0.1)).unwrap();
-        let mut input = feedback(0, 6, 0.5);
-        input.current_round = 6;
-        input.actual_delay = 6;
+        for index in 0..=6 {
+            start_ca_ocrc_round_v1(&mut engine, &round(index, 0.1)).unwrap();
+        }
+        let input = feedback(0, 6, 0.5);
         let receipt = receive_ca_ocrc_feedback_v1(&mut engine, &input).unwrap();
         assert_eq!(receipt.disposition, CaOcrcTrackingDispositionV1::GuaranteeSuspended);
         assert_eq!(
