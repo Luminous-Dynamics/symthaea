@@ -44,6 +44,7 @@ event contract.
 - [Competitive strategy and qualification scorecard](SYMTHAEA_POLYEMBODIMENT_COMPETITIVE_STRATEGY_V0_1_2026-11-28.md)
 - [Multi-party addressee and silence benchmark](SYMTHAEA_MULTIPARTY_CONTROL_BENCHMARK_V1_2026-11-28.md)
 - [Continuous-stream engagement benchmark](SYMTHAEA_CONTINUOUS_STREAM_ENGAGEMENT_BENCHMARK_V1_2026-11-28.md)
+- [Continuous-stream opportunity/prediction schema](SYMTHAEA_STREAM_ENGAGEMENT_SCHEMA_V1_2026-11-28.json)
 - [Presentation outcome receipts](SYMTHAEA_PRESENTATION_OUTCOME_RECEIPTS_V0_1_2026-11-27.md)
 - [Compositor presentation observer](SYMTHAEA_COMPOSITOR_PRESENTATION_OBSERVER_V0_1_2026-11-27.md)
 - [Wayland presentation-feedback ledger](../../crates/domains/symthaea-soma/src/embodiment_presentation_feedback.rs)
