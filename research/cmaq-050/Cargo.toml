@@ -9,5 +9,6 @@ description = "Continuous-covariate product Fourier paired conditional discrepan
 [dependencies]
 cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
 cmaq-048-fourier-kernel-approachability = { path = "../cmaq-048" }
+cmaq-049-contextual-paired-kernel = { path = "../cmaq-049" }
 
 [workspace]
