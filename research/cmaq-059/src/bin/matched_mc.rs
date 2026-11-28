@@ -293,7 +293,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         &observation.y,
                     )?;
                     c058_latencies.push(start.elapsed().as_nanos().min(u64::MAX as u128) as u64);
-                    c058_coordinates = c058_coordinates.saturating_add(c058_coordinates_per_pair(&configurations));
+                    c058_coordinates = c058_coordinates.saturating_add(coordinates_per_c058_pair(&configurations));
                     if update.quarantined { c058_alarm = Some(observation.sequence); }
                 }
 
