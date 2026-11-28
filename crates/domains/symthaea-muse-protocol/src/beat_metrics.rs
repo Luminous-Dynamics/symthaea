@@ -204,7 +204,10 @@ pub fn validate_mirex_beat_score_evidence(
     evidence: &MirexBeatScoreEvidenceV1,
 ) -> Result<(), MirexBeatMetricError> {
     if evidence.track_id.trim().is_empty()
+        || evidence.track_id.trim() != evidence.track_id
         || evidence.source_master_family_id.trim().is_empty()
+        || evidence.source_master_family_id.trim() != evidence.source_master_family_id
+        || evidence.source_master_family_id != evidence.source_master_family_id.to_ascii_lowercase()
     {
         return Err(MirexBeatMetricError::InvalidScoreEvidenceIdentity);
     }
@@ -1087,7 +1090,7 @@ mod tests {
         );
         assert_eq!(fixture.oracle.trim_seconds, MIREX_INITIAL_TRIM_SECONDS);
         assert_eq!(fixture.oracle.metric_keys.len(), 8);
-        assert_eq!(fixture.cases.len(), 8);
+        assert_eq!(fixture.cases.len(), 9);
 
         for case in fixture.cases {
             let report = score_mirex_beat_track(
@@ -1189,6 +1192,11 @@ mod tests {
             MIR_EVAL_REFERENCE_VERSION);
         let trim_rules = schema["$defs"]["receipt"]["allOf"].as_array().unwrap();
         assert_eq!(trim_rules.len(), 2);
+        assert!(schema["$defs"]["metric_scores"]["properties"]["cemgil"]
+            .get("maximum")
+            .is_none());
+        assert!(schema["$defs"]["qualified_beat_track_report"]
+            .is_object());
     }
 
     #[test]
