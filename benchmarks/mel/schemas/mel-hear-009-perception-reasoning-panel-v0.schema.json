@@ -27,16 +27,44 @@
     "conditions"
   ],
   "properties": {
-    "schema_version": { "const": "mel-hear-009-perception-reasoning-panel-v0" },
-    "benchmark_id": { "const": "MEL-PERCEPTION-REASONING-GAP" },
-    "benchmark_version": { "type": "string", "minLength": 1 },
-    "panel_id": { "type": "string", "minLength": 1 },
-    "split": { "enum": ["train", "development", "test"] },
-    "item_id": { "type": "string", "minLength": 1 },
-    "pair_id": { "type": "string", "minLength": 1 },
-    "triad_sha256": { "$ref": "#/$defs/sha256" },
-    "source_work_lineage_sha256": { "$ref": "#/$defs/sha256" },
-    "performer_cohort_manifest_sha256": { "$ref": "#/$defs/sha256" },
+    "schema_version": {
+      "const": "mel-hear-009-perception-reasoning-panel-v0"
+    },
+    "benchmark_id": {
+      "const": "MEL-PERCEPTION-REASONING-GAP"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "panel_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "train",
+        "development",
+        "test"
+      ]
+    },
+    "item_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "triad_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "source_work_lineage_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "performer_cohort_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
     "target_property": {
       "enum": [
         "ChordQuality",
@@ -49,21 +77,42 @@
         "InstrumentFamily"
       ]
     },
-    "question_sha256": { "$ref": "#/$defs/sha256" },
-    "reference_disposition": {
-      "enum": ["Same", "Different", "Ambiguous", "NotEstimable"]
+    "question_sha256": {
+      "$ref": "#/$defs/sha256"
     },
-    "reference_manifest_sha256": { "$ref": "#/$defs/sha256" },
-    "annotation_manifest_sha256": { "$ref": "#/$defs/sha256" },
-    "audio_materialization_report_sha256": { "$ref": "#/$defs/sha256" },
-    "audio_evidence_manifest_sha256": { "$ref": "#/$defs/sha256" },
-    "sampling_design_manifest_sha256": { "$ref": "#/$defs/sha256" },
-    "matched_budget_profile_sha256": { "$ref": "#/$defs/sha256" },
+    "reference_disposition": {
+      "enum": [
+        "Same",
+        "Different",
+        "Ambiguous",
+        "NotEstimable"
+      ]
+    },
+    "reference_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "annotation_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "audio_materialization_report_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "audio_evidence_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "sampling_design_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "matched_budget_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
     "conditions": {
       "type": "array",
       "minItems": 5,
       "maxItems": 5,
-      "items": { "$ref": "#/$defs/condition" }
+      "items": {
+        "$ref": "#/$defs/condition"
+      }
     }
   },
   "$defs": {
@@ -92,9 +141,7 @@
     },
     "evidenceStage": {
       "enum": [
-        "local_context_verified",
-        "client_request_bound",
-        "provider_input_attested"
+        "local_context_verified"
       ]
     },
     "condition": {
@@ -118,41 +165,115 @@
         "prediction_confidence"
       ],
       "properties": {
-        "kind": { "$ref": "#/$defs/conditionKind" },
-        "model_identity_sha256": { "$ref": "#/$defs/sha256" },
-        "runtime_identity_sha256": { "$ref": "#/$defs/sha256" },
-        "system_prompt_sha256": { "$ref": "#/$defs/sha256" },
-        "adapter_identity_sha256": { "$ref": "#/$defs/sha256" },
-        "decoding_config_sha256": { "$ref": "#/$defs/sha256" },
-        "reasoner_model_identity_sha256": {
-          "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+        "kind": {
+          "$ref": "#/$defs/conditionKind"
         },
-        "budget_profile_sha256": { "$ref": "#/$defs/sha256" },
-        "execution_receipt_sha256": { "$ref": "#/$defs/sha256" },
-        "input_context_sha256": { "$ref": "#/$defs/sha256" },
-        "evidence_stage": { "$ref": "#/$defs/evidenceStage" },
+        "model_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "runtime_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "system_prompt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "adapter_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decoding_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reasoner_model_identity_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "budget_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "execution_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidence_stage": {
+          "$ref": "#/$defs/evidenceStage"
+        },
         "audio_evidence_manifest_sha256": {
-          "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "oracle_symbolic_reference_sha256": {
-          "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "predicted_symbolic_representation_sha256": {
-          "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "transcription_report_sha256": {
-          "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "alignment_report_sha256": {
-          "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "reference_visibility_audit_sha256": { "$ref": "#/$defs/sha256" },
-        "reference_label_exposed": { "const": false },
-        "prediction": { "$ref": "#/$defs/prediction" },
+        "reference_visibility_audit_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reference_label_exposed": {
+          "const": false
+        },
+        "prediction": {
+          "$ref": "#/$defs/prediction"
+        },
         "prediction_confidence": {
           "oneOf": [
-            { "type": "null" },
-            { "type": "number", "minimum": 0, "maximum": 1 }
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
           ]
         }
       }
