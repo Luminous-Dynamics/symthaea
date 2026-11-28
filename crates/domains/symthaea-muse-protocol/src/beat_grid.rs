@@ -1072,6 +1072,102 @@ mod tests {
     }
 
     #[test]
+    fn verifies_exact_observed_pulse_anchors() {
+        let mut contract = transition_contract();
+        let alignment = contract.alignment.as_mut().unwrap();
+        alignment.source_anchor_frame = 100;
+        alignment.target_anchor_frame = 300;
+        let source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        assert!(verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn verifies_selected_hypotheses_inside_ambiguous_reports() {
+        let contract = transition_contract();
+        let mut source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        source_report.disposition = BeatGridDisposition::Ambiguous;
+        let mut alternative = source_report.hypotheses[0].clone();
+        alternative.hypothesis_id = "source-grid-alternative".to_string();
+        source_report.hypotheses.push(alternative);
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        assert!(verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn rejects_transition_when_source_audio_reference_does_not_match() {
+        let contract = transition_contract();
+        let mut source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        source_report.source.sha256 = "9".repeat(64);
+        source_report.evidence.source_audio_sha256 = "9".repeat(64);
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        );
+        assert_eq!(
+            found[0].code,
+            TransitionGridBindingViolationCode::SourceAudioReferenceMismatch
+        );
+    }
+
+    #[test]
+    fn rejects_transition_when_target_hypothesis_is_missing() {
+        let mut contract = transition_contract();
+        contract.alignment.as_mut().unwrap().target_grid_hypothesis_id =
+            "missing-grid".to_string();
+        let source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        );
+        assert_eq!(
+            found[0].code,
+            TransitionGridBindingViolationCode::TargetHypothesisNotFound
+        );
+    }
+
+    #[test]
+    fn rejects_target_anchor_outside_pulse_support() {
+        let mut contract = transition_contract();
+        contract.alignment.as_mut().unwrap().target_anchor_frame = 800;
+        let source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        );
+        assert_eq!(
+            found[0].code,
+            TransitionGridBindingViolationCode::TargetAnchorOutsidePulseSupport
+        );
+    }
+
+    #[test]
     fn rejects_transition_when_selected_hypothesis_is_missing() {
         let mut contract = transition_contract();
         contract.alignment.as_mut().unwrap().source_grid_hypothesis_id =
