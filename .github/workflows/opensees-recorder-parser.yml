@@ -12,7 +12,7 @@ on:
       - "rust-toolchain.toml"
       - "rustfmt.toml"
   push:
-    branches: [main]
+    branches: [main, research/opensees-scalar-recorder-parser-v0-1-current-main]
     paths:
       - "crates/bridges/symthaea-opensees-bridge/**"
       - "crates/bridges/symthaea-sim-bridge/**"
