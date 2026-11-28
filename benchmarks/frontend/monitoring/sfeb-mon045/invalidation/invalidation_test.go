@@ -170,6 +170,14 @@ func TestOptionalMissingContextDoesNotHold(t *testing.T){
  if got:=Evaluate(in);got.GraphVerdict!=Qualified{t.Fatalf("missing optional context cannot hold required claim: %+v",got)}
 }
 
+
+func TestGraphDigestNormalizesNilAndEmptyArrays(t *testing.T){
+ in:=healthyInput()
+ a:=GraphDigest(in.Nodes,nil,in.RootClaimIDs)
+ b:=GraphDigest(in.Nodes,[]Edge{},in.RootClaimIDs)
+ if a!=b{t.Fatalf("nil and empty edge lists must have one canonical array form: %s != %s",a,b)}
+}
+
 func TestGraphDigestNormalizesEquivalentTimeZones(t *testing.T){
  in:=healthyInput();a:=GraphDigest(in.Nodes,in.Edges,in.RootClaimIDs)
  zone:=time.FixedZone("UTC+02",2*60*60)
