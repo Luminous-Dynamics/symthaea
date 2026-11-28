@@ -7,6 +7,8 @@
 //! This is the core of hallucination prevention - every claim must be
 //! epistemically verified before being presented.
 
+#[cfg(test)]
+use super::types::ResearchStatus;
 use super::types::{EpistemicStatus, ResearchSource, VerifiedClaim, WebResearchResult};
 use std::collections::HashMap;
 
@@ -59,12 +61,38 @@ pub struct SourceEvidence {
     pub source_type: ResearchSource,
     /// Relevant text from the source
     pub relevant_text: String,
-    /// Does this source support the claim?
+    /// Claim-specific support relation. None is unclassified and must remain neutral.
     pub supports: Option<bool>,
     /// Similarity score to the claim (0.0 - 1.0)
     pub similarity: f32,
     /// Credibility score of the source (0.0 - 1.0)
     pub credibility: f32,
+}
+
+impl SourceEvidence {
+    /// Construct retrieved evidence without asserting claim-specific support.
+    ///
+    /// Retrieval relevance and source credibility are ranking metadata, not a
+    /// support/refutation judgment. A later claim-scoped classifier may replace
+    /// `supports: None` only when it supplies an attributable relation.
+    pub fn unclassified(
+        url: impl Into<String>,
+        domain: impl Into<String>,
+        source_type: ResearchSource,
+        relevant_text: impl Into<String>,
+        similarity: f32,
+        credibility: f32,
+    ) -> Self {
+        Self {
+            url: url.into(),
+            domain: domain.into(),
+            source_type,
+            relevant_text: relevant_text.into(),
+            supports: None,
+            similarity,
+            credibility,
+        }
+    }
 }
 
 /// Result of verifying a claim
@@ -171,12 +199,9 @@ impl EpistemicVerifier {
                     contradicting.push(source.url.clone());
                     total_contradict_score += credibility * source.similarity;
                 }
-                None => {
-                    // Neutral/unclear - slight support if similarity is high
-                    if source.similarity > 0.7 {
-                        total_support_score += credibility * source.similarity * 0.3;
-                    }
-                }
+                // Retrieval relevance is not a claim/source support judgment.
+                // Unknown relations contribute neither support nor contradiction.
+                None => {}
             }
         }
 
@@ -209,7 +234,8 @@ impl EpistemicVerifier {
                 domain: self.extract_domain(&r.url),
                 source_type: r.source_type,
                 relevant_text: r.summary.clone(),
-                supports: Some(r.confidence > 0.5),
+                // A prior result's confidence is not independent claim support.
+                supports: None,
                 similarity: r.relevance,
                 credibility: r.confidence,
             })
@@ -370,6 +396,68 @@ mod tests {
 
         let result = verifier.verify_claim("Rust is memory safe", &context);
         assert_eq!(result.status, EpistemicStatus::InsufficientEvidence);
+    }
+
+    #[test]
+    fn production_retrieval_constructor_keeps_support_unclassified() {
+        let source = SourceEvidence::unclassified(
+            "https://example.org/result",
+            "example.org",
+            ResearchSource::Academic,
+            "A highly query-relevant passage without claim adjudication",
+            1.0,
+            1.0,
+        );
+
+        assert_eq!(source.supports, None);
+        assert_eq!(source.similarity, 1.0);
+        assert_eq!(source.credibility, 1.0);
+    }
+
+    #[test]
+    fn unclassified_source_is_neutral_even_when_query_similarity_is_high() {
+        let verifier = EpistemicVerifier::new();
+        let context = VerificationContext {
+            sources: vec![SourceEvidence::unclassified(
+                "https://example.org/page",
+                "example.org",
+                ResearchSource::Web,
+                "Text related to the topic but not adjudicated for this claim",
+                1.0,
+                1.0,
+            )],
+            query: "The original research query".to_string(),
+            domain: "science".to_string(),
+        };
+
+        let result = verifier.verify_claim("A specific extracted claim", &context);
+        assert_eq!(result.status, EpistemicStatus::InsufficientEvidence);
+        assert!(result.supporting_sources.is_empty());
+        assert!(result.contradicting_sources.is_empty());
+        assert_eq!(result.confidence, 0.2);
+    }
+
+    #[test]
+    fn prior_result_confidence_does_not_become_claim_support() {
+        let verifier = EpistemicVerifier::new();
+        let result = WebResearchResult {
+            title: "Retrieved page".to_string(),
+            url: "https://example.org/page".to_string(),
+            content: "Retrieved content".to_string(),
+            summary: "A query-relevant summary".to_string(),
+            source_type: ResearchSource::Academic,
+            relevance: 1.0,
+            confidence: 0.99,
+            epistemic_status: EpistemicStatus::HighConfidence,
+            status: ResearchStatus::Success,
+            claims: Vec::new(),
+        };
+
+        let verified = verifier.verify_from_results("A specific claim", &[result]);
+        assert_eq!(verified.status, EpistemicStatus::InsufficientEvidence);
+        assert!(verified.supporting_sources.is_empty());
+        assert!(verified.contradicting_sources.is_empty());
+        assert_eq!(verified.confidence, 0.2);
     }
 
     #[test]
