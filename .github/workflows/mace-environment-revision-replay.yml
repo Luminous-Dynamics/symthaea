@@ -1,0 +1,25 @@
+name: MACE Environment Revision Replay
+on:
+  pull_request:
+    paths:
+      - "research/mace-environment-revision-replay-v0-1/**"
+      - "data/schemas/mace_environment_policy_revision_replay_v1.schema.json"
+      - "docs/research/MACE_ENVIRONMENT_POLICY_REVISION_REPLAY_V1.md"
+      - ".github/workflows/mace-environment-revision-replay.yml"
+  push:
+    branches:
+      - "research/mace-environment-revision-replay-v0-1"
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Parse replay source
+        run: rustfmt --edition 2024 --emit stdout --config skip_children=true research/mace-environment-revision-replay-v0-1/src/lib.rs >/dev/null
+      - name: Test replay kernel
+        run: cargo test --manifest-path research/mace-environment-revision-replay-v0-1/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/mace-environment-revision-replay-v0-1/Cargo.toml --all-targets -- -D warnings
+      - name: Parse revision replay schema
+        run: python3 -m json.tool data/schemas/mace_environment_policy_revision_replay_v1.schema.json >/dev/null
