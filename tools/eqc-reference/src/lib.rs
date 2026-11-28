@@ -171,10 +171,24 @@ pub fn validate_schema_documents(
         .offline()
         .build(&task_schema)
         .context("compile EQC task Draft 2020-12 schema")?;
-    let _receipt_validator = jsonschema::options()
+    let receipt_validator = jsonschema::options()
         .offline()
         .build(&receipt_schema)
         .context("compile EQC run-receipt Draft 2020-12 schema")?;
+
+    let receipt_fixture_path =
+        repository_root.join("docs/research/eqc-run-receipt-schema-fixture-v0.1.json");
+    let receipt_fixture_bytes = fs::read(&receipt_fixture_path).with_context(|| {
+        format!(
+            "read run-receipt schema fixture {}",
+            receipt_fixture_path.display()
+        )
+    })?;
+    let receipt_fixture: Value = serde_json::from_slice(&receipt_fixture_bytes)
+        .context("parse run-receipt schema fixture")?;
+    if !receipt_validator.is_valid(&receipt_fixture) {
+        bail!("EQC run-receipt schema fixture fails Draft 2020-12 validation");
+    }
 
     let corpus: Value = serde_json::from_slice(corpus_bytes)
         .context("parse EQC corpus for schema validation")?;
@@ -782,6 +796,60 @@ mod tests {
             .remove("subject_id");
         let mutated = serde_json::to_vec(&corpus).expect("mutated corpus serializes");
         assert!(validate_schema_documents(&root, &mutated).is_err());
+    }
+
+    #[test]
+    fn receipt_schema_accepts_only_an_unqualified_schema_fixture() {
+        let root = repository_root();
+        let schema_bytes = std::fs::read(
+            root.join("docs/research/eqc-run-receipt-v0.1.schema.json"),
+        )
+        .expect("receipt schema exists");
+        let schema: serde_json::Value =
+            serde_json::from_slice(&schema_bytes).expect("receipt schema parses");
+        let validator = jsonschema::options()
+            .offline()
+            .build(&schema)
+            .expect("receipt schema compiles");
+        let fixture_bytes = std::fs::read(
+            root.join("docs/research/eqc-run-receipt-schema-fixture-v0.1.json"),
+        )
+        .expect("receipt fixture exists");
+        let mut fixture: serde_json::Value =
+            serde_json::from_slice(&fixture_bytes).expect("receipt fixture parses");
+
+        assert!(validator.is_valid(&fixture));
+        assert_eq!(fixture["qualified"], false);
+
+        fixture["source_head"] = serde_json::json!("not-a-commit-sha");
+        assert!(!validator.is_valid(&fixture));
+    }
+
+    #[test]
+    fn qualified_receipt_requires_all_independent_gates_and_replay() {
+        let root = repository_root();
+        let schema_bytes = std::fs::read(
+            root.join("docs/research/eqc-run-receipt-v0.1.schema.json"),
+        )
+        .expect("receipt schema exists");
+        let schema: serde_json::Value =
+            serde_json::from_slice(&schema_bytes).expect("receipt schema parses");
+        let validator = jsonschema::options()
+            .offline()
+            .build(&schema)
+            .expect("receipt schema compiles");
+        let fixture_bytes = std::fs::read(
+            root.join("docs/research/eqc-run-receipt-schema-fixture-v0.1.json"),
+        )
+        .expect("receipt fixture exists");
+        let mut fixture: serde_json::Value =
+            serde_json::from_slice(&fixture_bytes).expect("receipt fixture parses");
+
+        fixture["qualified"] = serde_json::json!(true);
+        assert!(
+            !validator.is_valid(&fixture),
+            "a qualified receipt cannot pass with failed dimensions or no replay"
+        );
     }
 
     #[test]
