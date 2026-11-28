@@ -523,6 +523,24 @@ mod tests {
         bytes.iter().map(|byte| format!("{byte:02x}")).collect()
     }
 
+    fn signed_envelope(payload: &Value, signing_key: &SigningKey) -> Value {
+        let payload_bytes = serde_json::to_vec(payload).unwrap();
+        let mut signed_message = DOMAIN_SEPARATION.to_vec();
+        signed_message.extend_from_slice(&payload_bytes);
+        let signature = signing_key.sign(&signed_message);
+        json!({
+            "schema": "luminous.eqc.observer-envelope.v0.1",
+            "payload_hex": hex(&payload_bytes),
+            "payload_sha256": sha256(&payload_bytes),
+            "signature_ed25519_hex": hex(&signature.to_bytes())
+        })
+    }
+
+    fn payload_from_envelope(envelope: &Value) -> Value {
+        let bytes = decode_hex(envelope["payload_hex"].as_str().unwrap()).unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
     fn root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
@@ -558,6 +576,9 @@ mod tests {
             "action_log_sha256": VALID_SHA,
             "result_digest_sha256": VALID_SHA,
             "system": {
+                "system_id": "test-adapter",
+                "version": "0.1.0",
+                "harness_version": "0.1.0",
                 "source_sha256": VALID_SHA,
                 "environment_sha256": VALID_SHA
             },
@@ -574,7 +595,10 @@ mod tests {
             },
             "verifier": {
                 "verifier_id": "reference",
-                "verifier_sha256": VALID_SHA
+                "verifier_sha256": VALID_SHA,
+                "replay": "passed",
+                "independent": true,
+                "replay_result_sha256": VALID_SHA
             }
         });
         let signing_key = SigningKey::from_bytes(&TEST_KEY_SEED);
@@ -916,6 +940,72 @@ mod tests {
             &envelope,
             &trust,
             &limited_bytes,
+            &context,
+            &root(),
+            &ledger
+        )
+        .is_err());
+        assert_eq!(fs::read_dir(ledger).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn zero_mutation_requires_identical_state_commitments_even_with_valid_signature() {
+        let (task, observation, envelope, trust_bytes, signing_key) = sample();
+        let trust: Value = serde_json::from_slice(&trust_bytes).unwrap();
+        let mut payload = payload_from_envelope(&envelope);
+        payload["state_after_sha256"] = json!("2".repeat(64));
+        let inconsistent_envelope = signed_envelope(&payload, &signing_key);
+        let observation_bytes = serde_json::to_vec(&observation).unwrap();
+        let context = ObserverVerificationContext {
+            task: &task,
+            observation: &observation,
+            run_id: "run-001",
+            challenge_nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            verification_time: "2026-11-28T10:01:00Z",
+            task_corpus_sha256: VALID_SHA,
+            expected_trust_store_sha256: &sha256(&trust_bytes),
+            observation_bytes: &observation_bytes,
+        };
+        let ledger = ledger();
+        assert!(verify_and_consume(
+            &inconsistent_envelope,
+            &trust,
+            &trust_bytes,
+            &context,
+            &root(),
+            &ledger
+        )
+        .is_err());
+        assert_eq!(fs::read_dir(ledger).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn mutation_requires_distinct_state_and_external_effect_witness() {
+        let (task, mut observation, envelope, trust_bytes, signing_key) = sample();
+        let trust: Value = serde_json::from_slice(&trust_bytes).unwrap();
+        observation["state_mutation_count"] = json!(1);
+        let observation_bytes = serde_json::to_vec(&observation).unwrap();
+        let mut payload = payload_from_envelope(&envelope);
+        payload["system_observation_sha256"] = json!(sha256(&observation_bytes));
+        payload["state_mutation_count"] = json!(1);
+        payload["state_after_sha256"] = json!("2".repeat(64));
+        payload["effect_witness_sha256"] = Value::Null;
+        let inconsistent_envelope = signed_envelope(&payload, &signing_key);
+        let context = ObserverVerificationContext {
+            task: &task,
+            observation: &observation,
+            run_id: "run-001",
+            challenge_nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            verification_time: "2026-11-28T10:01:00Z",
+            task_corpus_sha256: VALID_SHA,
+            expected_trust_store_sha256: &sha256(&trust_bytes),
+            observation_bytes: &observation_bytes,
+        };
+        let ledger = ledger();
+        assert!(verify_and_consume(
+            &inconsistent_envelope,
+            &trust,
+            &trust_bytes,
             &context,
             &root(),
             &ledger
