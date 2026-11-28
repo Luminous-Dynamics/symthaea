@@ -123,7 +123,7 @@ pub enum MultipartyControlError {
 pub struct MultipartyControlMetrics {
     pub item_count: usize,
     pub action_correct_count: usize,
-    pub action_accuracy: f32,
+    pub action_accuracy: Option<f32>,
     pub explicitly_addressed_count: usize,
     pub addressed_response_count: usize,
     pub addressed_response_rate: Option<f32>,
@@ -139,7 +139,7 @@ pub struct MultipartyControlMetrics {
     pub answers_correct_count: usize,
     pub answer_accuracy: Option<f32>,
     pub deadline_met_count: usize,
-    pub deadline_met_rate: f32,
+    pub deadline_met_rate: Option<f32>,
     pub median_decision_latency_ms: u32,
     pub p95_decision_latency_ms: u32,
 }
