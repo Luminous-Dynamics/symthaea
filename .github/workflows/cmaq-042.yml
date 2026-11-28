@@ -1,0 +1,45 @@
+name: CMAQ-042 finite-horizon reference-null threshold
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-042/**"
+      - ".github/workflows/cmaq-042.yml"
+  push:
+    branches:
+      - "research/cmaq-042-*"
+    paths:
+      - "research/cmaq-042/**"
+      - ".github/workflows/cmaq-042.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-042-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  finite-horizon-threshold:
+    name: finite-horizon-threshold
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-042/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-042/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-042/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Paired reference-null smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-042/Cargo.toml --locked --bin reference_null_probe -- 64 256 20261127 > cmaq-042-reference-null-smoke.csv
+      - name: Preserve probe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-042-reference-null-smoke
+          path: cmaq-042-reference-null-smoke.csv
+          if-no-files-found: error
