@@ -319,9 +319,9 @@ fn splitmix64_next(state: &mut u64) -> u64 {
 
 /// Uniform value strictly inside (0,1), using 53 random mantissa bits.
 fn uniform_open01(state: &mut u64) -> f64 {
-    const TWO_POW_53: f64 = 9_007_199_254_740_992.0;
+    const TWO_POW_53_PLUS_TWO: f64 = 9_007_199_254_740_994.0;
     let mantissa = splitmix64_next(state) >> 11;
-    (mantissa as f64 + 0.5) / TWO_POW_53
+    (mantissa as f64 + 1.0) / TWO_POW_53_PLUS_TWO
 }
 
 /// One Box-Muller pair of independent standard normal values.
