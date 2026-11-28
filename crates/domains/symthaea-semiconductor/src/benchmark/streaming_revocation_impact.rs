@@ -649,7 +649,10 @@ mod tests {
         assert_eq!(engine.adapter_state.accepted_update_count, 2);
         assert_ne!(engine.journal_head_sha256, engine.genesis_state_sha256);
         let report = assess_streaming_revocation_impact_v1(&input(engine.clone(), latest_reports(&engine))).unwrap();
-        assert_eq!(report.status, StreamingRevocationImpactStatusV1::CompleteNoReplayRequired);
+        assert_eq!(
+            report.status,
+            StreamingRevocationImpactStatusV1::CompleteNoReplayRequired
+        );
     }
 
     #[test]
@@ -662,7 +665,10 @@ mod tests {
         reports[0].report_sha256 = label_report_digest(&reports[0]).unwrap();
 
         let report = assess_streaming_revocation_impact_v1(&input(engine.clone(), reports)).unwrap();
-        assert_eq!(report.status, StreamingRevocationImpactStatusV1::RebuildRequired);
+        assert_eq!(
+            report.status,
+            StreamingRevocationImpactStatusV1::RebuildRequired
+        );
         assert_eq!(report.first_affected_update_sequence, Some(1));
         assert_eq!(report.directly_invalidated_update_sequences, vec![1]);
         assert_eq!(report.inherited_impacted_update_sequences, vec![2]);
@@ -762,7 +768,10 @@ mod tests {
         reports[1].report_sha256 = label_report_digest(&reports[1]).unwrap();
 
         let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
-        assert_eq!(report.status, StreamingRevocationImpactStatusV1::RebuildRequired);
+        assert_eq!(
+            report.status,
+            StreamingRevocationImpactStatusV1::RebuildRequired
+        );
         assert_eq!(report.first_affected_update_sequence, Some(1));
         assert_eq!(report.directly_indeterminate_update_sequences, vec![1]);
         assert_eq!(report.directly_invalidated_update_sequences, vec![2]);
@@ -772,7 +781,8 @@ mod tests {
     fn read_only_impact_report_is_deterministic() {
         let engine = two_update_engine();
         let reports = latest_reports(&engine);
-        let first = assess_streaming_revocation_impact_v1(&input(engine.clone(), reports.clone())).unwrap();
+        let first =
+            assess_streaming_revocation_impact_v1(&input(engine.clone(), reports.clone())).unwrap();
         let second = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
         assert_eq!(first.report_sha256, second.report_sha256);
         assert!(!first.historical_receipts_rewritten);
@@ -793,7 +803,10 @@ mod tests {
     fn empty_journal_is_complete_without_replay() {
         let engine = build_engine();
         let report = assess_streaming_revocation_impact_v1(&input(engine, Vec::new())).unwrap();
-        assert_eq!(report.status, StreamingRevocationImpactStatusV1::CompleteNoReplayRequired);
+        assert_eq!(
+            report.status,
+            StreamingRevocationImpactStatusV1::CompleteNoReplayRequired
+        );
         assert!(report.entries.is_empty());
     }
 }
