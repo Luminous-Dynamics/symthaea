@@ -89,19 +89,14 @@ impl WebResearcher {
                                 extraction.quality
                             );
                             // Build source evidence
-                            let source = SourceEvidence {
-                                url: url.clone(),
-                                domain: self.extract_domain(url),
-                                source_type: self
-                                    .classify_source(url, extraction.metadata.content_type),
-                                relevant_text: extraction.summary.clone(),
-                                // Retrieval does not establish claim support. Until a
-                                // claim-specific relation is independently classified, keep
-                                // this source neutral so query similarity cannot self-label it.
-                                supports: None,
-                                similarity: self.calculate_similarity(&extraction.body_text, query),
-                                credibility: extraction.quality,
-                            };
+                            let source = SourceEvidence::unclassified(
+                                url.clone(),
+                                self.extract_domain(url),
+                                self.classify_source(url, extraction.metadata.content_type),
+                                extraction.summary.clone(),
+                                self.calculate_similarity(&extraction.body_text, query),
+                                extraction.quality,
+                            );
 
                             all_sources.push(source);
                             all_claims.extend(extraction.claims);
