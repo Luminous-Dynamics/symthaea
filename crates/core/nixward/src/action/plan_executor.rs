@@ -14,6 +14,8 @@ pub enum StepStatus {
     Pending,
     Running,
     Completed,
+    /// The command was previewed and no process or system effect occurred.
+    Previewed,
     Failed(String),
     RolledBack,
     Skipped,
@@ -43,6 +45,8 @@ pub struct PlanExecutionResult {
     pub success: bool,
     /// Number of steps completed before failure (if any).
     pub completed_count: usize,
+    /// Number of steps previewed without executing a process.
+    pub previewed_count: usize,
     /// Number of steps rolled back (if any).
     pub rolled_back_count: usize,
     /// Rollback failures: (step_index, error_description).
@@ -125,19 +129,26 @@ impl PlanExecutor {
     pub async fn execute(&mut self, executor: &mut NixOSExecutor) -> PlanExecutionResult {
         let mut results: Vec<(PlanStep, Option<ExecutionResult>)> = Vec::new();
         let mut completed = 0;
+        let mut previewed = 0;
 
         for i in 0..self.steps.len() {
             self.steps[i].status = StepStatus::Running;
 
-            let result = executor
-                .execute(self.steps[i].command.clone(), self.phi)
-                .await;
+            let result = if self.dry_run {
+                executor.preview(self.steps[i].command.clone(), self.phi)
+            } else {
+                executor
+                    .execute(self.steps[i].command.clone(), self.phi)
+                    .await
+            };
 
-            let success = matches!(&result, ExecutionResult::Success { .. });
-
-            if success {
+            if matches!(&result, ExecutionResult::Success { .. }) {
                 self.steps[i].status = StepStatus::Completed;
                 completed += 1;
+                results.push((self.steps[i].clone(), Some(result)));
+            } else if matches!(&result, ExecutionResult::PreviewOnly { .. }) {
+                self.steps[i].status = StepStatus::Previewed;
+                previewed += 1;
                 results.push((self.steps[i].clone(), Some(result)));
             } else if self.steps[i].critical {
                 // Critical failure — rollback previous steps
@@ -158,6 +169,7 @@ impl PlanExecutor {
                     steps: results,
                     success: false,
                     completed_count: completed,
+                    previewed_count: previewed,
                     rolled_back_count: rolled_back,
                     rollback_failures,
                 };
@@ -170,8 +182,11 @@ impl PlanExecutor {
 
         PlanExecutionResult {
             steps: results,
-            success: true,
+            // A plan consisting only of previews is not a successful system
+            // mutation. Empty plans retain their historical no-op success.
+            success: previewed == 0,
             completed_count: completed,
+            previewed_count: previewed,
             rolled_back_count: 0,
             rollback_failures: Vec::new(),
         }
@@ -266,7 +281,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_dry_run_plan_execution() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
+        let mut nix_executor = NixOSExecutor::new();
         let mut plan = PlanExecutor::new(0.5).with_dry_run(true);
 
         plan.add_step(
@@ -284,9 +299,14 @@ mod tests {
         );
 
         let result = plan.execute(&mut nix_executor).await;
-        assert!(result.success);
-        assert_eq!(result.completed_count, 2);
+        assert!(!result.success, "a preview is not a completed system mutation");
+        assert_eq!(result.completed_count, 0);
+        assert_eq!(result.previewed_count, 2);
         assert_eq!(result.rolled_back_count, 0);
+        assert!(result.steps.iter().all(|(step, result)| {
+            step.status == StepStatus::Previewed
+                && matches!(result, Some(ExecutionResult::PreviewOnly { .. }))
+        }));
     }
 
     #[tokio::test]
@@ -343,8 +363,11 @@ mod tests {
 
         // Verify all steps have results
         for (step, exec_result) in &result.steps {
-            assert_eq!(step.status, StepStatus::Completed);
-            assert!(exec_result.is_some());
+            assert_eq!(step.status, StepStatus::Previewed);
+            assert!(matches!(
+                exec_result,
+                Some(ExecutionResult::PreviewOnly { .. })
+            ));
         }
     }
 
@@ -379,15 +402,20 @@ mod tests {
 
         let result = plan.execute(&mut nix_executor).await;
         assert!(!result.success);
-        assert_eq!(result.completed_count, 1, "Only step 0 should complete");
+        assert_eq!(result.completed_count, 0, "Previewed work is not completed");
+        assert_eq!(result.previewed_count, 1, "Only step 0 was previewed");
         assert_eq!(
-            result.rolled_back_count, 1,
-            "Step 0 (EnvInstall) should be rolled back"
+            result.rolled_back_count, 0,
+            "A previewed step must never be rolled back"
         );
         assert_eq!(result.steps.len(), 3);
 
-        // Step 0: completed (then rolled back)
-        assert!(result.steps[0].1.is_some());
+        // Step 0: previewed; no process was spawned and no rollback is valid.
+        assert_eq!(result.steps[0].0.status, StepStatus::Previewed);
+        assert!(matches!(
+            result.steps[0].1,
+            Some(ExecutionResult::PreviewOnly { .. })
+        ));
         // Step 1: failed (PendingConfirmation)
         assert!(matches!(result.steps[1].0.status, StepStatus::Failed(_)));
         // Step 2: skipped
@@ -530,6 +558,7 @@ mod tests {
         assert_eq!(StepStatus::Pending, StepStatus::Pending);
         assert_eq!(StepStatus::Running, StepStatus::Running);
         assert_eq!(StepStatus::Completed, StepStatus::Completed);
+        assert_eq!(StepStatus::Previewed, StepStatus::Previewed);
         assert_eq!(StepStatus::RolledBack, StepStatus::RolledBack);
         assert_eq!(StepStatus::Skipped, StepStatus::Skipped);
         assert_ne!(StepStatus::Pending, StepStatus::Completed);
