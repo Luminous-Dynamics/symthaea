@@ -95,7 +95,10 @@ impl WebResearcher {
                                 source_type: self
                                     .classify_source(url, extraction.metadata.content_type),
                                 relevant_text: extraction.summary.clone(),
-                                supports: Some(true), // Will be refined by verifier
+                                // Retrieval does not establish claim support. Until a
+                                // claim-specific relation is independently classified, keep
+                                // this source neutral so query similarity cannot self-label it.
+                                supports: None,
                                 similarity: self.calculate_similarity(&extraction.body_text, query),
                                 credibility: extraction.quality,
                             };
