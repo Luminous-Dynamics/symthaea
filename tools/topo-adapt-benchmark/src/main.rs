@@ -38,7 +38,10 @@ fn run() -> Result<(), String> {
                     "accepted_candidate_edges": edits,
                     "max_flow": result.max_flow,
                     "min_cut": result.min_cut,
-                    "requested_flow": result.requested_flow
+                    "requested_flow": result.requested_flow,
+                    "accepted_edge_additions": result.accepted_edge_additions,
+                    "edit_cost_units": result.edit_cost_units,
+                    "edge_maintenance_cost_units": result.edge_maintenance_cost_units
                 }));
             }
         }
