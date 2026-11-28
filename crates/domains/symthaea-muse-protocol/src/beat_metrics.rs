@@ -955,12 +955,18 @@ mod tests {
 
     #[test]
     fn f_measure_reproduces_mir_eval_float_window_boundary_operation_order() {
-        let reference = [7_663, 8_362, 9_413, 10_470, 10_723, 12_285];
-        let estimated = [6_051, 6_677, 10_624, 14_012, 14_372, 14_684, 14_846, 14_860];
+        let reference = [2_014];
+        let estimated = [2_084];
         // 2.084 - 0.07 is represented just above 2.014 in binary64;
         // mir_eval's estimate-centered window excludes that edge.
         let score = event_f_measure(&reference, &estimated, 1_000, 70);
         assert_eq!(score, 0.0);
+
+        // At 5.07, subtraction rounds to exactly 5.0 and mir_eval includes it.
+        let reference = [5_000];
+        let estimated = [5_070];
+        let score = event_f_measure(&reference, &estimated, 1_000, 70);
+        assert_eq!(score, 1.0);
     }
 
     #[test]
