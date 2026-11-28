@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Selective prediction and abstention scoring.
 //!
-//! This module is a reusable evaluator/scorer, not yet a complete task adapter.
-//! It distinguishes answer quality from the decision to answer, abstain, or
-//! request information. It also scores the counterfactual correctness of an
+//! This module is the reusable evaluator/scorer primitive used by the
+//! selective_prediction_task adapter. It distinguishes answer quality from
+//! the decision to answer, abstain, or request information. It also scores the counterfactual correctness of an
 //! answer on every item so confidence calibration is not conditioned only on
 //! the cases where the agent chose to answer.
 
