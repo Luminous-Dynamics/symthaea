@@ -498,14 +498,6 @@ impl ContentExtractor {
         });
     }
 
-    /// Compatibility helper for callers that only need claim strings.
-    fn extract_claims(&self, text: &str) -> Vec<String> {
-        self.extract_claim_spans(text)
-            .into_iter()
-            .map(|claim| claim.text)
-            .collect()
-    }
-
     /// Check if a sentence is likely a verifiable claim
     fn is_likely_claim(&self, sentence: &str) -> bool {
         let lower = sentence.to_lowercase();
