@@ -3,6 +3,7 @@ use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
+use std::path::Path;
 
 const ENVELOPE_SCHEMA: &str = "luminous.eqc.signed-observer-envelope.v0.1";
 const POLICY_SCHEMA: &str = "luminous.eqc.observer-trust-policy.v0.1";
@@ -304,6 +305,55 @@ pub fn verify_envelope(
         qualified: false,
         reasons,
     })
+}
+
+/// Validate envelope, trust-policy and run-expectation JSON using the
+/// versioned offline Draft 2020-12 schemas shipped with this repository.
+pub fn validate_observer_contract_schemas(
+    envelope: &serde_json::Value,
+    trust_policy: &serde_json::Value,
+    expectation: &serde_json::Value,
+    repository_root: &Path,
+) -> anyhow::Result<()> {
+    let contracts = [
+        ("eqc-observer-envelope-v0.1.schema.json", envelope),
+        ("eqc-observer-trust-policy-v0.1.schema.json", trust_policy),
+        ("eqc-observer-run-expectation-v0.1.schema.json", expectation),
+    ];
+
+    for (schema_name, instance) in contracts {
+        let schema_path = repository_root.join("docs/research").join(schema_name);
+        let schema_bytes = std::fs::read(&schema_path)
+            .with_context(|| format!("read observer schema {}", schema_path.display()))?;
+        let schema: serde_json::Value = serde_json::from_slice(&schema_bytes)
+            .with_context(|| format!("parse observer schema {}", schema_path.display()))?;
+        jsonschema::meta::validate(&schema).map_err(|error| {
+            anyhow::anyhow!(
+                "observer schema meta-validation failed for {}: {}",
+                schema_path.display(),
+                error
+            )
+        })?;
+        let validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .with_context(|| {
+                format!("compile offline observer schema {}", schema_path.display())
+            })?;
+        let errors = validator
+            .iter_errors(instance)
+            .map(|error| format!("{} at {}", error, error.instance_path()))
+            .collect::<Vec<_>>();
+        if !errors.is_empty() {
+            bail!(
+                "observer schema validation failed for {}: {}",
+                schema_name,
+                errors.join("; ")
+            );
+        }
+    }
+    Ok(())
 }
 
 fn validate_payload_shape(payload: &ObserverPayload) -> anyhow::Result<()> {
@@ -666,6 +716,53 @@ mod tests {
         let report = verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger).unwrap();
         assert!(!report.replay_receipt_consistent);
         assert!(!report.qualified);
+    }
+
+    #[test]
+    fn envelope_trust_and_expectation_schemas_validate_and_reject_mutations() {
+        let key = signing_key();
+        let envelope = signed_envelope(&key);
+        let trust = trust_policy(&key);
+        let expected = expectation();
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repository root resolves");
+        let envelope_value = serde_json::to_value(&envelope).unwrap();
+        let trust_value = serde_json::to_value(&trust).unwrap();
+        let expected_value = serde_json::to_value(&expected).unwrap();
+
+        validate_observer_contract_schemas(
+            &envelope_value,
+            &trust_value,
+            &expected_value,
+            &root,
+        )
+        .expect("all three published observer schemas validate");
+
+        let mut tampered = envelope_value.clone();
+        tampered["payload"]["unreviewed_authority_override"] = json!(true);
+        assert!(
+            validate_observer_contract_schemas(
+                &tampered,
+                &trust_value,
+                &expected_value,
+                &root
+            )
+            .is_err()
+        );
+
+        let mut trust_tampered = trust_value.clone();
+        trust_tampered["trusted_observers"][0]["unexpected_key"] = json!("attacker");
+        assert!(
+            validate_observer_contract_schemas(
+                &envelope_value,
+                &trust_tampered,
+                &expected_value,
+                &root
+            )
+            .is_err()
+        );
     }
 
     #[test]
