@@ -57,10 +57,16 @@ pub struct SowrcConfig {
     /// Reference to the frozen calibration configuration (alpha, delta, grid,
     /// betting fractions and mixture weights), committed before audit labels.
     pub calibration_protocol_manifest_ref: String,
+    /// SHA-256 of the exact frozen calibration-protocol manifest bytes.
+    pub calibration_protocol_manifest_sha256: String,
     /// Reference to the custodian-controlled predictable inclusion design.
     pub design_manifest_ref: String,
+    /// SHA-256 of the exact frozen inclusion-design manifest bytes.
+    pub design_manifest_sha256: String,
     /// Reference to frozen pre-label class probabilities / prediction outputs.
     pub prediction_manifest_ref: String,
+    /// SHA-256 of the exact frozen prediction-artifact manifest bytes.
+    pub prediction_manifest_sha256: String,
 }
 
 impl SowrcConfig {
@@ -70,8 +76,11 @@ impl SowrcConfig {
     pub fn for_audit_floor(
         q_min: f64,
         calibration_protocol_manifest_ref: impl Into<String>,
+        calibration_protocol_manifest_sha256: impl Into<String>,
         design_manifest_ref: impl Into<String>,
+        design_manifest_sha256: impl Into<String>,
         prediction_manifest_ref: impl Into<String>,
+        prediction_manifest_sha256: impl Into<String>,
     ) -> Self {
         let eta_max = 2.0 * q_min / (1.0 + 2.0 * q_min / 3.0);
         let betting_fractions = ETA_FACTORS
@@ -87,8 +96,11 @@ impl SowrcConfig {
             betting_fractions,
             mixture_weights,
             calibration_protocol_manifest_ref: calibration_protocol_manifest_ref.into(),
+            calibration_protocol_manifest_sha256: calibration_protocol_manifest_sha256.into(),
             design_manifest_ref: design_manifest_ref.into(),
+            design_manifest_sha256: design_manifest_sha256.into(),
             prediction_manifest_ref: prediction_manifest_ref.into(),
+            prediction_manifest_sha256: prediction_manifest_sha256.into(),
         }
     }
 }
@@ -125,8 +137,11 @@ pub struct SowrcReport {
     pub total_delta: f64,
     pub per_threshold_delta: f64,
     pub calibration_protocol_manifest_ref: String,
+    pub calibration_protocol_manifest_sha256: String,
     pub design_manifest_ref: String,
+    pub design_manifest_sha256: String,
     pub prediction_manifest_ref: String,
+    pub prediction_manifest_sha256: String,
     pub threshold_bounds: Vec<SowrcThresholdBound>,
     pub selected_lambda: f64,
     /// The upper risk certificate for the selected rule. A fallback to lambda=1
@@ -158,8 +173,11 @@ pub enum SowrcError {
     InvalidThresholdGrid,
     InvalidBettingMixture,
     InvalidCalibrationProtocolManifest,
+    InvalidCalibrationProtocolDigest,
     InvalidDesignManifest,
+    InvalidDesignDigest,
     InvalidPredictionManifest,
+    InvalidPredictionDigest,
     InvalidMixtureNumerics,
 }
 
@@ -389,8 +407,11 @@ pub fn evaluate_sowrc(
         total_delta: config.delta,
         per_threshold_delta,
         calibration_protocol_manifest_ref: config.calibration_protocol_manifest_ref.clone(),
+        calibration_protocol_manifest_sha256: config.calibration_protocol_manifest_sha256.clone(),
         design_manifest_ref: config.design_manifest_ref.clone(),
+        design_manifest_sha256: config.design_manifest_sha256.clone(),
         prediction_manifest_ref: config.prediction_manifest_ref.clone(),
+        prediction_manifest_sha256: config.prediction_manifest_sha256.clone(),
         threshold_bounds,
         selected_lambda,
         selected_risk_upper_bound: selected_bound,
@@ -460,6 +481,13 @@ pub fn evaluate_sowrc(
     })
 }
 
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn validate_config(config: &SowrcConfig) -> Result<(), SowrcError> {
     if !config.q_min.is_finite() || config.q_min <= 0.0 || config.q_min > 1.0 {
         return Err(SowrcError::InvalidProbabilityFloor);
@@ -510,11 +538,20 @@ fn validate_config(config: &SowrcConfig) -> Result<(), SowrcError> {
     if config.calibration_protocol_manifest_ref.trim().is_empty() {
         return Err(SowrcError::InvalidCalibrationProtocolManifest);
     }
+    if !is_sha256_hex(&config.calibration_protocol_manifest_sha256) {
+        return Err(SowrcError::InvalidCalibrationProtocolDigest);
+    }
     if config.design_manifest_ref.trim().is_empty() {
         return Err(SowrcError::InvalidDesignManifest);
     }
+    if !is_sha256_hex(&config.design_manifest_sha256) {
+        return Err(SowrcError::InvalidDesignDigest);
+    }
     if config.prediction_manifest_ref.trim().is_empty() {
         return Err(SowrcError::InvalidPredictionManifest);
+    }
+    if !is_sha256_hex(&config.prediction_manifest_sha256) {
+        return Err(SowrcError::InvalidPredictionDigest);
     }
     Ok(())
 }
@@ -636,8 +673,11 @@ mod tests {
         SowrcConfig::for_audit_floor(
             q_min,
             "artifact://frozen-sowrc-protocol/v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "custody://frozen-randomized-audit/v1",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "artifact://frozen-predictions/v1",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         )
     }
 
@@ -971,6 +1011,31 @@ mod tests {
         assert_eq!(half.lambda, 0.5);
         assert_eq!(half.horvitz_thompson_loss_total, 1.0);
         assert_eq!(half.empirical_weighted_risk, 1.0 / 3.0);
+    }
+
+    #[test]
+    fn all_three_manifest_digests_must_be_sha256_hex() {
+        let rows = vec![observation(0, "a", 1.0, Some(0.1))];
+        let mut cfg = config(1.0);
+        cfg.calibration_protocol_manifest_sha256 = "not-a-digest".to_owned();
+        assert_eq!(
+            evaluate_sowrc(&rows, &cfg).unwrap_err(),
+            SowrcError::InvalidCalibrationProtocolDigest
+        );
+
+        let mut cfg = config(1.0);
+        cfg.design_manifest_sha256 = "D".repeat(64);
+        assert_eq!(
+            evaluate_sowrc(&rows, &cfg).unwrap_err(),
+            SowrcError::InvalidDesignDigest
+        );
+
+        let mut cfg = config(1.0);
+        cfg.prediction_manifest_sha256 = "0".repeat(63);
+        assert_eq!(
+            evaluate_sowrc(&rows, &cfg).unwrap_err(),
+            SowrcError::InvalidPredictionDigest
+        );
     }
 
     #[test]
