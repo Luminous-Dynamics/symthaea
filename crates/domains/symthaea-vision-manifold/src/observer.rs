@@ -290,6 +290,14 @@ impl ObserverOnlyVisionManifold {
             return Err("unsupported temporal observer checkpoint schema".to_string());
         }
         checkpoint.profile.validate()?;
+        if let Some(geometry) = checkpoint.frame_geometry {
+            if geometry.width != width || geometry.height != height {
+                return Err(
+                    "observer checkpoint image dimensions do not match constructor geometry"
+                        .to_string(),
+                );
+            }
+        }
         let config_sha256 = sha256_json(&config)?;
         if config_sha256 != checkpoint.config_sha256 {
             return Err("observer checkpoint config digest mismatch".to_string());
@@ -911,6 +919,24 @@ mod tests {
             32,
             32,
             &tampered,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn checkpoint_constructor_rejects_different_initial_image_geometry() {
+        let mut observer = observer();
+        let frame = vec![128_u8; 32 * 32];
+        observer
+            .observe_frame(identity(0, 1_000_000), &frame, 32, 32, 1)
+            .unwrap();
+        let checkpoint = observer.save_checkpoint().unwrap();
+
+        assert!(ObserverOnlyVisionManifold::from_checkpoint(
+            VisionConfig::default(),
+            16,
+            64,
+            &checkpoint,
         )
         .is_err());
     }
