@@ -120,6 +120,21 @@ Every run should preserve:
 8. Peak memory, feature dimensions/count, number of map evaluations, and expert count.
 9. Exact code commit, configuration/manifest digest, raw per-replicate outcomes, and aggregate-artifact digests.
 
+## Verified research frontier snapshot (2026-11-28)
+
+The primary comparator is SCPT because it addresses the same online paired conditional-distribution null:
+
+- Zheng & Zhang, [Sequential Conditional Paired-Sample Testing with Applications to Online Monitoring](https://arxiv.org/abs/2611.22886), arXiv:2611.22886 (2026). Its null conditions on the current shared covariate and full past. It uses past-only sequential KNN conditional-mean-embedding estimates and covariate-indexed predictable betting fractions. The paper's reported simulations use 500 repetitions per configuration, maximum horizon 4,000, and alpha 0.05; its dependent/nonstationary section reports maximum empirical null rejection of 3.8% for the mixture and 5.4% for individual SCPT procedures. Reproduce the method faithfully; do not substitute a static-kernel/static-bet baseline.
+- This SCPT paper explicitly identifies the curse of dimensionality in nearest-neighbor conditioning and points to dimensionality reduction, learned representations, and adaptive distance metrics as future directions. This is a high-value CMAQ research target: improve conditional representation quality while preserving the prequential conditional-mean-zero proof.
+
+Adjacent, not directly interchangeable, state-of-the-art results:
+
+- [Anytime-Valid Two-Sample Testing over Kernel Families](https://github.com/ds9-code/anytime-valid-kernel-testing), ICML 2026 Workshop on Hypothesis Testing. The published repository composes per-kernel betting e-processes into a fixed-prior mixture and reweights family members online; it reports an additive log(K) sample cost and matching lower bound. It is a two-sample kernel-family comparator, not automatically a valid conditional paired baseline. Verify the precise null and adaptation assumptions before including it in the primary table.
+- Kalinke & Gavioli-Akilagun, [Optimal Online Change Detection via Random Fourier Features](https://proceedings.neurips.cc/paper_files/paper/2025/hash/0e3b37f830edb6972bb1206324cb566f-Abstract-Conference.html), NeurIPS 2025. It reports logarithmic time per observation, logarithmic space, and minimax-optimal delay guarantees for multivariate online two-sample change detection. This is an important computational baseline, but its unconditional two-sample target must remain a separate protocol table.
+- He & Sutherland, [Sequential Kernel-based Conditional Independence Testing via Adaptive Betting](https://proceedings.mlr.press/v306/he26ah.html), ICML 2026, PMLR 306. This is conditional-independence testing under a Model-X conditional-distribution premise, with adaptive kernel optimization and calibration corrections. It is not the direct paired conditional-distribution equality null.
+
+The comparison rule is therefore: same-null and same-filtration competitors belong in the primary rank table; adjacent problems belong in separate tables with their own metrics. Do not combine their scores into a single leaderboard.
+
 ## Prospective performance targets — not achieved results
 
 - At matched alpha, seek at least 20% lower restricted mean detection delay on three preregistered shift families versus the designated comparator.
