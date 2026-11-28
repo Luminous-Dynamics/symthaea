@@ -85,6 +85,53 @@ pub struct PreQuerySelectionReceiptV1 {
     pub receipt_sha256: String,
 }
 
+/// Safe metadata returned by the official backend's post_query_hook().
+/// LongMemEval-V2 persists this as memory_post_query_metadata in per_question.jsonl.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreQueryHookMetadataV1 {
+    pub schema_version: String,
+    pub query_invocation_id: String,
+    pub query_input_sha256: String,
+    pub pre_query_selection_receipt_sha256: String,
+    pub selected_item_count: u32,
+    pub metadata_sha256: String,
+}
+
+impl PreQuerySelectionReceiptV1 {
+    /// Produce the opaque metadata map that the official post_query_hook can return.
+    /// It contains no dataset question ID, answer, type or grader information.
+    pub fn to_post_query_metadata(&self) -> Result<PreQueryHookMetadataV1, AdapterRejectV1> {
+        if !self.verify_integrity() {
+            return Err(AdapterRejectV1::PreQueryReceiptMismatch);
+        }
+        let mut metadata = PreQueryHookMetadataV1 {
+            schema_version: ADAPTER_SCHEMA_V1.into(),
+            query_invocation_id: self.query_invocation_id.clone(),
+            query_input_sha256: self.query_input_sha256.clone(),
+            pre_query_selection_receipt_sha256: self.receipt_sha256.clone(),
+            selected_item_count: self.selected_items.len() as u32,
+            metadata_sha256: String::new(),
+        };
+        let mut unsigned = metadata.clone();
+        unsigned.metadata_sha256.clear();
+        metadata.metadata_sha256 = digest_serialized(&unsigned)?;
+        Ok(metadata)
+    }
+}
+
+impl PreQueryHookMetadataV1 {
+    pub fn verify_integrity(&self) -> bool {
+        let mut unsigned = self.clone();
+        unsigned.metadata_sha256.clear();
+        digest_serialized(&unsigned)
+            .is_ok_and(|digest| digest == self.metadata_sha256)
+            && valid_query_invocation_id(&self.query_invocation_id)
+            && valid_digest(&self.query_input_sha256)
+            && valid_digest(&self.pre_query_selection_receipt_sha256)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FinalContextItemV1 {
@@ -658,6 +705,21 @@ mod tests {
             receipt.exposed_evidence[0].source_lineage_receipt_sha256,
             receipt.exposed_evidence[1].source_lineage_receipt_sha256
         );
+    }
+
+
+    #[test]
+    fn post_query_hook_metadata_links_per_question_row_without_evaluator_labels() {
+        let selection = selection();
+        let metadata = selection.to_post_query_metadata().unwrap();
+        assert!(metadata.verify_integrity());
+        assert_eq!(metadata.query_invocation_id, query().query_invocation_id);
+        assert_eq!(metadata.pre_query_selection_receipt_sha256, selection.receipt_sha256);
+        let encoded = serde_json::to_value(&metadata).unwrap();
+        let object = encoded.as_object().unwrap();
+        for forbidden in ["question_id","question_type","answer_gold","eval_function","score"] {
+            assert!(!object.contains_key(forbidden));
+        }
     }
 
 }
