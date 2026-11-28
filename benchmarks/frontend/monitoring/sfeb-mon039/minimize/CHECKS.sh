@@ -29,19 +29,22 @@ verify_manifest "$(jq -r '.recovery_boundary_sha256' "$ROOT/INPUT-example.json")
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP/cmd"
+mkdir -p "$TMP/cmd/minimize" "$TMP/cmd/tournament"
 cp "$ROOT"/go.mod "$ROOT"/*.go "$TMP"/
-cp "$ROOT"/cmd/minimize/main.go "$TMP/cmd/main.go"
+cp "$ROOT"/cmd/minimize/main.go "$TMP/cmd/minimize/main.go"
+cp "$ROOT"/cmd/tournament/main.go "$TMP/cmd/tournament/main.go"
 cd "$TMP"
 
-gofmt -w ./*.go ./cmd/*.go
+gofmt -w ./*.go ./cmd/minimize/*.go ./cmd/tournament/*.go
 go vet ./...
 go test ./...
 go test -race ./...
-go build -o "$TMP/mon039" ./cmd
+go build -o "$TMP/mon039" ./cmd/minimize
+go build -o "$TMP/mon039-tournament" ./cmd/tournament
 
 if command -v check-jsonschema >/dev/null 2>&1; then
   check-jsonschema --schemafile "$ROOT/INPUT-v1.schema.json" "$ROOT/INPUT-example.json"
+  check-jsonschema --schemafile "$ROOT/TOURNAMENT-INPUT-v1.schema.json" "$ROOT/TOURNAMENT-INPUT-example.json"
 fi
 
 set +e
@@ -88,5 +91,16 @@ UNKNOWN_STATUS=$?
 set -e
 [ "$UNKNOWN_STATUS" -eq 65 ] || { echo "unknown JSON field was not rejected" >&2; exit 1; }
 
-go test -run '^$' -bench 'Benchmark(ExhaustiveTwelveFaults|OneMinimalSixtyFourFaults)$' -benchmem -count=5
-echo "MON-039 format, vet, unit, race, CLI, signature, completeness and benchmark checks passed."
+set +e
+"$TMP/mon039-tournament" --input "$ROOT/TOURNAMENT-INPUT-example.json" > "$TMP/tournament-result.json"
+TOURNAMENT_STATUS=$?
+set -e
+[ "$TOURNAMENT_STATUS" -eq 0 ] || { echo "complete exhaustive tournament fixture must exit 0, got $TOURNAMENT_STATUS" >&2; exit 1; }
+jq -e '.orders_attempted == 2 and (.orders|length) == 2 and .evidence_complete == true and .global_minimum_claimed == true and .campaign_verdict == "indeterminate" and .production_action_permitted == false' "$TMP/tournament-result.json" >/dev/null
+
+go test -run '^
+echo "MON-039 format, vet, unit, race, CLI, tournament, signature, completeness and benchmark checks passed."
+ -bench 'Benchmark(ExhaustiveTwelveFaults|OneMinimalSixtyFourFaults|MinimizeTournamentEightOrders)
+echo "MON-039 format, vet, unit, race, CLI, tournament, signature, completeness and benchmark checks passed."
+ -benchmem -count=5
+echo "MON-039 format, vet, unit, race, CLI, tournament, signature, completeness and benchmark checks passed."

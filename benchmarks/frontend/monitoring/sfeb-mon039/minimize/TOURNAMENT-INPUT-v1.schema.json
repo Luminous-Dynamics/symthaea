@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon039-multi-order-tournament-input-v1.json",
+  "title": "MON-039 Multi-Order Tournament Input v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "input",
+    "orders"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon039-multi-order-tournament-input-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "input": {
+      "$ref": "INPUT-v1.schema.json"
+    },
+    "orders": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 256,
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    }
+  }
+}
