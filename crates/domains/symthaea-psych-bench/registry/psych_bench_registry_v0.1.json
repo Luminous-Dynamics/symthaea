@@ -808,7 +808,8 @@
       "controls": {
         "status": "smoke_controls_only",
         "positive_controls": [
-          "scripted safe reference policy",
+          "full-information scripted safe reference policy",
+          "partial-observation task-specific policy and gate-failure recovery variant",
           "full-information BFS safe-action oracle",
           "full-information Dijkstra safe-cost oracle"
         ],
@@ -816,7 +817,7 @@
           "deterministic random-action floor policy",
           "destructive forced-crossing shortcut"
         ],
-        "note": "Controls distinguish task success from safe success and action/cost ceilings; they do not yet qualify general cognitive constructs. Add held-out topologies, partial-observation planners, causal ablations and independent scorer controls."
+        "note": "The observation-only policy acts from inspection receipts and its own action history and does not read manifest.layout() or hidden inventory, but it is a hand-written task policy, not a general planner. Full-information oracles are ceilings. These controls distinguish task mechanics and safe versus unsafe completion but do not yet qualify general cognitive constructs; add held-out topologies, partial-observation search, causal ablations and independent scorer controls."
       },
       "comparison_eligibility": {
         "inter_system_same_protocol": "eligible_for_environment_smoke_only",
