@@ -12,9 +12,7 @@ use std::env;
 use std::fmt::Write as _;
 
 use cmaq_038_rank_spectrum_monitor::{RankSpectrumMonitor, SpectrumUpdate};
-use cmaq_045_conditional_rank_spectrum::{
-    ConditionalRankSpectrumMonitor, ConditionalUpdate,
-};
+use cmaq_045_conditional_rank_spectrum::{ConditionalRankSpectrumMonitor, ConditionalUpdate};
 
 const CALIBRATION_COUNT: usize = 99;
 const RANK_BUCKETS: usize = CALIBRATION_COUNT + 1;
@@ -95,7 +93,9 @@ fn parse_config() -> Result<Config, String> {
     let shift_after = usize::try_from(parse(3, "300", "shift_after")?)
         .map_err(|_| "shift_after exceeds usize".to_string())?;
     if replications == 0 || horizon == 0 || shift_after >= horizon {
-        return Err("replications and horizon must be positive; shift_after must be below horizon".into());
+        return Err(
+            "replications and horizon must be positive; shift_after must be below horizon".into(),
+        );
     }
     Ok(Config {
         replications,
@@ -123,15 +123,11 @@ fn draw_stationary_sticky_rank(rng: &mut SplitMix64, previous_rank: usize) -> us
     if rng.below(5) != 0 {
         previous_rank
     } else {
-        usize::try_from(rng.below(RANK_BUCKETS as u64) + 1)
-            .expect("rank bucket index fits usize")
+        usize::try_from(rng.below(RANK_BUCKETS as u64) + 1).expect("rank bucket index fits usize")
     }
 }
 
-fn observe_fixed(
-    monitor: &mut RankSpectrumMonitor,
-    rank: usize,
-) -> Result<Option<usize>, String> {
+fn observe_fixed(monitor: &mut RankSpectrumMonitor, rank: usize) -> Result<Option<usize>, String> {
     match monitor
         .observe_rank(rank)
         .map_err(|error| format!("CMAQ-038 update failed: {error:?}"))?
@@ -175,18 +171,11 @@ fn run_replication(
         });
     let mut rng = SplitMix64::new(seed);
     let mut predictive_counts = vec![0u64; RANK_BUCKETS];
-    let mut fixed = RankSpectrumMonitor::new(
-        CALIBRATION_COUNT,
-        ALPHA_NUMERATOR,
-        ALPHA_DENOMINATOR,
-    )
-    .map_err(|error| format!("CMAQ-038 construction failed: {error:?}"))?;
-    let mut conditional = ConditionalRankSpectrumMonitor::new(
-        CALIBRATION_COUNT,
-        ALPHA_NUMERATOR,
-        ALPHA_DENOMINATOR,
-    )
-    .map_err(|error| format!("CMAQ-045 construction failed: {error:?}"))?;
+    let mut fixed = RankSpectrumMonitor::new(CALIBRATION_COUNT, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)
+        .map_err(|error| format!("CMAQ-038 construction failed: {error:?}"))?;
+    let mut conditional =
+        ConditionalRankSpectrumMonitor::new(CALIBRATION_COUNT, ALPHA_NUMERATOR, ALPHA_DENOMINATOR)
+            .map_err(|error| format!("CMAQ-045 construction failed: {error:?}"))?;
 
     let mut fixed_alarm = None;
     let mut conditional_alarm = None;
@@ -246,9 +235,8 @@ fn median_delay(alarms: &[Option<usize>], shift_after: usize) -> Option<usize> {
     let mut delays = alarms
         .iter()
         .filter_map(|time| {
-            time.as_ref().and_then(|alarm| {
-                (*alarm > shift_after).then_some(*alarm - shift_after)
-            })
+            time.as_ref()
+                .and_then(|alarm| (*alarm > shift_after).then_some(*alarm - shift_after))
         })
         .collect::<Vec<_>>();
     if delays.is_empty() {
