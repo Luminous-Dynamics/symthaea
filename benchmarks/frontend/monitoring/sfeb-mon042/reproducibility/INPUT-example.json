@@ -19,5 +19,12 @@
   "required_independent_clusters": 2,
   "minimum_reliability": 0.9,
   "confidence_level": 0.95,
-  "units": []
+  "units": [],
+  "scenario_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "recovery_boundary_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "fault_set_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "code_revision": "0123456789abcdef0123456789abcdef01234567",
+  "required_seeds": [
+    1000
+  ]
 }
