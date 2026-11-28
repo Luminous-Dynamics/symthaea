@@ -1,0 +1,93 @@
+{
+  "schema_version": "hlb-information-choice-fixture-v1",
+  "status": "environment_fixture_only",
+  "claim_ceiling": "This fixture qualifies deterministic environment mechanics and baseline sanity only. It does not execute Symthaea HDC, CfC/LTC, FEP, or an integrated HLB; it cannot support task-performance, SOTA, or consciousness claims.",
+  "environment": {
+    "description": "Partially observed binary-goal task. The agent receives a noisy initial cue and may pay a cost for a second noisy observation before committing left or right.",
+    "goal_prior": "P(left)=P(right)=0.5",
+    "correct_reward_bps": 10000,
+    "incorrect_reward_bps": 0,
+    "one_probe_maximum": 1,
+    "reward_units": "basis points: 10000 = 1.0 reward unit",
+    "random_generator": "SplitMix64 with fixed constants, implemented in the Rust fixture",
+    "episodes_per_scenario": 1000,
+    "episode_seed_rule": "scenario_index * 1000003 + episode_index + 1",
+    "information_boundary": "The hidden goal and pre-generated probe signal are private environment state. The policy receives the cue and task parameters; the probe signal is revealed only after an Inspect action."
+  },
+  "scenarios": [
+    {
+      "id": "clear_cue_probe_not_worth_cost",
+      "cue_accuracy_bps": 9000,
+      "probe_accuracy_bps": 9700,
+      "probe_cost_bps": 800,
+      "expected_probe_decision": "decline"
+    },
+    {
+      "id": "ambiguous_cue_cheap_probe",
+      "cue_accuracy_bps": 6000,
+      "probe_accuracy_bps": 9500,
+      "probe_cost_bps": 500,
+      "expected_probe_decision": "inspect"
+    },
+    {
+      "id": "ambiguous_cue_expensive_probe",
+      "cue_accuracy_bps": 6000,
+      "probe_accuracy_bps": 9500,
+      "probe_cost_bps": 4500,
+      "expected_probe_decision": "decline"
+    },
+    {
+      "id": "weak_probe_not_worth_cost",
+      "cue_accuracy_bps": 6500,
+      "probe_accuracy_bps": 5500,
+      "probe_cost_bps": 500,
+      "expected_probe_decision": "decline"
+    }
+  ],
+  "reference_policies": [
+    {
+      "id": "cue_greedy",
+      "description": "Commit to the maximum-likelihood goal from the initial cue; never inspect."
+    },
+    {
+      "id": "always_inspect",
+      "description": "Always pay for the probe and then use the maximum-likelihood decision from available signals."
+    },
+    {
+      "id": "bayes_value_of_information",
+      "description": "Inspect iff the expected increase in optimal goal accuracy from the probe exceeds its cost; then select by posterior likelihood."
+    },
+    {
+      "id": "random",
+      "description": "Deterministic seeded random choice; independently has a 50% chance to inspect before choosing a side."
+    }
+  ],
+  "metrics": [
+    "goal_accuracy",
+    "mean_reward_bps",
+    "probe_rate",
+    "invalid_action_count",
+    "mean_regret_to_perfect_information_oracle_bps"
+  ],
+  "integrity_requirements": [
+    "All policies receive the same scenario, world seed, initial observation, and action constraints.",
+    "The hidden goal is not part of the Observation type.",
+    "The probe signal is exposed only after a valid Inspect action.",
+    "Repeated inspection is an invalid action.",
+    "Fixed scenario and episode seeds must reproduce identical world observations and scores.",
+    "The perfect-information oracle is an upper bound only and is not a deployable baseline.",
+    "This fixture must not label a reference policy as the Symthaea FEP implementation."
+  ],
+  "research_context": [
+    {
+      "id": "active_inference_artificial_reasoning_2026",
+      "url": "https://doi.org/10.1038/s41467-026-77209-5",
+      "relevance": "Model-directed information selection and disambiguation of competing explanations."
+    },
+    {
+      "id": "active_inference_vs_rl_2026",
+      "url": "https://doi.org/10.1016/j.jmp.2026.103011",
+      "relevance": "Complexity-matched comparison; avoid assuming universal active-inference superiority."
+    }
+  ]
+}
