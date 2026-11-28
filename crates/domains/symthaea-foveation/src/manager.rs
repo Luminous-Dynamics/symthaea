@@ -162,25 +162,27 @@ impl FoveationManager {
 
         // Optional temporal budget gates ROI work without changing upstream
         // capture cadence or granting camera/sensor permissions.
-        let mut temporal_cost_estimate = None;
-        if let (Some(budget), Some(pending), Some(frame)) = (
-            self.temporal_budget.as_mut(),
-            self.pending.peek(),
-            self.frame_buffer.as_ref(),
-        ) {
-            let width = self.patch_size.saturating_mul(3).min(frame.width as usize);
-            let height = self.patch_size.saturating_mul(3).min(frame.height as usize);
-            let estimated_pixels = width.saturating_mul(height) as u64;
-            match budget.decide(now_us, estimated_pixels, self.in_flight.len()) {
-                Ok(TemporalBudgetDecision::Dispatch { pixel_cost, .. }) => {
-                    temporal_cost_estimate = Some(pixel_cost);
+        let mut temporal_budget_enabled = false;
+        if !self.pending.is_empty() {
+            if let Some(budget) = self.temporal_budget.as_mut() {
+                let Some(frame) = self.frame_buffer.as_ref() else {
+                    return;
+                };
+                // One patch plus one patch of context on each side. This
+                // intentionally budgets ROI pixels, not full-frame FPS.
+                let width = self.patch_size.saturating_mul(3).min(frame.width as usize);
+                let height = self.patch_size.saturating_mul(3).min(frame.height as usize);
+                let estimated_pixels = width.saturating_mul(height) as u64;
+                match budget.decide(now_us, estimated_pixels, self.in_flight.len()) {
+                    Ok(TemporalBudgetDecision::Dispatch { .. }) => {
+                        temporal_budget_enabled = true;
+                    }
+                    Ok(TemporalBudgetDecision::Defer { .. })
+                    | Ok(TemporalBudgetDecision::BudgetExhausted { .. })
+                    | Ok(TemporalBudgetDecision::ConcurrencyLimited { .. })
+                    | Err(_) => return,
                 }
-                Ok(TemporalBudgetDecision::Defer { .. })
-                | Ok(TemporalBudgetDecision::BudgetExhausted { .. })
-                | Ok(TemporalBudgetDecision::ConcurrencyLimited { .. })
-                | Err(_) => return,
             }
-            let _ = pending;
         }
 
         // Dispatch highest-priority pending request
@@ -216,16 +218,15 @@ impl FoveationManager {
 
                 match self.channel.request(request) {
                     Ok(rx) => {
-                        if let Some(_reserved_estimate) = temporal_cost_estimate {
+                        if temporal_budget_enabled {
                             if let Some(budget) = self.temporal_budget.as_mut() {
                                 let actual_pixels = (crop_width as u64).saturating_mul(crop_height as u64);
-                                // A successful bounded-channel enqueue must be committed.
-                                // The preceding decision was made under the same mutable
-                                // manager lock and timestamp, so failure indicates an
-                                // internal invariant violation rather than ordinary backpressure.
+                                // The previous decision and this commit share the same
+                                // manager update. The actual crop cannot exceed the
+                                // conservative padded-patch estimate.
                                 if budget.record_dispatch(now_us, actual_pixels).is_err() {
-                                    self.pending.push(prioritized);
-                                    return;
+                                    tracing::warn!("temporal foveation budget invariant failed; disabling optional policy");
+                                    self.temporal_budget = None;
                                 }
                             }
                         }
