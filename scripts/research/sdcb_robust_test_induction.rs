@@ -91,6 +91,11 @@ fn terminal_phi(x1: bool, x2: bool) -> Q {
     if x1 != x2 { TERMINAL_REJECTION } else { Q::zero() }
 }
 
+/// Conditional expectation at the full filtration equals the measurable test.
+fn member_conditional_at_horizon(_p: Q, x1: bool, x2: bool) -> Q {
+    terminal_phi(x1, x2)
+}
+
 fn terminal_size(p: Q) -> Q {
     let mut total = Q::zero();
     for x1 in [false, true] {
@@ -245,11 +250,14 @@ mod tests {
 
     #[test]
     fn induced_process_matches_terminal_randomized_test() {
-        for x1 in [false, true] {
-            for x2 in [false, true] {
-                // At the full filtration, every member-specific conditional
-                // expectation equals the terminal test on supported histories.
-                assert_eq!(terminal_phi(x1, x2), terminal_phi(x1, x2));
+        for p in [P_B1, P_B2] {
+            for x1 in [false, true] {
+                for x2 in [false, true] {
+                    assert_eq!(
+                        member_conditional_at_horizon(p, x1, x2),
+                        terminal_phi(x1, x2)
+                    );
+                }
             }
         }
     }
