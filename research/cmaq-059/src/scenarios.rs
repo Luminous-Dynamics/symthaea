@@ -177,6 +177,7 @@ pub fn generate_stream(
 
     let mut stream_hasher = Sha256::new();
     stream_hasher.update(STREAM_DOMAIN);
+    stream_hasher.update(b"rand=0.9.2;rand_chacha=0.9.0;ChaCha20Rng;StandardNormal=rand_distr-0.5.1");
     update_length_prefixed(&mut stream_hasher, experiment_id.as_bytes());
     update_length_prefixed(&mut stream_hasher, scenario_id.as_bytes());
     stream_hasher.update(replicate_id.to_be_bytes());
