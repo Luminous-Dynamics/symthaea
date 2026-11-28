@@ -8,6 +8,10 @@ Pinned upstream: [UCSB-NLP-Chang/GroupMemBench](https://github.com/UCSB-NLP-Chan
 
 This is a protocol kernel, not a completed benchmark integration or benchmark score. The upstream data, reader, judge and runner must still be checked out at the pinned revision and invoked by an outer harness.
 
+## Upstream license
+
+The pinned upstream README states that benchmark code is MIT-licensed and conversation data is CC BY 4.0; the repository includes the MIT license file. Preserve attribution and the applicable CC BY 4.0 terms when using benchmark conversation data. Recheck the upstream release and any linked underlying assets before each evaluation; the benchmark license does not grant rights to private customer data or third-party materials included in imported traces.
+
 ## Official benchmark surface
 
 The release covers four synthetic domains (Finance, Technology, Healthcare and Manufacturing), with six separate question types: multi-hop, knowledge update, temporal, user-implicit, term ambiguity and abstention. The published release contains 715 questions.
