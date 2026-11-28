@@ -29,9 +29,9 @@ pub struct IndicatorScore {
     pub score: f64,
     /// The raw metric value used.
     pub raw_value: f64,
-    /// What was measured.
+    /// Metric name and observed probe output.
     pub metric: &'static str,
-    /// Whether the prediction was met.
+    /// Whether this configured probe threshold was met.
     pub prediction_met: bool,
 }
 
@@ -53,13 +53,13 @@ pub struct QualiaConfidenceScore {
 /// Legacy threshold bucket for the heuristic probe index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfidenceLevel {
-    /// ≥ 0.80: All necessary conditions met convincingly.
+    /// ≥ 0.80: Upper bucket of the legacy heuristic index.
     Strong,
-    /// 0.60–0.80: Most conditions met, some weakly.
+    /// 0.60–0.80: Mid-high bucket of the legacy heuristic index.
     Moderate,
-    /// 0.40–0.60: Mixed evidence, several conditions marginal.
+    /// 0.40–0.60: Mid-low bucket of the legacy heuristic index.
     Weak,
-    /// < 0.40: One or more conditions clearly failed.
+    /// < 0.40: Lower bucket of the legacy heuristic index.
     Insufficient,
 }
 
@@ -79,9 +79,9 @@ struct IndicatorDef {
     name: &'static str,
     benchmark_contains: &'static str,
     metric_key: &'static str,
-    /// Normalize raw value to [0, 1]. Higher = stronger evidence.
+    /// Normalize a raw probe metric to [0, 1] for this heuristic index.
     normalize: fn(f64) -> f64,
-    /// Threshold for "prediction met".
+    /// Configured engineering threshold; not an empirically validated criterion.
     prediction_threshold: f64,
     /// Weight in composite (all equal by default).
     weight: f64,
@@ -155,9 +155,9 @@ const INDICATORS: &[IndicatorDef] = &[
         weight: 1.0,
     },
     IndicatorDef {
-        name: "Metacognitive Tracking",
+        name: "HOT/GWT Shared-input Alignment",
         benchmark_contains: "MetacognitiveIgnition",
-        metric_key: "spontaneous_tracking_score",
+        metric_key: "shared_input_alignment_score",
         // Already in [0, 1]
         normalize: |score| clamp01(score),
         prediction_threshold: 0.50,
