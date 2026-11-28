@@ -23,6 +23,7 @@ Keep these methods separate; do not merge their guarantees or silently borrow th
 | CMAQ-049 | Context-blocked paired Fourier kernel discrepancy e-process | Conditional paired-distribution equality in frozen discrete pre-response contexts; finite map and context partition |
 | CMAQ-050 | Continuous-covariate product Fourier paired conditional e-process | Conditional paired-distribution equality via frozen product Fourier maps; no hard bins, finite product dimension |
 | CMAQ-051 | Fixed equal-weight portfolio of contextual and product Fourier paired e-processes | Conditional paired-distribution equality; fixed representation weights, same null, stopped member processes |
+| CMAQ-052 | Independent-reference Hoeffding target envelope with explicit alpha split | Iid stationary reference/test null only; unconditional false-alarm bound alpha_test+delta |
 
 For every method, freeze source revision, dependencies, score mapping, reference set, ties, warm-up, alpha, horizon and stopping rule. The CCTM/PF-CCTM arms operate on their own stated score/p-value contracts; a PRM result cannot be presented as a reproduction of either.
 
@@ -70,6 +71,28 @@ A smaller smoke run may test wiring but cannot estimate a five-percent false-ala
 **Recoverability shifts:** increasing residual variance, decreasing barrier/recoverability margin, delayed actuation, fallback degradation, and simultaneous sensor/control disturbances. Ground-truth deadlines must come from independent plant/scenario evaluation, not from the detector.
 
 For every generator, store its source, parameters, seed, split, effective block ID, rank/score receipt and exact build digest.
+
+### Reference-target uncertainty experiments (CMAQ-052)
+
+This family measures whether the statistical target itself is justified by finite reference evidence. It is not merely another detector arm.
+
+Assume m independent reference blocks and an independent iid test stream from the same stationary null distribution, with each vector norm bounded by R. In dimension d, CMAQ-052 constructs a simultaneous coordinatewise Hoeffding envelope with radius
+
+    epsilon = R * sqrt(2 * log(2d/delta) / m).
+
+The reference target contains the true mean with probability at least 1-delta. The inner CMAQ-046 test e-process operates at alpha_test. The unconditional anytime false-alarm bound is alpha_test+delta, and the exact rational budget must satisfy alpha_test+delta <= alpha_total.
+
+Compare:
+- oracle known-mean target (upper bound only);
+- CMAQ-052 simultaneous Hoeffding envelope;
+- naïve plug-in point-estimate target with no coverage allocation (invalid negative control);
+- fixed conservative hand-set target.
+
+Sweep reference block count, feature dimension, observation norm bound, delta, alpha_test/alpha_total ratio, target width, mean shift magnitude and horizon. Include clean iid null; mean shifts just inside, at, and outside the envelope; duplicated/common-cause reference blocks; reference/test distribution mismatch; and serial dependence in the test stream as a negative control outside the stated guarantee.
+
+Report empirical reference-envelope coverage, radius/target width, full-horizon false alarm probability and confidence interval, misses, H+1-restricted delay, p50/p90/p95 detection delay, runtime and reference storage. The primary guarantee is alpha_test+delta, not alpha_test alone. Use at least 10,000 independent reference/test replications per primary cell and CMAQ-044 paired effective-block inference.
+
+Do not transfer this iid guarantee to arbitrary serially dependent, conditional, or covariate-varying nulls. Such settings need a separately validated dependence-aware reference confidence construction.
 
 ### Representation portfolio comparisons (CMAQ-051)
 
