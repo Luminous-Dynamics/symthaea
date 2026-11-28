@@ -472,6 +472,100 @@ mod tests {
     }
 
     #[test]
+    fn duration_weighting_and_arithmetic_segment_mean_are_distinct() {
+        let reference = [
+            0, 1_000, 2_000, 3_000,
+            10_000, 11_000, 12_000, 13_000, 14_000, 15_000, 16_000, 17_000,
+        ];
+        let estimated = [0, 1_000, 2_000, 3_000, 10_000];
+        let segments = [
+            BeatValidSegment {
+                start_frame: 0,
+                end_frame: 4_000,
+            },
+            BeatValidSegment {
+                start_frame: 10_000,
+                end_frame: 18_000,
+            },
+        ];
+        let mut duration_config = config(MirexSegmentBeatTrimPolicy::NoTrim);
+        duration_config.aggregation_mode = MirexSegmentAggregationMode::DurationWeighted;
+        let mut arithmetic_config = duration_config;
+        arithmetic_config.aggregation_mode =
+            MirexSegmentAggregationMode::ArithmeticMeanPerSegment;
+
+        let duration = score_mirex_valid_segments(
+            &reference,
+            &estimated,
+            &[],
+            &[],
+            1_000,
+            20_000,
+            &segments,
+            duration_config,
+            evidence(),
+        )
+        .unwrap();
+        let arithmetic = score_mirex_valid_segments(
+            &reference,
+            &estimated,
+            &[],
+            &[],
+            1_000,
+            20_000,
+            &segments,
+            arithmetic_config,
+            evidence(),
+        )
+        .unwrap();
+        assert!(
+            (duration.beat_aggregate.scores.f_measure
+                - arithmetic.beat_aggregate.scores.f_measure)
+                .abs()
+                > 0.1
+        );
+        assert_eq!(
+            duration.beat_aggregate.mode,
+            MirexBeatAggregationMode::DurationWeighted
+        );
+        assert_eq!(
+            arithmetic.beat_aggregate.mode,
+            MirexBeatAggregationMode::ArithmeticMeanPerTrack
+        );
+    }
+
+    #[test]
+    fn counts_events_outside_the_union_of_valid_regions_once() {
+        let events = [0, 1_000, 5_000, 6_000, 30_000];
+        let segments = [
+            BeatValidSegment {
+                start_frame: 0,
+                end_frame: 2_000,
+            },
+            BeatValidSegment {
+                start_frame: 5_000,
+                end_frame: 7_000,
+            },
+        ];
+        let result = score_mirex_valid_segments(
+            &events,
+            &events,
+            &events,
+            &events,
+            1_000,
+            40_000,
+            &segments,
+            config(MirexSegmentBeatTrimPolicy::NoTrim),
+            evidence(),
+        )
+        .unwrap();
+        assert_eq!(result.reference_beats_excluded_by_valid_mask, 1);
+        assert_eq!(result.estimated_beats_excluded_by_valid_mask, 1);
+        assert_eq!(result.reference_downbeats_excluded_by_valid_mask, 1);
+        assert_eq!(result.estimated_downbeats_excluded_by_valid_mask, 1);
+    }
+
+    #[test]
     fn rejects_overlapping_segments_before_scoring() {
         let error = score_mirex_valid_segments(
             &[],
