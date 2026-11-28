@@ -639,6 +639,9 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
     }
 
     let mut used_required = BTreeSet::new();
+    // Multiple independently qualified sources may support the same exact
+    // response claim span. Partial overlaps are rejected to avoid ambiguous
+    // claim-to-evidence attribution.
     let mut spans = BTreeSet::new();
     for claim_use in &receipt.claim_uses {
         let constraint = by_id.get(claim_use.constraint_id.as_str())
@@ -661,7 +664,12 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
         {
             return Err(AssistanceRejectV1::InvalidResponseSpan);
         }
-        if !spans.insert((start, end)) {
+        if spans.iter().any(|(prior_start, prior_end, _)| {
+            start < *prior_end && *prior_start < end && (start, end) != (*prior_start, *prior_end)
+        }) {
+            return Err(AssistanceRejectV1::InvalidResponseSpan);
+        }
+        if !spans.insert((start, end, claim_use.constraint_id.clone())) {
             return Err(AssistanceRejectV1::InvalidResponseSpan);
         }
         if digest_bytes(&response_bytes[start..end]) != claim_use.response_span_sha256 {
@@ -1026,6 +1034,55 @@ mod tests {
                 &receipt, b"request", bytes, &context, &vec![qualified], &closure, &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ClaimQualificationMismatch)
+        );
+    }
+
+    #[test]
+    fn two_independent_constraints_may_support_the_same_exact_claim_span() {
+        let closure = closure();
+        let context = assistance_context(&closure);
+        let first = constraint(ResponseConstraintActionV1::MayAssert, true, &closure);
+        let mut second = constraint(ResponseConstraintActionV1::MayAssert, true, &closure);
+        second.constraint_id = sha("constraint-2");
+        second.source_evidence_id = "e4".into();
+        let bytes = b"The agreed review is scheduled for Friday.";
+        let receipt = response_binding(
+            &context,
+            &vec![first.clone(), second.clone()],
+            &closure,
+            bytes,
+            ResponseDispositionV1::Answer,
+            vec![
+                claim_use(&first, bytes, None, None),
+                claim_use(&second, bytes, None, None),
+            ],
+        );
+        assert!(verify_assistance_binding_v1(
+            &receipt,
+            b"request",
+            bytes,
+            &context,
+            &vec![first, second],
+            &closure,
+            &FixtureVerifier,
+        ).is_ok());
+    }
+
+    #[test]
+    fn relation_closure_cannot_be_replayed_under_a_different_audience_snapshot() {
+        let closure = closure();
+        let mut changed_context = assistance_context(&closure);
+        changed_context.audience_id = "private:alice".into();
+        assert_eq!(
+            seal_assistance_binding_v1(
+                &changed_context,
+                &vec![constraint(ResponseConstraintActionV1::MayAssert, false, &closure)],
+                &closure,
+                b"claim",
+                ResponseDispositionV1::Answer,
+                Vec::new(),
+            ),
+            Err(AssistanceRejectV1::RelationClosureDigestMismatch)
         );
     }
 
