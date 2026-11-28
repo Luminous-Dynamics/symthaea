@@ -8,6 +8,8 @@
 //! epistemically verified before being presented.
 
 use super::types::{EpistemicStatus, ResearchSource, VerifiedClaim, WebResearchResult};
+#[cfg(test)]
+use super::types::ResearchStatus;
 use std::collections::HashMap;
 
 /// Configuration for the epistemic verifier
