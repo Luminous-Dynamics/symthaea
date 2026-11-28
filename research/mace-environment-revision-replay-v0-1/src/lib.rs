@@ -731,4 +731,36 @@ mod tests {
         tampered.query.known_at_ms = 90;
         assert!(!tampered.verify_integrity());
     }
+
+    #[test]
+    fn unverified_future_notice_does_not_poison_an_earlier_as_known_query() {
+        let mut events = Vec::new();
+        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
+            "policy-a", "source-a", "authority-a", 100, 100);
+        append(&mut events, RevisionEventKindV1::Activate, Some("rev-b1"), None, Some("rev-a1"), None,
+            "policy-b", "source-b", "authority-b", 200, 300);
+        let authorities = BTreeSet::from([digest("authority-a")]);
+        let head = events.last().unwrap().event_sha256.clone();
+
+        let result = resolve_environment_policy_v1(
+            &events, &query(250, 250), &authorities, &head
+        ).unwrap();
+        assert_eq!(
+            result.active_revision.as_ref().map(|revision| revision.revision_id.as_str()),
+            Some("rev-a1")
+        );
+    }
+
+    #[test]
+    fn retroactive_effective_time_insertion_is_rejected_explicitly() {
+        let mut events = Vec::new();
+        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
+            "policy-a", "source-a", "authority-a", 100, 100);
+        append(&mut events, RevisionEventKindV1::Activate, Some("rev-b1"), None, Some("rev-a1"), None,
+            "policy-b", "source-b", "authority-b", 200, 200);
+        append(&mut events, RevisionEventKindV1::Activate, Some("rev-c1"), None, Some("rev-b1"), None,
+            "policy-c", "source-c", "authority-c", 150, 300);
+        assert_eq!(resolve(&events, 400, 400), Err(ReplayRejectV1::InvalidTimeOrder));
+    }
+
 }
