@@ -104,10 +104,20 @@ baselines, not evidence of general cognitive capability or a state-of-the-art
 comparison. The PCE unit tests and Rust build have not yet been run on this
 research branch.
 
+## Selective prediction (scorer substrate)
+
+`benchmarks/metacognition/selective_prediction.rs` provides reusable scoring
+for answer, abstain and request-information decisions. It reports coverage,
+selective risk, false abstention, inappropriate answers on unanswerable items,
+counterfactual-answer Brier/ECE, a confidence-ranked risk/coverage curve and
+decision cost. It is a scorer primitive, not yet a complete item adapter or
+a measured Symthaea result.
+
 Research specifications and external comparisons:
 - `docs/research/PSYCHBENCH_COGNITIVE_ECOLOGY_SPEC_v0.1.md`
 - `docs/research/PSYCHBENCH_VNEXT_RESEARCH_AND_EXECUTION_PLAN_2026-11.md`
 - `docs/research/PSYCHBENCH_AWARENESSBENCH_CROSSWALK_2026-11.md`
+- `docs/research/PSYCHBENCH_INDUSTRY_CROSSWALK_AND_PARADIGM_SHIFTS_2026-11.md`
 
 Benchmark targets include CogBench, AwarenessBench, HumanBaseline, ToMBench/BigToM,
 ARC-AGI-2/3 and GAIA. Each is a distinct task family, not a single interchangeable
@@ -135,7 +145,7 @@ available as `registry::PsychBenchRegistry::pilot()` and validates the bundled
 definitions (stable/unique IDs, crate-local implementation paths, explicit
 metric selectors, bounds, evidence classes and human-norm claim boundaries).
 Unit tests cover those fail-closed rules and check that the listed implementation
-files exist. A source-level test also checks all 28 pilot metric selectors
+files exist. A source-level test also checks all 30 pilot metric selectors
 against their registered implementation files. Selected pilot metrics now call
 `MetricValue::from_samples_with_bounds`, which validates observations against
 declared support and computes intervals in the metric's original units. The JSON
