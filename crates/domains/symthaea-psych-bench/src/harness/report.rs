@@ -200,7 +200,7 @@ impl MetricValue {
         let std_dev = variance.sqrt();
 
         let (ci_lower, ci_upper) = if let Some(upper) = bounds.upper {
-            if upper == bounds.lower || samples.iter().all(|sample| *sample == samples[0]) {
+            if upper == bounds.lower {
                 (mean, mean)
             } else {
                 let width = upper - bounds.lower;
@@ -211,8 +211,15 @@ impl MetricValue {
                 let all_binary = normalized
                     .iter()
                     .all(|sample| *sample == 0.0 || *sample == 1.0);
+                let all_identical = samples.iter().all(|sample| *sample == samples[0]);
                 let (lower, upper) = if all_binary {
+                    // Keep Wilson uncertainty even when every Bernoulli sample
+                    // is a success or every sample is a failure.
                     wilson_score_interval(normalized.iter().sum::<f64>() / n as f64, n)
+                } else if n == 1 || all_identical {
+                    // A degenerate non-Bernoulli bootstrap would claim false
+                    // precision. Preserve the declared support conservatively.
+                    (0.0, 1.0)
                 } else {
                     let mut seed = 0xcbf29ce484222325_u64;
                     for sample in &normalized {
@@ -2964,6 +2971,33 @@ mod tests {
         assert!(metric.ci_lower >= 0.0);
         assert!(metric.ci_upper <= 1.0);
         assert!(metric.ci_lower < metric.mean && metric.ci_upper > metric.mean);
+    }
+
+    #[test]
+    fn explicit_all_success_binary_sample_does_not_claim_perfect_certainty() {
+        let bounds = crate::registry::MetricBounds {
+            lower: 0.0,
+            upper: Some(1.0),
+        };
+        let samples = [1.0, 1.0, 1.0, 1.0, 1.0];
+        let metric = MetricValue::from_samples_with_bounds(&samples, bounds)
+            .expect("valid all-success sample");
+        assert_eq!(metric.mean, 1.0);
+        assert!(metric.ci_lower < 1.0);
+        assert_eq!(metric.ci_upper, 1.0);
+    }
+
+    #[test]
+    fn explicit_constant_continuous_sample_preserves_declared_support() {
+        let bounds = crate::registry::MetricBounds {
+            lower: -1.0,
+            upper: Some(1.0),
+        };
+        let samples = [0.25, 0.25, 0.25, 0.25];
+        let metric = MetricValue::from_samples_with_bounds(&samples, bounds)
+            .expect("valid constant continuous sample");
+        assert_eq!(metric.ci_lower, -1.0);
+        assert_eq!(metric.ci_upper, 1.0);
     }
 
     #[test]
