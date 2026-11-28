@@ -250,16 +250,14 @@ func Evaluate(in Input)Result{
   for _,e:=range inbound[id]{
    dependency,exists:=nodes[e.PrerequisiteID]
    if !exists{
-    if e.Relation==Requires{combined=resultCombine(combined,Indeterminate);codes=appendUnique(codes,"required_prerequisite_missing:"+e.PrerequisiteID)}
-    else{optional=appendUnique(optional,e.PrerequisiteID)}
+    if e.Relation==Requires{combined=resultCombine(combined,Indeterminate);codes=appendUnique(codes,"required_prerequisite_missing:"+e.PrerequisiteID)} else{optional=appendUnique(optional,e.PrerequisiteID)}
     continue
    }
    depVerdict:=effective[e.PrerequisiteID]
    digestMatches:=e.ExpectedSHA256==""||e.ExpectedSHA256==dependency.Digest
    if e.Relation==Requires{
     required=append(required,e.PrerequisiteID)
-    if !validDigest(e.ExpectedSHA256){combined=resultCombine(combined,Indeterminate);codes=appendUnique(codes,"required_dependency_digest_unverifiable:"+e.PrerequisiteID)}
-    else if !digestMatches{combined=Blocked;codes=appendUnique(codes,"required_dependency_digest_mismatch:"+e.PrerequisiteID)}
+    if !validDigest(e.ExpectedSHA256){combined=resultCombine(combined,Indeterminate);codes=appendUnique(codes,"required_dependency_digest_unverifiable:"+e.PrerequisiteID)} else if !digestMatches{combined=Blocked;codes=appendUnique(codes,"required_dependency_digest_mismatch:"+e.PrerequisiteID)}
     combined=resultCombine(combined,depVerdict)
     if depVerdict!=Qualified{codes=appendUnique(codes,"required_dependency_not_qualified:"+e.PrerequisiteID)}
    }else{
