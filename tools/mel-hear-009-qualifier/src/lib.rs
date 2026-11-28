@@ -393,7 +393,9 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
     for condition in &panel.conditions {
         validate_condition_common(condition, &panel.matched_budget_profile_sha256)?;
         if condition.question_sha256 != panel.question_sha256 {
-            return Err("condition question digest differs from the panel's canonical question".to_owned());
+            return Err(
+                "condition question digest differs from the panel's canonical question".to_owned(),
+            );
         }
         validate_condition_kind(condition, &panel.audio_evidence_manifest_sha256)?;
         if by_kind.insert(condition.kind, condition).is_some() {
