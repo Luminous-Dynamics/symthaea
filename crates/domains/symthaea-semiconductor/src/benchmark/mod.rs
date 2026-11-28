@@ -148,4 +148,5 @@ pub use gated_streaming_adapter::{
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
+    verify_streaming_prediction_receipt_v1, verify_streaming_update_receipt_v1,
 };
