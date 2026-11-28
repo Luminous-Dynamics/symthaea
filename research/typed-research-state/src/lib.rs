@@ -427,10 +427,9 @@ pub fn verify_claim_source_quote<'a>(
         return Err(EvidenceQuoteVerificationError::ArtifactDigestMismatch);
     }
 
-    let start = usize::try_from(byte_start)
-        .map_err(|_| EvidenceQuoteVerificationError::InvalidSpan)?;
-    let end =
-        usize::try_from(byte_end).map_err(|_| EvidenceQuoteVerificationError::InvalidSpan)?;
+    let start =
+        usize::try_from(byte_start).map_err(|_| EvidenceQuoteVerificationError::InvalidSpan)?;
+    let end = usize::try_from(byte_end).map_err(|_| EvidenceQuoteVerificationError::InvalidSpan)?;
     if start >= end {
         return Err(EvidenceQuoteVerificationError::InvalidSpan);
     }
@@ -1359,13 +1358,8 @@ mod tests {
     fn claim_quote_rejects_out_of_range_and_non_utf8_byte_spans() {
         let artifact = "aéz".as_bytes();
         let artifact_digest = digest_for_test(artifact);
-        let out_of_range = verify_claim_source_quote(
-            artifact,
-            &artifact_digest,
-            0,
-            99,
-            &"0".repeat(64),
-        );
+        let out_of_range =
+            verify_claim_source_quote(artifact, &artifact_digest, 0, 99, &"0".repeat(64));
         assert_eq!(
             out_of_range,
             Err(EvidenceQuoteVerificationError::InvalidSpan)
