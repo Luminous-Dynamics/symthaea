@@ -245,10 +245,20 @@ pub fn verify_action_cancellation_v1(
         return Err(ActionTimelineError::WrongClockDomain);
     }
     validate_identifier(&cancellation.cause_event_id)?;
-    if cancellation.cancelled_at_monotonic_ns < timeline.source_timestamp_monotonic_ns
-        || cancellation.cancelled_at_monotonic_ns >= timeline.expires_at_monotonic_ns
-    {
+    if cancellation.cancelled_at_monotonic_ns < timeline.source_timestamp_monotonic_ns {
         return Err(ActionTimelineError::CancellationOutsideLifetime);
+    }
+    match cancellation.reason {
+        ActionCancellationReason::Expired => {
+            if cancellation.cancelled_at_monotonic_ns < timeline.expires_at_monotonic_ns {
+                return Err(ActionTimelineError::CancellationOutsideLifetime);
+            }
+        }
+        _ => {
+            if cancellation.cancelled_at_monotonic_ns >= timeline.expires_at_monotonic_ns {
+                return Err(ActionTimelineError::CancellationOutsideLifetime);
+            }
+        }
     }
     match (cancellation.reason, cancellation.replacement_plan_id.as_deref()) {
         (ActionCancellationReason::Superseded, Some(id)) => validate_identifier(id)?,
@@ -474,6 +484,21 @@ mod tests {
         assert!(ActionPhase::Onset < ActionPhase::Sustain);
         assert!(ActionPhase::Sustain < ActionPhase::Release);
         assert!(ActionPhase::Release < ActionPhase::Recovery);
+    }
+
+    #[test]
+    fn expiry_cancellation_is_valid_at_or_after_plan_expiry() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        let cancellation = ActionCancellationV1 {
+            plan_id: compiled.plan_id.clone(),
+            clock_domain_id: compiled.clock_domain_id.clone(),
+            cancelled_at_monotonic_ns: compiled.expires_at_monotonic_ns,
+            cause_event_id: "expiry-1".to_owned(),
+            reason: ActionCancellationReason::Expired,
+            replacement_plan_id: None,
+            timeline_digest: compiled.timeline_digest.clone(),
+        };
+        verify_action_cancellation_v1(&compiled, &cancellation).unwrap();
     }
 
     #[test]
