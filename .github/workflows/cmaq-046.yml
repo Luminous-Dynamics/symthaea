@@ -1,0 +1,123 @@
+name: CMAQ-046 convex-target approachability e-process
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-046/**"
+      - "research/cmaq-047/**"
+      - "research/cmaq-048/**"
+      - "research/cmaq-049/**"
+      - ".github/workflows/cmaq-046.yml"
+  push:
+    branches:
+      - "research/cmaq-046-*"
+    paths:
+      - "research/cmaq-046/**"
+      - ".github/workflows/cmaq-046.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-046-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  convex-target-approachability:
+    name: convex-target-approachability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-046/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-046/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-046/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Paired unknown-direction smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-046/Cargo.toml --locked --bin approachability_probe -- 32 500 20261127 250 > cmaq-046-approachability-smoke.csv
+      - name: Preserve paired probe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-046-approachability-smoke
+          path: cmaq-046-approachability-smoke.csv
+          if-no-files-found: error
+
+  controlled-blackwell-actions:
+    name: CMAQ-047 controlled Blackwell actions
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-047-controlled-blackwell-actions-v0-1-20261127'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-047/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-047/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-047/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Controlled action smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-047/Cargo.toml --locked --bin controlled_action_probe -- 64 > cmaq-047-controlled-actions-smoke.csv
+      - name: Preserve controlled action artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-047-controlled-actions-smoke
+          path: cmaq-047-controlled-actions-smoke.csv
+          if-no-files-found: error
+
+  fourier-kernel-approachability:
+    name: CMAQ-048 Fourier kernel mean approachability
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-048-fourier-kernel-approachability-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-048/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-048/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-048/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Paired scale-only smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-048/Cargo.toml --locked --bin fourier_scale_probe -- 32 500 20261128 250 > cmaq-048-fourier-scale-smoke.csv
+      - name: Preserve paired probe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-048-fourier-scale-smoke
+          path: cmaq-048-fourier-scale-smoke.csv
+          if-no-files-found: error
+
+  contextual-paired-kernel:
+    name: CMAQ-049 contextual paired kernel
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-049-contextual-paired-kernel-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-049/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-049/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-049/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Paired conditional discrepancy smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-049/Cargo.toml --locked --bin conditional_pair_probe -- 32 200 20261128 > cmaq-049-paired-kernel-smoke.csv
+      - name: Preserve paired probe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-049-paired-kernel-smoke
+          path: cmaq-049-paired-kernel-smoke.csv
+          if-no-files-found: error
