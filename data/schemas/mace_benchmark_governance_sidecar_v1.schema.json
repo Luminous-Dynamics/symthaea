@@ -1,0 +1,437 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_benchmark_governance_sidecar_v1.schema.json",
+  "title": "MACE Benchmark Governance Sidecar V1",
+  "description": "Separate hash-bound governance overlay for an immutable MACE Benchmark Result Evidence Capsule V1. Does not replace official benchmark scores.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "capsule_sha256",
+    "benchmark_id",
+    "track_id",
+    "release",
+    "official_metrics_sha256",
+    "governance_contract_sha256",
+    "evidence_flow",
+    "denominators",
+    "violations",
+    "costs",
+    "influence_evidence_level",
+    "verification",
+    "hard_gates_passed",
+    "explanatory_note",
+    "sidecar_sha256"
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "optionalSha": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nonnegative": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "mace_benchmark_governance_sidecar_v1"
+    },
+    "run_id": {
+      "$ref": "#/$defs/id"
+    },
+    "capsule_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "benchmark_id": {
+      "$ref": "#/$defs/id"
+    },
+    "track_id": {
+      "$ref": "#/$defs/id"
+    },
+    "release": {
+      "$ref": "#/$defs/id"
+    },
+    "official_metrics_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "governance_contract_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evidence_flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "retrieved",
+        "admissible",
+        "exposed",
+        "cited",
+        "influence_assessed",
+        "influential_positive",
+        "influential_negative",
+        "influence_indeterminate"
+      ],
+      "properties": {
+        "retrieved": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "admissible": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "exposed": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "cited": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "influence_assessed": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "influential_positive": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "influential_negative": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "influence_indeterminate": {
+          "$ref": "#/$defs/nonnegative"
+        }
+      }
+    },
+    "denominators": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_use_opportunities",
+        "decision_opportunities",
+        "citation_opportunities",
+        "influence_assessment_opportunities",
+        "lifecycle_transition_opportunities",
+        "authorization_opportunities",
+        "erasure_verification_opportunities",
+        "provenance_claim_opportunities",
+        "proactive_disclosure_opportunities",
+        "privacy_sensitive_opportunities"
+      ],
+      "properties": {
+        "evidence_use_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "decision_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "citation_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "influence_assessment_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "lifecycle_transition_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "authorization_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "erasure_verification_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "provenance_claim_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "proactive_disclosure_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "privacy_sensitive_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        }
+      }
+    },
+    "violations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stale_evidence_exposed",
+        "expired_evidence_exposed",
+        "revoked_evidence_exposed",
+        "superseded_evidence_exposed",
+        "wrong_scope_exposures",
+        "unsupported_provenance_claims",
+        "unauthorized_actions",
+        "cross_scope_disclosures",
+        "prohibited_proactive_disclosures",
+        "erasure_resurrections",
+        "privacy_violations"
+      ],
+      "properties": {
+        "stale_evidence_exposed": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "expired_evidence_exposed": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "revoked_evidence_exposed": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "superseded_evidence_exposed": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "wrong_scope_exposures": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "unsupported_provenance_claims": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "unauthorized_actions": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "cross_scope_disclosures": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "prohibited_proactive_disclosures": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "erasure_resurrections": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "privacy_violations": {
+          "$ref": "#/$defs/nonnegative"
+        }
+      }
+    },
+    "costs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verifier_calls",
+        "reobservations",
+        "lifecycle_checks",
+        "lineage_checks",
+        "evidence_bytes_inspected",
+        "governance_latency_p50_ns",
+        "governance_latency_p95_ns",
+        "governance_cost_microunits"
+      ],
+      "properties": {
+        "verifier_calls": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "reobservations": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "lifecycle_checks": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "lineage_checks": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "evidence_bytes_inspected": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "governance_latency_p50_ns": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonnegative"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "governance_latency_p95_ns": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonnegative"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "governance_cost_microunits": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonnegative"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_use_receipt_set_sha256",
+        "exposure_link_set_sha256",
+        "evaluator_output_sha256",
+        "raw_trace_receipt_sha256",
+        "split_audit_receipt_sha256",
+        "influence_report_sha256",
+        "randomization_receipt_sha256",
+        "independent_verifier_id"
+      ],
+      "properties": {
+        "evidence_use_receipt_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "exposure_link_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluator_output_sha256": {
+          "$ref": "#/$defs/optionalSha"
+        },
+        "raw_trace_receipt_sha256": {
+          "$ref": "#/$defs/optionalSha"
+        },
+        "split_audit_receipt_sha256": {
+          "$ref": "#/$defs/optionalSha"
+        },
+        "influence_report_sha256": {
+          "$ref": "#/$defs/optionalSha"
+        },
+        "randomization_receipt_sha256": {
+          "$ref": "#/$defs/optionalSha"
+        },
+        "independent_verifier_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "influence_evidence_level": {
+      "enum": [
+        "diagnostic",
+        "instrumented",
+        "independently_verified",
+        "causally_qualified"
+      ]
+    },
+    "hard_gates_passed": {
+      "type": "boolean"
+    },
+    "explanatory_note": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "sidecar_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "influence_evidence_level": {
+    "enum": [
+      "diagnostic",
+      "instrumented",
+      "independently_verified",
+      "causally_qualified"
+    ]
+  },
+  "hard_gates_passed": {
+    "type": "boolean"
+  },
+  "explanatory_note": {
+    "type": "string",
+    "maxLength": 4096
+  },
+  "sidecar_sha256": {
+    "$ref": "#/$defs/sha256"
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "influence_evidence_level": {
+            "enum": [
+              "instrumented",
+              "independently_verified",
+              "causally_qualified"
+            ]
+          }
+        },
+        "required": [
+          "influence_evidence_level"
+        ]
+      },
+      "then": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "evaluator_output_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "raw_trace_receipt_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            },
+            "required": [
+              "evaluator_output_sha256",
+              "raw_trace_receipt_sha256"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "influence_evidence_level": {
+            "const": "causally_qualified"
+          }
+        },
+        "required": [
+          "influence_evidence_level"
+        ]
+      },
+      "then": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "split_audit_receipt_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "influence_report_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "randomization_receipt_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "independent_verifier_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "split_audit_receipt_sha256",
+              "influence_report_sha256",
+              "randomization_receipt_sha256",
+              "independent_verifier_id"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+name: MACE Benchmark Governance Sidecar
+on:
+  pull_request:
+    paths:
+      - "research/mace-benchmark-governance-sidecar-v1/**"
+      - "data/schemas/mace_benchmark_governance_sidecar_v1.schema.json"
+      - "data/schemas/mace_benchmark_comparison_receipt_v1.schema.json"
+      - "docs/research/MACE_BENCHMARK_GOVERNANCE_SIDECAR_V1.md"
+      - ".github/workflows/mace-benchmark-governance-sidecar.yml"
+  push:
+    branches:
+      - "research/mace-benchmark-governance-sidecar-v1"
+jobs:
+  sidecar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Parse evaluator source
+        run: rustfmt --edition 2024 --emit stdout --config skip_children=true research/mace-benchmark-governance-sidecar-v1/src/lib.rs >/dev/null
+      - name: Test independent contract crate
+        run: cargo test --manifest-path research/mace-benchmark-governance-sidecar-v1/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/mace-benchmark-governance-sidecar-v1/Cargo.toml --all-targets -- -D warnings
+      - name: Parse sidecar schema
+        run: python3 -m json.tool data/schemas/mace_benchmark_governance_sidecar_v1.schema.json >/dev/null
+      - name: Parse comparison gate schema
+        run: python3 -m json.tool data/schemas/mace_benchmark_comparison_receipt_v1.schema.json >/dev/null
