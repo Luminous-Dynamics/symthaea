@@ -40,7 +40,7 @@ fn acquire_nonce_ledger_lock(path: &Path) -> anyhow::Result<NonceLedgerLock> {
         .open(&lock_path)
         .with_context(|| {
             format!(
-                "acquire exclusive observer nonce ledger lock {}; stale locks require operator review",
+                "observer nonce lock {} is held; stale locks require operator review",
                 lock_path.display()
             )
         })?;
@@ -346,7 +346,9 @@ mod nonce_ledger_tests {
     fn cleanup(path: &Path) {
         let _ = fs::remove_file(path);
         let _ = fs::remove_file(PathBuf::from(format!("{}.lock", path.display())));
-        let _ = fs::remove_file(PathBuf::from(format!("{}.tmp-{}", path.display(), std::process::id())));
+        let temp_path =
+            PathBuf::from(format!("{}.tmp-{}", path.display(), std::process::id()));
+        let _ = fs::remove_file(temp_path);
     }
 
     #[test]
@@ -379,7 +381,8 @@ mod nonce_ledger_tests {
         let first = acquire_nonce_ledger_lock(&path).expect("first evaluator acquires lock");
         assert!(acquire_nonce_ledger_lock(&path).is_err());
         drop(first);
-        let second = acquire_nonce_ledger_lock(&path).expect("lock released after first evaluator");
+        let second = acquire_nonce_ledger_lock(&path)
+            .expect("lock released after first evaluator");
         drop(second);
         cleanup(&path);
     }
