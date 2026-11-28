@@ -526,6 +526,53 @@ mod tests {
     }
 
     #[test]
+    fn trusted_observer_is_required_and_still_cannot_compensate_for_failed_contracts() {
+        let task = task();
+        let observation = valid_observation(&task);
+        let evidence = crate::observer::VerifiedObserverEvidence {
+            observer_id: "observer-test".to_owned(),
+            key_id: "key-test".to_owned(),
+            observer_binary_sha256: "a".repeat(64),
+            observer_environment_sha256: "b".repeat(64),
+            trust_store_sha256: "c".repeat(64),
+            payload_sha256: "d".repeat(64),
+            challenge_sha256: "e".repeat(64),
+            run_id: "run-test".to_owned(),
+            task_id: task["task_id"].as_str().unwrap().to_owned(),
+            replay_verifier_id: "replay-test".to_owned(),
+            replay_verifier_sha256: "f".repeat(64),
+            challenge_ledger_marker_sha256: "1".repeat(64),
+        };
+
+        let report = qualify_observation_with_observer(
+            &task,
+            &observation,
+            evidence.clone(),
+        )
+        .expect("observer-backed contract report");
+        assert!(report.contract_checks_pass);
+        assert!(report.independent_evidence_verified);
+        assert!(report.qualified);
+        assert_eq!(
+            report.qualification_status,
+            "qualified_with_trusted_observer_v0_1"
+        );
+        assert!(report.observer_evidence.is_some());
+
+        let mut over_budget = valid_observation(&task);
+        over_budget["resource_usage"]["elapsed_ms"] = json!(10_001);
+        let report = qualify_observation_with_observer(&task, &over_budget, evidence)
+            .expect("failed contract report remains inspectable");
+        assert!(report.independent_evidence_verified);
+        assert!(!report.contract_checks_pass);
+        assert!(!report.qualified);
+        assert_eq!(
+            report.qualification_status,
+            "unqualified_contract_checks_failed"
+        );
+    }
+
+    #[test]
     fn over_budget_time_or_tool_calls_prevents_qualification() {
         let task = task();
         let mut observation = valid_observation(&task);
