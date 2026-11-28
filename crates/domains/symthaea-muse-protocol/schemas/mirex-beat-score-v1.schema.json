@@ -12,6 +12,9 @@
     },
     {
       "$ref": "#/$defs/aggregate_report"
+    },
+    {
+      "$ref": "#/$defs/qualified_beat_track_report"
     }
   ],
   "$defs": {
@@ -348,6 +351,111 @@
         },
         "scores": {
           "$ref": "#/$defs/metric_scores"
+        }
+      }
+    },
+    "valid_segment_policy": {
+      "enum": [
+        "full_track",
+        "declared_valid_segments"
+      ]
+    },
+    "score_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_id",
+        "benchmark_manifest_sha256",
+        "source_audio_sha256",
+        "reference_annotation_sha256",
+        "estimated_event_output_sha256",
+        "source_master_family_id",
+        "valid_segment_policy",
+        "valid_segment_manifest_sha256"
+      ],
+      "properties": {
+        "track_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "benchmark_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reference_annotation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "estimated_event_output_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_master_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "valid_segment_policy": {
+          "$ref": "#/$defs/valid_segment_policy"
+        },
+        "valid_segment_manifest_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "valid_segment_policy": {
+                "const": "full_track"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "valid_segment_manifest_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "valid_segment_policy": {
+                "const": "declared_valid_segments"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "valid_segment_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "qualified_beat_track_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "report",
+        "evidence"
+      ],
+      "properties": {
+        "report": {
+          "$ref": "#/$defs/beat_track_report"
+        },
+        "evidence": {
+          "$ref": "#/$defs/score_evidence"
         }
       }
     }
