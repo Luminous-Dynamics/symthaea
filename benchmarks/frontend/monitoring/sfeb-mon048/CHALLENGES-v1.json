@@ -1,0 +1,227 @@
+{
+  "profile": "mon-evaluator-challenge-v1",
+  "description": "Deterministic seeded evaluator challenge manifest. Expected outcomes are benchmark oracle labels, not live recovery observations.",
+  "counts": {
+    "total": 27,
+    "positive_controls": 3,
+    "negative_or_adversarial": 24
+  },
+  "cases": [
+    {
+      "id": "P01",
+      "name": "clean_complete_recovery",
+      "mutation": "none",
+      "expected_disposition": "qualified",
+      "category": "positive_control",
+      "description": "Complete authenticated evidence and closed scope; recovery invariants pass."
+    },
+    {
+      "id": "P02",
+      "name": "safe_historical_signature",
+      "mutation": "none",
+      "expected_disposition": "qualified",
+      "category": "positive_control",
+      "description": "Capture interval ends before effective revocation and trust checkpoint is valid."
+    },
+    {
+      "id": "P03",
+      "name": "unrelated_claim_survives_revocation",
+      "mutation": "none",
+      "expected_disposition": "qualified",
+      "category": "positive_control",
+      "description": "Revocation affects another claim only; this claim has no dependency path to it."
+    },
+    {
+      "id": "N01",
+      "name": "missing_schema_history",
+      "mutation": "omit_mandatory_evidence",
+      "expected_disposition": "indeterminate",
+      "category": "scope",
+      "description": "Rows reconcile but required DDL/schema-history surface is absent."
+    },
+    {
+      "id": "N02",
+      "name": "forged_capture_receipt",
+      "mutation": "forge_receipt_signature",
+      "expected_disposition": "blocked",
+      "category": "custody",
+      "description": "Receipt signature fails under independently pinned trust root."
+    },
+    {
+      "id": "N03",
+      "name": "replayed_receipt_nonce",
+      "mutation": "reuse_nonce",
+      "expected_disposition": "blocked",
+      "category": "custody",
+      "description": "Previously consumed one-use nonce is replayed."
+    },
+    {
+      "id": "N04",
+      "name": "untrusted_root_substitution",
+      "mutation": "replace_trust_root",
+      "expected_disposition": "blocked",
+      "category": "trust_bootstrap",
+      "description": "Trust snapshot is not authenticated to configured root."
+    },
+    {
+      "id": "N05",
+      "name": "stale_revocation_checkpoint",
+      "mutation": "freeze_revocation_checkpoint",
+      "expected_disposition": "indeterminate",
+      "category": "freshness",
+      "description": "Freshness requirement cannot be established."
+    },
+    {
+      "id": "N06",
+      "name": "revocation_before_capture",
+      "mutation": "move_revocation_before_capture",
+      "expected_disposition": "blocked",
+      "category": "temporal",
+      "description": "Effective revocation precedes the entire capture interval."
+    },
+    {
+      "id": "N07",
+      "name": "revocation_overlaps_capture_interval",
+      "mutation": "widen_capture_interval",
+      "expected_disposition": "indeterminate",
+      "category": "temporal",
+      "description": "Capture uncertainty interval overlaps effective revocation."
+    },
+    {
+      "id": "N08",
+      "name": "clock_skew_unbounded",
+      "mutation": "remove_clock_uncertainty_bound",
+      "expected_disposition": "indeterminate",
+      "category": "temporal",
+      "description": "No defensible temporal ordering can be established."
+    },
+    {
+      "id": "N09",
+      "name": "inventory_from_same_compromised_plane",
+      "mutation": "collapse_independence_domains",
+      "expected_disposition": "indeterminate",
+      "category": "independence",
+      "description": "Nominally separate inventories share a single compromised authority."
+    },
+    {
+      "id": "N10",
+      "name": "unsupported_required_capability",
+      "mutation": "remove_capability_declaration",
+      "expected_disposition": "indeterminate",
+      "category": "capability",
+      "description": "Mandatory state surface has no qualified capture capability."
+    },
+    {
+      "id": "N11",
+      "name": "false_complete_inventory",
+      "mutation": "omit_inventory_member",
+      "expected_disposition": "indeterminate",
+      "category": "scope",
+      "description": "Independent source inventory contains a required member absent from capture scope."
+    },
+    {
+      "id": "N12",
+      "name": "unrelated_claim_overinvalidated",
+      "mutation": "invalidate_all_claims",
+      "expected_disposition": "blocked",
+      "category": "invalidation_precision",
+      "description": "Mutation damages unrelated claim; exact affected set is known."
+    },
+    {
+      "id": "N13",
+      "name": "dependent_claim_not_invalidated",
+      "mutation": "drop_dependency_edge",
+      "expected_disposition": "blocked",
+      "category": "invalidation_recall",
+      "description": "Revoked prerequisite remains in downstream claim dependency closure."
+    },
+    {
+      "id": "N14",
+      "name": "expired_claim_admitted",
+      "mutation": "advance_time_past_lease",
+      "expected_disposition": "blocked",
+      "category": "freshness",
+      "description": "Claim lease expired before relying-party admission."
+    },
+    {
+      "id": "N15",
+      "name": "canonicalization_key_order_mutation",
+      "mutation": "disable_jcs_key_sort",
+      "expected_disposition": "blocked",
+      "category": "canonicalization",
+      "description": "Canonical bytes diverge from golden JCS vector."
+    },
+    {
+      "id": "N16",
+      "name": "duplicate_json_member",
+      "mutation": "accept_duplicate_member",
+      "expected_disposition": "blocked",
+      "category": "canonicalization",
+      "description": "Parser silently collapses duplicate object member names."
+    },
+    {
+      "id": "N17",
+      "name": "domain_separation_removed",
+      "mutation": "remove_digest_prefix",
+      "expected_disposition": "blocked",
+      "category": "canonicalization",
+      "description": "Claim digest no longer uses required domain separation."
+    },
+    {
+      "id": "N18",
+      "name": "admission_target_substitution",
+      "mutation": "change_target_after_appraisal",
+      "expected_disposition": "blocked",
+      "category": "admission",
+      "description": "Token for one recovery target is presented for another."
+    },
+    {
+      "id": "N19",
+      "name": "admission_nonce_race",
+      "mutation": "concurrent_nonce_reuse",
+      "expected_disposition": "blocked",
+      "category": "admission",
+      "description": "Two concurrent mutations attempt to consume the same nonce."
+    },
+    {
+      "id": "N20",
+      "name": "all_indeterminate_evaluator",
+      "mutation": "return_indeterminate_for_everything",
+      "expected_disposition": "blocked",
+      "category": "evaluator_gaming",
+      "description": "Evaluator evades false qualifications but fails required positive-control decision coverage."
+    },
+    {
+      "id": "N21",
+      "name": "positive_control_false_block",
+      "mutation": "block_clean_recovery",
+      "expected_disposition": "blocked",
+      "category": "evaluator_sensitivity",
+      "description": "Known-safe control is incorrectly blocked."
+    },
+    {
+      "id": "N22",
+      "name": "conflicting_source_witnesses",
+      "mutation": "ignore_conflicting_witness",
+      "expected_disposition": "indeterminate",
+      "category": "source_truth",
+      "description": "Independent witnesses disagree and conflict policy is unresolved."
+    },
+    {
+      "id": "N23",
+      "name": "partial_kafka_partition_coverage",
+      "mutation": "omit_partition_high_watermark",
+      "expected_disposition": "indeterminate",
+      "category": "scope",
+      "description": "At least one required partition lacks a qualified terminal boundary."
+    },
+    {
+      "id": "N24",
+      "name": "application_invariant_failure",
+      "mutation": "ignore_failed_business_invariant",
+      "expected_disposition": "blocked",
+      "category": "semantic_recovery",
+      "description": "Storage and schema checks pass but required application invariant fails."
+    }
+  ]
+}
