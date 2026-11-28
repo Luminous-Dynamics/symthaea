@@ -169,6 +169,21 @@ func TestOptionalMissingContextDoesNotHold(t *testing.T){
  in:=healthyInput();in.Edges=append(in.Edges,Edge{PrerequisiteID:"missing-optional-context",DependentID:"recovery-claim",Relation:Context})
  if got:=Evaluate(in);got.GraphVerdict!=Qualified{t.Fatalf("missing optional context cannot hold required claim: %+v",got)}
 }
+
+func TestGraphDigestNormalizesEquivalentTimeZones(t *testing.T){
+ in:=healthyInput();a:=GraphDigest(in.Nodes,in.Edges,in.RootClaimIDs)
+ zone:=time.FixedZone("UTC+02",2*60*60)
+ for i:=range in.Nodes{in.Nodes[i].IssuedAt=in.Nodes[i].IssuedAt.In(zone);in.Nodes[i].ValidUntil=in.Nodes[i].ValidUntil.In(zone)}
+ b:=GraphDigest(in.Nodes,in.Edges,in.RootClaimIDs)
+ if a!=b{t.Fatalf("same instants encoded with different offsets must have same graph digest: %s != %s",a,b)}
+}
+func TestMissingEvaluationTimeHoldsClaims(t *testing.T){
+ in:=healthyInput();in.EvaluatedAt=time.Time{}
+ got:=Evaluate(in)
+ if got.GraphVerdict!=Indeterminate||findClaim(got,"recovery-claim")!=nil{ /* fixture has recovery-claim absent */ }
+ if got.GraphVerdict!=Indeterminate||findClaim(got,"recovery-claim")==nil||findClaim(got,"recovery-claim").Verdict!=Indeterminate{t.Fatalf("missing evaluation time must hold root claim: %+v",got)}
+}
+
 func BenchmarkEvaluate1000NodeEvidenceGraph(b *testing.B){
  in:=Input{Profile:Profile,Version:Version,Mode:OfflineFixture,EvaluatedAt:at,AllowedFutureSkewSeconds:5}
  root:=node("root-claim",Claim);in.Nodes=append(in.Nodes,root);in.RootClaimIDs=[]string{"root-claim"}
