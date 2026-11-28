@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:symthaea:roi-information-value-manifest:v1",
+  "title": "Symthaea ROI expected-information-value manifest v1",
+  "description": "Replayable ranking inputs for already-authorized ROI candidates. Schema shape does not authenticate calibration evidence or grant processing permission.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "now_us",
+    "now_clock_domain_id",
+    "config",
+    "candidates"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.roi-information-value-manifest.v1"
+    },
+    "now_us": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709552000
+    },
+    "now_clock_domain_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "config": {
+      "$ref": "#/$defs/config"
+    },
+    "candidates": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/estimate"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "unitValue": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_source_age_us",
+        "minimum_calibration_samples",
+        "maximum_expected_calibration_error",
+        "minimum_confidence_level",
+        "minimum_net_benefit",
+        "minimum_benefit_per_1000_pixels"
+      ],
+      "properties": {
+        "maximum_source_age_us": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_calibration_samples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_expected_calibration_error": {
+          "$ref": "#/$defs/unitValue"
+        },
+        "minimum_confidence_level": {
+          "$ref": "#/$defs/unitValue"
+        },
+        "minimum_net_benefit": {
+          "$ref": "#/$defs/unitValue"
+        },
+        "minimum_benefit_per_1000_pixels": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "calibration_id",
+        "model_digest",
+        "calibration_report_digest",
+        "task_family",
+        "sample_count",
+        "expected_calibration_error"
+      ],
+      "properties": {
+        "calibration_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "model_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "calibration_report_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "task_family": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_calibration_error": {
+          "$ref": "#/$defs/unitValue"
+        }
+      }
+    },
+    "estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "task_id",
+        "task_family",
+        "source_clock_domain_id",
+        "source_frame_id",
+        "source_timestamp_us",
+        "expected_loss_without_roi",
+        "expected_loss_with_roi",
+        "expected_loss_reduction_lcb",
+        "confidence_level",
+        "latency_penalty",
+        "staleness_penalty",
+        "source_pixel_cost",
+        "calibration"
+      ],
+      "properties": {
+        "candidate_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "task_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "task_family": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source_clock_domain_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source_frame_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709552000
+        },
+        "source_timestamp_us": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709552000
+        },
+        "expected_loss_without_roi": {
+          "$ref": "#/$defs/unitValue"
+        },
+        "expected_loss_with_roi": {
+          "$ref": "#/$defs/unitValue"
+        },
+        "expected_loss_reduction_lcb": {
+          "$ref": "#/$defs/unitValue"
+        },
+        "confidence_level": {
+          "$ref": "#/$defs/unitValue"
+        },
+        "latency_penalty": {
+          "$ref": "#/$defs/unitValue"
+        },
+        "staleness_penalty": {
+          "$ref": "#/$defs/unitValue"
+        },
+        "source_pixel_cost": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 18446744073709552000
+        },
+        "calibration": {
+          "$ref": "#/$defs/calibration"
+        }
+      }
+    }
+  }
+}
