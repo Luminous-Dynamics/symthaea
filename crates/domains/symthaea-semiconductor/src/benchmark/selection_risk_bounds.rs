@@ -86,6 +86,8 @@ pub struct IndependentAuditEstimateV1 {
     pub effective_sample_size: f64,
     pub minimum_inclusion_probability: f64,
     pub audit_sample_count: usize,
+    pub qualified_frame_audit_count: usize,
+    pub missing_frame_audit_count: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -228,16 +230,20 @@ fn estimate_from_independent_audit(
         ));
     }
 
+    let population_ids: BTreeSet<u64> = input.population_round_ids.iter().copied().collect();
     let mut sample_ids = BTreeSet::new();
+    let mut qualified_frame_audit_count = 0_usize;
+    let mut missing_frame_audit_count = 0_usize;
     let mut ht_missing_sum = 0.0;
     let mut variance_total = 0.0;
     let mut sum_weights = 0.0;
     let mut sum_squared_weights = 0.0;
     for observation in &input.independent_audit_losses {
-        if !missing_ids.contains(&observation.round_id) || !sample_ids.insert(observation.round_id)
+        if !population_ids.contains(&observation.round_id)
+            || !sample_ids.insert(observation.round_id)
         {
             return Err(SelectionRiskErrorV1(
-                "audit round must be unique and belong to the nonqualified population".into(),
+                "audit round must be unique and belong to the frozen population".into(),
             ));
         }
         bounded_loss(observation.loss, "audit loss")?;
@@ -255,11 +261,20 @@ fn estimate_from_independent_audit(
             ));
         }
         let pi = observation.inclusion_probability;
-        let weight = 1.0 / pi;
-        ht_missing_sum += observation.loss * weight;
-        variance_total += (1.0 - pi) * observation.loss * observation.loss / (pi * pi);
-        sum_weights += weight;
-        sum_squared_weights += weight * weight;
+        if missing_ids.contains(&observation.round_id) {
+            // The audit draw is over the full frozen population. Only audited
+            // members of the residual missing-outcome frame contribute to the
+            // Horvitz-Thompson correction; qualified-frame draws remain in the
+            // receipt for audit independence/concordance, but are not double-counted.
+            let weight = 1.0 / pi;
+            ht_missing_sum += observation.loss * weight;
+            variance_total += (1.0 - pi) * observation.loss * observation.loss / (pi * pi);
+            sum_weights += weight;
+            sum_squared_weights += weight * weight;
+            missing_frame_audit_count += 1;
+        } else {
+            qualified_frame_audit_count += 1;
+        }
     }
     if !ht_missing_sum.is_finite()
         || !variance_total.is_finite()
@@ -310,6 +325,8 @@ fn estimate_from_independent_audit(
         },
         minimum_inclusion_probability: design.minimum_inclusion_probability,
         audit_sample_count: input.independent_audit_losses.len(),
+        qualified_frame_audit_count,
+        missing_frame_audit_count,
     }))
 }
 
@@ -589,16 +606,31 @@ mod tests {
     }
 
     #[test]
-    fn audit_sample_must_be_from_missing_population_only() {
+    fn full_population_audit_may_include_qualified_rows_without_double_counting() {
         let mut data = input();
         data.audit_design = Some(audit_design());
-        data.independent_audit_losses = vec![IndependentAuditLossObservationV1 {
-            round_id: 1,
-            loss: 0.0,
-            inclusion_probability: 0.5,
-            audit_measurement_receipt_sha256: digest('2'),
-        }];
-        assert!(evaluate_selection_adjusted_population_risk_v1(&data).is_err());
+        data.independent_audit_losses = vec![
+            IndependentAuditLossObservationV1 {
+                round_id: 1,
+                loss: 1.0,
+                inclusion_probability: 0.5,
+                audit_measurement_receipt_sha256: digest('2'),
+            },
+            IndependentAuditLossObservationV1 {
+                round_id: 3,
+                loss: 1.0,
+                inclusion_probability: 0.5,
+                audit_measurement_receipt_sha256: digest('3'),
+            },
+        ];
+        let report = evaluate_selection_adjusted_population_risk_v1(&data).unwrap();
+        let audit = report.independent_audit_estimate.unwrap();
+        assert_eq!(audit.audit_sample_count, 2);
+        assert_eq!(audit.qualified_frame_audit_count, 1);
+        assert_eq!(audit.missing_frame_audit_count, 1);
+        // Qualified loss for round 1 is already in the known-loss total.
+        // The audit observation must not add it a second time.
+        assert_eq!(audit.population_risk_estimate, 0.75);
     }
 
     #[test]
