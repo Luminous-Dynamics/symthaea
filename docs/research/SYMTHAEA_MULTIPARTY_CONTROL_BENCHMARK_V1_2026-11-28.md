@@ -74,4 +74,4 @@ Report precision/recall by addressing type and speaker/session, not only aggrega
 
 ## Evidence boundary
 
-Ten source-level tests are authored. They have not been compiled or executed. The evaluator is not an audio perception model, and no consented multi-party dataset, external benchmark score or runtime latency result exists. Dataset licensing and participant consent must be checked independently before use.
+Twelve source-level tests are authored. They have not been compiled or executed. The evaluator is not an audio perception model, and no consented multi-party dataset, external benchmark score or runtime latency result exists. Dataset licensing and participant consent must be checked independently before use.
