@@ -75,8 +75,8 @@ is a synthetic accounting convention, not measured physical energy or money.
 
 Thirteen tests are authored for repeated disruption, the snapshot-reset negative control, persistent runtime-created edges,
 cumulative budgets, event-order invariance, conflict rejection, duplicate
-action IDs, stale pre-state digests, deterministic replay, demand persistence
-and context-bound state digests.
+action IDs and event IDs, stale pre-state digests, deterministic replay,
+demand persistence, skipped-schedule rejection and context-bound state digests.
 
 Run:
     cargo test -p topo-adapt-benchmark
