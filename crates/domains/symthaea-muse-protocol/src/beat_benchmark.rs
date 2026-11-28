@@ -66,6 +66,7 @@ pub enum BeatAnnotationProvenance {
     HumanAdjudicated,
     AutoThenCorrected,
     AutoOnly,
+    SyntheticKnownAnswer,
     Unknown,
 }
 
