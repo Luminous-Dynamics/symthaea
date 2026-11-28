@@ -1,0 +1,41 @@
+{
+  "profile": "mon045-evidence-dependency-input-v1",
+  "version": "1.0.0",
+  "mode": "offline_fixture",
+  "evaluated_at": "2026-11-28T12:30:00Z",
+  "allowed_future_skew_seconds": 5,
+  "nodes": [
+    {
+      "id": "recovery-complete",
+      "kind": "claim",
+      "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "declared_verdict": "qualified",
+      "issuer_id": "offline-test-issuer",
+      "issued_at": "2026-11-28T11:00:00Z",
+      "valid_until": "2026-11-28T14:00:00Z",
+      "authenticated": true
+    },
+    {
+      "id": "postgres-source-truth",
+      "kind": "evidence",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "declared_verdict": "qualified",
+      "issuer_id": "offline-test-issuer",
+      "issued_at": "2026-11-28T11:00:00Z",
+      "valid_until": "2026-11-28T14:00:00Z",
+      "authenticated": true,
+      "revoked_at": "2026-11-28T12:00:00Z"
+    }
+  ],
+  "edges": [
+    {
+      "prerequisite_id": "postgres-source-truth",
+      "dependent_id": "recovery-complete",
+      "relation": "requires",
+      "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "root_claim_ids": [
+    "recovery-complete"
+  ]
+}
