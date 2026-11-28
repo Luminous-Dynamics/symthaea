@@ -386,6 +386,65 @@ fn validate_classifier(
     classifier_id
 }
 
+/// Failure while binding a claim quote to the exact bytes of its source artifact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceQuoteVerificationError {
+    InvalidArtifactDigest,
+    ArtifactDigestMismatch,
+    InvalidQuoteDigest,
+    InvalidSpan,
+    QuoteSpanNotUtf8,
+    QuoteDigestMismatch,
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// Verify a claim-specific quote span against the exact retrieved artifact bytes.
+///
+/// The caller must supply the artifact digest and byte offsets from the same
+/// immutable evidence record referenced by the ResearchState relation. The
+/// returned string is the exact UTF-8 slice whose digest was checked. This
+/// verifies byte identity, not semantic entailment or classifier correctness.
+pub fn verify_claim_source_quote<'a>(
+    source_bytes: &'a [u8],
+    expected_artifact_sha256: &str,
+    byte_start: u64,
+    byte_end: u64,
+    expected_quote_sha256: &str,
+) -> Result<&'a str, EvidenceQuoteVerificationError> {
+    if !is_digest(expected_artifact_sha256) {
+        return Err(EvidenceQuoteVerificationError::InvalidArtifactDigest);
+    }
+    if !is_digest(expected_quote_sha256) {
+        return Err(EvidenceQuoteVerificationError::InvalidQuoteDigest);
+    }
+    if sha256_hex(source_bytes) != expected_artifact_sha256.to_ascii_lowercase() {
+        return Err(EvidenceQuoteVerificationError::ArtifactDigestMismatch);
+    }
+
+    let start = usize::try_from(byte_start)
+        .map_err(|_| EvidenceQuoteVerificationError::InvalidSpan)?;
+    let end =
+        usize::try_from(byte_end).map_err(|_| EvidenceQuoteVerificationError::InvalidSpan)?;
+    if start >= end {
+        return Err(EvidenceQuoteVerificationError::InvalidSpan);
+    }
+    let span = source_bytes
+        .get(start..end)
+        .ok_or(EvidenceQuoteVerificationError::InvalidSpan)?;
+    let quote =
+        std::str::from_utf8(span).map_err(|_| EvidenceQuoteVerificationError::QuoteSpanNotUtf8)?;
+    if sha256_hex(span) != expected_quote_sha256.to_ascii_lowercase() {
+        return Err(EvidenceQuoteVerificationError::QuoteDigestMismatch);
+    }
+    Ok(quote)
+}
+
 fn validate_quote_span(value: &Value, path: &str, issues: &mut Vec<ValidationIssue>) {
     let Some(map) = object(value, path, issues) else {
         return;
@@ -1226,6 +1285,103 @@ mod tests {
         let mut state = first_state();
         state["claims"][0]["confidence"] = Value::from(0.99);
         assert!(validate_state(&state.to_string()).is_err());
+    }
+
+    fn digest_for_test(bytes: &[u8]) -> String {
+        Sha256::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect()
+    }
+
+    #[test]
+    fn claim_quote_is_resolved_from_the_exact_pinned_artifact_bytes() {
+        let artifact = b"header\nThe measured response was 42 units.\nfooter";
+        let quote = b"The measured response was 42 units.";
+        let start = artifact
+            .windows(quote.len())
+            .position(|window| window == quote)
+            .unwrap();
+        let resolved = verify_claim_source_quote(
+            artifact,
+            &digest_for_test(artifact),
+            start as u64,
+            (start + quote.len()) as u64,
+            &digest_for_test(quote),
+        )
+        .unwrap();
+
+        assert_eq!(resolved.as_bytes(), quote);
+    }
+
+    #[test]
+    fn claim_quote_rejects_a_modified_artifact_even_when_the_quote_digest_matches() {
+        let artifact = b"source text with a decisive claim";
+        let quote = b"decisive claim";
+        let start = artifact
+            .windows(quote.len())
+            .position(|window| window == quote)
+            .unwrap();
+        let result = verify_claim_source_quote(
+            artifact,
+            &"0".repeat(64),
+            start as u64,
+            (start + quote.len()) as u64,
+            &digest_for_test(quote),
+        );
+
+        assert_eq!(
+            result,
+            Err(EvidenceQuoteVerificationError::ArtifactDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn claim_quote_rejects_a_span_digest_that_does_not_match_the_artifact_slice() {
+        let artifact = b"source text with another claim";
+        let start = 0;
+        let end = 6;
+        let result = verify_claim_source_quote(
+            artifact,
+            &digest_for_test(artifact),
+            start,
+            end,
+            &"f".repeat(64),
+        );
+
+        assert_eq!(
+            result,
+            Err(EvidenceQuoteVerificationError::QuoteDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn claim_quote_rejects_out_of_range_and_non_utf8_byte_spans() {
+        let artifact = "aéz".as_bytes();
+        let artifact_digest = digest_for_test(artifact);
+        let out_of_range = verify_claim_source_quote(
+            artifact,
+            &artifact_digest,
+            0,
+            99,
+            &"0".repeat(64),
+        );
+        assert_eq!(
+            out_of_range,
+            Err(EvidenceQuoteVerificationError::InvalidSpan)
+        );
+
+        let split_codepoint = verify_claim_source_quote(
+            artifact,
+            &artifact_digest,
+            2,
+            3,
+            &digest_for_test(&artifact[2..3]),
+        );
+        assert_eq!(
+            split_codepoint,
+            Err(EvidenceQuoteVerificationError::QuoteSpanNotUtf8)
+        );
     }
 
     #[test]
