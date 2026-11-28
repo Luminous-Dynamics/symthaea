@@ -1,4 +1,4 @@
-use topo_adapt_benchmark::{evaluate_episode, Episode, Fixture, FlowResult, FIXTURE_JSON};
+use topo_adapt_benchmark::{evaluate_episode, select_best_single_edge, Episode, Fixture, FlowResult, FIXTURE_JSON};
 
 fn fixture() -> Fixture {
     let fixture = Fixture::parse(FIXTURE_JSON).expect("fixture parses");
@@ -207,4 +207,35 @@ fn malformed_graphs_and_costs_fail_closed() {
     }
     .validate()
     .is_err());
+}
+
+#[test]
+fn candidate_sweep_oracle_abstains_from_stationary_edits() {
+    let fixture = fixture();
+    let case = episode(&fixture, "stationary_demand_control");
+    let decision = select_best_single_edge(case, &fixture.graph_semantics, 0).unwrap();
+    assert_eq!(decision.selected_candidate_id, None);
+    assert_eq!(decision.result.max_flow, 6);
+    assert_eq!(decision.result.accepted_edge_additions, 0);
+    assert_eq!(decision.result.edit_cost_units, 0);
+}
+
+#[test]
+fn candidate_sweep_oracle_selects_new_sink_connection() {
+    let fixture = fixture();
+    let case = episode(&fixture, "new_sink_demand_shift");
+    let decision = select_best_single_edge(case, &fixture.graph_semantics, 1).unwrap();
+    assert_eq!(decision.selected_candidate_id.as_deref(), Some("connect_new_sink_path"));
+    assert_eq!(decision.result.max_flow, 8);
+    assert_eq!(decision.result.min_cut, 8);
+}
+
+#[test]
+fn candidate_sweep_oracle_selects_bridge_reroute() {
+    let fixture = fixture();
+    let case = episode(&fixture, "bridge_failure_reroute");
+    let decision = select_best_single_edge(case, &fixture.graph_semantics, 1).unwrap();
+    assert_eq!(decision.selected_candidate_id.as_deref(), Some("restore_sink_route"));
+    assert_eq!(decision.result.max_flow, 4);
+    assert_eq!(decision.result.min_cut, 4);
 }
