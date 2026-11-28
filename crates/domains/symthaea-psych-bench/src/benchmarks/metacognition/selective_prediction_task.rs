@@ -375,7 +375,7 @@ pub fn fixture_items() -> Vec<SyntheticSelectivePredictionItem> {
                     evidence_strength: 0.94,
                     premise_consistent: true,
                     source_is_current: true,
-                        clarification_available: false,
+                    clarification_available: false,
                     estimated_clarification_resolution_probability: 0.0,
                     estimated_post_clarification_accuracy: 0.94,
                 },
@@ -480,8 +480,9 @@ fn validate_items(
             }
             (false, None) => {}
         }
-        if item.observation.clarification_available
-            && item.clarification_target != Some(target_for_observation(&item.observation))
+        if (item.observation.clarification_available
+            && item.clarification_target != Some(target_for_observation(&item.observation)))
+            || (!item.observation.clarification_available && item.clarification_target.is_some())
         {
             return Err(SelectivePredictionTaskError::InvalidClarificationObservation { index });
         }
@@ -889,6 +890,15 @@ mod tests {
         assert!(matches!(
             validate_items(&bad_clarification),
             Err(SelectivePredictionTaskError::ClarificationWithoutAvailableContext { .. })
+        ));
+
+        let mut bad_estimate = fixture_items();
+        bad_estimate[7]
+            .observation
+            .estimated_clarification_resolution_probability = f64::NAN;
+        assert!(matches!(
+            validate_items(&bad_estimate),
+            Err(SelectivePredictionTaskError::InvalidClarificationObservation { .. })
         ));
     }
 }
