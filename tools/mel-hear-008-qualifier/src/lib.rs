@@ -501,7 +501,10 @@ fn validate_estimand(
                         *counts.entry(performer).or_default() += 1;
                     }
                     if counts.len() != performer_ids.len() {
-                        return Err("equal-performer mean is unsupported when a performer has no observed cells".to_owned());
+                        return Err(
+                            "equal-performer mean is unsupported when a performer has no observed cells"
+                                .to_owned(),
+                        );
                     }
                     for (cell_id, weight, _) in &contributions {
                         let performer = cells_by_id[cell_id].performer_membership[0]
@@ -509,7 +512,10 @@ fn validate_estimand(
                             .as_str();
                         let expected_weight = 1.0 / (counts.len() * counts[performer]) as f64;
                         if !approximately_equal(*weight, expected_weight) {
-                            return Err("equal-performer macro weights do not give every performer equal mass".to_owned());
+                            return Err(
+                                "equal-performer macro weights do not give every performer equal mass"
+                                    .to_owned(),
+                            );
                         }
                     }
                 }
