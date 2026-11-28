@@ -80,7 +80,9 @@ struct Config {
 fn parse_config() -> Result<Config, String> {
     let values = env::args().skip(1).collect::<Vec<_>>();
     if values.len() > 4 {
-        return Err("usage: reference_envelope_probe [replications] [horizon] [seed] [shift_after]".into());
+        return Err(
+            "usage: reference_envelope_probe [replications] [horizon] [seed] [shift_after]".into(),
+        );
     }
     let parse = |index: usize, default: &str, name: &str| -> Result<u64, String> {
         values
@@ -98,7 +100,9 @@ fn parse_config() -> Result<Config, String> {
     let shift_after = usize::try_from(parse(3, "500", "shift_after")?)
         .map_err(|_| "shift_after exceeds usize".to_string())?;
     if replications == 0 || horizon == 0 || shift_after >= horizon {
-        return Err("replications and horizon must be positive; shift_after must be below horizon".into());
+        return Err(
+            "replications and horizon must be positive; shift_after must be below horizon".into(),
+        );
     }
     Ok(Config {
         replications,
@@ -210,8 +214,7 @@ fn run_replication(
         / REFERENCE_COUNT as f64;
     let mut naive = point_monitor(reference_mean)?;
     let mut oracle = point_monitor(0.0)?;
-    let coverage = calibrated.target().lower()[0] <= 0.0
-        && calibrated.target().upper()[0] >= 0.0;
+    let coverage = calibrated.target().lower()[0] <= 0.0 && calibrated.target().upper()[0] >= 0.0;
 
     let mut calibrated_alarm = None;
     let mut naive_alarm = None;
@@ -305,9 +308,7 @@ fn main() -> Result<(), String> {
             .iter()
             .map(|arm| arm.iter().filter(|alarm| alarm.is_some()).count())
             .collect::<Vec<_>>();
-        if scenario == Scenario::IidNull
-            || scenario == Scenario::HeteroskedasticMartingaleNull
-        {
+        if scenario == Scenario::IidNull || scenario == Scenario::HeteroskedasticMartingaleNull {
             eprintln!(
                 "{}: reps={} reference_coverage={}/{} calibrated_false_alarms={} naive_invalid_false_alarms={} oracle_false_alarms={}",
                 scenario.name(),
@@ -338,11 +339,15 @@ fn main() -> Result<(), String> {
             eprintln!(
                 "mean_shift: reps={} calibrated_prechange_false={} naive_prechange_false={} oracle_prechange_false={} calibrated_detected={} calibrated_misses={} calibrated_median_delay={} naive_detected={} oracle_detected={}",
                 config.replications,
-                prechange[0], prechange[1], prechange[2],
-                detected[0], config.replications - detected[0],
+                prechange[0],
+                prechange[1],
+                prechange[2],
+                detected[0],
+                config.replications - detected[0],
                 median_delay(&alarms[0], config.shift_after)
                     .map_or_else(|| "NA".into(), |time| time.to_string()),
-                detected[1], detected[2],
+                detected[1],
+                detected[2],
             );
         }
     }
