@@ -893,6 +893,71 @@ mod tests {
     }
 
     #[test]
+    fn outcome_dependent_audit_breaks_the_bound_negative_control() {
+        // The evaluator is told q=0.5, but the actual audit mechanism violates
+        // conditional ignorability: q=0.1 when the hidden event is a loss and
+        // q=0.9 when it is not. The input cannot detect this lie from the
+        // observed rows. Exact design enumeration shows the nominal bound can
+        // fail more often than delta_j under this invalid design.
+        const HORIZON: usize = 14;
+        let q_declared = 0.5_f64;
+        let q_min = 0.5_f64;
+        let delta = 0.8_f64;
+        let per_threshold_delta = delta / 2.0;
+        let eta_max = 2.0 * q_min / (1.0 + 2.0 * q_min / 3.0);
+        let betting_fractions = ETA_FACTORS
+            .iter()
+            .map(|factor| eta_max * factor)
+            .collect::<Vec<_>>();
+        let mixture_weights =
+            vec![1.0 / betting_fractions.len() as f64; betting_fractions.len()];
+        let losses = (0..HORIZON)
+            .map(|index| index % 2 == 0)
+            .collect::<Vec<_>>();
+        let true_population_risk =
+            losses.iter().filter(|loss| **loss).count() as f64 / HORIZON as f64;
+        let mut failure_probability = 0.0_f64;
+
+        for mask in 0..(1usize << HORIZON) {
+            let mut ht_loss_total = 0.0_f64;
+            let mut mask_probability = 1.0_f64;
+            for (index, is_loss) in losses.iter().enumerate() {
+                // Selection depends on the hidden current outcome, violating
+                // the conditional-ignorability premise.
+                let actual_q = if *is_loss { 0.1 } else { 0.9 };
+                let observed = mask & (1usize << index) != 0;
+                mask_probability *= if observed {
+                    actual_q
+                } else {
+                    1.0 - actual_q
+                };
+                if observed && *is_loss {
+                    // Deliberately use the false q supplied to the evaluator.
+                    ht_loss_total += 1.0 / q_declared;
+                }
+            }
+            let (upper_bound, _, _) = invert_mixture_upper_bound(
+                HORIZON,
+                ht_loss_total,
+                per_threshold_delta,
+                1.0,
+                1.0 / q_min,
+                &betting_fractions,
+                &mixture_weights,
+            )
+            .unwrap();
+            if upper_bound + 1e-12 < true_population_risk {
+                failure_probability += mask_probability;
+            }
+        }
+
+        assert!(
+            failure_probability > per_threshold_delta,
+            "negative control did not expose invalid-design undercoverage: {failure_probability}"
+        );
+    }
+
+    #[test]
     fn scores_equal_to_lambda_are_not_miscovered() {
         let mut cfg = config(1.0);
         cfg.threshold_grid = vec![0.5, 1.0];
