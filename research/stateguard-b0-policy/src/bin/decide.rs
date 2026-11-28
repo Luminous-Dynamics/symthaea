@@ -1,5 +1,5 @@
-use std::process::ExitCode;
 use stateguard_b0_policy::decide_json;
+use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let path = std::env::args()
