@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon-dependency-impact-corpus-v1.schema.json",
+  "title": "MON Dependency Impact Corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "counts",
+    "graph",
+    "scenarios"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon-dependency-impact-corpus-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total"
+      ],
+      "properties": {
+        "total": {
+          "const": 6
+        }
+      }
+    },
+    "graph": {
+      "$ref": "#/$defs/graph"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
+    }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "enum": [
+            "claim",
+            "evidence",
+            "policy",
+            "capability",
+            "scope"
+          ]
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to",
+        "mode"
+      ],
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "required",
+            "context"
+          ]
+        }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "nodes",
+        "edges"
+      ],
+      "properties": {
+        "profile": {
+          "const": "mon-dependency-graph-v1"
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edge"
+          }
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "id",
+        "kind",
+        "target"
+      ],
+      "properties": {
+        "profile": {
+          "const": "mon-dependency-event-v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "enum": [
+            "evidence_revoked",
+            "evidence_expired",
+            "source_replaced",
+            "capability_withdrawn",
+            "policy_superseded",
+            "scope_changed"
+          ]
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "event",
+        "expected_affected_claims",
+        "expected_unaffected_claims"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "$ref": "#/$defs/event"
+        },
+        "expected_affected_claims": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected_unaffected_claims": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
