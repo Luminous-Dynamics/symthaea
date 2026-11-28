@@ -225,6 +225,12 @@ See `papers/` directory for 15+ manuscripts in various stages of development.
 
 ---
 
+
+
+## Evidence-Qualified Capability
+
+- [Evidence-Qualified Capability Benchmark v0.1](EVIDENCE_QUALIFIED_CAPABILITY_BENCHMARK_V0_1.md) — cross-domain protocol, JSON Schema contracts, synthetic seed fixtures and standalone Rust reference validator.
+
 ## Research Roadmap
 
 ### Near-Term (2026)
