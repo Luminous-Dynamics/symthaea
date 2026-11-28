@@ -104,6 +104,7 @@ pub enum RoiInformationValueError {
     ZeroPixelCost,
     FutureSourceTimestamp,
     StaleSourceFrame,
+    ClockDomainMismatch,
     InsufficientCalibrationSamples,
     CalibrationErrorTooHigh,
     NoExpectedLossReduction,
@@ -118,9 +119,14 @@ pub enum RoiInformationValueError {
 pub fn evaluate_roi_information_value(
     estimate: &RoiValueEstimate,
     now_us: u64,
+    now_clock_domain_id: &str,
     config: RoiInformationValueConfig,
 ) -> Result<RoiInformationValueScore, RoiInformationValueError> {
     config.validate()?;
+    validate_identifier(now_clock_domain_id)?;
+    if estimate.source_clock_domain_id != now_clock_domain_id {
+        return Err(RoiInformationValueError::ClockDomainMismatch);
+    }
     validate_identifier(&estimate.candidate_id)?;
     validate_identifier(&estimate.task_id)?;
     validate_identifier(&estimate.source_clock_domain_id)?;
@@ -203,22 +209,33 @@ pub struct RoiInformationRanking {
 pub fn rank_roi_information_value(
     estimates: &[RoiValueEstimate],
     now_us: u64,
+    now_clock_domain_id: &str,
     config: RoiInformationValueConfig,
 ) -> Result<RoiInformationRanking, RoiInformationValueError> {
     config.validate()?;
+    validate_identifier(now_clock_domain_id)?;
+    let mut counts = std::collections::HashMap::with_capacity(estimates.len());
+    for estimate in estimates {
+        *counts.entry(estimate.candidate_id.as_str()).or_insert(0usize) += 1;
+    }
     let mut seen = HashSet::with_capacity(estimates.len());
     let mut ranked = Vec::with_capacity(estimates.len());
     let mut rejected = Vec::new();
 
     for estimate in estimates {
         if !seen.insert(estimate.candidate_id.as_str()) {
-            rejected.push(RoiCandidateRejection {
-                candidate_id: estimate.candidate_id.clone(),
-                reason: RoiInformationValueError::DuplicateCandidateId,
-            });
             continue;
         }
-        match evaluate_roi_information_value(estimate, now_us, config) {
+        if counts.get(estimate.candidate_id.as_str()).copied().unwrap_or(0) > 1 {
+            for _ in 0..counts[estimate.candidate_id.as_str()] {
+                rejected.push(RoiCandidateRejection {
+                    candidate_id: estimate.candidate_id.clone(),
+                    reason: RoiInformationValueError::DuplicateCandidateId,
+                });
+            }
+            continue;
+        }
+        match evaluate_roi_information_value(estimate, now_us, now_clock_domain_id, config) {
             Ok(score) => ranked.push(score),
             Err(reason) => rejected.push(RoiCandidateRejection {
                 candidate_id: estimate.candidate_id.clone(),
@@ -320,7 +337,7 @@ mod tests {
         let mut value = estimate("roi-1", 0.8, 0.5, 10_000);
         value.calibration.sample_count = 20;
         assert_eq!(
-            evaluate_roi_information_value(&value, 1_100, RoiInformationValueConfig::default()),
+            evaluate_roi_information_value(&value, 1_100, "clock:camera-1", RoiInformationValueConfig::default()),
             Err(RoiInformationValueError::InsufficientCalibrationSamples)
         );
     }
@@ -330,7 +347,7 @@ mod tests {
         let mut value = estimate("roi-1", 0.8, 0.5, 10_000);
         value.calibration.expected_calibration_error = 0.2;
         assert_eq!(
-            evaluate_roi_information_value(&value, 1_100, RoiInformationValueConfig::default()),
+            evaluate_roi_information_value(&value, 1_100, "clock:camera-1", RoiInformationValueConfig::default()),
             Err(RoiInformationValueError::CalibrationErrorTooHigh)
         );
     }
@@ -339,7 +356,7 @@ mod tests {
     fn zero_or_negative_loss_reduction_is_rejected() {
         let value = estimate("roi-1", 0.4, 0.5, 10_000);
         assert_eq!(
-            evaluate_roi_information_value(&value, 1_100, RoiInformationValueConfig::default()),
+            evaluate_roi_information_value(&value, 1_100, "clock:camera-1", RoiInformationValueConfig::default()),
             Err(RoiInformationValueError::NoExpectedLossReduction)
         );
     }
@@ -350,7 +367,7 @@ mod tests {
         value.latency_penalty = 0.08;
         value.staleness_penalty = 0.04;
         assert_eq!(
-            evaluate_roi_information_value(&value, 1_100, RoiInformationValueConfig::default()),
+            evaluate_roi_information_value(&value, 1_100, "clock:camera-1", RoiInformationValueConfig::default()),
             Err(RoiInformationValueError::BelowMinimumNetBenefit)
         );
     }
@@ -389,9 +406,9 @@ mod tests {
             1_100,
             RoiInformationValueConfig::default(),
         ).unwrap();
-        assert_eq!(ranking.ranked.len(), 1);
-        assert_eq!(ranking.rejected.len(), 1);
-        assert_eq!(ranking.rejected[0].reason, RoiInformationValueError::DuplicateCandidateId);
+        assert!(ranking.ranked.is_empty());
+        assert_eq!(ranking.rejected.len(), 2);
+        assert!(ranking.rejected.iter().all(|item| item.reason == RoiInformationValueError::DuplicateCandidateId));
     }
 
     #[test]
@@ -406,11 +423,25 @@ mod tests {
     }
 
     #[test]
+    fn cross_clock_value_estimates_are_rejected() {
+        let value = estimate("roi-1", 0.8, 0.5, 10_000);
+        assert_eq!(
+            evaluate_roi_information_value(
+                &value,
+                1_100,
+                "clock:other-camera",
+                RoiInformationValueConfig::default()
+            ),
+            Err(RoiInformationValueError::ClockDomainMismatch)
+        );
+    }
+
+    #[test]
     fn non_finite_estimates_fail_closed() {
         let mut value = estimate("roi-1", 0.8, 0.5, 10_000);
         value.latency_penalty = f32::NAN;
         assert_eq!(
-            evaluate_roi_information_value(&value, 1_100, RoiInformationValueConfig::default()),
+            evaluate_roi_information_value(&value, 1_100, "clock:camera-1", RoiInformationValueConfig::default()),
             Err(RoiInformationValueError::InvalidEstimate)
         );
     }
