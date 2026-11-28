@@ -65,6 +65,14 @@ impl From<KernelError> for KernelFamilyError {
     }
 }
 
+impl std::fmt::Display for KernelFamilyError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
+impl std::error::Error for KernelFamilyError {}
+
 #[derive(Clone, Debug)]
 pub struct KernelExpertConfig {
     pub expert_id: String,
@@ -489,7 +497,7 @@ impl KernelFamilyPortfolio {
         &self.deployment_plan_sha256
     }
 
-    pub fn map_bindings(&self) -> Vec<(String, String, String, String)> {
+    pub fn map_bindings(&self) -> Vec<(String, String, String, String, String, String)> {
         self.experts
             .iter()
             .map(|expert| {
@@ -498,6 +506,8 @@ impl KernelFamilyPortfolio {
                     expert.response_map.map_sha256().to_string(),
                     expert.covariate_map.map_sha256().to_string(),
                     expert.target_sha256.clone(),
+                    expert.response_reference_sha256.clone(),
+                    expert.covariate_reference_sha256.clone(),
                 )
             })
             .collect()
