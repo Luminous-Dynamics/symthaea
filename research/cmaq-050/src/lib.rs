@@ -438,15 +438,17 @@ mod tests {
 
     #[test]
     fn product_dimension_limit_is_enforced() {
+        // 17 frequencies yield 34 paired features per map, so the
+        // product size is 34*34 = 1,156, above the 1,024 hard cap.
         let response = FourierFeatureMap::new(
             1,
-            (0..16).map(|index| vec![index as f64 + 1.0]).collect(),
+            (0..17).map(|index| vec![index as f64 + 1.0]).collect(),
             RESPONSE_MAP_SHA.into(),
         )
         .unwrap();
         let covariates = FourierFeatureMap::new(
             1,
-            (0..16).map(|index| vec![index as f64 + 1.0]).collect(),
+            (0..17).map(|index| vec![index as f64 + 1.0]).collect(),
             COVARIATE_MAP_SHA.into(),
         )
         .unwrap();
