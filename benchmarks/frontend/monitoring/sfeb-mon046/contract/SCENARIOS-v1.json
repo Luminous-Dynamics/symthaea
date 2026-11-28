@@ -1,0 +1,112 @@
+{
+  "profile": "mon046-adversarial-scenarios-v1",
+  "version": "1.0.0",
+  "status": "proposed",
+  "scenarios": [
+    {
+      "id": "M46-001",
+      "family": "trust-boundary",
+      "attack": "Flip caller authentication boolean without verifier appraisal",
+      "expected": "indeterminate",
+      "reason": "appraisal_missing"
+    },
+    {
+      "id": "M46-002",
+      "family": "artifact-integrity",
+      "attack": "Replace artifact bytes after signing descriptor",
+      "expected": "blocked",
+      "reason": "artifact_digest_mismatch"
+    },
+    {
+      "id": "M46-003",
+      "family": "trust-bootstrap",
+      "attack": "Present unsigned, stale or rolled-back trust snapshot",
+      "expected": "indeterminate",
+      "reason": "trust_checkpoint_untrusted_or_stale"
+    },
+    {
+      "id": "M46-004",
+      "family": "replay",
+      "attack": "Race two admissions using same nonce",
+      "expected": "exactly_one_consumed",
+      "reason": "nonce_atomicity_violation"
+    },
+    {
+      "id": "M46-005",
+      "family": "time-and-revocation",
+      "attack": "Capture-time uncertainty overlaps effective key revocation",
+      "expected": "indeterminate",
+      "reason": "revocation_order_ambiguous"
+    },
+    {
+      "id": "M46-006",
+      "family": "freshness",
+      "attack": "Revocation checkpoint ages beyond policy max between evaluation and mutation",
+      "expected": "indeterminate",
+      "reason": "revocation_checkpoint_stale"
+    },
+    {
+      "id": "M46-007",
+      "family": "scope-completeness",
+      "attack": "Omit required scope item from self-consistent supplied manifest",
+      "expected": "indeterminate",
+      "reason": "inventory_completeness_unproven"
+    },
+    {
+      "id": "M46-008",
+      "family": "capture-completeness",
+      "attack": "Omit Kafka event from both capture records and reconciliation array",
+      "expected": "indeterminate",
+      "reason": "capture_interval_not_closed"
+    },
+    {
+      "id": "M46-009",
+      "family": "semantic-scope",
+      "attack": "Missing required DDL/schema-history/non-row state after row reconciliation",
+      "expected": "blocked_or_indeterminate_by_authenticated_capability",
+      "reason": "required_surface_uncovered"
+    },
+    {
+      "id": "M46-010",
+      "family": "dependency-semantics",
+      "attack": "Optional context dependency fails",
+      "expected": "required_claim_verdict_unchanged",
+      "reason": "context_edge_not_mandatory"
+    },
+    {
+      "id": "M46-011",
+      "family": "independence",
+      "attack": "Two runs share a hidden control-plane failure domain",
+      "expected": "cluster_count_reduced",
+      "reason": "common_cause_dependency"
+    },
+    {
+      "id": "M46-012",
+      "family": "claim-closure",
+      "attack": "Orphan invalid node exists outside root dependency closure",
+      "expected": "unrelated_root_unchanged",
+      "reason": "scoped_invalidation"
+    },
+    {
+      "id": "M46-013",
+      "family": "oracle-integrity",
+      "attack": "Mutate evaluator to qualify a blocked prerequisite",
+      "expected": "mutation_killed",
+      "reason": "oracle_mutation_survived"
+    },
+    {
+      "id": "M46-014",
+      "family": "abstention",
+      "attack": "Evaluator returns indeterminate for every positive and negative case",
+      "expected": "fails_coverage_gate",
+      "reason": "selective_risk_coverage"
+    },
+    {
+      "id": "M46-015",
+      "family": "admission",
+      "attack": "Replay token for another environment, operation or fencing generation",
+      "expected": "blocked",
+      "reason": "admission_binding_or_fence_mismatch"
+    }
+  ]
+}
