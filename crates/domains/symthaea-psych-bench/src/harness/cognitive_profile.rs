@@ -13,18 +13,18 @@ use std::collections::BTreeMap;
 
 use super::report::{BenchmarkReport, key_metric_for_benchmark};
 
-/// A cognitive domain with its constituent benchmarks.
+/// A task group with heuristically transformed metrics; the index is not psychometrically calibrated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DomainScore {
     /// Domain name.
     pub domain: String,
     /// Mean of heuristically transformed task metrics (0.0–1.0); not psychometric.
     pub score: f64,
-    /// Number of benchmarks contributing.
+    /// Number of task metrics contributing.
     pub n_benchmarks: usize,
-    /// Individual benchmark scores within this domain.
+    /// Individual heuristic task indices within this group.
     pub benchmark_scores: Vec<(String, f64)>,
-    /// Interpretation label.
+    /// Descriptive bucket for the heuristic index only.
     pub interpretation: String,
 }
 
@@ -135,13 +135,13 @@ use super::report::is_lower_better;
 /// Full cognitive profile from a benchmark report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CognitiveProfile {
-    /// Per-domain scores.
+    /// Per-group heuristic indices.
     pub domains: Vec<DomainScore>,
     /// Legacy unweighted mean of heuristic domain indices; not a validated overall ability score.
     pub overall: f64,
-    /// Strongest domain.
+    /// Group with the highest current heuristic index.
     pub strongest: String,
-    /// Weakest domain.
+    /// Group with the lowest current heuristic index.
     pub weakest: String,
 }
 
@@ -393,8 +393,8 @@ mod tests {
         let md = profile.to_radar_markdown();
 
         assert!(md.contains("Heuristic Domain Dashboard"));
-        assert!(md.contains("Overall:"));
-        assert!(md.contains("Strongest:"));
+        assert!(md.contains("not an ability estimate"));
+        assert!(md.contains("Highest index:"));
         assert!(md.contains("#")); // bar chart
     }
 
