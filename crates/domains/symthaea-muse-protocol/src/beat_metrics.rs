@@ -101,8 +101,8 @@ pub enum MirexBeatMetricError {
     SourceDurationExceedsMirEvalLimit,
     ReferenceFrameOutOfBounds,
     EstimatedFrameOutOfBounds,
-    ReferenceEventsNotStrictlyIncreasing,
-    EstimatedEventsNotStrictlyIncreasing,
+    ReferenceEventsDecreasing,
+    EstimatedEventsDecreasing,
 }
 
 /// Score one beat track using the pinned MIREX/mir_eval semantics.
@@ -287,11 +287,11 @@ fn validate_event_inputs(
     if estimated_frames.iter().any(|frame| *frame >= total_frames) {
         return Err(MirexBeatMetricError::EstimatedFrameOutOfBounds);
     }
-    if reference_frames.windows(2).any(|pair| pair[0] >= pair[1]) {
-        return Err(MirexBeatMetricError::ReferenceEventsNotStrictlyIncreasing);
+    if reference_frames.windows(2).any(|pair| pair[0] > pair[1]) {
+        return Err(MirexBeatMetricError::ReferenceEventsDecreasing);
     }
-    if estimated_frames.windows(2).any(|pair| pair[0] >= pair[1]) {
-        return Err(MirexBeatMetricError::EstimatedEventsNotStrictlyIncreasing);
+    if estimated_frames.windows(2).any(|pair| pair[0] > pair[1]) {
+        return Err(MirexBeatMetricError::EstimatedEventsDecreasing);
     }
     Ok(())
 }
@@ -892,7 +892,7 @@ mod tests {
     fn rejects_non_monotonic_events_and_invalid_source_clocks() {
         assert_eq!(
             score_mirex_beat_track(&[6, 5], &[6, 7], 1_000, 20_000).unwrap_err(),
-            MirexBeatMetricError::ReferenceEventsNotStrictlyIncreasing
+            MirexBeatMetricError::ReferenceEventsDecreasing
         );
         assert_eq!(
             score_mirex_beat_track(&[6], &[7], 0, 20_000).unwrap_err(),
