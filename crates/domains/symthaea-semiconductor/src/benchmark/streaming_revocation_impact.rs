@@ -236,6 +236,38 @@ fn verify_journal(engine: &GatedStreamingAdapterEngineV1) -> Result<(), String> 
             || entry.update_receipt.label_revision != delivery.label_revision
             || entry.update_receipt.label_payload_sha256 != delivery.label_payload_sha256
             || entry.update_receipt.measurement_event_id != delivery.measurement_event_id
+            || entry.update_receipt.engine_id != engine.engine_id
+            || entry.update_receipt.policy_sha256 != engine.policy_sha256
+            || entry.update_receipt.label_available_at_unix_seconds
+                != delivery.label_available_at_unix_seconds
+            || entry.update_receipt.eligibility_report_available_at_unix_seconds
+                != delivery.eligibility_report_available_at_unix_seconds
+            || entry.update_receipt.delivered_at_unix_seconds
+                != delivery.delivered_at_unix_seconds
+            || entry.update_receipt.clock_domain_id != delivery.clock_domain_id
+            || entry.update_receipt.idempotency_key != delivery.idempotency_key
+            || delivery.idempotency_key
+                != format!("{}:{}", delivery.label_id, delivery.label_revision)
+            || entry.prediction_receipt.global_model_artifact_sha256
+                != engine.global_model_artifact_sha256
+            || entry.prediction_receipt.feature_schema_sha256 != engine.feature_schema_sha256
+            || entry.prediction_receipt.policy_sha256 != engine.policy_sha256
+            || entry.prediction_receipt.clock_domain_id != engine.clock_domain_id
+            || entry.prediction_receipt.clock_domain_id != delivery.clock_domain_id
+            || delivery.label_available_at_unix_seconds
+                < entry.prediction_receipt.event_time_unix_seconds
+            || delivery.eligibility_report_available_at_unix_seconds
+                < delivery.label_available_at_unix_seconds
+            || delivery.delivered_at_unix_seconds
+                < delivery.eligibility_report_available_at_unix_seconds
+            || delivery.delivered_at_unix_seconds
+                < entry.prediction_receipt.prediction_at_unix_seconds
+            || !delivery.label_value.is_finite()
+            || delivery.label_value != report.qualified_corrected_value
+            || report.qualified_standard_uncertainty_upper_bound.is_none()
+            || report
+                .qualified_standard_uncertainty_upper_bound
+                .is_some_and(|value| !value.is_finite() || value < 0.0)
             || entry.prediction_receipt.sample_id != delivery.sample_id
             || entry.prediction_receipt.measurement_event_id != delivery.measurement_event_id
             || report.label_id != delivery.label_id
@@ -730,6 +762,42 @@ mod tests {
         let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
         assert_eq!(report.status, StreamingRevocationImpactStatusV1::Rejected);
         assert!(report.reason_codes[0].contains("journal_entry_digest_invalid"));
+    }
+
+    #[test]
+    fn resealed_journal_cannot_change_delivery_clock_or_idempotency_metadata() {
+        let mut engine = two_update_engine();
+        let entry = &mut engine.accepted_update_journal[0];
+        entry.delivery.clock_domain_id = "other-clock".into();
+        entry.entry_sha256 = journal_entry_digest(entry).unwrap();
+        engine.journal_head_sha256 = engine
+            .accepted_update_journal
+            .last()
+            .unwrap()
+            .entry_sha256
+            .clone();
+        let reports = latest_reports(&engine);
+        let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::Rejected);
+        assert!(report.reason_codes[0].contains("journal_evidence_binding_mismatch"));
+    }
+
+    #[test]
+    fn resealed_journal_cannot_change_delivery_availability_metadata() {
+        let mut engine = two_update_engine();
+        let entry = &mut engine.accepted_update_journal[0];
+        entry.delivery.eligibility_report_available_at_unix_seconds =
+            entry.delivery.delivered_at_unix_seconds + 10;
+        entry.entry_sha256 = journal_entry_digest(entry).unwrap();
+        engine.journal_head_sha256 = engine
+            .accepted_update_journal
+            .last()
+            .unwrap()
+            .entry_sha256
+            .clone();
+        let reports = latest_reports(&engine);
+        let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::Rejected);
     }
 
     #[test]
