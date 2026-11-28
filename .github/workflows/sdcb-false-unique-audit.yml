@@ -1,0 +1,76 @@
+name: SDCB false-unique audit reference
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "scripts/research/sdcb_false_unique_risk.rs"
+      - "scripts/research/run_sdcb_false_unique_risk_tests.sh"
+      - "docs/research/SDCB_FALSE_UNIQUE_AUDIT_FIXTURE_V1.tsv"
+      - ".github/workflows/sdcb-false-unique-audit.yml"
+  push:
+    branches:
+      - "research/false-unique-audit-reference-v1"
+    paths:
+      - "scripts/research/sdcb_false_unique_risk.rs"
+      - "scripts/research/run_sdcb_false_unique_risk_tests.sh"
+      - "docs/research/SDCB_FALSE_UNIQUE_AUDIT_FIXTURE_V1.tsv"
+      - ".github/workflows/sdcb-false-unique-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdcb-false-unique-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reference:
+    name: Rust 1.96 standalone reference format, test and Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Bind execution to exact candidate head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          test "$actual_head" = "$EXPECTED_HEAD"
+          printf 'EXACT_HEAD=%s\n' "$actual_head"
+
+      - name: Check committed-source formatting
+        run: rustfmt --edition 2021 --check scripts/research/sdcb_false_unique_risk.rs
+
+      - name: Compile, test and lint in isolated standard-library-only crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          harness="$(mktemp -d)"
+          trap 'rm -rf "$harness"' EXIT
+          mkdir -p "$harness/src/bin" "$harness/docs/research"
+          cp scripts/research/sdcb_false_unique_risk.rs "$harness/src/bin/"
+          cp docs/research/SDCB_FALSE_UNIQUE_AUDIT_FIXTURE_V1.tsv "$harness/docs/research/"
+          cat > "$harness/Cargo.toml" <<'EOF'
+          [package]
+          name = "sdcb-false-unique-audit-reference"
+          version = "0.1.0"
+          edition = "2021"
+
+          [[bin]]
+          name = "sdcb_false_unique_risk"
+          path = "src/bin/sdcb_false_unique_risk.rs"
+          EOF
+          cargo clippy --manifest-path "$harness/Cargo.toml" --bin sdcb_false_unique_risk --all-targets -- -D warnings
+          cargo test --manifest-path "$harness/Cargo.toml" --bin sdcb_false_unique_risk
+          cargo run --manifest-path "$harness/Cargo.toml" --bin sdcb_false_unique_risk
