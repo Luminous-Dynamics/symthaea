@@ -76,7 +76,9 @@
         "group_count",
         "familywise_delta",
         "unacceptable_loss_threshold",
-        "minimum_independent_clusters"
+        "minimum_independent_clusters",
+        "evaluation_split_sha256",
+        "split_audit_receipt_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -207,6 +209,12 @@
         "minimum_independent_clusters": {
           "type": "integer",
           "minimum": 2
+        },
+        "evaluation_split_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split_audit_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
@@ -782,6 +790,212 @@
           }
         }
       ]
+    },
+    "split_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "role",
+        "benchmark_suite_sha256",
+        "dataset_snapshot_sha256",
+        "split_sha256",
+        "task_spec_sha256",
+        "group_hierarchy_sha256",
+        "sufficiency_score_definition_sha256",
+        "decision_loss_definition_sha256",
+        "independence_unit_schema_sha256",
+        "calibration_examples_sha256",
+        "cluster_commitments",
+        "episode_commitments",
+        "observation_commitments",
+        "outcome_labels_sealed",
+        "candidate_outcome_access",
+        "evaluation_outcome_seal_sha256",
+        "inventory_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_split_inventory_v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "role": {
+          "enum": [
+            "calibration",
+            "evaluation"
+          ]
+        },
+        "benchmark_suite_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "dataset_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "task_spec_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "group_hierarchy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sufficiency_score_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_loss_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "independence_unit_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_examples_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cluster_commitments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sha256"
+          },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "episode_commitments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sha256"
+          },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "observation_commitments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sha256"
+          },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "outcome_labels_sealed": {
+          "type": "boolean"
+        },
+        "candidate_outcome_access": {
+          "type": "boolean"
+        },
+        "evaluation_outcome_seal_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inventory_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "split_audit_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "calibration_split_sha256",
+        "evaluation_split_sha256",
+        "calibration_inventory_sha256",
+        "evaluation_inventory_sha256",
+        "calibration_cluster_count",
+        "evaluation_cluster_count",
+        "calibration_episode_count",
+        "evaluation_episode_count",
+        "calibration_observation_count",
+        "evaluation_observation_count",
+        "cluster_overlap_count",
+        "episode_overlap_count",
+        "observation_overlap_count",
+        "preregistration_sha256",
+        "audit_method",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_calibration_evaluation_split_audit_v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "calibration_split_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluation_split_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_inventory_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluation_inventory_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evaluation_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "calibration_episode_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evaluation_episode_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "calibration_observation_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evaluation_observation_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cluster_overlap_count": {
+          "const": 0
+        },
+        "episode_overlap_count": {
+          "const": 0
+        },
+        "observation_overlap_count": {
+          "const": 0
+        },
+        "preregistration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "audit_method": {
+          "const": "opaque_cluster_episode_observation_commitment_disjointness_v1"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
     }
   }
 }
