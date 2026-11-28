@@ -1,0 +1,12 @@
+[package]
+name = "cmaq-061-previsible-learned-representations"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Previsible bounded unary representations for sequential conditional paired monitoring"
+
+[dependencies]
+sha2 = "=0.10.9"
+
+[workspace]
