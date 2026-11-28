@@ -1,0 +1,226 @@
+{
+  "schema_version": "sdcb-composite-null-test-induction-v1",
+  "title": "Anytime-valid lower-envelope induction of a fixed-horizon composite-null test",
+  "status": "analytic-finite-rational-fixture;rust-authored-not-compiled-or-ci-qualified",
+  "provenance": {
+    "parent_issue": 14222,
+    "codesign_issue": 14161,
+    "minimax_oracle_issue": 14185,
+    "base_commit": "f5d7bf4b3fbf7cdbf72083db77e88a9ac2c81820",
+    "literature": "https://doi.org/10.1093/jrsssb/qkag050"
+  },
+  "assumptions": {
+    "horizon": 2,
+    "filtration": [
+      "F0",
+      "F1=public X1",
+      "F2=public (X1,X2)"
+    ],
+    "policy": "fixed common non-anticipating policy; no hidden null-index access",
+    "terminal_test": "phi_2(X1,X2)=5/32 when X1 != X2, otherwise 0",
+    "terminal_randomization": "phi is the conditional rejection probability; draw independent randomization only at decision time if a binary action is needed",
+    "alpha": {
+      "numerator": 1,
+      "denominator": 20
+    }
+  },
+  "null_family": [
+    {
+      "id": "B1",
+      "model": "iid Bernoulli(p)",
+      "p": {
+        "numerator": 1,
+        "denominator": 5
+      }
+    },
+    {
+      "id": "B2",
+      "model": "iid Bernoulli(p)",
+      "p": {
+        "numerator": 4,
+        "denominator": 5
+      }
+    }
+  ],
+  "member_specific_process": {
+    "g0": [
+      {
+        "null_id": "B1",
+        "value": {
+          "numerator": 1,
+          "denominator": 20
+        }
+      },
+      {
+        "null_id": "B2",
+        "value": {
+          "numerator": 1,
+          "denominator": 20
+        }
+      }
+    ],
+    "g1": {
+      "B1": {
+        "x1_0": {
+          "numerator": 1,
+          "denominator": 32
+        },
+        "x1_1": {
+          "numerator": 1,
+          "denominator": 8
+        }
+      },
+      "B2": {
+        "x1_0": {
+          "numerator": 1,
+          "denominator": 8
+        },
+        "x1_1": {
+          "numerator": 1,
+          "denominator": 32
+        }
+      }
+    },
+    "g2": {
+      "x1=0,x2=0": {
+        "numerator": 0,
+        "denominator": 1
+      },
+      "x1=0,x2=1": {
+        "numerator": 5,
+        "denominator": 32
+      },
+      "x1=1,x2=0": {
+        "numerator": 5,
+        "denominator": 32
+      },
+      "x1=1,x2=1": {
+        "numerator": 0,
+        "denominator": 1
+      }
+    }
+  },
+  "robust_lower_envelope": {
+    "g0": {
+      "numerator": 1,
+      "denominator": 20
+    },
+    "g1": {
+      "x1_0": {
+        "numerator": 1,
+        "denominator": 32
+      },
+      "x1_1": {
+        "numerator": 1,
+        "denominator": 32
+      }
+    },
+    "g2": "identical to phi_2 on every terminal history"
+  },
+  "stopping_time_campaign": [
+    {
+      "rule": "stop at n=0",
+      "B1": {
+        "numerator": 1,
+        "denominator": 20
+      },
+      "B2": {
+        "numerator": 1,
+        "denominator": 20
+      }
+    },
+    {
+      "rule": "stop at n=1 on both X1 branches",
+      "B1": {
+        "numerator": 1,
+        "denominator": 32
+      },
+      "B2": {
+        "numerator": 1,
+        "denominator": 32
+      }
+    },
+    {
+      "rule": "stop at n=1 only when X1=0; otherwise continue to n=2",
+      "B1": {
+        "numerator": 1,
+        "denominator": 20
+      },
+      "B2": {
+        "numerator": 1,
+        "denominator": 32
+      }
+    },
+    {
+      "rule": "stop at n=1 only when X1=1; otherwise continue to n=2",
+      "B1": {
+        "numerator": 1,
+        "denominator": 32
+      },
+      "B2": {
+        "numerator": 1,
+        "denominator": 20
+      }
+    },
+    {
+      "rule": "continue to n=2 on both branches",
+      "B1": {
+        "numerator": 1,
+        "denominator": 20
+      },
+      "B2": {
+        "numerator": 1,
+        "denominator": 20
+      }
+    }
+  ],
+  "negative_controls": {
+    "single_member_process": {
+      "process": "use g1^B1 under true null B2",
+      "expected_level": {
+        "numerator": 17,
+        "denominator": 160
+      },
+      "alpha": {
+        "numerator": 1,
+        "denominator": 20
+      },
+      "disposition": "INVALID"
+    },
+    "max_aggregation": {
+      "process": "max(g1^B1,g1^B2)",
+      "expected_level_under_B1": {
+        "numerator": 1,
+        "denominator": 8
+      },
+      "expected_level_under_B2": {
+        "numerator": 1,
+        "denominator": 8
+      },
+      "disposition": "INVALID"
+    },
+    "supermartingale_claim": {
+      "witness": "under B1 after X1=1, E_B1[phi_2|X1=1]=1/8 while g1=1/32",
+      "disposition": "lower-envelope process is not generally a memberwise supermartingale"
+    }
+  },
+  "theorem": {
+    "definition": "g_n^j = E_{P_j^pi}[phi_N | F_n]; g_n = min_j g_n^j",
+    "stopping_time_bound": "for every true null member k and bounded public stopping time tau, E_{P_k^pi}[g_tau] <= E_{P_k^pi}[g_tau^k] = E_{P_k^pi}[phi_N] <= alpha",
+    "terminal_match": "g_N = phi_N",
+    "scope": "finite null family; common non-anticipating policy; jointly measurable conditional versions on the protocol support"
+  },
+  "validation": {
+    "python_fraction_replay": "passed",
+    "rust_tests": {
+      "authored": 8,
+      "compiled": false,
+      "executed": false
+    },
+    "hosted_ci": "not yet inspected for final branch head",
+    "physical_validation": false,
+    "continuous_null_claim": false,
+    "production_stopping_policy": false
+  },
+  "claim_boundary": "An exact finite two-step Bernoulli fixture and a theorem conditional on the stated finite-family/shared-policy assumptions. It is not an e-process, not generally a supermartingale, not a continuous-null proof, and not a production stopping policy."
+}
