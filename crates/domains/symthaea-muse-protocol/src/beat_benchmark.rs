@@ -244,6 +244,35 @@ pub enum BeatBenchmarkViolationCode {
     SourceMasterFamilyCrossesSplits,
 }
 
+/// Overall manifest admission state, derived only from validator findings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BeatBenchmarkManifestDisposition {
+    /// No structural, rights, policy, or leakage findings were emitted.
+    /// This is manifest admission, not scientific benchmark qualification.
+    ManifestAdmissible,
+    /// No hard rejection, but at least one evidence gap blocks a strong claim.
+    ExploratoryOnly,
+    /// At least one hard policy or structural gate failed.
+    Rejected,
+}
+
+/// Classify validator findings without collapsing unqualified evidence into success.
+pub fn classify_beat_benchmark_manifest(
+    violations: &[BeatBenchmarkViolation],
+) -> BeatBenchmarkManifestDisposition {
+    if violations
+        .iter()
+        .any(|violation| violation.severity == BeatBenchmarkViolationSeverity::Reject)
+    {
+        BeatBenchmarkManifestDisposition::Rejected
+    } else if !violations.is_empty() {
+        BeatBenchmarkManifestDisposition::ExploratoryOnly
+    } else {
+        BeatBenchmarkManifestDisposition::ManifestAdmissible
+    }
+}
+
 /// One deterministic validation result with a stable field path.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -922,6 +951,19 @@ mod tests {
         assert!(found.contains(
             &BeatBenchmarkViolationCode::MirexLockedDatasetUsedOutsideLockedTest
         ));
+        assert_eq!(
+            classify_beat_benchmark_manifest(&validate_beat_benchmark_manifest(
+                &manifest(vec![valid_track(
+                    "gtzan-0001",
+                    "GTZAN",
+                    BeatDatasetSplit::Development,
+                    BeatDatasetPurpose::ModelSelection,
+                    &"1".repeat(64),
+                    "master-gtzan-0001",
+                )])
+            )),
+            BeatBenchmarkManifestDisposition::Rejected
+        );
     }
 
     #[test]
@@ -1016,6 +1058,23 @@ mod tests {
     }
 
     #[test]
+    fn classifies_clean_manifest_as_admissible_not_scientifically_qualified() {
+        let track = valid_track(
+            "synthetic-clean-0001",
+            "synthetic-policy-corpus",
+            BeatDatasetSplit::Development,
+            BeatDatasetPurpose::Development,
+            &"6".repeat(64),
+            "master-clean-0001",
+        );
+        let violations = validate_beat_benchmark_manifest(&manifest(vec![track]));
+        assert_eq!(
+            classify_beat_benchmark_manifest(&violations),
+            BeatBenchmarkManifestDisposition::ManifestAdmissible
+        );
+    }
+
+    #[test]
     fn reports_unknown_source_master_and_overlap_as_unqualified() {
         let mut track = valid_track(
             "unknown-source",
@@ -1036,6 +1095,10 @@ mod tests {
             violation.code == BeatBenchmarkViolationCode::OverlapAuditUnknown
                 && violation.severity == BeatBenchmarkViolationSeverity::Unqualified
         }));
+        assert_eq!(
+            classify_beat_benchmark_manifest(&result),
+            BeatBenchmarkManifestDisposition::ExploratoryOnly
+        );
     }
 
     #[test]
