@@ -894,6 +894,27 @@ mod tests {
     }
 
     #[test]
+    fn attempt_charges_observation_budget_exhaustion() {
+        let manifest = ScenarioManifest {
+            observation_budget: 1,
+            ..ScenarioManifest::default()
+        };
+        let initial = WorldState::initial(&manifest).expect("initial state");
+        let (observed, _, first_outcome) =
+            attempt(&manifest, &initial, Action::Inspect).expect("first inspection");
+        assert_eq!(first_outcome, AttemptOutcome::Accepted);
+        let (rejected, receipt, outcome) =
+            attempt(&manifest, &observed, Action::Inspect).expect("charged over-budget attempt");
+        assert_eq!(rejected.tick, observed.tick + 1);
+        assert_eq!(
+            outcome,
+            AttemptOutcome::Rejected(TransitionError::ObservationBudgetExhausted)
+        );
+        assert!(matches!(&receipt.event.kind, EventKind::ActionRejected { .. }));
+        assert_eq!(rejected.observation_budget_remaining, 0);
+    }
+
+    #[test]
     fn scenario_step_limit_is_enforced() {
         let manifest = ScenarioManifest {
             max_steps: 1,
