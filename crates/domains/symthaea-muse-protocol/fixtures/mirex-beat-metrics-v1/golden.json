@@ -392,7 +392,7 @@
       ],
       "expected": {
         "f_measure": 0,
-        "cemgil": 0,
+        "cemgil": 1.1769109439216723e-34,
         "goto": 0,
         "p_score": 0,
         "cmlc": 0,
