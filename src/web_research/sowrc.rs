@@ -350,12 +350,11 @@ pub fn evaluate_sowrc(
         });
     }
 
-    // Search only nonterminal thresholds first. Lambda=1 always returns the
-    // entire label space, so the exact structural fallback is risk zero even
-    // when the statistical mixture is too conservative to certify a smaller set.
+    // Select the smallest threshold whose simultaneous mixture bound meets
+    // alpha. If no grid point is certified, lambda=1 is a structural fallback:
+    // the full label space has exactly zero miscoverage.
     let selected = threshold_bounds
         .iter()
-        .take(threshold_bounds.len().saturating_sub(1))
         .find(|report| report.upper_risk_bound <= config.target_risk);
     let (selected_lambda, selected_bound, selection_status) = match selected {
         Some(report) => (
