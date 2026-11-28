@@ -317,6 +317,12 @@
       "number": 8468,
       "role": "stacked active evidence selection, Brier information value, decision-sensitive EVSI, noisy evidence, misspecification and robust calibration",
       "status": "open; latest retrieved comment references head 2e40571fa2a1186bfa13bf95a04f4b99e3c775fb with checks queued at that time; current status query returned no status records"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "number": 14125,
+      "role": "TOPO-ADAPT v0.1 frozen deterministic graph fixtures with independently checked max-flow/min-cut references",
+      "status": "open draft; declarative JSON/Markdown only; no Rust evaluator or controller implementation"
     }
   ],
   "cross_repository_owners": [
@@ -449,7 +455,7 @@
   "new_workstream": {
     "owner_issue": 14123,
     "title": "TOPO-ADAPT-001",
-    "status": "open_issue_specification",
+    "status": "fixture_specification_draft_pr_open",
     "first_slice": {
       "node_count": "12-20",
       "oracle": "independent exact max-flow/min-cost references for small hand-checkable instances",
@@ -470,6 +476,31 @@
         "latency/downtime accounting",
         "future-demand leakage gate",
         "graph-isomorphism/node-relabeling metamorphics"
+      ],
+      "fixture_path": "tools/topo-adapt-benchmark/fixtures/topo_adapt_fixture_v0_1.json",
+      "fixture_pr": 14125,
+      "verified_cases": [
+        {
+          "id": "stationary_demand_control",
+          "max_flow": 6,
+          "min_cut": 6,
+          "correct_edit": "none"
+        },
+        {
+          "id": "new_sink_demand_shift",
+          "max_flow_before": 6,
+          "max_flow_after_useful_edit": 8,
+          "min_cut_after_edit": 8,
+          "correct_edit": "connect_new_sink_path"
+        },
+        {
+          "id": "bridge_failure_reroute",
+          "max_flow_before_failure": 4,
+          "max_flow_after_failure": 0,
+          "max_flow_after_useful_edit": 4,
+          "min_cut_after_edit": 4,
+          "correct_edit": "restore_sink_route"
+        }
       ]
     },
     "claim_limit": "No controller implementation, score or superiority claim exists yet."
