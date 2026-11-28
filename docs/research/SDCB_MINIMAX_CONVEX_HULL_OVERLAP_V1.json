@@ -1,0 +1,221 @@
+{
+  "schema_version": "sdcb-minimax-convex-hull-overlap-v1",
+  "title": "Exact finite-outcome convex-mixture overlap oracle",
+  "status": "analytic-rational-known-answer",
+  "provenance": {
+    "parent_issue": 14185,
+    "robust_test_issue": 14136,
+    "pairwise_overlap_issue": 14133,
+    "symmetric_gaussian_oracle_pr": 14162,
+    "base_commit": "7ea52b16664637a8450af59660087f85e0eff410"
+  },
+  "observation_space": [
+    "y1",
+    "y2"
+  ],
+  "alpha": {
+    "numerator": 1,
+    "denominator": 10,
+    "value": 0.1
+  },
+  "null_family": [
+    {
+      "id": "B1",
+      "probabilities": [
+        {
+          "numerator": 1,
+          "denominator": 3
+        },
+        {
+          "numerator": 2,
+          "denominator": 3
+        }
+      ]
+    }
+  ],
+  "alternative_family": [
+    {
+      "id": "A1",
+      "probabilities": [
+        {
+          "numerator": 1,
+          "denominator": 1
+        },
+        {
+          "numerator": 0,
+          "denominator": 1
+        }
+      ]
+    },
+    {
+      "id": "A2",
+      "probabilities": [
+        {
+          "numerator": 0,
+          "denominator": 1
+        },
+        {
+          "numerator": 1,
+          "denominator": 1
+        }
+      ]
+    }
+  ],
+  "pairwise_law_intersection": {
+    "status": "DISJOINT",
+    "proof": "A1=(1,0), A2=(0,1), and B1=(1/3,2/3); no alternative member equals B1."
+  },
+  "convex_hull_intersection": {
+    "status": "EXACT_INTERSECTION",
+    "alternative_mixture_weights": [
+      {
+        "numerator": 1,
+        "denominator": 3
+      },
+      {
+        "numerator": 2,
+        "denominator": 3
+      }
+    ],
+    "null_mixture_weights": [
+      {
+        "numerator": 1,
+        "denominator": 1
+      }
+    ],
+    "common_mixture_probabilities": [
+      {
+        "numerator": 1,
+        "denominator": 3
+      },
+      {
+        "numerator": 2,
+        "denominator": 3
+      }
+    ],
+    "identity": "B1 = (1/3) A1 + (2/3) A2"
+  },
+  "primal_known_answer": {
+    "test_rejection_probabilities": [
+      {
+        "numerator": 1,
+        "denominator": 10
+      },
+      {
+        "numerator": 1,
+        "denominator": 10
+      }
+    ],
+    "null_sizes": [
+      {
+        "id": "B1",
+        "numerator": 1,
+        "denominator": 10
+      }
+    ],
+    "alternative_powers": [
+      {
+        "id": "A1",
+        "numerator": 1,
+        "denominator": 10
+      },
+      {
+        "id": "A2",
+        "numerator": 1,
+        "denominator": 10
+      }
+    ],
+    "worst_case_power": {
+      "numerator": 1,
+      "denominator": 10
+    },
+    "proof": "The constant randomized test phi(y1)=phi(y2)=alpha attains size and power alpha."
+  },
+  "dual_known_answer": {
+    "alternative_weights": [
+      {
+        "numerator": 1,
+        "denominator": 3
+      },
+      {
+        "numerator": 2,
+        "denominator": 3
+      }
+    ],
+    "unnormalized_null_weights": [
+      {
+        "numerator": 1,
+        "denominator": 1
+      }
+    ],
+    "positive_part_integral": {
+      "numerator": 0,
+      "denominator": 1
+    },
+    "dual_objective": {
+      "numerator": 1,
+      "denominator": 10
+    },
+    "primal_dual_gap": {
+      "numerator": 0,
+      "denominator": 1
+    }
+  },
+  "glrt_p_sup_comparator": {
+    "statistic": "T(y)=max_i log p_Ai(y)-log p_B1(y)",
+    "score_order": [
+      "y1",
+      "y2"
+    ],
+    "component_p_values": [
+      {
+        "outcome": "y1",
+        "numerator": 1,
+        "denominator": 3
+      },
+      {
+        "outcome": "y2",
+        "numerator": 1,
+        "denominator": 1
+      }
+    ],
+    "rejection_at_alpha": [
+      false,
+      false
+    ],
+    "worst_case_power": {
+      "numerator": 0,
+      "denominator": 1
+    },
+    "interpretation": "The conservative p_sup-GLRT is valid but has zero power at alpha=0.1 on this convex-hull-overlap fixture; it is not a maximin oracle."
+  },
+  "qualification": {
+    "exact_arithmetic": true,
+    "family_scope": "finite discrete observation laws only",
+    "gaussian_claim": false,
+    "continuous_family_claim": false,
+    "physical_validation": false,
+    "sota_claim": false
+  },
+  "claim_boundary": "This fixture proves that pairwise family disjointness does not imply maximin power above alpha for general observation-law families. It is an exact finite-outcome rational counterexample, not a claim that distinct finite Gaussian mixtures can have identical representations.",
+  "reference_implementation": {
+    "language": "Rust 2024",
+    "source": "scripts/research/sdcb_convex_hull_overlap.rs",
+    "harness": "scripts/research/run_sdcb_convex_hull_overlap_tests.sh",
+    "status": "authored-not-compiled-or-executed",
+    "arithmetic": "exact i128 rational arithmetic on the frozen small fixture",
+    "tests_authored": 7,
+    "scope": "fixture-specific exact verifier, not a general LP solver"
+  },
+  "validation": {
+    "exact_fraction_replay": "independently checked in authoring runtime",
+    "committed_source_fetchback": "passed",
+    "committed_harness_fetchback": "passed",
+    "manifest_parse": "passed",
+    "rust_compile": "not run; rustc unavailable",
+    "rust_tests": "seven unit tests authored, not run",
+    "hosted_ci": "CI and PR Governance workflows completed with conclusion skipped on PR head fdc10385d98e9f776c6d309933ba855b725b6928; combined status list empty; no CI pass claimed",
+    "physical_validation": false,
+    "gaussian_mixture_claim": false
+  }
+}
