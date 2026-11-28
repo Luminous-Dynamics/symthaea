@@ -53,6 +53,7 @@ The versioned panel manifest binds:
 
 Fail-closed checks include:
 - exactly one of each of the five condition types;
+- one canonical question digest repeated and checked across every condition;
 - one shared frozen budget profile;
 - one exact audio evidence manifest shared by raw, audio-derived and fusion arms;
 - oracle and audio-derived symbolic arms use the same downstream reasoning-head identity;
