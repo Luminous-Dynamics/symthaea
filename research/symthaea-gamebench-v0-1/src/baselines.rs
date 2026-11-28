@@ -235,14 +235,22 @@ mod tests {
         let mut replay_candidate = RandomLegalCandidate::new(7);
         first_candidate.reset().expect("first reset");
         replay_candidate.reset().expect("replay reset");
-        let input = CandidateInput {
-            observation: &observation,
-            legal_actions: &actions,
-            remaining_actions: 12,
-            episode_step: 0,
-        };
-        let first = first_candidate.decide(input).expect("random action");
-        let replayed = replay_candidate.decide(input).expect("replayed random action");
+        let first = first_candidate
+            .decide(CandidateInput {
+                observation: &observation,
+                legal_actions: &actions,
+                remaining_actions: 12,
+                episode_step: 0,
+            })
+            .expect("random action");
+        let replayed = replay_candidate
+            .decide(CandidateInput {
+                observation: &observation,
+                legal_actions: &actions,
+                remaining_actions: 12,
+                episode_step: 0,
+            })
+            .expect("replayed random action");
         assert_eq!(first.action, replayed.action);
     }
 
