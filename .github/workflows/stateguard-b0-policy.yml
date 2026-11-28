@@ -1,0 +1,60 @@
+name: StateGuard B0 Public-State Policy Baseline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "research/stateguard-b0-policy/**"
+      - "research/typed-research-state/**"
+      - ".github/workflows/stateguard-b0-policy.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/stateguard-b0-policy/**"
+      - "research/typed-research-state/**"
+      - ".github/workflows/stateguard-b0-policy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Rust 1.96 StateGuard B0 tests and replay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/stateguard-b0-policy/Cargo.toml -- --check
+      - name: Run locked policy tests
+        run: cargo test --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets
+      - name: Run synthetic policy input
+        run: |
+          cargo run --manifest-path research/stateguard-b0-policy/Cargo.toml --locked -- research/stateguard-b0-policy/fixtures/policy-input-synthetic-example-v0.1.json > /tmp/stateguard-decision.json
+          cat /tmp/stateguard-decision.json
+          jq -e '.disposition == "SELECTED" and .selected_offer_id == "classify-claim-a-ev-a1" and .selected_action_kind == "CLASSIFY_CLAIM_SOURCE"' /tmp/stateguard-decision.json
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/stateguard-b0-policy/Cargo.toml --locked --all-targets -- -D warnings
+
+
+  format_preview:
+    name: Generate canonical rustfmt preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Format B0 source without changing policy behavior
+        run: rustfmt --edition 2024 research/stateguard-b0-policy/src/lib.rs
+      - name: Upload formatted source preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: stateguard-b0-rustfmt-preview
+          path: research/stateguard-b0-policy/src/lib.rs
