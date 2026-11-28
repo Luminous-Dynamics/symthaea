@@ -159,13 +159,15 @@ pub enum BeatBenchmarkViolationCode {
     EmptyDatasetRevision,
     InvalidAudioSha256,
     InvalidAnnotationSha256,
-    MiretLockedDatasetUsedOutsideLockedTest,
+    MirexLockedDatasetUsedOutsideLockedTest,
     LockedTestUsedForNonBenchmarkPurpose,
+    SplitPurposeMismatch,
     RightsNotApproved,
     EmptyRightsReference,
     UnknownAnnotationProvenance,
     EmptyAnnotationRevision,
     KnownTrainingOverlap,
+    OverlapAuditUnknown,
     InvalidSampleRate,
     InvalidChannelCount,
     EmptySourceAudio,
@@ -317,9 +319,40 @@ pub fn validate_beat_benchmark_manifest(
         {
             push(
                 &mut violations,
-                BeatBenchmarkViolationCode::MiretLockedDatasetUsedOutsideLockedTest,
+                BeatBenchmarkViolationCode::MirexLockedDatasetUsedOutsideLockedTest,
                 BeatBenchmarkViolationSeverity::Reject,
                 format!("{base}.split"),
+            );
+        }
+        let purpose_matches_split = match track.split {
+            BeatDatasetSplit::Train => {
+                track.purpose == BeatDatasetPurpose::Training
+            }
+            BeatDatasetSplit::Validation => matches!(
+                track.purpose,
+                BeatDatasetPurpose::Validation
+                    | BeatDatasetPurpose::ModelSelection
+                    | BeatDatasetPurpose::ParameterTuning
+            ),
+            BeatDatasetSplit::Development => matches!(
+                track.purpose,
+                BeatDatasetPurpose::Development
+                    | BeatDatasetPurpose::ModelSelection
+                    | BeatDatasetPurpose::ParameterTuning
+            ),
+            BeatDatasetSplit::LockedTest => {
+                track.purpose == BeatDatasetPurpose::BenchmarkEvaluation
+            }
+            BeatDatasetSplit::PrivateExternal => {
+                track.purpose == BeatDatasetPurpose::ExternalValidation
+            }
+        };
+        if !purpose_matches_split {
+            push(
+                &mut violations,
+                BeatBenchmarkViolationCode::SplitPurposeMismatch,
+                BeatBenchmarkViolationSeverity::Reject,
+                format!("{base}.purpose"),
             );
         }
         if track.split == BeatDatasetSplit::LockedTest
@@ -375,7 +408,7 @@ pub fn validate_beat_benchmark_manifest(
             ),
             BeatOverlapAuditStatus::Unknown => push(
                 &mut violations,
-                BeatBenchmarkViolationCode::KnownTrainingOverlap,
+                BeatBenchmarkViolationCode::OverlapAuditUnknown,
                 BeatBenchmarkViolationSeverity::Unqualified,
                 format!("{base}.overlap_audit"),
             ),
@@ -702,7 +735,7 @@ mod tests {
         );
         let found = codes(&manifest(vec![track]));
         assert!(found.contains(
-            &BeatBenchmarkViolationCode::MiretLockedDatasetUsedOutsideLockedTest
+            &BeatBenchmarkViolationCode::MirexLockedDatasetUsedOutsideLockedTest
         ));
     }
 
@@ -717,7 +750,7 @@ mod tests {
             "master-smc-0001",
         );
         assert!(codes(&manifest(vec![track])).contains(
-            &BeatBenchmarkViolationCode::MiretLockedDatasetUsedOutsideLockedTest
+            &BeatBenchmarkViolationCode::MirexLockedDatasetUsedOutsideLockedTest
         ));
     }
 
@@ -798,7 +831,7 @@ mod tests {
                 && violation.severity == BeatBenchmarkViolationSeverity::Unqualified
         }));
         assert!(result.iter().any(|violation| {
-            violation.code == BeatBenchmarkViolationCode::KnownTrainingOverlap
+            violation.code == BeatBenchmarkViolationCode::OverlapAuditUnknown
                 && violation.severity == BeatBenchmarkViolationSeverity::Unqualified
         }));
     }
@@ -930,7 +963,7 @@ mod tests {
         let json = include_str!("../fixtures/beat-benchmark-v1/gtzan-development-invalid.json");
         let manifest: BeatBenchmarkManifestV1 = serde_json::from_str(json).unwrap();
         assert!(codes(&manifest).contains(
-            &BeatBenchmarkViolationCode::MiretLockedDatasetUsedOutsideLockedTest
+            &BeatBenchmarkViolationCode::MirexLockedDatasetUsedOutsideLockedTest
         ));
     }
 }
