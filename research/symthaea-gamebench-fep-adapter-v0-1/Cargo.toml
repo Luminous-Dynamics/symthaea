@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-gamebench-fep-adapter"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "FEP ActiveInferenceAgent adapter for the Symthaea GameBench navigation track"
+
+# Isolated research workspace. This adapter deliberately depends on the real
+# symthaea-fep crate but does not add it to the production Symthaea workspace.
+[workspace]
+members = ["."]
+resolver = "2"
+
+[dependencies]
+symthaea-gamebench = { path = "../symthaea-gamebench-v0-1" }
+symthaea-fep = { path = "../../crates/core/symthaea-fep" }
+symthaea-core = { path = "../../crates/core/symthaea-core" }
