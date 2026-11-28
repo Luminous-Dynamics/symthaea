@@ -1,0 +1,56 @@
+{
+  "profile": "mon044-capture-capability-input-v1",
+  "version": "1.0.0",
+  "mode": "offline_fixture",
+  "evaluated_at": "2026-11-28T12:00:00Z",
+  "trial_id": "mon044-synthetic-valid-001",
+  "capability_identity_sha256": "31645128b4fc451e5d78ed45b99a4528d311c6a77b2d4f851709c45057285024",
+  "capability_manifest_sha256": "5ea41aa8a0fd690481ad2e988b7464b502723bae6de43fdf565e863c0cb7bafe",
+  "required_scope_sha256": "74e7dfcc9e79549ac7e4295c977e23398edebad199939e01236c57ae18174194",
+  "required_scope_source_id": "independent-db-catalog-export",
+  "required_scope_provenance_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "required_items": [
+    {
+      "item_id": "required-ddl-schema-history",
+      "state_domain": "schema",
+      "object_id": "database-catalog",
+      "operation": "schema_snapshot",
+      "required": true,
+      "scope_sha256": "e2fa74d77afc9a881210f5a885448d48f20ba31c31742c5b72a00897e82d1ebc"
+    }
+  ],
+  "manifest": {
+    "identity": {
+      "connector_id": "debezium-postgres-example",
+      "connector_version": "3.7.1.Final",
+      "distribution_sha256": "93354845030274cd4bf1686abd60ab28ec52e1a792fa6f7ccb9cbd0ddff53d12",
+      "database_engine": "postgresql",
+      "database_version": "18.7",
+      "logical_decoding_plugin": "pgoutput",
+      "broker_version": "4.3.1",
+      "client_version": "4.3.1",
+      "configuration_sha256": "b79606fb3afea5bd1609ed40b622142f1c98125abcfe89a76a661b0e8e343910",
+      "publication_sha256": "3f662004cb4676be8aa8eae1a6a2328aeb693df48ceebb81f492e6b34872f4e7",
+      "schema_history_sha256": "a61997054deb22acdc6e90832fcb055bc40c6551c1ca7808ca2b9acdc365773d",
+      "snapshot_mode": "initial",
+      "transaction_metadata_enabled": true,
+      "transaction_metadata_epoch": "deployment-epoch-example",
+      "operation_filters_sha256": "fda2877eb18ffb739fd67247add2d94911c33eedd617401a9ada3aca03c06a87",
+      "column_policy_sha256": "7b5e46406b4d04a198d3ecee744d5bf8da7832be15206b19e90297b7ae3c2f5e",
+      "topic_routing_sha256": "243f09d716f05552a58e1415a8af90c098715ff85db35e554951ca61fcd81d06"
+    },
+    "items": [
+      {
+        "item_id": "required-ddl-schema-history",
+        "scope_sha256": "e2fa74d77afc9a881210f5a885448d48f20ba31c31742c5b72a00897e82d1ebc",
+        "status": "supported",
+        "conformance": {
+          "capability_identity_sha256": "31645128b4fc451e5d78ed45b99a4528d311c6a77b2d4f851709c45057285024",
+          "test_profile_sha256": "75b5f7d666873bac07a3a7c3fb64df61c0664aabcb27c6ca1ce4877e6a2bcab7",
+          "report_sha256": "5a4f90cf6adc9c35759c13b142e3bf265e5283e4ff2dd10ddbce2deed4ee83dd",
+          "status": "passed"
+        }
+      }
+    ]
+  }
+}
