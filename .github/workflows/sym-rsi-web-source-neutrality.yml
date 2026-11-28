@@ -41,6 +41,7 @@ jobs:
           rustfmt --edition 2024 --check --config skip_children=true \
             src/web_research/types.rs \
             src/web_research/verifier.rs \
+            src/web_research/researcher.rs \
             tools/sym-rsi-web-source-neutrality/src/lib.rs
       - name: Test the production verifier source
         run: cargo test --locked --manifest-path tools/sym-rsi-web-source-neutrality/Cargo.toml
