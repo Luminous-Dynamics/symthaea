@@ -880,7 +880,10 @@ mod tests {
         assert!(nontrivial_probability > 0.0);
         assert!(
             failure_probability <= per_threshold_delta + 1e-12,
-            "Markov/adaptive-audit failure probability {failure_probability} exceeded {per_threshold_delta}"
+            concat!(
+                "Markov/adaptive-audit failure probability {failure_probability} ",
+                "exceeded {per_threshold_delta}"
+            )
         );
     }
 
