@@ -7,6 +7,8 @@ on:
     paths:
       - "docs/research/spatial-frame-metamorphic-v0.1.json"
       - "docs/research/spatial-frame-metamorphic-v0.1.schema.json"
+      - "crates/core/symthaea-core/tests/spatial_frame_metamorphic.rs"
+      - "Cargo.toml"
       - ".github/workflows/spatial-frame-metamorphic.yml"
   pull_request:
     branches: [main]
@@ -40,6 +42,20 @@ jobs:
 
       - name: Install pinned JSON Schema validator
         run: python -m pip install --disable-pip-version-check jsonschema==4.23.0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting of analytic frame oracle
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/tests/spatial_frame_metamorphic.rs
+
+      - name: Run analytic frame metamorphic tests
+        run: cargo test --locked -p symthaea-core --no-default-features --test spatial_frame_metamorphic
+
+      - name: Run strict Clippy on analytic frame oracle
+        run: cargo clippy --locked -p symthaea-core --no-default-features --test spatial_frame_metamorphic -- -D warnings
 
       - name: Validate schema and exact paired matrix
         run: |
