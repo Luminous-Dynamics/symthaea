@@ -73,7 +73,8 @@ The task adapter at `src/benchmarks/metacognition/selective_prediction_task.rs` 
 - one evaluator-mediated clarification cycle followed by a fresh policy decision, using only the updated observation;
 - a value-of-information heuristic that uses observation-visible estimates of clarification resolution and post-clarification accuracy, then subtracts a declared normalized request burden; these estimates are synthetic fixture inputs, not calibrated probabilities;
 - fixed evaluator-charged action costs for both initial and follow-up decisions;
-- a BLAKE3 manifest digest shared across all policy reports;
+- a BLAKE3 manifest digest shared across all policy reports, ordered per-item decision receipts, post-clarification observation digests and a report-integrity digest;
+- `verify_report_integrity` for mutation detection and `verify_report_with_policy` for deterministic callback replay and full-report comparison;
 - initial-answer, final-answer and post-clarification accuracy, plus clarification precision/recall and follow-up cost; and
 - tests intended to prevent a reward loophole for answering everything or abstaining on everything, to verify useful recovery and to reject inconsistent evaluator labels and invalid updated observations.
 
