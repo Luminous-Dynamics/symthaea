@@ -5,6 +5,7 @@ on:
     paths:
       - "research/cmaq-060/**"
       - "research/cmaq-059/**"
+      - "research/cmaq-058/**"
       - "research/cmaq-056/**"
       - "research/cmaq-054/**"
       - "research/cmaq-053/**"
