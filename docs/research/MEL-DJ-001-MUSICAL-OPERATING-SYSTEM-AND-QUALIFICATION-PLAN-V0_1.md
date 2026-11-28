@@ -286,3 +286,63 @@ The numeric leadership targets are intentionally falsifiable. If power simulatio
 - Report paired effect sizes, confidence intervals, calibration, coverage, subgroup performance, missingness, and all exclusions. Do not promote descriptive-only or underpowered cohorts to leaderboard claims.
 - Freeze analysis model/checkpoint hashes, transition search budgets, separation compute budgets, sample rates, buffers, loudness normalization, preview mastering and playback conditions for each comparison.
 - Publish a failure taxonomy: bad beatgrid, wrong phrase boundary, harmonic/melodic clash, vocal collision, transient damage, stem bleed, missing target content, energy discontinuity, wrong set intent, unsafe command, dropout, and portability loss.
+
+
+## 15. MIREX 2026 beat-tracking baseline and DJ-specific qualification
+
+The 2026 MIREX beat-tracking results give us a more precise public anchor than a generic beat-F1 target. The JSIR experimental jazz set contains 260 recordings. The published Beat This! baseline reports beat F1 94.70 and continuity CMLt 83.50; its downbeat F-measure is 87.27. MIREX also reports GTZAN (999), SMC (217), osu2beat2025 (703 full-length tracks), and Yamaha private cohorts. On the SMC set, the Beat This! row is flagged as trained/tuned on that set and is not ranked; the default CASM system reports F1 57.95 and CMLt 43.30. This variation is exactly why we need per-dataset/per-slice evaluation rather than one pooled average.
+
+References:
+- MIREX 2026 beat-tracking results: https://music-ir.org/mirex/wiki/2026:Audio_Beat_Tracking_Results
+- MIREX 2026 downbeat results: https://music-ir.org/mirex/wiki/2026:Audio_Downbeat_Estimation_Results
+- Beat This! paper (arXiv): https://arxiv.org/abs/2407.21658
+
+### Beat-grid scorecard
+
+Add a dedicated **MEL-DJ-007 — Adaptive Beat-Grid and Tempo-Map Qualification** scorecard (tracked separately from transition quality):
+
+| Dimension | Metric / test | Required comparison |
+|---|---|---|
+| Beat location | F1 at declared tolerance, Cemgil, P-score | Beat This! and 2026 MIREX submissions where weights/implementation are reproducible |
+| Continuity | CMLt / CMLc, long-range phase drift, beat insertion/deletion rate | Beat This!; publish accuracy/continuity trade-off |
+| Downbeat | F1, precision, recall, meter-confusion matrix | Beat This! / MIREX downbeat results |
+| Tempo map | local tempo MAE, slope/turning-point error, half/double-time confusion | constant-tempo tracker, Beat This!, human DJ correction |
+| Live adaptation | phase-lock time, reacquisition latency after tempo changes, maximum transient phase error | controlled tempo-ramp / rubato / dropout interventions |
+| DJ usability | manual corrections per ten minutes, correction time, undo rate, downstream cue/transition failure | current manual workflow and incumbent beatgrid editors |
+| Calibration | coverage-risk and selective accuracy of alternate grid hypotheses | forced single-grid output versus calibrated multi-hypothesis/abstention |
+
+The target on the JSIR cohort is to exceed the Beat This! reference on beat F1 (>94.70) and continuity (>83.50 CMLt), and to exceed its downbeat F-measure (>87.27), with uncertainty intervals. These are cohort-specific targets, not global thresholds. For DJ-focused electronic material, preregister a stable-tempo subset target of >=0.95 beat F1 and >=0.90 downbeat F1, while preserving CMLt >=0.90. For SMC, rubato, live drummers, tempo ramps, meter changes and edits, report separate distributions and selective coverage; do not force the stable-tempo target onto unsupported material.
+
+MIREX's published GTZAN and SMC test sets are explicitly prohibited from training, validation, model selection, parameter tuning or development. Preserve them as locked test cohorts under their published rules. The osu2beat2025, JSIR and Yamaha test cohorts need their own documented overlap, licensing, annotation, and use review before inclusion. The public leaderboard results are comparison references, not permission to train on test audio.
+
+### The DJ-specific paradigm shift: beat maps as live hypotheses, not static metadata
+
+A beatgrid should be a time-indexed posterior over competing pulse hypotheses, with a confidence and provenance record, not a single static BPM plus a manually placed first beat. Keep independent tracks for:
+- pulse/beat phase;
+- tempo curve and meter hypothesis;
+- phrase/section boundaries;
+- expressive timing and microtiming;
+- source edit / transient discontinuity;
+- confidence, alternative hypotheses and correction history.
+
+The performance runtime consumes a selected, explicitly approved hypothesis. It never overwrites the source or analysis record when the DJ corrects a grid. Reacquisition after a tempo discontinuity is a first-class control problem. Measure the time until the phase estimate returns within the declared tolerance and whether the system falsely reports lock while it remains outside tolerance.
+
+## 16. Dated industry capability snapshot — 2026-11-28
+
+The vendor matrix should be versioned by release, not by product family alone. The currently verified public snapshot is:
+
+| Product | Verified version / recent capability | Implication for Melothaea |
+|---|---|---|
+| Serato DJ Pro | 5.1.0 is the current download; 5.0 introduced Lucid Beatgrids (automatic tempo tracking) and Open Streaming across multiple services | Variable-tempo following and multi-service support are already industry expectations; test our beat-map hypothesis/phase recovery rather than claiming variable tempo as unique |
+| rekordbox | 7.2.20 is the latest release-note entry; 7.2.16 had vocal-position AI detection across subscription plans, Spotify Automix/collection support and hardware additions | The library/streaming/hardware ecosystem is broad; focus on portable, inspectable music intelligence and rights-aware local workflows |
+| Traktor Pro 4 | 4.5.1 (2026-07-09) is the current version in Native Instruments' update-status thread; Pro 4 supports four decks, flexible beatgrids and four-stem separation | Four decks, flexible grids and stems are parity; use its beatgrid/manual-correction UX as a comparator |
+| Engine DJ | 5.3.0 (2026-11-05) added third-party playlist reimport/one-click import; stem rendering gates export while stems are incomplete | Library interoperation and explicit readiness gating matter as much as generation quality |
+
+Sources:
+- Serato DJ Pro downloads / release information: https://serato.com/dj/pro/downloads?download=true&os=win
+- rekordbox release notes: https://rekordbox.com/en/support/releasenote/
+- Traktor Pro 4 official update status: https://community.native-instruments.com/discussion/43/official-update-status-traktor-pro-4-current-version-4-5-1
+- Traktor Pro 4 feature overview: https://www.native-instruments.com/products/traktor-pro
+- Engine DJ official downloads/release notes: https://enginedj.com/downloads
+
+Treat this matrix as a dated public-feature inventory. It does not establish equivalent quality, compatibility across all devices, or the internal implementation of any competitor. Re-check release notes when a new comparison is run. The strategic conclusion is unchanged: do not compete on hardware catalog breadth or streaming rights. Build the cross-vendor evidence, musical-property, transition-planning and set-intent layer that a DJ can audit and carry between tools.
