@@ -84,7 +84,9 @@ PCE is a deterministic interactive environment primitive, not yet a validated
 psychological benchmark. It currently includes two seeded hidden-resource
 layouts, partial agent observations, charged invalid actions, gate-failure
 interventions, deterministic replay, evaluator-owned scoring, and reference
-and random baselines.
+and random baselines. A breadth-first search oracle computes the shortest valid
+action sequence for the current fully specified task and serves only as an
+evaluator ceiling, not as a black-box competitor.
 
 Run the baseline examples:
 
@@ -94,7 +96,9 @@ cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines -- --jso
 ```
 
 The scripted reference policy is optimal only for the two current hand-authored
-layouts. The random policy is a floor baseline. These are environment smoke
+layouts. The BFS oracle searches the current known state space and computes a
+shortest valid plan; it is an evaluator ceiling, not an achievable agent result
+unless the same state information is available. The random policy is a floor baseline. These are environment smoke
 baselines, not evidence of general cognitive capability or a state-of-the-art
 comparison. The PCE unit tests and Rust build have not yet been run on this
 research branch.
