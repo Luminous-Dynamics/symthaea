@@ -63,9 +63,9 @@ pub struct PerformanceIdentityArmMembershipV1 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SamplingDesignShapeV1 {
-    WorkDisjointIndependentClusters,
+    WorkDisjointClusters,
     NestedWithinWork,
-    CrossedPerformerOrSession,
+    CrossedPerformerSessionOrTake,
     InsufficientlyIdentified,
 }
 
@@ -297,11 +297,11 @@ pub fn audit_performance_identity_sampling_design(
     let design_shape = if incomplete {
         SamplingDesignShapeV1::InsufficientlyIdentified
     } else if crossed {
-        SamplingDesignShapeV1::CrossedPerformerOrSession
+        SamplingDesignShapeV1::CrossedPerformerSessionOrTake
     } else if nested {
         SamplingDesignShapeV1::NestedWithinWork
     } else {
-        SamplingDesignShapeV1::WorkDisjointIndependentClusters
+        SamplingDesignShapeV1::WorkDisjointClusters
     };
 
     let independence_basis_present = !design.independence_basis.trim().is_empty();
@@ -702,7 +702,7 @@ mod tests {
         let report = audit_performance_identity_sampling_design(&crossed_fixture()).unwrap();
         assert_eq!(
             report.design_shape,
-            SamplingDesignShapeV1::CrossedPerformerOrSession
+            SamplingDesignShapeV1::CrossedPerformerSessionOrTake
         );
         assert_eq!(
             report.disposition,
@@ -759,10 +759,87 @@ mod tests {
         first.clean.session_identity_sha256 = shared_session.clone();
         second.clean.session_identity_sha256 = shared_session;
         let report = audit_performance_identity_sampling_design(&design(vec![first, second])).unwrap();
-        assert_eq!(report.design_shape, SamplingDesignShapeV1::CrossedPerformerOrSession);
+        assert_eq!(report.design_shape, SamplingDesignShapeV1::CrossedPerformerSessionOrTake);
         assert_eq!(report.crossed_performer_count, 0);
         assert_eq!(report.crossed_session_count, 1);
         assert_eq!(report.disposition, SamplingDesignDispositionV1::CrossedInferenceRequired);
+    }
+
+    #[test]
+    fn a_take_reused_across_works_is_crossed_even_when_performers_are_disjoint() {
+        let performer_a = digest(151);
+        let performer_b = digest(152);
+        let shared_take = digest(153);
+        let mut first = observation(
+            "take-a",
+            "pair-take-a",
+            &digest(154),
+            &performer_a,
+            &performer_a,
+            &performer_a,
+            1_500,
+        );
+        let mut second = observation(
+            "take-b",
+            "pair-take-b",
+            &digest(155),
+            &performer_b,
+            &performer_b,
+            &performer_b,
+            1_600,
+        );
+        first.performance_stay.take_identity_sha256 = shared_take.clone();
+        second.performance_stay.take_identity_sha256 = shared_take;
+
+        let report = audit_performance_identity_sampling_design(&design(vec![first, second])).unwrap();
+        assert_eq!(
+            report.design_shape,
+            SamplingDesignShapeV1::CrossedPerformerSessionOrTake
+        );
+        assert_eq!(report.crossed_performer_count, 0);
+        assert_eq!(report.crossed_session_count, 0);
+        assert_eq!(report.crossed_take_count, 1);
+        assert_eq!(
+            report.disposition,
+            SamplingDesignDispositionV1::CrossedInferenceRequired
+        );
+    }
+
+    #[test]
+    fn secondary_ensemble_member_reused_across_works_is_crossed() {
+        let lead_a = digest(161);
+        let lead_b = digest(162);
+        let shared_member = digest(163);
+        let mut first = observation(
+            "ensemble-a",
+            "pair-ensemble-a",
+            &digest(164),
+            &lead_a,
+            &lead_a,
+            &lead_a,
+            1_700,
+        );
+        let mut second = observation(
+            "ensemble-b",
+            "pair-ensemble-b",
+            &digest(165),
+            &lead_b,
+            &lead_b,
+            &lead_b,
+            1_800,
+        );
+        first.clean.performer_membership_sha256.push(shared_member.clone());
+        second.clean.performer_membership_sha256.push(shared_member);
+
+        let report = audit_performance_identity_sampling_design(&design(vec![first, second])).unwrap();
+        assert_eq!(
+            report.design_shape,
+            SamplingDesignShapeV1::CrossedPerformerSessionOrTake
+        );
+        assert_eq!(report.crossed_performer_count, 1);
+        assert_eq!(report.crossed_session_count, 0);
+        assert_eq!(report.crossed_take_count, 0);
+        assert_eq!(report.multi_performer_arm_count, 2);
     }
 
     #[test]
@@ -789,7 +866,7 @@ mod tests {
         )]);
         input.independence_basis.clear();
         let report = audit_performance_identity_sampling_design(&input).unwrap();
-        assert_eq!(report.design_shape, SamplingDesignShapeV1::WorkDisjointIndependentClusters);
+        assert_eq!(report.design_shape, SamplingDesignShapeV1::WorkDisjointClusters);
         assert_eq!(report.disposition, SamplingDesignDispositionV1::DescriptiveOnly);
         assert!(!report.work_cluster_bootstrap_permitted_under_declared_assumption);
     }
@@ -827,7 +904,7 @@ mod tests {
         let crossed = design_for_comparison(&comparison);
         let error =
             audit_paired_comparison_with_sampling_design(&comparison, &crossed).unwrap_err();
-        assert!(error.contains("CrossedPerformerOrSession"));
+        assert!(error.contains("CrossedPerformerSessionOrTake"));
         assert!(error.contains("CrossedInferenceRequired"));
     }
 
