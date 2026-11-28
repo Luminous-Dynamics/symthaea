@@ -251,9 +251,11 @@ fn main() -> Result<(), String> {
             .count();
         let kernel_false_or_prechange = kernel_alarms
             .iter()
-            .filter(|alarm| alarm.is_some_and(|time| {
-                scenario == Scenario::ConditionalNull || time <= config.shift_after
-            }))
+            .filter(|alarm| {
+                alarm.is_some_and(|time| {
+                    scenario == Scenario::ConditionalNull || time <= config.shift_after
+                })
+            })
             .count();
 
         if scenario == Scenario::ConditionalNull {
