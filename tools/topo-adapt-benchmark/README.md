@@ -1,33 +1,34 @@
 # topo-adapt-benchmark
 
-A small deterministic evaluator for the synthetic fixtures owned by
-[TOPO-ADAPT-001 #14123](https://github.com/Luminous-Dynamics/symthaea/issues/14123).
+A deterministic evaluator for the synthetic fixtures owned by TOPO-ADAPT-001
+(issue #14123).
 
 ## Run
 
 From the repository root:
 
-```sh
-cargo test -p topo-adapt-benchmark
-cargo run -p topo-adapt-benchmark
-```
+    cargo test -p topo-adapt-benchmark
+    cargo run -p topo-adapt-benchmark
 
-The crate uses only the workspace's existing `serde` and `serde_json`
-dependencies. The fixture is embedded at build time from
-`fixtures/topo_adapt_fixture_v0_1.json`.
+The crate uses the workspace's existing serde, serde_json and blake3 dependencies.
+The JSON fixture is embedded at build time from the fixtures directory.
+
+The CLI prints the fixture BLAKE3 digest and an optional GITHUB_SHA. When the
+source SHA is unavailable it emits null; such a run is not a source-bound
+qualification receipt.
 
 ## Contract
 
 - Directed integer capacities.
 - Exactly one source per episode.
-- Demand schedules are forward-time and sink-specific.
-- Candidate edges are inactive until selected.
-- Graph-edit budget is enforced before evaluation.
-- Node/edge references and interventions are validated.
-- Maximum flow is computed with an augmenting-path residual network.
-- For these small fixtures, minimum cut is independently obtained by
-  exhaustive partition enumeration; a flow/cut mismatch is a hard error.
-- Graphs above 20 nodes are rejected by this v0.1 exhaustive-cut oracle.
+- Forward-time, sink-specific demand schedules.
+- Candidate edges remain inactive until selected.
+- Graph-edit budget enforced before evaluation.
+- Node, edge and intervention references validated.
+- Maximum flow calculated with an augmenting-path residual network.
+- Minimum cut independently obtained by exhaustive partition enumeration.
+- Flow/cut disagreement is a hard error.
+- The exhaustive cut oracle is capped at 20 graph nodes in v0.1.
 
 This is a benchmark evaluator, not a learned controller. It does not model
-biological transport, bioelectricity, physical repair, or industrial actuation.
+biological transport, bioelectricity, physical repair or industrial actuation.
