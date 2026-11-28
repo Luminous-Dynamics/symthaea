@@ -555,8 +555,8 @@ fn p_score(
         .windows(2)
         .map(|pair| pair[1] - pair[0])
         .collect();
-    let median = median_u64(&intervals);
-    let window = round_ties_even(MIREX_P_SCORE_WINDOW_RATIO * median as f64) as u64;
+    let median = median_f64(&intervals);
+    let window = round_ties_even(MIREX_P_SCORE_WINDOW_RATIO * median) as u64;
 
     let mut total_pairs = 0u128;
     let mut left = 0usize;
@@ -593,19 +593,17 @@ fn quantize_10ms_bins(frames: &[u64], offset: u64, sample_rate_hz: u32) -> Vec<u
     bins
 }
 
-fn median_u64(values: &[u64]) -> u64 {
+fn median_f64(values: &[u64]) -> f64 {
     if values.is_empty() {
-        return 0;
+        return 0.0;
     }
     let mut sorted = values.to_vec();
     sorted.sort_unstable();
     let mid = sorted.len() / 2;
     if sorted.len() % 2 == 1 {
-        sorted[mid]
+        sorted[mid] as f64
     } else {
-        round_ties_even(
-            (u128::from(sorted[mid - 1]) + u128::from(sorted[mid])) as f64 / 2.0,
-        ) as u64
+        (sorted[mid - 1] as f64 + sorted[mid] as f64) * 0.5
     }
 }
 
@@ -657,12 +655,8 @@ fn continuity_scores(
             } else {
                 variation[nearest] - variation[nearest - 1]
             };
-            let estimated_interval = if estimate_index == 0 {
-                estimated[1] - estimated[0]
-            } else if estimate_index + 1 == estimated.len() {
-                estimated[estimate_index] - estimated[estimate_index - 1]
-            } else if estimate_index == 0 {
-                estimated[1] - estimated[0]
+            let estimated_interval = if estimate_index + 1 < estimated.len() {
+                estimated[estimate_index + 1] - estimated[estimate_index]
             } else {
                 estimated[estimate_index] - estimated[estimate_index - 1]
             };
@@ -789,7 +783,7 @@ mod tests {
 
     #[test]
     fn double_time_is_not_mistaken_for_correct_metric_level() {
-        let estimated: Vec<f64> = (0..=24).map(|index| index as f64 * 0.5).collect();
+        let estimated: Vec<f64> = (0..=25).map(|index| index as f64 * 0.5).collect();
         let scores = score_seconds(&reference(), &estimated);
         assert!((scores.f_measure - 2.0 / 3.0).abs() < 1e-6);
         assert!((scores.cemgil - 2.0 / 3.0).abs() < 1e-6);
