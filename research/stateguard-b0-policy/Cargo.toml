@@ -12,5 +12,5 @@ description = "Deterministic public-state constrained research policy baseline"
 [dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "=1.0.150", features = ["preserve_order"] }
-sha2 = { version = "=0.10.9", features = ["oid"] }
+sha2 = "=0.10.9"
 typed-research-state-contract = { path = "../typed-research-state" }
