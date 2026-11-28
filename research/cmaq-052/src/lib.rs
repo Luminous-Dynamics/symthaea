@@ -404,6 +404,39 @@ mod tests {
             .collect()
     }
 
+    fn next_heteroskedastic_value(state: &mut u64, previous_sign: f64) -> (f64, f64) {
+        // The conditional variance is predictable from the previous sign;
+        // the next sign is generated from the next PRNG bit. In the intended
+        // probability model that sign is a fresh symmetric Rademacher draw.
+        let mut value = *state;
+        value ^= value << 13;
+        value ^= value >> 7;
+        value ^= value << 17;
+        *state = value;
+        let sign = if value & 1 == 1 { 1.0 } else { -1.0 };
+        let amplitude = if previous_sign > 0.0 { 1.0 } else { 0.25 };
+        (amplitude * sign, sign)
+    }
+
+    fn heteroskedastic_references(
+        count: usize,
+        state: &mut u64,
+        previous_sign: &mut f64,
+    ) -> Vec<ReferenceBlock> {
+        (0..count)
+            .map(|index| {
+                let (value, next_sign) =
+                    next_heteroskedastic_value(state, *previous_sign);
+                *previous_sign = next_sign;
+                ReferenceBlock {
+                    block_id: format!("heteroskedastic-reference-{index}"),
+                    trace_sha256: format!("{:064x}", index + 1),
+                    value: vec![value],
+                }
+            })
+            .collect()
+    }
+
     fn monitor() -> CalibratedReferenceApproachabilityMonitor {
         CalibratedReferenceApproachabilityMonitor::new(
             references(256, 0.0),
@@ -594,6 +627,49 @@ mod tests {
             Err(CalibrationError::DuplicateTestBlockId)
         );
         assert_eq!(fitted.observations_seen(), 1);
+    }
+
+    #[test]
+    fn predictable_heteroskedastic_martingale_null_uses_same_reference_and_test_mean() {
+        let mut state = 0x9e3779b97f4a7c15u64;
+        let mut previous_sign = 1.0;
+        let reference_blocks =
+            heteroskedastic_references(512, &mut state, &mut previous_sign);
+        let mut fitted = CalibratedReferenceApproachabilityMonitor::new(
+            reference_blocks,
+            1.0,
+            alpha_test(),
+            delta(),
+            alpha_total(),
+            REF_SHA.into(),
+            TARGET_SHA.into(),
+        )
+        .unwrap();
+
+        // The simulated transition law has E[r_t | F_(t-1)] = 0 in both
+        // phases, while the predictable amplitude changes with the previous
+        // sign. The fixed-seed path is a plumbing check, not a coverage study.
+        assert!(fitted.target().lower()[0] <= 0.0);
+        assert!(fitted.target().upper()[0] >= 0.0);
+
+        let mut saw_low_variance = false;
+        let mut saw_high_variance = false;
+        for index in 0..128 {
+            let (value, next_sign) =
+                next_heteroskedastic_value(&mut state, previous_sign);
+            previous_sign = next_sign;
+            saw_low_variance |= value.abs() == 0.25;
+            saw_high_variance |= value.abs() == 1.0;
+            let update = fitted
+                .observe(&format!("heteroskedastic-test-{index}"), &[value])
+                .unwrap();
+            if update.quarantined {
+                break;
+            }
+        }
+        assert!(saw_low_variance);
+        assert!(saw_high_variance);
+        assert!(fitted.observations_seen() > 0);
     }
 
     #[test]
