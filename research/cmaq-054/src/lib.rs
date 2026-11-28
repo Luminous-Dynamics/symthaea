@@ -762,6 +762,8 @@ mod tests {
     fn scale_selective_shift_reweights_toward_the_resolving_expert() {
         let mut family = portfolio();
         let mut update = None;
+        // The X and Y marginals are identical over each two-pair block:
+        // X=(0, 2pi), Y=(2pi, 0). Only the conditional pairing changes.
         for sequence in 1..=200u64 {
             let result = family
                 .observe_pair(
@@ -791,6 +793,9 @@ mod tests {
             .find(|expert| expert.expert_id == "high-frequency")
             .unwrap();
         assert!(high.posterior_weight > 0.99);
+        assert!(
+            (low.posterior_weight + high.posterior_weight - 1.0).abs() < 1e-10
+        );
         assert!(high.log_e_value > low.log_e_value + 5.0);
     }
 
