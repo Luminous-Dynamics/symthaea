@@ -18,7 +18,8 @@ use crate::beat_benchmark::BeatValidSegment;
 use crate::beat_metrics::{
     aggregate_mirex_beat_scores, score_mirex_beat_track_with_trim,
     score_mirex_downbeat_events, validate_mirex_beat_score_evidence,
-    MirexBeatAggregationMode, MirexBeatScoreEvidenceV1, MirexBeatTrackReportV1,
+    MirexBeatAggregationMode, MirexBeatMetricScores, MirexBeatScoreEvidenceV1,
+    MirexBeatTrackReportV1,
     MirexDownbeatEventScoresV1, MirexValidSegmentPolicy, WeightedMirexBeatScores,
 };
 use crate::transition::MAX_SAFE_JSON_INTEGER;
