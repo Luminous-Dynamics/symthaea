@@ -418,15 +418,24 @@ pub fn verify_delayed_aci_prediction_receipt_v1(
     receipt: &DelayedAciPredictionReceiptV1,
 ) -> Result<(), DelayedAciErrorV1> {
     if receipt.schema != DELAYED_ACI_PREDICTION_RECEIPT_SCHEMA_V1
+        || receipt.delay_rounds == 0
+        || receipt.delay_rounds > 10_000
+        || !receipt.learning_rate.is_finite()
+        || receipt.learning_rate <= 0.0
+        || !receipt.target_miscoverage.is_finite()
+        || !(0.0..1.0).contains(&receipt.target_miscoverage)
         || !valid_sha256(&receipt.model_artifact_sha256)
         || !valid_sha256(&receipt.policy_sha256)
         || !valid_sha256(&receipt.calibration_state_before_sha256)
         || !valid_sha256(&receipt.calibration_state_after_sha256)
         || receipt.calibration_state_before_sha256 != receipt.calibration_state_after_sha256
-        || receipt.expected_delivery_round != receipt.round.saturating_add(receipt.delay_rounds)
+        || receipt.expected_delivery_round
+            != receipt.round.checked_add(receipt.delay_rounds).unwrap_or(u64::MAX)
         || receipt.phase != receipt.round % receipt.delay_rounds
         || !receipt.point_prediction.is_finite()
         || !receipt.alpha_at_issue.is_finite()
+        || receipt.alpha_at_issue < -receipt.learning_rate
+        || receipt.alpha_at_issue > 1.0 + receipt.learning_rate
     {
         return Err(DelayedAciErrorV1(
             "delayed ACI prediction receipt identity or read-only invariant is invalid".into(),
@@ -1362,6 +1371,47 @@ mod tests {
             ),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn public_prediction_and_update_receipt_verifiers_reject_tampering() {
+        let mut engine = engine(1);
+        begin_delayed_aci_round_v1(&mut engine, 0).unwrap();
+        let prediction = issue_delayed_aci_prediction_v1(
+            &mut engine,
+            &prediction_input(
+                "verify-sample",
+                "verify-event",
+                0,
+                AciPredictionIntervalV1::bounded(9.0, 11.0),
+            ),
+        )
+        .unwrap();
+        verify_delayed_aci_prediction_receipt_v1(&prediction).unwrap();
+
+        let mut tampered = prediction.clone();
+        tampered.point_prediction += 0.5;
+        assert!(verify_delayed_aci_prediction_receipt_v1(&tampered).is_err());
+
+        let mut zero_delay = prediction;
+        zero_delay.delay_rounds = 0;
+        assert!(verify_delayed_aci_prediction_receipt_v1(&zero_delay).is_err());
+    }
+
+    #[test]
+    fn calibration_unbounded_and_one_sided_intervals_have_explicit_miss_semantics() {
+        let full = AciPredictionIntervalV1::full_real_line();
+        assert!(!full.misses(f64::MAX));
+        let empty = AciPredictionIntervalV1::empty();
+        assert!(empty.misses(0.0));
+        let lower = AciPredictionIntervalV1::lower_unbounded(10.0);
+        assert!(!lower.misses(5.0));
+        assert!(lower.misses(11.0));
+        let upper = AciPredictionIntervalV1::upper_unbounded(10.0);
+        assert!(!upper.misses(11.0));
+        assert!(upper.misses(9.0));
+        let calibration = AciPredictionIntervalV1::calibration_unbounded();
+        assert!(!calibration.misses(1.0e300));
     }
 
     #[test]
