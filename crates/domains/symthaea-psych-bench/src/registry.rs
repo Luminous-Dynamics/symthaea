@@ -413,7 +413,9 @@ fn valid_stable_id(value: &str) -> bool {
     !value.is_empty()
         && value
             .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-".contains(&byte))
+            .all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-".contains(&byte)
+            })
         && value.as_bytes()[0].is_ascii_lowercase()
 }
 
