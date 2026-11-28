@@ -65,7 +65,7 @@ pub struct PerformanceIdentityArmMembershipV1 {
 pub enum SamplingDesignShapeV1 {
     WorkDisjointClusters,
     NestedWithinWork,
-    CrossedPerformerSessionOrTake,
+    CrossedPerformerSessionTakeOrPerformance,
     InsufficientlyIdentified,
 }
 
@@ -114,8 +114,8 @@ pub struct SamplingDesignQualifiedComparisonReportV1 {
 
 /// Classify the supplied incidence structure without making an inferential claim.
 ///
-/// A repeated performer, session, or take across source works is a crossed
-/// dependency. A multi-performer ensemble confined to one work is nested,
+/// A repeated performer, session, take, or performance realization across source
+/// works is a crossed dependency. A multi-performer ensemble confined to one work is nested,
 /// not crossed. Missing pseudonyms or design metadata force descriptive-only.
 pub fn audit_performance_identity_sampling_design(
     design: &PerformanceIdentitySamplingDesignV1,
@@ -311,7 +311,7 @@ pub fn audit_performance_identity_sampling_design(
     let design_shape = if incomplete {
         SamplingDesignShapeV1::InsufficientlyIdentified
     } else if crossed {
-        SamplingDesignShapeV1::CrossedPerformerSessionOrTake
+        SamplingDesignShapeV1::CrossedPerformerSessionTakeOrPerformance
     } else if nested {
         SamplingDesignShapeV1::NestedWithinWork
     } else {
@@ -723,7 +723,7 @@ mod tests {
         let report = audit_performance_identity_sampling_design(&crossed_fixture()).unwrap();
         assert_eq!(
             report.design_shape,
-            SamplingDesignShapeV1::CrossedPerformerSessionOrTake
+            SamplingDesignShapeV1::CrossedPerformerSessionTakeOrPerformance
         );
         assert_eq!(
             report.disposition,
@@ -782,7 +782,7 @@ mod tests {
         first.clean.session_identity_sha256 = shared_session.clone();
         second.clean.session_identity_sha256 = shared_session;
         let report = audit_performance_identity_sampling_design(&design(vec![first, second])).unwrap();
-        assert_eq!(report.design_shape, SamplingDesignShapeV1::CrossedPerformerSessionOrTake);
+        assert_eq!(report.design_shape, SamplingDesignShapeV1::CrossedPerformerSessionTakeOrPerformance);
         assert_eq!(report.crossed_performer_count, 0);
         assert_eq!(report.crossed_session_count, 1);
         assert_eq!(report.disposition, SamplingDesignDispositionV1::CrossedInferenceRequired);
@@ -817,7 +817,7 @@ mod tests {
         let report = audit_performance_identity_sampling_design(&design(vec![first, second])).unwrap();
         assert_eq!(
             report.design_shape,
-            SamplingDesignShapeV1::CrossedPerformerSessionOrTake
+            SamplingDesignShapeV1::CrossedPerformerSessionTakeOrPerformance
         );
         assert_eq!(report.crossed_performer_count, 0);
         assert_eq!(report.crossed_session_count, 0);
@@ -857,7 +857,7 @@ mod tests {
         let report = audit_performance_identity_sampling_design(&design(vec![first, second])).unwrap();
         assert_eq!(
             report.design_shape,
-            SamplingDesignShapeV1::CrossedPerformerSessionOrTake
+            SamplingDesignShapeV1::CrossedPerformerSessionTakeOrPerformance
         );
         assert_eq!(report.crossed_performer_count, 1);
         assert_eq!(report.crossed_session_count, 0);
@@ -896,7 +896,7 @@ mod tests {
             audit_performance_identity_sampling_design(&design(vec![first, second])).unwrap();
         assert_eq!(
             report.design_shape,
-            SamplingDesignShapeV1::CrossedPerformerSessionOrTake
+            SamplingDesignShapeV1::CrossedPerformerSessionTakeOrPerformance
         );
         assert_eq!(report.crossed_performer_count, 0);
         assert_eq!(report.crossed_session_count, 0);
@@ -971,7 +971,7 @@ mod tests {
         let crossed = design_for_comparison(&comparison);
         let error =
             audit_paired_comparison_with_sampling_design(&comparison, &crossed).unwrap_err();
-        assert!(error.contains("CrossedPerformerSessionOrTake"));
+        assert!(error.contains("CrossedPerformerSessionTakeOrPerformance"));
         assert!(error.contains("CrossedInferenceRequired"));
     }
 
