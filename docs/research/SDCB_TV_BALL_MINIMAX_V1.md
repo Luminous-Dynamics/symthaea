@@ -120,3 +120,40 @@ This is a fixture-specific comparison, not a general claim that p_sup is always 
 - An independent Python `Fraction` replay confirms the interval endpoints, worst-null size, worst-alternative power, dual certificate and p_sup tails.
 - Rust compilation/tests remain unrun because `rustc` is unavailable in the authoring environment.
 - This does not establish a general TV-polytope solver, continuous-density result, physical sensor qualification or SOTA superiority.
+
+
+## Exact robustness-radius frontier
+
+The binary-alphabet case admits a complete radius sensitivity solution, not just one operating point. Let \(\epsilon_A\) and \(\epsilon_B\) be the alternative and null TV radii around Bernoulli(4/5) and Bernoulli(1/5).
+
+The least-favourable endpoints are:
+\[
+p_{\min}=4/5-\epsilon_A,\qquad
+q_{\max}=1/5+\epsilon_B.
+\]
+
+The exact phase boundary is:
+\[
+\epsilon_A+\epsilon_B=3/5.
+\]
+
+- When \(\epsilon_A+\epsilon_B<3/5\), the two Bernoulli intervals are disjoint and
+\[
+\beta^*(\epsilon_A,\epsilon_B)
+=\alpha\frac{4/5-\epsilon_A}{1/5+\epsilon_B}.
+\]
+The exact test is \(\phi(0)=0,\phi(1)=\alpha/q_{\max}\). The dual endpoint certificate uses \(\lambda=1\), \(w=p_{\min}/q_{\max}\), and zero positive-part slack.
+- When \(\epsilon_A+\epsilon_B\ge3/5\), the intervals intersect. An exact common-law witness gives the upper bound \(\beta^*\le\alpha\), and the constant randomized test \(\phi(0)=\phi(1)=\alpha\) attains it. The exact robust value is therefore \(\alpha\), not below it.
+
+| Alternative radius \(\epsilon_A\) | Null radius \(\epsilon_B\) | Exact maximin power | |
+|---:|---:|---:|---|
+| 0 | 0 | 2/5 | separated |
+| 1/10 | 1/10 | 7/30 | separated |
+| 3/20 | 1/20 | 13/50 | original frozen point |
+| 3/10 | 1/5 | 1/8 | separated |
+| 2/5 | 1/5 | 1/10 | exact overlap boundary |
+| 9/20 | 1/5 | 1/10 | overlapping families |
+
+An independent rational replay also confirms that increasing either radius individually cannot increase this robust value. This is a complete analytic solution for the binary Bernoulli TV-ball special case; it is not a general finite-alphabet TV-polytope algorithm.
+
+The Rust reference now includes exact interval endpoints, a common-law overlap witness, separated/overlap primal tests, matching dual objectives, and 12 authored tests. Rust compilation remains unrun.
