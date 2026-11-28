@@ -3,9 +3,16 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Metacognitive Ignition Tracking Benchmark
 //!
-//! Tests whether the Higher-Order Thought (HOT) system's consciousness
-//! classification spontaneously predicts Global Workspace Theory (GWT) ignition,
-//! even though HOT has no direct access to workspace competition dynamics.
+//! Tests alignment between HOT and GWT decisions under shared activation evidence.
+//!
+//! The target activation is supplied to GWT and also passed as the confidence
+//! input to HOT (optionally with added HOT-side noise). HOT does not receive the
+//! GWT outcome or filler/competition state, but the modules do share a common
+//! target-evidence signal. Therefore this is a controlled shared-input alignment
+//! probe, not evidence of spontaneous metacognition or independent cross-module
+//! emergence. A stronger confirmatory test must use an independently estimated
+//! HOT readout and counterfactual trials where the same HOT-visible evidence
+//! leads to different GWT outcomes because hidden competition context changes.
 //!
 //! ## Scientific Basis
 //!
@@ -21,8 +28,10 @@
 //! ### Primary Condition (liberal HOT)
 //!
 //! GWT `max_capacity = 2` with fillers at ~0.64 and ~0.74. HOT threshold 0.50.
-//! Creates a disagreement zone (0.50–0.64) where HOT classifies targets as
-//! conscious but GWT rejects them due to competition.
+//! Creates a disagreement zone where HOT can classify target evidence as salient
+//! while GWT rejects it due to competition. HOT receives the target activation
+//! but not filler activations or the GWT result; this shared-input dependency is
+//! an explicit limitation, not proof of independent metacognitive prediction.
 //!
 //! ### Competition Pressure Sweep
 //!
@@ -50,21 +59,20 @@
 //!
 //! ## ROC Analysis (Green & Swets, 1966)
 //!
-//! Full Receiver Operating Characteristic by sweeping HOT threshold from 0.30 to 0.80.
-//! Each threshold produces a (false alarm rate, hit rate) point. The Area Under Curve
-//! (AUC) is a bias-free measure of metacognitive sensitivity — it answers "how well
-//! does HOT track GWT ignition, regardless of where the threshold is set?"
+//! Threshold-sweep ROC using the continuous activation/confidence value supplied
+//! to HOT. Since this value is the shared target-evidence input, AUC measures how
+//! well that input discriminates GWT ignition under the benchmark's competition
+//! distribution. It is not an independent HOT-generated confidence/readout and
+//! must not be reported as stand-alone metacognitive sensitivity.
 //! Optimal threshold identified via Youden's J statistic (max hit_rate - fa_rate).
 //!
 //! ## Confidence Calibration (Niculescu-Mizil & Caruana, 2005)
 //!
-//! Tests whether the continuous activation level is calibrated as a probability
-//! of GWT ignition. Activations binned into deciles; for each bin, measures
-//! the gap between mean activation (interpreted as predicted P(ignition)) and
-//! actual ignition rate. Expected Calibration Error (ECE) quantifies the
-//! miscalibration. Since GWT has a sharp threshold, the calibration curve is
-//! sigmoid-like rather than diagonal — the ECE reveals that consciousness is
-//! a threshold phenomenon, not a probability proportional to evidence strength.
+//! Bins the shared activation/confidence input into deciles and compares each
+//! bin's mean input value with the observed GWT ignition rate. This is an
+//! input-score reliability curve, not calibration of a probability explicitly
+//! predicted by HOT. Interpret it as a property of the stimulus/evidence scale
+//! and GWT response under this setup, not a validated confidence-calibration score.
 //!
 //! ## Observation Noise Sweep (Lau & Rosenthal, 2011)
 //!
@@ -342,10 +350,11 @@ fn compute_metrics(cr: &ConditionResult, levels: &[f64]) -> ConditionMetrics {
     }
 }
 
-/// Compute ROC curve by sweeping HOT threshold over trial-level data.
+/// Compute a threshold-sweep ROC from the continuous score supplied to HOT.
 ///
-/// For each threshold, classifies trials as "conscious" (activation >= threshold) and
-/// computes hit rate and false alarm rate against GWT ground truth.
+/// The score is the HOT-visible target activation/confidence input. Thresholding
+/// it is equivalent to running the simple HOT threshold rule at multiple
+/// configured thresholds; it is not an independent HOT-generated confidence.
 ///
 /// Returns (auc, optimal_threshold, optimal_j, num_curve_points).
 fn compute_roc(trials: &[(f64, bool)], thresholds: &[f64]) -> (f64, f64, f64, usize) {
@@ -414,12 +423,10 @@ fn compute_roc(trials: &[(f64, bool)], thresholds: &[f64]) -> (f64, f64, f64, us
     )
 }
 
-/// Compute confidence calibration metrics from trial-level data.
+/// Compute input-score calibration diagnostics from trial-level data.
 ///
-/// Bins activations into equal-width bins and measures whether the mean activation
-/// in each bin predicts the GWT ignition rate. Perfect calibration would mean
-/// activation = P(ignition), but GWT's threshold dynamics create a sharp sigmoid
-/// rather than a diagonal — the miscalibration itself is informative.
+/// Bins the score supplied to HOT and compares its mean with observed GWT
+/// ignition frequency. This does not evaluate a probability generated by HOT.
 ///
 /// Returns (ece, slope, max_bin_error).
 fn compute_calibration(trials: &[(f64, bool)], num_bins: usize) -> (f64, f64, f64) {
@@ -776,8 +783,14 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
                 .fold(f64::NEG_INFINITY, f64::max)]),
         );
 
-        // ROC analysis
+        // ROC is computed from the shared activation/confidence input supplied
+        // to HOT, not from an independently generated HOT confidence report.
+        result.notes.push(
+            "ROC AUC and calibration ECE use the target activation/confidence value supplied to HOT; it is also the common evidence input to GWT. These are shared-input discrimination/calibration diagnostics, not independent HOT metacognitive readouts."
+                .to_string(),
+        );
         result.insert("roc_auc", MetricValue::from_samples(&[roc_auc]));
+        result.insert("hot_input_score_roc_auc", MetricValue::from_samples(&[roc_auc]));
         result.insert(
             "roc_optimal_threshold",
             MetricValue::from_samples(&[roc_optimal_threshold]),
@@ -791,6 +804,10 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
         // Confidence calibration
         result.insert(
             "calibration_ece",
+            MetricValue::from_samples(&[calibration_ece]),
+        );
+        result.insert(
+            "hot_input_score_calibration_ece",
             MetricValue::from_samples(&[calibration_ece]),
         );
         result.insert(
@@ -997,11 +1014,12 @@ mod tests {
         assert!(prov.unwrap().citation.contains("Rosenthal"));
     }
 
-    /// Multi-seed statistical analysis: 10 seeds, mean ± SD, CV < 0.30 for stability.
+    /// Multi-seed smoke diagnostic: 10 fixed seeds, mean ± SD, CV < 0.30.
     ///
-    /// Transforms single-seed results into population-level claims. Tests that
-    /// the 5 headline metrics are stable across random seeds (low coefficient of
-    /// variation) and that predictions hold consistently (not just at seed=42).
+    /// Measures variation across ten deterministic seed settings for this
+    /// synthetic probe. Seeds are not human participants, independent model
+    /// instances, or a population sample; these results do not support
+    /// population-level psychometric claims.
     #[test]
     fn test_multi_seed_confidence_intervals() {
         use crate::benchmarks::qualia_confidence::helpers::coefficient_of_variation;
