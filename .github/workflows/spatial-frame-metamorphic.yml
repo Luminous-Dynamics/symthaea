@@ -1,4 +1,4 @@
-name: Spatial frame metamorphic matrix integrity
+name: Spatial frame metamorphic qualification
 
 on:
   push:
@@ -15,6 +15,8 @@ on:
     paths:
       - "docs/research/spatial-frame-metamorphic-v0.1.json"
       - "docs/research/spatial-frame-metamorphic-v0.1.schema.json"
+      - "crates/core/symthaea-core/tests/spatial_frame_metamorphic.rs"
+      - "Cargo.toml"
       - ".github/workflows/spatial-frame-metamorphic.yml"
 
 permissions:
