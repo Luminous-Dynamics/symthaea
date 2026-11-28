@@ -311,12 +311,24 @@ fn score_condition(
     reference: ReferenceDisposition,
 ) -> ConditionMetrics {
     let scorable = matches!(reference, ReferenceDisposition::Same | ReferenceDisposition::Different);
-    let answered = usize::from(matches!(condition.prediction, Prediction::Same | Prediction::Different));
-    let abstained_or_ambiguous = usize::from(matches!(
+    let answered = if matches!(condition.prediction, Prediction::Same | Prediction::Different) {
+        1
+    } else {
+        0
+    };
+    let abstained_or_ambiguous = if matches!(
         condition.prediction,
         Prediction::Ambiguous | Prediction::NotEstimable | Prediction::Abstain
-    ));
-    let unparseable = usize::from(condition.prediction == Prediction::Unparseable);
+    ) {
+        1
+    } else {
+        0
+    };
+    let unparseable = if condition.prediction == Prediction::Unparseable {
+        1
+    } else {
+        0
+    };
     let correct = usize::from(
         scorable
             && matches!(
@@ -325,7 +337,7 @@ fn score_condition(
                     | (Prediction::Different, ReferenceDisposition::Different)
             ),
     );
-    let incorrect = usize::from(scorable) - correct;
+    let incorrect = if scorable { 1 - correct } else { 0 };
     ConditionMetrics {
         kind: condition.kind,
         scorable,
