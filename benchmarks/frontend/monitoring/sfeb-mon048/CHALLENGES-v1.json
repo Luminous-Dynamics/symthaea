@@ -123,7 +123,7 @@
       "id": "N12",
       "name": "unrelated_claim_overinvalidated",
       "mutation": "invalidate_all_claims",
-      "expected_disposition": "blocked",
+      "expected_disposition": "qualified",
       "category": "invalidation_precision",
       "description": "Mutation damages unrelated claim; exact affected set is known."
     },
@@ -187,7 +187,7 @@
       "id": "N20",
       "name": "all_indeterminate_evaluator",
       "mutation": "return_indeterminate_for_everything",
-      "expected_disposition": "blocked",
+      "expected_disposition": "qualified",
       "category": "evaluator_gaming",
       "description": "Evaluator evades false qualifications but fails required positive-control decision coverage."
     },
@@ -195,7 +195,7 @@
       "id": "N21",
       "name": "positive_control_false_block",
       "mutation": "block_clean_recovery",
-      "expected_disposition": "blocked",
+      "expected_disposition": "qualified",
       "category": "evaluator_sensitivity",
       "description": "Known-safe control is incorrectly blocked."
     },
@@ -223,5 +223,8 @@
       "category": "semantic_recovery",
       "description": "Storage and schema checks pass but required application invariant fails."
     }
-  ]
+  ],
+  "semantics": {
+    "expected_disposition": "Expected claim verdict for the scenario input. Candidate-evaluator failures are scored separately using the named mutation and the benchmark gates; for example, an all-indeterminate candidate fails decision coverage even though the clean positive-control claim's expected verdict remains qualified."
+  }
 }
