@@ -264,9 +264,11 @@ value_per_1000_pixels = 1000 * net_benefit / source_pixel_cost
 
 The ranking requires a task-family-matched calibration report, at least 100 calibration samples, expected calibration error <=0.10, confidence level >=0.95, a matching source clock, and a source frame within the configured freshness horizon. Rejected candidates remain in a separate rejection list. Duplicate candidate IDs are rejected as a group; score ties use candidate ID as a deterministic tie-break.
 
+The ranking input now has a serializable schema: `SYMTHAEA_ROI_INFORMATION_VALUE_MANIFEST_SCHEMA_V1_2026-11-28.json`, with a positive replay fixture and five negative JSON Patch cases in `SYMTHAEA_ROI_INFORMATION_VALUE_FIXTURES_V1_2026-11-28.json`. Rust JSON round-trip and deterministic result serialization tests are authored.
+
 This is deliberately not integrated into `FoveationManager` yet. The manager still uses the urgency threshold and pixel-token budget. The new module only ranks caller-supplied, calibration-backed estimates. It cannot authorize media capture or override privacy/permission checks. Its lower confidence bound, not the point estimate, is used for allocation; the point estimate is reported separately.
 
-The temporal-budget policy has fourteen authored tests, the EVI ranking module has fourteen authored tests, and the manager has five new integration tests. All remain uncompiled and unexecuted. No calibration report, held-out ECE result, ROI utility study or EVSI leaderboard result exists.
+The temporal-budget policy has fourteen authored tests, the EVI ranking module has eighteen authored tests, and the manager has five new integration tests. All remain uncompiled and unexecuted. No calibration report, held-out ECE result, ROI utility study or EVSI leaderboard result exists.
 
 ## 11. Qualification status
 
