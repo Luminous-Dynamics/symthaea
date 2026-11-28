@@ -26,7 +26,9 @@
     "raw_media_stored_in_repo",
     "model_terms_ref",
     "retention_policy_ref",
-    "deletion_policy_ref"
+    "deletion_policy_ref",
+    "approved_at",
+    "expires_at"
   ],
   "properties": {
     "schema": {
@@ -70,14 +72,11 @@
     },
     "approved_at": {
       "type": "string",
-      "format": "date-time"
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
     },
     "expires_at": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "format": "date-time"
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
     },
     "approved_intended_uses": {
       "type": "array",
