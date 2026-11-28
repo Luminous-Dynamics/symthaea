@@ -31,11 +31,67 @@ pub enum LongMemEvalDomainV1 { Web, Enterprise }
 #[serde(rename_all = "snake_case")]
 pub enum ContextItemKindV1 { Text, Image }
 
+/// Frozen identity for one official LongMemEval-V2 operating point.
+/// Every insert, query, hook and final-reader receipt binds to this digest.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LongMemEvalRunBindingV1 {
+    pub schema_version: String,
+    pub run_id: String,
+    pub benchmark_id: String,
+    pub benchmark_release: String,
+    pub harness_commit_sha: String,
+    pub dataset_snapshot_sha256: String,
+    pub dataset_split_sha256: String,
+    pub tier: LongMemEvalTierV1,
+    pub domain: LongMemEvalDomainV1,
+    pub memory_context_budget_tokens: u32,
+    pub reader_model_sha256: String,
+    pub reader_generation_config_sha256: String,
+    pub memory_backend_config_sha256: String,
+    pub task_manifest_sha256: String,
+    pub cluster_unit: String,
+    pub binding_sha256: String,
+}
+
+fn run_binding_digest(binding: &LongMemEvalRunBindingV1) -> Result<String, AdapterRejectV1> {
+    let mut unsigned = binding.clone();
+    unsigned.binding_sha256.clear();
+    digest_serialized(&unsigned)
+}
+
+impl LongMemEvalRunBindingV1 {
+    pub fn seal(mut self) -> Result<Self, AdapterRejectV1> {
+        if !nonempty(&self.run_id) || self.benchmark_id != "longmemeval_v2"
+            || !nonempty(&self.benchmark_release) || !valid_git_sha(&self.harness_commit_sha)
+            || !nonempty(&self.cluster_unit) || self.memory_context_budget_tokens == 0 {
+            return Err(AdapterRejectV1::InvalidIdentity);
+        }
+        for value in [
+            self.dataset_snapshot_sha256.as_str(), self.dataset_split_sha256.as_str(),
+            self.reader_model_sha256.as_str(), self.reader_generation_config_sha256.as_str(),
+            self.memory_backend_config_sha256.as_str(), self.task_manifest_sha256.as_str(),
+        ] {
+            if !valid_digest(value) { return Err(AdapterRejectV1::InvalidDigest); }
+        }
+        self.schema_version = ADAPTER_SCHEMA_V1.into();
+        self.binding_sha256.clear();
+        self.binding_sha256 = run_binding_digest(&self)?;
+        Ok(self)
+    }
+
+    pub fn verify_integrity(&self) -> bool {
+        self.schema_version == ADAPTER_SCHEMA_V1
+            && run_binding_digest(self).is_ok_and(|value| value == self.binding_sha256)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TrajectoryInsertReceiptV1 {
     pub schema_version: String,
     pub run_id: String,
+    pub run_binding_sha256: String,
     pub tier: LongMemEvalTierV1,
     pub domain: LongMemEvalDomainV1,
     /// Monotonically increasing order supplied by the official harness.
@@ -56,6 +112,7 @@ pub struct TrajectoryInsertReceiptV1 {
 pub struct MemoryQueryInputV1 {
     pub schema_version: String,
     pub run_id: String,
+    pub run_binding_sha256: String,
     /// The official harness uses uuid.uuid4().hex; this is not a dataset question ID.
     pub query_invocation_id: String,
     pub question_text_sha256: String,
@@ -78,6 +135,7 @@ pub struct PreQueryContextItemV1 {
 pub struct PreQuerySelectionReceiptV1 {
     pub schema_version: String,
     pub run_id: String,
+    pub run_binding_sha256: String,
     pub query_invocation_id: String,
     pub query_input_sha256: String,
     pub selection_policy_sha256: String,
@@ -93,6 +151,7 @@ pub struct PreQuerySelectionReceiptV1 {
 #[serde(deny_unknown_fields)]
 pub struct PreQueryHookMetadataV1 {
     pub schema_version: String,
+    pub run_binding_sha256: String,
     pub query_invocation_id: String,
     pub query_input_sha256: String,
     pub pre_query_selection_receipt_sha256: String,
@@ -109,6 +168,7 @@ impl PreQuerySelectionReceiptV1 {
         }
         let mut metadata = PreQueryHookMetadataV1 {
             schema_version: ADAPTER_SCHEMA_V1.into(),
+            run_binding_sha256: self.run_binding_sha256.clone(),
             query_invocation_id: self.query_invocation_id.clone(),
             query_input_sha256: self.query_input_sha256.clone(),
             pre_query_selection_receipt_sha256: self.receipt_sha256.clone(),
@@ -128,6 +188,7 @@ impl PreQueryHookMetadataV1 {
         unsigned.metadata_sha256.clear();
         digest_serialized(&unsigned)
             .is_ok_and(|digest| digest == self.metadata_sha256)
+            && valid_digest(&self.run_binding_sha256)
             && valid_query_invocation_id(&self.query_invocation_id)
             && valid_digest(&self.query_input_sha256)
             && valid_digest(&self.pre_query_selection_receipt_sha256)
@@ -160,6 +221,7 @@ pub struct ExposedEvidenceItemV1 {
 pub struct ReaderExposureReceiptV1 {
     pub schema_version: String,
     pub run_id: String,
+    pub run_binding_sha256: String,
     pub query_invocation_id: String,
     pub pre_query_selection_receipt_sha256: String,
     pub final_context_items_sha256: String,
@@ -246,6 +308,7 @@ pub fn seal_trajectory_insert_v1(
         value.trajectory_sha256.as_str(),
         value.payload_sha256.as_str(),
         value.source_snapshot_sha256.as_str(),
+        value.run_binding_sha256.as_str(),
     ] {
         if !valid_digest(hash) { return Err(AdapterRejectV1::InvalidDigest); }
     }
@@ -267,7 +330,9 @@ pub fn validate_trajectory_insert_sequence_v1(
         if !receipt.verify_integrity() || receipt.schema_version != ADAPTER_SCHEMA_V1 {
             return Err(AdapterRejectV1::IntegrityMismatch);
         }
-        if receipt.run_id != first.run_id || receipt.tier != first.tier
+        if receipt.run_id != first.run_id
+            || receipt.run_binding_sha256 != first.run_binding_sha256
+            || receipt.tier != first.tier
             || receipt.domain != first.domain
             || receipt.source_snapshot_sha256 != first.source_snapshot_sha256 {
             return Err(AdapterRejectV1::RunOrDomainMismatch);
@@ -288,7 +353,8 @@ impl MemoryQueryInputV1 {
         if !valid_query_invocation_id(&self.query_invocation_id) {
             return Err(AdapterRejectV1::InvalidQueryInvocationId);
         }
-        if !valid_digest(&self.question_text_sha256)
+        if !valid_digest(&self.run_binding_sha256)
+            || !valid_digest(&self.question_text_sha256)
             || self.question_image_sha256.as_deref().is_some_and(|value| !valid_digest(value)) {
             return Err(AdapterRejectV1::InvalidDigest);
         }
@@ -335,6 +401,7 @@ pub fn seal_pre_query_selection_v1(
     let mut receipt = PreQuerySelectionReceiptV1 {
         schema_version: ADAPTER_SCHEMA_V1.into(),
         run_id: query.run_id.clone(),
+        run_binding_sha256: query.run_binding_sha256.clone(),
         query_invocation_id: query.query_invocation_id.clone(),
         query_input_sha256: digest_serialized(query)?,
         selection_policy_sha256,
@@ -383,6 +450,8 @@ pub fn finalize_reader_exposure_v1(
         return Err(AdapterRejectV1::PreQueryReceiptMismatch);
     }
     if pre_query.run_id != query.run_id
+        || pre_query.run_binding_sha256 != query.run_binding_sha256
+        || pre_query.run_binding_sha256 != query.run_binding_sha256
         || pre_query.query_invocation_id != query.query_invocation_id
         || pre_query.query_input_sha256 != digest_serialized(query)? {
         return Err(AdapterRejectV1::QueryInputMismatch);
@@ -400,7 +469,9 @@ pub fn finalize_reader_exposure_v1(
         || final_context_tokens > original_context_tokens {
         return Err(AdapterRejectV1::InvalidTokenBudget);
     }
-    if context_was_truncated != (original_context_tokens > final_context_tokens) {
+    let actual_context_truncation = original_context_tokens > final_context_tokens
+        || final_items.len() < pre_query.selected_items.len();
+    if context_was_truncated != actual_context_truncation {
         return Err(AdapterRejectV1::InvalidTruncationFlag);
     }
     if final_items.len() > pre_query.selected_items.len() {
@@ -441,6 +512,7 @@ pub fn finalize_reader_exposure_v1(
     let mut receipt = ReaderExposureReceiptV1 {
         schema_version: ADAPTER_SCHEMA_V1.into(),
         run_id: query.run_id.clone(),
+        run_binding_sha256: query.run_binding_sha256.clone(),
         query_invocation_id: query.query_invocation_id.clone(),
         pre_query_selection_receipt_sha256: pre_query.receipt_sha256.clone(),
         final_context_items_sha256: digest_serialized(final_items)?,
@@ -469,10 +541,32 @@ mod tests {
 
     fn digest(value: &str) -> String { digest_bytes(value.as_bytes()) }
 
+    fn run_binding() -> LongMemEvalRunBindingV1 {
+        LongMemEvalRunBindingV1 {
+            schema_version: ADAPTER_SCHEMA_V1.into(),
+            run_id: "lme-small-web".into(),
+            benchmark_id: "longmemeval_v2".into(),
+            benchmark_release: "v2".into(),
+            harness_commit_sha: "0123456789abcdef0123456789abcdef01234567".into(),
+            dataset_snapshot_sha256: digest("dataset-snapshot"),
+            dataset_split_sha256: digest("dataset-split"),
+            tier: LongMemEvalTierV1::Small,
+            domain: LongMemEvalDomainV1::Web,
+            memory_context_budget_tokens: 4096,
+            reader_model_sha256: digest("reader-model"),
+            reader_generation_config_sha256: digest("reader-generation"),
+            memory_backend_config_sha256: digest("memory-backend"),
+            task_manifest_sha256: digest("task-manifest"),
+            cluster_unit: "conversation_family".into(),
+            binding_sha256: String::new(),
+        }.seal().unwrap()
+    }
+
     fn query() -> MemoryQueryInputV1 {
         MemoryQueryInputV1 {
             schema_version: ADAPTER_SCHEMA_V1.into(),
             run_id: "lme-small-web".into(),
+            run_binding_sha256: run_binding().binding_sha256,
             query_invocation_id: "0123456789abcdef0123456789abcdef".into(),
             question_text_sha256: digest("how to complete workflow"),
             question_image_sha256: Some(digest("question-image-bytes")),
@@ -556,7 +650,8 @@ mod tests {
     fn token_budget_and_truncation_flags_must_match_observed_counts() {
         let items = vec![];
         assert_eq!(finalize(items.clone(), 10, 100, 20, true), Err(AdapterRejectV1::InvalidTokenBudget));
-        assert_eq!(finalize(items, 100, 100, 100, true), Err(AdapterRejectV1::InvalidTruncationFlag));
+        assert_eq!(finalize(items.clone(), 100, 100, 100, false), Err(AdapterRejectV1::InvalidTruncationFlag));
+        assert!(finalize(items, 100, 100, 100, true).is_ok());
         let selected_empty = seal_pre_query_selection_v1(&query(), digest("policy"), vec![]).unwrap();
         let result = finalize_reader_exposure_v1(
             &query(), &selected_empty, &[], 100, 100, 100, false,
@@ -601,7 +696,8 @@ mod tests {
     fn insertion_receipts_preserve_order_and_allow_repeated_identical_payloads() {
         let receipt = |order, id: &str| seal_trajectory_insert_v1(TrajectoryInsertReceiptV1 {
             schema_version: ADAPTER_SCHEMA_V1.into(),
-            run_id: "run-1".into(), tier: LongMemEvalTierV1::Small, domain: LongMemEvalDomainV1::Web,
+            run_id: "run-1".into(), run_binding_sha256: run_binding().binding_sha256,
+            tier: LongMemEvalTierV1::Small, domain: LongMemEvalDomainV1::Web,
             insert_order: order, trajectory_sha256: digest(id), payload_sha256: digest(&format!("payload-{id}")),
             source_snapshot_sha256: digest("snapshot"), inserted_at_monotonic_ns: order * 10,
             receipt_sha256: String::new(),
@@ -618,6 +714,7 @@ mod tests {
     fn cross_domain_or_snapshot_insert_receipts_are_rejected() {
         let base = seal_trajectory_insert_v1(TrajectoryInsertReceiptV1 {
             schema_version: ADAPTER_SCHEMA_V1.into(), run_id: "run-1".into(),
+            run_binding_sha256: run_binding().binding_sha256,
             tier: LongMemEvalTierV1::Small, domain: LongMemEvalDomainV1::Web,
             insert_order: 0, trajectory_sha256: digest("a"), payload_sha256: digest("payload-a"),
             source_snapshot_sha256: digest("snapshot-a"), inserted_at_monotonic_ns: 10,
@@ -717,6 +814,36 @@ mod tests {
         for forbidden in ["question_id","question_type","answer_gold","eval_function","score"] {
             assert!(!object.contains_key(forbidden));
         }
+    }
+
+
+    #[test]
+    fn run_binding_pins_harness_dataset_tier_domain_and_reader_configuration() {
+        let binding = run_binding();
+        assert!(binding.verify_integrity());
+        let mut tampered = binding.clone();
+        tampered.harness_commit_sha = "fedcba9876543210fedcba9876543210fedcba98".into();
+        assert!(!tampered.verify_integrity());
+        let encoded = serde_json::to_value(&binding).unwrap();
+        assert_eq!(encoded["benchmark_id"], "longmemeval_v2");
+        assert_eq!(encoded["tier"], "small");
+        assert_eq!(encoded["domain"], "web");
+    }
+
+    #[test]
+    fn query_receipts_cannot_be_joined_across_run_bindings() {
+        let mut invalid = selection();
+        invalid.run_binding_sha256 = digest("other-run-binding");
+        let mut unsigned = invalid.clone();
+        unsigned.receipt_sha256.clear();
+        invalid.receipt_sha256 = digest_serialized(&unsigned).unwrap();
+        assert_eq!(
+            finalize_reader_exposure_v1(
+                &query(), &invalid, &[], 100, 100, 100, false,
+                digest("request"), digest("response"), digest("reader"), digest("generation"), 1, 1
+            ),
+            Err(AdapterRejectV1::QueryInputMismatch)
+        );
     }
 
 }
