@@ -570,7 +570,7 @@ mod tests {
     fn run_binding_is_integrity_bound() {
         let mut run = binding("run-1");
         assert!(run.verify_integrity());
-        run.seed += 1;
+        run.top_k += 1;
         assert!(!run.verify_integrity());
     }
 
