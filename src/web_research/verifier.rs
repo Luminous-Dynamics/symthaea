@@ -418,16 +418,14 @@ mod tests {
     fn unclassified_source_is_neutral_even_when_query_similarity_is_high() {
         let verifier = EpistemicVerifier::new();
         let context = VerificationContext {
-            sources: vec![SourceEvidence {
-                url: "https://example.org/page".to_string(),
-                domain: "example.org".to_string(),
-                source_type: ResearchSource::Web,
-                relevant_text: "Text related to the topic but not adjudicated for this claim"
-                    .to_string(),
-                supports: None,
-                similarity: 1.0,
-                credibility: 1.0,
-            }],
+            sources: vec![SourceEvidence::unclassified(
+                "https://example.org/page",
+                "example.org",
+                ResearchSource::Web,
+                "Text related to the topic but not adjudicated for this claim",
+                1.0,
+                1.0,
+            )],
             query: "The original research query".to_string(),
             domain: "science".to_string(),
         };
