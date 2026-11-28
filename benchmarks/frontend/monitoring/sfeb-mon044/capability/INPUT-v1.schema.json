@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon044-capture-capability-input-v1.json",
+  "title": "MON-044 Capture Capability Input v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "mode",
+    "evaluated_at",
+    "trial_id",
+    "capability_identity_sha256",
+    "capability_manifest_sha256",
+    "required_scope_sha256",
+    "required_scope_source_id",
+    "required_scope_provenance_sha256",
+    "required_items",
+    "manifest"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon044-capture-capability-input-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "mode": {
+      "enum": [
+        "offline_fixture",
+        "runtime_candidate"
+      ]
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "trial_id": {
+      "$ref": "#/$defs/id"
+    },
+    "capability_identity_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "capability_manifest_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "required_scope_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "required_scope_source_id": {
+      "$ref": "#/$defs/id"
+    },
+    "required_scope_provenance_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "required_items": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/requiredItem"
+      }
+    },
+    "manifest": {
+      "$ref": "#/$defs/manifest"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connector_id",
+        "connector_version",
+        "distribution_sha256",
+        "database_engine",
+        "database_version",
+        "logical_decoding_plugin",
+        "broker_version",
+        "client_version",
+        "configuration_sha256",
+        "publication_sha256",
+        "schema_history_sha256",
+        "snapshot_mode",
+        "transaction_metadata_enabled",
+        "transaction_metadata_epoch",
+        "operation_filters_sha256",
+        "column_policy_sha256",
+        "topic_routing_sha256"
+      ],
+      "properties": {
+        "connector_id": {
+          "$ref": "#/$defs/id"
+        },
+        "connector_version": {
+          "$ref": "#/$defs/id"
+        },
+        "distribution_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "database_engine": {
+          "$ref": "#/$defs/id"
+        },
+        "database_version": {
+          "$ref": "#/$defs/id"
+        },
+        "logical_decoding_plugin": {
+          "$ref": "#/$defs/id"
+        },
+        "broker_version": {
+          "$ref": "#/$defs/id"
+        },
+        "client_version": {
+          "$ref": "#/$defs/id"
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "publication_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "schema_history_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "snapshot_mode": {
+          "$ref": "#/$defs/id"
+        },
+        "transaction_metadata_enabled": {
+          "type": "boolean"
+        },
+        "transaction_metadata_epoch": {
+          "type": "string"
+        },
+        "operation_filters_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "column_policy_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "topic_routing_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "requiredItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "state_domain",
+        "object_id",
+        "operation",
+        "required",
+        "scope_sha256"
+      ],
+      "properties": {
+        "item_id": {
+          "$ref": "#/$defs/id"
+        },
+        "state_domain": {
+          "$ref": "#/$defs/id"
+        },
+        "object_id": {
+          "$ref": "#/$defs/id"
+        },
+        "operation": {
+          "$ref": "#/$defs/id"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "scope_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "conformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_identity_sha256",
+        "test_profile_sha256",
+        "report_sha256",
+        "status"
+      ],
+      "properties": {
+        "capability_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "test_profile_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "report_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "missing"
+          ]
+        }
+      }
+    },
+    "prerequisite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prerequisite_id",
+        "evidence_sha256",
+        "status"
+      ],
+      "properties": {
+        "prerequisite_id": {
+          "$ref": "#/$defs/id"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "missing"
+          ]
+        }
+      }
+    },
+    "capabilityItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "scope_sha256",
+        "status"
+      ],
+      "properties": {
+        "item_id": {
+          "$ref": "#/$defs/id"
+        },
+        "scope_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "status": {
+          "enum": [
+            "supported",
+            "conditional",
+            "unsupported",
+            "excluded",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "conformance": {
+          "$ref": "#/$defs/conformance"
+        },
+        "required_prerequisites": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "prerequisite_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/prerequisite"
+          }
+        },
+        "authority_reference": {
+          "type": "string"
+        },
+        "authority_document_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "justification_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "items"
+      ],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 100000,
+          "items": {
+            "$ref": "#/$defs/capabilityItem"
+          }
+        }
+      }
+    }
+  }
+}
