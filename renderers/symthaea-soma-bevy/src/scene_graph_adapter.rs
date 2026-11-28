@@ -192,8 +192,22 @@ pub(super) struct ActiveSceneGraph {
     group_id: u64,
 }
 
-#[derive(Component)]
-struct SceneGraphRelationEntity;
+#[derive(Component, Debug, Clone, PartialEq, Eq)]
+pub struct SceneGraphNodeMetadata {
+    pub node_id: u16,
+    pub graph_digest: String,
+    pub canonical_cue_digest: String,
+}
+
+#[derive(Component, Debug, Clone, PartialEq, Eq)]
+pub struct SceneGraphRelationMetadata {
+    pub relation_id: u16,
+    pub kind: SceneRelationKind,
+    pub source_node_id: u16,
+    pub target_node_id: u16,
+    pub graph_digest: String,
+    pub canonical_cue_digest: String,
+}
 
 pub(super) fn render_pending_scene_graph(
     mut commands: Commands,
@@ -290,6 +304,11 @@ pub(super) fn render_pending_scene_graph(
             if amplitude > 0.0 { Visibility::Visible } else { Visibility::Hidden },
             RenderedSceneEntity,
             SceneGroupId(group_id),
+            SceneGraphNodeMetadata {
+                node_id: node.node_id,
+                graph_digest: graph.scene_graph_digest.clone(),
+                canonical_cue_digest: graph.canonical_cue_digest.clone(),
+            },
             SceneElementPresentation {
                 role: node.role,
                 glyph: node.glyph,
@@ -315,6 +334,14 @@ pub(super) fn render_pending_scene_graph(
         let points = quadratic_points(
             relation.start, relation.control, relation.end, 12,
         );
+        let relation_metadata = SceneGraphRelationMetadata {
+            relation_id: relation.relation_id,
+            kind: relation.kind,
+            source_node_id: relation.source_node_id,
+            target_node_id: relation.target_node_id,
+            graph_digest: graph.scene_graph_digest.clone(),
+            canonical_cue_digest: graph.canonical_cue_digest.clone(),
+        };
         for pair in points.windows(2) {
             let start = pair[0];
             let end = pair[1];
@@ -336,9 +363,35 @@ pub(super) fn render_pending_scene_graph(
                 Visibility::Visible,
                 RenderedSceneEntity,
                 SceneGroupId(group_id),
-                SceneGraphRelationEntity,
+                relation_metadata.clone(),
             ));
         }
+        let tangent = relation.end - relation.control;
+        let arrow_angle = if tangent.length_squared() > f32::EPSILON {
+            tangent.y.atan2(tangent.x)
+        } else {
+            (relation.end - relation.start).y.atan2(
+                (relation.end - relation.start).x,
+            )
+        };
+        let arrow_mesh = meshes.add(Mesh::from(Triangle2d::new(
+            Vec2::new(9.0, 0.0),
+            Vec2::new(-5.0, 4.5),
+            Vec2::new(-5.0, -4.5),
+        )));
+        commands.spawn((
+            Mesh2d(arrow_mesh),
+            MeshMaterial2d(material),
+            Transform {
+                translation: Vec3::new(relation.end.x, relation.end.y, -0.1),
+                rotation: Quat::from_rotation_z(arrow_angle),
+                scale: Vec3::ONE,
+            },
+            Visibility::Visible,
+            RenderedSceneEntity,
+            SceneGroupId(group_id),
+            relation_metadata,
+        ));
         relation_count += 1;
     }
     }
