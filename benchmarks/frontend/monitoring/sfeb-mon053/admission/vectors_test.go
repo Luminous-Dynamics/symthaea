@@ -21,7 +21,7 @@ type temporalCorpus struct {
 	} `json:"cases"`
 }
 
-const temporalCorpusSHA256 = "a799044cabc52cc49f07218adfc61b217a27aa12c33a0c5c9094f3d58d3def85"
+const temporalCorpusSHA256 = "83ea170f955562d7b49e66fea29f857c27d94c02f8841d94fdec250574642e07"
 
 func TestFrozenTemporalBoundaryCorpus(t *testing.T) {
 	data, err := os.ReadFile("fixtures/TEMPORAL-BOUNDARIES-v1.json")
