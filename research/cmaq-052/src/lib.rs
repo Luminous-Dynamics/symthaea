@@ -1,22 +1,29 @@
 #![forbid(unsafe_code)]
 
-//! Uncertainty-aware null-reference target for bounded iid stationary streams.
+//! Uncertainty-aware reference envelope for bounded common-conditional-mean
+//! martingale streams.
 //!
-//! Independent reference blocks r_i in R^d obey ||r_i||_2 <= R. Coordinate
-//! values therefore lie in [-R,R]. For m independent reference blocks, the
-//! simultaneous Hoeffding radius
+//! Reference increments r_i in R^d are adapted to G_i and satisfy
+//! E[r_i | G_(i-1)] = mu for one fixed (non-random) vector mu, with
+//! ||r_i||_2 <= R. Coordinates lie in [-R,R]. Azuma-Hoeffding gives the
+//! simultaneous coordinatewise envelope radius
 //!
 //!   epsilon = R * sqrt(2 * ln(2d/delta) / m)
 //!
-//! gives P(mu not in S_hat) <= delta for the true iid mean mu, where S_hat is
-//! the coordinatewise box around the reference sample mean. An independent
-//! iid test stream then uses the CMAQ-046 e-process at alpha_test conditional
-//! on mu being in S_hat. The unconditional false-alarm bound is
+//! and P(mu not in S_hat) <= delta for the box around the reference sample
+//! mean. The test phase continues under an enlarged filtration containing all
+//! reference history and previous test observations. It must satisfy the same
+//! conditional-mean identity E[r_t | F_(t-1)] = mu and the same bound R.
+//! Conditional on the reference envelope containing mu, CMAQ-046's e-process
+//! is valid at alpha_test. Therefore
 //!
 //!   P(false alarm ever) <= alpha_test + delta <= alpha_total.
 //!
-//! This is an iid stationary mean guarantee. It is not a conditional-mean
-//! guarantee for arbitrary serially dependent test streams.
+//! This contract permits serial dependence and predictable heteroskedasticity.
+//! It does not permit conditional-mean drift, unmodelled covariate-dependent
+//! means, different reference/test conditional means, or norm violations.
+//! The implementation checks bounded inputs and receipt structure; it cannot
+//! verify the stochastic conditional-mean assumptions or source provenance.
 
 use std::collections::HashSet;
 
@@ -92,7 +99,9 @@ impl RiskFraction {
     }
 }
 
-/// One independent calibration block, represented by one bounded vector.
+/// One bounded reference increment, represented by one vector. A unique ID
+/// or trace digest does not prove independence; validity rests on the stated
+/// common-conditional-mean martingale assumption.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReferenceBlock {
     pub block_id: String,
@@ -116,17 +125,19 @@ pub struct ReferenceEnvelopeReceipt {
     pub unconditional_false_alarm_bound: f64,
 }
 
-/// Independent-reference calibrated CMAQ-046 monitor.
+/// Common-conditional-mean martingale calibrated CMAQ-046 monitor.
 ///
 /// Required assumptions:
-/// - reference blocks are mutually independent draws from a single iid null
-///   distribution;
-/// - the test stream is independent of the reference and iid from that same
-///   distribution under the null;
-/// - every reference and test vector has L2 norm at most R.
+/// - reference increments are adapted to their filtration and have one fixed
+///   conditional mean mu at every reference step;
+/// - test increments, conditional on the full reference history and all prior
+///   test observations, have that same fixed conditional mean mu;
+/// - all reference and test vectors have L2 norm at most R.
 ///
-/// The hash fields are shape-checked only. They do not authenticate source
-/// identity or statistical independence.
+/// Independence and identical distribution are not required. This contract
+/// does not cover conditional-mean drift or serial dependence that changes
+/// the conditional mean. Hashes are shape-checked only; they do not
+/// authenticate provenance or establish the stochastic assumptions.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CalibratedReferenceApproachabilityMonitor {
     target: BoxTarget,
@@ -258,8 +269,10 @@ impl CalibratedReferenceApproachabilityMonitor {
         })
     }
 
-    /// Adds one independent test observation. Test block IDs are consumed only
-    /// after the CMAQ-046 update succeeds.
+    /// Adds one bounded test-phase martingale increment. Under the null, its
+    /// conditional mean given all reference history and previous test values
+    /// must equal the same fixed reference-phase mean mu. Test block IDs are
+    /// consumed only after the CMAQ-046 update succeeds.
     pub fn observe(
         &mut self,
         test_block_id: &str,
@@ -387,6 +400,39 @@ mod tests {
                 block_id: format!("reference-block-{index}"),
                 trace_sha256: format!("{:064x}", index + 1),
                 value: vec![shift],
+            })
+            .collect()
+    }
+
+    fn next_heteroskedastic_value(state: &mut u64, previous_sign: f64) -> (f64, f64) {
+        // The conditional variance is predictable from the previous sign;
+        // the next sign is generated from the next PRNG bit. In the intended
+        // probability model that sign is a fresh symmetric Rademacher draw.
+        let mut value = *state;
+        value ^= value << 13;
+        value ^= value >> 7;
+        value ^= value << 17;
+        *state = value;
+        let sign = if value & 1 == 1 { 1.0 } else { -1.0 };
+        let amplitude = if previous_sign > 0.0 { 1.0 } else { 0.25 };
+        (amplitude * sign, sign)
+    }
+
+    fn heteroskedastic_references(
+        count: usize,
+        state: &mut u64,
+        previous_sign: &mut f64,
+    ) -> Vec<ReferenceBlock> {
+        (0..count)
+            .map(|index| {
+                let (value, next_sign) =
+                    next_heteroskedastic_value(state, *previous_sign);
+                *previous_sign = next_sign;
+                ReferenceBlock {
+                    block_id: format!("heteroskedastic-reference-{index}"),
+                    trace_sha256: format!("{:064x}", index + 1),
+                    value: vec![value],
+                }
             })
             .collect()
     }
@@ -581,6 +627,49 @@ mod tests {
             Err(CalibrationError::DuplicateTestBlockId)
         );
         assert_eq!(fitted.observations_seen(), 1);
+    }
+
+    #[test]
+    fn predictable_heteroskedastic_martingale_null_uses_same_reference_and_test_mean() {
+        let mut state = 0x9e3779b97f4a7c15u64;
+        let mut previous_sign = 1.0;
+        let reference_blocks =
+            heteroskedastic_references(512, &mut state, &mut previous_sign);
+        let mut fitted = CalibratedReferenceApproachabilityMonitor::new(
+            reference_blocks,
+            1.0,
+            alpha_test(),
+            delta(),
+            alpha_total(),
+            REF_SHA.into(),
+            TARGET_SHA.into(),
+        )
+        .unwrap();
+
+        // The simulated transition law has E[r_t | F_(t-1)] = 0 in both
+        // phases, while the predictable amplitude changes with the previous
+        // sign. The fixed-seed path is a plumbing check, not a coverage study.
+        assert!(fitted.target().lower()[0] <= 0.0);
+        assert!(fitted.target().upper()[0] >= 0.0);
+
+        let mut saw_low_variance = false;
+        let mut saw_high_variance = false;
+        for index in 0..128 {
+            let (value, next_sign) =
+                next_heteroskedastic_value(&mut state, previous_sign);
+            previous_sign = next_sign;
+            saw_low_variance |= value.abs() == 0.25;
+            saw_high_variance |= value.abs() == 1.0;
+            let update = fitted
+                .observe(&format!("heteroskedastic-test-{index}"), &[value])
+                .unwrap();
+            if update.quarantined {
+                break;
+            }
+        }
+        assert!(saw_low_variance);
+        assert!(saw_high_variance);
+        assert!(fitted.observations_seen() > 0);
     }
 
     #[test]
