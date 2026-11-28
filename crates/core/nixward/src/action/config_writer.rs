@@ -695,6 +695,99 @@ mod tests {
     }
 
     #[test]
+    fn arbitrary_nix_expressions_are_rejected_by_legacy_set_option() {
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let injection = "true; services.openssh.enable = true";
+        let error = writer
+            .set_option("networking.firewall.enable", injection)
+            .expect_err("arbitrary Nix source must not be accepted");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+
+        let error = writer
+            .set_option("networking.firewall.enable; services.openssh.enable", "true")
+            .expect_err("an injected attribute path must not be accepted");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn json_string_values_are_escaped_as_nix_literals() {
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let payload = concat!("$", "{builtins.abort \"not executable\"}");
+        let raw = serde_json::to_string(&payload).unwrap();
+        let patch = writer.set_option("networking.hostName", &raw).unwrap();
+
+        assert!(patch.modified.contains(&concat!("\\", "$", "{builtins.abort")));
+        let unescaped = patch.modified.replace(&concat!("\\", "$", "{"), "");
+        assert!(!unescaped.contains(&concat!("$", "{")));
+    }
+
+    #[test]
+    fn package_attribute_paths_reject_expression_injection() {
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        for candidate in [
+            "git; builtins.abort",
+            "git ) ; services.openssh.enable = true",
+            "python3Packages..numpy",
+            "pkgs.git",
+            "git with builtins",
+        ] {
+            let error = writer
+                .add_system_package(candidate)
+                .expect_err("invalid package attribute must be rejected");
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        }
+    }
+
+    #[test]
+    fn package_removal_does_not_remove_a_longer_prefix_match() {
+        let config = r#"{ config, pkgs, ... }:
+{
+  environment.systemPackages = [
+    pkgs.git
+    pkgs.github-cli
+  ];
+}
+"#;
+        let (_dir, writer) = setup_temp_config(config);
+        let patch = writer.remove_system_package("git").unwrap();
+        assert!(!patch.modified.contains("pkgs.git\n"));
+        assert!(patch.modified.contains("pkgs.github-cli"));
+    }
+
+    #[test]
+    fn stale_patch_is_rejected_without_overwriting_concurrent_edit() {
+        let (dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let patch = writer.set_option("services.openssh.enable", "false").unwrap();
+
+        let changed = format!("{SAMPLE_CONFIG}\n# concurrent operator edit\n");
+        fs::write(dir.path().join("configuration.nix"), &changed).unwrap();
+
+        let error = writer
+            .apply_patch(&patch)
+            .expect_err("patch created from a stale pre-state must be rejected");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        assert_eq!(
+            fs::read_to_string(dir.path().join("configuration.nix")).unwrap(),
+            changed
+        );
+    }
+
+    #[test]
+    fn duplicate_option_definitions_are_not_textually_replaced() {
+        let duplicate = r#"{ config, pkgs, ... }:
+{
+  services.openssh.enable = true;
+  services.openssh.enable = false;
+}
+"#;
+        let (_dir, writer) = setup_temp_config(duplicate);
+        let error = writer
+            .set_option("services.openssh.enable", "true")
+            .expect_err("ambiguous duplicate definitions must fail closed");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[test]
     fn test_dry_run_apply() {
         let (dir, writer) = setup_temp_config(SAMPLE_CONFIG);
         let patch = writer.add_system_package("htop").unwrap();
