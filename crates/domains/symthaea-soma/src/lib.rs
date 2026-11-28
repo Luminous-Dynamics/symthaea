@@ -63,6 +63,7 @@ pub mod embodiment_scene;
 pub mod embodiment_scene_graph;
 pub mod embodiment_action_timeline;
 pub mod cgrb_state;
+pub mod cgrb_world;
 pub mod embodiment_multiparty_control;
 pub mod embodiment_stream_engagement;
 pub mod embodiment_floor_transition;
