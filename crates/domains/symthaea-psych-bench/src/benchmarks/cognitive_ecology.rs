@@ -10,8 +10,8 @@
 //! and audited independently of the agent implementation.
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 use std::cmp::Reverse;
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 
 /// Versioned benchmark-internal cost units. These are task costs, not joules,
 /// wall-clock latency, API tokens, or monetary cost.
@@ -527,7 +527,9 @@ pub struct ScenarioScore {
     pub inspections: u32,
     pub evaluator_perturbations: u32,
     pub successful_recoveries: u32,
+    /// Minimum action count for the unchanged, no-intervention scenario.
     pub optimal_agent_steps: u32,
+    /// Minimum manifest-defined action cost for the unchanged scenario under the step budget.
     pub optimal_resource_cost_units: u64,
     /// 0 when the goal is incomplete; otherwise optimal steps / actual agent attempts, capped at 1.
     pub action_efficiency: f64,
@@ -774,14 +776,14 @@ fn score_replayed_state(
         .filter(|event| matches!(&event.kind, EventKind::Perturbed(_)))
         .count() as u32;
 
-    let mut awaiting_recovery = false;
-    let mut successful_recoveries = 0;
+    let mut pending_recoveries = 0_u32;
+    let mut successful_recoveries = 0_u32;
     for event in &state.event_log {
         match &event.kind {
-            EventKind::Perturbed(_) => awaiting_recovery = true,
-            EventKind::GateOpened if awaiting_recovery => {
+            EventKind::Perturbed(_) => pending_recoveries = pending_recoveries.saturating_add(1),
+            EventKind::GateOpened if pending_recoveries > 0 => {
                 successful_recoveries += 1;
-                awaiting_recovery = false;
+                pending_recoveries -= 1;
             }
             _ => {}
         }
@@ -1231,6 +1233,18 @@ mod tests {
                 least_cost.score.resource_cost_units <= shortest.score.resource_cost_units
             );
         }
+    }
+
+    #[test]
+    fn cost_oracle_fails_closed_when_step_budget_is_insufficient() {
+        let manifest = ScenarioManifest {
+            max_steps: 1,
+            ..ScenarioManifest::default()
+        };
+        assert_eq!(
+            run_cost_oracle(&manifest),
+            Err(TransitionError::PlannerExhausted)
+        );
     }
 
     #[test]
