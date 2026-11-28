@@ -220,20 +220,18 @@ fn validate_evidence(
     let id = string(map, "evidence_id", &path, issues).map(str::to_owned);
     string(map, "artifact_ref", &path, issues);
     digest_string(map, "artifact_sha256", &path, issues);
-    if let Some(source) = string(map, "canonical_source_ref", &path, issues) {
-        if !(source.starts_with("https://") || source.starts_with("http://")) {
-            issue(
-                issues,
-                format!("{path}.canonical_source_ref"),
-                "source URI must use HTTP(S)",
-            );
-        }
+    if let Some(source) = string(map, "canonical_source_ref", &path, issues)
+        && !(source.starts_with("https://") || source.starts_with("http://"))
+    {
+        issue(
+            issues,
+            format!("{path}.canonical_source_ref"),
+            "source URI must use HTTP(S)",
+        );
     }
     for key in ["published_at", "captured_at"] {
-        if let Some(time) = string(map, key, &path, issues) {
-            if !valid_time(time) {
-                issue(issues, format!("{path}.{key}"), "invalid RFC3339 timestamp");
-            }
+        if let Some(time) = string(map, key, &path, issues) && !valid_time(time) {
+            issue(issues, format!("{path}.{key}"), "invalid RFC3339 timestamp");
         }
     }
 
@@ -279,31 +277,31 @@ fn validate_evidence(
         );
     }
 
-    if let Some(role) = string(map, "source_role", &path, issues) {
-        if !["UNKNOWN", "PRIMARY", "SECONDARY", "REGISTRY", "SYNDICATED"].contains(&role) {
-            issue(issues, format!("{path}.source_role"), "unknown source role");
-        }
+    if let Some(role) = string(map, "source_role", &path, issues)
+        && !["UNKNOWN", "PRIMARY", "SECONDARY", "REGISTRY", "SYNDICATED"].contains(&role)
+    {
+        issue(issues, format!("{path}.source_role"), "unknown source role");
     }
-    if let Some(state) = string(map, "integrity_status", &path, issues) {
-        if !["UNKNOWN", "CLEAN", "COMPROMISED", "MISSING"].contains(&state) {
-            issue(
-                issues,
-                format!("{path}.integrity_status"),
-                "unknown integrity state",
-            );
-        }
+    if let Some(state) = string(map, "integrity_status", &path, issues)
+        && !["UNKNOWN", "CLEAN", "COMPROMISED", "MISSING"].contains(&state)
+    {
+        issue(
+            issues,
+            format!("{path}.integrity_status"),
+            "unknown integrity state",
+        );
     }
-    if let Some(state) = string(map, "correction_status", &path, issues) {
-        if !["UNKNOWN", "NONE", "CORRECTED", "RETRACTED", "SUPERSEDED"].contains(&state) {
-            issue(
-                issues,
-                format!("{path}.correction_status"),
-                "unknown correction state",
-            );
-        }
+    if let Some(state) = string(map, "correction_status", &path, issues)
+        && !["UNKNOWN", "NONE", "CORRECTED", "RETRACTED", "SUPERSEDED"].contains(&state)
+    {
+        issue(
+            issues,
+            format!("{path}.correction_status"),
+            "unknown correction state",
+        );
     }
-    if let Some(state) = string(map, "retrieval_state", &path, issues) {
-        if ![
+    if let Some(state) = string(map, "retrieval_state", &path, issues)
+        && ![
             "NOT_FOUND",
             "FETCHED",
             "CAPTURED",
@@ -311,22 +309,19 @@ fn validate_evidence(
             "UNATTRIBUTED",
         ]
         .contains(&state)
-        {
-            issue(
-                issues,
-                format!("{path}.retrieval_state"),
-                "unknown retrieval state",
-            );
-        }
+    {
+        issue(
+            issues,
+            format!("{path}.retrieval_state"),
+            "unknown retrieval state",
+        );
     }
-    if let Some(id) = id {
-        if ids.insert(id.clone(), family).is_some() {
-            issue(
-                issues,
-                format!("{path}.evidence_id"),
-                "duplicate evidence ID",
-            );
-        }
+    if let Some(id) = id && ids.insert(id.clone(), family).is_some() {
+        issue(
+            issues,
+            format!("{path}.evidence_id"),
+            "duplicate evidence ID",
+        );
     }
 }
 
@@ -337,9 +332,7 @@ fn validate_classifier(
     claim_sha256: &str,
     issues: &mut Vec<ValidationIssue>,
 ) -> Option<String> {
-    let Some(map) = object(value, path, issues) else {
-        return None;
-    };
+    let map = object(value, path, issues)?;
     const KEYS: &[&str] = &[
         "classifier_id",
         "version",
@@ -361,14 +354,12 @@ fn validate_classifier(
             "classifier confidence must be finite and in [0,1]",
         );
     }
-    if let Some(time) = string(map, "emitted_at", path, issues) {
-        if !valid_time(time) {
-            issue(
-                issues,
-                format!("{path}.emitted_at"),
-                "invalid RFC3339 timestamp",
-            );
-        }
+    if let Some(time) = string(map, "emitted_at", path, issues) && !valid_time(time) {
+        issue(
+            issues,
+            format!("{path}.emitted_at"),
+            "invalid RFC3339 timestamp",
+        );
     }
     let actual_prefix = digest_string(map, "evidence_prefix_sha256", path, issues);
     if actual_prefix.as_deref() != Some(prefix_sha256) {
@@ -480,15 +471,11 @@ fn validate_relation(
                 .as_ref()
                 .map(|id| format!("unknown-origin:{id}"))
         });
-        if relation == "SUPPORTS" {
-            if let Some(origin) = origin.as_ref() {
-                context.supports.insert(origin.clone());
-            }
+        if relation == "SUPPORTS" && let Some(origin) = origin.as_ref() {
+            context.supports.insert(origin.clone());
         }
-        if relation == "REFUTES" {
-            if let Some(origin) = origin.as_ref() {
-                context.refutes.insert(origin.clone());
-            }
+        if relation == "REFUTES" && let Some(origin) = origin.as_ref() {
+            context.refutes.insert(origin.clone());
         }
     }
 
@@ -578,24 +565,22 @@ fn validate_adjudication(
                 );
             }
             let authority = string(map, "authority_id", path, issues).map(str::to_owned);
-            if let Some(authority) = authority.as_ref() {
-                if classifier_ids.contains(authority) {
-                    issue(
-                        issues,
-                        format!("{path}.authority_id"),
-                        "claim-source classifier cannot serve as independent adjudicator",
-                    );
-                }
+            if let Some(authority) = authority.as_ref()
+                && classifier_ids.contains(authority)
+            {
+                issue(
+                    issues,
+                    format!("{path}.authority_id"),
+                    "claim-source classifier cannot serve as independent adjudicator",
+                );
             }
             string(map, "evidence_reference", path, issues);
-            if let Some(time) = string(map, "adjudicated_at", path, issues) {
-                if !valid_time(time) {
-                    issue(
-                        issues,
-                        format!("{path}.adjudicated_at"),
-                        "invalid RFC3339 timestamp",
-                    );
-                }
+            if let Some(time) = string(map, "adjudicated_at", path, issues) && !valid_time(time) {
+                issue(
+                    issues,
+                    format!("{path}.adjudicated_at"),
+                    "invalid RFC3339 timestamp",
+                );
             }
             (true, result)
         }
@@ -845,14 +830,13 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
         "reference_time",
         "$.decision_context",
         &mut issues,
-    ) {
-        if !valid_time(time) {
-            issue(
-                &mut issues,
-                "$.decision_context.reference_time",
-                "invalid RFC3339 timestamp",
-            );
-        }
+    ) && !valid_time(time)
+    {
+        issue(
+            &mut issues,
+            "$.decision_context.reference_time",
+            "invalid RFC3339 timestamp",
+        );
     }
     let risk_class = string(decision, "risk_class", "$.decision_context", &mut issues)
         .unwrap_or_default()
@@ -972,19 +956,19 @@ fn validate_state(input: &str) -> Result<ValidationReport, Vec<ValidationIssue>>
                     refutes: &mut refute_families,
                 };
                 validate_relation(relation, relation_index, &mut relation_context, &mut issues);
-                if let Some(relation_map) = relation.as_object() {
-                    if let (Some(claim_ref), Some(evidence_ref)) = (
+                if let Some(relation_map) = relation.as_object()
+                    && let (Some(claim_ref), Some(evidence_ref)) = (
                         relation_map.get("claim_id").and_then(Value::as_str),
                         relation_map.get("evidence_id").and_then(Value::as_str),
-                    ) {
-                        let key = format!("{claim_ref}|{evidence_ref}");
-                        if !pair_ids.insert(key) {
-                            issue(
-                                &mut issues,
-                                format!("{path}.evidence_relations[{relation_index}]"),
-                                "duplicate claim/evidence relation",
-                            );
-                        }
+                    )
+                {
+                    let key = format!("{claim_ref}|{evidence_ref}");
+                    if !pair_ids.insert(key) {
+                        issue(
+                            &mut issues,
+                            format!("{path}.evidence_relations[{relation_index}]"),
+                            "duplicate claim/evidence relation",
+                        );
                     }
                 }
             }
@@ -1115,14 +1099,14 @@ pub fn validate_examples() -> Result<ExamplesReport, Vec<ValidationIssue>> {
             continue;
         };
         exact_keys(map, &["fixture_id", "state"], &path, &mut issues);
-        if let Some(id) = string(map, "fixture_id", &path, &mut issues) {
-            if !ids.insert(id.to_owned()) {
-                issue(
-                    &mut issues,
-                    format!("{path}.fixture_id"),
-                    "duplicate example ID",
-                );
-            }
+        if let Some(id) = string(map, "fixture_id", &path, &mut issues)
+            && !ids.insert(id.to_owned())
+        {
+            issue(
+                &mut issues,
+                format!("{path}.fixture_id"),
+                "duplicate example ID",
+            );
         }
         if let Some(state) = map.get("state") {
             match validate_state(&state.to_string()) {
