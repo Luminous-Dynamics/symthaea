@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cmaq-053-\${{ github.ref }}
+  group: cmaq-053-risk-budget
   cancel-in-progress: true
 
 jobs:
