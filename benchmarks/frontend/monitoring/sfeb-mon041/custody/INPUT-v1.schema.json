@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon041-custody-input-v1.json",
+  "title": "MON-041 Custody Input v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile","version","mode","evaluated_at","claim_id","trial_id","recovery_boundary_sha256","required_evidence_classes","expected_sources","issued_nonces","used_nonces","trusted_keys","receipts","max_receipt_age_seconds","allowed_clock_skew_seconds"],
+  "properties": {
+    "profile": {"const":"mon041-custody-input-v1"},
+    "version": {"const":"1.0.0"},
+    "mode": {"enum":["offline_fixture","runtime_candidate"]},
+    "evaluated_at": {"type":"string","format":"date-time"},
+    "claim_id": {"type":"string","minLength":1,"maxLength":256},
+    "trial_id": {"type":"string","minLength":1,"maxLength":256},
+    "recovery_boundary_sha256": {"$ref":"#/$defs/digest"},
+    "required_evidence_classes": {"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1,"maxLength":256}},
+    "expected_sources": {"type":"object","additionalProperties":{"type":"string","minLength":1,"maxLength":256}},
+    "issued_nonces": {"type":"array","items":{"$ref":"#/$defs/nonce"}},
+    "used_nonces": {"type":"array","items":{"$ref":"#/$defs/nonce"}},
+    "trusted_keys": {"type":"array","items":{"$ref":"#/$defs/trustedKey"}},
+    "receipts": {"type":"array","maxItems":1000,"items":{"$ref":"#/$defs/receipt"}},
+    "max_receipt_age_seconds": {"type":"integer","minimum":1,"maximum":604800},
+    "allowed_clock_skew_seconds": {"type":"integer","minimum":0,"maximum":300}
+  },
+  "$defs": {
+    "digest": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "nonce": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "trustedKey": {
+      "type":"object","additionalProperties":false,
+      "required":["key_id","principal","public_key_base64","not_before","not_after"],
+      "properties":{
+        "key_id":{"type":"string","minLength":1,"maxLength":256},
+        "principal":{"type":"string","minLength":1,"maxLength":256},
+        "public_key_base64":{"type":"string","minLength":1},
+        "not_before":{"type":"string","format":"date-time"},
+        "not_after":{"type":"string","format":"date-time"},
+        "revoked_at":{"type":"string","format":"date-time"}
+      }
+    },
+    "receipt": {
+      "type":"object","additionalProperties":false,
+      "required":["profile","version","receipt_id","session_id","nonce","claim_id","trial_id","recovery_boundary_sha256","source_id","evidence_class","capture_principal","captured_at","expires_at","sequence","artifact_sha256","artifact_bytes","media_type","signer_key_id","signature_base64"],
+      "properties":{
+        "profile":{"const":"mon041-evidence-receipt-v1"},
+        "version":{"const":"1.0.0"},
+        "receipt_id":{"type":"string","minLength":1,"maxLength":256},
+        "session_id":{"type":"string","minLength":1,"maxLength":256},
+        "nonce":{"$ref":"#/$defs/nonce"},
+        "claim_id":{"type":"string","minLength":1,"maxLength":256},
+        "trial_id":{"type":"string","minLength":1,"maxLength":256},
+        "recovery_boundary_sha256":{"$ref":"#/$defs/digest"},
+        "source_id":{"type":"string","minLength":1,"maxLength":256},
+        "evidence_class":{"type":"string","minLength":1,"maxLength":256},
+        "capture_principal":{"type":"string","minLength":1,"maxLength":256},
+        "captured_at":{"type":"string","format":"date-time"},
+        "expires_at":{"type":"string","format":"date-time"},
+        "sequence":{"type":"integer","minimum":1},
+        "previous_receipt_sha256":{"$ref":"#/$defs/digest"},
+        "artifact_sha256":{"$ref":"#/$defs/digest"},
+        "artifact_bytes":{"type":"integer","minimum":1},
+        "media_type":{"type":"string","minLength":1},
+        "signer_key_id":{"type":"string","minLength":1,"maxLength":256},
+        "signature_base64":{"type":"string","minLength":1}
+      }
+    }
+  }
+}
