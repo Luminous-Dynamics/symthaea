@@ -460,3 +460,78 @@ The beat-grid report contract requires each hypothesis to state how tempo values
 - `linear_in_frame_time`: interpolate BPM linearly in source-frame time.
 
 A non-empty tempo map without an interpolation declaration is invalid. A report with no tempo map must use `null`. This prevents the same beat-grid points from producing different phase forecasts in the planner, transition preview and real-time clock. It does not imply that either interpolation mode accurately models the performer; the estimator's residual, calibration and out-of-domain status remain separate evidence.
+
+
+## 26. Decoder, resampler, time-stretch and real-time handoff qualification
+
+The native runtime must select these components by measured end-to-end performance and distribution constraints, not by a crate's feature list or a synthetic demo.
+
+### Candidate component matrix — 2026-11-28
+
+| Role | Candidate | Strengths / constraints | Decision |
+|---|---|---|---|
+| Source demux/decode | Symphonia 0.6.1 | Pure Rust, MPL-2.0, explicit format/codec feature flags, good metadata and gapless support for several pairs. It does not make every container/codec combination gapless: e.g. MP3/FLAC/ALAC/WAV are documented gapless, while AAC-LC and ISO/MP4 are not. Gapless needs both demuxer and decoder support. | Primary Rust-first candidate for corpus and format-conformance testing. Pin a minimal explicit feature set; do not enable `all` by default. |
+| Sample-rate conversion | Rubato 5.1.0 | Rust; fixed-ratio FFT and variable-ratio asynchronous sinc/polynomial modes. Its real-time API uses preallocated buffers; asynchronous modes can compensate for device clock drift. It is a resampler, not pitch-preserving time-stretch. | Primary Rust candidate for output-device conversion and clock-drift correction; evaluate quality/CPU trade-offs. |
+| Pitch-preserving time-stretch | Signalsmith Stretch | MIT; C++11 header-only polyphonic pitch/time library with explicit input/output latency. Upstream says time-stretch quality is best over a more modest range, approximately 0.75x–1.5x. A Rust wrapper exists but must be inspected, pinned and qualified. | First quality/latency candidate; FFI and target support are explicit review gates. |
+| Pitch/tempo comparator | SoundTouch 2.3.3 | LGPL-2.1; established C++ tempo/pitch processor. | Include in comparative evaluation; decide bundling only after license review. |
+| High-quality external reference | Rubber Band 4.0 | GPL or separately licensed commercial distribution. | Optional evaluation comparator; do not silently add it to shipped binaries. |
+| SPSC PCM handoff | rtrb 0.4.1 vs existing ringbuf 0.4 | rtrb documents fixed-capacity, wait-free SPSC reads/writes, no post-construction allocation, and explicit full/empty errors. Existing ringbuf is already in the Muse audio output path. Neither is automatically superior for our target load. | Benchmark both with real block sizes, multi-deck traffic, backpressure, cache contention and fault injection before choosing. |
+| Device I/O | CPAL 0.18.2 vs repo CPAL 0.17 | CPAL 0.18.2 reports xruns on AAudio/CoreAudio/PipeWire and provides more accurate hardware timestamps/latency; it also contains significant API changes. CPAL repository master has 0.19 API changes that are not the same as a published stable release. | Test the published 0.18.2 migration against our pinned Rust/toolchain and supported backends; do not target unreleased master APIs. |
+
+References:
+- Symphonia 0.6.1 feature, codec, gapless and license information: https://docs.rs/crate/symphonia/0.6.1
+- Rubato 5.1.0 real-time and resampling modes: https://docs.rs/rubato/5.1.0/rubato/
+- Signalsmith Stretch implementation, latency and operating range: https://github.com/Signalsmith-Audio/signalsmith-stretch
+- SoundTouch license and tempo/pitch behavior: https://github.com/Tencent-RTC/soundtouch
+- Rubber Band license and distribution terms: https://github.com/breakfastquay/rubberband
+- rtrb 0.4.1 SPSC guarantees: https://docs.rs/rtrb/0.4.1/rtrb/
+- CPAL 0.18.2 release notes: https://github.com/RustAudio/cpal/releases/tag/v0.18.2
+- Reproducible DSP benchmark methodology (time-stretch, pitch-shift, SRC): https://github.com/syshlted/timepitch-bench
+
+The `timepitch-bench` project is a useful methodology reference, not a field-wide standard or a sufficient DJ benchmark: it records CPU/real-time factor, memory, pitch error, latency and library/build identities, but its current test corpus is largely synthetic and its own next steps include transient-preservation scoring. Extend that style of reproducibility with polyphonic musical sources, real drum transients, stereo scenes, tempo ramps, audio artifacts, and listener studies.
+
+### Real-time graph boundary
+
+The proposed pipeline is:
+
+1. **Decoder worker:** source-file I/O, demux, decode, metadata/gapless handling and source digest verification.
+2. **Per-deck DSP worker:** resampling, pitch-preserving time-stretch, channel conversion and bounded pre-render of upcoming PCM. All algorithm state and input/output buffers are allocated before processing.
+3. **Bounded SPSC handoff:** one explicitly sized PCM queue per deck (or a benchmark-justified topology); no worker waits by spinning inside the device callback. Full and empty are observable, counted and fault-injected.
+4. **Device callback:** consumes ready frames, applies already-validated sample-accurate transport/gain/routing commands, mixes preallocated buses and writes the device buffer. No decode, filesystem access, stretch model, allocation, blocking lock, logging, UI callback or unbounded work.
+5. **Evidence collector:** outside the callback, records queue occupancy, underrun/overrun/xrun events, command age, phase error, decoder faults, worker timing and device timestamps.
+
+The DSP worker's look-ahead buffer is part of the user-facing latency budget. A high-quality offline stretch render does not qualify a live tempo adjustment. Commands must declare an effective frame/time, processing horizon and cancellation/supersession behavior; late commands are rejected or explicitly deferred rather than applied at an arbitrary future point.
+
+### Required decoder qualification
+
+- Explicit supported format/codec matrix with version and feature flags; test each pair, not just each file extension.
+- Gapless priming/padding, encoder delay, VBR seeking, container timestamps, long files, corrupt/truncated frames and metadata/cover-art bounds.
+- Sample-count agreement to the declared source clock; channel order/layout; 16/24/32-bit integer and float conversions; NaN/Inf/clipping handling.
+- Decode throughput as real-time factor plus p50/p95/p99 chunk time, first-audio latency, cold/warm seek latency and peak memory per concurrent deck.
+- Reference decoding comparisons (e.g. FFmpeg) for licensed fixture corpus with explicit tolerance and version pin.
+- Decoder errors, unsupported feature and corrupt frame remain typed outcomes; no silent substitute codec, duration estimate or false gapless claim.
+
+### Required DSP qualification
+
+Test resampling and pitch-preserving time-stretch separately:
+
+| Layer | Signal / task metrics | Live/runtime metrics |
+|---|---|---|
+| Sample-rate conversion | passband ripple, stopband attenuation, alias rejection, channel match, sample-count and group-delay error | p95/p99 worker time, fixed/variable-ratio response, drift correction and buffer occupancy |
+| Time-stretch | pitch error in cents, tempo-ratio error, transient timing/shape preservation, phase coherence, stereo image, formant/timbre stability, modulation artifacts | algorithmic input/output latency, p95/p99 block time, worst-case time under tempo ramps, queued look-ahead and audible response time |
+| Pitch-shift | tuning error, spectral residual, formant deviation, transient degradation, stereo coherence | processing budget and automation response across the declared pitch range |
+| Integrated deck | beat/phrase phase drift, discontinuity/click energy, loudness and clipping, recovery after seek/rate change | underruns/xruns, callback deadline, command-to-audible latency, CPU/RAM/energy under 2- and 4-deck load |
+
+Use synthetic known-truth material (sines, impulses, chirps, multitone, noise, controlled transients) and licensed polyphonic material (drums, bass, sustained harmony, lead vocals, dense mixes, live/rubato). Evaluate both static ratios and ramps, with primary declared range 0.75x–1.5x plus explicit stress tests outside it. Normalize loudness for listening, but keep original and output levels available for diagnostic metrics. A single spectral distance or one pitch-error score must not hide damaged transients or stereo cancellation.
+
+### Decision rule
+
+No library is selected for production by reputation alone. A candidate must pass:
+- license and distribution review;
+- deterministic offline quality tests;
+- no-allocation/preallocated processing audit for its real-time path;
+- CPU/RAM/latency tests on target hardware;
+- failure and recovery tests;
+- comparative listening on matched, held-out, licensed material.
+
+Maintain at least one permissively licensed production candidate and one external reference comparator. If no candidate meets the declared quality/latency/compute envelope, the capability remains unsupported rather than weakening the gate.
