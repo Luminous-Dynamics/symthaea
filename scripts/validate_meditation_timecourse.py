@@ -149,7 +149,7 @@ def analyze_subject(bdf_path):
 def main():
     print()
     print('=' * 72)
-    print(' MEDITATIONSENTINEL TIME-COURSE VALIDATION'.center(72))
+    print(' UNLABELLED EEG FEATURE TIME-COURSE'.center(72))
     print(' Feature Extraction Verification'.center(72))
     print('=' * 72)
     print()
