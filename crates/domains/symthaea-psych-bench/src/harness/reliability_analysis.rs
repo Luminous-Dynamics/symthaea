@@ -143,54 +143,124 @@ pub struct TestRetestResult {
 
 // ──── Statistical functions ────
 
-/// Compute ICC(3,1) one-way random effects model.
+/// Compute the two-way mixed-effects, single-measure, consistency ICC(3,1).
 ///
-/// `ICC = (BMS - WMS) / (BMS + WMS)`
+/// Rows are subjects and the two columns are fixed measurement occasions. The
+/// calculation uses the two-way ANOVA decomposition:
 ///
-/// where BMS = between-subject mean square, WMS = within-subject mean square.
-/// Each "subject" is a paired observation from session1 and session2.
+/// ICC(3,1) = (MS_subject - MS_error) / (MS_subject + (k - 1) * MS_error)
+///
+/// The session/occasion main effect is removed before estimating residual error.
+/// Consequently, a uniform shift between sessions does not reduce this
+/// consistency coefficient. Use compute_icc_2_1 when absolute agreement
+/// across occasions is the target.
+///
+/// Inputs are paired by index; unmatched trailing values are ignored.
+/// Returns 0.0 when fewer than two paired subjects are available or the
+/// denominator is degenerate.
 pub fn compute_icc(session1: &[f64], session2: &[f64]) -> f64 {
     let n = session1.len().min(session2.len());
     if n < 2 {
         return 0.0;
     }
 
-    // Compute subject means and grand mean
-    let grand_sum: f64 = session1[..n].iter().sum::<f64>() + session2[..n].iter().sum::<f64>();
-    let grand_mean = grand_sum / (2 * n) as f64;
+    let k = 2.0_f64;
+    let grand_mean = (session1[..n].iter().sum::<f64>()
+        + session2[..n].iter().sum::<f64>())
+        / (n as f64 * k);
 
-    // Between-subject mean square (BMS)
-    // BMS = k * sum_i( (subject_mean_i - grand_mean)^2 ) / (n - 1)
-    // where k = number of measurements per subject (2)
-    let k = 2.0f64;
-    let bms: f64 = {
-        let ss_between: f64 = (0..n)
-            .map(|i| {
-                let subj_mean = (session1[i] + session2[i]) / 2.0;
-                (subj_mean - grand_mean).powi(2)
-            })
-            .sum();
-        k * ss_between / (n as f64 - 1.0)
-    };
+    let subject_means: Vec<f64> = (0..n)
+        .map(|i| (session1[i] + session2[i]) / k)
+        .collect();
+    let session_means = [
+        session1[..n].iter().sum::<f64>() / n as f64,
+        session2[..n].iter().sum::<f64>() / n as f64,
+    ];
 
-    // Within-subject mean square (WMS)
-    // WMS = sum_i sum_j (x_ij - subject_mean_i)^2 / (n * (k - 1))
-    let wms: f64 = {
-        let ss_within: f64 = (0..n)
-            .map(|i| {
-                let subj_mean = (session1[i] + session2[i]) / 2.0;
-                (session1[i] - subj_mean).powi(2) + (session2[i] - subj_mean).powi(2)
-            })
-            .sum();
-        ss_within / (n as f64 * (k - 1.0))
-    };
+    let ss_subject = k
+        * subject_means
+            .iter()
+            .map(|mean| (mean - grand_mean).powi(2))
+            .sum::<f64>();
+    let ms_subject = ss_subject / (n as f64 - 1.0);
 
-    let denom = bms + wms;
-    if denom.abs() < 1e-15 {
+    let ss_total = (0..n)
+        .map(|i| {
+            (session1[i] - grand_mean).powi(2)
+                + (session2[i] - grand_mean).powi(2)
+        })
+        .sum::<f64>();
+    let ss_session = n as f64
+        * session_means
+            .iter()
+            .map(|mean| (mean - grand_mean).powi(2))
+            .sum::<f64>();
+    let ss_error = (ss_total - ss_subject - ss_session).max(0.0);
+    let ms_error = ss_error / ((n as f64 - 1.0) * (k - 1.0));
+
+    let denominator = ms_subject + (k - 1.0) * ms_error;
+    if !denominator.is_finite() || denominator.abs() < 1e-15 {
         return 0.0;
     }
 
-    ((bms - wms) / denom).clamp(-1.0, 1.0)
+    ((ms_subject - ms_error) / denominator).clamp(-1.0, 1.0)
+}
+
+/// Compute the two-way random-effects, single-measure, absolute-agreement
+/// ICC(2,1) for two measurement occasions.
+///
+/// Unlike compute_icc, this coefficient penalizes a systematic shift
+/// between sessions. It is appropriate when values must agree in their
+/// original units, not merely preserve subject ranking.
+pub fn compute_icc_2_1(session1: &[f64], session2: &[f64]) -> f64 {
+    let n = session1.len().min(session2.len());
+    if n < 2 {
+        return 0.0;
+    }
+
+    let k = 2.0_f64;
+    let grand_mean = (session1[..n].iter().sum::<f64>()
+        + session2[..n].iter().sum::<f64>())
+        / (n as f64 * k);
+    let subject_means: Vec<f64> = (0..n)
+        .map(|i| (session1[i] + session2[i]) / k)
+        .collect();
+    let session_means = [
+        session1[..n].iter().sum::<f64>() / n as f64,
+        session2[..n].iter().sum::<f64>() / n as f64,
+    ];
+
+    let ss_subject = k
+        * subject_means
+            .iter()
+            .map(|mean| (mean - grand_mean).powi(2))
+            .sum::<f64>();
+    let ms_subject = ss_subject / (n as f64 - 1.0);
+
+    let ss_session = n as f64
+        * session_means
+            .iter()
+            .map(|mean| (mean - grand_mean).powi(2))
+            .sum::<f64>();
+    let ms_session = ss_session / (k - 1.0);
+
+    let ss_total = (0..n)
+        .map(|i| {
+            (session1[i] - grand_mean).powi(2)
+                + (session2[i] - grand_mean).powi(2)
+        })
+        .sum::<f64>();
+    let ss_error = (ss_total - ss_subject - ss_session).max(0.0);
+    let ms_error = ss_error / ((n as f64 - 1.0) * (k - 1.0));
+
+    let denominator = ms_subject
+        + (k - 1.0) * ms_error
+        + (k * (ms_session - ms_error).max(0.0) / n as f64);
+    if !denominator.is_finite() || denominator.abs() < 1e-15 {
+        return 0.0;
+    }
+
+    ((ms_subject - ms_error) / denominator).clamp(-1.0, 1.0)
 }
 
 /// Compute standard error of measurement.
@@ -407,6 +477,32 @@ mod tests {
             "Perfect agreement should give ICC=1.0, got {}",
             icc
         );
+    }
+
+    #[test]
+    fn test_icc_consistency_separates_session_offset_from_agreement() {
+        let s1 = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let s2: Vec<f64> = s1.iter().map(|value| value + 10.0).collect();
+
+        // The subject ordering is perfectly preserved, but absolute scores shift.
+        let consistency = compute_icc(&s1, &s2);
+        let agreement = compute_icc_2_1(&s1, &s2);
+
+        assert!(
+            (consistency - 1.0).abs() < 1e-10,
+            "A fixed occasion shift should not reduce consistency ICC, got {consistency}"
+        );
+        assert!(
+            agreement < consistency,
+            "Absolute agreement should penalize a systematic shift: {agreement} vs {consistency}"
+        );
+    }
+
+    #[test]
+    fn test_icc_2_1_perfect_agreement() {
+        let s1 = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let s2 = s1.clone();
+        assert!((compute_icc_2_1(&s1, &s2) - 1.0).abs() < 1e-10);
     }
 
     #[test]
