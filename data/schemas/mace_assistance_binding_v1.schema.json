@@ -1,0 +1,472 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_assistance_binding_v1.schema.json",
+  "title": "MACE Assistance Binding V1",
+  "description": "Candidate proposals and response bindings. Authenticity and admissibility require injected host verifiers; digests are not signatures.",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "relationContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "valid_at_ms",
+        "known_at_ms",
+        "scope_id",
+        "purpose_id",
+        "audience_id",
+        "policy_sha256"
+      ],
+      "properties": {
+        "valid_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scope_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "purpose_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "audience_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "relationEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "edge_id",
+        "from_evidence_id",
+        "to_evidence_id",
+        "kind",
+        "scope_id",
+        "purpose_id",
+        "source_relation_sha256",
+        "source_lineage_receipt_sha256",
+        "authority_receipt_sha256",
+        "valid_from_ms",
+        "valid_until_ms",
+        "known_from_ms",
+        "known_until_ms"
+      ],
+      "properties": {
+        "edge_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "from_evidence_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "to_evidence_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "kind": {
+          "enum": [
+            "same_subject",
+            "same_event",
+            "same_decision",
+            "participant_in",
+            "supports",
+            "contradicts",
+            "supersedes",
+            "depends_on",
+            "temporal_neighbor"
+          ]
+        },
+        "scope_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "purpose_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "source_relation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_lineage_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "authority_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "valid_from_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_until_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "known_from_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_until_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "relationClosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "seed_evidence_ids",
+        "selected_relation_kinds",
+        "evidence_ids",
+        "traversed_edge_ids",
+        "conflict_edges",
+        "context_sha256",
+        "max_hops",
+        "max_nodes",
+        "closure_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_assistance_binding_v1"
+        },
+        "seed_evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        },
+        "selected_relation_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        },
+        "traversed_edge_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        },
+        "conflict_edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "left_evidence_id",
+              "right_evidence_id",
+              "relation_edge_id"
+            ],
+            "properties": {
+              "left_evidence_id": {
+                "$ref": "#/$defs/nonempty"
+              },
+              "right_evidence_id": {
+                "$ref": "#/$defs/nonempty"
+              },
+              "relation_edge_id": {
+                "$ref": "#/$defs/nonempty"
+              }
+            }
+          }
+        },
+        "context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "max_hops": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_nodes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "closure_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "assistanceContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_sha256",
+        "valid_at_ms",
+        "known_at_ms",
+        "scope_id",
+        "purpose_id",
+        "audience_id",
+        "policy_sha256",
+        "relation_closure_sha256"
+      ],
+      "properties": {
+        "request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "valid_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scope_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "purpose_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "audience_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "relation_closure_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint_id",
+        "source_evidence_id",
+        "subject_id",
+        "source_speaker_id",
+        "provenance_kind",
+        "action",
+        "required",
+        "proposition_sha256",
+        "source_span_sha256",
+        "evidence_use_receipt_sha256",
+        "decision_evidence_use_link_sha256",
+        "source_lineage_receipt_sha256",
+        "relation_closure_sha256",
+        "scope_id",
+        "purpose_id",
+        "audience_id",
+        "required_qualification_sha256",
+        "valid_from_ms",
+        "valid_until_ms",
+        "known_from_ms",
+        "known_until_ms"
+      ],
+      "properties": {
+        "constraint_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "source_evidence_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "subject_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "source_speaker_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provenance_kind": {
+          "enum": [
+            "direct_quotation",
+            "speaker_assertion",
+            "first_hand_observation",
+            "group_agreement",
+            "derived_inference",
+            "contested_claim"
+          ]
+        },
+        "action": {
+          "enum": [
+            "may_assert",
+            "must_attribute",
+            "must_qualify",
+            "must_not_assert",
+            "must_abstain"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "proposition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_span_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidence_use_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_evidence_use_link_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_lineage_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "relation_closure_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "purpose_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "audience_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "required_qualification_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "valid_from_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_until_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "known_from_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_until_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "claimUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint_id",
+        "proposition_sha256",
+        "start_byte",
+        "end_byte",
+        "response_span_sha256",
+        "speaker_id",
+        "qualification_sha256"
+      ],
+      "properties": {
+        "constraint_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "proposition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "start_byte": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_byte": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "response_span_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "speaker_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "qualification_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "request_sha256",
+        "response_sha256",
+        "context_sha256",
+        "relation_closure_sha256",
+        "constraint_set_sha256",
+        "disposition",
+        "claim_uses",
+        "binding_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_assistance_binding_v1"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "response_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "relation_closure_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "constraint_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "disposition": {
+          "enum": [
+            "answer",
+            "clarify",
+            "abstain"
+          ]
+        },
+        "claim_uses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/claimUse"
+          }
+        },
+        "binding_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
