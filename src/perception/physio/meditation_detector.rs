@@ -1,9 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Meditation & Flow State Detection from Multi-Channel EEG
+//! Experimental EEG band-power proxy pipeline (legacy meditation/flow labels).
 //!
-//! Implements the scientific foundations of EEG-based meditation and flow detection:
+//! This module is an exploratory signal-feature prototype, not a validated
+//! meditation, flow, consciousness, or clinical detector. Its current power
+//! ratios are not equivalent to cross-spectral coherence or phase synchrony;
+//! reported state labels are heuristic proxies and confidence is not calibrated.
 //!
 //! ## The Superconscious States
 //!
@@ -118,7 +121,7 @@ impl MeditationState {
         MeditationCategory::Wandering
     }
 
-    /// Overall meditation quality score
+    /// Heuristic state index; not a validated measure of meditation quality
     pub fn quality(&self) -> f64 {
         // Weighted combination emphasizing presence and flow
         0.3 * self.focus + 0.2 * self.calm + 0.3 * self.flow + 0.2 * self.presence
@@ -432,7 +435,7 @@ impl Default for FrontalMidlineTheta {
     }
 }
 
-/// Alpha Coherence detector (inter-hemispheric synchrony)
+/// Posterior alpha power-balance proxy (not a coherence estimator)
 #[derive(Debug)]
 pub struct AlphaCoherence {
     /// Smoothing factor
@@ -450,7 +453,7 @@ impl AlphaCoherence {
         }
     }
 
-    /// Compute alpha coherence between left and right hemispheres
+    /// Compare alpha band-power magnitudes; this is not signal coherence or phase synchrony
     pub fn compute(&mut self, eeg: &MeditationEEG) -> Option<f64> {
         // Use O1-O2 pair for posterior alpha coherence
         let alpha_o1 = eeg.alpha_power(MeditationChannel::O1)?;
@@ -498,7 +501,7 @@ impl Default for AlphaCoherence {
     }
 }
 
-/// Gamma Synchrony detector (flow state marker)
+/// Gamma power-balance proxy (not a synchrony/coherence estimator)
 #[derive(Debug)]
 pub struct GammaSynchrony {
     /// Smoothing factor
@@ -524,7 +527,7 @@ impl GammaSynchrony {
         self.baseline = Some(baseline);
     }
 
-    /// Compute gamma synchrony across frontal-parietal network
+    /// Compare gamma band-power magnitudes across sites; this is not synchrony
     pub fn compute(&mut self, eeg: &MeditationEEG) -> Option<f64> {
         // Gamma at frontal and parietal sites
         let gamma_fz = eeg.gamma_power(MeditationChannel::Fz)?;
@@ -615,7 +618,8 @@ impl MeditationSentinel {
         // Presence = combination of coherence and sustained attention
         let presence = (coherence * 0.6 + focus * 0.4).clamp(0.0, 1.0);
 
-        // Confidence based on signal quality
+        // Legacy placeholder only: this constant is not calibrated or a probability.
+        // Do not use it as confidence until an independent held-out calibration.
         let confidence = 0.85;
 
         let state = MeditationState::new(focus, calm, flow, presence, confidence);
