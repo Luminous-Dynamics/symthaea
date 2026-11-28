@@ -155,7 +155,7 @@ impl HdcSpatialCandidate {
 impl InteractiveCandidate<Observation, Action> for HdcSpatialCandidate {
     type Error = HdcCandidateError;
 
-    fn reset(&mut self, _episode_id: u64) -> Result<(), Self::Error> {
+    fn reset(&mut self) -> Result<(), Self::Error> {
         // All random frequencies are frozen at construction; reset does not
         // change the representation or leak an evaluator seed.
         Ok(())
