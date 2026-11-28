@@ -257,7 +257,10 @@ impl std::fmt::Display for PredictableAuditError {
             }
             Self::QPolicyMismatch { sequence_number } => write!(
                 formatter,
-                "event q_t does not match the frozen pre-label q-policy at sequence {sequence_number}"
+                concat!(
+                    "event q_t does not match the frozen pre-label q-policy ",
+                    "at sequence {sequence_number}"
+                )
             ),
             Self::MissingSelectedAdjudication(id) => {
                 write!(formatter, "selected audit event has no independent label: {id}")
