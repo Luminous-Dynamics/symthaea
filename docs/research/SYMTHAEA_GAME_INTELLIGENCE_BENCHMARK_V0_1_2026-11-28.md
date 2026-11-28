@@ -562,3 +562,69 @@ Report success, normalized excess path cost, invalid action rate, decision laten
 
 Then expand to F4 memory retention and F6 probe choice. FEP is only the first submodule baseline. A full Symthaea candidate that combines HDC representations, CfC/LTC temporal dynamics, and the existing memory/planning pathways requires a separate adapter with source-level API review and component-matched ablations. It must not inherit the label from this narrower FEP arm.
 
+
+
+## 17. Expanded Symthaea candidate arms and blind reset semantics — 28 November 2026
+
+### 17.1 Candidate reset no longer receives an episode ID
+
+The original candidate reset signature accepted an `episode_id`. Static review identified that such an identifier could be task-correlated or accidentally reveal evaluator identity. The contract is now `reset()`: it clears policy-side state without receiving any evaluator episode ID or task seed.
+
+- The random baseline derives per-episode PRNG state from its own configured master seed and internal counter.
+- FEP and HDC-LTC reinitialize from candidate configuration seeds, not environment seeds.
+- HDC spatial coding remains fixed for the candidate instance.
+
+No candidate policy receives an evaluator seed through its reset interface.
+
+### 17.2 Expanded matched architecture arms
+
+The adapter workspace now has three real Symthaea-component candidates:
+
+1. **FEP ActiveInferenceAgent** — existing `symthaea-fep` action-selection, belief update and transition learning. The transition prior is a deliberately small 2D identity-plus-direction-bias model.
+2. **Spatial HDC** — actual `symthaea-core::hdc::unified_hv::ContinuousHV` 16,384D representations, using role binding, bundling and randomized Fourier spatial coordinates. It is a one-step representation/action-ranking arm, not a trained model.
+3. **HDC-LTC** — actual `symthaea-core::hdc::hdc_ltc_unified::HdcLtcUnifiedNeuron`, with closed-form temporal evolution over the spatial state representation. Candidate actions are evaluated using cloned temporal states; the persistent temporal state is updated only from the actual next observation.
+
+**Do not call the HDC-LTC arm CfC.** The production `src/dynamics/cfc` pathway is not yet integrated. Do not call the FEP arm the full Symthaea cognitive architecture. The next integration milestone must separately connect and ablate the actual CfC pathway, episodic memory, and planning rather than aggregating component names into a broad agent claim.
+
+### 17.3 Confidence and observation budgets
+
+- Candidate success confidence is optional; selection probabilities and HDC similarities are not accepted as calibrated task-success probabilities.
+- FEP returns `confidence: None` and normalized coordinate outcome distributions using predicted belief precision.
+- HDC/HDC-LTC return representation-based candidate action ranking and point coordinate forecasts; no calibrated confidence is emitted.
+- All candidate arms reject zero remaining action budget.
+- The greedy Manhattan baseline is explicitly O1-only and rejects incomplete maps. It does not treat unknown cells as free space.
+
+### 17.4 Current source-authored test inventory
+
+The candidate/environment crate now contains:
+- 41 F1–F6 environment tests;
+- 7 candidate-output contract tests;
+- 5 random / greedy baseline tests.
+
+The adapter crate contains:
+- 6 FEP candidate tests;
+- 5 spatial HDC candidate tests;
+- 5 HDC-LTC candidate tests.
+
+Total: **69 authored Rust tests**. These are not observed test executions. Both focused workflows must pass rustfmt, Cargo tests, and strict Clippy on the exact PR head. The main GameBench and adapter workspaces are isolated; adapter CI also watches changes to the sibling `symthaea-core` and `symthaea-fep` source paths because it compiles those actual components.
+
+### 17.5 Proposed first comparative campaign
+
+For each frozen O1 F1 map/seed, run:
+- seeded random legal;
+- one-step greedy Manhattan;
+- spatial HDC;
+- HDC-LTC;
+- FEP ActiveInferenceAgent;
+- evaluator-only exact BFS.
+
+Record success rate, normalized path regret, action validity, episode length, action latency, CPU time, peak memory, prediction log score, and calibration status separately. Paired seeds and an independent replay are mandatory. Exact BFS is an oracle reference, never a learned-agent comparator. No result is claimed until this campaign has actually run.
+
+Then perform:
+- held-out obstacle layouts;
+- mechanics/observation perturbations;
+- F4 memory-retention under local-view forgetting;
+- F6 probe-policy comparison (passive, fixed, random, entropy-greedy, decision-value and exact oracle);
+- matched ablations of HDC encoding, HDC-LTC evolution, and FEP belief updates.
+
+This is the point where Symthaea can test whether the components contribute additive or synergistic benefit instead of assuming that architectural labels imply capability.
