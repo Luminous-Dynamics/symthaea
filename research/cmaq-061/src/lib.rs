@@ -137,7 +137,7 @@ impl PredictableEncoder {
         }
 
         let mut next = self.weights.clone();
-        let mean = x.iter().zip(y).map(|(a, b)| (a + b) * 0.5).collect::<Vec<_>>();
+        let mean = x.iter().zip(y).map(|(a, b)| a * 0.5 + b * 0.5).collect::<Vec<_>>();
         for (row_index, row) in next.iter_mut().enumerate() {
             let activation = dot(&self.weights[row_index], &mean).tanh();
             for (weight, input) in row.iter_mut().zip(&mean) {
@@ -145,6 +145,9 @@ impl PredictableEncoder {
                 let step = raw_step.clamp(-max_parameter_step, max_parameter_step);
                 *weight += step;
             }
+        }
+        if next.iter().flatten().any(|value| !value.is_finite()) {
+            return Err(EncoderError::NonFiniteParameter);
         }
         let next_digest = digest_weights(&next, self.norm_bound);
         Ok(PreparedEncoderUpdate {
@@ -320,6 +323,17 @@ mod tests {
             true
         }).unwrap();
         assert_eq!(encoder.version(), 1);
+    }
+
+    #[test]
+    fn overflowing_parameter_update_fails_closed() {
+        let encoder = PredictableEncoder::new(vec![vec![1.0e308]], 1.0).unwrap();
+        assert!(matches!(
+            encoder.prepare_next_version(
+                1, &[f64::MAX], &[f64::MAX], 1.0, f64::MAX
+            ),
+            Err(EncoderError::NonFiniteParameter)
+        ));
     }
 
     #[test]
