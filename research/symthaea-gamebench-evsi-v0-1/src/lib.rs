@@ -174,7 +174,7 @@ impl DecisionProblem {
             if intervention.id.trim().is_empty() {
                 return Err(DecisionProblemError::EmptyId { kind: "intervention" });
             }
-            if intervention_ids.iter().any(|id| id == &intervention.id) {
+            if intervention_ids.contains(&intervention.id) {
                 return Err(DecisionProblemError::DuplicateId {
                     kind: "intervention",
                     id: intervention.id.clone(),
@@ -199,7 +199,7 @@ impl DecisionProblem {
                 if outcome.id.trim().is_empty() {
                     return Err(DecisionProblemError::EmptyId { kind: "outcome" });
                 }
-                if outcome_ids.iter().any(|id| id == &outcome.id) {
+                if outcome_ids.contains(&outcome.id) {
                     return Err(DecisionProblemError::DuplicateId {
                         kind: "outcome",
                         id: outcome.id.clone(),
@@ -441,7 +441,7 @@ fn validate_unique_ids(ids: &[String], kind: &'static str) -> Result<(), Decisio
         if id.trim().is_empty() {
             return Err(DecisionProblemError::EmptyId { kind });
         }
-        if seen.iter().any(|prior| prior == id) {
+        if seen.contains(id) {
             return Err(DecisionProblemError::DuplicateId { kind, id: id.clone() });
         }
         seen.push(id.clone());
