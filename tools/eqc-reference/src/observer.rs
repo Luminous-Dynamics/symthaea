@@ -118,6 +118,7 @@ pub struct ObserverRunExpectation {
     pub max_cpu_time_ms: u64,
     pub max_peak_memory_bytes: u64,
     pub max_tool_calls: u64,
+    pub max_human_interventions: u64,
     pub network_policy: String,
 }
 
@@ -287,7 +288,8 @@ pub fn verify_envelope(
     let budget_contract = payload.elapsed_ms <= expectation.max_elapsed_ms
         && payload.cpu_time_ms <= expectation.max_cpu_time_ms
         && payload.peak_memory_bytes <= expectation.max_peak_memory_bytes
-        && payload.tool_calls <= expectation.max_tool_calls;
+        && payload.tool_calls <= expectation.max_tool_calls
+        && payload.human_interventions <= expectation.max_human_interventions;
     let measurement_contract_pass =
         state_contract && denied_contract && network_contract && budget_contract;
 
@@ -399,6 +401,18 @@ fn validate_payload_shape(payload: &ObserverPayload) -> anyhow::Result<()> {
     if payload.measurement_profile != "linux-cgroup-v2-netns-deny-v1" {
         bail!("unsupported observer measurement profile");
     }
+    if payload.runner_os != "linux" {
+        bail!("v0.1 observer profile requires a Linux runner");
+    }
+    if payload.replay_status != "passed"
+        && payload.replay_status != "failed"
+        && payload.replay_status != "not_run"
+    {
+        bail!("unsupported replay status");
+    }
+    if !is_canonical_utc_timestamp(&payload.observed_at_utc) {
+        bail!("observer timestamp must be canonical UTC RFC3339 seconds");
+    }
     for (name, digest) in [
         ("task_digest_sha256", &payload.task_digest_sha256),
         ("policy_digest_sha256", &payload.policy_digest_sha256),
@@ -424,6 +438,26 @@ fn validate_payload_shape(payload: &ObserverPayload) -> anyhow::Result<()> {
     }
     if !is_sha256(&payload.nonce) {
         bail!("observer nonce must be 32 random bytes encoded as lowercase hex");
+    }
+    const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+    for value in [
+        payload.state_mutation_count,
+        payload.network_bytes_sent,
+        payload.network_bytes_received,
+        payload.elapsed_ms,
+        payload.cpu_time_ms,
+        payload.peak_memory_bytes,
+        payload.tool_calls,
+        payload.human_interventions,
+    ] {
+        if value > MAX_SAFE_INTEGER {
+            bail!("observer numeric measurement exceeds the RFC 8785 safe-integer range");
+        }
+    }
+    if payload.energy_millijoules.is_some_and(|value| value > MAX_SAFE_INTEGER)
+        || payload.cost_microusd.is_some_and(|value| value > MAX_SAFE_INTEGER)
+    {
+        bail!("observer energy or cost exceeds the RFC 8785 safe-integer range");
     }
     if payload.network_policy != "none" || !payload.network_enforced {
         bail!("v0.1 observer verifier only supports enforced network_policy=none");
@@ -473,6 +507,23 @@ fn digest_map(inputs: &[ObserverInputDigest]) -> anyhow::Result<BTreeMap<String,
         }
     }
     Ok(map)
+}
+
+fn is_canonical_utc_timestamp(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 20
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+        || bytes[19] != b'Z'
+    {
+        return false;
+    }
+    bytes.iter().enumerate().all(|(index, byte)| {
+        matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
+    })
 }
 
 fn is_sha256(value: &str) -> bool {
@@ -612,6 +663,7 @@ mod tests {
             max_cpu_time_ms: 5_000,
             max_peak_memory_bytes: 128 * 1024 * 1024,
             max_tool_calls: 3,
+            max_human_interventions: 0,
             network_policy: "none".into(),
         }
     }
