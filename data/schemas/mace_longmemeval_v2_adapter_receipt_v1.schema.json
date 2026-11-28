@@ -11,6 +11,9 @@
       "$ref": "#/$defs/query_input"
     },
     {
+      "$ref": "#/$defs/pre_query_hook_metadata"
+    },
+    {
       "$ref": "#/$defs/pre_query_selection"
     },
     {
@@ -349,6 +352,40 @@
           "$ref": "#/$defs/sha"
         },
         "reader_generation_config_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "pre_query_hook_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "query_invocation_id",
+        "query_input_sha256",
+        "pre_query_selection_receipt_sha256",
+        "selected_item_count",
+        "metadata_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_longmemeval_v2_adapter_receipt_v1"
+        },
+        "query_invocation_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "query_input_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "pre_query_selection_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "selected_item_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "metadata_sha256": {
           "$ref": "#/$defs/sha"
         }
       }
