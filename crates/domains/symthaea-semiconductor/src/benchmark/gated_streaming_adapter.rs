@@ -289,7 +289,10 @@ pub fn verify_streaming_prediction_receipt_v1(
         ));
     }
     require_text(&receipt.sample_id, "receipt.sample_id")?;
-    require_text(&receipt.measurement_event_id, "receipt.measurement_event_id")?;
+    require_text(
+        &receipt.measurement_event_id,
+        "receipt.measurement_event_id",
+    )?;
     if !valid_sha256(&receipt.global_model_artifact_sha256)
         || !valid_sha256(&receipt.feature_schema_sha256)
         || !valid_sha256(&receipt.policy_sha256)
@@ -308,18 +311,24 @@ pub fn verify_streaming_prediction_receipt_v1(
     }
     if receipt.selected_feature_indices.is_empty()
         || receipt.selected_feature_indices.len() != receipt.selected_feature_vector.len()
-        || receipt.selected_feature_vector.iter().any(|value| !value.is_finite())
+        || receipt
+            .selected_feature_vector
+            .iter()
+            .any(|value| !value.is_finite())
         || !receipt.global_baseline_prediction.is_finite()
         || !receipt.feature_adapter_prediction.is_finite()
         || !receipt.context_correction.is_finite()
         || !receipt.temporal_correction.is_finite()
         || !receipt.base_prediction.is_finite()
         || !receipt.prediction_value.is_finite()
-        || (receipt.base_prediction - (receipt.global_baseline_prediction
-            + receipt.feature_adapter_prediction
-            + receipt.context_correction)).abs()
+        || (receipt.base_prediction
+            - (receipt.global_baseline_prediction
+                + receipt.feature_adapter_prediction
+                + receipt.context_correction))
+            .abs()
             > f64::EPSILON * 8.0
-        || (receipt.prediction_value - (receipt.base_prediction + receipt.temporal_correction)).abs()
+        || (receipt.prediction_value - (receipt.base_prediction + receipt.temporal_correction))
+            .abs()
             > f64::EPSILON * 8.0
     {
         return Err(GatedStreamingAdapterErrorV1(
@@ -347,7 +356,10 @@ pub fn verify_streaming_update_receipt_v1(
     require_text(&receipt.engine_id, "receipt.engine_id")?;
     require_text(&receipt.sample_id, "receipt.sample_id")?;
     require_text(&receipt.label_id, "receipt.label_id")?;
-    require_text(&receipt.measurement_event_id, "receipt.measurement_event_id")?;
+    require_text(
+        &receipt.measurement_event_id,
+        "receipt.measurement_event_id",
+    )?;
     if !valid_sha256(&receipt.policy_sha256)
         || !valid_sha256(&receipt.label_payload_sha256)
         || !valid_sha256(&receipt.adapter_state_before_sha256)
@@ -368,8 +380,7 @@ pub fn verify_streaming_update_receipt_v1(
     let is_update = receipt.disposition == StreamingUpdateDispositionV1::Updated;
     if receipt.adapter_state_mutated != is_update
         || receipt.update_sequence.is_some() != is_update
-        || (!is_update
-            && receipt.adapter_state_before_sha256 != receipt.adapter_state_after_sha256)
+        || (!is_update && receipt.adapter_state_before_sha256 != receipt.adapter_state_after_sha256)
         || receipt.retraining_executed
         || receipt.equipment_control_authority
     {
