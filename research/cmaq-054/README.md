@@ -11,7 +11,7 @@ This direction is motivated by Sreedhar & Li, *Anytime-Valid Two-Sample Testing 
 Every expert k freezes:
 - response Fourier map phi_k;
 - shared-covariate Fourier map psi_k;
-- a convex target S_k;
+- a convex target S_k that contains the zero vector, which is the conditional-mean null for the paired feature difference;
 - response/covariate reference and target digests;
 - a positive rational prior weight w_k.
 
@@ -52,6 +52,7 @@ The e-value and posterior are necessarily evaluated in floating-point log space.
 
 The Rust crate has no third-party dependencies and tests:
 - exact rational prior normalization, root and nested component-threshold scaling, and member-alpha derivation;
+- fail-closed rejection of any expert target that excludes the zero-mean conditional null;
 - duplicate expert IDs, dimension mismatches and inventory-binding mismatch;
 - initial wealth normalization and posterior sum;
 - deterministic scale-selective alternative where one registered response frequency is deliberately blind and another resolves the change;
