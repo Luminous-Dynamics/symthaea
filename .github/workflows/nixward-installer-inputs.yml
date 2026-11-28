@@ -11,6 +11,13 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - ".github/workflows/nixward-installer-inputs.yml"
+  push:
+    branches:
+      - "fix/nixward-installer-input-escaping-20261128"
+    paths:
+      - "crates/core/nixward/src/sovereign_config.rs"
+      - "crates/core/nixward/src/typed_nix.rs"
+      - ".github/workflows/nixward-installer-inputs.yml"
   workflow_dispatch:
 
 permissions:
