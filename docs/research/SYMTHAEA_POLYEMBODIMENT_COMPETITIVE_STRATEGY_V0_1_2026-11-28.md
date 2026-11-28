@@ -235,8 +235,23 @@ New companion programme:
 - [CGRB positive/negative fixtures](SYMTHAEA_CGRB_SCENARIO_FIXTURES_V0_1_2026-11-28.json)
 - [Issue #14303](https://github.com/Luminous-Dynamics/symthaea/issues/14303)
 
-CGRB composes with #14213 rather than replacing the AV pilot. The new `crates/domains/symthaea-soma/src/cgrb_state.rs` reference verifier is exported by `symthaea-soma`; its twelve regression tests are authored but unexecuted. It distinguishes verified commit from unknown, rejected, not-applied and violation states. It adds versioned environment state, preconditions/postconditions, exact action authority, idempotency semantics, reconciliation after unknown outcomes, separately authorized compensation, independent state-oracle reads, and claim–state concordance. The initial pilot uses an isolated deterministic environment; production side effects are out of scope.
+CGRB composes with #14213 rather than replacing the AV pilot. The new `crates/domains/symthaea-soma/src/cgrb_state.rs` reference verifier is exported by `symthaea-soma`; its sixteen regression tests are authored but unexecuted. It distinguishes verified commit from unknown, rejected, not-applied and violation states. It adds versioned environment state, preconditions/postconditions, exact action authority, idempotency semantics, reconciliation after unknown outcomes, separately authorized compensation, independent state-oracle reads, and claim–state concordance. The initial pilot uses an isolated deterministic environment; production side effects are out of scope.
 
 Use TRG panels and a conditional multiparty panel. Authority, evidence integrity, zero unauthorized side effects, no blind non-idempotent retries, and no unsupported completion claims are hard gates, not weighted score components.
 
 This is a research hypothesis and protocol increment. It is not an executed benchmark, dataset release, model result or deployment qualification.
+
+
+## Industry comparison refresh — 2026-11-28 evening
+
+Keep all numbers versioned and architecture-stratified:
+
+- **VideoFDB v1.4 (Nov 25):** perception leader overall Anam Cara-5 Preview (cascaded) 3.87 / 87.88% TOR / 920 ms; strongest listed full-duplex perception entry Tavus Griffin Lite 3.85 / 90.63% / 200 ms. Generation leader Anam Cara-5 Preview (cascaded) 4.44 / 80.00% / 920 ms; strongest listed full-duplex generation entry Tavus Griffin Lite 4.20 / 48.78% / 1,200 ms. Do not compare across architecture strata or use the cascaded winner to claim a full-duplex win. Source: https://research.nvidia.com/labs/amri/projects/video-fdb/leaderboard.html
+- **Full-Duplex-Bench v3:** 100 human-recorded requests across 79 scenarios/12 speakers/four domains; the authors' reported table has GPT-Realtime Pass@1 60%, Gemini Live 3.1 54% (fastest 4.25 s) and Ultravox v0.7 41%. The harness uses mock APIs; CGRB's extension is independent postcondition verification and interruption/reconciliation. Source: https://www.fullduplex.ai/benchmarks/fdb-v3
+- **TACT:** best reported model composite 0.47 versus human topline 0.86; TACT correlates with held-out human judgments at Spearman 0.81 versus 0.46 for binary turn metrics. Source: https://arxiv.org/abs/2609.27372
+- **DuplexLedger:** best evaluated final-state fact coverage 2.01%; ACT-Mem raises latest-value accuracy from 4.11% to 8.68% on its 219-session held-out slice. This motivates a dedicated memory track composed with #9075, not conflated with external task outcomes. Source: https://arxiv.org/abs/2610.27581
+- **τ-Voice v2 snapshot (Oct 20):** 79.9% for GPT-Live 1 + GPT-6 Astra backend and 68.5% for Gemini 3.8 Live Extended Thinking (high) on its six-language customer-service-call slice. Distinct from the earlier ICML paper's benchmark version. Source: https://www.fullduplex.ai/analytics
+- **EVA-Bench 2.0 snapshot (Oct 15):** faithfulness 66.2% Grok Voice 3.0, 49.4% gpt-realtime-2.1, 42.1% Gemini 3.8 Live Extended Thinking (high), for 213 clean-audio enterprise scenarios. Source: https://www.fullduplex.ai/analytics
+- **StreamEval:** 300 scripted 15–300 s sessions; the highest reported Following score among seven avatar-performance models is 36.90. Preserve the task-specific denominator and do not add the custom-avatar bonus when comparing content quality. Source: https://arxiv.org/abs/2610.28402
+
+The strategy is not to beat all these systems in one aggregate leaderboard. It is to run matched adapters and improve on their weak dimensions while adding independently qualified external-state, output-stop and recovery evidence.
