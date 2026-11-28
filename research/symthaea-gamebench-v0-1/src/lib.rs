@@ -7,6 +7,9 @@
 //! It is a benchmark substrate, not an agent,
 //! game-playing result, or production runtime component.
 
+mod baselines;
+pub use baselines::{BaselineError, GreedyManhattanCandidate, RandomLegalCandidate};
+
 mod candidate;
 pub use candidate::{
     CandidateDecision, CandidateFeedback, CandidateInput, DecisionValidationError,
