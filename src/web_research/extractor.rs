@@ -453,12 +453,7 @@ impl ContentExtractor {
                 continue;
             }
 
-            self.push_claim_span(
-                text,
-                sentence_start,
-                delimiter_index,
-                &mut claims,
-            );
+            self.push_claim_span(text, sentence_start, delimiter_index, &mut claims);
             sentence_start = delimiter_index + delimiter.len_utf8();
 
             if claims.len() >= self.max_claims {
