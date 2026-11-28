@@ -81,9 +81,9 @@ Candidate policy baselines in the core crate:
 - Candidate-output contract: 7 tests.
 - Random and greedy policy baselines: 5 tests.
 - Evaluator-owned F1 runner: **6 tests**.
-- Core crate total: **64 authored tests**.
+- Core crate total: **65 authored tests**.
 - Separate candidate-adapter workspace: 6 FEP tests, 5 spatial HDC tests, 5 HDC-LTC tests (**16 authored tests**).
-- Combined source inventory: **80 authored Rust tests**.
+- Combined source inventory: **81 authored Rust tests**.
 
 These are authored counts, not observed execution results. Dedicated workflows run formatting, Cargo tests, and strict Clippy for each workspace. No pass is claimed until each exact-head workflow completes successfully.
 
@@ -110,7 +110,7 @@ The paired comparison example lives in the separate adapter workspace at `exampl
 F4 now includes `ExploreMemory`, a candidate-owned stateful map store:
 - merges only cells returned in candidate-visible observations;
 - preserves unknown cells as unknown rather than assuming floor;
-- rejects inconsistent re-observations and geometry mismatches;
+- rejects inconsistent re-observations, duplicate cells, missing/blocked agent positions and geometry mismatches;
 - tracks visited positions, observation count, and observed-cell coverage;
 - exposes frontier positions (known traversable cells adjacent to unknown cells).
 
