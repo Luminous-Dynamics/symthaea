@@ -20,8 +20,10 @@ const CONTEXT_SHA: &str = "ccccccccccccccccccccccccccccccccccccccccccccccccccccc
 const PORTFOLIO_SHA: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 const CONTEXT_TARGET_SHA: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const PRODUCT_TARGET_SHA: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-const RESPONSE_REFERENCE_SHA: &str = "1111111111111111111111111111111111111111111111111111111111111111";
-const COVARIATE_REFERENCE_SHA: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+const RESPONSE_REFERENCE_SHA: &str =
+    "1111111111111111111111111111111111111111111111111111111111111111";
+const COVARIATE_REFERENCE_SHA: &str =
+    "2222222222222222222222222222222222222222222222222222222222222222";
 const ALPHA_NUMERATOR: u32 = 1;
 const ALPHA_DENOMINATOR: u32 = 20;
 const CONTEXT_COUNT: usize = 2;
@@ -100,18 +102,12 @@ fn parse_config() -> Result<Config, String> {
 }
 
 fn monitor() -> Result<RepresentationEPortfolio, String> {
-    let response_map = FourierFeatureMap::new(
-        1,
-        vec![vec![1.0], vec![3.0]],
-        RESPONSE_MAP_SHA.into(),
-    )
-    .map_err(|error| format!("response map invalid: {error:?}"))?;
-    let covariate_map = FourierFeatureMap::new(
-        1,
-        vec![vec![1.0], vec![3.0]],
-        COVARIATE_MAP_SHA.into(),
-    )
-    .map_err(|error| format!("covariate map invalid: {error:?}"))?;
+    let response_map =
+        FourierFeatureMap::new(1, vec![vec![1.0], vec![3.0]], RESPONSE_MAP_SHA.into())
+            .map_err(|error| format!("response map invalid: {error:?}"))?;
+    let covariate_map =
+        FourierFeatureMap::new(1, vec![vec![1.0], vec![3.0]], COVARIATE_MAP_SHA.into())
+            .map_err(|error| format!("covariate map invalid: {error:?}"))?;
 
     let contextual_target = BoxTarget::new(
         vec![-0.005; CONTEXT_COUNT * 4],
@@ -139,19 +135,11 @@ fn monitor() -> Result<RepresentationEPortfolio, String> {
     .map_err(|error| format!("portfolio construction failed: {error:?}"))
 }
 
-fn draw_pair(
-    scenario: Scenario,
-    rng: &mut SplitMix64,
-) -> (f64, usize, f64, f64) {
+fn draw_pair(scenario: Scenario, rng: &mut SplitMix64) -> (f64, usize, f64, f64) {
     let covariate = 0.2 * rng.sign();
     let context = if covariate > 0.0 { 0 } else { 1 };
     match scenario {
-        Scenario::ConditionalPairNull => (
-            covariate,
-            context,
-            0.2 * rng.sign(),
-            0.2 * rng.sign(),
-        ),
+        Scenario::ConditionalPairNull => (covariate, context, 0.2 * rng.sign(), 0.2 * rng.sign()),
         Scenario::EqualMarginalConditionalShift if covariate > 0.0 => {
             (covariate, context, 0.2, 0.8)
         }
