@@ -14,6 +14,15 @@ use serde::{Deserialize, Serialize};
 
 pub const CGRB_STATE_CONTRACT_V1: &str = "symthaea.cgrb-state.v1";
 
+fn is_content_digest(value: &str) -> bool {
+    let Some((algorithm, hex)) = value.split_once(':') else {
+        return false;
+    };
+    matches!(algorithm, "sha256" | "blake3")
+        && hex.len() == 64
+        && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CgrbOracleIndependenceV1 {
@@ -203,11 +212,11 @@ pub fn assess_task_outcome_v1(
 ) -> CgrbTaskOutcomeV1 {
     if attempt.operation_id.trim().is_empty()
         || attempt.clock_id.trim().is_empty()
-        || attempt.action_digest.trim().is_empty()
+        || !is_content_digest(&attempt.action_digest)
         || attempt.precondition_state_version.trim().is_empty()
-        || attempt.precondition_state_digest.trim().is_empty()
-        || attempt.postcondition_digest.trim().is_empty()
-        || attempt.authority.policy_digest.trim().is_empty()
+        || !is_content_digest(&attempt.precondition_state_digest)
+        || !is_content_digest(&attempt.postcondition_digest)
+        || !is_content_digest(&attempt.authority.policy_digest)
         || attempt.authority.clock_id.trim().is_empty()
         || attempt.authority.effective_until_tick < attempt.authority.effective_from_tick
     {
@@ -319,7 +328,11 @@ pub fn assess_task_outcome_v1(
 
     match observation.operation_status {
         CgrbOperationStatusV1::Unknown => {
-            CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::PostconditionNotResolved)
+            if observation.effect_count != 0 || observation.applied_at_tick.is_some() {
+                CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::ContradictoryOracleState)
+            } else {
+                CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::PostconditionNotResolved)
+            }
         }
         CgrbOperationStatusV1::NotApplied => {
             if observation.effect_count != 0 || observation.applied_at_tick.is_some() {
@@ -575,6 +588,32 @@ mod tests {
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::UntrustedOracle)
+        );
+    }
+
+    #[test]
+    fn malformed_state_digest_is_not_accepted_as_evidence() {
+        let mut observed = observation();
+        observed.state_digest = "not-a-digest".into();
+        let result = assess_task_outcome_v1(
+            &attempt(), &profile(), Some(&observed), "world-clock", 21, 5
+        );
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::IncompleteObservation)
+        );
+    }
+
+    #[test]
+    fn unknown_operation_cannot_claim_an_applied_effect() {
+        let mut observed = observation();
+        observed.operation_status = CgrbOperationStatusV1::Unknown;
+        let result = assess_task_outcome_v1(
+            &attempt(), &profile(), Some(&observed), "world-clock", 21, 5
+        );
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::ContradictoryOracleState)
         );
     }
 
