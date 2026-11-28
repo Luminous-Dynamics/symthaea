@@ -6,6 +6,12 @@
 //! / local observations (O1/O2). It is a benchmark substrate, not a Symthaea agent,
 //! game-playing result, or production runtime component.
 
+mod prerequisites;
+pub use prerequisites::{
+    DoorSpec, KeySpec, PrerequisiteGame, PrerequisiteSpec, PrerequisiteSpecError,
+    PrerequisiteState, PrerequisiteStepError, PrerequisiteTransition,
+};
+
 mod sokoban;
 pub use sokoban::{
     SokobanGame, SokobanSpec, SokobanSpecError, SokobanState, SokobanStepError,
