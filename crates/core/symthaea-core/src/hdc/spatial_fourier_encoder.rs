@@ -77,6 +77,8 @@ struct EncoderIdentity {
     dimension: usize,
     length_scale_bits: u64,
     seed: u64,
+    /// Digest of the caller-declared coordinate frame, axes, origin and units.
+    coordinate_frame_digest: [u8; 32],
     algorithm_version: u32,
 }
 
@@ -130,6 +132,7 @@ impl SpatialFourierEncoder {
         dimension: usize,
         length_scale: f64,
         seed: u64,
+        coordinate_frame_digest: [u8; 32],
     ) -> Result<Self, SpatialFourierError> {
         if dimension < 8 || dimension % 2 != 0 {
             return Err(SpatialFourierError::InvalidDimension);
@@ -142,6 +145,7 @@ impl SpatialFourierEncoder {
             dimension,
             length_scale_bits: length_scale.to_bits(),
             seed,
+            coordinate_frame_digest,
             algorithm_version: Self::ALGORITHM_VERSION,
         };
 
@@ -179,6 +183,16 @@ impl SpatialFourierEncoder {
     /// Seed used for deterministic frequency generation.
     pub fn seed(&self) -> u64 {
         self.identity.seed
+    }
+
+    /// Caller-supplied digest for the coordinate frame contract.
+    ///
+    /// The digest should bind axis conventions, handedness, origin, coordinate
+    /// units and the qualified transform lineage. This encoder does not verify
+    /// that contract; it only prevents codes with different digests from being
+    /// silently compared or transformed.
+    pub fn coordinate_frame_digest(&self) -> [u8; 32] {
+        self.identity.coordinate_frame_digest
     }
 
     /// Encode a finite 2D coordinate as cosine/sine quadrature pairs.
@@ -336,7 +350,8 @@ mod tests {
     use super::*;
 
     fn encoder(dimension: usize, length_scale: f64, seed: u64) -> SpatialFourierEncoder {
-        SpatialFourierEncoder::new(dimension, length_scale, seed).expect("valid encoder config")
+        SpatialFourierEncoder::new(dimension, length_scale, seed, [0xA5; 32])
+            .expect("valid encoder config")
     }
 
     #[test]
@@ -453,9 +468,12 @@ mod tests {
         let enc_a = encoder(256, 1.0, 1);
         let enc_b = encoder(256, 1.0, 2);
         let enc_c = encoder(256, 2.0, 1);
+        let enc_d = SpatialFourierEncoder::new(256, 1.0, 1, [0x5A; 32])
+            .expect("valid alternate frame");
         let code_a = enc_a.encode(0.0, 0.0).expect("finite point");
         let code_b = enc_b.encode(0.0, 0.0).expect("finite point");
         let code_c = enc_c.encode(0.0, 0.0).expect("finite point");
+        let code_d = enc_d.encode(0.0, 0.0).expect("finite point");
 
         assert_eq!(
             enc_a.translate(&code_b, 1.0, 0.0).unwrap_err(),
@@ -465,24 +483,28 @@ mod tests {
             enc_a.similarity(&code_a, &code_c).unwrap_err(),
             SpatialFourierError::ConfigurationMismatch
         );
+        assert_eq!(
+            enc_a.similarity(&code_a, &code_d).unwrap_err(),
+            SpatialFourierError::ConfigurationMismatch
+        );
     }
 
     #[test]
     fn invalid_dimensions_and_scales_fail_closed() {
         assert_eq!(
-            SpatialFourierEncoder::new(7, 1.0, 0).unwrap_err(),
+            SpatialFourierEncoder::new(7, 1.0, 0, [0xA5; 32]).unwrap_err(),
             SpatialFourierError::InvalidDimension
         );
         assert_eq!(
-            SpatialFourierEncoder::new(9, 1.0, 0).unwrap_err(),
+            SpatialFourierEncoder::new(9, 1.0, 0, [0xA5; 32]).unwrap_err(),
             SpatialFourierError::InvalidDimension
         );
         assert_eq!(
-            SpatialFourierEncoder::new(128, 0.0, 0).unwrap_err(),
+            SpatialFourierEncoder::new(128, 0.0, 0, [0xA5; 32]).unwrap_err(),
             SpatialFourierError::InvalidLengthScale
         );
         assert_eq!(
-            SpatialFourierEncoder::new(128, f64::NAN, 0).unwrap_err(),
+            SpatialFourierEncoder::new(128, f64::NAN, 0, [0xA5; 32]).unwrap_err(),
             SpatialFourierError::InvalidLengthScale
         );
     }
