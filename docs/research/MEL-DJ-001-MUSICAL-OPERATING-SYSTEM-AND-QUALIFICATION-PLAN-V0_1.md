@@ -741,3 +741,42 @@ The source has 26 unit tests. GitHub read-back confirms module registration, sch
 ### Next evaluator step
 
 Do not implement a partial metric formula and label it MIREX-compatible. The next slice should pin a reference scorer implementation/version, document its exact tolerance and aggregation semantics, and create independent known-answer tests for F1/Cemgil/continuity/downbeat scoring. Cross-check against MIREX-published examples or a separately run reference implementation before claiming equivalence. Keep the official columns separate from DJ-specific tempo-ramp, phase-recovery, coverage and correction-burden measures.
+
+
+## 35. MEL-DJ-010 implementation — pinned MIREX beat metrics
+
+The first Rust score implementation is in [PR #14326](https://github.com/Luminous-Dynamics/symthaea/pull/14326), stacked on benchmark-manifest admission #14322 and transition contract #14267.
+
+The scorer is pinned to:
+- Official MIREX evaluator repository commit `b9fa0b0b32e2145af31f35830f78fc9d09a4301b`.
+- `mir_eval==0.8.2`, source commit `8db0b3812e2032544c1fc00d02d4256cab043f3d`.
+
+It implements the eight public MIREX beat columns separately: F-measure, original-level Cemgil, Goto, P-score, CMLc, CMLt, AMLc and AMLt. Cemgil best metric level is kept as an extra diagnostic, not substituted for the public Cemgil result. It reproduces the default five-second trim for the beat task, and provides a separate downbeat event F-measure path with a task-specific receipt. Aggregation mode is explicit: arithmetic mean per track (public evaluator default) or duration-weighted.
+
+The compatibility-sensitive details are pinned:
+- Estimate-centred floating-point event windows and maximum one-to-one event matching for F-measure.
+- 40 ms Cemgil sigma and original/best-of-five metric levels.
+- Goto's local phase/period errors, longest continuous correct region and sample standard deviation.
+- P-score's 10 ms impulse quantization, median reference IOI, 0.2 window and ties-to-even rounding.
+- CML/AML phase and period continuity at 0.175.
+
+The report schema and score receipt pin metric parameters and exact reference commits. The qualified score envelope binds the benchmark manifest, source audio, reference annotation, estimated output, source-master family and valid-segment policy/digest. The score implementation has 22 authored Rust tests and nine synthetic event-coordinate golden cases; no MIREX audio or private labels are present. A separate 5,000-case event-list comparison of the algorithm translation against installed `mir_eval==0.8.2` found no metric-vector differences. This is an analysis cross-check, not execution of the Rust binary.
+
+**Important scope boundary:** the scorer does not yet perform JSIR's valid-segment masking/aggregation internally. The score evidence records the declared policy and requires its digest, while the caller must currently provide event arrays already filtered according to that policy. The following section owns the full adapter.
+
+## 36. MEL-DJ-011 — valid-segment and JSIR aggregation adapter
+
+The follow-on is tracked in [issue #14327](https://github.com/Luminous-Dynamics/symthaea/issues/14327). The MIREX 2026 JSIR notes say metrics are evaluated only within annotated valid segments and weighted by duration. The exact sequence of five-second trimming, region masking, per-region scoring, track aggregation and final cohort weighting must be established against the reference evaluator/annotation representation before implementation.
+
+The adapter must not concatenate across invalid gaps and accidentally create a long inter-beat interval. It should retain per-region and per-track metric vectors, duration weights, empty/short-region diagnostics, and the exact valid-segment manifest digest. Only after these semantics are pinned can the programme claim protocol-equivalent JSIR scoring.
+
+## 37. Current benchmark engineering stack and qualification state
+
+The current review stack is:
+1. [#14267](https://github.com/Luminous-Dynamics/symthaea/pull/14267) — shared transition contract and source-clock constraints.
+2. [#14322](https://github.com/Luminous-Dynamics/symthaea/pull/14322) — benchmark-manifest admission, MIREX locked-set policy, rights/provenance, source-master leakage and valid-annotation structural checks.
+3. [#14326](https://github.com/Luminous-Dynamics/symthaea/pull/14326) — pinned beat score semantics and qualified score evidence.
+4. [#14317](https://github.com/Luminous-Dynamics/symthaea/pull/14317) — joint beat-phase/tempo verification consuming selected beat-grid reports.
+5. [#14327](https://github.com/Luminous-Dynamics/symthaea/issues/14327) — valid-segment/JSIR adapter remains pending.
+
+The implementation branches are reviewable and use only the existing `serde` and `serde_json` protocol dependencies. At the latest read, workflow jobs for the transition, manifest, beat-grid and metric PRs were queued; no compile/test pass was present. Local Rust formatting, compile, native/WASM tests and Clippy remain unrun because the execution environment does not have `rustc` or `cargo`. Authored tests and static source/schema read-back are not claimed as executed Rust qualification.
