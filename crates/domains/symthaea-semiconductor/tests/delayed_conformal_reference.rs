@@ -6,11 +6,13 @@ use sha2::{Digest, Sha256};
 use symthaea_semiconductor::benchmark::{
     CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_SCHEMA_V1,
     DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1,
+    BoundedConformalScoreContractV1, BoundedConformalScoreKindV1, BoundedPredictionSetInputV1,
     DELAYED_ACI_PREDICTION_SCHEMA_V1, CaOcrcFeedbackV1, CaOcrcPolicyV1,
     CaOcrcPredictionKindV1, CaOcrcRoundInputV1, CaOcrcTrackingDispositionV1,
     DelayedAciLabelDeliveryV1, DelayedAciPolicyV1, DelayedAciPredictionInputV1,
     DelayedAciDispositionV1, LabelConsumptionEligibilityReportV1,
     LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
+    bounded_conformal_score_contract_sha256_v1, build_bounded_score_prediction_set_v1,
     ca_ocrc_proxy_survival_v1, ca_ocrc_risk_gap_bound_v1,
     create_ca_ocrc_engine_v1, create_delayed_aci_engine_v1,
     deliver_delayed_aci_label_v1,
@@ -60,6 +62,17 @@ fn eligibility_report(
     report
 }
 
+fn bounded_score_contract() -> BoundedConformalScoreContractV1 {
+    BoundedConformalScoreContractV1 {
+        schema: "luminous.semi-bench.bounded-score-contract.v1".into(),
+        contract_id: "bounded-normalized-residual-v1".into(),
+        revision: 1,
+        score_kind: BoundedConformalScoreKindV1::BoundedScaleNormalizedAbsoluteResidual,
+        score_bound_b: 1.0,
+        scale_floor: 1.0e-6,
+    }
+}
+
 fn ca_policy() -> CaOcrcPolicyV1 {
     let mut pmf = vec![0.0; 6];
     pmf[0] = 0.5; // proxy delay -1 (do not track)
@@ -71,7 +84,9 @@ fn ca_policy() -> CaOcrcPolicyV1 {
         target_risk: 0.05,
         learning_rate: 0.10,
         score_bound_b: 1.0,
-        score_contract_sha256: digest('f'),
+        score_contract_sha256: bounded_conformal_score_contract_sha256_v1(
+            &bounded_score_contract(),
+        ).unwrap(),
         initial_threshold: 0.5,
         tracking_capacity: 2,
         maximum_feedback_delay: 4,
@@ -82,6 +97,20 @@ fn ca_policy() -> CaOcrcPolicyV1 {
 }
 
 fn ca_round(index: u64, draw: f64) -> CaOcrcRoundInputV1 {
+    let set = build_bounded_score_prediction_set_v1(
+        &bounded_score_contract(),
+        &BoundedPredictionSetInputV1 {
+            schema: "luminous.semi-bench.bounded-prediction-set-input.v1".into(),
+            prediction_id: format!("prediction-{index}"),
+            sample_id: format!("sample-{index}"),
+            measurement_event_id: format!("measurement-event-{index}"),
+            round_index: index,
+            global_model_artifact_sha256: digest('a'),
+            point_prediction: 100.0,
+            prediction_scale: 2.0,
+            threshold: 0.5,
+        },
+    ).unwrap();
     CaOcrcRoundInputV1 {
         schema: CA_OCRC_ROUND_SCHEMA_V1.into(),
         round_index: index,
@@ -89,11 +118,11 @@ fn ca_round(index: u64, draw: f64) -> CaOcrcRoundInputV1 {
         sample_id: format!("sample-{index}"),
         measurement_event_id: format!("measurement-event-{index}"),
         prediction_kind: CaOcrcPredictionKindV1::Nontrivial,
-        lower_bound: Some(0.0),
-        upper_bound: Some(1.0),
-        threshold_used: 0.5,
-        score_contract_sha256: digest('f'),
-        prediction_set_sha256: digest('g'),
+        lower_bound: set.lower_bound,
+        upper_bound: set.upper_bound,
+        threshold_used: set.threshold_used,
+        score_contract_sha256: set.score_contract_sha256,
+        prediction_set_sha256: set.receipt_sha256,
         event_time_unix_seconds: 1_800_000_000 + index as i64 * 60,
         prediction_at_unix_seconds: 1_800_000_002 + index as i64 * 60,
         clock_domain_id: "fab-clock".into(),
@@ -108,7 +137,7 @@ fn ca_feedback(origin: u64, current: u64, value: f64) -> CaOcrcFeedbackV1 {
         current_round: current,
         origin_round: origin,
         actual_delay: current - origin,
-        prediction_set_sha256: digest('g'),
+        prediction_set_sha256: ca_round(origin, 0.9).prediction_set_sha256,
         prediction_id: format!("prediction-{origin}"),
         sample_id: format!("sample-{origin}"),
         measurement_event_id: format!("measurement-event-{origin}"),
