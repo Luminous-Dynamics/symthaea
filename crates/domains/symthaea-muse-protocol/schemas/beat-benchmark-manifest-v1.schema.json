@@ -75,7 +75,8 @@
         "auto_only",
         "unknown",
         "synthetic_known_answer"
-      ]
+      ],
+      "description": "Auto-only reference labels are accepted only as unqualified exploratory material; synthetic_known_answer is reserved for generated fixtures."
     },
     "overlap_audit": {
       "enum": [
@@ -111,6 +112,8 @@
         "track_id",
         "dataset_id",
         "dataset_revision",
+        "dataset_reference",
+        "collection_process_reference",
         "audio_sha256",
         "source_master_family_id",
         "split",
@@ -235,6 +238,14 @@
               "type": "null"
             }
           ]
+        },
+        "dataset_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "collection_process_reference": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
