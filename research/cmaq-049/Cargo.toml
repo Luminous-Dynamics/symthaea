@@ -1,0 +1,13 @@
+[package]
+name = "cmaq-049-contextual-paired-kernel"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Anytime-valid conditional paired-kernel discrepancy monitor with context blocking"
+
+[dependencies]
+cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
+cmaq-048-fourier-kernel-approachability = { path = "../cmaq-048" }
+
+[workspace]
