@@ -45,7 +45,7 @@ The contract records all nine potential single-performer cells, including seven 
 - the work × performer incidence cells and observed/missing status;
 - performer membership weights in the schema; v0 execution accepts only one performer per cell and rejects ensemble/set-valued membership until a distinct ensemble estimand is defined;
 - distinct estimand kinds and explicit per-cell weights;
-- target work and performer marginals for the declared product-population estimand; the full target weight vector includes both missing cell records;
+- target work and performer marginals for the declared product-population estimand; the full target weight vector includes both missing cell records, and the qualifier recomputes the marginals from the joint cell weights;
 - connected components, isolated nodes, and maximum row/column degree;
 - a fail-closed disposition when target cells are missing and extrapolation is not authorized.
 
@@ -69,6 +69,10 @@ Candidate procedures must be compared against the **same estimand**:
 - multi-performer cells require an explicit ensemble or multiple-membership estimand. Never duplicate one ensemble cell once for every member and treat those copies as independent observations.
 
 The next simulation increment under #14026 should hold the data-generating process fixed while varying incidence imbalance, degree concentration, missingness mechanism and graph connectivity. Each candidate method must report bias, interval coverage, type-I error, interval width, Monte Carlo uncertainty and rejection/not-estimable rate against the same declared target.
+
+## Joint-to-marginal consistency
+
+For a declared target-population mean, v0 requires one explicit joint weight for every potential work × performer cell, including missing records, and complete work/performer marginal weight vectors. The qualifier derives each marginal by summing the joint cell weights over the other axis and rejects any disagreement. This does not assume independence or require product weights: it permits any declared joint distribution whose marginals are internally consistent. The retained uniform product fixture is one special case.
 
 ## Fail-closed rules
 
