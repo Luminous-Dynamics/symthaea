@@ -32,6 +32,7 @@ pub struct ObserverVerificationContext<'a> {
     pub challenge_nonce: &'a str,
     pub verification_time: &'a str,
     pub task_corpus_sha256: &'a str,
+    pub expected_trust_store_sha256: &'a str,
     pub observation_bytes: &'a [u8],
 }
 
@@ -228,6 +229,11 @@ pub fn verify_and_consume(
         "eqc-observer-trust-store-v0.1.schema.json",
         repository_root,
     )?;
+    if !is_sha256(context.expected_trust_store_sha256)
+        || sha256(trust_store_bytes) != context.expected_trust_store_sha256
+    {
+        bail!("observer trust store does not match the externally pinned trust-store digest");
+    }
 
     if required_str(envelope, "/schema")? != "luminous.eqc.observer-envelope.v0.1" {
         bail!("unsupported observer envelope schema");
@@ -311,10 +317,14 @@ pub fn verify_and_consume(
         .get("keys")
         .and_then(Value::as_array)
         .context("observer trust store has no keys array")?;
-    let key = keys
+    let matching_keys = keys
         .iter()
-        .find(|key| key.get("key_id").and_then(Value::as_str) == Some(key_id))
-        .context("observer key id is not present in the externally supplied trust store")?;
+        .filter(|key| key.get("key_id").and_then(Value::as_str) == Some(key_id))
+        .collect::<Vec<_>>();
+    if matching_keys.len() != 1 {
+        bail!("observer key id must resolve to exactly one trust-store entry");
+    }
+    let key = matching_keys[0];
     if required_str(key, "/status")? != "active"
         || required_str(key, "/observer_id")? != observer_id
     {
@@ -421,6 +431,7 @@ pub fn verify_and_consume(
         .get("replay")
         .context("observer payload has no replay evidence")?;
     if required_str(replay, "/status")? != "passed"
+        || required_str(observation, "/verifier/replay")? != "passed"
         || required_str(replay, "/result_sha256")?
             != required_str(observation, "/result_digest_sha256")?
         || required_str(replay, "/verifier_id")?
@@ -526,6 +537,8 @@ mod tests {
             }
         });
         let signing_key = SigningKey::from_bytes(&TEST_KEY_SEED);
+        let observation_bytes = serde_json::to_vec(&observation).unwrap();
+        let observation_sha256 = sha256(&observation_bytes);
         let payload = json!({
             "schema": "luminous.eqc.observer-payload.v0.1",
             "task_id": "eqc-observer-demo-001",
@@ -534,7 +547,7 @@ mod tests {
             "issued_at": "2026-11-28T10:00:00Z",
             "expires_at": "2026-11-28T10:05:00Z",
             "task_corpus_sha256": VALID_SHA,
-            "system_observation_sha256": VALID_SHA,
+            "system_observation_sha256": observation_sha256,
             "observer": {
                 "observer_id": "observer-1",
                 "key_id": "observer-key-1",
@@ -607,6 +620,7 @@ mod tests {
             challenge_nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             verification_time: "2026-11-28T10:01:00Z",
             task_corpus_sha256: VALID_SHA,
+            expected_trust_store_sha256: &sha256(&trust_bytes),
             observation_bytes: &observation_bytes,
         };
         let verified = verify_and_consume(
