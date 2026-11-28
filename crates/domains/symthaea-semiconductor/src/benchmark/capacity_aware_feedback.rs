@@ -964,7 +964,7 @@ mod tests {
             lower_bound: Some(0.0), upper_bound: Some(1.0),
             threshold_used: 0.5,
             score_contract_sha256: digest('f'),
-            prediction_set_sha256: digest('g'),
+            prediction_set_sha256: digest('7'),
             event_time_unix_seconds: 1_800_000_000 + index as i64 * 60,
             prediction_at_unix_seconds: 1_800_000_002 + index as i64 * 60,
             clock_domain_id: "fab-clock".into(), uniform_draw: draw,
@@ -976,7 +976,7 @@ mod tests {
         CaOcrcFeedbackV1 {
             schema: CA_OCRC_FEEDBACK_SCHEMA_V1.into(), current_round: current,
             origin_round: origin, actual_delay: current - origin,
-            prediction_set_sha256: digest('g'),
+            prediction_set_sha256: digest('7'),
             prediction_id: format!("pred-{origin}"),
             sample_id: format!("sample-{origin}"),
             measurement_event_id: format!("event-{origin}"),
