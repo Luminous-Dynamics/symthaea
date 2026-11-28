@@ -14,7 +14,7 @@ Counting dependency clusters instead of raw replay runs reduces overconfident re
 | Missing/incomplete replay denominator | 100% retained as cluster non-success |
 | Duplicate units, seeds and replay IDs | 100% blocked |
 | Receipt/domain manifest tampering | 100% blocked |
-| Mixed-stratum pooling | 0 accepted |
+| Mixed-stratum pooling | 0 accepted |\n| Mixed cluster-size pooling | 0 accepted without a stratified plan |\n| Replay scope / seed schedule drift | 100% blocked |
 | Exact confidence bounds | 100% known-answer arithmetic |
 | Campaign authorization from hash-only input | 0 permitted |
 
