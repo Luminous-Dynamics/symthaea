@@ -672,6 +672,21 @@ mod tests {
     }
 
     #[test]
+    fn add_package_does_not_confuse_longer_attribute_prefix() {
+        let config = r#"{ config, pkgs, ... }:
+{
+  environment.systemPackages = [
+    pkgs.github-cli
+  ];
+}
+"#;
+        let (_dir, writer) = setup_temp_config(config);
+        let patch = writer.add_system_package("git").unwrap();
+        assert!(patch.modified.contains("pkgs.git"));
+        assert!(patch.modified.contains("pkgs.github-cli"));
+    }
+
+    #[test]
     fn test_add_existing_package_noop() {
         let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
         let patch = writer.add_system_package("firefox").unwrap();
