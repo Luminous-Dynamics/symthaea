@@ -211,3 +211,49 @@ H7: Portable sidecars and explicit loss reports reduce migration friction across
 - No unsupported real-time or hardware claims.
 - Exact-head Rust formatting, compile, tests, and Clippy evidence attached when executable implementation exists.
 - Independent statistical review completed before inferential leaderboard claims.
+
+
+## 11. Integration with existing Melothaea evidence work
+
+This programme is a consumer of the auditory-evidence substrate, not a competing implementation of it. Coordinate with the existing open work before adding low-level audio abstractions:
+
+- **#14227 / MEL-HEAR-011 owns the physics-grounded auditory-scene substrate.** It is responsible for preserving source audio provenance, multi-resolution signal views (including phase-capable evidence), psychoacoustic grouping cues, performance dynamics, source/room/channel hypotheses, identifiability and residuals. DJ preparation and transition planning should consume versioned evidence references from that layer. Do not build a second STFT/ERB/CQT, auditory-grouping or source-cause pipeline inside the DJ workspace.
+- **#7230 / MEL-005A owns the canonical symbolic score-state trajectory.** Keep score-derived timing and content distinct from audio-derived event evidence; align them with explicit receipts.
+- **#13908 owns property-relative musical identity** and the acoustic-STAY / performance-STAY / musical-FLIP distinctions. This is directly relevant to deciding whether a proposed transition preserves a hook, groove, chord, vocal phrase or rhythmic role despite mastering, EQ, room, instrument or performance changes.
+- **#14147 owns the perception / audio-derived reasoning / oracle-symbolic decomposition.** Use it to prevent an oracle-assisted score from being reported as an audio-only result.
+- **#14144 owns generic transformation-path algebra** and commutator checks; DJ-specific contracts should specialize it rather than introduce another general path framework.
+- **#14151 owns the symbolic identity quotient consumer.** It is not a replacement for acoustic evidence, and must not prune a candidate solely from a learned embedding.
+- **#4121 and #12892 remain bounded adjacent primitives** for waveform-window overlap accounting and speech F0/voicing/energy respectively. Neither is a complete music-scene or DJ-tempo solution.
+
+The DJ-specific adapter should retain immutable references to the source audio, analysis configuration/version, time-support intervals, evidence claims, competing hypotheses, uncertainty, residuals, and abstention reasons. A transition receipt should say exactly which evidence versions it consumed. Re-analysis must not silently mutate an already-reviewed plan.
+
+## 12. Benchmark decomposition and updated SOTA protocol
+
+MEL-DJ-001 is the programme umbrella. Split executable scorecards so that gains cannot be hidden by a composite score:
+
+| Suite | Scope | Critical comparison |
+|---|---|---|
+| MEL-DJ-002 — Transition Contract Oracle | Typed contract validation, authorization, timing, source integrity, replay | Exhaustive deterministic known-answer fixtures; 100% hard-gate compliance |
+| MEL-DJ-003 — Musical Property FLIP/STAY | Whether a queried musical property changed under controlled acoustic/performance/production interventions | #13908 cases; MusicListenBench-style FLIP/STAY; real recordings and out-of-domain slices |
+| MEL-DJ-004 — Transition Quality | Alignment, structure, stem routing/gains, energy, contrast, phrase fit, perceived quality | Fixed crossfade, BPM/key heuristics, rule-based baseline, MixWeaver reproduction, and DJtransGAN where code/weights/data permit |
+| MEL-DJ-005 — Live Runtime and Control | Audio deadline, xruns, monitoring, latency, controller safety, recovery | Device/configuration-specific soak tests and fault injection; no offline-to-live extrapolation |
+| MEL-DJ-006 — DJ Copilot Causal Value | Set intent, decision quality, workload, agency, trust calibration | Counterbalanced randomized, sham, and yoked interventions; novice/expert slices |
+
+For MEL-DJ-004, do not claim that reproducing MixWeaver's reported ablation/preference results establishes superiority. Its ISMIR 2026 post-review update explicitly says the study did not directly compare with DJtransGAN; it also narrows the current objective to smooth intro/outro blending, acknowledges that hard cuts/abrupt transitions can be unfairly penalized, and states that its dataset comes from the authors' personal collections rather than a public dataset. Its listening study and objective results are valuable baselines, not a complete DJ-performance evaluation. Reproduce the disclosed method as closely as available, publish deviations, and test transition types its objective does not cover.
+
+For MEL-DJ-003, use paired interventions with opposite expected outcomes. FLIP changes the queried musical property; STAY changes irrelevant sound/performance/production factors while preserving that property. Include same-chord re-strums, room/reverb, hiss/noise, gain, EQ, codec, mastering, instrument substitution, tuning, expressive timing, and real recordings. Evaluate false flips and missed flips separately, calibration, selective risk under abstention, and per-property results. Do not let an audio model use oracle notation in the audio-only track.
+
+For MEL-DJ-004 stem claims, report SI-SDR/SDR and spectral metrics alongside Bleedless and Fullness, reconstruction residual, phase consistency, transient preservation, role/event accuracy, and listening preference. The November 2026 TISMIR MVSep Quality Checker work shows that bleed and missing target content are complementary dimensions that a single SDR number can conceal. Freeze model versions, separation settings, segment support, and test splits; never compare a precomputed high-quality stem to an online low-latency stem without labelling the different compute/latency budgets.
+
+## 13. Competitive execution strategy
+
+The late-2026 incumbent feature set means parity and interoperability need to be treated seriously:
+
+- Rekordbox 7 exposes 3/4-stem controls, Mix Point Link, cloud library workflows, AI vocal-position detection, and personalized cue-point automation.
+- Serato exposes real-time or pre-prepared vocal/bass/melody/drum separation and stem-based effects.
+- Traktor Pro 4 offers four decks, flexible beatgrids, stem separation, DVS, and controller mapping.
+- Engine DJ 5.3.0 (released 5 November 2026) documents playlist/crate import and reimport flows for Serato, Apple Music/iTunes, rekordbox and Traktor, alongside standalone workflows and stem rendering in its ecosystem.
+
+These are source-backed product capabilities, not evidence that all products have equivalent quality or that every feature works on every hardware profile. Maintain a dated capability matrix, record product/version/hardware/subscription context, and validate each interoperability claim with lawful fixture-based round trips.
+
+The defensible route beyond incumbent systems is not a raw feature count. It is a reproducible advantage on: (1) property-relative musical judgment under nuisance transformations; (2) transition success across more than smooth EDM-style blends; (3) calibrated abstention when beat, structure, or stem evidence is ambiguous; (4) set-level intent attainment without homogenizing taste; (5) measurable reduction in DJ workload with preserved agency; and (6) auditable portability with explicit metadata-loss accounting. A claim of state of the art requires protocol-matched data, frozen baselines, held-out DJs and source tracks, uncertainty intervals, and public failure slices. Closed competitors should be compared in controlled user studies or exported artifacts where feasible, not by inventing internal benchmark numbers.
