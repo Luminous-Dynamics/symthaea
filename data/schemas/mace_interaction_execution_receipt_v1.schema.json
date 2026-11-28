@@ -1,0 +1,415 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_interaction_execution_receipt_v1.schema.json",
+  "title": "MACE Interaction Execution Receipt V1",
+  "description": "Binds action-policy selections to independently verifiable executor events. Digests are not signatures and do not establish semantic response quality.",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_sha256",
+        "subject_id",
+        "scope_id",
+        "purpose_id",
+        "audience_id",
+        "valid_at_ms",
+        "known_at_ms",
+        "policy_sha256"
+      ],
+      "properties": {
+        "request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "subject_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "scope_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "purpose_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "audience_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "valid_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "requirement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "control_id",
+            "setting_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "control_equals"
+            },
+            "control_id": {
+              "$ref": "#/$defs/nonempty"
+            },
+            "setting_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "action_class_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "action_must_occur"
+            },
+            "action_class_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "action_class_sha256",
+            "window_start_ms",
+            "window_end_ms"
+          ],
+          "properties": {
+            "kind": {
+              "const": "action_must_not_occur"
+            },
+            "action_class_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "window_start_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "window_end_ms": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      ]
+    },
+    "preference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preference_id",
+        "dimension_id",
+        "setting_sha256",
+        "source_evidence_receipt_sha256",
+        "scope_id",
+        "purpose_id",
+        "audience_id",
+        "valid_from_ms",
+        "valid_until_ms",
+        "known_from_ms",
+        "known_until_ms",
+        "requirements"
+      ],
+      "properties": {
+        "preference_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "dimension_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "setting_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_evidence_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "purpose_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "audience_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "valid_from_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_until_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "known_from_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_until_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "requirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/requirement"
+          }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selection_id",
+        "subject_id",
+        "context_sha256",
+        "decision_policy_sha256",
+        "selection_authority_receipt_sha256",
+        "preferences",
+        "selection_sha256"
+      ],
+      "properties": {
+        "selection_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "subject_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "selection_authority_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "preferences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/preference"
+          }
+        },
+        "selection_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "eventKind": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "control_id",
+            "setting_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "control_applied"
+            },
+            "control_id": {
+              "$ref": "#/$defs/nonempty"
+            },
+            "setting_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "action_class_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "action_emitted"
+            },
+            "action_class_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "action_class_sha256",
+            "window_start_ms",
+            "window_end_ms",
+            "observed_through_ms",
+            "action_events_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "no_action_window_closed"
+            },
+            "action_class_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "window_start_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "window_end_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "observed_through_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "action_events_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "response_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "response_committed"
+            },
+            "response_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "selection_id",
+        "subject_id",
+        "occurred_at_ms",
+        "source_receipt_sha256",
+        "kind"
+      ],
+      "properties": {
+        "event_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "selection_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "subject_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "occurred_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "kind": {
+          "$ref": "#/$defs/eventKind"
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "selection_id",
+        "request_sha256",
+        "response_sha256",
+        "context_sha256",
+        "selection_sha256",
+        "event_manifest_sha256",
+        "executor_build_sha256",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_interaction_execution_receipt_v1"
+        },
+        "selection_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "response_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "selection_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "event_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "executor_build_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/context"
+    },
+    {
+      "$ref": "#/$defs/requirement"
+    },
+    {
+      "$ref": "#/$defs/preference"
+    },
+    {
+      "$ref": "#/$defs/selection"
+    },
+    {
+      "$ref": "#/$defs/event"
+    },
+    {
+      "$ref": "#/$defs/receipt"
+    }
+  ]
+}

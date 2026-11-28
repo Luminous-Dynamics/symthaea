@@ -1,0 +1,27 @@
+name: MACE Interaction Execution Receipt
+on:
+  pull_request:
+    paths:
+      - "research/mace-interaction-execution-receipt-v0-1/**"
+      - "data/schemas/mace_interaction_execution_receipt_v1.schema.json"
+      - "docs/research/MACE_INTERACTION_EXECUTION_RECEIPT_V0_1.md"
+      - ".github/workflows/mace-interaction-execution-receipt.yml"
+  push:
+    branches:
+      - "research/mace-interaction-execution-receipt-v0-1"
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust format
+        run: cargo fmt --manifest-path research/mace-interaction-execution-receipt-v0-1/Cargo.toml -- --check
+      - name: Contract tests
+        run: cargo test --manifest-path research/mace-interaction-execution-receipt-v0-1/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/mace-interaction-execution-receipt-v0-1/Cargo.toml --all-targets -- -D warnings
+      - name: Parse schema
+        run: python3 -m json.tool data/schemas/mace_interaction_execution_receipt_v1.schema.json >/dev/null
