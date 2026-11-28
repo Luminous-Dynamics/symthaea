@@ -636,6 +636,22 @@ mod tests {
     }
 
     #[test]
+    fn optional_message_metadata_may_be_absent() {
+        let raw = r#"{"msg_node":"Msg_1","content":"Minimal message.","channel":"team"}"#;
+        let parsed: GroupMessageV1 = serde_json::from_str(raw).expect("optional metadata defaults");
+        assert_eq!(parsed.author, None);
+        assert_eq!(parsed.role, None);
+        assert_eq!(parsed.timestamp, None);
+        assert_eq!(parsed.reply_to, None);
+        assert_eq!(parsed.phase_name, None);
+        assert_eq!(parsed.topic, None);
+        assert_eq!(
+            parsed.format_retrieved_passage(),
+            "[user=? / channel=team / msg_node=Msg_1]\nMinimal message."
+        );
+    }
+
+    #[test]
     fn canonical_order_is_channel_then_timestamp_then_message_id() {
         let ordered = vec![
             message("Msg_2", "alpha", "2026-01-02T00:00:00Z", "second"),
