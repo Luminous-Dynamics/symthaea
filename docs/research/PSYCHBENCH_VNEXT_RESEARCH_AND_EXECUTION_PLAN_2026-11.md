@@ -132,6 +132,19 @@ Keep a public development set and a private/sequestered confirmatory set. Use pr
 
 ---
 
+## 2.5 Pilot benchmark registry
+
+An initial, explicitly incomplete machine-readable registry is now present:
+
+- `crates/domains/symthaea-psych-bench/registry/psych_bench_registry_v0.1.json`
+- `crates/domains/symthaea-psych-bench/registry/psych_bench_registry_v0.1.schema.json`
+
+The pilot covers seven selected implementations (N-back, Stroop, metacognitive calibration, false-belief, causal intervention, shared-input HOT/GWT theory probe, and PCE) with 28 metric definitions. It records implementation paths, construct cards, evidence classes, stimulus provenance, metric bounds/units/directions, validation status, and comparison eligibility.
+
+A structural check parsed the registry and schema and verified unique IDs, implementation path prefixes, metric selector exclusivity, bound ordering, and declared enums. **This is not yet a full JSON Schema validation or CI gate.** It is not the full benchmark inventory, is not yet consumed by the runner, and must not be used to publish total benchmark counts. Next steps are a typed Rust loader, exact metric-key existence checks, completeness coverage, generated README/paper tables, and CI schema validation.
+
+An important example of why the registry matters: the existing N-back field named `accuracy` is computed as hit rate minus false-alarm rate, so its support is [-1,1], not [0,1]. Likewise, Stroop effect is congruent minus incongruent accuracy (a signed difference), and intervention discrimination is one minus cosine similarity (support [0,2]). These semantics must travel with the metric rather than be inferred from names.
+
 ## 3. PsychBench Next architecture
 
 ### 3.1 Five evidence classes
