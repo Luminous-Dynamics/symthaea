@@ -1,0 +1,43 @@
+name: CMAQ-054 evidence-adaptive kernel family
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-054/**"
+      - "research/cmaq-053/**"
+      - "research/cmaq-048/**"
+      - "research/cmaq-046/**"
+      - ".github/workflows/cmaq-054.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-054-kernel-family
+  cancel-in-progress: true
+
+jobs:
+  evidence-adaptive-kernel-family:
+    name: evidence-adaptive-kernel-family
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-054-evidence-adaptive-kernel-family-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-054/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-054/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-054/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Multi-scale evidence-posterior probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-054/Cargo.toml --locked --bin kernel_family_probe > cmaq-054-kernel-family-smoke.csv
+      - name: Preserve kernel-family artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-054-kernel-family-smoke
+          path: cmaq-054-kernel-family-smoke.csv
+          if-no-files-found: error
