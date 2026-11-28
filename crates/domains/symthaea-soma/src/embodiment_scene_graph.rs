@@ -270,6 +270,18 @@ pub fn verify_scene_graph_v2(
 ) -> Result<(), SceneGraphV2Error> {
     let frame = compile_scene(cue, permit)
         .map_err(SceneGraphV2Error::SceneCompileRejected)?;
+    match &cue.semantic {
+        SemanticCue::AttentionFocus { target, .. } if target.trim().is_empty() => {
+            return Err(SceneGraphV2Error::InvalidSemanticTarget);
+        }
+        SemanticCue::TurnState {
+            state: TurnState::Yield,
+            target: Some(target),
+        } if target.trim().is_empty() => {
+            return Err(SceneGraphV2Error::InvalidSemanticTarget);
+        }
+        _ => {}
+    }
     let expected_cue_digest =
         canonical_cue_digest(cue).map_err(|_| SceneGraphV2Error::CanonicalCueDigestMismatch)?;
 
