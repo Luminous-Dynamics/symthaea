@@ -184,25 +184,29 @@ pub enum TemporalDisposition {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemporalEvidenceResult {
-    pub evidence_id: String,
-    pub disposition: TemporalDisposition,
-    pub reason_codes: Vec<String>,
+    // Not public: candidate-controlled callers must not mint trusted outcomes.
+    pub(crate) evidence_id: String,
+    pub(crate) disposition: TemporalDisposition,
+    pub(crate) reason_codes: Vec<String>,
 }
 
 /// Typed boundary for the shared #11253 time-frontier result.
 ///
+/// Construction is crate-internal. External callers cannot create a PASS by
+/// populating public fields; a concrete adapter inside this crate must first
+/// consume the shared #11253 kernel and #11264 principal/rights proof bridge.
 /// The verifier checks exact ID/frontier/profile binding, but does not
-/// authenticate the upstream proof itself. That remains the responsibility of
-/// the #11264 schema/proof adapter and Mycelix provenance/rights verifier.
+/// authenticate upstream proof material itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemporalEvaluation {
-    pub evaluation_mode: String,
-    pub decision_frontier: String,
-    pub principal_profile_id: Option<String>,
-    pub rights_profile_id: Option<String>,
-    pub verifier_id: String,
-    pub verifier_build_sha256: String,
-    pub evidence: Vec<TemporalEvidenceResult>,
+    // Not public: only the in-crate trusted adapter can construct this value.
+    pub(crate) evaluation_mode: String,
+    pub(crate) decision_frontier: String,
+    pub(crate) principal_profile_id: Option<String>,
+    pub(crate) rights_profile_id: Option<String>,
+    pub(crate) verifier_id: String,
+    pub(crate) verifier_build_sha256: String,
+    pub(crate) evidence: Vec<TemporalEvidenceResult>,
 }
 
 /// Bounded, caller-supplied resolver for immutable artifact bytes.
