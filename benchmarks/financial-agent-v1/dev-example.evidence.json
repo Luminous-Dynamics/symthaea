@@ -1,0 +1,70 @@
+{
+  "schema_version": "luminous.financial-research-evidence-manifest.v1",
+  "artifacts": [
+    {
+      "schema_version": "luminous.financial-research-evidence.v1",
+      "evidence_id": "ev.synthetic.supplier-status.0001",
+      "source_id": "synthetic-source.supplier-status.v1",
+      "source_record_id": "SYN-REC-SUPPLIER-0001",
+      "subject_refs": [
+        "SYN-BUYER-01",
+        "SYN-SUPPLIER-01"
+      ],
+      "evidence_kind": "supply_chain_observation",
+      "content_sha256": "00267da342f0e0901070c16ceb5b0daeda51172cc3fd23dd7a60d99179501adc",
+      "media_type": "application/json",
+      "published_at": "2026-09-30T09:00:00Z",
+      "valid_from": "2026-09-30T09:00:00Z",
+      "valid_until": null,
+      "known_at": "2026-09-30T09:15:00Z",
+      "retrieved_at": "2026-09-30T09:15:00Z",
+      "provenance_family_id": "synthetic-family.supplier.v1",
+      "rights_profile": "synthetic-public-development",
+      "access_class": "public",
+      "payload_ref": "inline:/artifacts/0/metadata/synthetic_record",
+      "metadata": {
+        "synthetic_record": {
+          "fictional_subject_id": "SYN-BUYER-01",
+          "observation_type": "supplier_status",
+          "supplier_id": "SYN-SUPPLIER-01",
+          "status": "shipment_schedule_disrupted",
+          "reported_at": "2026-09-30T09:00:00Z",
+          "buyer_purchase_share": "unknown",
+          "buyer_inventory_buffer": "unknown"
+        }
+      }
+    },
+    {
+      "schema_version": "luminous.financial-research-evidence.v1",
+      "evidence_id": "ev.synthetic.energy-index.0001",
+      "source_id": "synthetic-source.energy-index.v1",
+      "source_record_id": "SYN-REC-ENERGY-0001",
+      "subject_refs": [
+        "SYN-ENERGY-STRESS-INDEX",
+        "SYN-BUYER-01"
+      ],
+      "evidence_kind": "macro_series",
+      "content_sha256": "d2f2546d4770292721f77a509cf1e3fb6d1b1a12c9ee8c85f9d5c291dec203b6",
+      "media_type": "application/json",
+      "published_at": "2026-09-30T10:00:00Z",
+      "valid_from": "2026-09-01T00:00:00Z",
+      "valid_until": "2026-10-01T00:00:00Z",
+      "known_at": "2026-09-30T10:10:00Z",
+      "retrieved_at": "2026-09-30T10:10:00Z",
+      "provenance_family_id": "synthetic-family.energy.v1",
+      "rights_profile": "synthetic-public-development",
+      "access_class": "public",
+      "payload_ref": "inline:/artifacts/1/metadata/synthetic_record",
+      "metadata": {
+        "synthetic_record": {
+          "series_id": "SYN-ENERGY-STRESS-INDEX",
+          "value": "124",
+          "unit": "index_points",
+          "period": "2026-09",
+          "published_at": "2026-09-30T10:00:00Z",
+          "buyer_energy_tariff": "unknown"
+        }
+      }
+    }
+  ]
+}

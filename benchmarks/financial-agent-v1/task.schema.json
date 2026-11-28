@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/financial-agent-v1/task.schema.json",
+  "title": "Luminous Financial Research Task Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "cohort",
+    "category",
+    "language",
+    "complexity",
+    "decision_at",
+    "prompt",
+    "evidence_manifest_sha256",
+    "evidence_ids",
+    "allowed_tools",
+    "budget",
+    "scoring_profile"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "luminous.financial-research-task.v1"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"
+    },
+    "cohort": {
+      "enum": [
+        "development_public",
+        "sealed_synthetic",
+        "historical_point_in_time",
+        "prospective_shadow",
+        "analyst_comparison"
+      ]
+    },
+    "category": {
+      "enum": [
+        "company_research",
+        "market_event",
+        "financial_statement",
+        "macro_economics",
+        "credit_risk",
+        "portfolio_exposure",
+        "real_asset_underwriting",
+        "accounting_audit",
+        "supply_chain_risk",
+        "monetary_system",
+        "inequality_distribution",
+        "regenerative_economics",
+        "other"
+      ]
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$"
+    },
+    "complexity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "decision_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 12000
+    },
+    "evidence_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      },
+      "uniqueItems": true
+    },
+    "allowed_tools": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "uniqueItems": true
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_wall_ms",
+        "max_tool_calls",
+        "max_input_tokens",
+        "max_output_tokens",
+        "currency"
+      ],
+      "properties": {
+        "max_wall_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_cost_minor_units": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        }
+      }
+    },
+    "scoring_profile": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "rights_profile": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "sealed_oracle_ref": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 128
+      },
+      "uniqueItems": true
+    }
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/financial-agent-v1/evidence.schema.json",
+  "title": "Luminous Financial Research Evidence Artifact v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "source_id",
+    "source_record_id",
+    "subject_refs",
+    "evidence_kind",
+    "content_sha256",
+    "media_type",
+    "known_at",
+    "retrieved_at",
+    "provenance_family_id",
+    "rights_profile",
+    "access_class",
+    "payload_ref"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "luminous.financial-research-evidence.v1"
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source_record_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "subject_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      },
+      "uniqueItems": true
+    },
+    "evidence_kind": {
+      "enum": [
+        "filing",
+        "financial_statement",
+        "price_observation",
+        "quote_observation",
+        "trade_observation",
+        "macro_series",
+        "market_calendar",
+        "corporate_action",
+        "policy_document",
+        "company_announcement",
+        "research",
+        "supply_chain_observation",
+        "geospatial_observation",
+        "physical_measurement",
+        "model_output",
+        "other"
+      ]
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "media_type": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "published_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "valid_from": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "valid_until": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "known_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "retrieved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "provenance_family_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "rights_profile": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "access_class": {
+      "enum": [
+        "public",
+        "licensed",
+        "participant_authorized",
+        "sealed_evaluator_only"
+      ]
+    },
+    "payload_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "supersedes_evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}
