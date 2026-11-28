@@ -47,12 +47,23 @@ pub struct CalibrationConfigV1 {
     pub calibration_data_sha256: String,
     pub calibration_split_sha256: String,
     pub group_hierarchy_sha256: String,
+    pub cluster_unit_definition_sha256: String,
+    pub cluster_sampling_design_sha256: String,
+    pub cluster_workload_policy_sha256: String,
+    pub cluster_assignment_manifest_sha256: String,
+    pub maximum_observations_per_cluster: usize,
+    pub cluster_design_receipt_sha256: String,
     pub sufficiency_score_definition_sha256: String,
     pub decision_loss_definition_sha256: String,
     pub decision_policy_sha256: String,
     pub candidate_code_sha256: String,
     pub evaluator_code_sha256: String,
     pub threshold_grid_sha256: String,
+    pub threshold_grid_source: ThresholdGridSourceV1,
+    pub threshold_grid_source_sha256: String,
+    pub threshold_grid_precommitment_sha256: String,
+    pub threshold_grid_committed_at_ms: u64,
+    pub calibration_opened_at_ms: u64,
     pub thresholds: Vec<f64>,
     pub threshold_selection_method: ThresholdSelectionMethodV1,
     pub risk_target_alpha: f64,
@@ -67,6 +78,13 @@ pub struct CalibrationConfigV1 {
 pub enum ThresholdSelectionMethodV1 {
     FixedSequenceCluster,
     BonferroniSimultaneous,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThresholdGridSourceV1 {
+    DomainPredeclared,
+    IndependentPilot,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -98,6 +116,9 @@ pub struct GroupCertificateV1 {
     pub decision_policy_sha256: String,
     pub sufficiency_score_definition_sha256: String,
     pub group_hierarchy_sha256: String,
+    pub cluster_unit_definition_sha256: String,
+    pub cluster_sampling_design_sha256: String,
+    pub cluster_workload_policy_sha256: String,
     pub group_id: String,
     pub group_path: Vec<String>,
     pub parent_group_id: Option<String>,
@@ -144,8 +165,19 @@ pub struct CalibrationManifestV1 {
     pub candidate_code_sha256: String,
     pub evaluator_code_sha256: String,
     pub threshold_grid_sha256: String,
+    pub threshold_grid_source: ThresholdGridSourceV1,
+    pub threshold_grid_source_sha256: String,
+    pub threshold_grid_precommitment_sha256: String,
+    pub threshold_grid_committed_at_ms: u64,
+    pub calibration_opened_at_ms: u64,
     pub threshold_count: usize,
     pub group_count: usize,
+    pub cluster_unit_definition_sha256: String,
+    pub cluster_sampling_design_sha256: String,
+    pub cluster_workload_policy_sha256: String,
+    pub cluster_assignment_manifest_sha256: String,
+    pub maximum_observations_per_cluster: usize,
+    pub cluster_design_receipt_sha256: String,
     pub calibration_method: String,
     pub risk_target_alpha: f64,
     pub familywise_delta: f64,
@@ -190,6 +222,11 @@ pub enum CalibrationRejectV1 {
     GroupHierarchyDigestMismatch,
     CalibrationDataDigestMismatch,
     ThresholdGridDigestMismatch,
+    ThresholdGridPrecommitmentMismatch,
+    ClusterDesignReceiptMismatch,
+    ClusterAssignmentManifestMismatch,
+    DuplicateOutcomeReceipt,
+    ClusterWorkloadLimitExceeded,
     SerializationFailure,
 }
 
@@ -222,6 +259,9 @@ pub struct DecisionInputV1 {
     pub sufficiency_score: f64,
     pub sufficiency_score_definition_sha256: String,
     pub group_hierarchy_sha256: String,
+    pub cluster_unit_definition_sha256: String,
+    pub cluster_sampling_design_sha256: String,
+    pub cluster_workload_policy_sha256: String,
     pub hard_gates_pass: bool,
     pub distribution_shift_detected: bool,
     pub evidence_acquisition_available: bool,
@@ -245,6 +285,9 @@ pub struct DecisionAssessmentV1 {
     pub policy_sha256: String,
     pub sufficiency_score_definition_sha256: String,
     pub group_hierarchy_sha256: String,
+    pub cluster_unit_definition_sha256: String,
+    pub cluster_sampling_design_sha256: String,
+    pub cluster_workload_policy_sha256: String,
     pub group_id: String,
     pub action: DecisionActionV1,
     pub status: DecisionAssessmentStatusV1,
@@ -268,6 +311,87 @@ fn digest_serialized<T: Serialize + ?Sized>(value: &T) -> Result<String, Calibra
     serde_json::to_vec(value).map(|bytes| sha256_hex(&bytes)).map_err(|_| CalibrationRejectV1::SerializationFailure)
 }
 
+#[derive(Serialize)]
+struct ThresholdGridPrecommitmentProjectionV1<'a> {
+    schema_version: &'static str,
+    run_id: &'a str,
+    source: ThresholdGridSourceV1,
+    source_sha256: &'a str,
+    threshold_grid_sha256: &'a str,
+    intended_calibration_split_sha256: &'a str,
+    committed_at_ms: u64,
+}
+
+#[derive(Serialize)]
+struct ClusterDesignProjectionV1<'a> {
+    schema_version: &'static str,
+    calibration_split_sha256: &'a str,
+    cluster_unit_definition_sha256: &'a str,
+    cluster_sampling_design_sha256: &'a str,
+    cluster_workload_policy_sha256: &'a str,
+    cluster_assignment_manifest_sha256: &'a str,
+    maximum_observations_per_cluster: usize,
+}
+
+#[derive(Serialize)]
+struct ClusterAssignmentEntryV1<'a> {
+    outcome_receipt_sha256: &'a str,
+    group_id: &'a str,
+    independent_cluster_id: &'a str,
+}
+
+/// Recompute the row-to-cluster mapping from unique evaluator outcome receipts.
+pub fn compute_cluster_assignment_manifest_sha256_v1(
+    examples: &[CalibrationExampleV1],
+) -> Result<String, CalibrationRejectV1> {
+    let mut entries = Vec::with_capacity(examples.len());
+    let mut seen_receipts = BTreeSet::new();
+    for example in examples {
+        if !seen_receipts.insert(example.outcome_receipt_sha256.as_str()) {
+            return Err(CalibrationRejectV1::DuplicateOutcomeReceipt);
+        }
+        entries.push(ClusterAssignmentEntryV1 {
+            outcome_receipt_sha256: &example.outcome_receipt_sha256,
+            group_id: &example.group_id,
+            independent_cluster_id: &example.independent_cluster_id,
+        });
+    }
+    entries.sort_by(|left, right| left.outcome_receipt_sha256.cmp(right.outcome_receipt_sha256));
+    digest_serialized(&entries)
+}
+
+/// Recompute the threshold-grid precommitment. This binds the candidate grid
+/// to its source and intended calibration split, but does not authenticate time.
+pub fn compute_threshold_grid_precommitment_sha256_v1(
+    config: &CalibrationConfigV1,
+) -> Result<String, CalibrationRejectV1> {
+    digest_serialized(&ThresholdGridPrecommitmentProjectionV1 {
+        schema_version: "mace_threshold_grid_precommitment_v1",
+        run_id: &config.run_id,
+        source: config.threshold_grid_source,
+        source_sha256: &config.threshold_grid_source_sha256,
+        threshold_grid_sha256: &config.threshold_grid_sha256,
+        intended_calibration_split_sha256: &config.calibration_split_sha256,
+        committed_at_ms: config.threshold_grid_committed_at_ms,
+    })
+}
+
+/// Recompute the cluster design receipt tying the independent unit, sampling
+/// frame, workload horizon and assignment manifest to the calibration split.
+pub fn compute_cluster_design_receipt_sha256_v1(
+    config: &CalibrationConfigV1,
+) -> Result<String, CalibrationRejectV1> {
+    digest_serialized(&ClusterDesignProjectionV1 {
+        schema_version: "mace_cluster_design_receipt_v1",
+        calibration_split_sha256: &config.calibration_split_sha256,
+        cluster_unit_definition_sha256: &config.cluster_unit_definition_sha256,
+        cluster_sampling_design_sha256: &config.cluster_sampling_design_sha256,
+        cluster_workload_policy_sha256: &config.cluster_workload_policy_sha256,
+        cluster_assignment_manifest_sha256: &config.cluster_assignment_manifest_sha256,
+        maximum_observations_per_cluster: config.maximum_observations_per_cluster,
+    })
+}
+
 fn validate_config(config: &CalibrationConfigV1) -> Result<(), CalibrationRejectV1> {
     if !nonempty(&config.run_id)
         || !config.risk_target_alpha.is_finite()
@@ -277,17 +401,44 @@ fn validate_config(config: &CalibrationConfigV1) -> Result<(), CalibrationReject
         || !config.unacceptable_loss_threshold.is_finite()
         || !(0.0..=1.0).contains(&config.unacceptable_loss_threshold)
         || config.minimum_independent_clusters < 2
+        || config.maximum_observations_per_cluster == 0
         || config.thresholds.is_empty() {
         return Err(CalibrationRejectV1::InvalidConfig);
     }
     for value in [
         config.calibration_data_sha256.as_str(), config.calibration_split_sha256.as_str(),
-        config.group_hierarchy_sha256.as_str(), config.sufficiency_score_definition_sha256.as_str(),
+        config.group_hierarchy_sha256.as_str(),
+        config.cluster_unit_definition_sha256.as_str(),
+        config.cluster_sampling_design_sha256.as_str(),
+        config.cluster_workload_policy_sha256.as_str(),
+        config.cluster_assignment_manifest_sha256.as_str(),
+        config.cluster_design_receipt_sha256.as_str(),
+        config.threshold_grid_source_sha256.as_str(),
+        config.threshold_grid_precommitment_sha256.as_str(),
+        config.sufficiency_score_definition_sha256.as_str(),
         config.decision_loss_definition_sha256.as_str(), config.decision_policy_sha256.as_str(),
         config.candidate_code_sha256.as_str(), config.evaluator_code_sha256.as_str(),
         config.threshold_grid_sha256.as_str(),
     ] {
         if !valid_digest(value) { return Err(CalibrationRejectV1::InvalidDigest); }
+    }
+    if config.threshold_grid_committed_at_ms == 0
+        || config.calibration_opened_at_ms == 0
+        || config.threshold_grid_committed_at_ms >= config.calibration_opened_at_ms
+        || config.threshold_grid_source_sha256 == config.calibration_data_sha256
+        || config.threshold_grid_source_sha256 == config.calibration_split_sha256
+    {
+        return Err(CalibrationRejectV1::InvalidConfig);
+    }
+    if compute_threshold_grid_precommitment_sha256_v1(config)?
+        != config.threshold_grid_precommitment_sha256
+    {
+        return Err(CalibrationRejectV1::ThresholdGridPrecommitmentMismatch);
+    }
+    if compute_cluster_design_receipt_sha256_v1(config)?
+        != config.cluster_design_receipt_sha256
+    {
+        return Err(CalibrationRejectV1::ClusterDesignReceiptMismatch);
     }
     let mut previous = None;
     for threshold in &config.thresholds {
@@ -483,6 +634,9 @@ fn blank_certificate(config:&CalibrationConfigV1,manifest:&str,group:&GroupSpecV
         decision_policy_sha256:config.decision_policy_sha256.clone(),
         sufficiency_score_definition_sha256:config.sufficiency_score_definition_sha256.clone(),
         group_hierarchy_sha256:config.group_hierarchy_sha256.clone(),
+        cluster_unit_definition_sha256:config.cluster_unit_definition_sha256.clone(),
+        cluster_sampling_design_sha256:config.cluster_sampling_design_sha256.clone(),
+        cluster_workload_policy_sha256:config.cluster_workload_policy_sha256.clone(),
         group_id:group.group_id.clone(),group_path:path,parent_group_id:group.parent_group_id.clone(),
         status:RiskStatusV1::NotEstimableNoCalibrationClusters,
         calibration_cluster_count:cluster_count,calibration_example_count:example_count,
@@ -513,15 +667,40 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
         }
     }
 
+    let recomputed_cluster_assignment =
+        compute_cluster_assignment_manifest_sha256_v1(examples)?;
+    if recomputed_cluster_assignment != config.cluster_assignment_manifest_sha256 {
+        return Err(CalibrationRejectV1::ClusterAssignmentManifestMismatch);
+    }
+    let mut cluster_workloads: BTreeMap<&str, usize> = BTreeMap::new();
+    for example in examples {
+        let count = cluster_workloads.entry(example.independent_cluster_id.as_str()).or_default();
+        *count += 1;
+        if *count > config.maximum_observations_per_cluster {
+            return Err(CalibrationRejectV1::ClusterWorkloadLimitExceeded);
+        }
+    }
+
     let mut manifest=CalibrationManifestV1{
         schema_version:SCHEMA_VERSION_V1.into(),record_type:"calibration_manifest".into(),run_id:config.run_id.clone(),
         calibration_data_sha256:config.calibration_data_sha256.clone(),calibration_split_sha256:config.calibration_split_sha256.clone(),
+        cluster_unit_definition_sha256:config.cluster_unit_definition_sha256.clone(),
+        cluster_sampling_design_sha256:config.cluster_sampling_design_sha256.clone(),
+        cluster_workload_policy_sha256:config.cluster_workload_policy_sha256.clone(),
+        cluster_assignment_manifest_sha256:config.cluster_assignment_manifest_sha256.clone(),
+        maximum_observations_per_cluster:config.maximum_observations_per_cluster,
+        cluster_design_receipt_sha256:config.cluster_design_receipt_sha256.clone(),
         calibration_cluster_count:examples.iter().map(|row|row.independent_cluster_id.as_str()).collect::<BTreeSet<_>>().len(),
         calibration_example_count:examples.len(),group_hierarchy_sha256:config.group_hierarchy_sha256.clone(),
         sufficiency_score_definition_sha256:config.sufficiency_score_definition_sha256.clone(),
         decision_loss_definition_sha256:config.decision_loss_definition_sha256.clone(),
         decision_policy_sha256:config.decision_policy_sha256.clone(),candidate_code_sha256:config.candidate_code_sha256.clone(),
         evaluator_code_sha256:config.evaluator_code_sha256.clone(),threshold_grid_sha256:config.threshold_grid_sha256.clone(),
+        threshold_grid_source:config.threshold_grid_source,
+        threshold_grid_source_sha256:config.threshold_grid_source_sha256.clone(),
+        threshold_grid_precommitment_sha256:config.threshold_grid_precommitment_sha256.clone(),
+        threshold_grid_committed_at_ms:config.threshold_grid_committed_at_ms,
+        calibration_opened_at_ms:config.calibration_opened_at_ms,
         threshold_count:config.thresholds.len(),group_count:groups.len(),
         calibration_method:"hierarchical_group_conditional_exact_cluster_risk".into(),
         risk_target_alpha:config.risk_target_alpha,familywise_delta:config.familywise_delta,
@@ -655,6 +834,9 @@ pub fn assess_decision_v1(input:&DecisionInputV1,certificate:&GroupCertificateV1
     let certificate_scope_matches = certificate.decision_policy_sha256 == input.policy_sha256
         && certificate.sufficiency_score_definition_sha256 == input.sufficiency_score_definition_sha256
         && certificate.group_hierarchy_sha256 == input.group_hierarchy_sha256
+        && certificate.cluster_unit_definition_sha256 == input.cluster_unit_definition_sha256
+        && certificate.cluster_sampling_design_sha256 == input.cluster_sampling_design_sha256
+        && certificate.cluster_workload_policy_sha256 == input.cluster_workload_policy_sha256
         && certificate.group_id == input.group_id;
     let (action,status,reason)=if !input.hard_gates_pass{
         (if input.escalate_on_hard_gate{DecisionActionV1::Escalate}else{DecisionActionV1::Abstain},
@@ -668,9 +850,12 @@ pub fn assess_decision_v1(input:&DecisionInputV1,certificate:&GroupCertificateV1
     }else if certificate.sufficiency_score_definition_sha256!=input.sufficiency_score_definition_sha256{
         (DecisionActionV1::Abstain,DecisionAssessmentStatusV1::AbstainedNotEstimable,
          "sufficiency score definition does not match the calibrated certificate")
-    }else if certificate.group_hierarchy_sha256!=input.group_hierarchy_sha256{
+    }else if certificate.group_hierarchy_sha256!=input.group_hierarchy_sha256
+        || certificate.cluster_unit_definition_sha256!=input.cluster_unit_definition_sha256
+        || certificate.cluster_sampling_design_sha256!=input.cluster_sampling_design_sha256
+        || certificate.cluster_workload_policy_sha256!=input.cluster_workload_policy_sha256 {
         (DecisionActionV1::Abstain,DecisionAssessmentStatusV1::AbstainedNotEstimable,
-         "group hierarchy does not match the calibrated certificate")
+         "cluster unit, sampling design, workload policy or group hierarchy differs from the calibrated certificate")
     }else if !certificate.is_usable(){
         match certificate.status{
             RiskStatusV1::RiskExceedsTarget=>(if input.evidence_acquisition_available{DecisionActionV1::AcquireEvidence}else{DecisionActionV1::Abstain},
@@ -699,6 +884,9 @@ pub fn assess_decision_v1(input:&DecisionInputV1,certificate:&GroupCertificateV1
         policy_sha256:input.policy_sha256.clone(),
         sufficiency_score_definition_sha256:input.sufficiency_score_definition_sha256.clone(),
         group_hierarchy_sha256:input.group_hierarchy_sha256.clone(),
+        cluster_unit_definition_sha256:input.cluster_unit_definition_sha256.clone(),
+        cluster_sampling_design_sha256:input.cluster_sampling_design_sha256.clone(),
+        cluster_workload_policy_sha256:input.cluster_workload_policy_sha256.clone(),
         group_id:input.group_id.clone(),action,status,
         hard_gates_pass:input.hard_gates_pass,sufficiency_score:input.sufficiency_score,
         threshold:certificate.threshold,risk_target_alpha:certificate.risk_target_alpha,
@@ -732,16 +920,31 @@ mod tests{
         }).collect()
     }
     fn config(groups:&[GroupSpecV1],rows:&[CalibrationExampleV1],thresholds:Vec<f64>,minimum:usize)->CalibrationConfigV1{
-        CalibrationConfigV1{
+        let mut config=CalibrationConfigV1{
             run_id:"run-001".into(),calibration_data_sha256:digest_serialized(rows).unwrap(),
             calibration_split_sha256:digest("split"),group_hierarchy_sha256:digest_serialized(groups).unwrap(),
+            cluster_unit_definition_sha256:digest("person_profile"),
+            cluster_sampling_design_sha256:digest("profile_cluster_sampling_v1"),
+            cluster_workload_policy_sha256:digest("max_episodes_per_profile_20"),
+            cluster_assignment_manifest_sha256:compute_cluster_assignment_manifest_sha256_v1(rows).unwrap(),
+            maximum_observations_per_cluster:20,
+            cluster_design_receipt_sha256:String::new(),
             sufficiency_score_definition_sha256:digest("score"),decision_loss_definition_sha256:digest("loss"),
             decision_policy_sha256:digest("policy"),candidate_code_sha256:digest("candidate"),
             evaluator_code_sha256:digest("evaluator"),threshold_grid_sha256:digest_serialized(&thresholds).unwrap(),
+            threshold_grid_source:ThresholdGridSourceV1::IndependentPilot,
+            threshold_grid_source_sha256:digest("pilot-split"),
+            threshold_grid_precommitment_sha256:String::new(),
+            threshold_grid_committed_at_ms:10,calibration_opened_at_ms:20,
             thresholds,threshold_selection_method:ThresholdSelectionMethodV1::FixedSequenceCluster,
             risk_target_alpha:0.1,familywise_delta:0.05,unacceptable_loss_threshold:0.5,
             minimum_independent_clusters:minimum,exchangeability_justified_by_design:true
-        }
+        };
+        config.threshold_grid_precommitment_sha256 =
+            compute_threshold_grid_precommitment_sha256_v1(&config).unwrap();
+        config.cluster_design_receipt_sha256 =
+            compute_cluster_design_receipt_sha256_v1(&config).unwrap();
+        config
     }
 
     #[test]
@@ -784,7 +987,11 @@ mod tests{
         let assessment=assess_decision_v1(&DecisionInputV1{
             group_id:"root".into(),sufficiency_score:1.0,
             sufficiency_score_definition_sha256:cfg.sufficiency_score_definition_sha256.clone(),
-            group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),hard_gates_pass:false,
+            group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),
+            cluster_unit_definition_sha256:cfg.cluster_unit_definition_sha256.clone(),
+            cluster_sampling_design_sha256:cfg.cluster_sampling_design_sha256.clone(),
+            cluster_workload_policy_sha256:cfg.cluster_workload_policy_sha256.clone(),
+            hard_gates_pass:false,
             distribution_shift_detected:false,evidence_acquisition_available:false,retrieval_available:false,
             escalate_on_hard_gate:false,decision_need_sha256:digest("need"),
             evidence_capsule_sha256:digest("capsule"),policy_sha256:digest("policy")
@@ -852,7 +1059,11 @@ mod tests{
         let assessment=assess_decision_v1(&DecisionInputV1{
             group_id:"root".into(),sufficiency_score:0.1,
             sufficiency_score_definition_sha256:cfg.sufficiency_score_definition_sha256.clone(),
-            group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),hard_gates_pass:true,distribution_shift_detected:false,
+            group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),
+            cluster_unit_definition_sha256:cfg.cluster_unit_definition_sha256.clone(),
+            cluster_sampling_design_sha256:cfg.cluster_sampling_design_sha256.clone(),
+            cluster_workload_policy_sha256:cfg.cluster_workload_policy_sha256.clone(),
+            hard_gates_pass:true,distribution_shift_detected:false,
             evidence_acquisition_available:true,retrieval_available:true,escalate_on_hard_gate:false,
             decision_need_sha256:digest("need"),evidence_capsule_sha256:digest("capsule"),policy_sha256:digest("policy")
         },cert).unwrap();
@@ -865,7 +1076,11 @@ mod tests{
         let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();let cert=&result.certificates[0];
         let input=DecisionInputV1{group_id:"root".into(),sufficiency_score:0.9,
         sufficiency_score_definition_sha256:cfg.sufficiency_score_definition_sha256.clone(),
-        group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),hard_gates_pass:true,
+        group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),
+            cluster_unit_definition_sha256:cfg.cluster_unit_definition_sha256.clone(),
+            cluster_sampling_design_sha256:cfg.cluster_sampling_design_sha256.clone(),
+            cluster_workload_policy_sha256:cfg.cluster_workload_policy_sha256.clone(),
+            hard_gates_pass:true,
             distribution_shift_detected:false,evidence_acquisition_available:false,retrieval_available:false,
             escalate_on_hard_gate:false,decision_need_sha256:digest("need"),
             evidence_capsule_sha256:digest("capsule"),policy_sha256:digest("policy")};
@@ -894,7 +1109,11 @@ mod tests{
         let input=DecisionInputV1{
             group_id:"root".into(),sufficiency_score:0.9,
             sufficiency_score_definition_sha256:cfg.sufficiency_score_definition_sha256.clone(),
-            group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),hard_gates_pass:true,
+            group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),
+            cluster_unit_definition_sha256:cfg.cluster_unit_definition_sha256.clone(),
+            cluster_sampling_design_sha256:cfg.cluster_sampling_design_sha256.clone(),
+            cluster_workload_policy_sha256:cfg.cluster_workload_policy_sha256.clone(),
+            hard_gates_pass:true,
             distribution_shift_detected:false,evidence_acquisition_available:false,retrieval_available:false,
             escalate_on_hard_gate:false,decision_need_sha256:digest("need"),
             evidence_capsule_sha256:digest("capsule"),policy_sha256:digest("different-policy")
@@ -917,6 +1136,9 @@ mod tests{
             group_id:"root".into(),sufficiency_score:0.9,
             sufficiency_score_definition_sha256:cfg.sufficiency_score_definition_sha256.clone(),
             group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),
+            cluster_unit_definition_sha256:cfg.cluster_unit_definition_sha256.clone(),
+            cluster_sampling_design_sha256:cfg.cluster_sampling_design_sha256.clone(),
+            cluster_workload_policy_sha256:cfg.cluster_workload_policy_sha256.clone(),
             hard_gates_pass:true,distribution_shift_detected:false,
             evidence_acquisition_available:false,retrieval_available:false,escalate_on_hard_gate:false,
             decision_need_sha256:digest("need"),evidence_capsule_sha256:digest("capsule"),
@@ -954,6 +1176,9 @@ mod tests{
         simultaneous.threshold_selection_method=ThresholdSelectionMethodV1::BonferroniSimultaneous;
         simultaneous.thresholds.reverse();
         simultaneous.threshold_grid_sha256=digest_serialized(&simultaneous.thresholds).unwrap();
+        // The changed threshold grid needs a new precommitment before calibration opens.
+        simultaneous.threshold_grid_precommitment_sha256=
+            compute_threshold_grid_precommitment_sha256_v1(&simultaneous).unwrap();
         let bonf=calibrate_selective_evidence_v1(&simultaneous,&groups,&rows).unwrap();
         let bonf_cert=&bonf.certificates[0];
         assert_ne!(bonf_cert.status,RiskStatusV1::Certified);
@@ -965,6 +1190,7 @@ mod tests{
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let mut rows=examples(40,"root",0.9,0.0);
         let mut repeated=rows[0].clone();
+        repeated.outcome_receipt_sha256=digest("outcome-repeated");
         repeated.sufficiency_score=0.1;
         repeated.decision_loss=1.0;
         rows.push(repeated);
@@ -982,6 +1208,109 @@ mod tests{
         let rows=examples(40,"root",0.9,0.0);
         let cfg=config(&groups,&rows,vec![0.0,0.5],30);
         assert_eq!(calibrate_selective_evidence_v1(&cfg,&groups,&rows),Err(CalibrationRejectV1::InvalidThresholdGrid));
+    }
+
+
+    #[test]
+    fn calibration_rejects_grid_committed_after_calibration_started() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let rows=examples(40,"root",0.9,0.0);
+        let mut cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
+        cfg.calibration_opened_at_ms=10;
+        cfg.threshold_grid_committed_at_ms=20;
+        cfg.threshold_grid_precommitment_sha256=compute_threshold_grid_precommitment_sha256_v1(&cfg).unwrap();
+        assert_eq!(calibrate_selective_evidence_v1(&cfg,&groups,&rows),Err(CalibrationRejectV1::InvalidConfig));
+    }
+
+    #[test]
+    fn calibration_rejects_threshold_grid_source_from_the_calibration_split() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let rows=examples(40,"root",0.9,0.0);
+        let mut cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
+        cfg.threshold_grid_source_sha256=cfg.calibration_split_sha256.clone();
+        cfg.threshold_grid_precommitment_sha256=compute_threshold_grid_precommitment_sha256_v1(&cfg).unwrap();
+        assert_eq!(calibrate_selective_evidence_v1(&cfg,&groups,&rows),Err(CalibrationRejectV1::InvalidConfig));
+    }
+
+    #[test]
+    fn certificate_cannot_transfer_to_a_different_cluster_unit_or_workload_policy() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let rows=examples(100,"root",0.9,0.0);
+        let cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
+        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let cert=&result.certificates[0];
+        let mut input=DecisionInputV1{
+            group_id:"root".into(),sufficiency_score:0.9,
+            sufficiency_score_definition_sha256:cfg.sufficiency_score_definition_sha256.clone(),
+            group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),
+            cluster_unit_definition_sha256:cfg.cluster_unit_definition_sha256.clone(),
+            cluster_sampling_design_sha256:cfg.cluster_sampling_design_sha256.clone(),
+            cluster_workload_policy_sha256:cfg.cluster_workload_policy_sha256.clone(),
+            hard_gates_pass:true,distribution_shift_detected:false,
+            evidence_acquisition_available:false,retrieval_available:false,escalate_on_hard_gate:false,
+            decision_need_sha256:digest("need"),evidence_capsule_sha256:digest("capsule"),
+            policy_sha256:cfg.decision_policy_sha256.clone()
+        };
+        input.cluster_workload_policy_sha256=digest("different workload horizon");
+        let assessment=assess_decision_v1(&input,cert).unwrap();
+        assert_eq!(assessment.action,DecisionActionV1::Abstain);
+        assert_eq!(assessment.status,DecisionAssessmentStatusV1::AbstainedNotEstimable);
+        assert_eq!(assessment.risk_upper_bound,None);
+        assert!(assessment.verify_integrity());
+    }
+
+    #[test]
+    fn precommitment_and_cluster_design_receipts_are_recomputed_and_tamper_evident() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let rows=examples(40,"root",0.9,0.0);
+        let cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
+        assert_eq!(compute_threshold_grid_precommitment_sha256_v1(&cfg).unwrap(),cfg.threshold_grid_precommitment_sha256);
+        assert_eq!(compute_cluster_design_receipt_sha256_v1(&cfg).unwrap(),cfg.cluster_design_receipt_sha256);
+        let mut altered=cfg.clone();
+        altered.cluster_assignment_manifest_sha256=digest("different cluster assignment");
+        assert_ne!(compute_cluster_design_receipt_sha256_v1(&altered).unwrap(),cfg.cluster_design_receipt_sha256);
+    }
+
+
+    #[test]
+    fn calibration_recomputes_row_to_cluster_assignment_manifest() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let rows=examples(40,"root",0.9,0.0);
+        let cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
+        let mut altered=rows.clone();
+        altered[0].independent_cluster_id="profile-swapped".into();
+        let mut altered_cfg=cfg;
+        altered_cfg.calibration_data_sha256=digest_serialized(&altered).unwrap();
+        assert_eq!(
+            calibrate_selective_evidence_v1(&altered_cfg,&groups,&altered),
+            Err(CalibrationRejectV1::ClusterAssignmentManifestMismatch)
+        );
+    }
+
+    #[test]
+    fn calibration_enforces_the_declared_per_cluster_workload_limit() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let mut rows=examples(2,"root",0.9,0.0);
+        rows[1].independent_cluster_id=rows[0].independent_cluster_id.clone();
+        let mut cfg=config(&groups,&rows,vec![0.8,0.5,0.0],2);
+        cfg.maximum_observations_per_cluster=1;
+        cfg.cluster_workload_policy_sha256=digest("max_episodes_per_profile_1");
+        cfg.cluster_design_receipt_sha256=compute_cluster_design_receipt_sha256_v1(&cfg).unwrap();
+        assert_eq!(
+            calibrate_selective_evidence_v1(&cfg,&groups,&rows),
+            Err(CalibrationRejectV1::ClusterWorkloadLimitExceeded)
+        );
+    }
+
+
+    #[test]
+    fn duplicate_outcome_receipts_cannot_make_cluster_assignment_ambiguous() {
+        let mut rows=examples(2,"root",0.9,0.0);
+        rows[1].outcome_receipt_sha256=rows[0].outcome_receipt_sha256.clone();
+        assert_eq!(
+            compute_cluster_assignment_manifest_sha256_v1(&rows),
+            Err(CalibrationRejectV1::DuplicateOutcomeReceipt)
+        );
     }
 
 }
