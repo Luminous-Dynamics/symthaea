@@ -1,0 +1,11 @@
+[package]
+name = "cmaq-053-compositional-risk-budget"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact composition of fleet, reference-calibration and representation risk budgets"
+
+[dependencies]
+
+[workspace]
