@@ -22,6 +22,8 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # Stale directory referenced by the core/* glob but missing Cargo.toml; keep workspace metadata resolvable.
+    "crates/core/symthaea-observation-attestation",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
