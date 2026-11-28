@@ -1029,6 +1029,34 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_score_schema_parses_and_pins_task_trim_semantics() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/mirex-beat-score-v1.schema.json"
+        ))
+        .unwrap();
+        assert_eq!(schema["$defs"]["receipt"]["properties"]["mirex_evaluator_commit"]["const"],
+            MIREX_EVALUATOR_SOURCE_COMMIT);
+        assert_eq!(schema["$defs"]["receipt"]["properties"]["reference_library_version"]["const"],
+            MIR_EVAL_REFERENCE_VERSION);
+        let trim_rules = schema["$defs"]["receipt"]["allOf"].as_array().unwrap();
+        assert_eq!(trim_rules.len(), 2);
+    }
+
+    #[test]
+    fn scoring_receipt_distinguishes_beat_and_downbeat_task_defaults() {
+        let beat =
+            mirex_beat_scoring_receipt(MirexScoringTask::BeatTracking, 44_100);
+        let downbeat =
+            mirex_beat_scoring_receipt(MirexScoringTask::DownbeatEstimation, 44_100);
+        assert_eq!(beat.initial_trim_seconds, 5);
+        assert_eq!(downbeat.initial_trim_seconds, 0);
+        assert_eq!(beat.event_f_measure_tolerance_ms, 70);
+        assert_eq!(beat.cemgil_sigma_ms, 40);
+        assert_eq!(beat.continuity_phase_threshold_ppm, 175_000);
+        assert_eq!(beat.continuity_period_threshold_ppm, 175_000);
+    }
+
+    #[test]
     fn perfect_grid_matches_mireval_082_golden_vector() {
         let scores = score_seconds(&reference(), &reference());
         assert!((scores.f_measure - 1.0).abs() < 1e-12);
