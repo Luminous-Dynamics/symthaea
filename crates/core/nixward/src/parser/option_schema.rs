@@ -8,34 +8,49 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
-/// Represents the full schema of a NixOS option including type, default, and description.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Structured NixOS option metadata.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NixOptionSchema {
-    /// Full dotted path (e.g., "services.nginx.enable")
+    /// Full dotted path (e.g., "services.nginx.enable").
     pub name: String,
-    /// NixOS option type (e.g., "bool", "string", "listOf package")
+    /// NixOS option type (e.g., "bool", "string", "listOf package").
     pub option_type: String,
-    /// Default value as string representation
+    /// Human-readable display form of the default, retained for existing callers.
     pub default: Option<String>,
-    /// Human-readable description
+    /// Original default JSON value, preserving literal-expression metadata.
+    pub default_value: Option<serde_json::Value>,
+    /// Original example JSON value, preserving literal-expression metadata.
+    pub example: Option<serde_json::Value>,
+    /// Whether the option is read-only. None means the source did not say.
+    pub read_only: Option<bool>,
+    /// Structured option location components from the evaluated option docs.
+    pub location: Option<Vec<String>>,
+    /// Human-readable description.
     pub description: String,
-    /// Packages related to this option
+    /// Packages related to this option, extracted heuristically for retrieval.
     pub related_packages: Vec<String>,
-    /// Module declaration file paths
+    /// Original relatedPackages documentation field, when supplied.
+    pub related_packages_markdown: Option<String>,
+    /// Module declaration file paths.
     pub declarations: Vec<String>,
 }
 
-/// Raw JSON schema entry from `nixos-option --json`
+/// Raw JSON option entry from nixosOptionsDoc/options JSON.
 #[derive(Debug, Deserialize)]
 struct RawOptionEntry {
     #[serde(rename = "type")]
     option_type: Option<String>,
     default: Option<serde_json::Value>,
+    example: Option<serde_json::Value>,
     description: Option<String>,
     declarations: Option<Vec<String>>,
+    #[serde(rename = "loc")]
+    location: Option<Vec<String>>,
+    #[serde(rename = "relatedPackages")]
+    related_packages_markdown: Option<String>,
     #[serde(rename = "readOnly")]
-    #[allow(dead_code)]
     read_only: Option<bool>,
 }
 
@@ -82,20 +97,26 @@ pub fn parse_nixos_options(json: &str) -> Result<Vec<NixOptionSchema>, String> {
     for (name, entry) in raw {
         let option_type = entry.option_type.unwrap_or_else(|| "unknown".into());
         let description = entry.description.unwrap_or_default();
-        let default = entry.default.map(|v| match v {
-            serde_json::Value::String(s) => s,
+        let default_value = entry.default;
+        let default = default_value.as_ref().map(|value| match value {
+            serde_json::Value::String(text) => text.clone(),
             other => other.to_string(),
         });
 
-        // Extract related packages from description heuristics
+        // Keep structured source metadata; heuristics remain retrieval hints only.
         let related_packages = extract_related_packages(&name, &description);
 
         schemas.push(NixOptionSchema {
             name,
             option_type,
             default,
+            default_value,
+            example: entry.example,
+            read_only: entry.read_only,
+            location: entry.location,
             description,
             related_packages,
+            related_packages_markdown: entry.related_packages_markdown,
             declarations: entry.declarations.unwrap_or_default(),
         });
     }
@@ -134,65 +155,154 @@ pub fn load_bundled_options() -> Result<Vec<NixOptionSchema>, String> {
     parse_nixos_options(json)
 }
 
-/// Load NixOS options with automatic fallback.
+/// Origin of an option catalog loaded by the controller.
 ///
-/// 1. If on NixOS, tries `nixos-option --json` first
-/// 2. Falls back to bundled options if the command fails or isn't available
-///
-/// This ensures the system always has a usable option set.
-pub fn load_options_with_fallback() -> Vec<NixOptionSchema> {
+/// Neither origin is a substitute for an option set evaluated from a remote
+/// target flake. BundledReference is a discovery hint only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OptionSchemaSource {
+    /// Observed from nixos-option on the controller's own current machine.
+    ControllerLocalLive,
+    /// Compiled into NixWard; not authoritative for any particular host.
+    BundledReference,
+}
+
+/// Load options and retain whether they came from the local live host or a
+/// bundled reference set. This is deliberately not called TargetBound.
+fn load_options_with_provenance(
+) -> (Vec<NixOptionSchema>, OptionSchemaSource, Option<Instant>) {
+    let observed_at = Instant::now();
     match load_nixos_options() {
         Ok(schemas) if !schemas.is_empty() => {
-            tracing::info!(count = schemas.len(), "Loaded live NixOS options");
-            schemas
+            tracing::info!(count = schemas.len(), "Loaded controller-local NixOS options");
+            (
+                schemas,
+                OptionSchemaSource::ControllerLocalLive,
+                Some(observed_at),
+            )
         }
-        Ok(_) | Err(_) => {
-            tracing::info!("Using bundled NixOS option schemas (nixos-option unavailable)");
-            load_bundled_options().unwrap_or_default()
+        Ok(_) => {
+            tracing::info!("Live NixOS option command returned an empty set; using bundled references");
+            (
+                load_bundled_options().unwrap_or_default(),
+                OptionSchemaSource::BundledReference,
+                None,
+            )
+        }
+        Err(error) => {
+            tracing::info!(%error, "Live NixOS option lookup failed; using bundled references");
+            (
+                load_bundled_options().unwrap_or_default(),
+                OptionSchemaSource::BundledReference,
+                None,
+            )
         }
     }
 }
 
-/// Auto-refreshing option schema cache.
+/// Load NixOS options with compatibility fallback.
 ///
-/// Caches loaded schemas and refreshes them periodically on NixOS systems.
+/// Prefer OptionSchemaCache when source provenance matters. This compatibility
+/// helper intentionally returns only the schema vector and therefore cannot
+/// establish whether a result was live or bundled.
+pub fn load_options_with_fallback() -> Vec<NixOptionSchema> {
+    load_options_with_provenance().0
+}
+
+/// Auto-refreshing local option cache with explicit source provenance.
+///
+/// The live command observes the controller's current machine only. The cache
+/// is never target-bound to an arbitrary remote flake or host.
 pub struct OptionSchemaCache {
     schemas: Vec<NixOptionSchema>,
-    last_refresh: std::time::Instant,
-    refresh_interval: std::time::Duration,
+    source: OptionSchemaSource,
+    last_attempt: Instant,
+    last_live_refresh: Option<Instant>,
+    refresh_interval: Duration,
 }
 
 impl OptionSchemaCache {
-    /// Create a new cache, loading schemas immediately.
+    /// Create a new cache, recording whether the source was live or bundled.
     pub fn new() -> Self {
+        let (schemas, source, last_live_refresh) = load_options_with_provenance();
         Self {
-            schemas: load_options_with_fallback(),
-            last_refresh: std::time::Instant::now(),
-            refresh_interval: std::time::Duration::from_secs(3600), // 1 hour default
+            schemas,
+            source,
+            last_attempt: Instant::now(),
+            last_live_refresh,
+            refresh_interval: Duration::from_secs(3600),
         }
     }
 
     /// Set the refresh interval.
-    pub fn with_refresh_interval(mut self, interval: std::time::Duration) -> Self {
+    pub fn with_refresh_interval(mut self, interval: Duration) -> Self {
         self.refresh_interval = interval;
         self
     }
 
-    /// Get the cached schemas, refreshing if stale.
+    /// Get the cached schemas, retrying live discovery after the refresh interval.
     pub fn schemas(&mut self) -> &[NixOptionSchema] {
-        if self.last_refresh.elapsed() >= self.refresh_interval {
+        if self.last_attempt.elapsed() >= self.refresh_interval {
             self.refresh();
         }
         &self.schemas
     }
 
-    /// Force a refresh from the live system (with bundled fallback).
+    /// Force a live refresh. A failed refresh preserves the existing schema set
+    /// and never advances the last successful live-refresh timestamp.
     pub fn refresh(&mut self) {
-        let fresh = load_options_with_fallback();
-        if !fresh.is_empty() {
-            self.schemas = fresh;
-            self.last_refresh = std::time::Instant::now();
+        self.apply_live_result(load_nixos_options(), Instant::now());
+    }
+
+    fn apply_live_result(
+        &mut self,
+        result: Result<Vec<NixOptionSchema>, String>,
+        attempted_at: Instant,
+    ) {
+        self.last_attempt = attempted_at;
+        if let Ok(schemas) = result
+            && !schemas.is_empty()
+        {
+            self.schemas = schemas;
+            self.source = OptionSchemaSource::ControllerLocalLive;
+            self.last_live_refresh = Some(attempted_at);
+            return;
         }
+
+        // Do not replace a previously live catalog with bundled data after a
+        // transient failure. If the cache has no entries at all, use references.
+        if self.schemas.is_empty()
+            && let Ok(bundled) = load_bundled_options()
+            && !bundled.is_empty()
+        {
+            self.schemas = bundled;
+            self.source = OptionSchemaSource::BundledReference;
+        }
+    }
+
+    /// Source of the current cached schema vector.
+    pub fn source(&self) -> OptionSchemaSource {
+        self.source
+    }
+
+    /// True only when the current vector came from a recent controller-local
+    /// lookup. This does not mean it applies to a different target host.
+    pub fn has_fresh_local_live_data(&self) -> bool {
+        self.source == OptionSchemaSource::ControllerLocalLive
+            && self
+                .last_live_refresh
+                .is_some_and(|time| time.elapsed() < self.refresh_interval)
+    }
+
+    /// Age of the last successful live lookup, or None if none has succeeded.
+    pub fn last_live_refresh_age(&self) -> Option<Duration> {
+        self.last_live_refresh.map(|time| time.elapsed())
+    }
+
+    /// Local and bundled catalogs are not bound to a caller-selected target flake.
+    pub fn is_target_bound(&self) -> bool {
+        false
     }
 
     /// Number of cached schemas.
