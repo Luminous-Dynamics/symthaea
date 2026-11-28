@@ -157,6 +157,7 @@ The first deterministic slice is deliberately small (12–20 nodes) and uses ind
 | [#8372 DIVERSE-INTEL-001](https://github.com/Luminous-Dynamics/symthaea/issues/8372) | Representation remapping and navigation under damage/topology shift | Parent benchmark, held-out remapping and target navigation |
 | [#8388 MULTIRATE-COORD-001](https://github.com/Luminous-Dynamics/symthaea/issues/8388) | Fast-local / slow-nonlocal coordination | Temporal-channel and adaptive-routing factorial |
 | [#14123 TOPO-ADAPT-001](https://github.com/Luminous-Dynamics/symthaea/issues/14123) | Endogenous topology edits under damage and demand shift | Dedicated synthetic graph-control tournament; distinguishes graph edits from edge-weight adaptation and communication scheduling |
+| [PR #14125](https://github.com/Luminous-Dynamics/symthaea/pull/14125) | TOPO-ADAPT v0.1 frozen reference fixtures | Three 12-node cases with independently checked max-flow/min-cut values; declarative fixtures only, no controller implementation |
 | [#8401 MORPH-ID-001](https://github.com/Luminous-Dynamics/symthaea/issues/8401) | Current morphology vs target identity | Parent contract for identity, ambiguity and abstention |
 | [PR #8405](https://github.com/Luminous-Dynamics/symthaea/pull/8405) | Dependency-free Rust morphology continuity oracle | Existing chair/backrest identifiability fixture, exhaustive four-cell deletion enumeration and deterministic receipts; exact-head Rust qualification must be checked |
 | [PR #8468](https://github.com/Luminous-Dynamics/symthaea/pull/8468) | Active evidence selection under morphology ambiguity | Existing action-selection, decision-value/EVSI, noisy evidence, misspecification and robust calibration fixtures; treat provenance flags as scenario inputs, not cryptographic verification |
@@ -405,7 +406,7 @@ This is a transfer/utility programme, not part of the biological or morphogenesi
 - Reproduce or clearly label any BraiNCA and hybrid-attractor implementation.
 
 ### Gate 4 — Qualify endogenous topology adaptation
-- Follow #14123: start with hand-checkable 12–20-node max-flow fixtures.
+- Follow #14123: start with hand-checkable 12–20-node max-flow fixtures; [PR #14125](https://github.com/Luminous-Dynamics/symthaea/pull/14125) now provides the v0.1 stationary-control, new-sink and bridge-failure fixtures.
 - Reproduce fixed-topology, weight-only, local greedy, distributed routing and exact small-instance oracle baselines.
 - Add adaptive edge edits only after exact budget, feasibility and deterministic receipt tests pass.
 - Include degree-matched random rewiring, stationary-demand false-edit controls and held-out topology/demand families.
@@ -447,7 +448,7 @@ No synthetic or observational benchmark here establishes consciousness, sentienc
 ## 11. Immediate dispositions
 
 1. **Proceed now:** exact-head review and qualification of existing #8405 and #8468; do not rebuild their identity/evidence-selection fixtures.
-2. **Execute #14123 P0 slice:** freeze small max-flow fixtures and qualify fixed-topology, weight-only, greedy and exact-oracle baselines before introducing adaptive rewiring.
+2. **Execute #14123 P0 slice:** review [PR #14125](https://github.com/Luminous-Dynamics/symthaea/pull/14125), then implement the Rust evaluator and qualify fixed-topology, weight-only, greedy and exact-oracle baselines before introducing adaptive rewiring.
 3. **Parallel:** qualify Symtropy #2685 and reuse the existing planar-truss solver and receipt owners; do not add a second mechanics engine.
 4. **Parallel:** complete #8423's Smart Cellular Bricks artifact/rights audit without importing code or weights.
 5. **Biological lane:** keep #13423/#13450/#13460/#13425 independent: validate data rights, replicate/time splits and separate transport observables before modeling.
