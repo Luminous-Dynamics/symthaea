@@ -14,8 +14,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::ca_ocrc_bounded::{
-    CA_OCRC_ROUND_INPUT_SCHEMA_V1, CaOcrcFeedbackDispositionV1, CaOcrcLabelFeedbackV1,
-    CaOcrcPolicyV1, CaOcrcRoundInputV1, CaOcrcRoundReportV1,
+    CA_OCRC_ROUND_INPUT_SCHEMA_V1, CA_OCRC_PREDICTION_SCHEMA_V1, CaOcrcFeedbackDispositionV1,
+    CaOcrcLabelFeedbackV1, CaOcrcPolicyV1, CaOcrcPredictionInputV1, CaOcrcPredictionSetV1,
+    CaOcrcRoundInputV1, CaOcrcRoundReportV1, CaOcrcSetKindV1, close_ca_ocrc_feedback_horizon_v1,
+    create_ca_ocrc_engine_v1, step_ca_ocrc_round_v1,
 };
 use super::delayed_aci::{
     AciDegenerateResolutionReceiptV1, AciGuaranteeStateV1, AciIntervalKindV1,
@@ -1990,6 +1992,105 @@ mod tests {
         }
     }
 
+    fn ca_ocrc_evidence(policy: CaOcrcPolicyV1) -> JointCaOcrcArmEvidenceV1 {
+        let mut engine = create_ca_ocrc_engine_v1(
+            "joint-ca-ocrc-engine",
+            "fab-clock",
+            &digest('4'),
+            &digest('6'),
+            0.5,
+            policy.clone(),
+        )
+        .unwrap();
+        let first_input = CaOcrcRoundInputV1 {
+            schema: CA_OCRC_ROUND_INPUT_SCHEMA_V1.into(),
+            prediction: CaOcrcPredictionInputV1 {
+                schema: CA_OCRC_PREDICTION_SCHEMA_V1.into(),
+                round: 1,
+                sample_id: "wafer-001".into(),
+                measurement_event_id: "meas-001".into(),
+                event_time_unix_seconds: 1_899_999_980,
+                prediction_at_unix_seconds: 1_899_999_985,
+                round_time_unix_seconds: 1_899_999_990,
+                clock_domain_id: "fab-clock".into(),
+                global_model_artifact_sha256: digest('4'),
+                interval_method_sha256: digest('6'),
+                threshold_used: 0.5,
+                prediction_set: CaOcrcPredictionSetV1 {
+                    kind: CaOcrcSetKindV1::Interval,
+                    lower: Some(9.0),
+                    upper: Some(11.0),
+                    measurand_id: "cd".into(),
+                    unit: "nm".into(),
+                },
+                physical_measurement_selected: true,
+                proxy_uniform_draw: Some(0.75),
+            },
+            feedbacks: Vec::new(),
+        };
+        let first_report = step_ca_ocrc_round_v1(&mut engine, &first_input).unwrap();
+
+        let payload = digest('5');
+        let second_input = CaOcrcRoundInputV1 {
+            schema: CA_OCRC_ROUND_INPUT_SCHEMA_V1.into(),
+            prediction: CaOcrcPredictionInputV1 {
+                schema: CA_OCRC_PREDICTION_SCHEMA_V1.into(),
+                round: 2,
+                sample_id: "wafer-002".into(),
+                measurement_event_id: "meas-002".into(),
+                event_time_unix_seconds: 1_900_000_025,
+                prediction_at_unix_seconds: 1_900_000_030,
+                round_time_unix_seconds: 1_900_000_035,
+                clock_domain_id: "fab-clock".into(),
+                global_model_artifact_sha256: digest('4'),
+                interval_method_sha256: digest('6'),
+                threshold_used: engine.state.threshold,
+                prediction_set: CaOcrcPredictionSetV1 {
+                    kind: CaOcrcSetKindV1::Interval,
+                    lower: Some(9.0),
+                    upper: Some(11.0),
+                    measurand_id: "cd".into(),
+                    unit: "nm".into(),
+                },
+                physical_measurement_selected: false,
+                proxy_uniform_draw: Some(0.75),
+            },
+            feedbacks: vec![CaOcrcLabelFeedbackV1 {
+                schema: super::super::ca_ocrc_bounded::CA_OCRC_FEEDBACK_SCHEMA_V1.into(),
+                feedback_round: 2,
+                sample_id: "wafer-001".into(),
+                label_id: "label-001".into(),
+                label_revision: 1,
+                measurement_event_id: "meas-001".into(),
+                measurand_id: "cd".into(),
+                unit: "nm".into(),
+                label_payload_sha256: payload.clone(),
+                label_value: 12.0,
+                label_available_at_unix_seconds: 1_900_000_010,
+                eligibility_report_available_at_unix_seconds: 1_900_000_015,
+                delivered_at_unix_seconds: 1_900_000_040,
+                clock_domain_id: "fab-clock".into(),
+                eligibility_report: eligibility_report(
+                    "label-001",
+                    1,
+                    "meas-001",
+                    &payload,
+                    12.0,
+                    LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+                ),
+            }],
+        };
+        let second_report = step_ca_ocrc_round_v1(&mut engine, &second_input).unwrap();
+        let unresolved_tracking_rounds = close_ca_ocrc_feedback_horizon_v1(&mut engine).unwrap();
+        JointCaOcrcArmEvidenceV1 {
+            policy,
+            round_inputs: vec![first_input, second_input],
+            round_reports: vec![first_report, second_report],
+            feedback_horizon_closed: true,
+            unresolved_tracking_rounds,
+        }
+    }
+
     fn paired_fixture() -> JointRiskTraceInputV1 {
         let policy = DelayedAciPolicyV1 {
             schema: DELAYED_ACI_POLICY_SCHEMA_V1.into(),
@@ -2095,6 +2196,54 @@ mod tests {
             assert!(summary.independent_audit_population_estimate.is_some());
             assert!(summary.partial_identification_upper >= summary.partial_identification_lower);
         }
+    }
+
+    fn paired_mixed_controller_fixture() -> JointRiskTraceInputV1 {
+        let mut input = paired_fixture();
+        let ca_policy = CaOcrcPolicyV1 {
+            schema: super::super::ca_ocrc_bounded::CA_OCRC_POLICY_SCHEMA_V1.into(),
+            policy_id: "joint-fixture-ca-ocrc-v1".into(),
+            revision: 1,
+            target_risk_alpha: 0.10,
+            learning_rate_eta: 0.05,
+            bounded_score_upper: 1.0,
+            maximum_actual_delay_steps: 1,
+            tracking_capacity: 2,
+            proxy_delay_pmf: vec![0.0, 0.5, 0.5],
+            actual_delay_contract_sha256: digest('f'),
+            bounded_actual_delay_assumption_declared: true,
+        };
+        let ca_evidence = ca_ocrc_evidence(ca_policy.clone());
+        input.arms[1].method = JointControllerMethodV1::BoundedDelayCaOcrc;
+        input.arms[1].controller_policy_sha256 = json_sha256(&ca_policy).unwrap();
+        input.arms[1].controller_evidence =
+            JointControllerEvidenceV1::BoundedDelayCaOcrc(ca_evidence);
+        input.trace_sha256 = seal_joint_risk_trace_v1(&input).unwrap();
+        input
+    }
+
+    #[test]
+    fn mixed_tau_aci_and_ca_ocrc_arms_validate_on_one_shared_population_and_audit() {
+        let input = paired_mixed_controller_fixture();
+        let report = evaluate_joint_risk_trace_v1(&input).unwrap();
+        assert_eq!(report.status, JointTraceStatusV1::Complete);
+        assert_eq!(report.comparison_scope, JointComparisonScopeV1::ControllerAblation);
+        assert_eq!(report.arm_summaries.len(), 2);
+        let aci = report
+            .arm_summaries
+            .iter()
+            .find(|summary| summary.method == JointControllerMethodV1::FixedDelayTauAci)
+            .unwrap();
+        let ca = report
+            .arm_summaries
+            .iter()
+            .find(|summary| summary.method == JointControllerMethodV1::BoundedDelayCaOcrc)
+            .unwrap();
+        assert_eq!(aci.observed_miscoverage_count_denominator, Some(2));
+        assert_eq!(ca.ca_ocrc_tracking_capacity, Some(2));
+        assert_eq!(ca.ca_ocrc_updated_feedback_count, Some(1));
+        assert_eq!(ca.ca_ocrc_theorem_assumptions_intact, Some(false));
+        assert_eq!(report.independent_audit_count, 1);
     }
 
     #[test]
