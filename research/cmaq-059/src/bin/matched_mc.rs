@@ -392,7 +392,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ];
                 writeln!(summary, "{}", fields.join(","))?;
             }
-            }
         }
     }
 
