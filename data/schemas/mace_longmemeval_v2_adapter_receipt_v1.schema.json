@@ -278,7 +278,9 @@
         "memory_query_latency_ns",
         "post_query_hook_latency_ns",
         "exposed_evidence",
-        "receipt_sha256"
+        "receipt_sha256",
+        "reader_model_sha256",
+        "reader_generation_config_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -341,6 +343,12 @@
           }
         },
         "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "reader_model_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "reader_generation_config_sha256": {
           "$ref": "#/$defs/sha"
         }
       }
