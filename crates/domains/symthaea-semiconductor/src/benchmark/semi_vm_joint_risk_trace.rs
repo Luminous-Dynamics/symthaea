@@ -1902,7 +1902,6 @@ mod tests {
             initial_phase_alpha: 0.10,
         };
         let evidence = aci_evidence("joint-aci-engine", policy.clone());
-        let mut report_for_row = evidence.deliveries[0].eligibility_report.clone();
 
         let population_manifest = digest('7');
         let source_ledger = digest('8');
@@ -1923,7 +1922,6 @@ mod tests {
             selection_risk_input: selection.clone(),
             controller_evidence: JointControllerEvidenceV1::FixedDelayTauAci(evidence.clone()),
         };
-        report_for_row.report_sha256.clear();
 
         let mut input = JointRiskTraceInputV1 {
             schema: JOINT_RISK_TRACE_SCHEMA_V1.into(),
