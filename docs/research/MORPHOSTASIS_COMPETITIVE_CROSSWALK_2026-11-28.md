@@ -351,6 +351,14 @@ This is a transfer/utility programme, not part of the biological or morphogenesi
 4. **Function-preserving recovery:** assess whether the repaired asset restores declared service capacity, structural integrity or process constraints—not just whether it resembles its CAD/BOM configuration.
 5. **Reconfigurable cells:** adapt the communication and task graph after equipment removal, module replacement or changed process routing while maintaining safety constraints.
 
+### Industrial transfer candidate: distribution-grid reconfiguration
+
+A 2026 survey of decentralised electricity-distribution architectures argues for hybrid, multi-timescale coordination: local fast control, slower inter-cell/federated coordination, and a self-healing overlay during faults/cyber events. Suggested measures include scalability versus DER count, recovery time, load served under contingencies, communication complexity, data governance/attack surface, and economic/fairness outcomes. DOI: https://doi.org/10.1016/j.compeleceng.2026.111279. <Cite refs={["turn540123search3"]}/>
+
+This is a high-value second industry lane for topology adaptation, but it is **not** the generic max-flow benchmark. Distribution-grid evaluation must include domain-qualified power-flow semantics, voltage/thermal constraints, radiality/islanding, protection coordination, switching limits, DER uncertainty and operator authority. Candidate baselines include established distribution-system reconfiguration and OPF solvers, MILP/MIQP/MISOCP formulations, branch-exchange heuristics, GA/PSO, and safety-constrained learned graph/DRL policies where their operating semantics are reproducible.
+
+Metrics should include load served by criticality, unserved energy, voltage/thermal violations, switching count/wear, restoration time, losses, feasibility, communication overhead and fairness across affected loads/customers. Begin in offline digital-twin simulation and shadow mode. The synthetic TOPO-ADAPT result cannot establish grid safety, and no live switching is authorized or proposed by this benchmark.
+
 ### Strong baseline ladder
 
 - Conventional condition-monitoring/statistical process-control baselines appropriate to the sensor and process.
