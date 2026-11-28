@@ -93,11 +93,11 @@ pub use manifold::{
     TrackedObject, VisionManifold, VisualSceneGraph, VisualWorkingMemory, WorkingMemorySlot,
 };
 pub use observer::{
-    ObserverFrameIdentityV0_1, ObserverOnlyVisionManifold, TemporalObserverCheckpointV0_1,
+    ObserverFrameIdentityV0_1, ObserverOnlyVisionManifold,
+    TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1, TEMPORAL_OBSERVER_PROFILE_ID_V0_1,
+    TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1, TemporalObserverCheckpointV0_1,
     TemporalObserverFrameGeometryV0_1, TemporalObserverMetricsV0_1, TemporalObserverProfileV0_1,
     TemporalObserverStatusV0_1, TemporalPerceptionWitnessV0_1,
-    TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1, TEMPORAL_OBSERVER_PROFILE_ID_V0_1,
-    TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1,
 };
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use spectrum::{
