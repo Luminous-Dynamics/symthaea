@@ -19,7 +19,7 @@ The sampling manifest binds each exact comparison item and pair to:
 - CLEAN, Performance-STAY and Musical-FLIP arm membership;
 - the reducer-bound performer identity in each arm;
 - all declared participant identity commitments for multi-performer arms;
-- session, take and performance identity commitments;
+- session, take and performance-realization identity commitments;
 - sampling frame, target population, inclusion/exclusion policy and purpose-limited pseudonymization scope;
 - the explicit source-work-independence declaration and its written basis.
 
@@ -46,6 +46,7 @@ This v1 therefore always emits false for performer identity authentication, sour
 
 The Rust tests exercise:
 - performer reused across source works;
+- performance realization reused across source works;
 - session reused across source works with disjoint performers;
 - multiple performers and sessions nested within a work;
 - explicit multi-performer arm membership;
