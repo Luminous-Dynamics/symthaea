@@ -578,6 +578,47 @@ mod tests {
         assert!(result.primal_test.iter().all(|value| {
             value.is_nonnegative() && value.cmp(Rat::one()).unwrap() != Ordering::Greater
         }));
+
+        // Independently re-check every primal operating constraint.
+        for alternative in alternatives {
+            let power = dot(&alternative.probabilities, &result.primal_test).unwrap();
+            assert!(power.cmp(result.primal_power).unwrap() != Ordering::Less);
+        }
+        for null in nulls {
+            let size = dot(&null.probabilities, &result.primal_test).unwrap();
+            assert!(size.cmp(alpha).unwrap() != Ordering::Greater);
+        }
+
+        // Independently re-check the returned dual feasibility and objective.
+        assert_eq!(
+            result.dual_lambda.iter().copied()
+                .fold(Rat::zero(), |sum, value| sum.add(value).unwrap()),
+            Rat::one()
+        );
+        assert!(result.dual_lambda.iter().all(|x| x.is_nonnegative()));
+        assert!(result.dual_null_weights.iter().all(|x| x.is_nonnegative()));
+        assert!(result.dual_slack.iter().all(|x| x.is_nonnegative()));
+        for k in 0..result.dual_slack.len() {
+            let alt_mix = alternatives.iter().zip(result.dual_lambda.iter())
+                .map(|(law, weight)| law.probabilities[k].mul(*weight).unwrap())
+                .fold(Rat::zero(), |sum, value| sum.add(value).unwrap());
+            let null_mix = nulls.iter().zip(result.dual_null_weights.iter())
+                .map(|(law, weight)| law.probabilities[k].mul(*weight).unwrap())
+                .fold(Rat::zero(), |sum, value| sum.add(value).unwrap());
+            assert!(
+                alt_mix.sub(null_mix).unwrap().cmp(result.dual_slack[k]).unwrap()
+                    != Ordering::Greater
+            );
+        }
+        let null_weight_sum = result.dual_null_weights.iter().copied()
+            .fold(Rat::zero(), |sum, value| sum.add(value).unwrap());
+        let slack_sum = result.dual_slack.iter().copied()
+            .fold(Rat::zero(), |sum, value| sum.add(value).unwrap());
+        let dual_objective = alpha.mul(null_weight_sum).unwrap().add(slack_sum).unwrap();
+        assert_eq!(dual_objective, result.dual_upper_bound);
+
+        assert!(result.primal_bases_checked > 0);
+        assert!(result.dual_bases_checked > 0);
         result
     }
 
