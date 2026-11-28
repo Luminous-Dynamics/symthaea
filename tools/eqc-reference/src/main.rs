@@ -19,6 +19,10 @@ struct NonceLedgerLock {
     path: PathBuf,
 }
 
+fn non_empty_parent(path: &Path) -> Option<&Path> {
+    path.parent().filter(|parent| !parent.as_os_str().is_empty())
+}
+
 impl Drop for NonceLedgerLock {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.path);
@@ -27,7 +31,7 @@ impl Drop for NonceLedgerLock {
 
 fn acquire_nonce_ledger_lock(path: &Path) -> anyhow::Result<NonceLedgerLock> {
     let lock_path = PathBuf::from(format!("{}.lock", path.display()));
-    if let Some(parent) = lock_path.parent() {
+    if let Some(parent) = non_empty_parent(&lock_path) {
         fs::create_dir_all(parent)?;
     }
     let mut file = OpenOptions::new()
@@ -62,7 +66,7 @@ fn write_nonce_ledger(
     path: &Path,
     ledger: &observer::ObserverNonceLedger,
 ) -> anyhow::Result<()> {
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = non_empty_parent(path) {
         fs::create_dir_all(parent)?;
     }
     let document = NonceLedgerDocument {
@@ -86,9 +90,8 @@ fn write_nonce_ledger(
             temp_path.display()
         )
     })?;
-    if let Some(parent) = path.parent() {
-        File::open(parent)?.sync_all()?;
-    }
+    let parent = non_empty_parent(path).unwrap_or_else(|| Path::new("."));
+    File::open(parent)?.sync_all()?;
     Ok(())
 }
 
@@ -99,7 +102,7 @@ fn write_output_or_stdout(output: Option<PathBuf>, repository_root: &Path, bytes
         } else {
             repository_root.join(output)
         };
-        if let Some(parent) = output_path.parent() {
+        if let Some(parent) = non_empty_parent(&output_path) {
             fs::create_dir_all(parent)?;
         }
         fs::write(&output_path, bytes)?;
