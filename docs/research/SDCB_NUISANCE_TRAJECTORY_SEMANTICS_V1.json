@@ -1,0 +1,133 @@
+{
+  "schema_version": "sdcb-nuisance-trajectory-semantics-v1",
+  "title": "Persistent versus rectangular nuisance trajectory families",
+  "status": "analytic-exact-rational-two-stage-fixture;rust-authored-not-compiled-or-ci-qualified",
+  "provenance": {
+    "parent_issue": 14230,
+    "robust_testing_issue": 14136,
+    "minimax_oracle_issue": 14185,
+    "sequential_induction_issue": 14222,
+    "dynamic_state_space_issue": 13904,
+    "evidence_transition_issue": 13805,
+    "base_commit": "f5d7bf4b3fbf7cdbf72083db77e88a9ac2c81820"
+  },
+  "observation_process": {
+    "horizon": 2,
+    "observation_alphabet": [
+      "0",
+      "1"
+    ],
+    "nuisance_values": [
+      {
+        "numerator": 1,
+        "denominator": 5
+      },
+      {
+        "numerator": 4,
+        "denominator": 5
+      }
+    ],
+    "terminal_randomized_test": {
+      "reject_when": "X1 != X2",
+      "conditional_rejection_probability": {
+        "numerator": 5,
+        "denominator": 16
+      },
+      "otherwise": {
+        "numerator": 0,
+        "denominator": 1
+      }
+    },
+    "alpha": {
+      "numerator": 1,
+      "denominator": 10
+    }
+  },
+  "trajectory_families": [
+    {
+      "id": "PERSISTENT_SHARED",
+      "law": "Choose one p in {1/5,4/5} for the full episode; X1,X2 are conditionally iid Bernoulli(p).",
+      "discordance_probability": {
+        "numerator": 8,
+        "denominator": 25
+      },
+      "terminal_false_rejection": {
+        "numerator": 1,
+        "denominator": 10
+      },
+      "randomized_test_valid": true,
+      "valid_randomization_cap": {
+        "numerator": 5,
+        "denominator": 16
+      }
+    },
+    {
+      "id": "RECTANGULAR_PRECOMMITTED",
+      "law": "Choose p1,p2 independently from {1/5,4/5} before their respective observations; conditionally independent Bernoulli observations.",
+      "worst_case_pair": {
+        "p1": "1/5",
+        "p2": "4/5"
+      },
+      "worst_discordance_probability": {
+        "numerator": 17,
+        "denominator": 25
+      },
+      "terminal_false_rejection": {
+        "numerator": 17,
+        "denominator": 80
+      },
+      "randomized_test_valid": false,
+      "valid_randomization_cap": {
+        "numerator": 5,
+        "denominator": 34
+      }
+    },
+    {
+      "id": "RECTANGULAR_HISTORY_ADAPTIVE",
+      "law": "Choose p1 first; after observing X1, choose p2(X1) from {1/5,4/5} using a public non-anticipating selector.",
+      "worst_case_policy": {
+        "p1": "1/5",
+        "p2_if_X1_zero": "4/5",
+        "p2_if_X1_one": "1/5"
+      },
+      "worst_discordance_probability": {
+        "numerator": 4,
+        "denominator": 5
+      },
+      "terminal_false_rejection": {
+        "numerator": 1,
+        "denominator": 4
+      },
+      "deterministic_second_stage_selectors_enumerated": 8,
+      "randomized_test_valid": false,
+      "valid_randomization_cap": {
+        "numerator": 1,
+        "denominator": 8
+      }
+    }
+  ],
+  "exact_implication": "A terminal test calibrated for persistent shared nuisance is not automatically valid for a larger rectangular or history-adaptive trajectory family, even when every per-stage nuisance value comes from the same finite set.",
+  "implementation": {
+    "source": "scripts/research/sdcb_nuisance_trajectory_semantics.rs",
+    "harness": "scripts/research/run_sdcb_nuisance_trajectory_semantics_tests.sh",
+    "arithmetic": "exact i128 rational known-answer verifier",
+    "authored_tests": 8,
+    "scope": "fixed two-stage counterexample and selector enumeration, not a generic dynamic nuisance model"
+  },
+  "required_receipt_semantics": [
+    "nuisance scope: episode, device, channel, window, stage or observation",
+    "static, bounded-drift, Markov or history-adaptive transition semantics",
+    "shared-cause and reference-chain coupling identities",
+    "whether transition choices are exogenous, action-dependent or public-history-dependent",
+    "calibration/reset effect on latent state and epoch",
+    "complete trajectory law/support, not per-observation marginals alone"
+  ],
+  "validation": {
+    "independent_python_fraction_replay": "pending",
+    "rust_compile": false,
+    "rust_tests_executed": false,
+    "hosted_ci": "not checked for final head",
+    "physical_sensor_dynamics_inferred": false,
+    "claim_boundary": "The fixture proves that uncertainty-set geometry changes a test's error guarantee. It does not establish which trajectory-family semantics apply to a particular sensor; that requires traceable measurement evidence."
+  }
+}
