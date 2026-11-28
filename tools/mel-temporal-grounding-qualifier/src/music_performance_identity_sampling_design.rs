@@ -87,9 +87,11 @@ pub struct PerformanceIdentitySamplingDesignReportV1 {
     pub performer_identity_count: usize,
     pub session_identity_count: usize,
     pub take_identity_count: usize,
+    pub performance_identity_count: usize,
     pub crossed_performer_count: usize,
     pub crossed_session_count: usize,
     pub crossed_take_count: usize,
+    pub crossed_performance_count: usize,
     pub multi_performer_arm_count: usize,
     pub independent_source_work_sampling_claimed: bool,
     pub independence_basis_present: bool,
@@ -139,6 +141,7 @@ pub fn audit_performance_identity_sampling_design(
     let mut performer_works = BTreeMap::<String, BTreeSet<String>>::new();
     let mut session_works = BTreeMap::<String, BTreeSet<String>>::new();
     let mut take_works = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut performance_works = BTreeMap::<String, BTreeSet<String>>::new();
     let mut work_performers = BTreeMap::<String, BTreeSet<String>>::new();
     let mut work_sessions = BTreeMap::<String, BTreeSet<String>>::new();
     let mut work_takes = BTreeMap::<String, BTreeSet<String>>::new();
@@ -219,6 +222,12 @@ pub fn audit_performance_identity_sampling_design(
                     performance,
                     "performance_identity_sha256",
                 )?;
+                if !work.is_empty() {
+                    performance_works
+                        .entry(performance.to_string())
+                        .or_default()
+                        .insert(work.to_string());
+                }
             }
             if !primary.is_empty() {
                 crate::music_listen_bench::validate_digest(
@@ -283,9 +292,14 @@ pub fn audit_performance_identity_sampling_design(
         .filter(|works| works.len() > 1)
         .count();
     let crossed_take_count = take_works.values().filter(|works| works.len() > 1).count();
+    let crossed_performance_count = performance_works
+        .values()
+        .filter(|works| works.len() > 1)
+        .count();
     let crossed = crossed_performer_count > 0
         || crossed_session_count > 0
-        || crossed_take_count > 0;
+        || crossed_take_count > 0
+        || crossed_performance_count > 0;
 
     let nested = work_performers.values().any(|performers| performers.len() > 1)
         || work_sessions.values().any(|sessions| sessions.len() > 1)
@@ -341,6 +355,11 @@ pub fn audit_performance_identity_sampling_design(
             "{crossed_take_count} take identities occur across multiple source works"
         ));
     }
+    if crossed_performance_count > 0 {
+        reasons.push(format!(
+            "{crossed_performance_count} performance identities occur across multiple source works"
+        ));
+    }
     if nested && !crossed {
         reasons.push(
             "performers, sessions, or takes are nested within one or more source works".into(),
@@ -368,9 +387,11 @@ pub fn audit_performance_identity_sampling_design(
         performer_identity_count: performer_works.len(),
         session_identity_count: session_works.len(),
         take_identity_count: take_works.len(),
+        performance_identity_count: performance_works.len(),
         crossed_performer_count,
         crossed_session_count,
         crossed_take_count,
+        crossed_performance_count,
         multi_performer_arm_count,
         independent_source_work_sampling_claimed: design
             .independent_source_work_sampling_claimed,
@@ -395,8 +416,8 @@ pub fn audit_paired_comparison_with_sampling_design(
     comparison: &PairedMusicalIdentityComparisonCaseV1,
     design: &PerformanceIdentitySamplingDesignV1,
 ) -> Result<SamplingDesignQualifiedComparisonReportV1, String> {
-    validate_design_against_comparison(design, comparison)?;
     let sampling_design = audit_performance_identity_sampling_design(design)?;
+    validate_design_against_comparison(design, comparison)?;
     if !sampling_design.work_cluster_bootstrap_permitted_under_declared_assumption {
         return Err(format!(
             "source-work-only inference refused: {:?}; {:?}",
@@ -840,6 +861,49 @@ mod tests {
         assert_eq!(report.crossed_session_count, 0);
         assert_eq!(report.crossed_take_count, 0);
         assert_eq!(report.multi_performer_arm_count, 2);
+    }
+
+
+    #[test]
+    fn a_performance_realization_reused_across_works_is_crossed() {
+        let performer_a = digest(171);
+        let performer_b = digest(172);
+        let shared_performance = digest(173);
+        let mut first = observation(
+            "performance-a",
+            "pair-performance-a",
+            &digest(174),
+            &performer_a,
+            &performer_a,
+            &performer_a,
+            1_900,
+        );
+        let mut second = observation(
+            "performance-b",
+            "pair-performance-b",
+            &digest(175),
+            &performer_b,
+            &performer_b,
+            &performer_b,
+            2_000,
+        );
+        first.performance_stay.performance_identity_sha256 = shared_performance.clone();
+        second.performance_stay.performance_identity_sha256 = shared_performance;
+
+        let report =
+            audit_performance_identity_sampling_design(&design(vec![first, second])).unwrap();
+        assert_eq!(
+            report.design_shape,
+            SamplingDesignShapeV1::CrossedPerformerSessionOrTake
+        );
+        assert_eq!(report.crossed_performer_count, 0);
+        assert_eq!(report.crossed_session_count, 0);
+        assert_eq!(report.crossed_take_count, 0);
+        assert_eq!(report.crossed_performance_count, 1);
+        assert_eq!(
+            report.disposition,
+            SamplingDesignDispositionV1::CrossedInferenceRequired
+        );
     }
 
     #[test]
