@@ -1,0 +1,44 @@
+name: Financial Time Frontier
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/financial-time-frontier/**"
+      - ".github/workflows/financial-time-frontier.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "benchmarks/financial-time-frontier/**"
+      - ".github/workflows/financial-time-frontier.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Produce rustfmt-normalized source snapshot
+        working-directory: benchmarks/financial-time-frontier
+        run: |
+          cargo fmt
+          mkdir -p /tmp/financial-time-frontier-format
+          cp src/lib.rs /tmp/financial-time-frontier-format/lib.rs
+      - name: Upload formatter snapshot for maintainer review
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-time-frontier-rights-rustfmt-snapshot
+          path: /tmp/financial-time-frontier-format/lib.rs
+          retention-days: 1
+      - name: Require committed source to match rustfmt
+        run: git diff --exit-code -- benchmarks/financial-time-frontier/src/lib.rs
+      - name: Run unit and adversarial tests
+        if: always()
+        working-directory: benchmarks/financial-time-frontier
+        run: cargo test
