@@ -31,6 +31,8 @@ The v1 evidence schema currently contains a `known_at` string and a `rights_prof
 
 The `temporally_admissible` Boolean in a claim audit is untrusted candidate/audit metadata. The verifier checks it for consistency with the typed temporal-kernel result; it never uses that Boolean as the admission source.
 
+`TemporalEvaluation` and `TemporalEvidenceResult` have crate-internal fields. An external consumer cannot manufacture a temporal PASS by constructing these structs; qualified use requires an in-crate adapter that consumes the trusted #11253 result and the principal/rights proof bridge from #11264. That adapter is not implemented in this PR, so the public verification entry point is intentionally not yet externally usable for qualified runs.
+
 ### Artifact bytes
 
 Inline JSON payloads in the v1 development fixture resolve only inside their own evidence-manifest artifact entry. They are canonicalized with the pinned RFC 8785 implementation before hashing. External CAS/object payloads require an explicit bounded `PayloadResolver`; this crate has no URL, HTTP or filesystem auto-fetch path. The resolver caller remains responsible for an immutable allowlist and locator-to-artifact binding.
