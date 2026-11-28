@@ -344,6 +344,12 @@ impl NixOSCommand {
 /// Result of NixOS command execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExecutionResult {
+    /// Command preview only. No process was spawned and no system effect occurred.
+    PreviewOnly {
+        command: NixOSCommand,
+        executable: String,
+        args: Vec<String>,
+    },
     Success {
         stdout: String,
         stderr: String,
@@ -437,6 +443,19 @@ impl NixOSExecutor {
         Err(anyhow::anyhow!("Could not determine current generation"))
     }
 
+    /// Produce a non-executing preview. This never spawns a process and
+    /// is never classified as a successful command execution.
+    pub fn preview(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
+        let (executable, args) = command.to_command();
+        let result = ExecutionResult::PreviewOnly {
+            command: command.clone(),
+            executable,
+            args,
+        };
+        self.record_execution(&command, phi, &result);
+        result
+    }
+
     /// Execute a NixOS command, gated on `phi` clearing the command's safety
     /// tier threshold (see `SafetyLevel::required_phi`).
     ///
@@ -478,11 +497,7 @@ impl NixOSExecutor {
         );
 
         if self.dry_run {
-            return ExecutionResult::Success {
-                stdout: format!("[DRY-RUN] Would execute: {} {}", cmd, args.join(" ")),
-                stderr: String::new(),
-                execution_time_ms: 0,
-            };
+            return self.preview(command, phi);
         }
 
         let start = std::time::Instant::now();
@@ -586,11 +601,7 @@ impl NixOSExecutor {
         );
 
         if self.dry_run {
-            return ExecutionResult::Success {
-                stdout: format!("[DRY-RUN] Would execute: {} {}", cmd, args.join(" ")),
-                stderr: String::new(),
-                execution_time_ms: 0,
-            };
+            return self.preview(command, phi);
         }
 
         let start = std::time::Instant::now();
@@ -749,10 +760,15 @@ mod tests {
         let result = executor.execute(search, 0.5).await;
 
         match result {
-            ExecutionResult::Success { stdout, .. } => {
-                assert!(stdout.contains("[DRY-RUN]"));
+            ExecutionResult::PreviewOnly {
+                executable,
+                args,
+                ..
+            } => {
+                assert_eq!(executable, "nix");
+                assert!(args.iter().any(|arg| arg == "search"));
             }
-            _ => panic!("Expected success"),
+            other => panic!("Expected PreviewOnly, got {other:?}"),
         }
     }
 
@@ -793,10 +809,10 @@ mod tests {
         let result = executor.execute_confirmed(rebuild, 0.0).await;
 
         match result {
-            ExecutionResult::Success { stdout, .. } => {
-                assert!(stdout.contains("[DRY-RUN]"));
+            ExecutionResult::PreviewOnly { command, .. } => {
+                assert!(matches!(command, NixOSCommand::RebuildSwitch { .. }));
             }
-            other => panic!("Expected dry-run success, got {:?}", other),
+            other => panic!("Expected PreviewOnly, got {:?}", other),
         }
     }
 
