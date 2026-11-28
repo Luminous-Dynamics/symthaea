@@ -139,9 +139,7 @@ impl RepresentationEPortfolio {
         let product_dimension = response_dimension
             .checked_mul(covariate_dimension)
             .ok_or(PortfolioError::DimensionOverflow)?;
-        if contextual_dimension > MAX_MEMBER_FEATURES
-            || product_dimension > MAX_MEMBER_FEATURES
-        {
+        if contextual_dimension > MAX_MEMBER_FEATURES || product_dimension > MAX_MEMBER_FEATURES {
             return Err(PortfolioError::MemberFeatureLimitExceeded);
         }
         if contextual_target.dimension() != contextual_dimension
@@ -172,8 +170,7 @@ impl RepresentationEPortfolio {
             contextual_monitor.log_e_value(),
             product_monitor.log_e_value(),
         )?;
-        let log_threshold =
-            (f64::from(alpha_denominator) / f64::from(alpha_numerator)).ln();
+        let log_threshold = (f64::from(alpha_denominator) / f64::from(alpha_numerator)).ln();
         if !log_threshold.is_finite() {
             return Err(PortfolioError::ArithmeticOverflow);
         }
@@ -249,14 +246,10 @@ impl RepresentationEPortfolio {
         let response_dimension = self.response_map.feature_dimension();
         let covariate_dimension = self.covariate_map.feature_dimension();
 
-        let mut contextual_difference =
-            vec![0.0; self.context_count * response_dimension];
+        let mut contextual_difference = vec![0.0; self.context_count * response_dimension];
         let context_offset = context_id * response_dimension;
-        for (index, (y_feature, x_feature)) in
-            response_y.iter().zip(&response_x).enumerate()
-        {
-            contextual_difference[context_offset + index] =
-                0.5 * (y_feature - x_feature);
+        for (index, (y_feature, x_feature)) in response_y.iter().zip(&response_x).enumerate() {
+            contextual_difference[context_offset + index] = 0.5 * (y_feature - x_feature);
         }
 
         let mut product_difference = vec![0.0; response_dimension * covariate_dimension];
@@ -265,8 +258,7 @@ impl RepresentationEPortfolio {
                 response_y.iter().zip(&response_x).enumerate()
             {
                 let index = covariate_index * response_dimension + response_index;
-                product_difference[index] =
-                    0.5 * covariate_feature * (y_feature - x_feature);
+                product_difference[index] = 0.5 * covariate_feature * (y_feature - x_feature);
             }
         }
 
@@ -438,12 +430,7 @@ mod tests {
     const SHA_F: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
     fn feature_map(digest: &str) -> FourierFeatureMap {
-        FourierFeatureMap::new(
-            1,
-            vec![vec![1.0], vec![3.0]],
-            digest.into(),
-        )
-        .unwrap()
+        FourierFeatureMap::new(1, vec![vec![1.0], vec![3.0]], digest.into()).unwrap()
     }
 
     fn portfolio(
@@ -489,8 +476,8 @@ mod tests {
         for (left, right) in [(0.0, 0.0), (2.0, -3.0), (12.0, 9.0), (-8.0, -4.0)] {
             let mixed = log_mixture(left, right).unwrap();
             let maximum = left.max(right);
-            let expected = maximum
-                + (((left - maximum).exp() + (right - maximum).exp()) / 2.0).ln();
+            let expected =
+                maximum + (((left - maximum).exp() + (right - maximum).exp()) / 2.0).ln();
             assert!((mixed - expected).abs() < 1e-12);
         }
     }
