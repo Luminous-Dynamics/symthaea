@@ -823,6 +823,147 @@
         "inter_system_same_protocol": "eligible_for_environment_smoke_only",
         "human_normative": "not_eligible"
       }
+    },
+    {
+      "id": "metacognition.selective_control",
+      "version": "0.1.0",
+      "benchmark_name": "Metacognition::SelectiveControl",
+      "domain": "metacognition",
+      "construct_card": {
+        "construct": "Choosing to answer, abstain, or request relevant information under incomplete, false-premised, stale, or difficult evidence.",
+        "operationalization": "Apply four fixed decision-policy controls to a shared 14-item synthetic fixture; score answer coverage, false nonanswers, inappropriate answers, clarification quality and evaluator-charged relative cost.",
+        "exclusions": [
+          "The fixture is hand-authored and synthetic; it is not a validated psychometric instrument or human norm.",
+          "The baseline policies are transparent controls, not trained Symthaea agents or external foundation-model competitors.",
+          "The initial version scores clarification requests against evaluator-known opportunities but does not yet execute multi-turn clarification exchanges.",
+          "Relative action-cost units are not wall-clock latency, tokens, energy or monetary cost."
+        ]
+      },
+      "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/metacognition/selective_prediction_task.rs",
+      "evidence_classes": [
+        "synthetic_mechanism"
+      ],
+      "validation_status": "unvalidated",
+      "stimulus_provenance": {
+        "kind": "frozen_synthetic_policy_fixture",
+        "generator": "selective-control-fixture-0.1.0; 14 hand-authored cases across supported evidence, difficult answerable, missing constraint, false premise, stale evidence and unavailable source.",
+        "external_dataset": null,
+        "licence": "Original Luminous Dynamics synthetic fixture."
+      },
+      "paradigm_sources": [
+        {
+          "citation": "Kirichenko et al. (2025). AbstentionBench: Reasoning LLMs Fail on Unanswerable Questions. NeurIPS 2025.",
+          "doi": null
+        },
+        {
+          "citation": "Madhusudhan et al. (2025). Do LLMs Know When to NOT Answer? COLING 2025.",
+          "doi": null
+        },
+        {
+          "citation": "Zhao et al. (2026). When and What to Ask: AskBench and Rubric-Guided RLVR for LLM Clarification. Findings of ACL 2026.",
+          "doi": null
+        },
+        {
+          "citation": "Tayebati et al. (2026). CAP: Conformalized Abstention Policies for Context-Adaptive Risk Management for LLMs and VLMs. PMLR 304.",
+          "doi": null
+        }
+      ],
+      "metrics": [
+        {
+          "id": "answer_rate",
+          "key": "answer_rate",
+          "unit": "proportion_of_all_items_answered",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "Fraction of fixture items answered directly; must be interpreted alongside selective risk and false non-answer.",
+          "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "false_nonanswer_rate",
+          "key": "false_nonanswer_rate_on_answerable",
+          "unit": "proportion_of_answerable_items_withheld",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "lower",
+          "estimand": "Fraction of answerable items on which the policy abstained or requested information.",
+          "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "inappropriate_answer_rate",
+          "key": "inappropriate_answer_rate_on_unanswerable",
+          "unit": "proportion_of_unanswerable_items_answered",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "lower",
+          "estimand": "Fraction of unanswerable-now items answered directly.",
+          "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "clarification_precision",
+          "key": "clarification_precision",
+          "unit": "proportion_of_information_requests_that_are_useful",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "Fraction of information requests that target an evaluator-known resolvable clarification opportunity.",
+          "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "clarification_recall",
+          "key": "clarification_recall",
+          "unit": "proportion_of_resolvable_clarifications_requested",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "Fraction of evaluator-known resolvable clarification opportunities on which the policy requests information.",
+          "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "total_cost_units",
+          "key": "total_cost_units",
+          "unit": "relative_fixture_cost_units",
+          "bounds": {
+            "lower": 0,
+            "upper": null
+          },
+          "direction": "lower",
+          "estimand": "Sum of evaluator-charged relative answer, abstention and information-request costs; not physical or monetary cost.",
+          "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
+          "validation_status": "verified_in_code"
+        }
+      ],
+      "controls": {
+        "status": "smoke_controls_only",
+        "positive_controls": [
+          "premise-and-freshness-aware policy on the fixture's false-premise, stale-source and resolvable-clarification cases"
+        ],
+        "negative_controls": [
+          "always-answer policy",
+          "always-abstain policy",
+          "evidence-only threshold policy"
+        ],
+        "note": "Controls are intended to test that false-premise awareness and useful clarification matter while universal abstention is not rewarded as task success. All policies share the same fixture and manifest digest."
+      },
+      "comparison_eligibility": {
+        "inter_system_same_protocol": "not_eligible_until_external_adapters_multiturn_protocol_and_runner_validation",
+        "human_normative": "not_eligible"
+      }
     }
   ]
 }
