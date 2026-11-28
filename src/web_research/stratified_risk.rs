@@ -359,10 +359,9 @@ pub fn evaluate_stratified_audit_risk(
     });
 
     let all_ids: HashSet<&str> = sorted.iter().map(|row| row.id.as_str()).collect();
-    let always_answer = estimate_for_acceptance(
+    let always_answer = estimate_from_stratum_counts(
         "always_answer",
-        &all_ids,
-        predictions,
+        &counts_for_acceptance(&all_ids, predictions, plan),
         plan,
         config.minimum_sample_size,
     );
@@ -371,10 +370,9 @@ pub fn evaluate_stratified_audit_risk(
         .filter(|row| !row.model_abstained)
         .map(|row| row.id.as_str())
         .collect();
-    let observed_model_policy = estimate_for_acceptance(
+    let observed_model_policy = estimate_from_stratum_counts(
         "observed_model_policy",
-        &observed_ids,
-        predictions,
+        &counts_for_acceptance(&observed_ids, predictions, plan),
         plan,
         config.minimum_sample_size,
     );
@@ -490,10 +488,9 @@ pub fn evaluate_stratified_audit_risk(
                 .collect();
             DesignBasedThresholdPoint {
                 confidence_threshold: threshold,
-                estimate: estimate_for_acceptance(
+                estimate: estimate_from_stratum_counts(
                     &format!("confidence_threshold_{threshold:.17}"),
-                    &accepted_ids,
-                    predictions,
+                    &counts_for_acceptance(&accepted_ids, predictions, plan),
                     plan,
                     config.minimum_sample_size,
                 ),
@@ -535,6 +532,49 @@ struct StratumCounts {
     accepted_population_count: usize,
     accepted_audit_count: usize,
     observed_error_count: usize,
+}
+
+fn counts_for_acceptance(
+    accepted_ids: &HashSet<&str>,
+    predictions: &[SelectivePredictionRecord],
+    plan: &StratifiedAuditPlan,
+) -> Vec<StratumCounts> {
+    let stratum_index_by_id: HashMap<&str, usize> = plan
+        .strata
+        .iter()
+        .enumerate()
+        .map(|(index, stratum)| (stratum.stratum_id.as_str(), index))
+        .collect();
+    let selection_by_id: HashMap<&str, (usize, bool)> = plan
+        .selections
+        .iter()
+        .map(|selection| {
+            (
+                selection.record_id.as_str(),
+                (
+                    stratum_index_by_id[selection.stratum_id.as_str()],
+                    selection.selected_for_adjudication,
+                ),
+            )
+        })
+        .collect();
+
+    let mut counts = vec![StratumCounts::default(); plan.strata.len()];
+    for prediction in predictions {
+        if !accepted_ids.contains(prediction.id.as_str()) {
+            continue;
+        }
+        let (stratum_index, selected) = selection_by_id[prediction.id.as_str()];
+        let stratum_counts = &mut counts[stratum_index];
+        stratum_counts.accepted_population_count += 1;
+        if selected {
+            stratum_counts.accepted_audit_count += 1;
+            if prediction.predicted_label != prediction.adjudicated_truth.unwrap() {
+                stratum_counts.observed_error_count += 1;
+            }
+        }
+    }
+    counts
 }
 
 fn estimate_from_stratum_counts(
@@ -642,169 +682,6 @@ fn estimate_from_stratum_counts(
                 "at least one non-census stratum has fewer than two selected audit labels"
                     .to_owned(),
             )
-        } else if !enough_audit_labels {
-            Some(format!(
-                "accepted audit label count {accepted_audit_count} is below the configured minimum {minimum_sample_size}"
-            ))
-        } else {
-            None
-        },
-        strata,
-    }
-}
-
-fn estimate_for_acceptance(
-    acceptance_rule: &str,
-    accepted_ids: &HashSet<&str>,
-    predictions: &[SelectivePredictionRecord],
-    plan: &StratifiedAuditPlan,
-    minimum_sample_size: usize,
-) -> DesignBasedRiskEstimate {
-    let prediction_by_id: HashMap<&str, &SelectivePredictionRecord> = predictions
-        .iter()
-        .map(|prediction| (prediction.id.as_str(), prediction))
-        .collect();
-
-    let mut accepted_by_stratum = BTreeMap::<&str, usize>::new();
-    for selection in &plan.selections {
-        if accepted_ids.contains(selection.record_id.as_str()) {
-            *accepted_by_stratum
-                .entry(selection.stratum_id.as_str())
-                .or_default() += 1;
-        }
-    }
-
-    let mut accepted_audit_count = 0usize;
-    let mut estimated_error_total = 0.0_f64;
-    let mut estimated_variance_total = 0.0_f64;
-    let mut variance_estimable = true;
-    let mut variance_unavailable_strata = Vec::new();
-    let mut strata = Vec::with_capacity(plan.strata.len());
-
-    for stratum in &plan.strata {
-        let sample: Vec<&SelectivePredictionRecord> = plan
-            .selections
-            .iter()
-            .filter(|selection| {
-                selection.stratum_id == stratum.stratum_id
-                    && selection.selected_for_adjudication
-            })
-            .filter_map(|selection| prediction_by_id.get(selection.record_id.as_str()).copied())
-            .collect();
-        let n = stratum.sample_size;
-        let n_population = stratum.population_size;
-        let accepted_population_count = accepted_by_stratum
-            .get(stratum.stratum_id.as_str())
-            .copied()
-            .unwrap_or(0);
-        let accepted_sample: Vec<&SelectivePredictionRecord> = sample
-            .iter()
-            .copied()
-            .filter(|prediction| accepted_ids.contains(prediction.id.as_str()))
-            .collect();
-        let observed_error_count = accepted_sample
-            .iter()
-            .filter(|prediction| {
-                prediction.predicted_label != prediction.adjudicated_truth.unwrap()
-            })
-            .count();
-        let sample_sum = observed_error_count as f64;
-        let stratum_estimated_error = n_population as f64 * sample_sum / n as f64;
-        estimated_error_total += stratum_estimated_error;
-        accepted_audit_count += accepted_sample.len();
-
-        let sample_error_variance = if accepted_population_count == 0 || n_population == n {
-            // If the frozen candidate accepts no units in this stratum, the
-            // loss is identically zero even when the audit quota is one.
-            Some(0.0)
-        } else if n >= 2 {
-            let sample_mean = sample_sum / n as f64;
-            let sum_squared = sample
-                .iter()
-                .map(|prediction| {
-                    let value = if accepted_ids.contains(prediction.id.as_str())
-                        && prediction.predicted_label != prediction.adjudicated_truth.unwrap()
-                    {
-                        1.0
-                    } else {
-                        0.0
-                    };
-                    (value - sample_mean).powi(2)
-                })
-                .sum::<f64>();
-            Some(sum_squared / (n - 1) as f64)
-        } else {
-            None
-        };
-
-        let stratum_variance = sample_error_variance.map(|sample_variance| {
-            (n_population as f64).powi(2)
-                * (1.0 - n as f64 / n_population as f64)
-                * sample_variance
-                / n as f64
-        });
-        if let Some(value) = stratum_variance {
-            estimated_variance_total += value;
-        } else {
-            variance_estimable = false;
-            variance_unavailable_strata.push(stratum.stratum_id.clone());
-        }
-
-        strata.push(StratumRiskEstimate {
-            stratum_id: stratum.stratum_id.clone(),
-            population_size: n_population,
-            audit_sample_size: n,
-            accepted_population_count,
-            accepted_audit_count: accepted_sample.len(),
-            observed_error_count,
-            estimated_error_total: stratum_estimated_error,
-            estimated_error_total_variance: stratum_variance,
-            sample_error_variance,
-            variance_estimable: stratum_variance.is_some(),
-        });
-    }
-
-    let accepted_population_count = accepted_by_stratum.values().sum::<usize>();
-    let estimated_risk = (accepted_population_count > 0)
-        .then_some(estimated_error_total / accepted_population_count as f64);
-    let estimated_error_total_variance = variance_estimable.then_some(estimated_variance_total);
-    let estimated_risk_variance = estimated_error_total_variance.and_then(|variance| {
-        (accepted_population_count > 0)
-            .then_some(variance / (accepted_population_count as f64).powi(2))
-    });
-    let enough_audit_labels = accepted_audit_count >= minimum_sample_size;
-    let standard_error = if enough_audit_labels {
-        estimated_risk_variance.map(f64::sqrt)
-    } else {
-        None
-    };
-    let approximate_normal_95_interval = estimated_risk.zip(standard_error).map(|(risk, se)| {
-        ApproximateRiskInterval {
-            lower: risk - NORMAL_95_Z * se,
-            upper: risk + NORMAL_95_Z * se,
-            confidence_level: 0.95,
-            method: "pointwise normal approximation using unbiased stratified-SRSWOR variance".to_owned(),
-        }
-    });
-
-    DesignBasedRiskEstimate {
-        acceptance_rule: acceptance_rule.to_owned(),
-        accepted_population_count,
-        accepted_coverage: accepted_population_count as f64 / plan.population_size as f64,
-        accepted_audit_count,
-        estimated_error_total,
-        estimated_risk,
-        estimated_risk_outside_unit_interval: estimated_risk.is_some_and(|risk| {
-            !(0.0..=1.0).contains(&risk)
-        }),
-        estimated_error_total_variance,
-        estimated_risk_variance,
-        standard_error,
-        approximate_normal_95_interval,
-        variance_estimable,
-        variance_unavailable_strata: variance_unavailable_strata.clone(),
-        uncertainty_unavailable_reason: if !variance_estimable {
-            Some("at least one non-census stratum has fewer than two selected audit labels".to_owned())
         } else if !enough_audit_labels {
             Some(format!(
                 "accepted audit label count {accepted_audit_count} is below the configured minimum {minimum_sample_size}"
