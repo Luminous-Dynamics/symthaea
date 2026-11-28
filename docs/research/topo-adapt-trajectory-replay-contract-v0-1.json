@@ -1,0 +1,193 @@
+{
+  "contract_version": "topo_adapt_trajectory_replay_v0_1",
+  "status": "proposed_research_contract_not_implemented_or_qualified",
+  "date": "2026-11-28",
+  "owner": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "issue": 14123,
+    "related_prs": [
+      14125,
+      14127,
+      14128
+    ]
+  },
+  "episode_semantics": {
+    "authoritative_state_owner": "independent_evaluator",
+    "decision_tick_order": [
+      "apply_exogenous_event_batch",
+      "generate_timestamped_observations",
+      "invoke_policy_with_only_available_observations",
+      "validate_action_authority_and_remaining_budgets",
+      "execute_or_record_rejected_failed_or_unknown_outcome",
+      "emit_receipt_and_post_state_digest"
+    ],
+    "causal_constraints": [
+      "policy_cannot_read_future_events_or_future_demand",
+      "observations_must_include_source_time_age_and_missingness",
+      "accepted_edits_persist_until_explicitly_changed_or_failed",
+      "episode_budgets_are_cumulative_unless_explicitly_replenished",
+      "unknown_execution_outcome_blocks_further_mutation_until_reconciliation"
+    ],
+    "simultaneous_event_rule": "apply_nonconflicting_events_as_one_batch; reject conflicting same-resource events unless an explicit composition rule is declared",
+    "duplicate_action_rule": "stable action IDs are idempotent; duplicate accepted mutations are never applied or charged twice"
+  },
+  "action_types": [
+    "no_op",
+    "add_edge",
+    "remove_edge",
+    "set_capacity",
+    "request_observation",
+    "defer",
+    "abstain"
+  ],
+  "receipt_required_fields": [
+    "episode_id",
+    "tick",
+    "action_id",
+    "policy_digest",
+    "pre_state_digest",
+    "observation_set_digest",
+    "consumed_observation_ids",
+    "action_type",
+    "target_resource_ids",
+    "reason_code",
+    "predicted_service_delta_and_uncertainty_when_available",
+    "resource_reservation",
+    "execution_status",
+    "post_state_digest_when_known",
+    "fixture_digest",
+    "evaluator_digest"
+  ],
+  "cumulative_budgets": [
+    {
+      "name": "topology_edits",
+      "unit": "typed_edit_count_and_cost",
+      "scope": "episode",
+      "measure": "additions_removals_rewires_capacity_changes_and_reversals"
+    },
+    {
+      "name": "edge_lifecycle",
+      "unit": "cost_units_per_edge_time",
+      "scope": "episode",
+      "measure": "installation_removal_maintenance_and_dormant_reserve_cost"
+    },
+    {
+      "name": "communication",
+      "unit": "messages_and_bytes",
+      "scope": "episode_and_tick",
+      "measure": "include_headers_retries_routing_and_coordination"
+    },
+    {
+      "name": "computation",
+      "unit": "node_updates_operations_wall_time_memory_bytes",
+      "scope": "episode_and_tick",
+      "measure": "record actual controller trace"
+    },
+    {
+      "name": "sensing",
+      "unit": "observations_bytes_latency_cost",
+      "scope": "episode",
+      "measure": "include requested and acquired observations"
+    },
+    {
+      "name": "service_latency",
+      "unit": "time_units",
+      "scope": "per_path_and_episode",
+      "measure": "propagation_queue_processing_and_deadline_misses"
+    },
+    {
+      "name": "energy",
+      "unit": "metered_energy_or_named_calibrated_proxy",
+      "scope": "episode",
+      "measure": "never mix proxy and measured energy without labeling"
+    }
+  ],
+  "outcome_families": [
+    "cumulative_demand_weighted_service",
+    "deadline_constrained_service",
+    "unmet_demand_and_service_deficit_area",
+    "time_to_recovery_and_recovery_success_by_horizon",
+    "lower_tail_service_and_preregistered_cvar",
+    "topology_churn_and_unnecessary_edits",
+    "lifecycle_cost_and_resource_per_service",
+    "latency_p50_p95_p99",
+    "calibration_and_selective_abstention",
+    "decision_regret_against_information_labeled_oracles"
+  ],
+  "p0_fixtures": [
+    "stationary_demand_no_edit",
+    "transient_demand_pulse",
+    "persistent_new_demand",
+    "single_bridge_failure",
+    "repeated_disruption_with_persistent_edits",
+    "shared_capacity_bottleneck",
+    "stale_and_partitioned_observation",
+    "conflicting_same_tick_events",
+    "exhausted_cumulative_budget",
+    "infeasible_demand",
+    "held_out_graph_family",
+    "two_x_graph_scale_transfer"
+  ],
+  "baseline_families": {
+    "decentralized_peers": [
+      "static_topology",
+      "fixed_topology_dynamic_routing",
+      "edge_weight_adaptation",
+      "local_greedy_repair",
+      "distributed_shortest_path_or_augmenting_path",
+      "degree_and_edge_budget_matched_random_rewiring",
+      "multi_rate_local_plus_slow_coordination",
+      "learned_policy_after_evaluator_qualification"
+    ],
+    "structural_message_passing_controls": [
+      "delaunay_or_geometric_augmentation",
+      "spectral_gap_or_expander_inspired_rewiring",
+      "effective_resistance_or_curvature_ranked_edits",
+      "sparsification",
+      "virtual_node_or_hub_shortcuts"
+    ],
+    "centralized_and_upper_bounds": [
+      "rolling_horizon_centralized_optimizer_with_current_information",
+      "capacity_aware_milp_or_min_cost_network_design",
+      "robust_or_stochastic_network_design",
+      "genetic_algorithm_under_matched_tuning_budget",
+      "exact_small_instance_oracle",
+      "offline_clairvoyant_trajectory_upper_bound",
+      "one_step_full_visibility_candidate_sweep_upper_bound"
+    ]
+  },
+  "promotion_gates": [
+    "contract_and_schema_conformance",
+    "persistent_state_and_action_semantics",
+    "causal_observation_and_no_future_leakage",
+    "independent_small_instance_reference",
+    "cumulative_resource_enforcement",
+    "deterministic_trajectory_receipts",
+    "faithful_comparator_reproduction",
+    "held_out_graph_demand_disturbance_and_scale_tournament",
+    "independent_replication"
+  ],
+  "aspirational_targets_not_results": {
+    "deterministic_reference_agreement": "100_percent",
+    "invalid_authority_or_budget_violations": 0,
+    "future_information_violations": 0,
+    "stationary_control_edits": 0,
+    "cumulative_service_improvement": ">=5_percentage_points_vs_strongest_matched_decentralized_baseline_with_paired_95_percent_CI_excluding_zero",
+    "held_out_graph_transfer": ">=90_percent_of_in_distribution_cumulative_service_including_2x_size_test",
+    "efficiency": ">=2x_lower_communication_or_preregistered_lifecycle_cost_reduction_at_non_inferior_service"
+  },
+  "evidence_lanes": {
+    "synthetic_network_control": "primary_algorithmic_lane",
+    "smart_cellular_bricks": "embodied_decentralized_comparator; code_data_and_weights_require_rights_admission",
+    "dynamic_atlas": "observational_developmental_trajectory_lane_not_a_causal_controller_benchmark",
+    "flim_bioelectric": "observational_multirate_signal_lane_not_an_architecture_prescription",
+    "manufacturing": "offline_then_shadow_mode_then_human_approved_advisory; no_initial_autonomous_actuation_claim",
+    "distribution_grid": "separate_future_qualification_with_power_flow_voltage_thermal_radiality_protection_and_switching_constraints"
+  },
+  "claim_boundary": [
+    "this_manifest_is_a_proposed_contract_not_an_implementation",
+    "no_controller_or_score_is_claimed",
+    "synthetic_flow_does_not_establish_biological_mechanism",
+    "simulation_does_not_establish_physical_self_repair_or_industrial_safety"
+  ]
+}
