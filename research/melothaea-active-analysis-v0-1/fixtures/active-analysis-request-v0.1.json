@@ -47,7 +47,8 @@
             0.9
           ]
         }
-      ]
+      ],
+      "likelihood_table_sha256": "585f30e9023d485385ef05104b6e1d5b8dbe7698810ca87d6f8ebb70dd3c9e7e"
     },
     {
       "action_id": "expensive-stereo-source-probe",
@@ -69,7 +70,8 @@
             1
           ]
         }
-      ]
+      ],
+      "likelihood_table_sha256": "d1ca85f8aa7197f64f12a979daf65e9848f3f14e3dac9c7e67ea943719c336e1"
     }
   ],
   "policy": {
