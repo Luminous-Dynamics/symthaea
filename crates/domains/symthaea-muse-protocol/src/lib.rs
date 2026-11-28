@@ -40,6 +40,8 @@ pub mod transition;
 pub mod beat_benchmark;
 /// Pinned MIREX beat score semantics and known-answer parity (MEL-DJ-010).
 pub mod beat_metrics;
+/// Per-valid-segment MIREX scoring adapter (MEL-DJ-011).
+pub mod beat_segments;
 
 use serde::{Deserialize, Serialize};
 
