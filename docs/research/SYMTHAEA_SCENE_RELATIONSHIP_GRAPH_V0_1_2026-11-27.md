@@ -177,6 +177,6 @@ The schema fixtures remain structural JSON Schema fixtures. Their digest strings
 The tests are authored but have not been compiled or executed. No Bevy endpoint-connected graph rendering is claimed; the adapter still renders the earlier role-aware layout until the typed graph adapter is implemented.
 
 
-## 9. Qualification status
+## 11. Qualification status
 
 This document specifies the next contract increment. The current renderer uses deterministic, role-aware placement but still has no explicit endpoint-connected semantic graph. No v2 schema, graph compiler, edge renderer, or human study has been implemented or qualified.
