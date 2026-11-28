@@ -96,8 +96,8 @@ pub struct PredictableAuditSelection {
     pub inclusion_probability_f64_bits: u64,
     pub selected_for_adjudication: bool,
     /// Index into the external random-stream manifest. The raw draw is not
-    /// returned, so this receipt can be shared without revealing audit choice
-    /// to the candidate process.
+    /// returned. This selection row remains custodian-private because it does
+    /// contain the selected flag.
     pub random_stream_index: usize,
 }
 
