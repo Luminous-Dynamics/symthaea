@@ -765,13 +765,18 @@ mod tests {
         // The X and Y marginals are identical over each two-pair block:
         // X=(0, 2pi), Y=(2pi, 0). Only the conditional pairing changes.
         for sequence in 1..=200u64 {
+            let (covariate, x, y) = if sequence % 2 == 0 {
+                ([std::f64::consts::PI], [std::f64::consts::TAU], [0.0])
+            } else {
+                ([0.0], [0.0], [std::f64::consts::TAU])
+            };
             let result = family
                 .observe_pair(
                     sequence,
                     &format!("pair-{sequence}"),
-                    if sequence % 2 == 0 { &[std::f64::consts::PI] } else { &[0.0] },
-                    if sequence % 2 == 0 { &[std::f64::consts::TAU] } else { &[0.0] },
-                    if sequence % 2 == 0 { &[0.0] } else { &[std::f64::consts::TAU] },
+                    &covariate,
+                    &x,
+                    &y,
                 )
                 .unwrap();
             if result.quarantined {
@@ -896,14 +901,13 @@ mod tests {
         let mut family = portfolio();
         let mut stopped = false;
         for sequence in 1..=200u64 {
+            let (covariate, x, y) = if sequence % 2 == 0 {
+                ([std::f64::consts::PI], [std::f64::consts::TAU], [0.0])
+            } else {
+                ([0.0], [0.0], [std::f64::consts::TAU])
+            };
             let update = family
-                .observe_pair(
-                    sequence,
-                    &format!("shift-{sequence}"),
-                    if sequence % 2 == 0 { &[std::f64::consts::PI] } else { &[0.0] },
-                    if sequence % 2 == 0 { &[std::f64::consts::TAU] } else { &[0.0] },
-                    if sequence % 2 == 0 { &[0.0] } else { &[std::f64::consts::TAU] },
-                )
+                .observe_pair(sequence, &format!("shift-{sequence}"), &covariate, &x, &y)
                 .unwrap();
             if update.quarantined {
                 stopped = true;
