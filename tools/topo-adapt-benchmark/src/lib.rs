@@ -489,5 +489,8 @@ fn solve_flow(
         max_flow,
         min_cut,
         requested_flow,
+        accepted_edge_additions: 0,
+        edit_cost_units: 0,
+        edge_maintenance_cost_units: 0,
     })
 }
