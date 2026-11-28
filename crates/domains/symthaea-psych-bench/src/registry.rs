@@ -430,9 +430,28 @@ mod tests {
     }
 
     #[test]
+    fn pilot_implementation_paths_exist_in_this_crate() {
+        let registry = PsychBenchRegistry::pilot().expect("pilot registry");
+        let crate_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        for benchmark in &registry.benchmarks {
+            let relative = benchmark
+                .implementation_path
+                .strip_prefix("crates/domains/symthaea-psych-bench/")
+                .expect("path prefix checked by registry validator");
+            assert!(
+                crate_root.join(relative).is_file(),
+                "missing implementation for {}: {}",
+                benchmark.id,
+                benchmark.implementation_path
+            );
+        }
+    }
+
+    #[test]
     fn registry_rejects_duplicate_benchmark_ids() {
         let mut registry = PsychBenchRegistry::pilot().expect("pilot registry");
-        registry.benchmarks.push(registry.benchmarks[0].clone());
+        let duplicate = registry.benchmarks[0].clone();
+        registry.benchmarks.push(duplicate);
         let error = registry.validate().expect_err("duplicate ID must fail closed");
         assert!(error.message.contains("duplicate benchmark id"));
     }
