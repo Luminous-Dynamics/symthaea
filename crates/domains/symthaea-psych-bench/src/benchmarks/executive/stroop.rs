@@ -320,13 +320,13 @@ impl PsychBenchmark for StroopBenchmark {
         // RT metrics (tick-based)
         result.insert(
             "congruent::rt_ticks",
-            metric_with_bounds(&all_cong_rt, 0.0, None),
+            metric_with_bounds(&all_cong_rt, 8.0, Some(20.0)),
         );
         result.insert(
             "incongruent::rt_ticks",
-            metric_with_bounds(&all_incong_rt, 0.0, None),
+            metric_with_bounds(&all_incong_rt, 8.0, Some(20.0)),
         );
-        result.insert("neutral::rt_ticks", metric_with_bounds(&all_neut_rt, 0.0, None));
+        result.insert("neutral::rt_ticks", metric_with_bounds(&all_neut_rt, 8.0, Some(20.0)));
 
         if config.trial_trace {
             result.trial_trace = trace;
