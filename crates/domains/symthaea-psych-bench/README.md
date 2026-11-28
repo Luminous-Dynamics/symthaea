@@ -112,9 +112,9 @@ research branch.
 ## Selective prediction and clarification-control task (synthetic v0.1)
 
 - `benchmarks/metacognition/selective_prediction.rs` is the reusable scorer for answer, abstain and request-information decisions. It reports coverage, selective risk, false abstention, inappropriate answers on unanswerable items, counterfactual-answer Brier/ECE, a confidence-ranked risk/coverage curve and evaluator-charged decision cost.
-- `benchmarks/metacognition/selective_prediction_task.rs` adds a frozen 14-item synthetic task fixture and four matched policy controls: always-answer, always-abstain, evidence-threshold and premise/freshness-aware. It keeps answerability, counterfactual correctness and clarification outcomes evaluator-side; policies receive only the observation state.
-- `examples/selective_prediction_baselines.rs` emits one JSON report per baseline. Reports bind to a BLAKE3 manifest digest and separate answer quality, false nonanswers, inappropriate answers, clarification precision/recall and cost rather than collapsing them into an opaque composite.
-- This fixture is a small policy smoke test, not a validated benchmark, a trained Symthaea result, a human norm or an external SOTA comparison. Its costs are relative fixture units, not latency, tokens, joules or money. Replace it with held-out task-family generators, independent answer/clarification oracles, multi-turn interactions and matched public benchmark adapters before making performance claims.
+- `benchmarks/metacognition/selective_prediction_task.rs` adds a frozen 14-item synthetic task fixture and four matched policy controls: always-answer, always-abstain, evidence-threshold and premise/freshness-aware. Policies see only the observation state; answerability, counterfactual correctness, correct clarification target and post-clarification outcome remain evaluator-side.
+- `examples/selective_prediction_baselines.rs` emits one JSON report per baseline. Each information request names a target (supply a missing constraint, verify a premise, or refresh a stale source). A correct request receives one evaluator-mediated updated observation and the policy must decide again. Reports bind to a BLAKE3 manifest digest and separate initial answer quality, final answer accuracy, post-clarification recovery, false nonanswers, inappropriate answers, clarification precision/recall and follow-up cost rather than collapsing them into an opaque composite.
+- This fixture is a small policy smoke test, not a validated benchmark, a trained Symthaea result, a human norm or an external SOTA comparison. Its costs are relative fixture units, not latency, tokens, joules or money. It implements only one clarification-and-redecision cycle, not a general dialogue engine. Replace it with held-out task-family generators, independently authored answer/clarification oracles, longer interaction traces and matched public benchmark adapters before making performance claims.
 
 Research specifications and external comparisons:
 - `docs/research/PSYCHBENCH_COGNITIVE_ECOLOGY_SPEC_v0.1.md`
@@ -135,7 +135,7 @@ workflow is not validation.
 
 ## Evidence-qualified benchmark registry (pilot v0.1)
 
-The initial pilot registry covers eight selected tasks/environments and 40
+The initial pilot registry covers eight selected tasks/environments and 44
 metric definitions. It records stable IDs, implementation paths, construct
 cards, evidence classes, stimulus provenance, metric units/bounds/directions,
 validation status and comparison eligibility.
@@ -149,7 +149,7 @@ available as `registry::PsychBenchRegistry::pilot()` and validates the bundled
 definitions (stable/unique IDs, crate-local implementation paths, explicit
 metric selectors, bounds, evidence classes and human-norm claim boundaries).
 Unit tests cover those fail-closed rules and check that the listed implementation
-files exist. A source-level test also checks all 40 pilot metric selectors
+files exist. A source-level test also checks all 44 pilot metric selectors
 against their registered implementation files. Selected pilot metrics now call
 `MetricValue::from_samples_with_bounds`, which validates observations against
 declared support and computes intervals in the metric's original units. The JSON
