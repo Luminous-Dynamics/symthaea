@@ -142,6 +142,7 @@ pub struct PredictableAuditSelection {
     pub sequence_number: usize,
     pub record_id: String,
     pub prelabel_history_sha256: String,
+    pub prelabel_priority_score_numerator: u64,
     pub inclusion_probability_numerator: u128,
     pub inclusion_probability_denominator: u128,
     pub inclusion_probability_f64_bits: u64,
@@ -416,6 +417,11 @@ pub fn build_predictable_audit_receipt(
                 sequence_number: index,
             });
         }
+        if event.prelabel_priority_score_numerator > (1_u64 << 53) {
+            return Err(PredictableAuditError::InvalidPriorityScore(
+                event.prelabel_priority_score_numerator,
+            ));
+        }
         event.inclusion_probability.validate()?;
         if event.inclusion_probability.numerator
             < design.minimum_inclusion_probability.numerator
@@ -444,6 +450,7 @@ pub fn build_predictable_audit_receipt(
             sequence_number: index,
             record_id: event.record_id.clone(),
             prelabel_history_sha256: event.prelabel_history_sha256.clone(),
+            prelabel_priority_score_numerator: event.prelabel_priority_score_numerator,
             inclusion_probability_numerator: event.inclusion_probability.numerator,
             inclusion_probability_denominator: DYADIC_DENOMINATOR,
             inclusion_probability_f64_bits: event.inclusion_probability.as_f64().to_bits(),
@@ -712,6 +719,12 @@ mod tests {
                 .map(PredictableAuditSelection::inclusion_probability)
                 .collect::<Vec<_>>(),
             vec![0.25, 0.625, 1.0]
+        );
+        assert_eq!(
+            receipt.selections.iter()
+                .map(|selection| selection.prelabel_priority_score_numerator)
+                .collect::<Vec<_>>(),
+            vec![0, 1_u64 << 52, 1_u64 << 53]
         );
 
         second.inclusion_probability = DyadicInclusionProbability {
