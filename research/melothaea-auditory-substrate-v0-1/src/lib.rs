@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 
-pub mod dsp;
-
 //! Contract-only validation for the first MEL-HEAR-011 auditory evidence fixture.
 //!
 //! This crate does not implement an audio front end. It verifies provenance,
 //! sample metadata, representation declarations and claim-state boundaries.
+
+pub mod dsp;
 
 use serde::Serialize;
 use serde_json::Value;
