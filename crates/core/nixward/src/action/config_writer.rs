@@ -13,6 +13,9 @@
 //! does NOT execute system commands, it only produces modified config text
 //! and backup/restore operations.
 
+use crate::parser::nix_parser::NixParser;
+use crate::typed_nix::{NixAttributePath, NixExpr, NixPackageRef};
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -123,22 +126,26 @@ impl ConfigWriter {
     ///
     /// Returns a patch that, when applied, adds the package to the config.
     pub fn add_system_package(&self, package: &str) -> Result<ConfigPatch, std::io::Error> {
+        let package = NixPackageRef::new(package).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+        let package_attr = package.attribute().as_nix();
         let config_path = self.config_root.join("configuration.nix");
         let original = std::fs::read_to_string(&config_path)?;
 
-        let pkg_entry = format!("    pkgs.{package}");
+        let pkg_entry = format!("    pkgs.{package_attr}");
 
         // Check if already present
-        if original.contains(&format!("pkgs.{package}")) {
+        if original.contains(&format!("pkgs.{package_attr}")) {
             return Ok(ConfigPatch {
                 target: config_path,
                 original: original.clone(),
                 modified: original,
-                description: format!("{package} is already in systemPackages"),
+                description: format!("{package_attr} is already in systemPackages"),
             });
         }
 
-        // Find the systemPackages list and insert
+        // Find the systemPackages list and insert a validated package attribute.
         let modified = if let Some(pos) = original.find("environment.systemPackages") {
             if let Some(bracket_pos) = original[pos..].find('[') {
                 let insert_at = pos + bracket_pos + 1;
@@ -165,20 +172,24 @@ impl ConfigWriter {
             target: config_path,
             original,
             modified,
-            description: format!("Add pkgs.{package} to environment.systemPackages"),
+            description: format!("Add pkgs.{package_attr} to environment.systemPackages"),
         })
     }
 
     /// Remove a package from `environment.systemPackages`.
     pub fn remove_system_package(&self, package: &str) -> Result<ConfigPatch, std::io::Error> {
+        let package = NixPackageRef::new(package).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+        let package_attr = package.attribute().as_nix();
         let config_path = self.config_root.join("configuration.nix");
         let original = std::fs::read_to_string(&config_path)?;
 
         let patterns = [
-            format!("    pkgs.{package}\n"),
-            format!("    pkgs.{package}"),
-            format!("pkgs.{package}\n"),
-            format!("pkgs.{package}"),
+            format!("    pkgs.{package_attr}\n"),
+            format!("    pkgs.{package_attr}"),
+            format!("pkgs.{package_attr}\n"),
+            format!("pkgs.{package_attr}"),
         ];
 
         let mut modified = original.clone();
@@ -190,56 +201,163 @@ impl ConfigWriter {
             target: config_path,
             original,
             modified,
-            description: format!("Remove pkgs.{package} from environment.systemPackages"),
+            description: format!("Remove pkgs.{package_attr} from environment.systemPackages"),
         })
     }
 
-    /// Set a NixOS option to a value.
+    /// Set a NixOS option to a restricted typed literal.
     ///
-    /// This is a simple text-based approach — for complex modifications,
-    /// use the parser layer to produce a proper AST edit.
+    /// This compatibility API accepts only booleans, integers, null, and
+    /// JSON-quoted strings. Arbitrary Nix source is rejected. Use
+    /// `set_option_expr` when a caller already has a typed expression.
     pub fn set_option(
         &self,
         option_path: &str,
         value: &str,
     ) -> Result<ConfigPatch, std::io::Error> {
+        let expression = Self::parse_restricted_literal(value)?;
+        self.set_option_expr(option_path, &expression)
+    }
+
+    /// Parse a deliberately small CLI literal language.
+    ///
+    /// This does not parse general Nix. It accepts only bool, signed integer,
+    /// null and JSON string literals, so a syntactically valid Nix function,
+    /// attribute set, interpolation or extra assignment cannot pass through.
+    fn parse_restricted_literal(value: &str) -> Result<NixExpr, std::io::Error> {
+        let value = value.trim();
+        match value {
+            "true" => return Ok(NixExpr::Bool(true)),
+            "false" => return Ok(NixExpr::Bool(false)),
+            "null" => return Ok(NixExpr::Null),
+            _ => {}
+        }
+
+        if let Ok(integer) = value.parse::<i64>() {
+            return Ok(NixExpr::Int(integer));
+        }
+
+        if value.starts_with('"') {
+            let string = serde_json::from_str::<String>(value).map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("String values must be valid JSON double-quoted strings: {error}"),
+                )
+            })?;
+            return Ok(NixExpr::String(string));
+        }
+
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Unsupported value expression. Use true, false, null, an integer, or a JSON-quoted string; arbitrary Nix source is not accepted.",
+        ))
+    }
+
+    /// Construct a patch using a validated static option path and typed value.
+    ///
+    /// The value is rendered from NixExpr, never copied from user source. The
+    /// existing file is parsed and exact option paths are matched before a
+    /// source line is replaced. This is still a limited source edit: target
+    /// option existence/type/writeability and package membership require the
+    /// separate target resolver.
+    pub fn set_option_expr(
+        &self,
+        option_path: &str,
+        value: &NixExpr,
+    ) -> Result<ConfigPatch, std::io::Error> {
+        let option_path = NixAttributePath::parse(option_path).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+        let rendered_path = option_path.as_nix();
+        let rendered_value = value.as_nix().map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+
         let config_path = self.config_root.join("configuration.nix");
         let original = std::fs::read_to_string(&config_path)?;
+        let mut parser = NixParser::new();
+        let parsed = parser.parse(&original).map_err(|error| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Existing configuration did not parse: {}", error.message),
+            )
+        })?;
+        if !parsed.errors.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Existing configuration contains parse errors: {:?}", parsed.errors),
+            ));
+        }
 
-        let option_line = format!("  {option_path} = {value};");
+        let matching: Vec<_> = parsed
+            .options
+            .iter()
+            .filter(|option| option.path == rendered_path)
+            .collect();
+        if matching.len() > 1 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Refusing ambiguous patch: {rendered_path} has multiple definitions"),
+            ));
+        }
 
-        let modified = if let Some(pos) = original.find(option_path) {
-            // Find the end of this line (semicolon)
-            if let Some(semi) = original[pos..].find(';') {
-                let line_start = original[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
-                let line_end = pos + semi + 1;
-                let mut result = String::with_capacity(original.len());
-                result.push_str(&original[..line_start]);
-                result.push_str(&option_line);
-                result.push_str(&original[line_end..]);
-                result
-            } else {
-                original.clone()
+        let option_line = format!("  {rendered_path} = {rendered_value};");
+        let modified = if let Some(existing) = matching.first() {
+            let mut lines = original.lines().map(str::to_string).collect::<Vec<_>>();
+            let line_index = existing.line.saturating_sub(1);
+            if line_index >= lines.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Parser returned an invalid source line for {rendered_path}"),
+                ));
             }
+            let indentation = lines[line_index]
+                .chars()
+                .take_while(|character| character.is_whitespace())
+                .collect::<String>();
+            lines[line_index] = format!("{indentation}{rendered_path} = {rendered_value};");
+            let mut content = lines.join("\n");
+            if original.ends_with('\n') {
+                content.push('\n');
+            }
+            content
         } else {
-            // Option not found — insert before the closing brace
-            if let Some(pos) = original.rfind('}') {
-                let mut result = String::with_capacity(original.len() + option_line.len() + 2);
-                result.push_str(&original[..pos]);
-                result.push_str(&option_line);
+            let Some(position) = original.rfind('}') else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Could not locate the final module attribute-set brace",
+                ));
+            };
+            let mut result = String::with_capacity(original.len() + option_line.len() + 2);
+            result.push_str(&original[..position]);
+            if !result.ends_with('\n') {
                 result.push('\n');
-                result.push_str(&original[pos..]);
-                result
-            } else {
-                original.clone()
             }
+            result.push_str(&option_line);
+            result.push('\n');
+            result.push_str(&original[position..]);
+            result
         };
+
+        // Reject any output that the structural parser cannot read.
+        let reparsed = parser.parse(&modified).map_err(|error| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Generated configuration did not parse: {}", error.message),
+            )
+        })?;
+        if !reparsed.errors.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Generated configuration contains parse errors: {:?}", reparsed.errors),
+            ));
+        }
 
         Ok(ConfigPatch {
             target: config_path,
             original,
             modified,
-            description: format!("Set {option_path} = {value}"),
+            description: format!("Set {rendered_path} = {rendered_value}"),
         })
     }
 
