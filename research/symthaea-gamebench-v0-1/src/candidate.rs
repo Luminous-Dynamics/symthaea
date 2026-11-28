@@ -62,7 +62,8 @@ pub struct CandidateFeedback<'a, O, A> {
 pub trait InteractiveCandidate<O, A> {
     type Error: Error;
 
-    fn reset(&mut self, episode_id: u64) -> Result<(), Self::Error>;
+    /// Clear candidate-side state between episodes. No task seed or evaluator ID is passed.
+    fn reset(&mut self) -> Result<(), Self::Error>;
 
     fn decide(
         &mut self,
