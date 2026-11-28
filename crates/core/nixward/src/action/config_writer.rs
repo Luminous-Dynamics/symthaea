@@ -337,6 +337,18 @@ impl ConfigWriter {
 
         let option_line = format!("  {rendered_path} = {rendered_value};");
         let modified = if let Some(existing) = matching.first() {
+            let same_line_sibling = parsed.options.iter().any(|option| {
+                option.line == existing.line && option.path != rendered_path
+            });
+            if same_line_sibling || existing.raw_value.contains('\n') || existing.raw_value.contains('\r') {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "Refusing line-based edit for {rendered_path}: its source line contains another binding or a multi-line value"
+                    ),
+                ));
+            }
+
             let mut lines = original.lines().map(str::to_string).collect::<Vec<_>>();
             let line_index = existing.line.saturating_sub(1);
             if line_index >= lines.len() {
