@@ -73,7 +73,7 @@ produces actual message and update traces. Maintenance cost is charged once per
 active edge per simulated tick in the current research accounting unit; this
 is a synthetic accounting convention, not measured physical energy or money.
 
-Tests are authored for repeated disruption, persistent runtime-created edges,
+Eleven tests are authored for repeated disruption, the snapshot-reset negative control, persistent runtime-created edges,
 cumulative budgets, event-order invariance, conflict rejection, duplicate
 action IDs, stale pre-state digests, deterministic replay, demand persistence
 and context-bound state digests.
