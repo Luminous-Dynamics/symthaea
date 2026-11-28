@@ -478,7 +478,7 @@ pub fn select_evidence_set_v1(
     let selected_use_receipt_sha256:Vec<String>=selected_ids.iter().map(|id|{
         candidates[indices[id.as_str()]].receipt.canonical_sha256.clone()
     }).collect();
-    excluded.sort_by_key(|value| value.evidence_id.as_str());
+    excluded.sort_by(|left, right| left.evidence_id.cmp(&right.evidence_id));
     let mut selection=EvidenceSetSelectionReceiptV1{
         schema_version:EVIDENCE_SET_SCHEMA_V1.into(),context_sha256:ctx,candidate_set_sha256:cand,
         constraint_set_sha256:cons,constraint_policy_sha256:context.constraint_policy_sha256.clone(),
