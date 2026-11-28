@@ -40,10 +40,16 @@ pub mod crop;
 pub mod manager;
 pub mod types;
 pub mod temporal_budget;
+pub mod roi_information_value;
 pub mod ventral;
 
 pub use channel::FoveationChannel;
 pub use manager::FoveationManager;
+pub use roi_information_value::{
+    rank_roi_information_value, evaluate_roi_information_value, RoiCalibrationEvidence,
+    RoiCandidateRejection, RoiInformationRanking, RoiInformationValueConfig,
+    RoiInformationValueError, RoiInformationValueScore, RoiValueEstimate,
+};
 pub use temporal_budget::{
     TemporalBudgetDecision, TemporalFoveationBudget, TemporalFoveationConfig,
     TemporalFoveationError, TemporalSamplingMode, TemporalTrigger, TemporalTriggerKind,
