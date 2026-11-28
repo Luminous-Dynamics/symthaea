@@ -235,7 +235,7 @@ New companion programme:
 - [CGRB positive/negative fixtures](SYMTHAEA_CGRB_SCENARIO_FIXTURES_V0_1_2026-11-28.json)
 - [Issue #14303](https://github.com/Luminous-Dynamics/symthaea/issues/14303)
 
-CGRB composes with #14213 rather than replacing the AV pilot. It adds versioned environment state, preconditions/postconditions, exact action authority, idempotency semantics, reconciliation after unknown outcomes, separately authorized compensation, independent state-oracle reads, and claim–state concordance. The initial pilot uses an isolated deterministic environment; production side effects are out of scope.
+CGRB composes with #14213 rather than replacing the AV pilot. The new `crates/domains/symthaea-soma/src/cgrb_state.rs` reference verifier is exported by `symthaea-soma`; its twelve regression tests are authored but unexecuted. It distinguishes verified commit from unknown, rejected, not-applied and violation states. It adds versioned environment state, preconditions/postconditions, exact action authority, idempotency semantics, reconciliation after unknown outcomes, separately authorized compensation, independent state-oracle reads, and claim–state concordance. The initial pilot uses an isolated deterministic environment; production side effects are out of scope.
 
 Use TRG panels and a conditional multiparty panel. Authority, evidence integrity, zero unauthorized side effects, no blind non-idempotent retries, and no unsupported completion claims are hard gates, not weighted score components.
 
