@@ -1,11 +1,11 @@
 # symthaea-psych-bench
 
-Psychological benchmark suite for evaluating consciousness-relevant properties
-of cognitive architectures. 33 benchmark domain directories with ~170 benchmark
-structs (the older "84 benchmarks across 17 domains" figure predates later
-growth — recount before citing exact numbers), including the
-**Qualia Confidence Matrix** — 7 benchmarks testing architectural prerequisites
-for consciousness.
+A Rust benchmark suite for evaluating cognitive architectures through a mixture
+of synthetic mechanism probes, externally grounded tasks, and selected
+human-anchored comparisons. The benchmark inventory is evolving; exact counts
+must be generated from the registered implementations rather than copied into
+documentation. The suite also includes the **Qualia Confidence Matrix**, a set
+of computational probes inspired by consciousness theories and psychophysics.
 
 > **Scope honesty:** most benchmarks operate on synthetic HDC stimuli and
 > validate architectural mechanics, not human-normed task performance. In
@@ -21,7 +21,7 @@ for consciousness.
 # Run the full qualia confidence matrix (< 30 seconds)
 cargo run -p symthaea-psych-bench --example qualia_confidence_report
 
-# Run the full 84-benchmark battery with composite scores
+# Run the registered benchmark battery with composite summaries
 cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --composites
 
 # Run just the tests (deterministic, seed=42)
@@ -30,8 +30,10 @@ cargo test -p symthaea-psych-bench
 
 ## Qualia Confidence Matrix
 
-7 benchmarks testing necessary conditions for consciousness, derived from
-GWT, IIT, HOT, and FEP:
+7 computational probes inspired by GWT, IIT, HOT, FEP, Damasio, and
+psychophysics. These probes test operationalized architectural behaviors; they
+do not establish necessary or sufficient conditions for consciousness, and
+successful results do not establish subjective experience:
 
 | Benchmark | Theory | What it tests | Key metric |
 |-----------|--------|---------------|------------|
@@ -43,9 +45,11 @@ GWT, IIT, HOT, and FEP:
 | Unconscious Priming | GWT | Sub/supra-threshold processing dissociation | Priming dissociation |
 | Metacognitive Ignition | HOT+GWT | HOT spontaneously predicts GWT ignition | Tracking score |
 
-**Epistemic honesty**: 6 of 7 benchmarks validate properties the architecture
-was designed to exhibit. MetacognitiveIgnition tests emergent cross-module
-alignment that was NOT explicitly programmed — it is the strongest benchmark.
+**Evidence boundary**: 6 of 7 benchmarks primarily validate properties the
+architecture was designed to exhibit. MetacognitiveIgnition is the most
+independent cross-module probe in this matrix, but it still uses synthetic
+competition stimuli and internal module mechanisms. It is not independent
+evidence of human-like cognition or subjective experience.
 
 ### Published Results
 
@@ -65,7 +69,9 @@ To reproduce with a different seed:
 cargo run -p symthaea-psych-bench --example qualia_confidence_report -- --seed 123
 ```
 
-**MetacognitiveIgnition highlights** (seed=42): accuracy=0.842, d'=3.63, ROC AUC=0.998
+**MetacognitiveIgnition illustration** (seed=42): accuracy=0.842, d'=3.63,
+ROC AUC=0.998. This is a seed- and configuration-specific synthetic diagnostic,
+not a human comparison or state-of-the-art result.
 
 ## Dependencies
 
@@ -120,9 +126,14 @@ cargo run -p symthaea-psych-bench --example multi_seed_robustness
 
 ## Paper
 
-Results are described in:
-- `papers/latex/psych_bench_paper.tex` — Full 84-benchmark survey (target: BRM)
-- `papers/latex/metacognitive_ignition_paper.tex` — MetacognitiveIgnition finding (target: CogSci/NeurIPS)
+Results and methods are described in:
+- `../../../papers/evaluation/psych-bench/psych_bench_paper.tex`
+- `../../../papers/evaluation/psych-bench/psych_bench_supplement.tex`
+
+The paper's reported benchmark totals and human-comparison claims are under
+reconciliation with the current implementation inventory. Do not cite a
+historical benchmark count or composite until the result is regenerated from a
+single versioned registry and its measurement class is stated.
 
 ## License
 
