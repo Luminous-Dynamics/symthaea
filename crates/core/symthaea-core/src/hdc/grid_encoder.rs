@@ -493,7 +493,8 @@ mod tests {
                             let mut dense_best_index = 0usize;
                             let mut dense_best_score = f32::NEG_INFINITY;
                             for candidate in 0..enc.num_colors() {
-                                let candidate_cell = enc.encode_cell(row_index, col_index, candidate);
+                                let candidate_cell =
+                                    enc.encode_cell(row_index, col_index, candidate);
                                 let score = dense_cell.similarity(&candidate_cell);
                                 if score > dense_best_score {
                                     dense_best_index = candidate;
