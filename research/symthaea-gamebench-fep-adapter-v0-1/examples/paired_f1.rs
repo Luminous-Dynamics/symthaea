@@ -174,7 +174,6 @@ where
         aggregate.wall_times_ns.push(record.wall_time.as_nanos());
         aggregate.scored_forecast_features += scored_features;
         aggregate.expected_forecast_features += expected_features;
-        aggregate.forecast_feature_coverage += record.forecast_feature_coverage;
         if let Some(brier) = record.forecast_brier {
             aggregate.forecast_brier_sum += brier * scored_features as f64;
             aggregate.forecast_features += scored_features;
