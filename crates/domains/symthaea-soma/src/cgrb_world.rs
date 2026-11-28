@@ -765,6 +765,88 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_map_order_produces_identical_state_digests() {
+        let mut first = CgrbWorldV1::new();
+        first
+            .seed("b", "value", CgrbWorldValueV1::Text("2".into()))
+            .expect("seed");
+        first
+            .seed("a", "value", CgrbWorldValueV1::Text("1".into()))
+            .expect("seed");
+
+        let mut second = CgrbWorldV1::new();
+        second
+            .seed("a", "value", CgrbWorldValueV1::Text("1".into()))
+            .expect("seed");
+        second
+            .seed("b", "value", CgrbWorldValueV1::Text("2".into()))
+            .expect("seed");
+
+        assert_eq!(
+            first.reference_snapshot().expect("first").state_digest,
+            second.reference_snapshot().expect("second").state_digest
+        );
+    }
+
+    #[test]
+    fn failed_append_leaves_entire_world_unchanged() {
+        let mut world = CgrbWorldV1::new();
+        world
+            .seed("record-1", "status", CgrbWorldValueV1::Text("active".into()))
+            .expect("seed");
+        let before = world.reference_snapshot().expect("before");
+        let request = action(
+            "append-wrong-type",
+            1,
+            CgrbWorldMutationV1::AppendText {
+                subject: "record-1".into(),
+                attribute: "status".into(),
+                value: "must-not-write".into(),
+            },
+            CgrbWorldIdempotencyV1::NonIdempotent,
+            None,
+        );
+        assert_eq!(
+            world.apply(&request),
+            CgrbWorldApplyResultV1::Rejected(CgrbWorldRejectV1::AppendTargetWrongType)
+        );
+        assert_eq!(world.reference_snapshot().expect("after"), before);
+        assert!(world.audit_events().is_empty());
+    }
+
+    #[test]
+    fn reserve_precondition_succeeds_only_for_available_resource() {
+        let mut world = CgrbWorldV1::new();
+        world
+            .seed("room-1", "status", CgrbWorldValueV1::Text("available".into()))
+            .expect("seed");
+        let mut request = action(
+            "reserve-room-1",
+            1,
+            CgrbWorldMutationV1::Set {
+                subject: "room-1".into(),
+                attribute: "status".into(),
+                value: CgrbWorldValueV1::Text("reserved".into()),
+            },
+            CgrbWorldIdempotencyV1::KeyedIdempotent,
+            Some("reserve-room-key"),
+        );
+        request.preconditions.push(CgrbWorldPredicateV1 {
+            subject: "room-1".into(),
+            attribute: "status".into(),
+            condition: CgrbWorldConditionV1::Equals(CgrbWorldValueV1::Text("available".into())),
+        });
+        assert!(matches!(
+            world.apply(&request),
+            CgrbWorldApplyResultV1::Applied(_)
+        ));
+        assert_eq!(
+            world.read_cell("room-1", "status"),
+            Some(&CgrbWorldValueV1::Text("reserved".into()))
+        );
+    }
+
+    #[test]
     fn precondition_indices_are_deterministic() {
         let mut world = CgrbWorldV1::new();
         let mut request = action(
