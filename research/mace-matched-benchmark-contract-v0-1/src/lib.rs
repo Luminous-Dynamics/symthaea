@@ -174,7 +174,7 @@ fn digest_serialized<T: Serialize>(value: &T) -> Result<String, BenchmarkContrac
 }
 
 fn metric_definition_set_sha256(metrics: &[MetricObservationV1]) -> Result<String, BenchmarkContractRejectV1> {
-    let mut definitions: Vec<(&str, &str, MetricDirectionV1, &str)> = metrics.iter()
+    let mut definitions: Vec<(&str, &str, MetricDirectionV1, &str, Option<u64>)> = metrics.iter()
         .map(|metric| (metric.metric_id.as_str(), metric.unit.as_str(), metric.direction, metric.definition_sha256.as_str(), metric.denominator))
         .collect();
     definitions.sort_unstable();
@@ -444,7 +444,7 @@ mod tests {
     }
 
     fn manifest(arm:&str,method:&str)->BenchmarkRunManifestV1 {
-        BenchmarkRunManifestV1 {
+        let mut value = BenchmarkRunManifestV1 {
             schema_version:SCHEMA_VERSION_V1.into(),record_type:"benchmark_run_manifest".into(),
             run_id:format!("run-{arm}"),evidence_kind:EvidenceKindV1::LocalExperiment,
             benchmark_id:"longmemeval_v2".into(),track_id:"small".into(),
