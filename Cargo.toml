@@ -31,6 +31,16 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Source-only / examples-only directories that currently match the root globs
+    # but are not Cargo packages. Each has an owning issue or remains an explicitly
+    # unqualified research island; adding a real Cargo.toml later re-admits it.
+    "crates/core/symthaea",
+    "crates/core/symthaea-iit",
+    "crates/core/symthaea-observation-attestation",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",

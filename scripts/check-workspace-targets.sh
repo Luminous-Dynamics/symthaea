@@ -22,14 +22,53 @@ cd "$(dirname "$0")/.."  # -> symthaea/
 # Member globs — must mirror [workspace].members in Cargo.toml (immediate children).
 MEMBER_GLOBS=(crates/core/* crates/domains/* crates/bridges/*)
 
-# Excluded members — must mirror [workspace].exclude in Cargo.toml.
-EXCLUDES=(
-  "crates/core/symthaea-zkproof/methods"
-  "crates/core/symthaea-zkproof/host"
-  "crates/domains/symthaea-spore/fuzz"
-  "crates/domains/spark-engine"
-  "crates/domains/symthaea-lab"
-)
+workspace_exclusions_from_manifest() {
+  local manifest="$1"
+  awk '
+    BEGIN { in_workspace = 0; in_exclude = 0 }
+    /^\[workspace\]$/ { in_workspace = 1; next }
+    /^\[/ { in_workspace = 0; in_exclude = 0; next }
+    in_workspace && /^exclude[[:space:]]*=/ { in_exclude = 1; next }
+    in_exclude && /^[[:space:]]*\]/ { in_exclude = 0; next }
+    in_exclude {
+      line = $0
+      sub(/#.*/, "", line)
+      gsub(/["[:space:],]/, "", line)
+      if (line != "") print line
+    }
+  ' "$manifest"
+}
+
+# Keep the parser itself under test. A section boundary, full-line comment or
+# inline comment must not create a bogus exclusion or leak values from another
+# Cargo manifest section into the exclusion set.
+self_test_workspace_exclude_parser() {
+  local fixture expected actual tmp
+  tmp="$(mktemp)"
+  cat > "$tmp" <<'EOF'
+[workspace]
+members = ["crates/core/*"]
+exclude = [
+  "crates/core/example-only",
+  # Full-line comment must be ignored.
+  "crates/domains/deferred", # Inline comment must be ignored.
+]
+default-members = ["."]
+[workspace.package]
+edition = "2024"
+EOF
+  expected="$(printf '%s\n' 'crates/core/example-only' 'crates/domains/deferred')"
+  actual="$(workspace_exclusions_from_manifest "$tmp")"
+  rm -f "$tmp"
+  if [[ "$actual" != "$expected" ]]; then
+    echo "FAIL: workspace exclude parser self-test" >&2
+    printf 'expected:\\n%s\\nactual:\\n%s\\n' "$expected" "$actual" >&2
+    return 1
+  fi
+}
+
+self_test_workspace_exclude_parser || exit 1
+mapfile -t EXCLUDES < <(workspace_exclusions_from_manifest Cargo.toml)
 
 is_excluded() {
   local d="$1" e
@@ -42,14 +81,22 @@ has_target() {
   local d="$1"
   [[ -f "$d/src/lib.rs" || -f "$d/src/main.rs" ]] && return 0
   local b; for b in "$d"/src/bin/*.rs; do [[ -e "$b" ]] && return 0; done
-  grep -qE '^\[\[bin\]\]|^\[lib\]' "$d/Cargo.toml" && return 0
+  grep -qE "^\[\[bin\]\]|^\[lib\]" "$d/Cargo.toml" && return 0
   return 1
 }
 
 fail=0
 for glob in "${MEMBER_GLOBS[@]}"; do
   for dir in $glob; do
-    [[ -f "$dir/Cargo.toml" ]] || continue
+    [[ -d "$dir" ]] || continue
+    if [[ ! -f "$dir/Cargo.toml" ]]; then
+      if is_excluded "$dir"; then
+        continue
+      fi
+      echo "MISSING MANIFEST: $dir  (directory matches a workspace member glob but has no Cargo.toml; add a real package manifest or an explicit [workspace].exclude entry)"
+      fail=1
+      continue
+    fi
     is_excluded "$dir" && continue
     if ! has_target "$dir"; then
       echo "MISSING TARGET: $dir  (Cargo.toml but no src/lib.rs, src/main.rs, src/bin/*.rs, [lib], or [[bin]])"
@@ -93,8 +140,8 @@ check_declared_targets() {
       if (kind != "") { print kind "\t" name "\t" (path == "" ? "-" : path) }
       kind = ""; name = ""; path = ""; next
     }
-    kind != "" && /^[[:space:]]*name[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); name = v }
-    kind != "" && /^[[:space:]]*path[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); path = v }
+    kind != "" && /^[[:space:]]*name[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/"/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); name = v }
+    kind != "" && /^[[:space:]]*path[[:space:]]*=/ { v=$0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/"/, "", v); sub(/[[:space:]]*(#.*)?$/, "", v); path = v }
     END { if (kind != "") print kind "\t" name "\t" (path == "" ? "-" : path) }
   ' "$manifest" | while IFS=$'\t' read -r kind name path; do
     [[ -n "$name" ]] || continue
