@@ -27,6 +27,7 @@ pub const MIREX_2026_BEAT_PROTOCOL_ID: &str = "mirex-2026-audio-beat-tracking";
 pub const MIREX_2026_LOCKED_DATASETS: [&str; 2] = ["gtzan", "smc"];
 
 /// Defensive input limits for the portable benchmark manifest.
+pub const MAX_BENCHMARK_MANIFEST_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_BENCHMARK_TRACKS: usize = 10_000;
 pub const MAX_VALID_SEGMENTS_PER_TRACK: usize = 4_096;
 pub const MAX_REFERENCE_EVENTS_PER_TRACK: usize = 200_000;
@@ -143,6 +144,42 @@ pub struct BeatBenchmarkManifestV1 {
     pub protocol_id: String,
     pub manifest_revision: String,
     pub tracks: Vec<BeatBenchmarkTrack>,
+}
+
+
+/// Errors raised before typed manifest validation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BeatBenchmarkManifestInputError {
+    TooLarge {
+        actual_bytes: usize,
+        max_bytes: usize,
+    },
+    InvalidJson {
+        line: usize,
+        column: usize,
+    },
+}
+
+/// Parse and validate a manifest while enforcing the raw input size limit
+/// before serde allocates the manifest vectors.
+pub fn validate_beat_benchmark_manifest_json(
+    input: &[u8],
+) -> Result<Vec<BeatBenchmarkViolation>, BeatBenchmarkManifestInputError> {
+    if input.len() > MAX_BENCHMARK_MANIFEST_BYTES {
+        return Err(BeatBenchmarkManifestInputError::TooLarge {
+            actual_bytes: input.len(),
+            max_bytes: MAX_BENCHMARK_MANIFEST_BYTES,
+        });
+    }
+
+    let manifest: BeatBenchmarkManifestV1 =
+        serde_json::from_slice(input).map_err(|error| {
+            BeatBenchmarkManifestInputError::InvalidJson {
+                line: error.line(),
+                column: error.column(),
+            }
+        })?;
+    Ok(validate_beat_benchmark_manifest(&manifest))
 }
 
 /// Whether a manifest problem is a hard rejection or weakens the claim.
@@ -1202,18 +1239,43 @@ mod tests {
     }
 
     #[test]
+    fn rejects_oversized_json_before_manifest_deserialization() {
+        let bytes = vec![b' '; MAX_BENCHMARK_MANIFEST_BYTES + 1];
+        let result = validate_beat_benchmark_manifest_json(&bytes);
+        assert!(matches!(
+            result,
+            Err(BeatBenchmarkManifestInputError::TooLarge {
+                max_bytes: MAX_BENCHMARK_MANIFEST_BYTES,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn returns_line_and_column_for_malformed_manifest_json() {
+        let result = validate_beat_benchmark_manifest_json(b"{\n  \"schema_version\":");
+        assert!(matches!(
+            result,
+            Err(BeatBenchmarkManifestInputError::InvalidJson { .. })
+        ));
+    }
+
+    #[test]
     fn checked_in_valid_fixture_deserializes_and_validates() {
         let json = include_str!("../fixtures/beat-benchmark-v1/valid.json");
-        let manifest: BeatBenchmarkManifestV1 = serde_json::from_str(json).unwrap();
-        assert!(validate_beat_benchmark_manifest(&manifest).is_empty());
+        assert!(validate_beat_benchmark_manifest_json(json.as_bytes())
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
     fn checked_in_locked_test_violation_fixture_is_rejected() {
         let json = include_str!("../fixtures/beat-benchmark-v1/gtzan-development-invalid.json");
-        let manifest: BeatBenchmarkManifestV1 = serde_json::from_str(json).unwrap();
-        assert!(codes(&manifest).contains(
-            &BeatBenchmarkViolationCode::MirexLockedDatasetUsedOutsideLockedTest
-        ));
+        let result = validate_beat_benchmark_manifest_json(json.as_bytes()).unwrap();
+        assert!(result.iter().any(|violation| {
+            violation.code
+                == BeatBenchmarkViolationCode::MirexLockedDatasetUsedOutsideLockedTest
+                && violation.severity == BeatBenchmarkViolationSeverity::Reject
+        }));
     }
 }
