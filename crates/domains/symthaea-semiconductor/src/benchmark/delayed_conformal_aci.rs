@@ -104,6 +104,7 @@ pub struct DelayedAciPredictionInputV1 {
     pub prediction_at_unix_seconds: i64,
     pub clock_domain_id: String,
     pub global_model_artifact_sha256: String,
+    pub prediction_set_sha256: String,
     pub lower_bound: f64,
     pub upper_bound: f64,
 }
@@ -124,6 +125,7 @@ pub struct DelayedAciPredictionReceiptV1 {
     pub expected_delivery_round: u64,
     pub clock_domain_id: String,
     pub global_model_artifact_sha256: String,
+    pub prediction_set_sha256: String,
     pub guarantee_state_at_prediction: DelayedAciGuaranteeStateV1,
     pub receipt_sha256: String,
 }
@@ -310,6 +312,7 @@ pub fn register_delayed_aci_prediction_v1(
     require_text(&input.clock_domain_id, "clock_domain_id")?;
     if input.clock_domain_id != engine.clock_domain_id
         || !valid_sha256(&input.global_model_artifact_sha256)
+        || !valid_sha256(&input.prediction_set_sha256)
         || input.event_time_unix_seconds > input.feature_available_at_unix_seconds
         || input.feature_available_at_unix_seconds > input.prediction_at_unix_seconds
         || !input.lower_bound.is_finite()
@@ -345,6 +348,7 @@ pub fn register_delayed_aci_prediction_v1(
         expected_delivery_round,
         clock_domain_id: input.clock_domain_id.clone(),
         global_model_artifact_sha256: input.global_model_artifact_sha256.clone(),
+        prediction_set_sha256: input.prediction_set_sha256.clone(),
         guarantee_state_at_prediction: engine.guarantee_state,
         receipt_sha256: String::new(),
     };
@@ -643,6 +647,7 @@ mod tests {
             feature_available_at_unix_seconds: 1_800_000_001 + round as i64 * 60,
             prediction_at_unix_seconds: 1_800_000_002 + round as i64 * 60,
             clock_domain_id: "fab-clock".into(), global_model_artifact_sha256: digest('a'),
+            prediction_set_sha256: digest('b'),
             lower_bound: lower, upper_bound: upper,
         }
     }
@@ -758,6 +763,24 @@ mod tests {
         let result = deliver_delayed_aci_label_v1(&mut engine, &input).unwrap();
         assert_eq!(result.disposition, DelayedAciDispositionV1::Rejected);
         assert_eq!(engine.phase_alpha[0], 0.10);
+    }
+
+    #[test]
+    fn prediction_set_digest_is_required_and_bound_to_the_frozen_interval() {
+        let mut engine = engine(0);
+        let mut input = prediction(0, 0.0, 1.0);
+        input.prediction_set_sha256 = "not-a-digest".into();
+        assert!(register_delayed_aci_prediction_v1(&mut engine, &input).is_err());
+
+        let receipt = register_delayed_aci_prediction_v1(
+            &mut engine,
+            &prediction(0, 0.0, 1.0),
+        )
+        .unwrap();
+        assert_eq!(receipt.prediction_set_sha256, digest('b'));
+        let mut changed = receipt.clone();
+        changed.prediction_set_sha256 = digest('c');
+        assert_ne!(receipt.receipt_sha256, prediction_digest(&changed).unwrap());
     }
 
     #[test]
