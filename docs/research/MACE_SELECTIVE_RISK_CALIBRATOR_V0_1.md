@@ -32,9 +32,9 @@ The fixed-sequence threshold grid must come from either a domain-predeclared pol
 
 **This is not trusted timestamping.** The precommitment digest and the two timestamps are self-reported integrity data. They prevent accidental mismatch and bind the protocol record, but they do not prove when a grid was actually frozen. A confirmatory evaluation must additionally retain an independently held pilot artifact or externally timestamped/attested pre-registration receipt, and must verify that the calibration labels were not accessible when the grid was selected.
 
-The certificate also binds five pieces of the independence design: cluster-unit definition, sampling design, workload-per-cluster policy, cluster assignment manifest and the resulting cluster-design receipt. A person/profile cluster with a 20-episode workload horizon is not interchangeable with a repository cluster, conversation-turn cluster, or a different cap. Decision-time use requires the cluster unit, sampling design and workload policy to match exactly. A mismatch suppresses the risk bound and forces abstention.
+The certificate also binds five pieces of the independence design: cluster-unit definition, sampling design, workload-per-cluster policy, cluster assignment manifest and the resulting cluster-design receipt. The maximum observations allowed per cluster is explicit and enforced; clusters exceeding the frozen workload cap are rejected rather than being allowed to contribute extra opportunities. A person/profile cluster with a 20-episode workload horizon is not interchangeable with a repository cluster, conversation-turn cluster, or a different cap. Decision-time use requires the cluster unit, sampling design and workload policy to match exactly. A mismatch suppresses the risk bound and forces abstention.
 
-The cluster assignment manifest is a hash commitment to the row-to-cluster mapping, not proof that the mapping identifies genuinely independent units. That assignment must be audited against the benchmark's sampling frame. Repeated tasks, messages, evidence spans, memory events or ablation arms from one underlying person/repository/trajectory family must not be counted as independent clusters.
+The cluster assignment manifest is recomputed from each unique evaluator outcome-receipt ID and its group/cluster assignment; duplicate row receipts are rejected. The resulting hash is bound into the cluster-design receipt. This proves consistency between the input rows and the declared mapping, not that the mapping identifies genuinely independent units. That assignment must be audited against the benchmark's sampling frame. Repeated tasks, messages, evidence spans, memory events or ablation arms from one underlying person/repository/trajectory family must not be counted as independent clusters.
 
 ## Deployment and external validity
 
@@ -55,7 +55,7 @@ No guarantee transfers automatically to a new policy, score, hierarchy, source d
 
 ## Synthetic tests
 
-Twenty deterministic Rust tests cover the exact zero-violation bound and sample-size consequence, fixed-sequence stopping, simultaneous multiplicity, safe threshold selection, hard-gate precedence, risk-exceeds-target state, parent fallback, shift and exchangeability suspension, hierarchy/data/grid digest rejection, policy/score/group/cluster-scope non-transfer, retrieve-more behavior, certificate integrity, threshold precommitment ordering and source separation, and cluster-design receipt tampering.
+Twenty-two deterministic Rust tests cover the exact zero-violation bound and sample-size consequence, fixed-sequence stopping, simultaneous multiplicity, safe threshold selection, hard-gate precedence, risk-exceeds-target state, parent fallback, shift and exchangeability suspension, hierarchy/data/grid digest rejection, policy/score/group/cluster-scope non-transfer, retrieve-more behavior, certificate integrity, threshold precommitment ordering and source separation, and cluster-design receipt tampering, recomputed row-to-cluster assignment integrity and per-cluster workload-cap enforcement.
 
 ## Run
 
