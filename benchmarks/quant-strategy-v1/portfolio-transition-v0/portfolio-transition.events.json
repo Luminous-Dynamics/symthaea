@@ -1,0 +1,177 @@
+{
+  "schema_version": "luminous.portfolio-transition-events.v0-dev",
+  "stream_id": "dev.synthetic.portfolio-partial-fill.0001",
+  "qualification": "development_public_synthetic_integrity_only",
+  "base_currency": "USD",
+  "money_unit": "minor_units_cents",
+  "quantity_unit": "whole_shares",
+  "initial_state": {
+    "cash_minor_units": 1000000,
+    "positions": [],
+    "as_of": "2026-01-05T09:00:00Z"
+  },
+  "execution_profile": {
+    "fee_bps": 10,
+    "fee_rounding": "nearest_minor_unit_half_up",
+    "fill_price_is_transaction_price": true,
+    "slippage_diagnostic": "signed_difference_from_pre_fill_reference_price_times_quantity; already embedded in transaction price; do not deduct twice",
+    "unknown_costs": [
+      "market_impact",
+      "funding",
+      "borrow",
+      "tax",
+      "settlement_timing",
+      "capacity"
+    ]
+  },
+  "instruments": [
+    {
+      "instrument_id": "SYN-EQ-A",
+      "currency": "USD",
+      "quantity_scale": 1
+    },
+    {
+      "instrument_id": "SYN-EQ-B",
+      "currency": "USD",
+      "quantity_scale": 1
+    }
+  ],
+  "events": [
+    {
+      "event_id": "Q-A-092955",
+      "event_type": "quote_mark",
+      "instrument_id": "SYN-EQ-A",
+      "event_time": "2026-01-05T09:29:55Z",
+      "known_at": "2026-01-05T09:29:56Z",
+      "price_minor_units": 10050,
+      "currency": "USD"
+    },
+    {
+      "event_id": "O-A-092958",
+      "event_type": "order_accepted",
+      "order_id": "ORD-A-001",
+      "order_version": 1,
+      "instrument_id": "SYN-EQ-A",
+      "side": "buy",
+      "quantity": 10,
+      "event_time": "2026-01-05T09:29:58Z",
+      "known_at": "2026-01-05T09:29:58Z"
+    },
+    {
+      "event_id": "F-A-093000",
+      "event_type": "fill",
+      "fill_id": "FILL-A-001",
+      "order_id": "ORD-A-001",
+      "order_version": 1,
+      "instrument_id": "SYN-EQ-A",
+      "side": "buy",
+      "quantity": 6,
+      "price_minor_units": 10060,
+      "currency": "USD",
+      "fee_minor_units": 60,
+      "reference_quote_event_id": "Q-A-092955",
+      "slippage_diagnostic_minor_units": 60,
+      "event_time": "2026-01-05T09:30:00Z",
+      "known_at": "2026-01-05T09:30:01Z"
+    },
+    {
+      "event_id": "C-A-094500",
+      "event_type": "order_cancelled",
+      "order_id": "ORD-A-001",
+      "order_version": 1,
+      "instrument_id": "SYN-EQ-A",
+      "cancelled_remaining_quantity": 4,
+      "event_time": "2026-01-05T09:45:00Z",
+      "known_at": "2026-01-05T09:45:01Z"
+    },
+    {
+      "event_id": "Q-B-095920",
+      "event_type": "quote_mark",
+      "instrument_id": "SYN-EQ-B",
+      "event_time": "2026-01-05T09:59:20Z",
+      "known_at": "2026-01-05T09:59:21Z",
+      "price_minor_units": 4975,
+      "currency": "USD"
+    },
+    {
+      "event_id": "O-B-095922",
+      "event_type": "order_accepted",
+      "order_id": "ORD-B-001",
+      "order_version": 1,
+      "instrument_id": "SYN-EQ-B",
+      "side": "buy",
+      "quantity": 5,
+      "event_time": "2026-01-05T09:59:22Z",
+      "known_at": "2026-01-05T09:59:22Z"
+    },
+    {
+      "event_id": "F-B-095930",
+      "event_type": "fill",
+      "fill_id": "FILL-B-001",
+      "order_id": "ORD-B-001",
+      "order_version": 1,
+      "instrument_id": "SYN-EQ-B",
+      "side": "buy",
+      "quantity": 5,
+      "price_minor_units": 4950,
+      "currency": "USD",
+      "fee_minor_units": 25,
+      "reference_quote_event_id": "Q-B-095920",
+      "slippage_diagnostic_minor_units": -125,
+      "event_time": "2026-01-05T09:59:30Z",
+      "known_at": "2026-01-05T10:00:00Z"
+    },
+    {
+      "event_id": "Q-A-110000",
+      "event_type": "quote_mark",
+      "instrument_id": "SYN-EQ-A",
+      "event_time": "2026-01-05T11:00:00Z",
+      "known_at": "2026-01-05T11:05:00Z",
+      "price_minor_units": 10160,
+      "currency": "USD"
+    },
+    {
+      "event_id": "Q-B-110000",
+      "event_type": "quote_mark",
+      "instrument_id": "SYN-EQ-B",
+      "event_time": "2026-01-05T11:00:00Z",
+      "known_at": "2026-01-05T11:05:00Z",
+      "price_minor_units": 5050,
+      "currency": "USD"
+    }
+  ],
+  "frontiers": [
+    {
+      "frontier_id": "F0",
+      "decision_at": "2026-01-05T09:30:02Z",
+      "newly_admissible_event_ids": [
+        "Q-A-092955",
+        "O-A-092958",
+        "F-A-093000"
+      ]
+    },
+    {
+      "frontier_id": "F1",
+      "decision_at": "2026-01-05T10:00:02Z",
+      "newly_admissible_event_ids": [
+        "C-A-094500",
+        "Q-B-095920",
+        "O-B-095922",
+        "F-B-095930"
+      ]
+    },
+    {
+      "frontier_id": "F2",
+      "decision_at": "2026-01-05T11:00:03Z",
+      "newly_admissible_event_ids": []
+    },
+    {
+      "frontier_id": "F3",
+      "decision_at": "2026-01-05T11:06:00Z",
+      "newly_admissible_event_ids": [
+        "Q-A-110000",
+        "Q-B-110000"
+      ]
+    }
+  ]
+}
