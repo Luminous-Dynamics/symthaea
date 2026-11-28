@@ -123,7 +123,7 @@
     "complete trajectory law/support, not per-observation marginals alone"
   ],
   "validation": {
-    "independent_python_fraction_replay": "pending",
+    "independent_python_fraction_replay": "passed; enumerated both persistent members, all four precommitted pairs, all eight history-adaptive selectors, type-I levels, and exact randomization caps",
     "rust_compile": false,
     "rust_tests_executed": false,
     "hosted_ci": "not checked for final head",
