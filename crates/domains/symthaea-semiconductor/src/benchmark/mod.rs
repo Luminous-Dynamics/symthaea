@@ -20,6 +20,7 @@ pub mod secom_missingness;
 pub mod secom_observation_drift;
 pub mod secom_raw;
 pub mod secom_tabular_baselines;
+pub mod semi_vm_joint_risk_trace;
 pub mod selection_risk_bounds;
 pub mod split_manifest;
 pub mod stratified_repeat;
@@ -181,4 +182,13 @@ pub use selection_risk_bounds::{
     QualifiedLossObservationV1, SELECTION_AUDIT_DESIGN_SCHEMA_V1, SELECTION_RISK_INPUT_SCHEMA_V1,
     SELECTION_RISK_REPORT_SCHEMA_V1, SelectionAuditDesignV1, SelectionRiskErrorV1,
     SelectionRiskInputV1, SelectionRiskReportV1, evaluate_selection_adjusted_population_risk_v1,
+};
+
+pub use semi_vm_joint_risk_trace::{
+    JOINT_RISK_TRACE_REPORT_SCHEMA_V1, JOINT_RISK_TRACE_SCHEMA_V1, JointBenchmarkArmV1,
+    JointBenchmarkModeV1, JointCaOcrcArmEvidenceV1, JointControllerEvidenceV1,
+    JointControllerMethodV1, JointPopulationRowV1, JointRiskTraceErrorV1,
+    JointRiskTraceInputV1, JointRiskTraceReportV1, JointArmRiskSummaryV1,
+    JointTauAciArmEvidenceV1, JointTraceStatusV1, evaluate_joint_risk_trace_v1,
+    seal_joint_risk_trace_v1,
 };
