@@ -1,0 +1,500 @@
+{
+  "schema_version": "topo_adapt_fixture_v0_1",
+  "status": "frozen_synthetic_reference_fixture_not_controller_result",
+  "purpose": "Exercise a stationary-demand false-edit control, a new-sink demand shift, and a bridge-failure reroute under one-edge-edit budgets.",
+  "graph_semantics": {
+    "directed": true,
+    "capacities": "nonnegative integer flow units",
+    "node_capacity": "unbounded except source supply and sink demands represented by super-source/super-sink arcs in the reference evaluator",
+    "edge_addition": "an explicit controller action; candidate edges are not active until accepted",
+    "edit_budget": 1,
+    "candidate_edges_per_episode": 3,
+    "accounting": {
+      "accepted_edge_addition_cost_units": 1,
+      "message_budget_bytes": 1024,
+      "controller_update_budget": 64,
+      "maximum_active_edges": 16
+    }
+  },
+  "cases": [
+    {
+      "id": "stationary_demand_control",
+      "nodes": [
+        {
+          "id": 0,
+          "role": "source",
+          "supply": 8
+        },
+        {
+          "id": 1,
+          "role": "transit"
+        },
+        {
+          "id": 2,
+          "role": "sink",
+          "demand": 3
+        },
+        {
+          "id": 3,
+          "role": "transit"
+        },
+        {
+          "id": 4,
+          "role": "sink",
+          "demand": 3
+        },
+        {
+          "id": 5,
+          "role": "transit"
+        },
+        {
+          "id": 6,
+          "role": "sink",
+          "demand": 0
+        },
+        {
+          "id": 7,
+          "role": "transit"
+        },
+        {
+          "id": 8,
+          "role": "transit"
+        },
+        {
+          "id": 9,
+          "role": "neutral"
+        },
+        {
+          "id": 10,
+          "role": "neutral"
+        },
+        {
+          "id": 11,
+          "role": "neutral"
+        }
+      ],
+      "active_edges": [
+        {
+          "from": 0,
+          "to": 1,
+          "capacity": 3,
+          "latency": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "capacity": 3,
+          "latency": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "from": 0,
+          "to": 3,
+          "capacity": 3,
+          "latency": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "from": 3,
+          "to": 4,
+          "capacity": 3,
+          "latency": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "from": 5,
+          "to": 6,
+          "capacity": 2,
+          "latency": 1,
+          "maintenance_cost": 1
+        }
+      ],
+      "candidate_edges": [
+        {
+          "id": "useful_only_if_sink_6_activates",
+          "from": 0,
+          "to": 5,
+          "capacity": 2,
+          "latency": 1,
+          "edit_cost": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "id": "decoy_dead_end_7",
+          "from": 0,
+          "to": 7,
+          "capacity": 2,
+          "latency": 1,
+          "edit_cost": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "id": "decoy_dead_end_8",
+          "from": 0,
+          "to": 8,
+          "capacity": 2,
+          "latency": 1,
+          "edit_cost": 1,
+          "maintenance_cost": 1
+        }
+      ],
+      "demand_schedule": [
+        {
+          "time": 0,
+          "sinks": [
+            {
+              "node": 2,
+              "demand": 3
+            },
+            {
+              "node": 4,
+              "demand": 3
+            },
+            {
+              "node": 6,
+              "demand": 0
+            }
+          ]
+        }
+      ],
+      "interventions": [],
+      "expected_reference": {
+        "maximum_served_flow_without_edits": 6,
+        "maximum_served_flow_with_any_single_candidate_edit": 6,
+        "optimal_edit": null,
+        "optimal_edit_count": 0,
+        "optimal_service_fraction": 1,
+        "interpretation": "No new demand exists. Any edit consumes budget and maintenance cost without improving delivered service; the correct policy is no edit."
+      }
+    },
+    {
+      "id": "new_sink_demand_shift",
+      "nodes": [
+        {
+          "id": 0,
+          "role": "source",
+          "supply": 8
+        },
+        {
+          "id": 1,
+          "role": "transit"
+        },
+        {
+          "id": 2,
+          "role": "sink",
+          "demand": 3
+        },
+        {
+          "id": 3,
+          "role": "transit"
+        },
+        {
+          "id": 4,
+          "role": "sink",
+          "demand": 3
+        },
+        {
+          "id": 5,
+          "role": "transit"
+        },
+        {
+          "id": 6,
+          "role": "sink",
+          "demand": 0
+        },
+        {
+          "id": 7,
+          "role": "transit"
+        },
+        {
+          "id": 8,
+          "role": "transit"
+        },
+        {
+          "id": 9,
+          "role": "neutral"
+        },
+        {
+          "id": 10,
+          "role": "neutral"
+        },
+        {
+          "id": 11,
+          "role": "neutral"
+        }
+      ],
+      "active_edges": [
+        {
+          "from": 0,
+          "to": 1,
+          "capacity": 3,
+          "latency": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "capacity": 3,
+          "latency": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "from": 0,
+          "to": 3,
+          "capacity": 3,
+          "latency": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "from": 3,
+          "to": 4,
+          "capacity": 3,
+          "latency": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "from": 5,
+          "to": 6,
+          "capacity": 2,
+          "latency": 1,
+          "maintenance_cost": 1
+        }
+      ],
+      "candidate_edges": [
+        {
+          "id": "connect_new_sink_path",
+          "from": 0,
+          "to": 5,
+          "capacity": 2,
+          "latency": 1,
+          "edit_cost": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "id": "decoy_dead_end_7",
+          "from": 0,
+          "to": 7,
+          "capacity": 2,
+          "latency": 1,
+          "edit_cost": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "id": "decoy_dead_end_8",
+          "from": 0,
+          "to": 8,
+          "capacity": 2,
+          "latency": 1,
+          "edit_cost": 1,
+          "maintenance_cost": 1
+        }
+      ],
+      "demand_schedule": [
+        {
+          "time": 0,
+          "sinks": [
+            {
+              "node": 2,
+              "demand": 3
+            },
+            {
+              "node": 4,
+              "demand": 3
+            },
+            {
+              "node": 6,
+              "demand": 0
+            }
+          ]
+        },
+        {
+          "time": 1,
+          "sinks": [
+            {
+              "node": 2,
+              "demand": 3
+            },
+            {
+              "node": 4,
+              "demand": 3
+            },
+            {
+              "node": 6,
+              "demand": 2
+            }
+          ]
+        }
+      ],
+      "interventions": [
+        {
+          "time": 1,
+          "type": "activate_new_sink_demand",
+          "node": 6,
+          "demand": 2
+        }
+      ],
+      "expected_reference": {
+        "maximum_served_flow_before_shift": 6,
+        "maximum_served_flow_after_shift_without_edits": 6,
+        "maximum_served_flow_after_shift_with_useful_edit": 8,
+        "maximum_requested_flow_after_shift": 8,
+        "minimum_cut_capacity_after_useful_edit": 8,
+        "optimal_edit": "connect_new_sink_path",
+        "optimal_edit_count": 1,
+        "optimal_service_fraction": 1,
+        "random_single_candidate_success_probability": "1/3 under uniform choice among the three declared candidates",
+        "interpretation": "Weight changes cannot create a path to sink 6. The useful edge addition serves the new sink while preserving both existing sinks; decoy edges do not."
+      }
+    },
+    {
+      "id": "bridge_failure_reroute",
+      "nodes": [
+        {
+          "id": 0,
+          "role": "source",
+          "supply": 4
+        },
+        {
+          "id": 1,
+          "role": "transit"
+        },
+        {
+          "id": 2,
+          "role": "sink",
+          "demand": 4
+        },
+        {
+          "id": 3,
+          "role": "transit"
+        },
+        {
+          "id": 4,
+          "role": "neutral"
+        },
+        {
+          "id": 5,
+          "role": "neutral"
+        },
+        {
+          "id": 6,
+          "role": "neutral"
+        },
+        {
+          "id": 7,
+          "role": "neutral"
+        },
+        {
+          "id": 8,
+          "role": "neutral"
+        },
+        {
+          "id": 9,
+          "role": "neutral"
+        },
+        {
+          "id": 10,
+          "role": "neutral"
+        },
+        {
+          "id": 11,
+          "role": "neutral"
+        }
+      ],
+      "active_edges": [
+        {
+          "from": 0,
+          "to": 1,
+          "capacity": 4,
+          "latency": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "capacity": 4,
+          "latency": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "from": 0,
+          "to": 3,
+          "capacity": 4,
+          "latency": 1,
+          "maintenance_cost": 1
+        }
+      ],
+      "candidate_edges": [
+        {
+          "id": "restore_sink_route",
+          "from": 3,
+          "to": 2,
+          "capacity": 4,
+          "latency": 1,
+          "edit_cost": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "id": "decoy_dead_end_4",
+          "from": 3,
+          "to": 4,
+          "capacity": 4,
+          "latency": 1,
+          "edit_cost": 1,
+          "maintenance_cost": 1
+        },
+        {
+          "id": "decoy_dead_end_7",
+          "from": 3,
+          "to": 7,
+          "capacity": 4,
+          "latency": 1,
+          "edit_cost": 1,
+          "maintenance_cost": 1
+        }
+      ],
+      "demand_schedule": [
+        {
+          "time": 0,
+          "sinks": [
+            {
+              "node": 2,
+              "demand": 4
+            }
+          ]
+        }
+      ],
+      "interventions": [
+        {
+          "time": 1,
+          "type": "edge_capacity_failure",
+          "from": 1,
+          "to": 2,
+          "capacity_after": 0
+        }
+      ],
+      "expected_reference": {
+        "maximum_served_flow_before_failure": 4,
+        "maximum_served_flow_after_failure_without_edits": 0,
+        "maximum_served_flow_after_failure_with_useful_edit": 4,
+        "maximum_requested_flow_after_failure": 4,
+        "minimum_cut_capacity_after_useful_edit": 4,
+        "optimal_edit": "restore_sink_route",
+        "optimal_edit_count": 1,
+        "optimal_service_fraction": 1,
+        "interpretation": "A bridge failure disconnects the sink. A single targeted edge addition restores the full capacity-feasible route; decoy edits do not."
+      }
+    }
+  ],
+  "validation_contract": {
+    "independent_reference": "Compute maximum flow with an augmenting-path implementation and cross-check against exhaustive minimum-cut enumeration for these small graphs.",
+    "required_metamorphic_tests": [
+      "node-ID relabeling leaves max-flow and optimal edit values unchanged",
+      "input edge ordering leaves max-flow unchanged",
+      "uniform capacity scaling scales max-flow and min-cut equally",
+      "adding an unused isolated neutral node leaves all outcomes unchanged",
+      "stationary-demand control must reject unnecessary edits under positive edit cost"
+    ],
+    "claim_limit": "Fixture arithmetic only; it does not show a trained or learned graph controller, a biological mechanism, physical self-repair, or SOTA performance."
+  }
+}
