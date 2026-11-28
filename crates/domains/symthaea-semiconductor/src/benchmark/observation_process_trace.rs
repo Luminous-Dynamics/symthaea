@@ -548,10 +548,18 @@ fn validate_controller(
             if controller.tracking_state != ControllerTrackingStateV1::NotSubmitted
                 || has_receipts
                 || controller.controller_state_changed
+                || controller.theorem_assumptions_intact
                 || controller.policy_sha256.is_some()
                 || controller.delay_contract_sha256.is_some()
                 || controller.tracking_capacity.is_some()
                 || controller.tracking_occupancy_after.is_some()
+                || controller.feedback_delay_contract_steps.is_some()
+                || controller.actual_feedback_delay_steps.is_some()
+                || controller.feedback_round.is_some()
+                || controller.proxy_uniform_draw.is_some()
+                || controller.proxy_delay_steps.is_some()
+                || controller.proxy_survival_probability.is_some()
+                || controller.immediate_trivial_loss.is_some()
             {
                 return Err(ObservationProcessTraceErrorV1(format!(
                     "round {}: controller evidence supplied for controller_kind NONE",
@@ -803,6 +811,18 @@ fn validate_audit(
     {
         return Err(ObservationProcessTraceErrorV1(format!(
             "round {}: independent audit loss must be in [0,1]",
+            row.round_id
+        )));
+    }
+    if audit.state != IndependentAuditStateV1::NotSelected
+        && let Some(operational_method) = row.operational.measurement_system_sha256.as_deref()
+        && input
+            .audit_design
+            .as_ref()
+            .is_some_and(|design| design.reference_method_sha256 == operational_method)
+    {
+        return Err(ObservationProcessTraceErrorV1(format!(
+            "round {}: independent audit reference method must differ from the operational measurement system",
             row.round_id
         )));
     }
@@ -1447,6 +1467,89 @@ mod tests {
             independent_of_operational_qualification: true,
         });
         assert!(evaluate_observation_process_trace_v1(&data).is_err());
+    }
+
+    #[test]
+    fn audit_reference_method_must_differ_from_operational_measurement_system() {
+        let mut trace = row(1);
+        trace.operational.state = OperationalAcquisitionStateV1::Measured;
+        trace.operational.measured_at_unix_seconds = Some(1010);
+        trace.operational.measurement_system_sha256 = Some(digest('d'));
+        trace.operational.physical_measurement_cost = Some(1.0);
+        trace.k1.state = K1QualificationStateV1::Blocked;
+        trace.k1.label_id = Some("label-1".into());
+        trace.k1.label_revision = Some(1);
+        trace.k1.label_payload_sha256 = Some(digest('1'));
+        trace.k1.qualification_report_sha256 = Some(digest('2'));
+        trace.k1.measurement_event_id = Some("event-1".into());
+        trace.k1.label_available_at_unix_seconds = Some(1011);
+        trace.k1.report_available_at_unix_seconds = Some(1012);
+        trace.independent_audit = IndependentAuditEvidenceV1 {
+            state: IndependentAuditStateV1::AuditMeasured,
+            retention: AuditRetentionStateV1::OfflineArchive,
+            inclusion_probability: Some(0.5),
+            audit_selected_at_unix_seconds: Some(1013),
+            audit_measured_at_unix_seconds: Some(1014),
+            audit_measurement_cost: Some(5.0),
+            audit_measurement_receipt_sha256: Some(digest('3')),
+            audit_loss: Some(0.2),
+            unavailable_reason: None,
+        };
+        let mut data = input(vec![trace]);
+        data.audit_design = Some(SelectionAuditDesignV1 {
+            schema: super::super::selection_risk_bounds::SELECTION_AUDIT_DESIGN_SCHEMA_V1.into(),
+            design_sha256: digest('4'),
+            randomization_provenance_sha256: digest('5'),
+            reference_method_sha256: digest('d'),
+            minimum_inclusion_probability: 0.5,
+            confidence_delta: 0.05,
+            independent_of_operational_qualification: true,
+        });
+        assert!(evaluate_observation_process_trace_v1(&data).is_err());
+    }
+
+    #[test]
+    fn audit_reference_method_can_be_independent_of_operational_method() {
+        let mut trace = row(1);
+        trace.operational.state = OperationalAcquisitionStateV1::Measured;
+        trace.operational.measured_at_unix_seconds = Some(1010);
+        trace.operational.measurement_system_sha256 = Some(digest('d'));
+        trace.operational.physical_measurement_cost = Some(1.0);
+        trace.k1.state = K1QualificationStateV1::Blocked;
+        trace.k1.label_id = Some("label-1".into());
+        trace.k1.label_revision = Some(1);
+        trace.k1.label_payload_sha256 = Some(digest('1'));
+        trace.k1.qualification_report_sha256 = Some(digest('2'));
+        trace.k1.measurement_event_id = Some("event-1".into());
+        trace.k1.label_available_at_unix_seconds = Some(1011);
+        trace.k1.report_available_at_unix_seconds = Some(1012);
+        trace.independent_audit = IndependentAuditEvidenceV1 {
+            state: IndependentAuditStateV1::AuditMeasured,
+            retention: AuditRetentionStateV1::OfflineArchive,
+            inclusion_probability: Some(0.5),
+            audit_selected_at_unix_seconds: Some(1013),
+            audit_measured_at_unix_seconds: Some(1014),
+            audit_measurement_cost: Some(5.0),
+            audit_measurement_receipt_sha256: Some(digest('3')),
+            audit_loss: Some(0.2),
+            unavailable_reason: None,
+        };
+        let mut data = input(vec![trace]);
+        data.audit_design = Some(SelectionAuditDesignV1 {
+            schema: super::super::selection_risk_bounds::SELECTION_AUDIT_DESIGN_SCHEMA_V1.into(),
+            design_sha256: digest('4'),
+            randomization_provenance_sha256: digest('5'),
+            reference_method_sha256: digest('e'),
+            minimum_inclusion_probability: 0.5,
+            confidence_delta: 0.05,
+            independent_of_operational_qualification: true,
+        });
+        let report = evaluate_observation_process_trace_v1(&data).unwrap();
+        assert_eq!(report.audit_offline_archive_count, 1);
+        assert_eq!(
+            report.selection_risk_report.independent_audit_estimate.unwrap().audit_sample_count,
+            1
+        );
     }
 
     #[test]
