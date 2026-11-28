@@ -139,9 +139,16 @@ The following are ambitious internal targets for a frozen, architecture-matched 
 | Duplicate/late decisions | 0 |
 | Per-style recall floor | >= 0.92 |
 | Calibration | report Brier/ECE; improve over matched VAD and semantic baselines |
+| TACT-compatible intent-conditioned timing composite | >=0.55 initial; stretch >=0.65 |
+| Correlation with held-out human timing judgments | >=0.83 Spearman |
+| Intent-profile invariance | report memory/profile-swap delta; no material collapse |
 | Unauthorized or stale action | 0 |
 
 The target deliberately aims to improve on the recall/false-positive/latency trade-off rather than only beating the highest recall number. Human floor-transfer timing is a useful reference, but TurnBench's event-latency metric is not identical to the human overlap statistic; do not claim direct equivalence.
+
+
+
+**TACT baseline context (2026-09-23):** the published evaluation reports a best system composite of 0.47 and human topline of 0.86; TACT aligns with held-out human judgments at Spearman 0.81 versus 0.46 for reproduced binary metrics. These are TACT-specific results, not comparable to TurnBench recall or VideoFDB TOR alignment. The proposed >=0.55/0.65 values above are target scores only and require the same scoring implementation, permitted split, and calibration protocol.
 
 ## 6. Baselines and ablations
 
