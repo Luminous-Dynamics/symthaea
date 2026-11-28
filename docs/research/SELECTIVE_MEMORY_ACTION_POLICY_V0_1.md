@@ -16,7 +16,7 @@ The proposed north star is:
 
 This differs from a single confidence threshold. The costs of false persistence, stale use, unnecessary verification, unnecessary clarification, missed retention and delayed abstention are asymmetric. A useful system must optimize those distinct decisions rather than maximizing recall or action-label accuracy.
 
-This protocol defines a policy contract only. It does not create a second memory store, evidence verifier, consolidation engine, retrieval index, tool authority or benchmark oracle.
+This protocol defines a policy contract only. It does not create a second memory store, evidence verifier, consolidation engine, retrieval index, tool authority or benchmark oracle. It now also separates preference influence into Ignore, Support and Dominate; Dominate requires a distinct upstream authorization gate.
 
 The machine-readable candidate/evaluator record contract is [`data/schemas/selective_memory_action_policy_v0_1.schema.json`](https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/selective_memory_action_policy_v0_1.schema.json). Candidate action records and evaluator scores are separate record types and separate trust domains.
 
@@ -60,6 +60,8 @@ RPEval demonstrates why preference utilization should not be reduced to a binary
 - `dominate_preference` inherits those gates and requires the independent `dominant_preference_authorized` admission fact. The candidate model cannot set that fact from its own prose or infer strength from semantic similarity.
 
 Dominance remains subordinate to authority, privacy, audience, tool and safety constraints. It changes preference influence, not the lawfulness or feasibility of an action. This is the RPEval mapping; MemPABench, OP-Bench and PrefDiag-Bench remain separate outcome tracks.
+
+The three preference-influence actions are a separate query-stage choice, mapped to RPEval's Ignore / Support / Dominate labels. The current JSON Schema limits them to query-stage candidate records. The `dominant_preference_authorized` fact must come from an upstream scoped/consented authority decision, not the candidate model. The latest reference selector has 25 authored Rust tests; the focused workflow is pending and no executable result is claimed yet.
 
 ## 3. Decision-theoretic policy
 
