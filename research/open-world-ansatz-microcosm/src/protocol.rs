@@ -365,14 +365,7 @@ impl BlindEpisode {
         access: StructureAccess,
         max_probe_actions: usize,
     ) -> Result<Self, ProtocolError> {
-        Self::new_interaction_with_support(
-            episode_id,
-            truth,
-            access,
-            max_probe_actions,
-            false,
-            0,
-        )
+        Self::new_interaction_with_support(episode_id, truth, access, max_probe_actions, false, 0)
     }
 
     /// Evaluator-only interaction model-adequacy control. Adds a nonzero u²
@@ -412,11 +405,9 @@ impl BlindEpisode {
             }
             _ => return Err(ProtocolError::AccessFamilyMismatch),
         }
-        let world = interaction::InteractionWorld::new_with_quadratic_u_term(
-            truth,
-            quadratic_u_term,
-        )
-        .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
+        let world =
+            interaction::InteractionWorld::new_with_quadratic_u_term(truth, quadratic_u_term)
+                .map_err(|error| ProtocolError::WorldFailure(error.to_string()))?;
         Self::new_internal(EpisodeInit {
             episode_id: episode_id.into(),
             world_family: WorldFamily::TwoInputResponse,
@@ -870,9 +861,9 @@ impl BlindEpisode {
         let model_adequacy_challenge_complete = match self.manifest.world_family {
             WorldFamily::BooleanMechanism => true,
             WorldFamily::NumericMechanism => numeric::INPUT_LEVELS.iter().all(|input| {
-                self.observations.iter().any(|record| {
-                    record.intervention == AgentIntervention::Numeric(*input)
-                })
+                self.observations
+                    .iter()
+                    .any(|record| record.intervention == AgentIntervention::Numeric(*input))
             }),
             WorldFamily::TwoInputResponse => interaction::FACTORIAL_DESIGN.iter().all(|input| {
                 self.observations
