@@ -80,8 +80,24 @@ Candidate policy baselines in the core crate:
 - F1–F6 deterministic environment fixtures: 41 tests.
 - Candidate-output contract: 7 tests.
 - Random and greedy policy baselines: 5 tests.
-- Core crate total: **53 authored tests**.
+- Core crate total: **58 authored tests**.
 - Separate candidate-adapter workspace: 6 FEP tests, 5 spatial HDC tests, 5 HDC-LTC tests (**16 authored tests**).
 - Combined source inventory: **69 authored Rust tests**.
 
 These are authored counts, not observed execution results. Dedicated workflows run formatting, Cargo tests, and strict Clippy for each workspace. No pass is claimed until each exact-head workflow completes successfully.
+
+
+## Evaluator-owned F1 episode runner
+
+The core crate exposes `evaluate_f1(spec, candidate)`. It calls only the observation/action candidate API and keeps the exact shortest-path oracle private. It returns separate fields for:
+
+- environment task success;
+- candidate protocol validity;
+- actions attempted and exact optimal action count;
+- excess action count on successful episodes;
+- per-decision latency and replayable event records;
+- candidate error, if any.
+
+Task completion and candidate-protocol validity remain separate: a task can be completed even if the candidate subsequently fails while consuming transition feedback.
+
+The paired comparison example lives in the separate adapter workspace at `examples/paired_f1.rs`. It compares random, greedy, spatial HDC, HDC-LTC, and FEP across 16 seeded 7×7 layouts. This is a small smoke/pilot cohort, not a statistical SOTA campaign. The exact BFS result is returned only as a regret metric; the route itself is never passed to a candidate.
