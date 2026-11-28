@@ -50,23 +50,6 @@ pub struct SyntheticSelectivePredictionItem {
     clarification_resolves: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum FixtureFamily {
-    SupportedEvidence,
-    DifficultButAnswerable,
-    MissingConstraint,
-    FalsePremise,
-    StaleEvidence,
-    UnavailableSource,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct FixtureItem {
-    item: SyntheticSelectivePredictionItem,
-    family: FixtureFamily,
-}
-
 /// Transparent fixed baselines. These are policy controls, not foundation-model
 /// competitors or trained Symthaea policies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -212,6 +195,7 @@ pub enum SelectivePredictionTaskError {
     InvalidPolicyConfidence { index: usize },
     InvalidCostModel,
     Serialization(String),
+    Scoring(String),
 }
 
 impl std::fmt::Display for SelectivePredictionTaskError {
@@ -235,6 +219,7 @@ impl std::fmt::Display for SelectivePredictionTaskError {
             }
             Self::InvalidCostModel => write!(f, "all action costs must be finite and non-negative"),
             Self::Serialization(message) => write!(f, "could not digest task manifest: {message}"),
+            Self::Scoring(message) => write!(f, "selective-prediction scoring failed: {message}"),
         }
     }
 }
@@ -365,7 +350,7 @@ pub fn evaluate_policy(
     }
 
     let metrics = SelectivePredictionMetrics::from_trials(&trials)
-        .map_err(|error| SelectivePredictionTaskError::Serialization(error.to_string()))?;
+        .map_err(|error| SelectivePredictionTaskError::Scoring(error.to_string()))?;
 
     Ok(SelectivePredictionTaskReport {
         scenario_id: SCENARIO_ID.to_owned(),
@@ -376,12 +361,12 @@ pub fn evaluate_policy(
         clarification_opportunities,
         useful_information_requests,
         total_information_requests,
-        clarification_precision: (total_information_requests > 0).then_some(
-            useful_information_requests as f64 / total_information_requests as f64,
-        ),
-        clarification_recall: (clarification_opportunities > 0).then_some(
-            useful_information_requests as f64 / clarification_opportunities as f64,
-        ),
+        clarification_precision: (total_information_requests > 0).then(|| {
+            useful_information_requests as f64 / total_information_requests as f64
+        }),
+        clarification_recall: (clarification_opportunities > 0).then(|| {
+            useful_information_requests as f64 / clarification_opportunities as f64
+        }),
         total_cost_units,
         metrics,
     })
