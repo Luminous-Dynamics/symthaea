@@ -137,83 +137,54 @@ Required outcomes:
 - Sol-Atlas: versioned, resolution-aware source-region, crop, water, climate, logistics and energy context. Maps and climate correlations do not prove beverage sensory outcomes.
 - Mycelix: batch/lot identity, parent-child transformation provenance, rights/consent, custody and claim-specific verification. Hashes do not authenticate the underlying physical truth.
 
-## 9. Executable synthetic-corpus receipt
+## 9. Executable synthetic corpus and schema contract
 
-The first Rust executable is intentionally hosted in the existing `symthaea-culinary` crate to reuse its workspace dependencies and avoid an overlapping standalone culinary package.
+The checked-in scenario corpus contains ten **synthetic-only** positive, negative and indeterminate controls. It is a software-contract fixture, not a measurement dataset or fermentation model evaluation.
 
-From the repository root, after checking out the exact commit you intend to qualify:
+The standalone Rust harness contains `schema_contract_audit`. It validates the schema document against the bundled JSON Schema Draft 2020-12 meta-schema, builds an offline Draft 2020-12 validator with known format checks enabled, and validates the corpus instance. External network/file reference retrieval is disabled; local fragment references remain available.
+
+It additionally checks the fixture-only invariants that JSON Schema cannot express portably in this corpus contract: unique scenario identifiers, `synthetic=true` on every row, and agreement between each expected disposition and a deterministic rule over its declared integrity, rights, calibration, split, cutoff, evidence-class, shift and hard-gate fields.
+
+From the repository root, qualify the exact source revision:
 
 ```bash
 EXPECTED_HEAD="$(git rev-parse HEAD)"
-cargo fmt --all -- --check
-cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt
-cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- \
-  --corpus docs/research/beverage-engineering-scenarios-v1.json \
-  --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
-  --expected-head "$EXPECTED_HEAD" \
-  --out /tmp/beverage-benchmark-receipt.json
-```
-
-The receipt binds the raw corpus and schema bytes with SHA-256, includes the exact checked-out Git HEAD, rejects malformed input and unknown fields, checks unique scenario identifiers/names, verifies declared product/disposition values against schema enums, requires the corpus to remain explicitly synthetic, and emits a deterministic `PASS` or `FAIL` JSON report. The CLI exits non-zero on a failed contract.
-
-The focused harness compiles the exact tracked Rust source files through `tools/beverage-benchmark-harness/Cargo.toml`. This avoids falsely attributing a monorepo manifest-enumeration failure to the beverage tools: the current root workspace glob also sees `crates/core/symthaea-observation-attestation/src/lib.rs`, but that directory has no `Cargo.toml`. The harness does not exclude or skip that source from the main workspace and does not establish full-workspace health.
-
-**Qualification limit:** this first runner does not implement the full JSON Schema Draft 2020-12 specification. It checks a narrow set of safety-relevant schema invariants and then deserializes into strict Rust types. An independent standards-compliant JSON Schema validator remains required. Passing receipt checks establishes contract integrity only, not that any scientific result is valid. The test binary must be built, formatted, tested, and run against the exact intended head before the receipt can be called qualified.
-
-## 10. UCI wine-quality source auditor
-
-## Independent JSON Schema Draft 2020-12 validation
-
-The isolated harness also contains a Rust schema auditor backed by the pinned `jsonschema` 0.59.0 crate with default file/HTTP reference resolution disabled. It verifies the declared Draft 2020-12 dialect, validates the schema document against the Draft 2020-12 meta-schema, builds the validator with format checks enabled, and validates the instance. External `$ref`, `$dynamicRef`, and `$recursiveRef` targets are refused so the receipt cannot fetch remote schemas or read arbitrary external schema files.
-
-Example:
-
-```bash
+cargo fmt --manifest-path tools/beverage-benchmark-harness/Cargo.toml -- --check
 cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit
+cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- -D warnings
 cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \
   --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
   --instance docs/research/beverage-engineering-scenarios-v1.json \
-  --out /tmp/beverage-schema-receipt.json
+  --expected-head "$EXPECTED_HEAD" \
+  --out /tmp/beverage-schema-contract-receipt.json
 ```
 
-This is an independent second layer beside the strict Rust contract and receipt checks. The validator library implements Draft 2020-12 but is not claimed to pass every case in the official JSON Schema conformance suite. A receipt means the checked-in schema and instance passed this pinned local validation path; it does not prove the schema encodes every domain invariant or that the underlying scenario is scientifically true.
+The deterministic receipt binds the caller-supplied exact Git HEAD and the SHA-256 digests of the raw schema and corpus bytes. It reports meta-schema validity, validator construction, instance validity, semantic-control validity and individual errors. Invalid data exits non-zero and produces a `FAIL` receipt where a verdict can be formed.
 
-## Dryad fermentation time-series intake auditor
+The harness pins its direct Rust dependencies. Its standalone lockfile was absent when this audit began; the CI workflow therefore generates a lock graph, requires `--locked` for subsequent commands in that run, and uploads the lockfile with the receipt. That is a same-run dependency freeze, **not yet a committed cross-run lockfile**. A committed standalone `Cargo.lock` is still required before claiming fully reproducible dependency resolution across separate runs.
 
-A third focused Rust executable supports the three long-form tab-separated files in the 2026 Dryad wine-temperature / yeast-ecology dataset (DOI 10.5061/dryad.cfxpnvxp3). It checks the declared columns, resolves columns by name, validates time/treatment/replicate fields, preserves `NA` and `ND` as distinct missingness, summarizes numeric analytes by unit, detects duplicate observation keys, hashes exact input bytes, and generates a JSON receipt.
+**Qualification limit:** these checks establish schema and synthetic-fixture contract integrity only. They do not establish data rights, measurement truth, independent fermentation-batch identity, biological validity, predictive performance, food safety, production transfer or a scientific discovery.
 
-After downloading the files and reviewing the source record:
+## 10. Data-specific intake executables — not yet implemented
 
-```bash
-cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit
-cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit -- \
-  --input /path/to/Onetto2026_Figure1_raw_data_final.txt \
-  --dataset figure1 \
-  --out /tmp/figure1-intake.json
-```
+The current branch now restores only the independent schema/fixture auditor. The following two data adapters remain design specifications; there are no source files or executable targets for them in the current repository tree.
 
-Supported dataset kinds are `figure1`, `figure2`, and `figure-s1`. The auditor allows column reordering only when the exact required column set remains intact and reports that deviation. The receipt expressly marks source identity as caller-declared, not authenticated.
+### Dryad fermentation time-series intake
 
-**Important design limit:** the source README describes `rep` as a technical replicate. Distinct `rep` values and timepoint rows are not evidence of independent fermentation batches. Model evaluation must group samples by the underlying biological/experimental unit and treatment, as justified by the study design. `AUDIT_OK` means raw-file contract integrity only, not experimental independence, causal inference, predictive performance or industrial transfer. Missingness is retained; it is never imputed to zero.
+The intended adapter would support the three long-form tab-separated files in the 2026 Dryad wine-temperature / yeast-ecology dataset (DOI 10.5061/dryad.cfxpnvxp3). Its planned contract is to check declared columns, resolve columns by name, validate time/treatment/replicate fields, preserve `NA` and `ND` as distinct missingness, summarize numeric analytes by unit, detect duplicate observation keys, hash exact input bytes, and generate a JSON receipt.
 
-The second Rust executable audits a locally obtained red or white UCI Wine Quality CSV using the semicolon-delimited 12-column format. It computes the SHA-256 of the exact raw bytes; validates the declared header and column order; accounts for each parsed data row as valid or invalid; rejects missing, nonnumeric, nonfinite and semantically out-of-range values; and emits column summaries plus the quality-score distribution.
+The adapter is **not implemented**. Any future implementation must treat the README's `rep` field as a technical replicate, not proof of independent fermentation batches. `AUDIT_OK` would mean raw-file contract integrity only, not biological independence, causal inference, predictive performance or industrial transfer. Missingness must remain explicit rather than being imputed to zero.
 
-Example use after downloading and reviewing the current UCI terms:
+### UCI wine-quality source intake
 
-```bash
-cargo test -p symthaea-culinary --bin wine_quality_source_audit
-cargo run -p symthaea-culinary --bin wine_quality_source_audit -- \
-  --input /path/to/winequality-red.csv \
-  --color red \
-  --out /tmp/wine-quality-audit.json
-```
+The intended adapter would audit a locally obtained red or white UCI Wine Quality CSV using its semicolon-delimited 12-column format. Planned checks include raw-byte SHA-256, declared header/column order, valid/invalid row accounting, finite numeric values, semantic ranges and a quality-score distribution.
 
-The `color` is explicit metadata because the source files are separate and do not contain a color column. The tool labels source identity as caller-declared rather than authenticated. It does not bundle, redistribute, or download source data; it does not assert the file is genuinely from UCI merely because it parses. Review the dataset page and terms before any redistribution, preserve the raw input digest, and keep any future train/test split manifest separate from this intake receipt. The dataset supports a static chemistry-to-quality-score baseline only; absent batch/vintage/site identifiers prevent claims of production transfer.
+The adapter is **not implemented**. The `color` field must remain explicit metadata because the source files are separate and do not contain a color column. Source identity must remain caller-declared unless independently authenticated. The dataset supports a static chemistry-to-quality-score baseline only; absent batch/vintage/site identifiers prevent claims of production transfer.
 
 ## 11. Build sequence
 
 
-Phase A — corpus and contract: parse the scenario corpus, verify schema and unique IDs, emit deterministic expected/actual receipts and fail-closed outcomes. The current PR proposes this specification and corpus only.
+Phase A — corpus and contract: **implemented structurally** by the ten-case synthetic corpus, Draft 2020-12 schema, offline schema/instance auditor, unique-ID and synthetic-only checks, disposition oracle, and exact-head receipt. Exact-head Rust compilation, tests, Clippy and CI are pending. This is not a scientific result.
 
 Phase B — first public-data adapter: select one dataset after checking access rights, schema, target units and batch identifiers. Pin source version and hashes; do not copy the dataset until license and terms permit.
 
