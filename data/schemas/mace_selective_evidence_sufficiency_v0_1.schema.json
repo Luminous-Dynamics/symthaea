@@ -87,7 +87,8 @@
         "cluster_workload_policy_sha256",
         "cluster_assignment_manifest_sha256",
         "cluster_design_receipt_sha256",
-        "manifest_sha256"
+        "manifest_sha256",
+        "maximum_observations_per_cluster"
       ],
       "properties": {
         "schema_version": {
@@ -256,6 +257,10 @@
         },
         "manifest_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "maximum_observations_per_cluster": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
