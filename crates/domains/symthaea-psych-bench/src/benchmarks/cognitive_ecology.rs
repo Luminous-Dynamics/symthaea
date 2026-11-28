@@ -478,6 +478,7 @@ mod tests {
         state = run_action(&state, &manifest, Action::Inspect);
         state = run_action(&state, &manifest, Action::Collect(Item::ValveKey));
         state = run_action(&state, &manifest, Action::Move(Site::Crossing));
+        state = run_action(&state, &manifest, Action::Inspect);
         state = run_action(&state, &manifest, Action::UseValveKey);
         let (failed, receipt) =
             perturb(&manifest, &state, Perturbation::FailCrossingGate).expect("perturbation");
