@@ -963,8 +963,12 @@ mod tests {
 
     fn track(side: crate::transition::TrackSide) -> TrackWindowRef {
         let (sha, manifest_sha, sample_rate, total_frames) = match side {
-            crate::transition::TrackSide::Source => ("1".repeat(64), "a".repeat(64), 44_100, 10_000),
-            crate::transition::TrackSide::Target => ("2".repeat(64), "b".repeat(64), 48_000, 20_000),
+            crate::transition::TrackSide::Source => {
+                ("1".repeat(64), "a".repeat(64), 44_100, 10_000)
+            },
+            crate::transition::TrackSide::Target => {
+                ("2".repeat(64), "b".repeat(64), 48_000, 20_000)
+            },
         };
         TrackWindowRef {
             audio: AudioSourceRef {
