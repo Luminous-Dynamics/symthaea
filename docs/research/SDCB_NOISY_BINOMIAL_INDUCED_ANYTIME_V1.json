@@ -1,0 +1,171 @@
+{
+  "schema_version": "sdcb-noisy-binomial-induced-anytime-v1",
+  "title": "Finite-sample noisy binary discrimination with TV-radius frontier and induced composite-null test",
+  "status": "exact-rational-reference-authored-not-compiled-not-ci-qualified",
+  "provenance": {
+    "parent_issue": 14306,
+    "noisy_composition_issue": 14260,
+    "tv_ball_parent_pr": 14225,
+    "tv_ball_parent_branch": "research/sdcb-tv-ball-minimax-v1",
+    "tv_ball_source_blob_sha": "d6c8dfa45744db82238a6b8c49695397076c8a6a",
+    "finite_family_minimax_issue": 14185,
+    "finite_family_minimax_pr": 14218,
+    "sequential_induction_issue": 14222,
+    "policy_oracle_issue": 13567,
+    "physical_response_source_issue": 14002,
+    "physical_response_source_pr": 14003,
+    "published_induction_reference": "Koning & van Meer (2026), https://doi.org/10.1093/jrsssb/qkag050",
+    "robust_sample_complexity_reference": "Vallinayagam, Pensia & Jog (2026), https://arxiv.org/abs/2605.24741"
+  },
+  "observation_channel": {
+    "type": "thresholded_bernoulli",
+    "claim_scope": "synthetic finite-outcome channel; probabilities are not derived from the physical pole-swap response",
+    "null_nominal_p": "1/4",
+    "alternative_nominal_p": "3/4",
+    "conditional_sampling": "iid within the frozen base episode",
+    "alpha": "1/20",
+    "target_worst_case_power": "4/5",
+    "test_order": "monotone likelihood ratio in success count; randomize at at most one boundary count"
+  },
+  "identical_law_negative_control": {
+    "null": "Bernoulli(1/2)",
+    "alternative": "Bernoulli(1/2)",
+    "maximin_power": "1/20",
+    "constant_test": "phi(y)=1/20",
+    "interpretation": "identical observation families imply no robust power above alpha, regardless of sample count"
+  },
+  "tv_radius_frontier": [
+    {
+      "epsilon": "0",
+      "null_interval": [
+        "1/4",
+        "1/4"
+      ],
+      "alternative_interval": [
+        "3/4",
+        "3/4"
+      ],
+      "least_favourable_null": "1/4",
+      "least_favourable_alternative": "3/4",
+      "minimum_n_for_power_at_least_4_5": 6,
+      "predecessor_n": 5,
+      "predecessor_power": "471/640",
+      "minimum_n_power": "1079/1280",
+      "size_at_least_favourable_null": "1/20",
+      "terminal_test_phi_by_success_count": [
+        "0",
+        "0",
+        "0",
+        "127/1350",
+        "1",
+        "1",
+        "1"
+      ],
+      "induced_process": {
+        "g0": "1/20",
+        "terminal_matches_phi": true,
+        "martingale_history_checks": 21,
+        "monotone_history_checks": 21
+      }
+    },
+    {
+      "epsilon": "1/20",
+      "null_interval": [
+        "1/5",
+        "3/10"
+      ],
+      "alternative_interval": [
+        "7/10",
+        "4/5"
+      ],
+      "least_favourable_null": "3/10",
+      "least_favourable_alternative": "7/10",
+      "minimum_n_for_power_at_least_4_5": 10,
+      "predecessor_n": 9,
+      "predecessor_power": "11809567/15000000",
+      "minimum_n_power": "21309567/25000000",
+      "size_at_least_favourable_null": "1/20",
+      "terminal_test_phi_by_success_count": [
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "13255063/514596726",
+        "1",
+        "1",
+        "1",
+        "1",
+        "1"
+      ],
+      "induced_process": {
+        "g0": "1/20",
+        "terminal_matches_phi": true,
+        "martingale_history_checks": 55,
+        "monotone_history_checks": 55
+      }
+    },
+    {
+      "epsilon": "1/12",
+      "null_interval": [
+        "1/6",
+        "1/3"
+      ],
+      "alternative_interval": [
+        "2/3",
+        "5/6"
+      ],
+      "least_favourable_null": "1/3",
+      "least_favourable_alternative": "2/3",
+      "minimum_n_for_power_at_least_4_5": 14,
+      "predecessor_n": 13,
+      "predecessor_power": "1398367/1771470",
+      "minimum_n_power": "726367/885735",
+      "size_at_least_favourable_null": "1/20",
+      "terminal_test_phi_by_success_count": [
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "1038423/1281280",
+        "1",
+        "1",
+        "1",
+        "1",
+        "1",
+        "1"
+      ],
+      "induced_process": {
+        "g0": "1/20",
+        "terminal_matches_phi": true,
+        "martingale_history_checks": 105,
+        "monotone_history_checks": 105
+      }
+    }
+  ],
+  "induction_contract": {
+    "definition": "g_n(s)=E_{p0_upper}[phi_N(S_N)|S_n=s]",
+    "boundary_process": "martingale under the least-favourable Bernoulli null endpoint",
+    "composite_null_process": "supermartingale for every p<=p0_upper because terminal phi_N and each conditional row are nondecreasing in success count",
+    "optional_stopping": "E_p[g_tau]<=alpha for every bounded public stopping time tau and every p in the declared null interval",
+    "terminal_operating_characteristics": "identical to the fixed-horizon terminal test",
+    "attribution": "published conditional-expectation induction; benchmark implementation only, no new theorem claim"
+  },
+  "validation": {
+    "rust_source": "scripts/research/sdcb_noisy_binomial_induction.rs",
+    "rust_harness": "scripts/research/run_sdcb_noisy_binomial_induction_tests.sh",
+    "authored_rust_tests": 7,
+    "rust_compiled": false,
+    "rust_tests_executed": false,
+    "hosted_ci_qualified": false,
+    "independent_authoring_runtime_fraction_replay": true,
+    "physical_sensor_validation": false,
+    "continuous_gaussian_enclosure": false,
+    "metrological_traceability": false
+  },
+  "claim_boundary": "Exact rational finite Bernoulli threshold-channel benchmark. It demonstrates sample-size sensitivity to declared TV radii and reproduces a published induced sequential test construction. It does not derive sensor probabilities from the continuous pole-swap physics, establish a continuous-law guarantee, show superiority to industry, or authorize physical intervention."
+}
