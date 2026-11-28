@@ -10,6 +10,15 @@ use crate::protocol::{
 };
 use crate::{interaction, numeric};
 
+/// Return an unobserved numeric input in the finite public intervention domain.
+/// A singleton fit is not treated as model adequacy until this domain has been
+/// challenged at every input level.
+fn next_unobserved_numeric_input(log: &numeric::ObservationLog) -> Option<i64> {
+    numeric::INPUT_LEVELS
+        .into_iter()
+        .find(|input| !log.interventions.contains(input))
+}
+
 /// Baseline controller over the declared finite hypothesis family.
 pub struct FiniteEnumeratorBaseline;
 
@@ -80,7 +89,10 @@ impl FiniteEnumeratorBaseline {
         }
         let report = numeric::discover(&log, access)
             .map_err(|error| PolicyError::DiscoveryFailure(error.to_string()))?;
-        if view.remaining_probe_actions == 0 || report.compatible_models.len() <= 1 {
+        if view.remaining_probe_actions == 0
+            || report.compatible_models.is_empty()
+            || next_unobserved_numeric_input(&log).is_none()
+        {
             return Ok(submit(
                 view,
                 AgentClaim::Numeric {
@@ -88,6 +100,11 @@ impl FiniteEnumeratorBaseline {
                     compatible_models: report.compatible_models,
                 },
             ));
+        }
+        if report.compatible_models.len() == 1 {
+            if let Some(value) = next_unobserved_numeric_input(&log) {
+                return Ok(probe(AgentIntervention::Numeric(value)));
+            }
         }
         let horizon = view.remaining_probe_actions.clamp(1, 3);
         let recommendation = numeric::recommend_discriminating_probe(&log, &report, horizon)
@@ -215,7 +232,9 @@ impl StrategyEnumeratorBaseline {
                         .compatible_models
                 };
                 if !log.interventions.is_empty()
-                    && (view.remaining_probe_actions == 0 || models.len() <= 1)
+                    && (view.remaining_probe_actions == 0
+                        || models.is_empty()
+                        || next_unobserved_numeric_input(&log).is_none())
                 {
                     let count = models.len();
                     return Ok((
@@ -583,6 +602,45 @@ mod tests {
             let interaction_score = interaction_episode.evaluate_after_submission().unwrap();
             assert!(interaction_score.set_score.exact_version_space_match);
             assert!(interaction_score.generating_model_in_version_space);
+        }
+    }
+
+    #[test]
+    fn numeric_singleton_fit_is_challenged_across_the_full_input_domain() {
+        let truth = numeric::ModelHypothesis {
+            mechanism: numeric::Mechanism::DirectResponse,
+            gain: 2,
+            decay: None,
+            initial_state: None,
+            sensor: numeric::SensorMap::Identity,
+        };
+        let strategies = [
+            None,
+            Some(crate::strategies::ProbeStrategy::MaximumStructureInformationGain),
+        ];
+
+        for strategy in strategies {
+            let mut episode = BlindEpisode::new_numeric_structural_shift(
+                "numeric-structure-adequacy-f2",
+                truth,
+                1,
+                6,
+            )
+            .unwrap();
+
+            match strategy {
+                None => run_to_submission(&mut episode, 6).unwrap(),
+                Some(strategy) => run_strategy_to_submission(&mut episode, 6, strategy).unwrap(),
+            }
+
+            let score = episode.evaluate_after_submission().unwrap();
+            assert_eq!(score.probe_count, numeric::INPUT_LEVELS.len());
+            assert!(!score.generating_model_in_version_space);
+            assert!(!score.generating_truth_behaviorally_represented);
+            assert_eq!(score.set_score.oracle_model_count, 0);
+            assert_eq!(score.set_score.claimed_model_count, 0);
+            assert!(score.set_score.exact_version_space_match);
+            assert!(score.decision_correct);
         }
     }
 
