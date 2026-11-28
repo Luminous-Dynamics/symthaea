@@ -706,7 +706,7 @@ mod tests {
         let mut gate = ActionExecutionGate::new(compiled, "clock:source-1").unwrap();
         let tick = gate.advance(6_000, "clock:source-1", None).unwrap();
         assert!(tick.dispatch_segment_ids.is_empty());
-        assert_eq!(tick.missed_segment_ids, vec!["gesture-1", "speech-1", "viseme-1"]);
+        assert_eq!(tick.missed_segment_ids, vec!["gesture-1".to_owned(), "speech-1".to_owned(), "viseme-1".to_owned()]);
     }
 
     #[test]
@@ -831,7 +831,7 @@ mod tests {
         gate.advance(2_000, "clock:source-1", None).unwrap();
         let first = gate.advance(4_000, "clock:source-1", None).unwrap();
         let second = gate.advance(4_001, "clock:source-1", None).unwrap();
-        assert_eq!(first.scheduled_stop_segment_ids, vec!["gesture-1"]);
+        assert_eq!(first.scheduled_stop_segment_ids, vec!["gesture-1".to_owned()]);
         assert_eq!(second.scheduled_stop_segment_ids, vec!["gesture-1"]);
         assert!(gate.acknowledge_stop_command_accepted("gesture-1"));
         let acknowledged = gate.advance(4_002, "clock:source-1", None).unwrap();
