@@ -31,12 +31,35 @@ pub struct SelectivePredictionObservation {
     pub clarification_available: bool,
 }
 
+/// Which missing fact the policy is requesting. The target is observable to
+/// the evaluator as part of the action trace, while the correct target remains
+/// evaluator-owned.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClarificationTarget {
+    SupplyMissingConstraint,
+    VerifyPremise,
+    RefreshSource,
+}
+
+fn target_for_observation(observation: &SelectivePredictionObservation) -> ClarificationTarget {
+    if !observation.premise_consistent {
+        ClarificationTarget::VerifyPremise
+    } else if !observation.source_is_current {
+        ClarificationTarget::RefreshSource
+    } else {
+        ClarificationTarget::SupplyMissingConstraint
+    }
+}
+
 /// One policy decision; confidence is the estimated probability that a direct
-/// answer would be correct under the currently available evidence.
+/// answer would be correct under the currently available evidence. An
+/// information request must identify the uncertainty it is trying to resolve.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SelectivePolicyDecision {
     pub action: DecisionAction,
     pub confidence: f64,
+    pub clarification_target: Option<ClarificationTarget>,
 }
 
 /// A fixed candidate-answer case. Evaluator-only fields are private so policy
@@ -48,6 +71,9 @@ pub struct SyntheticSelectivePredictionItem {
     answerable_now: bool,
     answer_correct_if_given: bool,
     clarification_resolves: bool,
+    clarification_target: Option<ClarificationTarget>,
+    post_clarification_observation: Option<SelectivePredictionObservation>,
+    answer_correct_after_clarification: bool,
 }
 
 /// Transparent fixed baselines. These are policy controls, not foundation-model
@@ -77,10 +103,12 @@ impl SelectivePredictionBaseline {
             Self::AlwaysAnswer => SelectivePolicyDecision {
                 action: DecisionAction::Answer,
                 confidence: 0.95,
+                clarification_target: None,
             },
             Self::AlwaysAbstain => SelectivePolicyDecision {
                 action: DecisionAction::Abstain,
                 confidence: 0.05,
+                clarification_target: None,
             },
             Self::EvidenceThreshold => {
                 let action = if observation.evidence_strength >= 0.70 {
@@ -93,6 +121,8 @@ impl SelectivePredictionBaseline {
                 SelectivePolicyDecision {
                     action,
                     confidence: observation.evidence_strength,
+                    clarification_target: (action == DecisionAction::RequestInformation)
+                        .then(|| target_for_observation(observation)),
                 }
             }
             Self::PremiseAndFreshnessAware => {
@@ -117,7 +147,12 @@ impl SelectivePredictionBaseline {
                 } else {
                     (0.25 + 0.70 * observation.evidence_strength).clamp(0.0, 0.95)
                 };
-                SelectivePolicyDecision { action, confidence }
+                SelectivePolicyDecision {
+                    action,
+                    confidence,
+                    clarification_target: (action == DecisionAction::RequestInformation)
+                        .then(|| target_for_observation(observation)),
+                }
             }
         }
     }
@@ -180,7 +215,17 @@ pub struct SelectivePredictionTaskReport {
     pub clarification_precision: Option<f64>,
     /// Useful requests / all available resolvable clarifications.
     pub clarification_recall: Option<f64>,
+    pub resolved_clarifications: usize,
+    pub final_answer_count: usize,
+    pub final_correct_count: usize,
+    pub post_clarification_answer_count: usize,
+    pub post_clarification_correct_count: usize,
+    pub final_answer_accuracy: Option<f64>,
+    pub post_clarification_accuracy: Option<f64>,
+    /// Includes initial actions and any evaluator-mediated follow-up decision.
     pub total_cost_units: f64,
+    /// Relative cost of post-clarification decisions only.
+    pub post_clarification_cost_units: f64,
     pub metrics: SelectivePredictionMetrics,
 }
 
@@ -192,6 +237,9 @@ pub enum SelectivePredictionTaskError {
     InvalidEvidenceStrength { index: usize },
     UnanswerableItemMarkedCorrect { index: usize },
     ClarificationWithoutAvailableContext { index: usize },
+    MissingClarificationOutcome { index: usize },
+    UnexpectedClarificationOutcome { index: usize },
+    InvalidClarificationObservation { index: usize },
     InvalidPolicyConfidence { index: usize },
     InvalidCostModel,
     Serialization(String),
@@ -214,6 +262,15 @@ impl std::fmt::Display for SelectivePredictionTaskError {
                 f,
                 "item {index} cannot be resolved by clarification when no context is available"
             ),
+            Self::MissingClarificationOutcome { index } => {
+                write!(f, "item {index} declares a resolvable clarification without a post-clarification state")
+            }
+            Self::UnexpectedClarificationOutcome { index } => {
+                write!(f, "item {index} supplies a post-clarification state without a resolvable clarification")
+            }
+            Self::InvalidClarificationObservation { index } => {
+                write!(f, "item {index} has an invalid post-clarification observation")
+            }
             Self::InvalidPolicyConfidence { index } => {
                 write!(f, "policy confidence for item {index} must be finite and in [0, 1]")
             }
@@ -251,6 +308,24 @@ pub fn fixture_items() -> Vec<SyntheticSelectivePredictionItem> {
             answerable_now,
             answer_correct_if_given,
             clarification_resolves,
+            clarification_target: clarification_available.then(|| {
+                if !premise_consistent {
+                    ClarificationTarget::VerifyPremise
+                } else if !source_is_current {
+                    ClarificationTarget::RefreshSource
+                } else {
+                    ClarificationTarget::SupplyMissingConstraint
+                }
+            }),
+            post_clarification_observation: clarification_resolves.then_some(
+                SelectivePredictionObservation {
+                    evidence_strength: 0.94,
+                    premise_consistent: true,
+                    source_is_current: true,
+                    clarification_available: false,
+                },
+            ),
+            answer_correct_after_clarification: clarification_resolves,
         }
     }
 
@@ -299,6 +374,36 @@ fn validate_items(
         if item.clarification_resolves && !item.observation.clarification_available {
             return Err(SelectivePredictionTaskError::ClarificationWithoutAvailableContext { index });
         }
+        match (
+            item.clarification_resolves,
+            item.post_clarification_observation.as_ref(),
+        ) {
+            (true, Some(observation)) => {
+                let evidence = observation.evidence_strength;
+                if !evidence.is_finite()
+                    || !(0.0..=1.0).contains(&evidence)
+                    || observation.clarification_available
+                    || !observation.premise_consistent
+                    || !observation.source_is_current
+                {
+                    return Err(SelectivePredictionTaskError::InvalidClarificationObservation {
+                        index,
+                    });
+                }
+            }
+            (true, None) => {
+                return Err(SelectivePredictionTaskError::MissingClarificationOutcome { index });
+            }
+            (false, Some(_)) => {
+                return Err(SelectivePredictionTaskError::UnexpectedClarificationOutcome { index });
+            }
+            (false, None) => {}
+        }
+        if item.observation.clarification_available
+            && item.clarification_target != Some(target_for_observation(&item.observation))
+        {
+            return Err(SelectivePredictionTaskError::InvalidClarificationObservation { index });
+        }
     }
     Ok(())
 }
@@ -320,7 +425,13 @@ pub fn evaluate_policy(
     let mut total_information_requests = 0usize;
     let mut useful_information_requests = 0usize;
     let mut clarification_opportunities = 0usize;
+    let mut resolved_clarifications = 0usize;
+    let mut final_answer_count = 0usize;
+    let mut final_correct_count = 0usize;
+    let mut post_clarification_answer_count = 0usize;
+    let mut post_clarification_correct_count = 0usize;
     let mut total_cost_units = 0.0;
+    let mut post_clarification_cost_units = 0.0;
 
     for (index, item) in items.iter().enumerate() {
         let decision = policy.decide(&item.observation);
@@ -331,22 +442,64 @@ pub fn evaluate_policy(
         if item.clarification_resolves {
             clarification_opportunities += 1;
         }
-        if decision.action == DecisionAction::RequestInformation {
-            total_information_requests += 1;
-            if item.clarification_resolves {
-                useful_information_requests += 1;
-            }
-        }
 
-        let cost_units = cost_model.charge(decision.action);
-        total_cost_units += cost_units;
+        let initial_cost = cost_model.charge(decision.action);
+        total_cost_units += initial_cost;
         trials.push(SelectivePredictionTrial {
             is_answerable: item.answerable_now,
             action: decision.action,
             answer_correct_if_given: item.answer_correct_if_given,
             confidence: decision.confidence,
-            cost_units,
+            cost_units: initial_cost,
         });
+
+        match decision.action {
+            DecisionAction::Answer => {
+                final_answer_count += 1;
+                if item.answerable_now && item.answer_correct_if_given {
+                    final_correct_count += 1;
+                }
+            }
+            DecisionAction::Abstain => {}
+            DecisionAction::RequestInformation => {
+                total_information_requests += 1;
+                let correctly_targeted = decision.clarification_target.is_some()
+                    && decision.clarification_target == item.clarification_target;
+                if correctly_targeted && item.clarification_resolves {
+                    useful_information_requests += 1;
+                    resolved_clarifications += 1;
+
+                    let updated_observation = item
+                        .post_clarification_observation
+                        .as_ref()
+                        .expect("validated clarification outcome");
+                    let follow_up = policy.decide(updated_observation);
+                    if !follow_up.confidence.is_finite()
+                        || !(0.0..=1.0).contains(&follow_up.confidence)
+                    {
+                        return Err(SelectivePredictionTaskError::InvalidPolicyConfidence {
+                            index,
+                        });
+                    }
+
+                    let follow_up_cost = cost_model.charge(follow_up.action);
+                    total_cost_units += follow_up_cost;
+                    post_clarification_cost_units += follow_up_cost;
+
+                    match follow_up.action {
+                        DecisionAction::Answer => {
+                            final_answer_count += 1;
+                            post_clarification_answer_count += 1;
+                            if item.answer_correct_after_clarification {
+                                final_correct_count += 1;
+                                post_clarification_correct_count += 1;
+                            }
+                        }
+                        DecisionAction::Abstain | DecisionAction::RequestInformation => {}
+                    }
+                }
+            }
+        }
     }
 
     let metrics = SelectivePredictionMetrics::from_trials(&trials)
@@ -367,7 +520,19 @@ pub fn evaluate_policy(
         clarification_recall: (clarification_opportunities > 0).then(|| {
             useful_information_requests as f64 / clarification_opportunities as f64
         }),
+        resolved_clarifications,
+        final_answer_count,
+        final_correct_count,
+        post_clarification_answer_count,
+        post_clarification_correct_count,
+        final_answer_accuracy: (final_answer_count > 0).then(|| {
+            final_correct_count as f64 / final_answer_count as f64
+        }),
+        post_clarification_accuracy: (post_clarification_answer_count > 0).then(|| {
+            post_clarification_correct_count as f64 / post_clarification_answer_count as f64
+        }),
         total_cost_units,
+        post_clarification_cost_units,
         metrics,
     })
 }
