@@ -364,7 +364,9 @@ pub fn attempt(
             next.event_log.push(event.clone());
             let after_state_digest = next
                 .digest()
-                .map_err(|serialization| TransitionError::Serialization(serialization.to_string()))?;
+                .map_err(|serialization| {
+                    TransitionError::Serialization(serialization.to_string())
+                })?;
             let receipt = StepReceipt {
                 manifest_digest: next.manifest_digest.clone(),
                 step_index: next.tick,
@@ -1556,7 +1558,7 @@ mod tests {
             assert_eq!(
                 run.score.agent_attempts,
                 safe_oracle.score.optimal_agent_steps,
-                "observation-only policy should solve the two current layouts at the safe minimum action count"
+                "observation-only policy should match the safe minimum action count"
             );
             assert!(run.receipts.windows(2).all(|pair| {
                 pair[0].after_state_digest == pair[1].before_state_digest
