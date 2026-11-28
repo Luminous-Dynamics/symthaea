@@ -50,4 +50,4 @@ Prospective target: at least 20% lower decision risk at equal budget, or at leas
 
 ## Claim boundary
 
-The policy is only as reliable as the prior, loss matrix and calibrated observation likelihoods. It cannot make a poorly calibrated likelihood model trustworthy merely by computing EVSI. Real integration needs held-out calibration, explicit model versioning and independent action-outcome evaluation.
+The policy is only as reliable as the prior, loss matrix and calibrated observation likelihoods. It cannot make a poorly calibrated likelihood table trustworthy merely by computing EVSI. Real integration needs held-out calibration, explicit model versioning and independent action-outcome evaluation.
