@@ -946,6 +946,58 @@
           "estimand": "Sum of evaluator-charged relative answer, abstention and information-request costs; not physical or monetary cost.",
           "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
           "validation_status": "verified_in_code"
+        },
+        {
+          "id": "resolved_clarifications",
+          "key": "resolved_clarifications",
+          "unit": "count",
+          "bounds": {
+            "lower": 0,
+            "upper": null
+          },
+          "direction": "higher",
+          "estimand": "Number of evaluator-confirmed clarification requests that matched the required target and yielded an updated observation.",
+          "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "final_answer_accuracy",
+          "key": "final_answer_accuracy",
+          "unit": "proportion_of_final_answers_correct",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "Correctness among all direct answers, including answers after a valid clarification exchange.",
+          "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "post_clarification_accuracy",
+          "key": "post_clarification_accuracy",
+          "unit": "proportion_of_post_clarification_answers_correct",
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "direction": "higher",
+          "estimand": "Correctness among answers issued after a matched clarification and evaluator-mediated observation update.",
+          "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
+          "validation_status": "verified_in_code"
+        },
+        {
+          "id": "post_clarification_cost_units",
+          "key": "post_clarification_cost_units",
+          "unit": "relative_fixture_cost_units",
+          "bounds": {
+            "lower": 0,
+            "upper": null
+          },
+          "direction": "lower",
+          "estimand": "Evaluator-charged cost of follow-up decisions after successful clarification; not physical or monetary cost.",
+          "comparison_status": "synthetic_fixture_only_not_eligible_for_external_ranking",
+          "validation_status": "verified_in_code"
         }
       ],
       "controls": {
