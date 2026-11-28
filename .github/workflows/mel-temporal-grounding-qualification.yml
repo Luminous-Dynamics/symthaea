@@ -544,6 +544,7 @@ jobs:
             cp tools/mel-temporal-grounding-qualifier/fixtures/mel-music-performance-identity-sampling-design.crossed.synthetic.json "$evidence/"
             cp tools/mel-temporal-grounding-qualifier/schemas/mel-music-performance-identity-sampling-design-v1.schema.json "$evidence/"
             cp docs/research/MEL-HEAR-005-CROSSED-PERFORMER-SOURCE-WORK-SAMPLING-V1.md "$evidence/"
+            cp docs/research/MEL-HEAR-005-CROSSED-INFERENCE-SIMULATION-PLAN-V0_1.md "$evidence/"
             if [[ -f "$RUNNER_TEMP/music-performance-identity-sampling-design-report.json" ]]; then
               cp "$RUNNER_TEMP/music-performance-identity-sampling-design-report.json" "$evidence/"
             fi
