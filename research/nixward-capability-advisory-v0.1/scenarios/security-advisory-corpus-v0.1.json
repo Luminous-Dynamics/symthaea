@@ -354,6 +354,17 @@
       },
       "evidence": [
         {
+          "evidence_id": "e-005-lock",
+          "kind": "pinned_flake_lock",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-005-lock",
+          "summary": "Pinned host source identity"
+        },
+        {
           "evidence_id": "e-005-closure",
           "kind": "nix_store_closure",
           "subject_binding": "exact",
@@ -945,7 +956,7 @@
       "subject": {
         "host_id": "workstation-09",
         "nixos_release": "26.11",
-        "nixpkgs_revision": "2222222222222222222222222222222222222222",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
         "package": {
           "derivation_path": "/nix/store/dddddddddddddddddddddddddddddddd-openssl-3.0.13.drv",
           "derivation_name": "openssl-3.0.13",
@@ -988,7 +999,7 @@
           "kind": "nix_store_derivation",
           "subject_binding": "mismatched",
           "observed_at": "2026-11-28T10:00:00Z",
-          "source_revision": "fixture-source-v1",
+          "source_revision": "2222222222222222222222222222222222222222",
           "integrity": "verified_local",
           "freshness": "fresh",
           "value_digest": "fixture:e-015-derivation",
