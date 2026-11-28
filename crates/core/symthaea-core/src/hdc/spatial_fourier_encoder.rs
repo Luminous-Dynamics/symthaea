@@ -128,6 +128,10 @@ impl SpatialFourierEncoder {
     ///
     /// Returns InvalidDimension when dimension is odd or less than eight, and
     /// InvalidLengthScale when the scale is not finite and positive.
+    ///
+    /// coordinate_frame_digest is supplied by the caller and should uniquely
+    /// bind the coordinate axes, handedness, origin, units and qualified
+    /// transform lineage. Codes with different digests are incompatible.
     pub fn new(
         dimension: usize,
         length_scale: f64,
