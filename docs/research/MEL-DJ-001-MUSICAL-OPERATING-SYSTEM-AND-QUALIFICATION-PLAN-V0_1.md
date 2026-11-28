@@ -718,3 +718,26 @@ The test suite should include:
 - adversarial empty, duplicate, reversed and out-of-range event lists.
 
 This creates a testable benchmark apparatus before choosing or implementing the next beat-tracker architecture. Its correctness is separate from detector performance.
+
+
+## 34. MEL-DJ-009 implementation — benchmark-manifest admission
+
+The first executable manifest validator is now in [PR #14322](https://github.com/Luminous-Dynamics/symthaea/pull/14322), stacked on the current transition contract (#14267). It is separate from the beat-grid report and does not contain an estimator or audio scorer.
+
+The Rust protocol now implements:
+- Exact source audio and annotation digests, dataset revision/reference, collection-process reference, rights/permission reference, annotation provenance, source-master family, split role, declared purpose and sample clock.
+- MIREX locked-set admission for GTZAN and SMC. These records are rejected outside locked-test benchmark evaluation, including attempts to reuse them in another development suite.
+- Split/purpose consistency, exact-audio duplication and normalized source-master-family leakage gates.
+- Rights-approved, known annotation provenance, overlap-audit status and a publication ceiling for private external cohorts.
+- Ordered/non-overlapping valid annotation segments, ordered beat frames, and downbeat membership in the beat sequence.
+- Three explicit manifest dispositions: ManifestAdmissible, ExploratoryOnly, Rejected. Unresolved overlap or source-master identity is exploratory-only, not silently treated as clean.
+- Raw JSON admission capped at 16 MiB before deserialization; typed caps of 10,000 tracks, 4,096 segments/track, 200,000 reference events/track and 5,000,000 total reference events.
+- Binary-search membership checks for event-to-segment and downbeat-to-beat relations.
+
+The JSON Schema and two checked-in records are **synthetic policy fixtures**: one valid locked-test policy example and one rejected GTZAN development/model-selection attempt. They contain no MIREX test audio or private labels. The protocol still adds no dependencies beyond serde/serde_json.
+
+The source has 26 unit tests. GitHub read-back confirms module registration, schema and fixtures parse. The execution environment has no Rust toolchain, so these are authored tests, not locally executed test passes.
+
+### Next evaluator step
+
+Do not implement a partial metric formula and label it MIREX-compatible. The next slice should pin a reference scorer implementation/version, document its exact tolerance and aggregation semantics, and create independent known-answer tests for F1/Cemgil/continuity/downbeat scoring. Cross-check against MIREX-published examples or a separately run reference implementation before claiming equivalence. Keep the official columns separate from DJ-specific tempo-ramp, phase-recovery, coverage and correction-burden measures.
