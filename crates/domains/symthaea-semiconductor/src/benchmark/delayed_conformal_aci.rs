@@ -65,6 +65,7 @@ pub enum DelayedAciReasonV1 {
     DeliveredValueMismatch,
     ClockDomainMismatch,
     LabelAvailabilityBeforeMeasurement,
+    LabelAvailableBeforePrediction,
     ReportBeforeLabelAvailability,
     DeliveryBeforeLabelAvailability,
     ReportUnavailableAtDelivery,
@@ -455,6 +456,9 @@ pub fn deliver_delayed_aci_label_v1(
     if delivery.label_available_at_unix_seconds < prediction.event_time_unix_seconds {
         reasons.push(DelayedAciReasonV1::LabelAvailabilityBeforeMeasurement);
     }
+    if delivery.label_available_at_unix_seconds < prediction.prediction_at_unix_seconds {
+        reasons.push(DelayedAciReasonV1::LabelAvailableBeforePrediction);
+    }
     if delivery.eligibility_report_available_at_unix_seconds < delivery.label_available_at_unix_seconds {
         reasons.push(DelayedAciReasonV1::ReportBeforeLabelAvailability);
     }
@@ -484,7 +488,8 @@ pub fn deliver_delayed_aci_label_v1(
     }
     if !delivery.label_value.is_finite()
         || !report.qualified_corrected_value.is_finite()
-        || report.qualified_standard_uncertainty_upper_bound.is_none()
+        || report.qualified_standard_uncertainty_upper_bound
+            .is_none_or(|value| !value.is_finite() || value < 0.0)
     {
         reasons.push(DelayedAciReasonV1::ReportNumericValueInvalid);
     }
