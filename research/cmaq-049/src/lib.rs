@@ -134,9 +134,11 @@ impl ContextualPairedKernelMonitor {
         })
     }
 
-    /// Adds one paired observation. A successful update consumes its sample ID
-    /// exactly once in this process. The caller must use a durable external
-    /// ledger for replay protection across process restarts.
+    /// Adds one paired observation. The context ID must have been assigned
+    /// using pre-response covariates only; it must not depend on X or Y. A
+    /// successful update consumes its sample ID exactly once in this process.
+    /// The caller must use a durable external ledger for replay protection
+    /// across process restarts.
     pub fn observe_pair(
         &mut self,
         sequence: u64,
