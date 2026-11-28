@@ -469,8 +469,10 @@ impl ExpectedFreeEnergyComputer {
         if state.mean.len() != model.state_dim || state.precision.len() != model.state_dim {
             return Err("candidate scoring belief dimensions do not match the generative model".to_string());
         }
-        if state.mean.iter().chain(state.precision.iter()).any(|value| !value.is_finite()) {
-            return Err("candidate scoring belief contains non-finite values".to_string());
+        if state.mean.iter().any(|value| !value.is_finite())
+            || state.precision.iter().any(|value| !value.is_finite() || *value <= 0.0)
+        {
+            return Err("candidate scoring belief contains non-finite means or non-positive precision".to_string());
         }
         if self.preferences.is_empty()
             || self.preferences.iter().any(|value| !value.is_finite())
@@ -496,8 +498,14 @@ impl ExpectedFreeEnergyComputer {
                             || row.iter().any(|value| !value.is_finite())
                     })
             })
+            || model.transition_bias.len() != model.num_actions
+            || model.transition_bias.iter().any(|bias| {
+                bias.len() != model.state_dim || bias.iter().any(|value| !value.is_finite())
+            })
+            || !model.transition_precision.is_finite()
+            || model.transition_precision <= 0.0
         {
-            return Err("generative model transition matrix dimensions or values are invalid".to_string());
+            return Err("generative model transition dimensions, bias or precision are invalid".to_string());
         }
         if model.likelihood_matrix.len() != model.state_dim
             || model.likelihood_matrix.iter().any(|row| {
@@ -527,7 +535,11 @@ impl ExpectedFreeEnergyComputer {
                 result.novelty,
             ];
             if values.iter().any(|value| !value.is_finite())
+                || result.predicted_state.mean.len() != model.state_dim
+                || result.predicted_state.precision.len() != model.state_dim
                 || result.predicted_state.mean.iter().any(|value| !value.is_finite())
+                || result.predicted_state.precision.iter().any(|value| !value.is_finite() || *value <= 0.0)
+                || result.expected_observation.len() != model.obs_dim
                 || result.expected_observation.iter().any(|value| !value.is_finite())
             {
                 return Err(format!("candidate action {action} produced non-finite output"));
