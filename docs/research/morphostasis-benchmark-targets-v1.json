@@ -1,0 +1,706 @@
+{
+  "schema_version": "morphostasis-benchmark-targets-v1",
+  "as_of": "2026-11-28",
+  "status": "research_specification_only",
+  "audited_base": {
+    "ref": "main",
+    "commit": "625e3947be602c5e866b12cba767f90401d2e454"
+  },
+  "claim_boundary": {
+    "new_rust_code": false,
+    "model_execution": false,
+    "benchmark_scores": false,
+    "wet_lab_results": false,
+    "sota_claim": false
+  },
+  "central_hypothesis": "At matched information, compute, memory, and communication budgets, a distributed controller can preserve intended identity and critical capabilities while adapting its representation and interaction topology under damage and uncertainty.",
+  "paradigm_hypotheses": [
+    {
+      "id": "H1_TARGET_AS_ADMISSIBLE_SET",
+      "mechanism": "Represent target intent as a provenance-bound admissible region/equivalence class with explicit invariants rather than one exact mask.",
+      "falsifier": "No held-out gain over matched template control, or elevated false acceptance."
+    },
+    {
+      "id": "H2_IDENTITY_SEPARATION",
+      "mechanism": "Separate current morphology inference, remembered target identity, repair selection, outcome observation, and abstention.",
+      "falsifier": "Trusted target memory does not improve recovery under equal information, or confident errors remain high."
+    },
+    {
+      "id": "H3_TOPOLOGY_COEVOLUTION",
+      "mechanism": "Compare fixed topology, adaptive edge weights, and adaptive topology under matched degree and communication budgets.",
+      "falsifier": "Topology learning has no independent held-out benefit after matching work/messages or relies on leakage."
+    },
+    {
+      "id": "H4_MULTIRATE_CONTROL",
+      "mechanism": "Separate fast local, intermediate coordination, and slow distributed-history channels; gate expensive channels conditionally.",
+      "falsifier": "Benefits vanish under compute/message matching, temporal shuffling, or memory-irrelevant controls."
+    },
+    {
+      "id": "H5_VALUE_OF_INFORMATION",
+      "mechanism": "Choose among act, sense, diagnose, defer, and abstain based on downstream decision value and acquisition cost.",
+      "falsifier": "Active sensing does not reduce wrong repair or total cost versus equal-observation baseline."
+    },
+    {
+      "id": "H6_FUNCTIONAL_MORPHOSTASIS",
+      "mechanism": "Optimize task-native capabilities and invariants in addition to geometric resemblance.",
+      "falsifier": "Function measures add no valid signal or are evaluator-leaky."
+    }
+  ],
+  "existing_owners": [
+    {
+      "issue": 8372,
+      "role": "representation remapping and navigation under damage/topology shift"
+    },
+    {
+      "issue": 8388,
+      "role": "fast-local and slow-nonlocal coordination"
+    },
+    {
+      "issue": 8401,
+      "role": "current-shape vs target identity, identifiability, abstention"
+    },
+    {
+      "issue": 8409,
+      "role": "structured microfluctuations vs matched intervention controls"
+    },
+    {
+      "issue": 8423,
+      "role": "Smart Cellular Bricks artifact, license, and baseline reproduction"
+    },
+    {
+      "issue": 14054,
+      "role": "real neural-data correspondence; separate evidence lane"
+    },
+    {
+      "issue": 14123,
+      "role": "endogenous graph topology adaptation under damage and demand shift; synthetic graph-control tournament"
+    },
+    {
+      "issue": 13144,
+      "role": "mycelial structural failure-resilience evaluator; no transport or repair claim"
+    },
+    {
+      "issue": 13423,
+      "role": "multiplex mycelial structural, cytoplasmic, hydraulic, tracer and microbial transport lanes"
+    },
+    {
+      "issue": 13450,
+      "role": "demand-responsive cordogenesis/width forecasts and source-sink/hydration context"
+    },
+    {
+      "issue": 13460,
+      "role": "biological-replicate-disjoint and forward-time splits"
+    },
+    {
+      "issue": 13425,
+      "role": "rights-aware mycelial dataset registry and file-level provenance"
+    },
+    {
+      "issue": 13066,
+      "role": "evidence-driven Mycelial Presence semantics; separates authoritative CognitiveTopology from spatial morphology"
+    },
+    {
+      "issue": 13094,
+      "role": "event-sourced CognitiveTopology reducer and deterministic semantic topology deltas"
+    },
+    {
+      "issue": 13079,
+      "role": "deterministic visual morphogenesis and graph geometry; not a biological transport simulator"
+    }
+  ],
+  "benchmark_families": [
+    {
+      "id": "MORPH_ID",
+      "priority": "P0",
+      "description": "Destructive ambiguity, trusted/absent/corrupt/conflicting target memory, calibrated abstention."
+    },
+    {
+      "id": "LOCAL_REPAIR",
+      "priority": "P0",
+      "description": "2D/3D local and distributed damage, repeated lesions, observation noise, recovery trajectories."
+    },
+    {
+      "id": "TOPOLOGY_SCALE",
+      "priority": "P1",
+      "description": "Held-out graph families, 2x size extrapolation, relabeling, rewiring, fragmentation."
+    },
+    {
+      "id": "MULTIRATE_COORD",
+      "priority": "P1",
+      "description": "Fast/intermediate/slow channels, conditional invocation, equal-budget temporal controls."
+    },
+    {
+      "id": "FUNCTIONAL_HOMEOSTASIS",
+      "priority": "P1",
+      "description": "Task-specific connectivity, transport, load-path, reachability, or navigation invariants."
+    },
+    {
+      "id": "ENDOGENOUS_TARGET",
+      "priority": "P2",
+      "description": "Distributed attractor identity and authorized target changes versus damage/adversarial substitution."
+    },
+    {
+      "id": "ACTIVE_OBSERVATION",
+      "priority": "P2",
+      "description": "Costly diagnostics; act/sense/defer/abstain decisions under partial observability."
+    },
+    {
+      "id": "ENDOGENOUS_TOPOLOGY_ADAPTATION",
+      "priority": "P1",
+      "owner_issue": 14123,
+      "description": "Test bounded graph additions/removals/rewiring versus fixed topology, edge-weight-only adaptation, local greedy and distributed routing under demand shifts, damage, latency and explicit communication/maintenance budgets.",
+      "primary_metrics": [
+        "demand-weighted served fraction",
+        "capacity-feasible delivered flow",
+        "time to service recovery",
+        "edge-edit count and churn",
+        "messages/bytes",
+        "controller work",
+        "false edits on stationary demand",
+        "correct infeasibility/abstention"
+      ],
+      "claim_limit": "Synthetic graph-control task only; not a biological network or tissue mechanism."
+    }
+  ],
+  "baseline_ladder": [
+    "nearest-template observation-only classifier and repair",
+    "deterministic local hand-coded cellular rule",
+    "vanilla local NCA",
+    "Smart Cellular Bricks reference model, only after rights/provenance gate",
+    "distributed graph Weisfeiler-Lehman baseline for applicable shape task",
+    "BraiNCA-style attention/sparse long-range NCA; faithful reproduction only with matched artifacts/protocol",
+    "clean-room hybrid multiscale attractor model with fixed/adaptive weights",
+    "Symthaea HDC-only, temporal-only, HDC x CfC/LTC, and verified adaptive communication arms",
+    "centralized MPC/optimizer as upper bound only",
+    "random, no-memory, no-remapping, no-slow-channel, fixed-topology, shuffled-channel, target-blind controls",
+    "TOPO-ADAPT-001: fixed graph, weight-only adaptation, local greedy repair, fixed-topology distributed routing, adaptive-topology heuristic, degree-matched random rewiring, exact max-flow/min-cost oracle on small instances",
+    "GNN communication-topology rewiring family: Delaunay/dynamic triangulation, FOSR/spectral-gap/expander, curvature/effective-resistance, spectrum-preserving sparsification, virtual nodes and learned rewiring",
+    "Resilience-based network-design family: exact MILP/topology-capacity oracle for small cases, PSDA-style stochastic design and GA, subject to exact paper-protocol/artifact admission",
+    "One-step full-visibility candidate-sweep oracle: evaluate no edit and every permitted single-edge candidate; maximize service then minimize edit/maintenance cost; upper bound only."
+  ],
+  "metrics": {
+    "geometry": [
+      "IoU",
+      "precision",
+      "recall",
+      "Chamfer/Hausdorff where applicable",
+      "missing/extra target elements"
+    ],
+    "identity": [
+      "current-shape accuracy",
+      "historical target identity",
+      "calibration",
+      "selective risk",
+      "coverage",
+      "correct abstention"
+    ],
+    "function": [
+      "task-native function success",
+      "invariant margin",
+      "connectivity/reachability",
+      "false-positive repair",
+      "unnecessary modification"
+    ],
+    "dynamics": [
+      "recovery success",
+      "steps/time to recovery",
+      "full error trajectory",
+      "overshoot",
+      "oscillation",
+      "post-recovery stability",
+      "repeated-damage performance"
+    ],
+    "generalization": [
+      "held-out targets",
+      "held-out graph families",
+      "size extrapolation",
+      "damage severity",
+      "noise",
+      "message faults",
+      "worst-group performance"
+    ],
+    "resource": [
+      "node updates",
+      "inference work",
+      "message count/bytes",
+      "state bytes",
+      "model parameters",
+      "p50/p95/p99 latency",
+      "measured energy with declared boundary"
+    ]
+  },
+  "proposed_targets_not_results": [
+    {
+      "id": "BASELINE_FIDELITY",
+      "target": "Reproduce each comparable reference result within 1 percentage point or explain the discrepancy.",
+      "gate": "per-task baseline reproduction only"
+    },
+    {
+      "id": "IDENTITY_ABSTENTION",
+      "target": ">=99% correct abstention on deliberately non-identifiable/no-trusted-memory cases; <=1% wrong confident repairs on declared ambiguity suite.",
+      "gate": "tested ambiguity handling"
+    },
+    {
+      "id": "SEVERE_DAMAGE_WIN",
+      "target": ">=5 percentage points absolute recovery-success improvement over strongest matched decentralized baseline on preregistered severe/OOD conditions, paired 95% CI excluding zero.",
+      "gate": "task-bounded performance advantage"
+    },
+    {
+      "id": "EFFICIENCY_FRONTIER",
+      "target": "At quality within preregistered 1-point non-inferiority margin, >=2x lower communication bytes or measured inference work.",
+      "gate": "bounded efficiency advantage"
+    },
+    {
+      "id": "TOPOLOGY_TRANSFER",
+      "target": ">=90% of in-distribution task performance on held-out graph families and 2x size extrapolation, with no hidden topology identifiers.",
+      "gate": "declared graph-family generalization"
+    },
+    {
+      "id": "ABLATION_ATTRIBUTION",
+      "target": "Each claimed mechanism loses its advantage under its corresponding removal/shuffle; negative controls do not reproduce the win.",
+      "gate": "mechanistic attribution"
+    },
+    {
+      "id": "INDEPENDENT_REPRODUCTION",
+      "target": "Independent rerun reproduces key effect within frozen tolerance with compatible receipts.",
+      "gate": "reproducible bounded claim"
+    }
+  ],
+  "external_data_candidates": [
+    {
+      "id": "DYNAMIC_ATLAS_DROSOPHILA",
+      "doi": "10.1038/s41592-025-02897-8",
+      "evidence_type": "observational developmental trajectories",
+      "status": "candidate_pending_license_access_and_data_contract_review",
+      "claim_limit": "Predictive correspondence only; no causal mechanism inference."
+    },
+    {
+      "id": "XENOPUS_NEURAL_CREST_FLIM",
+      "doi": "10.1016/j.ydbio.2026.08.001",
+      "evidence_type": "bioelectric voltage estimates / multiscale time series",
+      "status": "candidate_pending_raw_data_and_measurement_provenance_review",
+      "claim_limit": "Only modality-appropriate prediction; no software-to-bioelectric equivalence."
+    },
+    {
+      "id": "NEUROALIGN",
+      "issue": 14054,
+      "evidence_type": "actual neural activity and behavior correspondence",
+      "status": "separate_lane",
+      "claim_limit": "Does not substitute for synthetic morphogenesis benchmark."
+    }
+  ],
+  "evidence_classes": [
+    "deterministic_fixture",
+    "synthetic_baseline_comparison",
+    "matched_cost_held_out_evaluation",
+    "independent_software_reproduction",
+    "observational_biological_data_fit",
+    "controlled_biological_study"
+  ],
+  "immediate_order": [
+    "Exact-head review and qualification of existing #8405 identity oracle; do not rebuild its fixture.",
+    "Exact-head review and qualification of stacked #8468 evidence-selection and decision-value work; distinguish Brier information value from downstream EVSI and robust policy loss.",
+    "Execute #14123 P0 slice: freeze hand-checkable 12–20-node max-flow fixtures and qualify fixed-topology, weight-only, local-greedy and exact-oracle baselines before adaptive rewiring.",
+    "Qualify Symtropy #2685 and reuse its existing planar-truss solver/receipt owners; do not add a second mechanics engine.",
+    "Resolve #8423 Smart Cellular Bricks rights and artifact provenance; do not vendor unlicensed code or weights.",
+    "Keep #13423/#13450/#13460/#13425 biological mycelium work separate: validate file rights, replicate/time splits, and distinct transport observables before model comparison.",
+    "Run one-factor-at-a-time factorials for remapping, memory, multirate channels, microfluctuations, adaptive weights and adaptive topology.",
+    "Integrate Symthaea only after exact code-path and interface audit.",
+    "Independently reproduce key effects before bounded superiority claims."
+  ],
+  "related_pull_requests": [
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "number": 8405,
+      "role": "dependency-free morphology continuity oracle; chair/table identifiability fixture; exhaustive four-cell backrest deletion",
+      "status": "open; PR body states exact-head Rust tests/format/Clippy/receipt workflow remain unverified"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "number": 8468,
+      "role": "stacked active evidence selection, Brier information value, decision-sensitive EVSI, noisy evidence, misspecification and robust calibration",
+      "status": "open; latest retrieved comment references head 2e40571fa2a1186bfa13bf95a04f4b99e3c775fb with checks queued at that time; current status query returned no status records"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "number": 14125,
+      "role": "TOPO-ADAPT v0.1 frozen deterministic graph fixtures with independently checked max-flow/min-cut references",
+      "status": "open draft; declarative JSON/Markdown only; no Rust evaluator or controller implementation"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "number": 14127,
+      "role": "draft Rust evaluator for TOPO-ADAPT v0.1 fixtures; max-flow/min-cut, input validation, edit/maintenance cost accounting and exact one-step candidate-sweep oracle",
+      "status": "open draft stacked on PR #14125; 11 Rust tests authored including stationary-no-edit, new-sink, bridge-reroute oracle decisions; exact-head compile/test/rustfmt/Clippy not run due missing toolchain; no CI pass claimed"
+    }
+  ],
+  "cross_repository_owners": [
+    {
+      "repository": "Luminous-Dynamics/symtropy",
+      "issue": 2685,
+      "title": "MORPH-FUNCTION-001",
+      "role": "function-preserving repair beyond geometric similarity; mechanical/load-path benchmark",
+      "related_pr": 2363,
+      "status": "open issue; reuse the planar-truss reference solver and receipt owners; do not create another mechanics engine"
+    }
+  ],
+  "industrial_validation_lane": {
+    "status": "separate_transfer_and_utility_programme_not_mixed_with_biological_or_morphogenesis_scores",
+    "references": [
+      {
+        "name": "NIST Super Intelligence for Manufacturing",
+        "url": "https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing",
+        "status": "NIST TIDAL (Teamed, Integrated, Digital-twin-assured and Layered Intelligence) programme: asset/site/enterprise tiers; human-machine teaming; contextualized OT data and knowledge graphs; DT VVUQ; integration test bench with UNS/MQTT, I3X and OPC UA; Tennessee Eastman initial use case; metrics accuracy/latency/cost/grounding with fault-detection recall prioritized and progressive context ablation; benchmark harness/toolkit planned for FY28"
+      },
+      {
+        "name": "IEEE IES Industrial AI Hub dataset catalogue",
+        "url": "https://ieee-ies-industrial-ai-lab.github.io/industrial-ai-hub/datasets/",
+        "status": "discovery index; verify authoritative licenses/splits"
+      },
+      {
+        "name": "Predictive maintenance dataset review",
+        "doi": "10.1016/j.icte.2025.11.013",
+        "status": "dataset-family survey"
+      },
+      {
+        "name": "Industrial dual-arm repair cell",
+        "url": "https://www.maxrobotics.com/en/news/a-modular-dual-arm-robotic-cell-for-disassembly-and-repair-of-industrial-control-electronics",
+        "status": "conventional industrial integration comparator"
+      },
+      {
+        "name": "Reconfigurable manufacturing digital twin",
+        "doi": "10.1016/j.procir.2025.02.246",
+        "status": "research demonstration, not an industry standard"
+      },
+      {
+        "name": "Decentralised grid architectures for electricity distribution networks: A survey",
+        "doi": "10.1016/j.compeleceng.2026.111279",
+        "status": "2026 survey; recommends tiered/multi-timescale/federated architectures and load-served/recovery-time/communication/economic-fairness metrics"
+      }
+    ],
+    "task_families": [
+      "condition monitoring and fault diagnosis under load/sensor/domain shift",
+      "maintenance decisions: inspect, continue, derate, repair, replace, abstain",
+      "configuration identity and repair provenance",
+      "function-preserving asset recovery",
+      "reconfigurable production-cell adaptation",
+      "distribution-grid reconfiguration and network restoration under DER variability and contingencies (separate power-system benchmark with validated AC/DC power flow, voltage/thermal, radiality, protection and switching constraints)"
+    ],
+    "baselines": [
+      "statistical process control and classical signal-processing baselines",
+      "logistic/linear models, random forests, gradient boosted trees, calibrated anomaly detection",
+      "task-appropriate temporal CNN, GRU/LSTM, or state-space model",
+      "physics/process model and calibrated digital twin",
+      "CMMS/rule/threshold/maintenance planning workflow where available",
+      "industrial robot stack using CAD/device graph, perception/force sensing, ROS 2, behavior trees, and human-in-the-loop",
+      "Symthaea in shadow mode before any decision authority"
+    ],
+    "metrics": [
+      "correct OT context retrieval and relation grounding across asset/site/enterprise hierarchy",
+      "human-verified knowledge-graph indexing, source evidence lineage and context integrity",
+      "progressive context ablation across measurements, operational hierarchy and digital-twin context",
+      "fault-detection recall is weighted ahead of precision in the NIST manufacturing fault-diagnosis description; publish both by severity rather than collapsing them",
+      "grounding: select the correct operational-technology data/context and bind diagnoses to traceable evidence",
+      "context ablation: compare data-only, structured context and richer digital-twin context at matched task/resource budgets",
+      "fault recall/precision by severity; false alarms per asset-hour; missed-critical-fault rate",
+      "detection lead time and RUL calibration only where labels support them",
+      "diagnosis top-k, uncertainty and abstention on unknown faults",
+      "decision regret under asset-owner cost matrix; downtime and SLA effects",
+      "repair success, recurrence, mean time to repair, rework and quality escape",
+      "safety constraint violations, unsafe action rate, human overrides",
+      "p50/p95/p99 latency, integration/data/compute cost, communication and measured energy",
+      "operator workload, evidence trail and reproducible configuration lineage"
+    ],
+    "promotion": [
+      "retrospective frozen-split evaluation",
+      "prospective shadow mode with no command authority",
+      "asset-level and chronological splits with explicit unseen regimes/faults/sensors",
+      "asset-owner-approved cost model and prospective business outcomes",
+      "recommendation mode only after calibration/human-factors review",
+      "actuation only after separate safety engineering and operational authorization"
+    ],
+    "claim_boundary": "No cross-domain transfer claim: predictive maintenance, industrial robotic repair, and biological morphogenesis remain separate evidence lanes.",
+    "distribution_grid_lane": {
+      "status": "candidate_future_industry_transfer",
+      "baselines": [
+        "qualified distribution-system reconfiguration and optimal-power-flow solvers",
+        "MILP/MIQP/MISOCP topology/switching/capacity formulations where applicable",
+        "branch-exchange and rule-based DSO reconfiguration",
+        "GA/PSO and published metaheuristics",
+        "safety-constrained learned graph or DRL controllers with matched observability and contingencies"
+      ],
+      "metrics": [
+        "criticality-weighted load served and unserved energy",
+        "voltage and thermal violations",
+        "radiality/islanding/protection feasibility",
+        "switching count, wear and restoration time",
+        "network losses and DER/contingency uncertainty",
+        "communication overhead and customer fairness"
+      ],
+      "promotion": [
+        "offline power-system/digital-twin evaluation",
+        "independent power-flow validation",
+        "shadow mode with no control authority",
+        "human/operator review before any recommendation",
+        "live operation excluded from this benchmark"
+      ],
+      "claim_limit": "Generic max-flow topology benchmark does not establish power-system feasibility, grid safety or authorization for live switching."
+    },
+    "reference_architecture": {
+      "name": "NIST TIDAL",
+      "expansion": "Teamed, Integrated, Digital-twin-assured and Layered Intelligence",
+      "layers": [
+        "asset",
+        "site/area",
+        "enterprise"
+      ],
+      "components": [
+        "human-machine teaming",
+        "contextualized OT data",
+        "knowledge graphs",
+        "digital-twin VVUQ",
+        "UNS/MQTT",
+        "I3X",
+        "OPC UA"
+      ],
+      "possible_luminous_mapping": {
+        "Symthaea": "topology/configuration proposal and evaluation",
+        "Mycelix": "authority, provenance and decision receipts",
+        "Symtropy": "physical/engineering constraint qualification",
+        "Sol-Atlas": "spatial and topological context"
+      },
+      "status": "proposed systems mapping; not an implemented or validated end-to-end industrial system",
+      "claim_limit": "Operators retain authority; offline and shadow-mode evaluation only before any recommendation."
+    }
+  },
+  "separate_biological_mycelium_lane": {
+    "status": "existing_repository_workstream; distinct from Levin animal somatic-cell bioelectric evidence",
+    "study": {
+      "title": "The mycelial network organization adapts to facilitate new substrate colonization and fruiting in Agaricus bisporus",
+      "doi": "10.1016/j.funbio.2026.101799",
+      "main_findings": [
+        "directional colonization into new substrate associates with cord formation",
+        "cord pathways supplying expanding fruiting bodies can widen",
+        "optical grayscale is a colonization proxy, not exact biomass"
+      ],
+      "design_limits": [
+        "longitudinal fructification series has three independent cultivation cycles",
+        "between-cycle timing and cord abundance vary substantially",
+        "cord abundance was not significantly correlated with total mushroom yield",
+        "directional-extension assay is a separate cohort with six biological replicates per treatment"
+      ],
+      "raw_data": "https://figshare.com/s/b241753378d5252ff808",
+      "rights_status": "verify Figshare file-level terms and sample metadata before ingestion or redistribution"
+    },
+    "owners": [
+      {
+        "issue": 13423,
+        "role": "separate structural/cytoplasmic/hydraulic/tracer/microbial transport layers"
+      },
+      {
+        "issue": 13450,
+        "role": "demand-responsive morphogenesis and transport prediction"
+      },
+      {
+        "issue": 13460,
+        "role": "replicate-disjoint forward-time splits"
+      },
+      {
+        "issue": 13425,
+        "role": "file-level rights and data provenance"
+      },
+      {
+        "issue": 13144,
+        "role": "structural graph failure resilience; no biological transport"
+      }
+    ],
+    "no_implicit_join": [
+      "Do not join cordogenesis and isotope-transfer datasets without verified paired sample identifiers.",
+      "Do not treat grayscale optical density as exact biomass.",
+      "Do not treat cord area or cord labels as measured hydraulic conductance without calibrated geometry/flow evidence.",
+      "Do not interpret fungal network observations as evidence for animal tissue bioelectric mechanisms."
+    ],
+    "claim_limit": "Observational fungal network prediction only unless independently qualified interventions establish causal effects; separate from synthetic controller results and Levin-related animal-tissue evidence."
+  },
+  "new_workstream": {
+    "owner_issue": 14123,
+    "title": "TOPO-ADAPT-001",
+    "status": "rust_evaluator_draft_pr_open_uncompiled",
+    "first_slice": {
+      "node_count": "12-20",
+      "oracle": "independent exact max-flow/min-cost references for small hand-checkable instances",
+      "baseline_arms": [
+        "fixed topology",
+        "edge-weight-only adaptation",
+        "local greedy repair",
+        "distributed fixed-topology routing",
+        "adaptive topology",
+        "degree-matched random rewiring",
+        "exact small-instance upper bound"
+      ],
+      "required_controls": [
+        "stationary-demand false-edit control",
+        "graph edit budget",
+        "message/byte budget",
+        "capacity budget",
+        "latency/downtime accounting",
+        "future-demand leakage gate",
+        "graph-isomorphism/node-relabeling metamorphics"
+      ],
+      "fixture_path": "tools/topo-adapt-benchmark/fixtures/topo_adapt_fixture_v0_1.json",
+      "fixture_pr": 14125,
+      "verified_cases": [
+        {
+          "id": "stationary_demand_control",
+          "max_flow": 6,
+          "min_cut": 6,
+          "correct_edit": "none"
+        },
+        {
+          "id": "new_sink_demand_shift",
+          "max_flow_before": 6,
+          "max_flow_after_useful_edit": 8,
+          "min_cut_after_edit": 8,
+          "correct_edit": "connect_new_sink_path"
+        },
+        {
+          "id": "bridge_failure_reroute",
+          "max_flow_before_failure": 4,
+          "max_flow_after_failure": 0,
+          "max_flow_after_useful_edit": 4,
+          "min_cut_after_edit": 4,
+          "correct_edit": "restore_sink_route"
+        }
+      ],
+      "additional_episode_family": "repeated/correlated disruptions with recovery horizons and chance-constrained recovered flow",
+      "new_comparator_families": [
+        "GNN message-passing graph rewirers",
+        "MILP topology+capacity design",
+        "PSDA-style stochastic network design",
+        "genetic algorithm"
+      ]
+    },
+    "claim_limit": "No controller implementation, score or superiority claim exists yet.",
+    "evaluator": {
+      "pull_request": 14127,
+      "package": "tools/topo-adapt-benchmark",
+      "algorithms": [
+        "residual-network augmenting-path maximum flow",
+        "independent exhaustive minimum-cut enumeration with nonzero-arc iteration"
+      ],
+      "limits": {
+        "fixture_nodes_min": 12,
+        "fixture_nodes_max": 20,
+        "min_cut_oracle_max_nodes": 20
+      },
+      "reported_costs": [
+        "accepted edge additions",
+        "declared edit cost units",
+        "one-step active-edge maintenance cost units"
+      ],
+      "test_count_authored": 11,
+      "exact_head_status": "not compiled or executed; cargo/rustc/rustfmt unavailable in execution environment",
+      "message_and_update_budget": "declared in fixture but not charged until controller traces exist",
+      "candidate_sweep_oracle": {
+        "decision_rule": [
+          "maximize served flow",
+          "then minimize declared edit plus one-step maintenance cost",
+          "then stable candidate-ID tie break"
+        ],
+        "information_access": "full candidate visibility",
+        "evidence_class": "upper bound; not a distributed or learned policy",
+        "tested_cases": [
+          "stationary demand chooses no edit",
+          "new sink demand chooses the sink-path addition",
+          "bridge failure chooses the alternate route"
+        ]
+      }
+    },
+    "competitive_update": {
+      "as_of": "2026-11-28",
+      "comparator_families": [
+        {
+          "name": "GNN graph rewiring for message propagation",
+          "doi": "10.24963/ijcai.2026/861",
+          "methods": [
+            "Delaunay/geometric augmentation",
+            "dynamic triangulation",
+            "spectral-gap/FOSR",
+            "expander-inspired rewiring",
+            "curvature/effective-resistance-ranked edits",
+            "spectrum-preserving sparsification",
+            "virtual-node/hub shortcuts",
+            "learned signal-guided edits"
+          ],
+          "claim_limit": "Communication/message-passing baseline only; does not establish capacity-feasible service restoration."
+        },
+        {
+          "name": "Resilience-based network design optimization under aleatory uncertainty",
+          "source": "https://www.sciencedirect.com/science/article/pii/S0360835226006790",
+          "methods": [
+            "joint topology and integer link-capacity selection",
+            "repeated disruption and recover-mode dynamics",
+            "chance-constrained recovered-flow requirements",
+            "MILP probabilistic solution-discovery algorithm (PSDA)",
+            "genetic algorithm baseline"
+          ],
+          "reported_case_sizes": [
+            7,
+            13,
+            20,
+            74
+          ],
+          "admission_status": "secondary-source lead; reconcile exact objective, uncertainty model, constraints, artifacts and evaluation before claiming reproduction",
+          "authors": [
+            "Kais Zaman",
+            "Tavila Sharmin",
+            "Faisal Mahmud"
+          ],
+          "doi": "10.1016/j.cie.2026.112478",
+          "journal": "Computers & Industrial Engineering",
+          "volume": "223",
+          "issue_date": "2027-01",
+          "publication_status": "online-available early-access study; issue listing is January 2027 as of 2026-11-28"
+        }
+      ],
+      "required_extension": [
+        "repeated and correlated disruptions with explicit recovery horizons",
+        "chance-constrained or distributionally robust recovered-service constraints",
+        "task-specific service and capacity metrics separate from spectral gap/diameter",
+        "joint topology and capacity actions when the environment permits capacity decisions",
+        "no-edit stationary control and charged maintenance/downtime costs"
+      ],
+      "key_differentiator": "Pareto improvement in recovered service, latency and resilience per reconfiguration/communication cost against the strongest applicable capacity-aware MILP/PSDA/GA and graph-rewiring baselines."
+    }
+  },
+  "architecture_topology_layers": [
+    {
+      "layer": "semantic_cognitive_topology",
+      "owners": [
+        13066,
+        13094
+      ],
+      "authority": "typed, ordered, provenance-bearing events from owning runtime subsystems",
+      "forbidden_inference": "visual geometry, procedural growth, animation or camera state cannot create cognitive claims"
+    },
+    {
+      "layer": "morphological_spatial_topology",
+      "owners": [
+        13079,
+        13066
+      ],
+      "authority": "deterministic geometry, stable filament/branch IDs, explicit contact/fusion evidence",
+      "forbidden_inference": "a geometric crossing or rendering artifact is not an accepted biological fusion or semantic relation"
+    },
+    {
+      "layer": "dynamical_interaction_transport_topology",
+      "owners": [
+        13423,
+        13450,
+        14123
+      ],
+      "authority": "observed biological morphology/transport with assay-specific evidence, plus a distinct synthetic graph-controller benchmark",
+      "forbidden_inference": "software rewiring scores do not establish fungal transport or Levin-style somatic-cell bioelectric mechanisms"
+    }
+  ]
+}
