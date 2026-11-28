@@ -37,6 +37,23 @@ Therefore:
 
 Source: https://turnbench.sesame.com/
 
+## 2.1 Intent-conditioned timing (TACT alignment)
+
+Binary fixed-window end-of-turn labels are insufficient as the only timing target. The TACT benchmark (arXiv:2609.27372) contains 9,728 episodes / 73.2 hours from five dyadic corpora and models response-offset appropriateness conditional on speaker intent. It scores temporal predictions with a proper probabilistic rule and reports materially better agreement with human judgments than binary metrics in its evaluation.
+
+Add a separate **intent-conditioned timing** lane without removing the existing causal one-decision and false-positive-constrained lanes:
+
+- Predict a distribution over the appropriate response offset / floor-transfer timing, not only a binary speak-now flag.
+- Condition on the permitted current and past evidence for the speaker's intent class; do not use future audio or annotator-only intent labels at inference.
+- Keep the gold intent posterior evaluator-only. Use proper scoring (TACT-compatible weighted CRPS where the benchmark adapter permits), calibration and coverage; never replace latency/FPR with a single probabilistic score.
+- Compare intent-conditioned predictions to human floor-transfer timing distributions, and report the six intent classes separately.
+- Include a matched ablation with/without conversation/profile context and an explicit profile-invariance check so the model does not merely learn speaker identity.
+- Preserve one emitted control action per hidden decision event. A distribution forecast does not authorize or dispatch speech; the causal action gate and live permission checks remain separate.
+
+This changes the research question from "did the model predict a fixed turn boundary?" to "given the speaker's likely intent, what response timing is appropriate, and how uncertain is that prediction?" It must be a separate benchmark stratum because TACT's dyadic corpora and scoring protocol are not interchangeable with TurnBench, DuplexAct or the multi-party challenge set.
+
+Reference: https://arxiv.org/abs/2609.27372.
+
 ## 3. Symthaea evaluation protocol
 
 ### 3.1 Frozen input
