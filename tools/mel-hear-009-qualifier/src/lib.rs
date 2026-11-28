@@ -6,8 +6,8 @@
 //! per-condition outcomes without making a population-inference claim.
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
 use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
 
 const DIGEST_LEN: usize = 64;
 
@@ -185,15 +185,39 @@ fn validate_panel_header(panel: &Panel) -> Result<(), String> {
 
     for (value, name) in [
         (&panel.triad_sha256, "triad_sha256"),
-        (&panel.source_work_lineage_sha256, "source_work_lineage_sha256"),
-        (&panel.performer_cohort_manifest_sha256, "performer_cohort_manifest_sha256"),
+        (
+            &panel.source_work_lineage_sha256,
+            "source_work_lineage_sha256",
+        ),
+        (
+            &panel.performer_cohort_manifest_sha256,
+            "performer_cohort_manifest_sha256",
+        ),
         (&panel.question_sha256, "question_sha256"),
-        (&panel.reference_manifest_sha256, "reference_manifest_sha256"),
-        (&panel.annotation_manifest_sha256, "annotation_manifest_sha256"),
-        (&panel.audio_materialization_report_sha256, "audio_materialization_report_sha256"),
-        (&panel.audio_evidence_manifest_sha256, "audio_evidence_manifest_sha256"),
-        (&panel.sampling_design_manifest_sha256, "sampling_design_manifest_sha256"),
-        (&panel.matched_budget_profile_sha256, "matched_budget_profile_sha256"),
+        (
+            &panel.reference_manifest_sha256,
+            "reference_manifest_sha256",
+        ),
+        (
+            &panel.annotation_manifest_sha256,
+            "annotation_manifest_sha256",
+        ),
+        (
+            &panel.audio_materialization_report_sha256,
+            "audio_materialization_report_sha256",
+        ),
+        (
+            &panel.audio_evidence_manifest_sha256,
+            "audio_evidence_manifest_sha256",
+        ),
+        (
+            &panel.sampling_design_manifest_sha256,
+            "sampling_design_manifest_sha256",
+        ),
+        (
+            &panel.matched_budget_profile_sha256,
+            "matched_budget_profile_sha256",
+        ),
     ] {
         require_sha256(value, name)?;
     }
@@ -203,15 +227,30 @@ fn validate_panel_header(panel: &Panel) -> Result<(), String> {
 fn validate_condition_common(condition: &Condition, budget_sha: &str) -> Result<(), String> {
     for (value, name) in [
         (&condition.model_identity_sha256, "model_identity_sha256"),
-        (&condition.runtime_identity_sha256, "runtime_identity_sha256"),
+        (
+            &condition.runtime_identity_sha256,
+            "runtime_identity_sha256",
+        ),
         (&condition.system_prompt_sha256, "system_prompt_sha256"),
-        (&condition.adapter_identity_sha256, "adapter_identity_sha256"),
+        (
+            &condition.adapter_identity_sha256,
+            "adapter_identity_sha256",
+        ),
         (&condition.decoding_config_sha256, "decoding_config_sha256"),
         (&condition.question_sha256, "condition.question_sha256"),
-        (&condition.budget_profile_sha256, "condition.budget_profile_sha256"),
-        (&condition.execution_receipt_sha256, "execution_receipt_sha256"),
+        (
+            &condition.budget_profile_sha256,
+            "condition.budget_profile_sha256",
+        ),
+        (
+            &condition.execution_receipt_sha256,
+            "execution_receipt_sha256",
+        ),
         (&condition.input_context_sha256, "input_context_sha256"),
-        (&condition.reference_visibility_audit_sha256, "reference_visibility_audit_sha256"),
+        (
+            &condition.reference_visibility_audit_sha256,
+            "reference_visibility_audit_sha256",
+        ),
     ] {
         require_sha256(value, name)?;
     }
@@ -235,15 +274,30 @@ fn validate_condition_common(condition: &Condition, budget_sha: &str) -> Result<
         }
     }
     for (value, name) in [
-        (condition.reasoner_model_identity_sha256.as_ref(), "reasoner_model_identity_sha256"),
-        (condition.audio_evidence_manifest_sha256.as_ref(), "audio_evidence_manifest_sha256"),
-        (condition.oracle_symbolic_reference_sha256.as_ref(), "oracle_symbolic_reference_sha256"),
+        (
+            condition.reasoner_model_identity_sha256.as_ref(),
+            "reasoner_model_identity_sha256",
+        ),
+        (
+            condition.audio_evidence_manifest_sha256.as_ref(),
+            "audio_evidence_manifest_sha256",
+        ),
+        (
+            condition.oracle_symbolic_reference_sha256.as_ref(),
+            "oracle_symbolic_reference_sha256",
+        ),
         (
             condition.predicted_symbolic_representation_sha256.as_ref(),
             "predicted_symbolic_representation_sha256",
         ),
-        (condition.transcription_report_sha256.as_ref(), "transcription_report_sha256"),
-        (condition.alignment_report_sha256.as_ref(), "alignment_report_sha256"),
+        (
+            condition.transcription_report_sha256.as_ref(),
+            "transcription_report_sha256",
+        ),
+        (
+            condition.alignment_report_sha256.as_ref(),
+            "alignment_report_sha256",
+        ),
     ] {
         if let Some(value) = value {
             require_sha256(value, name)?;
@@ -259,7 +313,9 @@ fn require_absent(condition: &Condition, kind: ConditionKind) -> Result<(), Stri
         || condition.transcription_report_sha256.is_some()
         || condition.alignment_report_sha256.is_some()
     {
-        return Err(format!("{kind:?} condition contains evidence it is not permitted to receive"));
+        return Err(format!(
+            "{kind:?} condition contains evidence it is not permitted to receive"
+        ));
     }
     Ok(())
 }
@@ -330,15 +386,15 @@ fn validate_condition_kind(
     Ok(())
 }
 
-fn score_condition(
-    condition: &Condition,
-    reference: ReferenceDisposition,
-) -> ConditionMetrics {
+fn score_condition(condition: &Condition, reference: ReferenceDisposition) -> ConditionMetrics {
     let scorable = matches!(
         reference,
         ReferenceDisposition::Same | ReferenceDisposition::Different
     );
-    let answered = if matches!(condition.prediction, Prediction::Same | Prediction::Different) {
+    let answered = if matches!(
+        condition.prediction,
+        Prediction::Same | Prediction::Different
+    ) {
         1
     } else {
         0
@@ -361,8 +417,7 @@ fn score_condition(
             (condition.prediction, reference),
             (Prediction::Same, ReferenceDisposition::Same)
                 | (Prediction::Different, ReferenceDisposition::Different)
-        )
-    {
+        ) {
         1
     } else {
         0
@@ -420,8 +475,8 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
     let fusion = by_kind[&ConditionKind::AudioPlusPredictedStructure];
     let no_evidence = by_kind[&ConditionKind::NoEvidenceControl];
 
-    let reasoner_identity_matched = oracle.reasoner_model_identity_sha256
-        == audio_derived.reasoner_model_identity_sha256;
+    let reasoner_identity_matched =
+        oracle.reasoner_model_identity_sha256 == audio_derived.reasoner_model_identity_sha256;
     if !reasoner_identity_matched {
         return Err(
             "oracle and audio-derived symbolic conditions must use the same downstream reasoning head"
@@ -644,9 +699,12 @@ mod tests {
         panel.reference_disposition = ReferenceDisposition::Ambiguous;
         let report = audit_panel(&panel).unwrap();
         assert!(!report.reference_scorable);
-        assert!(report.conditions.iter().all(|condition| {
-            condition.accuracy.is_none() && condition.coverage.is_none()
-        }));
+        assert!(
+            report
+                .conditions
+                .iter()
+                .all(|condition| { condition.accuracy.is_none() && condition.coverage.is_none() })
+        );
         assert_eq!(report.diagnostics.no_evidence_control_correct, None);
     }
 }
