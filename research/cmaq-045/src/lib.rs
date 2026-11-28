@@ -69,8 +69,7 @@ impl HaarContrast {
     }
 
     fn log_weight(&self) -> f64 {
-        -(self.active_resolution_levels as f64).ln()
-            - (self.contrasts_at_level as f64).ln()
+        -(self.active_resolution_levels as f64).ln() - (self.contrasts_at_level as f64).ln()
     }
 }
 
@@ -159,10 +158,7 @@ impl ConditionalRankSpectrumMonitor {
         if calibration_count == 0 {
             return Err(ConditionalError::InvalidCalibrationCount);
         }
-        if alpha_numerator == 0
-            || alpha_denominator == 0
-            || alpha_numerator >= alpha_denominator
-        {
+        if alpha_numerator == 0 || alpha_denominator == 0 || alpha_numerator >= alpha_denominator {
             return Err(ConditionalError::InvalidMiscoverage);
         }
 
@@ -241,8 +237,7 @@ impl ConditionalRankSpectrumMonitor {
                 for context in &contexts {
                     for direction in [Direction::Positive, Direction::Negative] {
                         for betting_rate in BETTING_RATES {
-                            let log_weight = -(contexts.len() as f64).ln()
-                                + feature_log_weight
+                            let log_weight = -(contexts.len() as f64).ln() + feature_log_weight
                                 - 2.0f64.ln()
                                 - (BETTING_RATES.len() as f64).ln();
                             components.push(Component {
@@ -296,8 +291,8 @@ impl ConditionalRankSpectrumMonitor {
         };
 
         let rank_buckets = self.calibration_count + 1;
-        let previous_bucket = ((last_rank - 1) * PREVIOUS_RANK_BUCKETS / rank_buckets)
-            .min(PREVIOUS_RANK_BUCKETS - 1);
+        let previous_bucket =
+            ((last_rank - 1) * PREVIOUS_RANK_BUCKETS / rank_buckets).min(PREVIOUS_RANK_BUCKETS - 1);
         active.push(previous_bucket);
 
         if let Some(second_last_rank) = self.history.second_last_rank {
@@ -543,7 +538,8 @@ fn centered_payoff(
     observation_index_one_based: u64,
     weighted_prefix: &[i128],
 ) -> Result<f64, ConditionalError> {
-    if rank_one_based == 0 || rank_one_based > calibration_count + 1
+    if rank_one_based == 0
+        || rank_one_based > calibration_count + 1
         || weighted_prefix.len() != calibration_count + 2
     {
         return Err(ConditionalError::InvalidRank);
@@ -562,7 +558,8 @@ fn centered_payoff(
     let expected_code = positive
         .checked_sub(negative)
         .ok_or(ConditionalError::ArithmeticOverflow)?;
-    let observed = contrast.code_for_rank(rank_one_based)
+    let observed = contrast
+        .code_for_rank(rank_one_based)
         .checked_mul(total_i128)
         .ok_or(ConditionalError::ArithmeticOverflow)?;
     let numerator = observed
@@ -643,7 +640,13 @@ mod tests {
     fn context_selection_uses_only_previously_committed_ranks() {
         let mut monitor = monitor();
         let first = monitor.observe_rank(1).unwrap();
-        assert!(matches!(first, ConditionalUpdate::Accepted { active_contexts: 0, .. }));
+        assert!(matches!(
+            first,
+            ConditionalUpdate::Accepted {
+                active_contexts: 0,
+                ..
+            }
+        ));
         assert_eq!(monitor.active_context_names().len(), 2); // previous rank bin + low extreme
 
         let second_active_before = monitor.active_context_names();
@@ -672,7 +675,10 @@ mod tests {
         let denominator = 15.0 + t as f64;
 
         for component in &monitor.components {
-            let indicator = if active.binary_search(&context_index(component.context)).is_ok() {
+            let indicator = if active
+                .binary_search(&context_index(component.context))
+                .is_ok()
+            {
                 1.0
             } else {
                 0.0
@@ -680,14 +686,8 @@ mod tests {
             let expectation: f64 = (1..=16)
                 .map(|rank| {
                     let mass = (1.0 + counts[rank - 1] as f64) / denominator;
-                    let payoff = centered_payoff(
-                        15,
-                        &component.contrast,
-                        rank,
-                        t,
-                        &prefix,
-                    )
-                    .unwrap();
+                    let payoff =
+                        centered_payoff(15, &component.contrast, rank, t, &prefix).unwrap();
                     mass * indicator * payoff * component.direction.sign()
                 })
                 .sum();
@@ -728,25 +728,53 @@ mod tests {
     fn high_and_low_runs_activate_only_after_two_prior_observations() {
         let mut monitor = monitor();
         monitor.observe_rank(16).unwrap();
-        assert!(!monitor.active_context_names().contains(&"previous_high_run"));
+        assert!(
+            !monitor
+                .active_context_names()
+                .contains(&"previous_high_run")
+        );
         monitor.observe_rank(16).unwrap();
-        assert!(monitor.active_context_names().contains(&"previous_high_run"));
+        assert!(
+            monitor
+                .active_context_names()
+                .contains(&"previous_high_run")
+        );
 
         let mut monitor = monitor();
         monitor.observe_rank(1).unwrap();
-        assert!(!monitor.active_context_names().contains(&"previous_low_run"));
+        assert!(
+            !monitor
+                .active_context_names()
+                .contains(&"previous_low_run")
+        );
         monitor.observe_rank(1).unwrap();
-        assert!(monitor.active_context_names().contains(&"previous_low_run"));
+        assert!(
+            monitor
+                .active_context_names()
+                .contains(&"previous_low_run")
+        );
     }
 
     #[test]
     fn movement_context_requires_two_prior_ranks() {
         let mut monitor = monitor();
         monitor.observe_rank(2).unwrap();
-        assert!(!monitor.active_context_names().contains(&"previous_two_step_up"));
+        assert!(
+            !monitor
+                .active_context_names()
+                .contains(&"previous_two_step_up")
+        );
         monitor.observe_rank(10).unwrap();
-        assert!(monitor.active_context_names().contains(&"previous_two_step_up"));
-        assert!(!monitor.active_context_names().contains(&"previous_two_step_down"));
+        assert!(
+            monitor
+                .active_context_names()
+                .contains(&"previous_two_step_up")
+        );
+        assert!(
+            !monitor
+                .active_context_names()
+                .contains(&"previous_two_step_down")
+        );
     }
 
     #[test]
@@ -756,7 +784,10 @@ mod tests {
         let before_counts = monitor.rank_counts.clone();
         let before_history = monitor.history;
         let before_components = monitor.components.clone();
-        assert_eq!(monitor.observe_rank(3), Err(ConditionalError::CounterOverflow));
+        assert_eq!(
+            monitor.observe_rank(3),
+            Err(ConditionalError::CounterOverflow)
+        );
         assert_eq!(monitor.rank_counts, before_counts);
         assert_eq!(monitor.history, before_history);
         assert_eq!(monitor.components, before_components);
@@ -772,7 +803,12 @@ mod tests {
         let counts = &monitor.rank_counts;
         let prefix = prefix(counts);
         let denominator = 15.0 + t as f64;
-        for contrast in &monitor.components.iter().map(|component| component.contrast).collect::<Vec<_>>() {
+        for contrast in &monitor
+            .components
+            .iter()
+            .map(|component| component.contrast)
+            .collect::<Vec<_>>()
+        {
             let expectation: f64 = (1..=16)
                 .map(|rank| {
                     let probability = (1.0 + counts[rank - 1] as f64) / denominator;
