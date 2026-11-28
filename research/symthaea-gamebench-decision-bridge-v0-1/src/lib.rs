@@ -634,7 +634,9 @@ mod tests {
     fn rejects_duplicate_or_unknown_forecast_outcomes() {
         let (_episode, _world, _nuisance, switch) = fixture();
         let duplicate = OutcomeForecast {
+            episode_id: "gamebench-f6-development-fixture".into(),
             probe_id: "inspect_switch_trace".into(),
+            emitted_at_step: 0,
             probabilities: vec![
                 OutcomeProbability { outcome_id: "trace_A".into(), probability: 0.5 },
                 OutcomeProbability { outcome_id: "trace_A".into(), probability: 0.5 },
@@ -646,7 +648,9 @@ mod tests {
         ));
 
         let unknown = OutcomeForecast {
+            episode_id: "gamebench-f6-development-fixture".into(),
             probe_id: "inspect_switch_trace".into(),
+            emitted_at_step: 0,
             probabilities: vec![
                 OutcomeProbability { outcome_id: "trace_A".into(), probability: 0.5 },
                 OutcomeProbability { outcome_id: "hidden_rule_label".into(), probability: 0.5 },
