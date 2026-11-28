@@ -1,0 +1,56 @@
+{
+  "schema": "luminous.eqc.run-receipt.v0.1",
+  "run_id": "eqc-schema-only-fixture-001",
+  "task_id": "eqc-health-read-authorized-001",
+  "task_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "source_head": "0000000000000000000000000000000000000000",
+  "system": {
+    "system_id": "synthetic-schema-fixture",
+    "version": "0.1.0",
+    "harness_version": "0.1.0"
+  },
+  "environment": {
+    "image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "runtime": "schema-fixture-only",
+    "network_policy": "none",
+    "host": "synthetic"
+  },
+  "authority_snapshot_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "input_digests": [
+    {
+      "input_id": "synthetic-consent-001",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "actions": [
+    {
+      "sequence": 0,
+      "action": "patient.read",
+      "resource_id": "synthetic-record-001",
+      "outcome": "unresolved",
+      "mutation_applied": false
+    }
+  ],
+  "observed_result": {
+    "disposition": "unresolved",
+    "state_mutation_count": 0,
+    "result_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "verifier": {
+    "verifier_id": "schema-fixture-only",
+    "verifier_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "replay": "not_run",
+    "independent": false,
+    "notes": "Synthetic schema fixture only; no system under test was evaluated."
+  },
+  "dimensions": {
+    "capability": false,
+    "authority": false,
+    "input_integrity": false,
+    "provenance": false,
+    "reproducibility": false,
+    "failure_containment": false
+  },
+  "qualified": false,
+  "timestamp": "2026-11-28T00:00:00Z"
+}
