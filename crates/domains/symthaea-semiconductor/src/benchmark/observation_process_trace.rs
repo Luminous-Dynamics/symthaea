@@ -1345,6 +1345,7 @@ mod tests {
     fn one_trace_has_disjoint_qualified_unknown_blocked_unmeasured_partition() {
         let mut qualified = row(1);
         qualified.operational.state = OperationalAcquisitionStateV1::Measured;
+        qualified.operational.design_sha256 = Some(digest('2'));
         qualified.operational.measured_at_unix_seconds = Some(1010);
         qualified.operational.measurement_system_sha256 = Some(digest('3'));
         qualified.operational.physical_measurement_cost = Some(2.0);
@@ -1531,6 +1532,7 @@ mod tests {
     fn audit_reference_method_can_be_independent_of_operational_method() {
         let mut trace = row(1);
         trace.operational.state = OperationalAcquisitionStateV1::Measured;
+        trace.operational.design_sha256 = Some(digest('c'));
         trace.operational.measured_at_unix_seconds = Some(1010);
         trace.operational.measurement_system_sha256 = Some(digest('d'));
         trace.operational.physical_measurement_cost = Some(1.0);
@@ -1609,6 +1611,34 @@ mod tests {
     fn expected_population_inventory_rejects_missing_round() {
         let mut data = input(vec![row(1), row(2)]);
         data.expected_population_round_ids = vec![1, 2, 3];
+        assert!(evaluate_observation_process_trace_v1(&data).is_err());
+    }
+
+    #[test]
+    fn independent_audit_budget_is_enforced() {
+        let mut trace = row(1);
+        trace.independent_audit = IndependentAuditEvidenceV1 {
+            state: IndependentAuditStateV1::SelectedPending,
+            retention: AuditRetentionStateV1::Neither,
+            inclusion_probability: Some(0.5),
+            audit_selected_at_unix_seconds: Some(1010),
+            audit_measured_at_unix_seconds: None,
+            audit_measurement_cost: None,
+            audit_measurement_receipt_sha256: None,
+            audit_loss: None,
+            unavailable_reason: None,
+        };
+        let mut data = input(vec![trace]);
+        data.independent_audit_budget = 0;
+        data.audit_design = Some(SelectionAuditDesignV1 {
+            schema: super::super::selection_risk_bounds::SELECTION_AUDIT_DESIGN_SCHEMA_V1.into(),
+            design_sha256: digest('a'),
+            randomization_provenance_sha256: digest('b'),
+            reference_method_sha256: digest('c'),
+            minimum_inclusion_probability: 0.5,
+            confidence_delta: 0.05,
+            independent_of_operational_qualification: true,
+        });
         assert!(evaluate_observation_process_trace_v1(&data).is_err());
     }
 
@@ -1692,6 +1722,109 @@ mod tests {
         let report = evaluate_observation_process_trace_v1(&data).unwrap();
         assert_eq!(report.controller_received_qualified_count, 1);
         assert_eq!(report.controller_state_update_count, 1);
+    }
+
+    #[test]
+    fn caocrc_qualified_feedback_is_bound_to_capacity_delay_and_k1_receipts() {
+        let mut trace = row(1);
+        trace.operational.state = OperationalAcquisitionStateV1::Measured;
+        trace.operational.design_sha256 = Some(digest('1'));
+        trace.operational.measured_at_unix_seconds = Some(1010);
+        trace.operational.measurement_system_sha256 = Some(digest('2'));
+        trace.operational.physical_measurement_cost = Some(1.0);
+        trace.k1 = K1QualificationEvidenceV1 {
+            state: K1QualificationStateV1::Eligible,
+            label_id: Some("label-1".into()),
+            label_revision: Some(1),
+            label_payload_sha256: Some(digest('3')),
+            qualification_report_sha256: Some(digest('4')),
+            measurement_event_id: Some("event-1".into()),
+            corrected_value: Some(1.0),
+            standard_uncertainty_upper_bound: Some(0.1),
+            label_available_at_unix_seconds: Some(1011),
+            report_available_at_unix_seconds: Some(1012),
+            calibration_certificate_sha256: Some(digest('5')),
+            requalification_report_sha256: Some(digest('6')),
+            qualified_loss: Some(0.2),
+            no_promotion_reason: None,
+        };
+        trace.controller.tracking_state = ControllerTrackingStateV1::ReceivedQualified;
+        trace.controller.policy_sha256 = Some(digest('7'));
+        trace.controller.delay_contract_sha256 = Some(digest('8'));
+        trace.controller.feedback_delay_contract_steps = Some(2);
+        trace.controller.tracking_capacity = Some(4);
+        trace.controller.tracking_occupancy_after = Some(1);
+        trace.controller.proxy_uniform_draw = Some(0.25);
+        trace.controller.proxy_delay_steps = Some(2);
+        trace.controller.proxy_survival_probability = Some(0.5);
+        trace.controller.prediction_receipt_sha256 = Some(digest('9'));
+        trace.controller.feedback_receipt_sha256 = Some(digest('a'));
+        trace.controller.update_receipt_sha256 = Some(digest('b'));
+        trace.controller.actual_feedback_delay_steps = Some(1);
+        trace.controller.feedback_round = Some(2);
+        trace.controller.feedback_received_at_unix_seconds = Some(1013);
+        trace.controller.controller_state_changed = true;
+        trace.controller.theorem_assumptions_intact = true;
+
+        let mut data = input(vec![trace]);
+        data.controller_kind = ObservationControllerKindV1::CaOcrc;
+        data.controller_policy_sha256 = Some(digest('7'));
+        data.controller_delay_contract_sha256 = Some(digest('8'));
+        data.controller_delay_steps = Some(2);
+        data.controller_tracking_capacity = Some(4);
+        let report = evaluate_observation_process_trace_v1(&data).unwrap();
+        assert_eq!(report.controller_received_qualified_count, 1);
+        assert_eq!(report.controller_state_update_count, 1);
+        assert_eq!(report.maximum_controller_occupancy, 1);
+        assert_eq!(report.controller_capacity_violation_count, 0);
+    }
+
+    #[test]
+    fn expired_caocrc_feedback_does_not_update_even_when_label_is_k1_eligible() {
+        let mut trace = row(1);
+        trace.operational.state = OperationalAcquisitionStateV1::Measured;
+        trace.operational.design_sha256 = Some(digest('1'));
+        trace.operational.measured_at_unix_seconds = Some(1010);
+        trace.operational.measurement_system_sha256 = Some(digest('2'));
+        trace.operational.physical_measurement_cost = Some(1.0);
+        trace.k1 = K1QualificationEvidenceV1 {
+            state: K1QualificationStateV1::Eligible,
+            label_id: Some("label-1".into()),
+            label_revision: Some(1),
+            label_payload_sha256: Some(digest('3')),
+            qualification_report_sha256: Some(digest('4')),
+            measurement_event_id: Some("event-1".into()),
+            corrected_value: Some(1.0),
+            standard_uncertainty_upper_bound: Some(0.1),
+            label_available_at_unix_seconds: Some(1011),
+            report_available_at_unix_seconds: Some(1012),
+            calibration_certificate_sha256: Some(digest('5')),
+            requalification_report_sha256: Some(digest('6')),
+            qualified_loss: Some(0.2),
+            no_promotion_reason: None,
+        };
+        trace.controller.tracking_state = ControllerTrackingStateV1::Expired;
+        trace.controller.policy_sha256 = Some(digest('7'));
+        trace.controller.delay_contract_sha256 = Some(digest('8'));
+        trace.controller.feedback_delay_contract_steps = Some(2);
+        trace.controller.tracking_capacity = Some(2);
+        trace.controller.tracking_occupancy_after = Some(0);
+        trace.controller.proxy_uniform_draw = Some(0.9);
+        trace.controller.proxy_delay_steps = Some(0);
+        trace.controller.proxy_survival_probability = Some(0.25);
+        trace.controller.prediction_receipt_sha256 = Some(digest('9'));
+        trace.controller.controller_state_changed = false;
+        trace.controller.theorem_assumptions_intact = true;
+
+        let mut data = input(vec![trace]);
+        data.controller_kind = ObservationControllerKindV1::CaOcrc;
+        data.controller_policy_sha256 = Some(digest('7'));
+        data.controller_delay_contract_sha256 = Some(digest('8'));
+        data.controller_delay_steps = Some(2);
+        data.controller_tracking_capacity = Some(2);
+        let report = evaluate_observation_process_trace_v1(&data).unwrap();
+        assert_eq!(report.controller_expired_count, 1);
+        assert_eq!(report.controller_state_update_count, 0);
     }
 
     #[test]
