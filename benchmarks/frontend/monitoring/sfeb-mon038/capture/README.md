@@ -9,7 +9,7 @@ MON-038 is the multi-partition capture complement to MON-037. It qualifies a bou
     go run ./cmd/qualify --input /tmp/mon038-bound.json
     bash CHECKS.sh
 
-The public example has two ledger partitions and one logical-message partition. It deliberately contains legal offset gaps. The fixture helper derives proof digests only for offline_fixture mode; it refuses runtime_candidate.
+The public example has two ledger partitions and one logical-message partition. It is deliberately gap-free for the positive control. The fixture helper derives proof digests only for offline_fixture mode; it refuses runtime_candidate.
 
 ## Core model
 
@@ -17,9 +17,9 @@ Each partition contributes its own half-open range [start_offset_inclusive, end_
 
 A valid v1 vector requires a complete topic/partition inventory; exactly one range for every declared partition; producer fencing before capture; read_committed isolation; stable log-start offset, Last Stable Offset (LSO), high watermark and leader epoch; end_offset_exclusive equal to LSO; stable LSO equal to high watermark for a closed capture; topic cleanup policy delete; record, partition-manifest, inventory and vector digests; and exact linkage between captured business records and MON-037 business-event envelopes.
 
-Kafka offset gaps are not automatically missing events. Aborted transactions and control records can consume offsets while being invisible to read_committed consumers. MON-038 reports the number of offset slots in each half-open range that are not represented by a visible record: range width minus visible record count. This is an observed hole count, not a claim that every hole represents one aborted transaction or one control record.
+V1 reports offset slots not represented by visible records as `offset_gap_slots_unclassified`. Any positive count makes the capture verdict indeterminate. V1 does not infer that a gap is legal merely because Kafka `read_committed` hides aborted transactional records and control markers. The current input does not contain raw broker-log/control-marker evidence sufficient to classify every exact interval.
 
-## Ordering semantics
+## Offset-hole safety rule\n\nThe negative-control suite removes the same in-range business record from both the captured-record array and business-event array, then recomputes fixture digests. The verifier must still return indeterminate because the range has an unexplained offset slot. A matching pair of incomplete arrays cannot qualify a capture.\n\nA future version may accept a gap only when independently authenticated, version-pinned broker-log/record-batch evidence accounts for the exact offsets as aborted data or control markers. Until then, no offset gap is silently accepted.\n\n## Ordering semantics
 
 Ordering is checked only inside a topic partition. Transactions may span partitions. MON-038 never infers a global order from partition offsets, capture timestamps or topic names.
 
