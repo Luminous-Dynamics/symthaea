@@ -100,13 +100,16 @@ pub struct SpatialFourierCode {
 }
 
 impl SpatialFourierCode {
-    /// Borrow the encoded quadrature values as a ContinuousHV.
+    /// Borrow the raw quadrature values without exposing generic HV algebra.
     ///
-    /// Do not use Hadamard binding as a substitute for the phase-rotation
-    /// action. A consumer composing this code with semantic features must
-    /// define and test a compatible binding algebra separately.
-    pub fn as_hv(&self) -> &ContinuousHV {
-        &self.vector
+    /// Keep the code identity (dimension, length scale, seed, algorithm and
+    /// coordinate-frame digest) attached to these values. Do not compare or
+    /// compose values from different configurations after discarding that
+    /// identity. This accessor intentionally does not return a ContinuousHV,
+    /// whose generic bind/similarity methods would bypass the compatibility
+    /// checks enforced by SpatialFourierEncoder.
+    pub fn as_slice(&self) -> &[f32] {
+        self.vector.as_slice()
     }
 
     /// Number of scalar features in this code.
@@ -373,7 +376,7 @@ mod tests {
         let second = encoder(512, 1.25, 17);
         let a = first.encode(0.25, -3.5).expect("finite point");
         let b = second.encode(0.25, -3.5).expect("finite point");
-        assert_eq!(a.as_hv().as_slice(), b.as_hv().as_slice());
+        assert_eq!(a.as_slice(), b.as_slice());
     }
 
     #[test]
