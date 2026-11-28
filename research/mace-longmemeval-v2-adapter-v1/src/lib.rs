@@ -263,7 +263,6 @@ pub fn validate_trajectory_insert_sequence_v1(
     if receipts.is_empty() { return Ok(()); }
     let first = &receipts[0];
     let mut previous_order = None;
-    let mut seen_trajectories = BTreeSet::new();
     for receipt in receipts {
         if !receipt.verify_integrity() || receipt.schema_version != ADAPTER_SCHEMA_V1 {
             return Err(AdapterRejectV1::IntegrityMismatch);
@@ -275,9 +274,6 @@ pub fn validate_trajectory_insert_sequence_v1(
         }
         if previous_order.is_some_and(|order| receipt.insert_order <= order) {
             return Err(AdapterRejectV1::InvalidInsertOrder);
-        }
-        if !seen_trajectories.insert(receipt.trajectory_sha256.as_str()) {
-            return Err(AdapterRejectV1::DuplicateTrajectory);
         }
         previous_order = Some(receipt.insert_order);
     }
@@ -603,7 +599,7 @@ mod tests {
     }
 
     #[test]
-    fn insertion_receipts_preserve_harness_order_and_reject_duplicates() {
+    fn insertion_receipts_preserve_order_and_allow_repeated_identical_payloads() {
         let receipt = |order, id: &str| seal_trajectory_insert_v1(TrajectoryInsertReceiptV1 {
             schema_version: ADAPTER_SCHEMA_V1.into(),
             run_id: "run-1".into(), tier: LongMemEvalTierV1::Small, domain: LongMemEvalDomainV1::Web,
@@ -615,8 +611,8 @@ mod tests {
         let second = receipt(1,"b");
         assert!(validate_trajectory_insert_sequence_v1(&[first.clone(),second.clone()]).is_ok());
         assert_eq!(validate_trajectory_insert_sequence_v1(&[second.clone(),first.clone()]),Err(AdapterRejectV1::InvalidInsertOrder));
-        let duplicate = receipt(2,"a");
-        assert_eq!(validate_trajectory_insert_sequence_v1(&[first,duplicate]),Err(AdapterRejectV1::DuplicateTrajectory));
+        let repeated_payload = receipt(2,"a");
+        assert!(validate_trajectory_insert_sequence_v1(&[first,repeated_payload]).is_ok());
     }
 
     #[test]
