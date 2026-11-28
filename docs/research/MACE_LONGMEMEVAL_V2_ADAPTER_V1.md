@@ -44,7 +44,7 @@ The LongMemEval-V2 harness currently truncates after the backend post-query hook
 
 ## Tests
 
-Fourteen synthetic Rust tests cover insert order and duplicate trajectory rejection, privacy-minimized query fields, opaque invocation IDs, pre-query binding, exact-prefix exposure, truncation and token-budget consistency, missing reader request/response, omitted tail items, cross-domain insertion, identical context bytes from distinct evidence sources, reader configuration binding, and receipt tampering.
+Fourteen synthetic Rust tests cover strict insert order and preservation of repeated identical trajectory payloads, privacy-minimized query fields, opaque invocation IDs, pre-query binding, exact-prefix exposure, truncation and token-budget consistency, missing reader request/response, omitted tail items, cross-domain insertion, identical context bytes from distinct evidence sources, reader configuration binding, and receipt tampering.
 
 ## Validation and claim boundary
 
