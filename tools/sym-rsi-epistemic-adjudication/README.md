@@ -81,3 +81,19 @@ The production module `src/web_research/stratified_audit.rs` turns an externally
 - The output composes with `SelectiveObservationRecord.adjudication_inclusion_probability`; selected records receive their label through the independent adjudicator, while nonselected records remain pending in the complete cohort.
 
 The random priorities, pre-label strata, quotas and selected IDs must be preserved in an independently controlled manifest. The selection guarantee is conditional on the custodian's randomization and the stated SRSWOR design.
+
+
+## Design-based stratified audit risk
+
+The production module src/web_research/stratified_risk.rs combines the complete frozen prediction cohort with the custodian-supplied SRSWOR audit plan.
+
+- Requires an exact one-to-one match between predictions and audit-plan records. Selected records must have independent labels; nonselected records remain pending in this audit lane.
+- Evaluates always-answer, the observed abstention policy, confidence thresholds and tie-safe risk–coverage prefixes.
+- For a fixed acceptance set, the binary loss is 1 only when the candidate answers and is wrong. Per stratum, the Horvitz-Thompson error total is N_h multiplied by the sample mean of loss.
+- The unbiased SRSWOR total variance is estimated as N_h squared times (1 - n_h/N_h) times s_h squared divided by n_h. Stratum variances add under independent stratum randomization; risk variance divides by the exact full-cohort accepted count squared.
+- A full census has zero sampling variance. A non-census stratum with one sampled unit has no estimable within-stratum variance and withholds the overall interval. A stratum where the candidate accepts no units has identically zero loss and contributes zero variance.
+- The point estimate is retained even when a confidence interval is unavailable. Normal 95% intervals are pointwise asymptotic approximations, gated by the minimum accepted audit-label count. They are not finite-sample, anytime-valid or simultaneous guarantees, and are not clipped to [0, 1].
+- AURC is reported as a tie-aware point estimate only; its covariance across nested prefixes is not yet estimated. No AURC confidence interval is claimed.
+- The risk–coverage curve is updated incrementally across descending confidence groups; each prefix is scored from per-stratum counts rather than rescanning the full cohort.
+
+The standalone harness imports the production source by path. Exact Rust 1.96 formatting, tests and strict Clippy remain required.
