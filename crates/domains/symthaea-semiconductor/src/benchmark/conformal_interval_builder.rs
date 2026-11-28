@@ -90,6 +90,7 @@ pub struct ConformalCalibrationSampleV1 {
     pub label_id: String,
     pub label_revision: u64,
     pub label_payload_sha256: String,
+    pub prediction_receipt_sha256: String,
     pub global_model_artifact_sha256: String,
     pub score_policy_sha256: String,
     pub measurement_contract_sha256: String,
@@ -119,6 +120,10 @@ pub struct ConformalIntervalInputV1 {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ConformalCalibrationScoreV1 {
+    pub sample_sha256: String,
+    pub sample_id: String,
+    pub measurement_event_id: String,
+    pub prediction_receipt_sha256: String,
     pub label_id: String,
     pub label_revision: u64,
     pub report_sha256: String,
@@ -261,6 +266,9 @@ fn calibration_score(
     {
         return Err(ConformalSetBuildReasonV1::CalibrationReportDigestMismatch);
     }
+    if !valid_sha256(&sample.prediction_receipt_sha256) {
+        return Err(ConformalSetBuildReasonV1::CalibrationReportDigestMismatch);
+    }
     if sample.global_model_artifact_sha256 != prediction.global_model_artifact_sha256
         || !valid_sha256(&sample.global_model_artifact_sha256)
     {
@@ -326,6 +334,11 @@ fn calibration_score(
         return Err(ConformalSetBuildReasonV1::InvalidCalibrationScale);
     }
     Ok(ConformalCalibrationScoreV1 {
+        sample_sha256: json_sha256(sample)
+            .map_err(|_| ConformalSetBuildReasonV1::CalibrationReportDigestMismatch)?,
+        sample_id: sample.sample_id.clone(),
+        measurement_event_id: sample.measurement_event_id.clone(),
+        prediction_receipt_sha256: sample.prediction_receipt_sha256.clone(),
         label_id: sample.label_id.clone(),
         label_revision: sample.label_revision,
         report_sha256: report.report_sha256.clone(),
@@ -554,6 +567,7 @@ mod tests {
             label_id,
             label_revision: 1,
             label_payload_sha256: payload,
+            prediction_receipt_sha256: digest('q'),
             global_model_artifact_sha256: digest('a'),
             score_policy_sha256: json_sha256(score_policy).unwrap(),
             measurement_contract_sha256: digest('m'),
