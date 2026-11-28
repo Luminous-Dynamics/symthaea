@@ -32,9 +32,13 @@ jobs:
         run: cargo +1.100.0 test --manifest-path research/cmaq-059/Cargo.toml --locked
       - name: Strict Clippy
         run: cargo +1.100.0 clippy --manifest-path research/cmaq-059/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Run SCPT wiring probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-059/Cargo.toml --locked --bin scpt_probe > cmaq-059-scpt-probe.csv
       - name: Preserve calibration test evidence
         uses: actions/upload-artifact@v4
         with:
           name: cmaq-059-calibration-test-evidence
-          path: research/cmaq-059/Cargo.lock
+          path: |
+            research/cmaq-059/Cargo.lock
+            cmaq-059-scpt-probe.csv
           if-no-files-found: error
