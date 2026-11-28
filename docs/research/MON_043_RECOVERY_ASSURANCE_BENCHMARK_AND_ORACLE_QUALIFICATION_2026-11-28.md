@@ -32,7 +32,9 @@ All arms receive the same source workload, backup snapshot, database version, br
 | A5 | A4 + transaction closure and partition-vector capture | MON semantic subset |
 | A6 | A5 + MON-037–040 | Integrated offline assurance |
 | A7 | A6 + MON-041 authenticated capture/custody | Runtime evidence admission |
-| A8 | Independent SRE/maintainer adjudication using sealed source truth | External adjudication reference |
+| A8 | A7 + MON-044 capability/negative-space qualification | Required-state observability and scope closure |
+| A9 | A8 + MON-045 typed dependency graph and scoped invalidation | Claim freshness, revocation propagation and blast-radius precision |
+| A10 | Independent SRE/maintainer adjudication using sealed source truth | External adjudication reference |
 
 Where a product does not expose a comparable capability, mark it not applicable rather than silently substituting a different check. Report both native and augmented variants when augmentation is technically fair.
 
@@ -81,6 +83,32 @@ The public benchmark should include a development corpus and a separately contro
 - traffic enabled before fencing;
 - revoked principal retains write authority;
 - rollback path unavailable or not independently tested.
+
+### F8 — Capture capability and negative space
+- required DDL/schema evolution with row-only CDC;
+- transaction metadata enabled only after the recovery scope begins;
+- generated-column state required without an independent recomputation/extraction lane;
+- TOAST/unavailable-value placeholders treated as source values;
+- TRUNCATE and partition-routing assumptions;
+- configured operation/table/column filters that exclude required state;
+- snapshot-to-stream handoff without a pinned source boundary;
+- schema-history loss or epoch mismatch;
+- sequences, roles, grants, publications, extensions and other required non-row state omitted;
+- capability report reused after connector, plugin, server or configuration drift;
+- optional unknown capability versus unknown mandatory capability.
+
+### F9 — Evidence dependency closure and scoped invalidation
+- revoke a source receipt used by one recovery claim while an unrelated claim remains valid;
+- revoke a shared capability consumed by multiple claims;
+- expire a schema/scope artifact while its dependent claim remains cached;
+- change a prerequisite digest without rebuilding dependent claims;
+- omit a required dependency edge from the supplied graph;
+- add an optional context edge and verify it cannot silently become mandatory;
+- invalidate transitive claim dependencies through capability and policy nodes;
+- revoke evidence after a claim is issued and measure stale-claim exposure;
+- present a revoked trust root with a valid historical receipt;
+- create dependency cycles, duplicated edges and ambiguous root claims;
+- test graph recomputation after one node changes rather than rebuilding every claim.
 
 ### F5 — Evidence and trust attacks
 - forged, unsigned, revoked, stale and replayed receipts;
@@ -161,6 +189,17 @@ Do not let the system under test generate the ground truth, expected verdicts, o
 - operator hours and manual interventions;
 - total cost per independently supported recovery.
 
+### Capability and invalidation quality
+- required-scope coverage by state domain and object;
+- unsupported/excluded required surface detection;
+- unknown mandatory surface rate;
+- false-complete rate caused by capture blind spots;
+- scope inventory provenance and conformance identity drift;
+- impacted-claim precision and recall after revocation or expiry;
+- unrelated-claim invalidation rate;
+- stale dependent-claim exposure time;
+- claim recomputation latency and evidence bytes invalidated.
+
 ### Diagnostic quality
 - fault-set size before/after reduction;
 - number of replays required;
@@ -236,6 +275,17 @@ Before any public leaderboard:
 - publish mutation and holdout corpus digests;
 - prohibit self-generated expected labels without independent confirmation.
 
+## Industry comparison and fair baseline interpretation
+
+The benchmark must distinguish capabilities that already exist in native tools from the additional assurance MON claims to add.
+
+- AWS Backup Restore Testing provides scheduled restore jobs, recovery-point selection, restore-duration monitoring and optional restore validation. This is the correct baseline for managed, recurring restore viability testing; MON should not claim that scheduling restores is novel. See https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing.html.
+- PostgreSQL pg_verifybackup checks a base backup against its generated manifest, but the PostgreSQL documentation explicitly states that it cannot perform every validation a running server performs and recommends test restores plus checking restored data. See https://www.postgresql.org/docs/current/app-pgverifybackup.html.
+- pgBackRest documentation likewise recommends regular restore testing as the way to verify backup consistency. See https://www.enterprisedb.com/docs/supported-open-source/pgbackrest/03-quick_start/.
+- Jepsen supplies real-cluster fault injection and history checking for distributed-system safety. Its published limitations distinguish safety analysis from performance benchmarking and state that experiments can find errors but cannot prove their absence. See https://jepsen.io/analyses/ethics and https://jepsen.io/services/analysis.
+
+MON's prospective differentiator is composition: independently sourced required-state inventory, capture capability and negative space, source/capture reconciliation, authenticated custody, dependency-aware sampling, counterfactual diagnosis and scoped downstream claim invalidation. The benchmark must measure whether this composition reduces false-complete or stale assurance claims, and report the incremental overhead. It must not misrepresent the native product capabilities listed above.
+
 ## Reporting and comparison rules
 
 Publish per-arm and per-fault-family confusion matrices. Report exact denominators and uncertainty intervals. Separate component capability, end-to-end assurance, operational performance and cost.
@@ -252,6 +302,7 @@ A claim that MON exceeds a baseline requires:
 A claim that MON beats SOTA is prohibited until the benchmark has a public protocol, sealed holdout, independent replication, and comparable measured baselines.
 
 ## Execution roadmap
+0. Integrate MON-044 capability/negative-space dispositions and MON-045 claim-dependency traces into the shared benchmark evidence schema; preserve each module's independent verdict and reason codes.
 
 1. Create benchmark schemas and scenario manifest format.
 2. Convert the existing MON-037/038/039/040 synthetic scenarios into a common index without changing their source fixtures.
