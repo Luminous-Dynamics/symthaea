@@ -39,10 +39,15 @@ pub mod channel;
 pub mod crop;
 pub mod manager;
 pub mod types;
+pub mod temporal_budget;
 pub mod ventral;
 
 pub use channel::FoveationChannel;
 pub use manager::FoveationManager;
+pub use temporal_budget::{
+    TemporalBudgetDecision, TemporalFoveationBudget, TemporalFoveationConfig,
+    TemporalFoveationError, TemporalSamplingMode, TemporalTrigger, TemporalTriggerKind,
+};
 pub use types::{
     FoveationConfig, FoveationRequest, FoveationResult, FoveationTelemetry, FrameBuffer,
     RecognizedContent, RoutingStrategy, SalientRegion,
