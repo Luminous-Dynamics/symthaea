@@ -811,6 +811,129 @@ mod tests {
     }
 
     #[test]
+    fn receipt_expiry_is_exclusive_and_does_not_consume_challenge() {
+        let (task, observation, envelope, trust_bytes, _) = sample();
+        let trust: Value = serde_json::from_slice(&trust_bytes).unwrap();
+        let observation_bytes = serde_json::to_vec(&observation).unwrap();
+        let root = root();
+        let ledger = ledger();
+        let context = ObserverVerificationContext {
+            task: &task,
+            observation: &observation,
+            run_id: "run-001",
+            challenge_nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            verification_time: "2026-11-28T10:05:00Z",
+            task_corpus_sha256: VALID_SHA,
+            expected_trust_store_sha256: &sha256(&trust_bytes),
+            observation_bytes: &observation_bytes,
+        };
+        assert!(verify_and_consume(
+            &envelope,
+            &trust,
+            &trust_bytes,
+            &context,
+            &root,
+            &ledger
+        )
+        .is_err());
+        assert_eq!(fs::read_dir(ledger).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn not_yet_valid_and_out_of_scope_keys_are_rejected_before_consumption() {
+        let (task, observation, envelope, trust_bytes, _) = sample();
+        let trust: Value = serde_json::from_slice(&trust_bytes).unwrap();
+        let observation_bytes = serde_json::to_vec(&observation).unwrap();
+        let root = root();
+
+        let mut future_key = trust.clone();
+        future_key["keys"][0]["valid_from"] = json!("2026-11-28T10:02:00Z");
+        let future_bytes = serde_json::to_vec(&future_key).unwrap();
+        let future_sha = sha256(&future_bytes);
+        let future_context = ObserverVerificationContext {
+            task: &task,
+            observation: &observation,
+            run_id: "run-001",
+            challenge_nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            verification_time: "2026-11-28T10:03:00Z",
+            task_corpus_sha256: VALID_SHA,
+            expected_trust_store_sha256: &future_sha,
+            observation_bytes: &observation_bytes,
+        };
+        let future_ledger = ledger();
+        assert!(verify_and_consume(
+            &envelope,
+            &future_key,
+            &future_bytes,
+            &future_context,
+            &root,
+            &future_ledger
+        )
+        .is_err());
+        assert_eq!(fs::read_dir(future_ledger).unwrap().count(), 0);
+
+        let mut out_of_scope = trust;
+        out_of_scope["keys"][0]["allowed_domains"] = json!(["simulation"]);
+        let scope_bytes = serde_json::to_vec(&out_of_scope).unwrap();
+        let scope_sha = sha256(&scope_bytes);
+        let scope_context = ObserverVerificationContext {
+            expected_trust_store_sha256: &scope_sha,
+            ..future_context
+        };
+        let scope_ledger = ledger();
+        assert!(verify_and_consume(
+            &envelope,
+            &out_of_scope,
+            &scope_bytes,
+            &scope_context,
+            &root,
+            &scope_ledger
+        )
+        .is_err());
+        assert_eq!(fs::read_dir(scope_ledger).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn operator_receipt_lifetime_limit_is_enforced() {
+        let (task, observation, envelope, trust_bytes, _) = sample();
+        let mut trust: Value = serde_json::from_slice(&trust_bytes).unwrap();
+        trust["max_receipt_lifetime_seconds"] = json!(120);
+        let limited_bytes = serde_json::to_vec(&trust).unwrap();
+        let limited_sha = sha256(&limited_bytes);
+        let observation_bytes = serde_json::to_vec(&observation).unwrap();
+        let context = ObserverVerificationContext {
+            task: &task,
+            observation: &observation,
+            run_id: "run-001",
+            challenge_nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            verification_time: "2026-11-28T10:01:00Z",
+            task_corpus_sha256: VALID_SHA,
+            expected_trust_store_sha256: &limited_sha,
+            observation_bytes: &observation_bytes,
+        };
+        let ledger = ledger();
+        assert!(verify_and_consume(
+            &envelope,
+            &trust,
+            &limited_bytes,
+            &context,
+            &root(),
+            &ledger
+        )
+        .is_err());
+        assert_eq!(fs::read_dir(ledger).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn utc_epoch_conversion_preserves_minute_and_leap_day_arithmetic() {
+        let start = utc_epoch_seconds("2024-02-28T23:59:59Z").unwrap();
+        let leap_day = utc_epoch_seconds("2024-02-29T00:00:00Z").unwrap();
+        let march = utc_epoch_seconds("2024-03-01T00:00:00Z").unwrap();
+        assert_eq!(leap_day - start, 1);
+        assert_eq!(march - leap_day, 86_400);
+    }
+
+    #[test]
     fn expired_or_revoked_observer_keys_fail_closed() {
         let (task, observation, envelope, trust_bytes, _) = sample();
         let trust: Value = serde_json::from_slice(&trust_bytes).unwrap();
