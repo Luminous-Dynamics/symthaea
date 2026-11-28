@@ -222,6 +222,12 @@ fn validate_condition_common(condition: &Condition, budget_sha: &str) -> Result<
     if condition.reference_label_exposed {
         return Err("reference labels must not be exposed to any model condition".to_owned());
     }
+    if condition.evidence_stage != EvidenceStage::LocalContextVerified {
+        return Err(
+            "v0 accepts only local-context evidence; client/provider attestations require the trusted stage verifier"
+                .to_owned(),
+        );
+    }
     if let Some(confidence) = condition.prediction_confidence {
         if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
             return Err("prediction_confidence must be finite and between zero and one".to_owned());
@@ -349,14 +355,17 @@ fn score_condition(
     } else {
         0
     };
-    let correct = usize::from(
-        scorable
-            && matches!(
-                (condition.prediction, reference),
-                (Prediction::Same, ReferenceDisposition::Same)
-                    | (Prediction::Different, ReferenceDisposition::Different)
-            ),
-    );
+    let correct = if scorable
+        && matches!(
+            (condition.prediction, reference),
+            (Prediction::Same, ReferenceDisposition::Same)
+                | (Prediction::Different, ReferenceDisposition::Different)
+        )
+    {
+        1
+    } else {
+        0
+    };
     let incorrect = if scorable { 1 - correct } else { 0 };
     ConditionMetrics {
         kind: condition.kind,
