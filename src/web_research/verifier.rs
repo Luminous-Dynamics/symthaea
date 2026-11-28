@@ -7,9 +7,9 @@
 //! This is the core of hallucination prevention - every claim must be
 //! epistemically verified before being presented.
 
-use super::types::{EpistemicStatus, ResearchSource, VerifiedClaim, WebResearchResult};
 #[cfg(test)]
 use super::types::ResearchStatus;
+use super::types::{EpistemicStatus, ResearchSource, VerifiedClaim, WebResearchResult};
 use std::collections::HashMap;
 
 /// Configuration for the epistemic verifier
