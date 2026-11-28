@@ -106,6 +106,7 @@ struct PreparedTick {
 pub struct EpisodeRuntimeState {
     episode: Episode,
     semantics: GraphSemantics,
+    context_digest: String,
     current_tick: Option<u64>,
     active_edges: Vec<Edge>,
     demands: Vec<SinkDemand>,
@@ -125,6 +126,7 @@ impl EpisodeRuntimeState {
         Ok(Self {
             episode: episode.clone(),
             semantics: semantics.clone(),
+            context_digest: digest_episode_context(episode, semantics),
             current_tick: None,
             active_edges: episode.active_edges.clone(),
             demands: Vec::new(),
@@ -170,6 +172,7 @@ impl EpisodeRuntimeState {
     /// action to a particular tick's event-updated state.
     pub fn state_digest(&self) -> String {
         digest_state(
+            &self.context_digest,
             self.current_tick.unwrap_or(0),
             &self.active_edges,
             &self.demands,
@@ -191,6 +194,7 @@ impl EpisodeRuntimeState {
     ) -> Result<String, String> {
         let prepared = self.prepare_tick(tick, events)?;
         Ok(digest_state(
+            &self.context_digest,
             tick,
             &prepared.active_edges,
             &prepared.demands,
@@ -214,6 +218,7 @@ impl EpisodeRuntimeState {
     ) -> Result<TickReceipt, String> {
         let prepared = self.prepare_tick(tick, events)?;
         let pre_action_state_digest = digest_state(
+            &self.context_digest,
             tick,
             &prepared.active_edges,
             &prepared.demands,
@@ -342,6 +347,7 @@ impl EpisodeRuntimeState {
         );
 
         let post_state_digest = digest_state(
+            &self.context_digest,
             tick,
             &next_edges,
             &next_demands,
@@ -537,6 +543,7 @@ fn decorate_flow(
 
 #[allow(clippy::too_many_arguments)]
 fn digest_state(
+    context_digest: &str,
     tick: u64,
     edges: &[Edge],
     demands: &[SinkDemand],
@@ -548,6 +555,7 @@ fn digest_state(
     applied_event_ids: &BTreeSet<String>,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
+    hash_optional_string(&mut hasher, Some(context_digest));
     hasher.update(&tick.to_le_bytes());
     hasher.update(&(remaining_edit_budget as u64).to_le_bytes());
     hasher.update(&cumulative_edit_cost_units.to_le_bytes());
@@ -597,7 +605,105 @@ fn hash_optional_string(hasher: &mut blake3::Hasher, value: Option<&str>) {
             hasher.update(&(value.len() as u64).to_le_bytes());
             hasher.update(value.as_bytes());
         }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        }
+    }
+}
+
+fn digest_episode_context(episode: &Episode, semantics: &GraphSemantics) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hash_optional_string(&mut hasher, Some(&episode.id));
+    hasher.update(&[u8::from(semantics.directed)]);
+    hasher.update(&(semantics.edit_budget as u64).to_le_bytes());
+    hasher.update(&(semantics.candidate_edges_per_episode as u64).to_le_bytes());
+    hasher.update(&semantics.accounting.accepted_edge_addition_cost_units.to_le_bytes());
+    hasher.update(&semantics.accounting.message_budget_bytes.to_le_bytes());
+    hasher.update(&semantics.accounting.controller_update_budget.to_le_bytes());
+    hasher.update(&(semantics.accounting.maximum_active_edges as u64).to_le_bytes());
+
+    let mut nodes = episode.nodes.clone();
+    nodes.sort_by_key(|node| node.id);
+    for node in &nodes {
+        hasher.update(&node.id.to_le_bytes());
+        hash_optional_string(&mut hasher, Some(&node.role));
+        hash_optional_u64(&mut hasher, node.supply);
+        hash_optional_u64(&mut hasher, node.demand);
+    }
+
+    for edges in [&episode.active_edges, &episode.candidate_edges] {
+        let mut canonical = edges.clone();
+        canonical.sort_by(|left, right| {
+            (left.from, left.to, left.id.as_deref()).cmp(&(
+                right.from,
+                right.to,
+                right.id.as_deref(),
+            ))
+        });
+        hasher.update(&(canonical.len() as u64).to_le_bytes());
+        for edge in &canonical {
+            hash_edge(&mut hasher, edge);
+        }
+    }
+
+    let mut schedules = episode.demand_schedule.clone();
+    schedules.sort_by_key(|step| step.time);
+    for schedule in &schedules {
+        hasher.update(&schedule.time.to_le_bytes());
+        let mut sinks = schedule.sinks.clone();
+        sinks.sort_by_key(|sink| sink.node);
+        for sink in &sinks {
+            hasher.update(&sink.node.to_le_bytes());
+            hasher.update(&sink.demand.to_le_bytes());
+        }
+    }
+
+    let mut interventions = episode.interventions.clone();
+    interventions.sort_by(|left, right| {
+        (left.time, left.kind.as_str(), left.from, left.to, left.capacity_after)
+            .cmp(&(right.time, right.kind.as_str(), right.from, right.to, right.capacity_after))
+    });
+    for event in &interventions {
+        hasher.update(&event.time.to_le_bytes());
+        hash_optional_string(&mut hasher, Some(&event.kind));
+        hash_optional_u16(&mut hasher, event.from);
+        hash_optional_u16(&mut hasher, event.to);
+        hash_optional_u64(&mut hasher, event.capacity_after);
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn hash_edge(hasher: &mut blake3::Hasher, edge: &Edge) {
+    hash_optional_string(hasher, edge.id.as_deref());
+    hasher.update(&edge.from.to_le_bytes());
+    hasher.update(&edge.to.to_le_bytes());
+    hasher.update(&edge.capacity.to_le_bytes());
+    hasher.update(&edge.latency.to_le_bytes());
+    hash_optional_u64(hasher, edge.edit_cost);
+    hasher.update(&edge.maintenance_cost.to_le_bytes());
+}
+
+fn hash_optional_u64(hasher: &mut blake3::Hasher, value: Option<u64>) {
+    match value {
+        Some(value) => {
+            hasher.update(&[1]);
+            hasher.update(&value.to_le_bytes());
+        }
+        None => {
+            hasher.update(&[0]);
+        }
+    }
+}
+
+fn hash_optional_u16(hasher: &mut blake3::Hasher, value: Option<u16>) {
+    match value {
+        Some(value) => {
+            hasher.update(&[1]);
+            hasher.update(&value.to_le_bytes());
+        }
+        None => {
+            hasher.update(&[0]);
+        }
     }
 }
 
