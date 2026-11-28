@@ -72,6 +72,7 @@ jobs:
             src/web_research/selective_prediction.rs
             src/web_research/selective_observation.rs
             src/web_research/stratified_audit.rs
+            src/web_research/stratified_risk.rs
             src/web_research/mod.rs
             tests/epistemic_consciousness_tests.rs
             tools/sym-rsi-epistemic-adjudication/src/lib.rs
