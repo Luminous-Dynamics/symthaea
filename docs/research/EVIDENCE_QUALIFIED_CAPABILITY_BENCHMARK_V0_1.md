@@ -427,6 +427,12 @@ The default transition on expiry or evidence mismatch is **unqualified**, not â€
 
 This turns qualification into an auditable, revocable capability lease. It makes the claim useful operationally: a system can be qualified for one bounded read-only workflow while remaining unqualified for writes, a different patient population, an unseen physics regime or a new software release.
 
+## 8.1 Trusted observer and signed evidence
+
+The observer-verification prototype is described separately in [EQC Trusted Observer Architecture v0.1](EQC_TRUSTED_OBSERVER_ARCHITECTURE_V0_1.md). The current Rust implementation verifies Ed25519 signatures over RFC 8785 canonical JSON, checks a trust policy and frozen run expectation supplied out-of-band, validates task/policy/input bindings, and enforces initial state/network/resource contracts.
+
+This verifier primitive is not the observer itself. It does not yet launch or isolate a system under test, capture host measurements, verify a CI OIDC token, or independently replay an artifact. Its result must remain unqualified even when the signature is valid. This preserves the distinction between *authenticated evidence bytes* and *truthful, independently observed execution*.
+
 ## 9. Implementation roadmap
 
 ### Stage 0 â€” Protocol and task validity
