@@ -6,8 +6,8 @@
 //! This module is an environment primitive, not yet a validated psychological
 //! benchmark or a `PsychBenchmark` implementation. It deliberately separates
 //! the full evaluator state from the partial observation returned to an agent.
-//! Every successful transition produces a deterministic receipt that can be
-//! replayed and audited independently of the agent implementation.
+//! Every charged attempt produces a deterministic receipt that can be replayed
+//! and audited independently of the agent implementation.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -18,7 +18,7 @@ pub struct ScenarioManifest {
     pub schema_version: u16,
     pub scenario_id: String,
     pub generator_version: String,
-    /// Reserved for the future scenario generator; the current fixed fixture ignores it.
+    /// Deterministically selects a generated layout variant (seed parity in v0.2).
     pub seed: u64,
     pub max_steps: u32,
     pub observation_budget: u32,
@@ -28,8 +28,8 @@ impl Default for ScenarioManifest {
     fn default() -> Self {
         Self {
             schema_version: 1,
-            scenario_id: "pce.hidden-resource-delivery.v0".to_string(),
-            generator_version: "pce-kernel-0.1.0".to_string(),
+            scenario_id: "pce.hidden-resource-delivery.v1".to_string(),
+            generator_version: "pce-kernel-0.2.0".to_string(),
             seed: 42,
             max_steps: 64,
             observation_budget: 12,
@@ -38,6 +38,13 @@ impl Default for ScenarioManifest {
 }
 
 impl ScenarioManifest {
+    /// Generate the hidden-resource layout for this manifest.
+    pub fn layout(&self) -> ScenarioLayout {
+        ScenarioLayout {
+            filter_location: if self.seed & 1 == 0 { Site::Depot } else { Site::Outpost },
+        }
+    }
+
     /// Stable digest of the exact scenario configuration.
     pub fn digest(&self) -> Result<String, serde_json::Error> {
         let bytes = serde_json::to_vec(self)?;
@@ -51,6 +58,12 @@ pub enum Site {
     Depot,
     Crossing,
     Outpost,
+}
+
+/// Generated layout for the current scenario family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScenarioLayout {
+    pub filter_location: Site,
 }
 
 /// Resources that can be discovered and collected.
@@ -72,7 +85,7 @@ pub enum GateState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Clue {
     DeliveryGoal,
-    FilterStoredAtDepot,
+    FilterStoredAt(Site),
     ValveKeyStoredAtDepot,
     ValveKeyOpensCrossingGate,
     GateRequiresRecoveryAfterFailure,
@@ -115,12 +128,13 @@ pub struct WorldState {
 impl WorldState {
     /// Create the evaluator's initial state for the manifest.
     pub fn initial(manifest: &ScenarioManifest) -> Result<Self, serde_json::Error> {
+        let layout = manifest.layout();
         Ok(Self {
             tick: 0,
             location: Site::Depot,
             inventory: BTreeSet::new(),
             items_at: [
-                (Site::Depot, Item::WaterFilter),
+                (layout.filter_location, Item::WaterFilter),
                 (Site::Depot, Item::ValveKey),
             ]
             .into_iter()
@@ -158,6 +172,7 @@ pub struct Observation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EventKind {
     Inspected(Site),
+    ActionRejected { action: Action, reason: String },
     Moved { from: Site, to: Site },
     Collected(Item),
     GateOpened,
@@ -179,7 +194,7 @@ pub struct Event {
     pub kind: EventKind,
 }
 
-/// One successful transition's evidence receipt.
+/// One attempted transition's evidence receipt, including rejected actions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StepReceipt {
     pub manifest_digest: String,
@@ -193,7 +208,7 @@ pub struct StepReceipt {
 /// Rejected transitions are transactional and do not advance the world. A
 /// future agent-facing runner must separately log and charge rejected attempts
 /// so invalid-action probing cannot become a free oracle.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TransitionError {
     StepLimitReached,
     ObservationBudgetExhausted,
@@ -208,6 +223,7 @@ pub enum TransitionError {
     AlreadyDelivered,
     ManifestMismatch,
     Serialization(String),
+    ReplayMismatch,
 }
 
 impl std::fmt::Display for TransitionError {
@@ -226,6 +242,7 @@ impl std::fmt::Display for TransitionError {
             Self::AlreadyDelivered => write!(f, "delivery goal is already complete"),
             Self::ManifestMismatch => write!(f, "world state belongs to a different scenario manifest"),
             Self::Serialization(message) => write!(f, "could not serialize transition evidence: {message}"),
+            Self::ReplayMismatch => write!(f, "recorded receipts do not match deterministic replay"),
         }
     }
 }
@@ -254,6 +271,52 @@ pub fn observe(state: &WorldState) -> Observation {
         gate_state: (state.location == Site::Crossing && inspected).then_some(state.gate_state),
         delivery_complete: (state.location == Site::Outpost).then_some(state.delivered),
         observation_budget_remaining: state.observation_budget_remaining,
+    }
+}
+
+/// Outcome of an agent action attempt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AttemptOutcome {
+    Accepted,
+    Rejected(TransitionError),
+}
+
+/// Runner-facing action attempt. Unlike `step`, a rejected action is charged
+/// one tick and recorded as an event. This prevents free invalid-action probing.
+pub fn attempt(
+    manifest: &ScenarioManifest,
+    state: &WorldState,
+    action: Action,
+) -> Result<(WorldState, StepReceipt, AttemptOutcome), TransitionError> {
+    match step(manifest, state, action.clone()) {
+        Ok((next, receipt)) => Ok((next, receipt, AttemptOutcome::Accepted)),
+        Err(error @ (TransitionError::StepLimitReached
+            | TransitionError::ManifestMismatch
+            | TransitionError::Serialization(_))) => Err(error),
+        Err(error) => {
+            let before_state_digest = state
+                .digest()
+                .map_err(|serialization| TransitionError::Serialization(serialization.to_string()))?;
+            let mut next = state.clone();
+            next.tick += 1;
+            let event = Event {
+                tick: next.tick,
+                kind: EventKind::ActionRejected { action, reason: error.to_string() },
+            };
+            next.event_log.push(event.clone());
+            let after_state_digest = next
+                .digest()
+                .map_err(|serialization| TransitionError::Serialization(serialization.to_string()))?;
+            let receipt = StepReceipt {
+                manifest_digest: next.manifest_digest.clone(),
+                step_index: next.tick,
+                before_state_digest,
+                after_state_digest,
+                event,
+                observation: observe(&next),
+            };
+            Ok((next, receipt, AttemptOutcome::Rejected(error)))
+        }
     }
 }
 
@@ -289,8 +352,12 @@ pub fn step(
             match next.location {
                 Site::Depot => {
                     next.known_clues.insert(Clue::DeliveryGoal);
-                    next.known_clues.insert(Clue::FilterStoredAtDepot);
-                    next.known_clues.insert(Clue::ValveKeyStoredAtDepot);
+                    if next.items_at.contains(&(Site::Depot, Item::WaterFilter)) {
+                        next.known_clues.insert(Clue::FilterStoredAt(Site::Depot));
+                    }
+                    if next.items_at.contains(&(Site::Depot, Item::ValveKey)) {
+                        next.known_clues.insert(Clue::ValveKeyStoredAtDepot);
+                    }
                 }
                 Site::Crossing => {
                     next.known_clues.insert(Clue::ValveKeyOpensCrossingGate);
@@ -300,6 +367,9 @@ pub fn step(
                 }
                 Site::Outpost => {
                     next.known_clues.insert(Clue::OutpostIsDeliveryDestination);
+                    if next.items_at.contains(&(Site::Outpost, Item::WaterFilter)) {
+                        next.known_clues.insert(Clue::FilterStoredAt(Site::Outpost));
+                    }
                 }
             }
             EventKind::Inspected(next.location)
@@ -406,10 +476,11 @@ pub fn replay(
 
     for command in commands {
         let (next, receipt) = match command {
-            RecordedCommand::Agent(action) => step(manifest, &state, action.clone())?,
-            RecordedCommand::Evaluator(perturbation) => {
-                perturb(manifest, &state, *perturbation)?
+            RecordedCommand::Agent(action) => {
+                let (next, receipt, _outcome) = attempt(manifest, &state, action.clone())?;
+                (next, receipt)
             }
+            RecordedCommand::Evaluator(perturbation) => perturb(manifest, &state, *perturbation)?,
         };
         state = next;
         receipts.push(receipt);
