@@ -57,7 +57,8 @@
     "beat_ordinal_milli": 16000,
     "confidence_ppm": 850000,
     "source_grid_hypothesis_id": "source-grid-primary",
-    "target_grid_hypothesis_id": "target-grid-primary"
+    "target_grid_hypothesis_id": "target-grid-primary",
+    "max_phase_error_milli": 100
   },
   "protected_regions": [
     {
