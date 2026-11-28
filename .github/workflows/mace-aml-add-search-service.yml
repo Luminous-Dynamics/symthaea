@@ -8,6 +8,8 @@ on:
     branches:
       - "research/mace-axum-http-runtime-v0-1"
       - "research/mace-redb-durable-store-v0-1"
+permissions:
+  contents: read
 jobs:
   service:
     runs-on: ubuntu-latest
