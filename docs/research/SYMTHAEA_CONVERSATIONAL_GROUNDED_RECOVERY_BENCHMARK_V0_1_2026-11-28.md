@@ -221,7 +221,7 @@ A skipped workflow, parser success, mock acknowledgement, synthetic fixture, mod
 
 `crates/domains/symthaea-soma/src/cgrb_state.rs` now contains a pure reference assessment kernel and authored regression tests. It requires a separately permissioned read-only oracle profile, exact operation/actor/action/target/policy bindings, matching precondition and postcondition digests, a comparable named clock, a fresh observation, one attributed effect, and a true postcondition. Adapter acknowledgement is informational only. It distinguishes Committed, NotApplied, OutcomeUnknown, Rejected and Violation, and exposes a retry recommendation that requires reauthorization after a definitive no-effect observation.
 
-The verifier is not an executor, permission issuer, oracle authenticator, transaction coordinator or production connector. Nine Rust regression tests are authored; they have not been compiled or executed. Cross-field semantics in the scenario manifest still require a loader/trace verifier and evaluator mutation tests.
+The verifier is not an executor, permission issuer, oracle authenticator, transaction coordinator or production connector. Twelve Rust regression tests are authored; they have not been compiled or executed. Cross-field semantics in the scenario manifest still require a loader/trace verifier and evaluator mutation tests.
 
 ## 12. Non-claims
 
