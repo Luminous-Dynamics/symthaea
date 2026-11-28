@@ -1,0 +1,430 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:nixward:security-advisory-corpus:0.1",
+  "title": "NixWard Security-Advisory Conformance Corpus v0.1",
+  "description": "Synthetic fixtures only. This schema validates fixture structure, not source authenticity or production security claims.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "synthetic_only",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "profile_id": {
+      "const": "NIXWARD-CAPABILITY-ADVISORY-V0.1"
+    },
+    "synthetic_only": {
+      "const": true
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "derivation_path",
+        "derivation_name",
+        "pname",
+        "version",
+        "output_paths"
+      ],
+      "properties": {
+        "derivation_path": {
+          "type": "string",
+          "pattern": "^/nix/store/[^/]+\\.drv$"
+        },
+        "derivation_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^/nix/store/"
+          },
+          "minItems": 1
+        },
+        "process_linkage_observed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "config_subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "identity"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "nixos_option",
+            "systemd_unit",
+            "network_service",
+            "ssh_daemon",
+            "host"
+          ]
+        },
+        "identity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declared_value": {},
+        "runtime_identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host_id",
+        "nixos_release",
+        "nixpkgs_revision",
+        "package",
+        "config_subject"
+      ],
+      "properties": {
+        "host_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nixos_release": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nixpkgs_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "package": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/package"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "config_subject": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/config_subject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "advisory": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "source_identity",
+        "advisory_id",
+        "source_revision",
+        "status",
+        "upstream_severity",
+        "affected_package",
+        "affected_range",
+        "fixed_version"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "GHSA",
+            "NIXPKGS_TRACKER",
+            "UPSTREAM_VENDOR",
+            "SYNTHETIC"
+          ]
+        },
+        "source_identity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "advisory_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "current",
+            "withdrawn",
+            "superseded",
+            "disputed",
+            "unavailable"
+          ]
+        },
+        "published_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "modified_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "upstream_severity": {
+          "enum": [
+            "critical",
+            "high",
+            "moderate",
+            "low",
+            "unknown",
+            "not_provided"
+          ]
+        },
+        "affected_package": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "affected_range": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fixed_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "kind",
+        "subject_binding",
+        "observed_at",
+        "source_revision",
+        "integrity",
+        "freshness",
+        "value_digest"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "pinned_flake_lock",
+            "nix_store_derivation",
+            "nix_store_closure",
+            "process_linkage",
+            "advisory_record",
+            "nixos_option_evaluation",
+            "runtime_unit_properties",
+            "runtime_listener",
+            "effective_firewall",
+            "route_observation",
+            "external_reachability_probe",
+            "sshd_effective_config",
+            "user_intent",
+            "restore_exercise_receipt"
+          ]
+        },
+        "subject_binding": {
+          "enum": [
+            "exact",
+            "partial",
+            "mismatched",
+            "unbound"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "integrity": {
+          "enum": [
+            "authenticated",
+            "verified_local",
+            "unsigned",
+            "unknown"
+          ]
+        },
+        "freshness": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unknown"
+          ]
+        },
+        "value_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "summary": {
+          "type": "string"
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applicability",
+        "exposure",
+        "disposition",
+        "required_evidence",
+        "must_not_claim"
+      ],
+      "properties": {
+        "applicability": {
+          "enum": [
+            "affected",
+            "not_affected",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "exposure": {
+          "enum": [
+            "confirmed",
+            "not_confirmed",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "disposition": {
+          "enum": [
+            "recommend",
+            "monitor",
+            "needs_observation",
+            "reject_inference",
+            "inform_only"
+          ]
+        },
+        "required_evidence": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "must_not_claim": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "cluster_id",
+        "scenario_class",
+        "description",
+        "subject",
+        "advisory",
+        "evidence",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^NWA-[0-9]{3}$"
+        },
+        "cluster_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_class": {
+          "enum": [
+            "package_advisory",
+            "package_presence",
+            "service_exposure",
+            "firewall_effectiveness",
+            "ssh_authentication",
+            "service_hardening",
+            "advisory_lifecycle",
+            "evidence_currentness",
+            "evidence_conflict",
+            "user_intended_exposure"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject": {
+          "$ref": "#/$defs/subject"
+        },
+        "advisory": {
+          "$ref": "#/$defs/advisory"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
