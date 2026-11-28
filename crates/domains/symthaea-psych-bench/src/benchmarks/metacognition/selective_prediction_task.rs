@@ -240,10 +240,45 @@ impl SelectivePredictionCostModel {
     }
 }
 
+/// One stage of a selective-control decision trace.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SelectivePredictionStage {
+    Initial,
+    AfterClarification,
+}
+
+/// Evaluator-charged record of one policy decision.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SelectivePredictionActionReceipt {
+    pub stage: SelectivePredictionStage,
+    pub action: DecisionAction,
+    pub confidence: f64,
+    pub clarification_target: Option<ClarificationTarget>,
+    pub cost_units: f64,
+}
+
+/// Per-item trace. Ground-truth labels remain outside this receipt; it records
+/// only the agent-visible decision and evaluator-computed event outcomes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SelectivePredictionEpisodeReceipt {
+    pub item_id: String,
+    pub initial: SelectivePredictionActionReceipt,
+    pub clarification_target_matched: Option<bool>,
+    pub clarification_resolved: bool,
+    pub updated_observation_digest: Option<String>,
+    pub follow_up: Option<SelectivePredictionActionReceipt>,
+    pub final_answer_correct: Option<bool>,
+}
+
 /// Task-level report combines the reusable scorer with clarification quality.
 /// No scalar composite is used: the report preserves the decision trade-offs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SelectivePredictionTaskReport {
+    /// BLAKE3 over the report with this field set to the empty string.
+    pub report_integrity_digest: String,
+    /// Ordered one-to-one with the frozen manifest items.
+    pub receipts: Vec<SelectivePredictionEpisodeReceipt>,
     pub scenario_id: String,
     pub generator_version: String,
     pub policy: String,
@@ -535,6 +570,7 @@ where
     let mut post_clarification_correct_count = 0usize;
     let mut total_cost_units = 0.0;
     let mut post_clarification_cost_units = 0.0;
+    let mut receipts = Vec::with_capacity(items.len());
 
     for (index, item) in items.iter().enumerate() {
         let decision = decide(&item.observation);
@@ -553,6 +589,21 @@ where
 
         let initial_cost = cost_model.charge(decision.action);
         total_cost_units += initial_cost;
+        let mut receipt = SelectivePredictionEpisodeReceipt {
+            item_id: item.id.clone(),
+            initial: SelectivePredictionActionReceipt {
+                stage: SelectivePredictionStage::Initial,
+                action: decision.action,
+                confidence: decision.confidence,
+                clarification_target: decision.clarification_target,
+                cost_units: initial_cost,
+            },
+            clarification_target_matched: None,
+            clarification_resolved: false,
+            updated_observation_digest: None,
+            follow_up: None,
+            final_answer_correct: None,
+        };
         trials.push(SelectivePredictionTrial {
             is_answerable: item.answerable_now,
             action: decision.action,
@@ -564,7 +615,9 @@ where
         match decision.action {
             DecisionAction::Answer => {
                 final_answer_count += 1;
-                if item.answerable_now && item.answer_correct_if_given {
+                let correct = item.answerable_now && item.answer_correct_if_given;
+                receipt.final_answer_correct = Some(correct);
+                if correct {
                     final_correct_count += 1;
                 }
             }
@@ -573,6 +626,7 @@ where
                 total_information_requests += 1;
                 let correctly_targeted = decision.clarification_target.is_some()
                     && decision.clarification_target == item.clarification_target;
+                receipt.clarification_target_matched = Some(correctly_targeted);
                 if correctly_targeted && item.clarification_resolves {
                     useful_information_requests += 1;
                     resolved_clarifications += 1;
@@ -581,6 +635,13 @@ where
                         .post_clarification_observation
                         .as_ref()
                         .expect("validated clarification outcome");
+                    receipt.clarification_resolved = true;
+                    let updated_bytes = serde_json::to_vec(updated_observation)
+                        .map_err(|error| {
+                            SelectivePredictionTaskError::Serialization(error.to_string())
+                        })?;
+                    receipt.updated_observation_digest =
+                        Some(blake3::hash(&updated_bytes).to_hex().to_string());
                     let follow_up = decide(updated_observation);
                     if !follow_up.confidence.is_finite()
                         || !(0.0..=1.0).contains(&follow_up.confidence)
@@ -598,11 +659,20 @@ where
                     let follow_up_cost = cost_model.charge(follow_up.action);
                     total_cost_units += follow_up_cost;
                     post_clarification_cost_units += follow_up_cost;
+                    receipt.follow_up = Some(SelectivePredictionActionReceipt {
+                        stage: SelectivePredictionStage::AfterClarification,
+                        action: follow_up.action,
+                        confidence: follow_up.confidence,
+                        clarification_target: follow_up.clarification_target,
+                        cost_units: follow_up_cost,
+                    });
 
                     match follow_up.action {
                         DecisionAction::Answer => {
                             final_answer_count += 1;
                             post_clarification_answer_count += 1;
+                            receipt.final_answer_correct =
+                                Some(item.answer_correct_after_clarification);
                             if item.answer_correct_after_clarification {
                                 final_correct_count += 1;
                                 post_clarification_correct_count += 1;
@@ -613,12 +683,13 @@ where
                 }
             }
         }
+        receipts.push(receipt);
     }
 
     let metrics = SelectivePredictionMetrics::from_trials(&trials)
         .map_err(|error| SelectivePredictionTaskError::Scoring(error.to_string()))?;
 
-    Ok(SelectivePredictionTaskReport {
+    let mut report = SelectivePredictionTaskReport {
         scenario_id: SCENARIO_ID.to_owned(),
         generator_version: GENERATOR_VERSION.to_owned(),
         policy: policy_name.to_owned(),
@@ -647,7 +718,49 @@ where
         total_cost_units,
         post_clarification_cost_units,
         metrics,
-    })
+        report_integrity_digest: String::new(),
+        receipts,
+    };
+    report.report_integrity_digest = report_integrity_digest(&report)?;
+    Ok(report)
+}
+
+/// Verify the report's own integrity digest. This detects accidental or
+/// unacknowledged mutation; it is not a signature or source-authenticity proof.
+pub fn verify_report_integrity(
+    report: &SelectivePredictionTaskReport,
+) -> Result<bool, SelectivePredictionTaskError> {
+    Ok(report.report_integrity_digest == report_integrity_digest(report)?)
+}
+
+fn report_integrity_digest(
+    report: &SelectivePredictionTaskReport,
+) -> Result<String, SelectivePredictionTaskError> {
+    let mut unsigned = report.clone();
+    unsigned.report_integrity_digest.clear();
+    let bytes = serde_json::to_vec(&unsigned)
+        .map_err(|error| SelectivePredictionTaskError::Serialization(error.to_string()))?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+/// Replay a policy over the same item manifest and compare the complete
+/// report, including the ordered receipts and all metrics. The callback must
+/// be deterministic for the supplied observations.
+pub fn verify_report_with_policy<F>(
+    items: &[SyntheticSelectivePredictionItem],
+    policy_name: &str,
+    decide: F,
+    cost_model: SelectivePredictionCostModel,
+    observed_report: &SelectivePredictionTaskReport,
+) -> Result<bool, SelectivePredictionTaskError>
+where
+    F: Fn(&SelectivePredictionObservation) -> SelectivePolicyDecision,
+{
+    if !verify_report_integrity(observed_report)? {
+        return Ok(false);
+    }
+    let replayed = evaluate_policy_with(items, policy_name, decide, cost_model)?;
+    Ok(&replayed == observed_report)
 }
 
 /// Run matched policy controls over the same frozen fixture and manifest.
