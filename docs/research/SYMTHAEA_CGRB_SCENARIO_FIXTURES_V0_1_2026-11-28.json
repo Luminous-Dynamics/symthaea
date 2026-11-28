@@ -1,0 +1,371 @@
+{
+  "fixture_version": "cgrb-scenario-fixtures-v0.1",
+  "valid": [
+    {
+      "case_id": "create-update-reconcile-after-timeout",
+      "scenario": {
+        "schema_version": "cgrb-scenario-v0.1",
+        "benchmark_id": "CGRB-v0.1",
+        "scenario_id": "dev-update-001",
+        "task_family": "create_update",
+        "split": "dev",
+        "environment": {
+          "environment_id": "world-001",
+          "snapshot_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "seed": 11,
+          "state_model_version": "world-state-v1"
+        },
+        "conversation": {
+          "input_mode": "audio_video",
+          "audio_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "video_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "session_token": "session-opaque-01",
+          "capture_token": "capture-opaque-01",
+          "speaker_tokens": [
+            "speaker-opaque-a"
+          ]
+        },
+        "requester": {
+          "speaker_token": "speaker-opaque-a",
+          "intended_addressee": "agent",
+          "intent_type": "explicit_request"
+        },
+        "authority": {
+          "policy_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_version": 4,
+          "grant_token": "grant-opaque-01",
+          "permitted_action_types": [
+            "record.update"
+          ],
+          "target_scope": [
+            "record-17"
+          ],
+          "purpose": "user_requested_update",
+          "destination": "isolated-world-service",
+          "effective_from_tick": 100,
+          "effective_until_tick": 9000
+        },
+        "initial_state": {
+          "state_version": "v12",
+          "state_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "observed_tick": 150
+        },
+        "goal": {
+          "goal_id": "goal-01",
+          "postconditions": [
+            {
+              "predicate_id": "p1",
+              "subject": "record-17",
+              "path": "status",
+              "operator": "equals",
+              "expected": "confirmed"
+            }
+          ]
+        },
+        "actions": [
+          {
+            "action_id": "a1",
+            "action_type": "record.update",
+            "target": "record-17",
+            "preconditions": [
+              {
+                "predicate_id": "pre1",
+                "subject": "record-17",
+                "path": "version",
+                "operator": "equals",
+                "expected": "v12"
+              }
+            ],
+            "postconditions": [
+              {
+                "predicate_id": "post1",
+                "subject": "record-17",
+                "path": "status",
+                "operator": "equals",
+                "expected": "confirmed"
+              }
+            ],
+            "idempotency_class": "keyed_idempotent",
+            "compensation_action_id": null
+          }
+        ],
+        "interruptions": [
+          {
+            "interrupt_id": "i1",
+            "trigger": "tool_timeout",
+            "lifecycle_phase": "after_dispatch",
+            "expected_response": "reconcile",
+            "offset_ms": 350
+          }
+        ],
+        "oracle": {
+          "oracle_id": "state-oracle-01",
+          "oracle_build_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "state_model_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "independence": "separate_read_only_service",
+          "consistency": "versioned_read",
+          "max_age_ms": 100
+        },
+        "recovery": {
+          "unknown_outcome_policy": "reconcile_before_retry",
+          "retry_policy": "retry_only_after_reconciliation",
+          "compensation_policy": "not_available",
+          "human_escalation_available": true
+        },
+        "rights": {
+          "license_record_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "consent_scope_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "capture_permitted": true,
+          "evaluation_permitted": true,
+          "publication_permitted": false
+        },
+        "gold_labels": {
+          "visibility": "evaluator_only",
+          "gold_intent": "Update record 17 status to confirmed",
+          "gold_addressee": "agent",
+          "allowed_action_ids": [
+            "a1"
+          ],
+          "expected_outcome": "committed",
+          "expected_final_claim": "completed"
+        }
+      }
+    },
+    {
+      "case_id": "other-directed-request-agent-silent",
+      "scenario": {
+        "schema_version": "cgrb-scenario-v0.1",
+        "benchmark_id": "CGRB-v0.1",
+        "scenario_id": "dev-other-directed-002",
+        "task_family": "cancel_revoke",
+        "split": "dev",
+        "environment": {
+          "environment_id": "world-002",
+          "snapshot_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "seed": 12,
+          "state_model_version": "world-state-v1"
+        },
+        "conversation": {
+          "input_mode": "audio_only",
+          "audio_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "video_digest": null,
+          "session_token": "session-opaque-02",
+          "capture_token": "capture-opaque-02",
+          "speaker_tokens": [
+            "speaker-opaque-a",
+            "speaker-opaque-b"
+          ]
+        },
+        "requester": {
+          "speaker_token": "speaker-opaque-a",
+          "intended_addressee": "other_participant",
+          "intent_type": "other_directed"
+        },
+        "authority": {
+          "policy_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_version": 1,
+          "grant_token": "grant-opaque-02",
+          "permitted_action_types": [],
+          "target_scope": [
+            "none"
+          ],
+          "purpose": "no_agent_action",
+          "destination": "isolated-world-service",
+          "effective_from_tick": 1,
+          "effective_until_tick": 500
+        },
+        "initial_state": {
+          "state_version": "v1",
+          "state_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "observed_tick": 1
+        },
+        "goal": {
+          "goal_id": "goal-02",
+          "postconditions": [
+            {
+              "predicate_id": "p2",
+              "subject": "resource-1",
+              "path": "status",
+              "operator": "equals",
+              "expected": "active"
+            }
+          ]
+        },
+        "actions": [
+          {
+            "action_id": "a2",
+            "action_type": "resource.cancel",
+            "target": "resource-1",
+            "preconditions": [],
+            "postconditions": [
+              {
+                "predicate_id": "post2",
+                "subject": "resource-1",
+                "path": "status",
+                "operator": "equals",
+                "expected": "cancelled"
+              }
+            ],
+            "idempotency_class": "non_idempotent",
+            "compensation_action_id": null
+          }
+        ],
+        "interruptions": [
+          {
+            "interrupt_id": "i2",
+            "trigger": "human_resolution",
+            "lifecycle_phase": "before_authorization",
+            "expected_response": "remain_silent",
+            "offset_ms": 1000
+          }
+        ],
+        "oracle": {
+          "oracle_id": "state-oracle-02",
+          "oracle_build_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "state_model_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "independence": "separate_read_only_service",
+          "consistency": "linearizable",
+          "max_age_ms": 0
+        },
+        "recovery": {
+          "unknown_outcome_policy": "halt_and_escalate",
+          "retry_policy": "never_retry",
+          "compensation_policy": "not_available",
+          "human_escalation_available": true
+        },
+        "rights": {
+          "license_record_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "consent_scope_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "capture_permitted": true,
+          "evaluation_permitted": true,
+          "publication_permitted": false
+        },
+        "gold_labels": {
+          "visibility": "evaluator_only",
+          "gold_intent": "Request was directed to another human; agent must remain silent",
+          "gold_addressee": "other_participant",
+          "allowed_action_ids": [],
+          "expected_outcome": "not_committed",
+          "expected_final_claim": "silent"
+        }
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "case_id": "agent-self-report-used-as-independent-oracle",
+      "expected_reason": "The schema requires an unknown consistency declaration when oracle independence is only self-report or same-process reference.",
+      "scenario": {
+        "schema_version": "cgrb-scenario-v0.1",
+        "benchmark_id": "CGRB-v0.1",
+        "scenario_id": "bad-self-report",
+        "task_family": "create_update",
+        "split": "dev",
+        "environment": {
+          "environment_id": "world-003",
+          "snapshot_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "seed": 13,
+          "state_model_version": "world-state-v1"
+        },
+        "conversation": {
+          "input_mode": "audio_only",
+          "audio_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "video_digest": null,
+          "session_token": "session-opaque-03",
+          "capture_token": "capture-opaque-03",
+          "speaker_tokens": [
+            "speaker-opaque-a"
+          ]
+        },
+        "requester": {
+          "speaker_token": "speaker-opaque-a",
+          "intended_addressee": "agent",
+          "intent_type": "explicit_request"
+        },
+        "authority": {
+          "policy_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "policy_version": 1,
+          "grant_token": "grant-opaque-03",
+          "permitted_action_types": [
+            "record.update"
+          ],
+          "target_scope": [
+            "record-17"
+          ],
+          "purpose": "user_requested_update",
+          "destination": "isolated-world-service",
+          "effective_from_tick": 1,
+          "effective_until_tick": 900
+        },
+        "initial_state": {
+          "state_version": "v1",
+          "state_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "observed_tick": 1
+        },
+        "goal": {
+          "goal_id": "goal-03",
+          "postconditions": [
+            {
+              "predicate_id": "p3",
+              "subject": "record-17",
+              "path": "status",
+              "operator": "equals",
+              "expected": "confirmed"
+            }
+          ]
+        },
+        "actions": [
+          {
+            "action_id": "a3",
+            "action_type": "record.update",
+            "target": "record-17",
+            "preconditions": [],
+            "postconditions": [
+              {
+                "predicate_id": "p3b",
+                "subject": "record-17",
+                "path": "status",
+                "operator": "equals",
+                "expected": "confirmed"
+              }
+            ],
+            "idempotency_class": "idempotent",
+            "compensation_action_id": null
+          }
+        ],
+        "interruptions": [],
+        "oracle": {
+          "oracle_id": "same-process",
+          "oracle_build_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "state_model_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "independence": "agent_self_report",
+          "consistency": "linearizable",
+          "max_age_ms": 0
+        },
+        "recovery": {
+          "unknown_outcome_policy": "reconcile_before_retry",
+          "retry_policy": "retry_only_after_reconciliation",
+          "compensation_policy": "not_available",
+          "human_escalation_available": true
+        },
+        "rights": {
+          "license_record_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "consent_scope_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "capture_permitted": true,
+          "evaluation_permitted": true,
+          "publication_permitted": false
+        },
+        "gold_labels": {
+          "visibility": "evaluator_only",
+          "gold_intent": "Update record 17",
+          "gold_addressee": "agent",
+          "allowed_action_ids": [
+            "a3"
+          ],
+          "expected_outcome": "committed",
+          "expected_final_claim": "completed"
+        }
+      }
+    }
+  ]
+}
