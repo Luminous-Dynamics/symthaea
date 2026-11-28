@@ -6,6 +6,8 @@ on:
     paths:
       - "tools/eqc-reference/**"
       - "docs/research/eqc-*.json"
+      - "docs/research/EVIDENCE_QUALIFIED_CAPABILITY_BENCHMARK_V0_1.md"
+      - "docs/research/README.md"
       - "docs/research/eqc-fixtures/**"
       - ".github/workflows/eqc-standalone-validation.yml"
   workflow_dispatch:
