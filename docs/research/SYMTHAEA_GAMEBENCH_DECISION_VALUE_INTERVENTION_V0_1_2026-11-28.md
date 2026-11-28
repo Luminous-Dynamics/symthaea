@@ -1,215 +1,171 @@
-# Symthaea GameBench Decision-Value Intervention Track v0.1
+# GameBench hidden-mechanics bridge to shared decision-value evaluators
 
-**Tracking issue:** [#14187](https://github.com/Luminous-Dynamics/symthaea/issues/14187)  
-**Parent programme:** [#14137](https://github.com/Luminous-Dynamics/symthaea/issues/14137)  
 **Date:** 2026-11-28  
-**Status:** Research protocol and isolated reference primitive; qualification pending
+**Tracking issue:** [#14187](https://github.com/Luminous-Dynamics/symthaea/issues/14187)  
+**Parent game benchmark:** [#14137](https://github.com/Luminous-Dynamics/symthaea/issues/14137)  
+**Shared one-step decision evaluator:** [research/decision-predictability-benchmark](https://github.com/Luminous-Dynamics/symthaea/tree/main/research/decision-predictability-benchmark)  
+**Sequential robust policy owner:** [#13567 / draft PR #13571](https://github.com/Luminous-Dynamics/symthaea/pull/13571)  
+**Cross-domain intervention co-design:** [#14161](https://github.com/Luminous-Dynamics/symthaea/issues/14161)
 
-## 1. Thesis
+## Scope correction: reuse the existing decision oracle
 
-An intelligent explorer should not maximize information. It should acquire information only when that information can change a consequential decision enough to justify its cost.
+The repository already contains a finite-world Bayesian and prior-free decision-value evaluator. Its README records an exact-head run on commit `d66d216d77d7b9d70cbbd7e66fa75a4bda3f6738`: Rust 1.96.0 formatting, 16/16 tests, and strict Clippy. The Bayesian evaluator calculates posterior Bayes risk, gross/net EVSI, and mutual information separately, with permission, budget, deadline, and risk-admission checks.
 
-GameBench already contains an F6 hidden-mechanics fixture in which visually matched worlds differ in a hidden switch rule. The next step is a decision-focused epistemic-control experiment: the candidate predicts what probes will reveal, selects an intervention, observes its actual consequence, revises its model, and makes a downstream decision. The evaluator scores the entire causal chain.
+The existing evaluator has known-answer controls for:
+- passive observational equivalence and irreducible decision risk;
+- a decision-changing probe with positive net EVSI;
+- a one-bit nuisance probe with zero decision value;
+- over-budget/deadline rejection and risk-gate vetoes.
 
-This track reuses the game task and observation/action boundary from #14137. It composes with active scientific intelligence (#13691), decision-centric world-model evaluation (#9094), sealed task generation and evaluator custody (#9332/#10756), and canonical run-manifest accounting (#9735). It does not create a second generic task manifest, evaluator authority, or runner.
+The repository's #13571 contribution adds a separate prior-free sequential policy tree with a separately written exhaustive enumerator. It is currently a draft and has not earned exact-head Rust qualification; it is not the Bayesian EVSI engine.
 
-## 2. The paradigm shift
+Issue #14161 owns the wider co-design of measurement/intervention, robust test, stopping, and terminal decision. #13739 owns the integration tournament for existing Symthaea experiment selectors.
 
-Traditional exploration often rewards information gain, map coverage, or curiosity. These are incomplete objectives.
+**Therefore this GameBench track does not implement a second EVSI engine, posterior authority, robust oracle, or generic policy planner.** It supplies the game-specific adapter, forecast score, and mechanics challenge contract.
 
-A probe can reveal several bits about irrelevant mechanics without changing the best action. A low-entropy probe can reveal the one distinction that changes a decision from unsafe to safe. A probe may also alter the environment: opening a door, consuming a key, advancing a hazard, or irreversibly committing a resource. Its cost and side effect must be part of the decision.
+## Research question
 
-The benchmark separates:
+Can a game agent identify which hidden-mechanics observation is useful for a later decision, forecast its observable outcomes before interacting, and abstain from irrelevant or unsupported claims—without being rewarded merely for reducing entropy?
 
-1. **Mechanism identifiability:** can the candidate distinguish mechanisms that predict different consequences?
-2. **Forecast quality:** did it predict the outcome distribution before probing?
-3. **Posterior revision:** did it update beliefs using the observed outcome without overclaiming?
-4. **Decision value:** did the intervention improve the best available downstream action?
-5. **Intervention cost/risk:** was the expected improvement worth the action, resource, compute, latency, and irreversible-state cost?
-6. **Transfer:** does the discovered mechanism generalize across appearance, layout, and novel compositions?
-7. **Assurance:** can an independent evaluator replay the trajectory and recompute every metric?
+The benchmark is deliberately about causal mechanics and decision relevance, not visual world realism. A hidden switch rule, conveyor direction, resource regeneration rule, or hazard cadence may be indistinguishable from the initial observation. A candidate must choose a legal read-only probe, predict its result distribution, update from the actual observation, and select a decision.
 
-No metric compensates for a failed claim boundary or invalid action protocol.
+## Existing shared API mapping
 
-## 3. Exact finite reference
+The bridge package is:
 
-The isolated crate is:
+`research/symthaea-gamebench-decision-bridge-v0-1/`
 
-\`research/symthaea-gamebench-evsi-v0-1/\`
+It path-depends on `research/decision-predictability-benchmark` and calls its `evaluate_candidate` function.
 
-For hypotheses h in H, decisions a in A, prior/posterior p(h), and an intervention I with possible outcomes o in O_I:
+| GameBench concept | Shared evaluator field |
+|---|---|
+| Hidden mechanic/world variant | EvaluatorWorld.states |
+| Consequence of a terminal action | StateModel.decision_loss |
+| Public game observation | CandidateEpisode.evidence |
+| Legal terminal actions | CandidateEpisode.allowed_decision_ids |
+| Read-only inspection action | ProbeModel |
+| Publicly offered inspection | CandidateEpisode.permitted_probes |
+| Observable probe result | OutcomeLikelihood |
+| Candidate's current terminal choice | CandidateSubmission.decision_id |
+| Candidate's selected probe | CandidateSubmission.requested_probe_id |
+| Probe budget and deadline | CandidateEpisode budget / step window |
+| Evaluator-side posterior and expected decision value | CandidateEvaluation / ProbeValue |
 
-\[
-V_0(p)=\max_{a\in A}\sum_h p(h)U_0(a,h)
-\]
+The adapter passes the requested probe through to the existing evaluator and returns its EVSI and information-gain fields unchanged. It does not duplicate those equations.
 
-\[
-V_I(p)=\sum_o P(o\mid p,I)
-\max_{a\in A}\sum_h P(h\mid o,p,I)U_{I,o}(a,h)
-\]
+## New candidate forecast contract
 
-\[
-\mathrm{GrossDelta}(I\mid p)=V_I(p)-V_0(p)
-\]
+The shared evaluator accepts a chosen probe but does not accept a candidate-authored forecast. GameBench requires the candidate to submit, before probe execution, a probability distribution over the public outcome vocabulary:
+- probe ID;
+- exact set of public outcome IDs;
+- one finite probability in [0,1] for each outcome;
+- normalized mass within the declared tolerance.
 
-\[
-\mathrm{NetValue}(I\mid p)=\mathrm{GrossDelta}(I\mid p)-c(I)
-\]
+After the environment reveals the actual outcome, the bridge scores the pre-action forecast with the multiclass Brier score:
 
-\[
-\mathrm{IG}(I\mid p)=H(p)-\sum_o P(o\mid p,I)H(P(h\mid o,p,I))
-\]
+[
+\mathrm{BS}(p,o)=\sum_{i=1}^{K}(p_i-\mathbf{1}[i=o])^2.
+]
 
-Here, U_I,o is the utility of each downstream decision after the intervention and its observation. It can encode physical side effects. For a purely informational probe, set every U_I,o = U_0. The two score families remain separate: information gain is a diagnostic; net decision value is the decision criterion.
+Forecast score remains separate from EVSI, mechanism discrimination, task success, and decision regret. The evaluator must not return its exact posterior, hidden likelihoods, decision-loss table, or probe-value estimate to the candidate during the episode.
 
-The exact reference selects the positive-net-value intervention with highest value, with deterministic declaration-order tie-breaking. It returns no intervention when all net values are non-positive. It rejects malformed probability mass, impossible observations, duplicate identifiers, invalid utility matrices, and non-finite costs/values.
+## Hard v0.1 limitation: read-only probes only
 
-### Why exact finite fixtures first?
+The shared one-step Bayesian EVSI model scores an information-gathering action with an outcome likelihood and an unchanged terminal-loss table. It does not define outcome-specific state transitions or post-intervention utility matrices.
 
-For small finite tasks, exact Bayesian updates and exhaustive decision values let us test the evaluator itself. This creates a reliable unit-test surface before adding stochastic simulators, language-model agents, or visual interfaces. It does not demonstrate that a candidate can represent the hypotheses or discover the correct model.
+The adapter therefore accepts only read-only observations, such as inspecting a label or reading a panel. It fails closed for world-mutating actions such as pulling a lever, consuming a key, opening a door, or advancing a hazard. Those actions must not be smuggled into a read-only probe model.
 
-## 4. Required task design
+A later state-changing track must define explicit transition and outcome-conditioned terminal-loss semantics, then compose with the existing sequential/robust owners. This PR does not claim that the current shared evaluator supports those semantics.
 
-### 4.1 Paired hidden-mechanics twins
+## Development known-answer challenge
 
-Construct pairs with the same visible layout, goal, assets, and initial observation, changing exactly one causal transition rule. Examples:
+The bridge's test fixture has four equally weighted hidden worlds:
+- switch mechanic A and nuisance state 0;
+- switch mechanic A and nuisance state 1;
+- switch mechanic B and nuisance state 0;
+- switch mechanic B and nuisance state 1.
 
-- switch opens only the adjacent gate versus all gates;
-- conveyor advances east versus west;
-- resource regenerates versus depletes permanently;
-- hazard advances every action versus every second action;
-- key unlocks one door permanently versus key is consumed and unlock is temporary.
+Terminal decision loss depends on the switch mechanic, not the nuisance lamp state.
 
-The independent generator must prove that initial observations are aliased and that at least one legal intervention distinguishes the mechanisms. If no available intervention can distinguish two hypotheses, the evaluator marks them observationally equivalent under the permitted action budget. The candidate is not rewarded for naming one arbitrarily.
+Two read-only probes are offered:
+1. Inspect the lamp: reveals the nuisance state perfectly, giving 1 bit of information but zero expected decision-value improvement.
+2. Inspect the switch trace: a noisy 75/25 observation of the decision-relevant mechanic, giving approximately 0.1887 bits of information but 0.15 gross EVSI and 0.11 net EVSI at the frozen synthetic cost of 0.04.
 
-### 4.2 Decision-relevant and irrelevant evidence
+The lower-information probe must outrank the high-information nuisance probe on net EVSI. These values are drawn from the shared evaluator; this bridge does not reimplement the equations.
 
-Every cohort includes:
-- high-information probes with no effect on the best downstream decision;
-- lower-information probes with high decision value;
-- probes whose expected value is positive only at particular belief states;
-- probes dominated by a cheaper probe;
-- probes with no possible positive net value;
-- probes whose physical side effect makes an otherwise informative action harmful;
-- stochastic probes with overlapping outcome distributions;
-- no-probe and abstention controls.
+## Candidate/evaluator custody
 
-This prevents the benchmark from equating curiosity, entropy reduction, or probe count with intelligence.
+Candidate-visible:
+- current public observation and evidence;
+- allowed decision IDs;
+- legal probe IDs, declared costs and deadlines;
+- public outcome labels;
+- candidate-authored pre-probe forecast;
+- actual observation after the selected read-only probe executes.
 
-### 4.3 Budget and risk
+Evaluator-only:
+- hidden world/mechanism IDs and generator state;
+- prior and outcome likelihoods;
+- decision-loss table;
+- posterior, Bayes risk, EVSI and information-gain calculations;
+- oracle policy/value references and sealed task labels.
 
-Probe costs are explicit and denominated in a declared utility unit. Keep raw measurements alongside any scalar conversion: actions, consumed resources, irreversible-loss probability, wall time, CPU/GPU time, peak memory, simulator calls, model queries, and energy method/quality. Report Pareto frontiers rather than a hidden weighted score.
+Rust type visibility is not a process sandbox. Confirmatory runs require an independently permissioned evaluator boundary and replay receipts bound to task, candidate artifact, environment, seed, and evidence digests.
 
-Do not silently assign arbitrary monetary/energy weights. Pre-register the utility conversion per task family and report sensitivity to reasonable alternative weights. For safety-critical probes, include a hard constraint on expected damage in addition to utility; favorable average value cannot excuse a forbidden action.
+## Scorecard and negative controls
 
-### 4.4 Forecast and update protocol
+Report separate axes:
+- game task success and terminal decision loss;
+- mechanism discrimination and false-unique-claim rate;
+- probe-choice regret against the shared decision-value reference;
+- forecast Brier/log score and calibration;
+- gross/net EVSI, cost, deadline and action count;
+- abstention and unsupported-case rates;
+- held-out rule-composition and appearance transfer;
+- replay agreement and receipt completeness.
 
-Before each intervention, the candidate emits a probability distribution over declared observable outcomes and, where available, its candidate-authored posterior or mechanism predictions. After the action, the evaluator returns only the actual task observation. The candidate then emits an updated belief and downstream action.
+Required controls:
+- high-information nuisance probe with zero decision value;
+- low-information decision-changing probe;
+- observationally equivalent mechanics with no available distinguishing probe;
+- probe outcome vocabulary mismatch;
+- malformed or unnormalized forecast;
+- duplicate/unknown outcome IDs;
+- candidate forecast emitted only after observing the result (invalid protocol);
+- over-budget and deadline-missing probes;
+- world-mutating probe sent to the read-only adapter (must reject);
+- task IDs, asset names, outcome labels, and error messages that encode hidden mechanism (must be absent from sealed candidate packets).
 
-Score forecasts with proper scoring rules (Brier and/or log score) against sealed outcomes. Score belief calibration separately. A narrative explanation is diagnostic only and cannot substitute for a pre-action forecast or machine-checkable belief update.
+No average score can compensate for a false unique-mechanism claim, evaluator leakage, or invalid evidence.
 
-## 5. Baselines and interventions
+## Industry comparison
 
-Compare on identical task instances and budgets:
+BALROG's official leaderboard snapshot shows Claude Opus 5 Max at 63.4 ± 1.8 overall progress (dated 2026-09-20), with uneven performance across game families, including 7.3% on NetHack. This is a broad agentic game-progress benchmark, not a decision-value-of-intervention result.
 
-- **No-probe:** choose the best action under the initial belief.
-- **Random legal probe:** random intervention from the legal set.
-- **Entropy-greedy:** choose the probe with largest expected information gain.
-- **Cost-aware entropy:** information gain divided by declared cost; diagnostic, not oracle.
-- **Decision-value oracle:** evaluator-only exact reference on finite fixtures.
-- **Heuristic causal learner:** explicit hypothesis table updated from observations.
-- **Symthaea component arms:** FEP, HDC, temporal model, episodic memory, planner, and coupled variants as actually integrated. Label every arm by exact component and source digest.
-- **External agent baselines:** use protocol-matched BALROG/GameWorld agents where interface and task semantics genuinely match. Never convert their aggregate progress into a causal-discovery score.
+GameWorld has two distinct protocols. Its standard project leaderboard reports the top generalist at 41.9% progress / 21.2% success and a novice-player progress baseline of 64.1 under the same task budget. Its separate Fine-Control 400-step leaderboard has GPT-6.1-Terra at 76.79% general progress / 61.18% general success; those figures are not comparable to the standard leaderboard or BALROG without protocol matching.
 
-Ablate memory, temporal dynamics, HDC, active sensing, planning, and model revision with matched interaction and inclusive compute budgets. Preserve the same evaluator, task, safety constraints, and action opportunities across ablations.
+Genie 4 demonstrates the frontier move toward photorealistic, steerable, multimodal generated worlds. Its November 2026 model card still lists object/visual drift during longer sessions, complex interaction fidelity, spatial accuracy, and long-term consistency as active limitations. Such models may generate appearance diversity, but they must not own ground truth: a separate executable task model and verifier must determine what actually happened.
 
-## 6. Scorecard
+This benchmark should not chase raw visual fidelity first. The differentiator is **decision-relevant exploration under hidden mechanics**: fewer wasted interactions, calibrated forecasts, reliable abstention under non-identifiability, transfer to unseen rule compositions, and exact replay. BALROG and GameWorld remain external capability checks, not interchangeable score columns.
 
-Publish separate axes:
+## Prospective qualification targets
 
-| Axis | Measure | Failure it exposes |
-|---|---|---|
-| Mechanism discrimination | Accuracy and calibrated log score on held-out mechanisms | Guessing or memorizing a named rule |
-| Outcome forecast | Brier/log score, calibration, coverage | Post-hoc explanation without prediction |
-| Decision value | Gross and net value delta | Information that does not improve action |
-| Probe regret | Oracle intervention value minus candidate intervention value | Wasteful or harmful exploration |
-| Downstream regret | Utility loss against exact decision after actual outcome | Correct discovery but poor action |
-| Adaptation | Interactions/updates to recover after one-rule flip | Frozen policy and slow relearning |
-| Transfer | Held-out appearance, layout, and composition | Surface memorization |
-| Retention/interference | Previously qualified skill retention after sequential tasks | Catastrophic forgetting |
-| Protocol | Valid actions, abstention correctness, replay agreement | Invalid or unauditable behaviour |
-| Efficiency | Cost per independently verified success/skill | Expensive capability hidden by raw score |
-
-Do not collapse these into one scalar ranking. Report confidence intervals and per-family results.
-
-## 7. Mutation tests and falsification
-
-Required negative controls:
-- identical observation and identical outcomes under multiple hypotheses;
-- action/outcome histories shuffled or duplicated;
-- probe observation corrupted or delayed;
-- hypothesis labels permuted without changing the model;
-- irrelevant high-information probe;
-- impossible outcome;
-- negative-cost, non-finite, or malformed-likelihood fixtures;
-- tampered trace, changed rule digest, or substituted seed;
-- oracle posterior or hidden rule accidentally serialized to the candidate;
-- intervention whose physical side effect dominates its information benefit.
-
-Falsify the causal-discovery claim if the candidate performs no better than a matched entropy-greedy or random policy on decision-value regret; predicts only after seeing outcomes; claims unique identification under observational equivalence; or loses the effect on held-out mechanism compositions.
-
-## 8. Industry comparison and realistic positioning
-
-### BALROG
-
-BALROG is the agentic reasoning baseline across BabyAI, Crafter, TextWorld, Baba Is AI, MiniHack, and NetHack. The official public leaderboard snapshot visible on 2026-11-28 shows Claude Opus 5 Max at **63.4 ± 1.8 overall progress**, dated 2026-09-20. The submission data lists 254 episodes and highly uneven per-environment outcomes, including 7.3% NetHack progress. This is a dated aggregate-progress reference, not an intervention-selection result or a locally reproduced baseline.
-
-Official sources: [BALROG leaderboard](https://balrogai.com/) and [ICLR 2025 paper](https://proceedings.iclr.cc/paper_files/paper/2025/hash/f0b1515be276f6ba82b4f2b25e50bef0-Abstract-Conference.html).
-
-### GameWorld
-
-GameWorld evaluates 34 browser games / 170 tasks using state-verifiable success and normalized progress. Its paused protocol isolates decision quality; GameWorld-RT keeps the environment running during inference and is a distinct latency-sensitive track. The public Fine-Control 400-step leaderboard snapshot reports GPT-6.1-Terra at **76.79 general progress / 61.18 general success** and **72.53 computer-use progress / 55.29 computer-use success**. These are protocol-specific figures, not a direct comparison to BALROG or this finite intervention core.
-
-Sources: [GameWorld project](https://gameworld-project.github.io/) and [official repository / leaderboard](https://github.com/gameworld-project/GameWorld).
-
-### Generated interactive worlds
-
-Google DeepMind's Genie 4 announcement (2026-10-27) and November 2026 model card show the move toward high-fidelity, steerable, multimodal world generation. The public model card still identifies short-session continuity, object persistence, complex interactions, and spatial accuracy as active limitations. This makes generative worlds valuable for diversity and challenge proposals, but they must not be the source of ground truth. Every generated challenge needs a separate executable ruleset, seeded hidden-state authority, and verifier-owned outcome.
-
-Sources: [Genie 4 announcement](https://deepmind.google/blog/genie-4-a-new-generation-of-world-simulation/) and [Genie 4 model card](https://deepmind.google/models/model-cards/genie-4/).
-
-### Where Symthaea can win
-
-Do not try to outspend frontier multimodal systems on raw visual fidelity or broad browser-game coverage. Aim to outperform on a narrower, falsifiable capability: **choosing the right experiment, learning the causal rule, updating only what changed, and transferring that model at lower verified interaction and compute cost**. BALROG/GameWorld remain external capability checks; this intervention track measures a different axis they do not directly isolate.
-
-## 9. Prospective qualification targets
-
-Targets are hypotheses, not results:
-
-- Exact 100% agreement with the finite reference on all frozen deterministic posterior/value fixtures and negative controls.
-- Zero probe choices when every available intervention has non-positive net value.
+These are targets, not current results:
+- 100% exact agreement on frozen adapter/reference fixtures.
+- Zero decision-value credit for the nuisance-only probe.
+- Positive decision-value probe selected over a higher-EIG irrelevant probe at matched declared costs.
 - Zero unique-mechanism claims under observational equivalence.
-- At least 80% held-out mechanism discrimination on a preregistered compositional cohort, with confidence intervals.
-- Statistically supported reduction in decision-value regret versus random and entropy-greedy policies at matched budgets.
-- At least 20% lower interactions or inclusive cost than a matched from-scratch baseline on held-out combinations, without worse safety or task validity.
-- 100% replay agreement for qualified episodes; missing or inconsistent receipts remain INCOMPLETE/INVALID.
+- At least 80% held-out mechanism discrimination on a preregistered compositional cohort, with clustered confidence intervals.
+- Statistically supported reduction in probe-choice regret against random and entropy-greedy baselines under matched budgets.
+- At least 20% reduction in interactions to a verified terminal decision on held-out rule compositions, with no worse safety or task validity.
+- 100% replay consistency for qualified episodes; missing receipts are INCOMPLETE, not pass.
 
-The first target qualifies the reference implementation only. The later targets require real Symthaea candidate arms and held-out campaigns.
+Only the first item can be qualified by this adapter crate. The rest require an actual GameBench candidate integration, sealed task families, and matched campaigns.
 
-## 10. Execution sequence
+## Qualification state
 
-1. Freeze the mathematical reference and tests in the isolated crate.
-2. Integrate F6 probes with evaluator-private likelihood/utility tables; do not expose the oracle model.
-3. Add candidate-authored pre-intervention outcome forecasts and post-intervention belief updates.
-4. Add no-probe, random, entropy-greedy, cost-aware entropy, and exact-oracle baselines.
-5. Add sealed twin mechanics and decision-relevance controls.
-6. Add matched FEP/HDC/temporal/memory/planner ablations only after those components are actually wired.
-7. Execute the small deterministic cohort first; then stochastic and held-out rule compositions.
-8. Only then connect to BALROG/GameWorld external tracks and report protocol-matched comparisons.
-
-## 11. Qualification status
-
-- The Rust reference and tests are source artifacts until exact-head CI or local commands complete.
-- No candidate agent has yet been evaluated on this track.
-- No mechanics-discovery, decision-value, held-out transfer, energy-efficiency, or SOTA result is claimed.
-- A skipped workflow is not a pass. A missing or stale receipt is not a pass.
+- The shared decision-evaluator library's previous exact-head pass is its own qualification and does not qualify this adapter.
+- The new bridge has six authored Rust tests. No local Rust toolchain is available; this crate has not been locally formatted, compiled, tested or Clippy-checked.
+- Its exact-head CI is required before any Rust qualification claim.
+- The GameBench agent adapter and candidate campaign remain future integration work.
+- No agent capability, transfer, physical validity, or SOTA superiority is claimed.
