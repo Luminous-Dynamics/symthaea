@@ -9,15 +9,16 @@ on:
       - "docs/research/MACE_PREFERENCE_EXPOSURE_INVENTORY_V0_1.md"
       - "research/broca-mace-transfer-bench-v0-1/policy/**"
       - "research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json"
-      - "research/broca-mace-transfer-bench-v0-1/schemas/preference-exposure-manifest-v1.schema.json"
       - "research/broca-mace-transfer-bench-v0-1/schemas/decision-evidence-use-link-v1.schema.json"
       - "research/broca-mace-transfer-bench-v0-1/schemas/preference-exposure-manifest-v1.schema.json"
+      - "research/broca-mace-transfer-bench-v0-1/schemas/decision-evidence-use-link-v1.schema.json"
       - "docs/research/MACE_USE_TIME_REVALIDATION_V0_1.md"
       - "docs/research/MACE_PREFERENCE_EXPOSURE_INVENTORY_V0_1.md"
       - ".github/workflows/mace-use-time-revalidation.yml"
   push:
     branches:
       - research/mace-use-time-revalidation-v0-1
+      - research/mace-preference-exposure-inventory-v0-1
     paths:
       - "research/broca-mace-transfer-bench-v0-1/ingress/**"
       - "research/broca-mace-transfer-bench-v0-1/policy/**"
