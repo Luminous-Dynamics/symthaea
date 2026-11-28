@@ -191,7 +191,7 @@ The 80% power and 10% decision-loss improvements are target values, not claims o
 ## 9. Next execution sequence
 
 1. Implement the Gaussian quadratic-form CDF with a documented Imhof/Davies numerical contract; compare at least two independently structured routines and retain convergence/error diagnostics.
-2. Reproduce this fixture in Rust using the repository's established statistics primitives where available; do not add another matrix/eigenvalue package without proving that the existing crate cannot serve the need.
+2. Reproduce this fixture in Rust only after resolving the dependency boundary. The active default-branch symthaea-statistics crate is v0.1.0 and currently exports only descriptive/distribution/inference/regression modules. The richer v1.x Cholesky/eigensolver/QMC material found during this audit is in versioned snapshots and combined patch files, not an active production API. Either promote and qualify the required primitives through that separate package work, or justify a bounded research-only implementation; do not assume an unlanded API or silently duplicate a production numerical substrate.
 3. Add exact-alias randomized tie controls, permutation invariance, nested-observation monotonicity, readout-noise stress, and invalid/SPD failure cases.
 4. Add a frozen seed/PRNG manifest for Monte Carlo cross-checks; distinguish statistical simulation uncertainty from quadrature error.
 5. Extend to uncertain response and shared calibration/reference processes by consuming #13805/#13951 rather than duplicating their authority.
