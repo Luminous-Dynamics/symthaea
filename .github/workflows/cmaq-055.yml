@@ -1,0 +1,41 @@
+name: CMAQ-055 dyadic start-time prior
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-055/**"
+      - "research/cmaq-053/**"
+      - ".github/workflows/cmaq-055.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-055-dyadic-start-prior
+  cancel-in-progress: true
+
+jobs:
+  dyadic-start-time-prior:
+    name: dyadic-start-time-prior
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-055-dyadic-start-time-prior-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-055/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-055/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-055/Cargo.toml --locked --all-targets -- -D warnings
+      - name: All-start restart portfolio smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-055/Cargo.toml --locked --bin restart_portfolio_probe > cmaq-055-restart-portfolio-smoke.csv
+      - name: Preserve all-start portfolio artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-055-restart-portfolio-smoke
+          path: cmaq-055-restart-portfolio-smoke.csv
+          if-no-files-found: error
