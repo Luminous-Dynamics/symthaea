@@ -61,7 +61,7 @@ A future replay executor must start from the frozen genesis policy/state and rep
 
 ## Tests
 
-Eleven Rust tests are authored:
+Twelve Rust tests are authored:
 1. two accepted updates form a digest-linked state/journal chain;
 2. revoking update 1 directly invalidates it and taints update 2;
 3. revoking update 2 leaves update 1 unaffected;
