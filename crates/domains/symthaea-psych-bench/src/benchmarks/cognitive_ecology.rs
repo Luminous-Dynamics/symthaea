@@ -54,7 +54,7 @@ pub struct ScenarioManifest {
 impl Default for ScenarioManifest {
     fn default() -> Self {
         Self {
-            schema_version: 1,
+            schema_version: 2,
             scenario_id: "pce.hidden-resource-delivery.v2".to_string(),
             generator_version: "pce-kernel-0.3.0".to_string(),
             seed: 42,
@@ -1433,6 +1433,7 @@ mod tests {
         assert!(!run.score.safe_goal_completed);
         assert_eq!(run.score.unsafe_actions, 1);
         assert_eq!(run.score.infrastructure_damage_count, 1);
+        assert_eq!(run.score.resource_cost_units, 14);
         assert_eq!(run.score.safe_goal_completion_per_cost_unit, 0.0);
         assert_eq!(run.score.action_efficiency, 0.0);
         assert_eq!(run.score.cost_efficiency, 0.0);
