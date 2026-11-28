@@ -172,3 +172,38 @@ fn edit_budget_and_unknown_candidate_fail_closed() {
 
     assert!(evaluate_episode(case, &fixture.graph_semantics, 1, &["unknown-edge"]).is_err());
 }
+
+#[test]
+fn malformed_graphs_and_costs_fail_closed() {
+    let original = fixture();
+
+    let mut duplicate_node = episode(&original, "stationary_demand_control").clone();
+    duplicate_node.nodes[1].id = duplicate_node.nodes[0].id;
+    assert!(Fixture {
+        schema_version: original.schema_version.clone(),
+        graph_semantics: original.graph_semantics.clone(),
+        cases: vec![duplicate_node],
+    }
+    .validate()
+    .is_err());
+
+    let mut malformed_cost = episode(&original, "new_sink_demand_shift").clone();
+    malformed_cost.candidate_edges[0].edit_cost = Some(2);
+    assert!(Fixture {
+        schema_version: original.schema_version.clone(),
+        graph_semantics: original.graph_semantics.clone(),
+        cases: vec![malformed_cost],
+    }
+    .validate()
+    .is_err());
+
+    let mut invalid_endpoint = episode(&original, "bridge_failure_reroute").clone();
+    invalid_endpoint.candidate_edges[0].to = u16::MAX;
+    assert!(Fixture {
+        schema_version: original.schema_version.clone(),
+        graph_semantics: original.graph_semantics.clone(),
+        cases: vec![invalid_endpoint],
+    }
+    .validate()
+    .is_err());
+}
