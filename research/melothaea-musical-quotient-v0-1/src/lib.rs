@@ -300,8 +300,8 @@ pub enum MusicalProperty {
 pub enum EvidenceClass {
     /// Exact finite action witness, e.g. a complete C12 table.
     ExactFiniteAction,
-    /// Exact continuous action witness, e.g. positive rational scaling.
-    ExactContinuousAction,
+    /// Bounded exact rational arithmetic fragment; not a complete group certificate.
+    ExactRationalActionFragment,
     /// Invertible only on a restricted declared subdomain.
     RestrictedPartialIsomorphism,
     /// Human-calibrated relation, not a formal action certificate.
@@ -406,7 +406,7 @@ pub fn classify_action(
                     EvidenceClass::ExactFiniteAction
                 ) | (
                     ActionKind::ConstantTempoScaling,
-                    EvidenceClass::ExactContinuousAction
+                    EvidenceClass::ExactRationalActionFragment
                 )
             );
             if !exact_pair {
@@ -418,8 +418,13 @@ pub fn classify_action(
                     }
                     EvidenceClass::OneWayNonInvertible => Disposition::NotEstimable,
                     EvidenceClass::ExactFiniteAction
-                    | EvidenceClass::ExactContinuousAction => Disposition::Unsupported,
+                    | EvidenceClass::ExactRationalActionFragment => Disposition::Unsupported,
                 };
+            }
+            if action == ActionKind::ConstantTempoScaling {
+                // The u64-representable positive rationals are not closed under
+                // every composition, so this fragment cannot authorize a quotient.
+                return Disposition::SoftRelationOnly;
             }
             match domain {
                 DomainCoverage::Complete => Disposition::FixtureHardQuotientEligible,
@@ -677,16 +682,16 @@ mod tests {
             classify_action(
                 ActionKind::ConstantTempoScaling,
                 MusicalProperty::RhythmicRatios,
-                EvidenceClass::ExactContinuousAction,
+                EvidenceClass::ExactRationalActionFragment,
                 DomainCoverage::Complete,
             ),
-            Disposition::FixtureHardQuotientEligible
+            Disposition::SoftRelationOnly
         );
         assert_eq!(
             classify_action(
                 ActionKind::ConstantTempoScaling,
                 MusicalProperty::PulseRate,
-                EvidenceClass::ExactContinuousAction,
+                EvidenceClass::ExactRationalActionFragment,
                 DomainCoverage::Complete,
             ),
             Disposition::EquivariantNotInvariant
@@ -737,7 +742,7 @@ mod tests {
             classify_action(
                 ActionKind::Rubato,
                 MusicalProperty::RhythmicRatios,
-                EvidenceClass::ExactContinuousAction,
+                EvidenceClass::ExactRationalActionFragment,
                 DomainCoverage::Complete,
             ),
             Disposition::Unsupported
