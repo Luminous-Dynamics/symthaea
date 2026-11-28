@@ -526,23 +526,23 @@ fn score_replayed_state(
     let invalid_actions = state
         .event_log
         .iter()
-        .filter(|event| matches!(event.kind, EventKind::ActionRejected { .. }))
+        .filter(|event| matches!(&event.kind, EventKind::ActionRejected { .. }))
         .count() as u32;
     let inspections = state
         .event_log
         .iter()
-        .filter(|event| matches!(event.kind, EventKind::Inspected(_)))
+        .filter(|event| matches!(&event.kind, EventKind::Inspected(_)))
         .count() as u32;
     let evaluator_perturbations = state
         .event_log
         .iter()
-        .filter(|event| matches!(event.kind, EventKind::Perturbed(_)))
+        .filter(|event| matches!(&event.kind, EventKind::Perturbed(_)))
         .count() as u32;
 
     let mut awaiting_recovery = false;
     let mut successful_recoveries = 0;
     for event in &state.event_log {
-        match event.kind {
+        match &event.kind {
             EventKind::Perturbed(_) => awaiting_recovery = true,
             EventKind::GateOpened if awaiting_recovery => {
                 successful_recoveries += 1;
@@ -905,6 +905,101 @@ mod tests {
             step(&manifest, &state, Action::Wait),
             Err(TransitionError::StepLimitReached)
         );
+    }
+
+    #[test]
+    fn scenario_seed_generates_two_hidden_filter_layouts() {
+        let depot_manifest = ScenarioManifest { seed: 42, ..ScenarioManifest::default() };
+        let outpost_manifest = ScenarioManifest { seed: 43, ..ScenarioManifest::default() };
+        assert_eq!(depot_manifest.layout().filter_location, Site::Depot);
+        assert_eq!(outpost_manifest.layout().filter_location, Site::Outpost);
+
+        let depot_state = WorldState::initial(&depot_manifest).expect("depot layout");
+        let outpost_state = WorldState::initial(&outpost_manifest).expect("outpost layout");
+        assert!(depot_state.items_at.contains(&(Site::Depot, Item::WaterFilter)));
+        assert!(outpost_state.items_at.contains(&(Site::Outpost, Item::WaterFilter)));
+    }
+
+    #[test]
+    fn rejected_agent_actions_consume_budget_and_emit_receipts() {
+        let manifest = ScenarioManifest::default();
+        let state = WorldState::initial(&manifest).expect("initial state");
+        let (next, receipt, outcome) =
+            attempt(&manifest, &state, Action::Deliver).expect("charged invalid attempt");
+
+        assert_eq!(state.tick, 0, "caller state remains immutable");
+        assert_eq!(next.tick, 1, "rejected attempt consumes one tick");
+        assert!(matches!(outcome, AttemptOutcome::Rejected(TransitionError::WrongLocation { .. })));
+        assert!(matches!(receipt.event.kind, EventKind::ActionRejected { .. }));
+        assert_eq!(receipt.step_index, 1);
+        assert_ne!(receipt.before_state_digest, receipt.after_state_digest);
+    }
+
+    #[test]
+    fn reference_policy_solves_both_seeded_layouts() {
+        for seed in [42, 43] {
+            let manifest = ScenarioManifest { seed, ..ScenarioManifest::default() };
+            let run = run_reference_policy(&manifest, false).expect("reference policy");
+            assert!(run.score.goal_completed);
+            assert_eq!(run.score.invalid_actions, 0);
+            assert_eq!(run.score.action_efficiency, 1.0);
+            assert_eq!(run.score.agent_attempts, run.score.optimal_agent_steps);
+            assert!(run.receipts.windows(2).all(|pair| {
+                pair[0].after_state_digest == pair[1].before_state_digest
+            }));
+        }
+    }
+
+    #[test]
+    fn reference_policy_recovers_after_an_evaluator_intervention() {
+        let manifest = ScenarioManifest::default();
+        let run = run_reference_policy(&manifest, true).expect("recovery policy");
+        assert!(run.score.goal_completed);
+        assert_eq!(run.score.evaluator_perturbations, 1);
+        assert_eq!(run.score.successful_recoveries, 1);
+        assert_eq!(run.score.invalid_actions, 0);
+        assert!(run.score.action_efficiency < 1.0);
+    }
+
+    #[test]
+    fn random_baseline_is_deterministic_and_charges_invalid_actions() {
+        let manifest = ScenarioManifest::default();
+        let a = run_random_policy(&manifest).expect("random baseline A");
+        let b = run_random_policy(&manifest).expect("random baseline B");
+        assert_eq!(a, b);
+        assert!(a.score.transitions_used <= manifest.max_steps);
+        assert_eq!(a.score.agent_attempts, a.score.transitions_used);
+        assert_eq!(a.score.invalid_actions, a.receipts.iter().filter(|receipt| {
+            matches!(&receipt.event.kind, EventKind::ActionRejected { .. })
+        }).count() as u32);
+    }
+
+    #[test]
+    fn replay_charges_and_verifies_rejected_actions() {
+        let manifest = ScenarioManifest::default();
+        let commands = vec![
+            RecordedCommand::Agent(Action::Deliver),
+            RecordedCommand::Agent(Action::Inspect),
+        ];
+        let (_state, receipts) = replay(&manifest, &commands).expect("replay");
+        let verified = verify_trace(&manifest, &commands, &receipts).expect("verify");
+        assert_eq!(verified.score.invalid_actions, 1);
+        assert_eq!(verified.score.transitions_used, 2);
+
+        let mut corrupt = receipts.clone();
+        corrupt[0].step_index += 100;
+        assert_eq!(
+            verify_trace(&manifest, &commands, &corrupt),
+            Err(TransitionError::ReplayMismatch)
+        );
+    }
+
+    #[test]
+    fn jsonl_export_emits_one_line_per_receipt() {
+        let run = run_reference_policy(&ScenarioManifest::default(), false).expect("reference");
+        let jsonl = receipts_to_jsonl(&run.receipts).expect("serialize");
+        assert_eq!(jsonl.lines().count(), run.receipts.len());
+        assert!(jsonl.lines().all(|line| serde_json::from_str::<StepReceipt>(line).is_ok()));
     }
 
     #[test]
