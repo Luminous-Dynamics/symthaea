@@ -21,6 +21,7 @@ use crate::liked_page::LikedPage;
 use crate::pages::{CreatePage, ListenPage, ResearchPage};
 use crate::playback::PlaybackEvent;
 use crate::player_bar::PlayerBar;
+use crate::perform_page::PerformPage;
 use crate::state::MuseState;
 
 #[component]
@@ -114,6 +115,7 @@ pub fn App() -> impl IntoView {
                         <Route path=path!("/research") view=ResearchPage />
                         <Route path=path!("/liked") view=LikedPage />
                         <Route path=path!("/atlas") view=AtlasPage />
+                        <Route path=path!("/perform") view=PerformPage />
                     </Routes>
                 </div>
                 <PlayerBar muse=muse />
@@ -174,6 +176,12 @@ fn GlobalHeader(muse: MuseState) -> impl IntoView {
                     attr:class=move || if is_active("/atlas") { "active" } else { "" }
                 >
                     <span>"Atlas"</span><small>"Map"</small>
+                </A>
+                <A
+                    href="/perform"
+                    attr:class=move || if is_active("/perform") { "active" } else { "" }
+                >
+                    <span>"Perform"</span><small>"DJ"</small>
                 </A>
             </nav>
         </header>
