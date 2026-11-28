@@ -676,7 +676,7 @@ mod tests {
     fn extracted_claim_spans_do_not_shift_when_duplicate_sentences_occur() {
         let extractor = ContentExtractor::new();
         let sentence = "Rust is a systems programming language";
-        let text = format!("{sentence}. A separator sentence that is not a claim. {sentence}!");
+        let text = format!("{sentence}. Neutral ornamental separator text. {sentence}!");
         let claims = extractor.extract_claim_spans(&text);
 
         assert_eq!(claims.len(), 2);
