@@ -112,7 +112,7 @@ All numbers below are proposed targets, not achieved results.
 |---|---|---:|---:|
 | FLIP/STAY property identity | MusicListenBench clean + real recordings | ≥90% clear-case accuracy; ≤5% false-STAY flip and ≤5% FLIP miss | ≥95% / ≤2% / ≤2% |
 | Performer/take invariance | #13908 crossed performer × source work | ≥90% accuracy on held-out performers and works; report each nuisance separately | ≥95% with calibrated abstention |
-| Temporal grounding | TAG-Bench | mIoU ≥40; Recall@0.7 ≥30%; occurrence count ≥25% | 50 / 40% / 40% |
+| Temporal grounding | TAG-Bench | mIoU ≥40; Recall@0.7 ≥35%; one-to-many count accuracy ≥50% | 50 / 40% / 40% |
 | Calibration | Per-property reliability and risk-coverage | ECE ≤0.05; nominal 95% intervals 93–97% coverage | ECE ≤0.03 with no subgroup collapse |
 | Quotient correctness | Exhaustive C12 and tempo fixtures | 100% C12 closure/inverse/lift checks; zero missed candidates | Same on a held-out exact symbolic family |
 | Quotient efficiency | Exhaustive unquotiented search | ≥2× total-cost reduction after construction, verification and lift costs | ≥5× on a larger exact family |
