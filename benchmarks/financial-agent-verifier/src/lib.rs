@@ -197,6 +197,21 @@ pub struct TemporalEvidenceResult {
 /// consume the shared #11253 kernel and #11264 principal/rights proof bridge.
 /// The verifier checks exact ID/frontier/profile binding, but does not
 /// authenticate upstream proof material itself.
+///
+/// External consumers cannot mint this input directly:
+///
+/// ```compile_fail
+/// use financial_agent_verifier::TemporalEvaluation;
+/// let _ = TemporalEvaluation {
+///     evaluation_mode: String::new(),
+///     decision_frontier: String::new(),
+///     principal_profile_id: None,
+///     rights_profile_id: None,
+///     verifier_id: String::new(),
+///     verifier_build_sha256: String::new(),
+///     evidence: Vec::new(),
+/// };
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemporalEvaluation {
     // Not public: only the in-crate trusted adapter can construct this value.
