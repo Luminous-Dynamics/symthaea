@@ -17,7 +17,12 @@
     "required_independent_clusters",
     "minimum_reliability",
     "confidence_level",
-    "units"
+    "units",
+    "scenario_sha256",
+    "recovery_boundary_sha256",
+    "fault_set_sha256",
+    "code_revision",
+    "required_seeds"
   ],
   "properties": {
     "profile": {
@@ -82,6 +87,29 @@
       "items": {
         "$ref": "#/$defs/unit"
       }
+    },
+    "scenario_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "recovery_boundary_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "fault_set_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "code_revision": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "required_seeds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
     }
   },
   "$defs": {
@@ -104,7 +132,13 @@
         "verdict",
         "failure_signature_sha256",
         "complete",
-        "outcome_receipt_sha256"
+        "outcome_receipt_sha256",
+        "unit_id",
+        "trial_id",
+        "scenario_sha256",
+        "recovery_boundary_sha256",
+        "fault_set_sha256",
+        "code_revision"
       ],
       "properties": {
         "replay_id": {
@@ -129,6 +163,25 @@
         },
         "outcome_receipt_sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "unit_id": {
+          "$ref": "#/$defs/id"
+        },
+        "trial_id": {
+          "$ref": "#/$defs/id"
+        },
+        "scenario_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "recovery_boundary_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "fault_set_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "code_revision": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
         }
       }
     },
