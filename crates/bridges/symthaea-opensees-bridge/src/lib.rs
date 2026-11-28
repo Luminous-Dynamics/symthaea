@@ -4,6 +4,9 @@
 
 #![deny(unsafe_code)]
 
+/// Strict parser for explicitly declared OpenSees recorder tables.
+pub mod recorder;
+
 use symthaea_sim_bridge::{
     CommandSolver, EngineeringDomain, SimulationBackend, SimulationError, SimulationRequest,
     SimulationResult, SolverKind,
