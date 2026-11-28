@@ -28,13 +28,26 @@ The digest is a content-integrity identifier, not a signature, trusted timestamp
 
 **From one monolithic avatar model to interoperable action channels.** A speech backend, viseme renderer, gesture controller and spatial display can consume the same event/phase schedule while preserving different visual grammars.
 
+## Deterministic execution gate (2026-11-28 follow-on)
+
+The action timeline now includes `ActionExecutionGate`, a pure scheduling state machine that a device adapter can consume.
+
+- Verifies a compiled timeline and exact source clock at construction.
+- Enforces monotonic clock progression and rejects timestamps before the event.
+- Dispatches each segment at most once, only while its time interval is live.
+- Classifies segments first observed after their window as missed; it never dispatches them late.
+- On a valid cancellation or plan expiry, returns every currently active segment as `stop_required_segment_ids` exactly once and suppresses future dispatch.
+- Separates dispatch/missed/elapsed/stop-required decisions. Elapsed schedule time is not proof of physical completion, and stop-required is not proof that the device stopped.
+
+Eight additional source-level tests cover one-shot dispatch, late/missed segments, cancellation across active channels, future cancellation timestamps, expiry stops, clock regressions and clock mismatch. The action timeline now has twenty-two authored tests, still uncompiled and unexecuted.
+
 ## Next integration steps
 
 1. Compile canonical turn/action intent into this schedule only after the existing one-candidate/one-decision turn gate.
 2. Bind speech generation chunk IDs and viseme frame timestamps to the same monotonic clock; do not align through wall-clock timestamps.
-3. Add a runtime scheduler with cancellation checkpoints at chunk boundaries and a bounded maximum stop latency.
+3. Feed `ActionExecutionGate` decisions into a runtime scheduler with cancellation checkpoints at audio chunk, viseme frame and actuator boundaries and a bounded maximum stop latency.
 4. Connect cancellation to the existing receipt lifecycle; only an independent output observer may produce Observed or Stopped.
-5. Add matched counterfactual tests: same canonical cue across all seven forms; interrupt during Prepare, Onset, Sustain and Release; policy revocation during cross-channel output; stale clock; out-of-order chunks.
+5. Add matched counterfactual tests: same canonical cue across all seven forms; interrupt during Prepare, Onset, Sustain and Release; policy revocation during cross-channel output; stale clock; out-of-order chunks; a late scheduler wake after a segment's end.
 6. Benchmark both perceptual continuity and interruption safety. A beautiful gesture that continues after a user barge-in is a failure.
 
 ## Benchmarks and targets (proposed, not results)
