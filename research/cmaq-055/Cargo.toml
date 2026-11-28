@@ -1,0 +1,15 @@
+[package]
+name = "cmaq-055-dyadic-start-time-prior"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact dyadic epoch prior for anytime-valid restart portfolios"
+
+[dependencies]
+cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
+cmaq-048-fourier-kernel-approachability = { path = "../cmaq-048" }
+cmaq-053-compositional-risk-budget = { path = "../cmaq-053" }
+cmaq-054-evidence-adaptive-kernel-family = { path = "../cmaq-054" }
+
+[workspace]
