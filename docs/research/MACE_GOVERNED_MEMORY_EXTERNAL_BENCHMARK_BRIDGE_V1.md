@@ -438,3 +438,118 @@ MACE's finite-world adaptive policy solver is not directly comparable to those n
 7. Impact Is Not Invalidation: claim-relative research comparator; do not claim paper-comparable reproduction until its official artifact is verifiably available.
 
 For every comparison, label separately: artifact available, protocol inspected, adapter authored, test executed, official scorer executed, independent replay completed, and field validated. A paper, a public dataset, a smoke adapter and a fully reproduced benchmark are different evidence levels.
+
+
+## 13. Benchmark landscape update — 2026-11-28
+
+This update incorporates official results released after the original 2026-11-26 snapshot. It does not claim that MACE has entered or reproduced any of these leaderboards.
+
+### 13.1 Agent Memory Leaderboard — Cycle 2
+
+Official results were published on 2026-11-19. The page reports 9 separate leaderboards and 289 track entries. Track, division and metric definitions differ; never combine these into one average.
+
+| Track | Open-source leader | Open-source score | Commercial/closed leader | Score |
+|---|---|---:|---|---:|
+| Textual | Resurface | 61.22 | MemoraX | 69.26 |
+| Multimodal | Khipu | 43.26 | MemoraX | 53.68 |
+| Coding | InsightMem | 63.33% resolved | MemoraX | 68.00% resolved |
+
+The textual board exposes explicit fact recall, relational/multi-hop reasoning, temporal sequencing, governance, personalization, workflow execution, epistemic safety/privacy and streaming. The multimodal board uses retrieval, relational reasoning, temporal reasoning, continual learning, personalization and evidence governance. The coding board reports resolution rates under relevant/noisy conditions and shows resource/time tiers. Use the official track-specific denominator and rubric.
+
+Sources:
+- https://agentmemoryleaderboard.ai/results/cycle-2/
+- https://agentmemories.ai/blog?post=phase2-results-20261119
+
+**MACE target, proposed:** first enter the open-source division and reach at least +3 absolute points over the current open-source leader on each matched track, without worse privacy/governance submetrics. Stretch: approach or exceed the commercial/closed leader under the same official task, model, API, denominator and compliance rules. Do not infer a general industry win from one track.
+
+### 13.2 LongMemEval-V2 — accuracy/latency frontier
+
+The official V2 harness models memory as chronological trajectory insertion followed by \`Query(q) -> bounded context\`, then a fixed reader. It reports answer accuracy and memory-query latency, not a single unconstrained end-to-end agent score.
+
+The current public page reports:
+- AgentRunbook-C: 74.9% at 108.3s on Small; 70.1% at 139.9s on Medium.
+- AgentRunbook-R: 58.6% at 26.9s on Small; 57.0% at 25.8s on Medium.
+- RAG query-to-slice plus notes: 51.0% at 0.2s on Small; 45.9% at 0.3s on Medium.
+- The leaderboard uses LAFS Gain, the increase in reachable accuracy over a fixed accuracy/latency reference frontier. The current page highlights an AgentRunbook-C v2 Online LAFS Gain of +2.823.
+
+Sources:
+- https://xiaowu0162.github.io/longmemeval-v2/
+- https://github.com/xiaowu0162/LongMemEval-V2/
+
+**MACE target, proposed:** first beat the RAG slice+notes frontier while preserving the evidence-governance sidecar; then target positive LAFS gain, and finally compete with the current +2.823 reference improvement using a valid official submission package. Report Small and Medium separately. Do not use the original LongMemEval result as a substitute for V2.
+
+### 13.3 Same-harness industry reproduction is not optional
+
+Vendor-reported scores are useful leads, not a fair cross-system ranking. For example:
+- Redis reports 86.5% task-averaged accuracy on original LongMemEval for its combined ReMi + Instruct strategy on a common GPT-4o backbone; this is a vendor-authored reproduction.
+- An OmniMemEval snapshot run by the MemOS team reports LongMemEval-S results including MemOS 89.20, Letta 77.67, Zep/Graphiti 79.80 and Mem0 Cloud 56.00 with a common GPT-4.1-mini answerer and GPT-4o-mini judge; this is a system-maker's benchmark, not a neutral third-party leaderboard.
+- A public third-party reproduction on 419 turns and 120 probes, with GPT-4o-mini and top-10 retrieval fixed, reports GoodMem vendor-config 57.6% recall, Letta 52.2%, Mem0 50.0%, LangMem 45.7%, and Zep/Graphiti 37.0%. It also records refusal on adversarial probes, p50 search latency, memory tokens and ingest time.
+
+Sources:
+- https://redis.io/resources/agent-memory-benchmark-report/
+- https://aiagentmemory.org/articles/agent-memory-leaderboard/
+- https://github.com/hamza-dev-tech/agent-memory-bench
+
+The point is not that one of these numbers is the universal truth. It is that model, judge, retrieval depth, configuration, corpus, prompt, abstention rubric and latency accounting can move results dramatically. MACE should publish its own reproducible harness and match these variables before making performance claims.
+
+### 13.4 A benchmark package MACE should submit
+
+For every official benchmark, keep the official score untouched and attach a separate MACE evidence-governance capsule.
+
+**Frozen comparison arms**
+1. No-memory / reader-only baseline.
+2. Full-context or official reference baseline.
+3. BM25 or keyword RAG.
+4. Dense-vector RAG.
+5. A competitive external memory backend (Mem0, Letta, Zep/Graphiti or the best supported open implementation).
+6. The same MACE candidate with evidence gating disabled (diagnostic ablation only).
+7. MACE with use-time revalidation and exposure lineage enabled.
+
+The same reader, judge, prompt, model revision, task order, query budget, context budget and resource envelope must be used wherever the official protocol permits. Mark any exception and do not compare it as matched.
+
+**Paired execution**
+- Run at least three fixed seeds where the benchmark permits.
+- Pair by task and preserve the benchmark's true independent cluster (person, workspace, repository or trajectory family).
+- Report paired difference, a cluster-aware confidence interval, missing/timeout/abstention counts and the number of independent clusters.
+- Freeze candidate code, memory adapter, prompt, reader, grader, tool contracts and resource budget before unsealing evaluation outcomes.
+- Use the calibration/evaluation split firewall introduced in the selective-risk-calibrator child PR before claiming held-out calibration performance.
+
+**Separate official metrics from governance sidecars**
+- Official answer/resolution accuracy, latency and token/time tiers.
+- Useful evidence recall and forbidden-evidence retrieval.
+- Stale, revoked, expired and superseded evidence exposed.
+- Cross-scope / unauthorized evidence exposure.
+- Unsupported provenance claims.
+- Correct abstention and appropriate non-use.
+- Evidence-span marginal utility from paired removal and neutral-marker interventions.
+- End-to-end cost, including ingestion, indexing, verification, re-observation, storage, retrieval and answer generation.
+
+Hard governance violations must remain veto counts/rates with explicit denominators. Never fold them into a weighted score that a high recall number can compensate for.
+
+### 13.5 Proposed MACE success gates
+
+These are internal targets, not published benchmark requirements or measured MACE results:
+
+| Dimension | Initial qualification gate | Stretch target |
+|---|---:|---:|
+| AML textual, open-source | Match the 61.22 Resurface reference | +3 points |
+| AML multimodal, open-source | Match the 43.26 Khipu reference | +3 points |
+| AML coding, open-source | Match 63.33% resolved | +3 points |
+| LongMemEval-V2 | Positive LAFS gain over the fixed official reference | Exceed +2.823 under exact official method |
+| Stale/revoked/wrong-scope evidence escapes | 0 observed in adversarial qualification suite | Maintain 0 under expanded hidden testing |
+| Unauthorized side effects / cross-scope disclosure | 0 observed | 0 under independent red-team evaluation |
+| Erasure resurrection | 0 observed through derived-memory and cache paths | 0 under independent lifecycle audit |
+| Cost-adjusted utility | Non-inferior official score at lower all-in cost | Better accuracy/latency/cost Pareto frontier |
+
+Do not claim a zero population risk from zero observed test failures. Report confidence bounds and finite-sample limits, including cluster counts.
+
+### 13.6 MACE's actual differentiation hypothesis
+
+Conventional memory systems compete primarily on extraction, retrieval, graph/entity structure, context compression, update mechanisms and answer accuracy. MACE should compete there, but its differentiator is the ability to attach enforceable evidence lineage and authority to a particular decision-use event.
+
+The testable hypothesis is:
+
+> At the same reader and resource budget, MACE can preserve or improve benchmark utility while reducing stale/unauthorized evidence exposure, false provenance, unnecessary personalization and post-erasure resurrection—and can demonstrate the marginal utility of each exposed evidence span.
+
+The research path is to test this hypothesis through matched benchmarks and independent instrumentation. The architecture alone does not establish it.
+
