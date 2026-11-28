@@ -38,7 +38,7 @@ pub struct CandidateDecision<A> {
     pub forecasts: Vec<FeatureForecast>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct CandidateInput<'a, O, A> {
     pub observation: &'a O,
     /// All action attempts permitted by the task contract. A blocked attempt
@@ -48,7 +48,7 @@ pub struct CandidateInput<'a, O, A> {
     pub episode_step: u32,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct CandidateFeedback<'a, O, A> {
     /// Previous candidate-visible observation.
     pub previous_observation: &'a O,
