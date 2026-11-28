@@ -196,10 +196,6 @@ pub fn validate_benchmark_license_manifest(
     if !manifest.approved_intended_uses.contains(&requested_use) {
         return Err(BenchmarkLicenseGateError::IntendedUseNotApproved);
     }
-    if !manifest.permitted_operations.contains(&required_operation) {
-        return Err(BenchmarkLicenseGateError::OperationNotPermitted);
-    }
-
     if is_commercial_use(requested_use) {
         if !manifest.commercial_use_authorized
             || !manifest.permitted_operations.contains(&BenchmarkOperation::CommercialUse)
@@ -248,6 +244,10 @@ pub fn validate_benchmark_license_manifest(
     }
     if required_operation == BenchmarkOperation::Publication && !manifest.publication_authorized {
         return Err(BenchmarkLicenseGateError::PublicationNotAuthorized);
+    }
+
+    if !manifest.permitted_operations.contains(&required_operation) {
+        return Err(BenchmarkLicenseGateError::OperationNotPermitted);
     }
 
     if let Some(transform) = transformation {
@@ -512,6 +512,22 @@ mod tests {
                 None,
             ),
             Err(BenchmarkLicenseGateError::RawMediaRepositoryViolation)
+        );
+    }
+
+    #[test]
+    fn requested_commercial_use_must_be_in_approved_scope() {
+        let mut value = manifest();
+        value.approved_intended_uses = vec![BenchmarkIntendedUse::NoncommercialResearch];
+        assert_eq!(
+            validate_benchmark_license_manifest(
+                &value,
+                "2026-11-28T00:00:00Z",
+                BenchmarkIntendedUse::CommercialDevelopment,
+                BenchmarkOperation::Evaluation,
+                None,
+            ),
+            Err(BenchmarkLicenseGateError::IntendedUseNotApproved)
         );
     }
 
