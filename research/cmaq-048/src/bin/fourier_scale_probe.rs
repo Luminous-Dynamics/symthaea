@@ -11,9 +11,7 @@
 use std::env;
 use std::fmt::Write as _;
 
-use cmaq_046_convex_target_approachability::{
-    BoxTarget, ConvexTargetApproachabilityMonitor,
-};
+use cmaq_046_convex_target_approachability::{BoxTarget, ConvexTargetApproachabilityMonitor};
 use cmaq_048_fourier_kernel_approachability::{
     FourierFeatureMap, KernelMeanApproachabilityMonitor,
 };
@@ -232,9 +230,7 @@ fn median_delay(values: &[Option<usize>], shift_after: usize) -> Option<usize> {
 
 fn main() -> Result<(), String> {
     let config = parse_config()?;
-    let mut csv = String::from(
-        "scenario,replication,arm,first_alarm_time_one_based,shift_after\n",
-    );
+    let mut csv = String::from("scenario,replication,arm,first_alarm_time_one_based,shift_after\n");
     for scenario in [Scenario::ConditionalNull, Scenario::ScaleOnlyShift] {
         let mut raw_alarms = Vec::with_capacity(config.replications);
         let mut kernel_alarms = Vec::with_capacity(config.replications);
@@ -247,9 +243,11 @@ fn main() -> Result<(), String> {
 
         let raw_false_or_prechange = raw_alarms
             .iter()
-            .filter(|alarm| alarm.is_some_and(|time| {
-                scenario == Scenario::ConditionalNull || time <= config.shift_after
-            }))
+            .filter(|alarm| {
+                alarm.is_some_and(|time| {
+                    scenario == Scenario::ConditionalNull || time <= config.shift_after
+                })
+            })
             .count();
         let kernel_false_or_prechange = kernel_alarms
             .iter()
@@ -261,9 +259,7 @@ fn main() -> Result<(), String> {
         if scenario == Scenario::ConditionalNull {
             eprintln!(
                 "conditional_null: replications={} raw_false_alarms={} kernel_false_alarms={}",
-                config.replications,
-                raw_false_or_prechange,
-                kernel_false_or_prechange,
+                config.replications, raw_false_or_prechange, kernel_false_or_prechange,
             );
         } else {
             let raw_detected = raw_alarms
