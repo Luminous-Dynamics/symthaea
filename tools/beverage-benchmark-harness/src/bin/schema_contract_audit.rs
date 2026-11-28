@@ -134,7 +134,8 @@ fn expected_fixture_disposition(scenario: &Value) -> Option<&'static str> {
     let reject = matches!(
         data_integrity,
         "group_leakage" | "post_cutoff_feature" | "unit_inconsistent"
-    ) || (asserted_as_measured && evidence_class != "MEASURED")
+    ) || cutoff_status == "post_cutoff_feature"
+        || (asserted_as_measured && evidence_class != "MEASURED")
         || hard_gate == "violated";
     if reject {
         return Some("REJECT");
@@ -459,6 +460,14 @@ mod tests {
         confusion["evidence_class"] = json!("MODELLED");
         confusion["expected_disposition"] = json!("REJECT");
         assert_eq!(expected_fixture_disposition(&confusion), Some("REJECT"));
+    }
+
+    #[test]
+    fn post_cutoff_status_cannot_be_hidden_by_a_valid_integrity_flag() {
+        let mut cutoff = scenario("BEV-SYN-006");
+        cutoff["cutoff_status"] = json!("post_cutoff_feature");
+        cutoff["expected_disposition"] = json!("REJECT");
+        assert_eq!(expected_fixture_disposition(&cutoff), Some("REJECT"));
     }
 
     #[test]
