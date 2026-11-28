@@ -27,8 +27,9 @@ pub use hidden_mechanics::{
 
 mod partial_map;
 pub use partial_map::{
-    ExploreAction, ExploreGame, ExploreObservation, ExploreSpec, ExploreSpecError,
-    ExploreState, ExploreStepError, ExploreTransition, ObservedCell,
+    ExploreAction, ExploreGame, ExploreMemory, ExploreMemoryError, ExploreObservation,
+    ExploreSpec, ExploreSpecError, ExploreState, ExploreStepError, ExploreTransition,
+    ObservedCell,
 };
 
 mod prerequisites;
