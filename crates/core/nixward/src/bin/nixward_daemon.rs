@@ -262,7 +262,7 @@ impl DaemonState {
         let unit_clean = unit.replace(".service", "");
 
         // Based on unit name, recommend a hardening configuration parameter
-        let (path_str, value_str) = match unit_clean.as_str() {
+        let (path_str, value) = match unit_clean.as_str() {
             "clickhouse-server" | "clickhouse" => (
                 "services.clickhouse.extraConfig".to_string(),
                 NixExpr::String("<max_server_memory_usage>80%</max_server_memory_usage>".to_string()),
@@ -1091,17 +1091,11 @@ impl DaemonState {
 
                                 // If it was an AST configuration patch, apply the configuration change before switching!
                                 if let Some((_, option_path, value)) = &patch_tweak {
-                                    // Route through ConfigWriter -- both its write
-                                    // mechanics (apply_patch: atomicity via temp+
-                                    // rename, a git backup so restore_last_backup()
-                                    // can undo it, syntax validation before anything
-                                    // touches disk) AND its patch-construction logic
-                                    // (set_option: read the freshest on-disk content
-                                    // and splice in the option, rather than the
-                                    // daemon hand-rolling an equivalent-but-separate
-                                    // rfind('}') insert that could only ever drift
-                                    // out of sync with ConfigWriter's own copy of the
-                                    // same logic). See
+                                                    // Route through ConfigWriter's typed API.
+                                    // The option path and value have already been
+                                    // represented as validated Nix identifiers and
+                                    // literal values; arbitrary source is not accepted.
+                                    // See
                                     // SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md
                                     // Phase 2.
                                     use nixward::action::config_writer::ConfigWriter;
@@ -3226,6 +3220,7 @@ mod tests {
     #[test]
     fn test_hardening_patch_path_value_apply_via_config_writer() {
         use nixward::action::config_writer::ConfigWriter;
+        use nixward::typed_nix::NixExpr;
 
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
@@ -3239,9 +3234,9 @@ mod tests {
             .with_dry_run(true);
 
         let patch = writer
-            .set_option(
+            .set_option_expr(
                 "services.clickhouse.extraConfig",
-                "<max_server_memory_usage>80%</max_server_memory_usage>",
+                &NixExpr::String("<max_server_memory_usage>80%</max_server_memory_usage>".into()),
             )
             .unwrap();
         assert!(patch.modified.contains("services.clickhouse.extraConfig"));
