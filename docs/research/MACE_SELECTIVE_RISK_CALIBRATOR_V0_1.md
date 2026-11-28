@@ -26,10 +26,24 @@ Groups form an explicit parent tree. Parent data include examples assigned to de
 4. Score below the certified threshold: retrieve more, acquire, or abstain.
 5. Only a matching usable group certificate, adequate score and passing hard gates permit accept-and-act.
 
+## Precommitment and certificate transfer
+
+The fixed-sequence threshold grid must come from either a domain-predeclared policy or an independent pilot artifact. It is tied by digest to the intended calibration split, and the declared commitment time must precede the declared calibration-open time. The evaluator recomputes this precommitment and rejects a missing, mismatched or temporally reversed declaration.
+
+**This is not trusted timestamping.** The precommitment digest and the two timestamps are self-reported integrity data. They prevent accidental mismatch and bind the protocol record, but they do not prove when a grid was actually frozen. A confirmatory evaluation must additionally retain an independently held pilot artifact or externally timestamped/attested pre-registration receipt, and must verify that the calibration labels were not accessible when the grid was selected.
+
+The certificate also binds five pieces of the independence design: cluster-unit definition, sampling design, workload-per-cluster policy, cluster assignment manifest and the resulting cluster-design receipt. A person/profile cluster with a 20-episode workload horizon is not interchangeable with a repository cluster, conversation-turn cluster, or a different cap. Decision-time use requires the cluster unit, sampling design and workload policy to match exactly. A mismatch suppresses the risk bound and forces abstention.
+
+The cluster assignment manifest is a hash commitment to the row-to-cluster mapping, not proof that the mapping identifies genuinely independent units. That assignment must be audited against the benchmark's sampling frame. Repeated tasks, messages, evidence spans, memory events or ablation arms from one underlying person/repository/trajectory family must not be counted as independent clusters.
+
+## Deployment and external validity
+
+A certificate is conditional on the calibration population and the declared cluster design. It does not automatically transfer to a new benchmark, split, language, model, policy, source population, group hierarchy, score definition, loss endpoint, cluster unit, sampling design or workload horizon. Any change requires recalibration or an explicitly justified bridge study with a new, frozen cluster assignment and independent held-out evaluation.
+
 ## Guarantee assumptions and limits
 
-- Calibration and evaluation splits are disjoint at the true independent cluster boundary.
-- Cluster-level unsafe indicators are independent and identically distributed, or the sampling design otherwise justifies the exact binomial bound.
+- Calibration and evaluation splits are disjoint at the true independent cluster boundary; the frozen threshold grid is selected from an independent pilot or domain-predeclared source before calibration is opened.
+- Cluster-level unsafe indicators are independent and identically distributed, or the sampling design otherwise justifies the exact binomial bound. The cluster unit, row-to-cluster mapping, sampling design and per-cluster workload horizon are bound into the certificate and must match at use time.
 - The score, loss, policy, thresholds, group tree and hard-gate definition are frozen and hashed.
 - Decision-time assessment requires exact policy, sufficiency-score-definition and group-hierarchy digests to match the certificate; a numerically similar score or reused group name is not sufficient.
 - Candidate code cannot observe evaluator losses, outcomes or calibration labels.
@@ -50,6 +64,6 @@ cargo test --manifest-path research/mace-selective-risk-calibrator-v0-1/Cargo.to
 cargo clippy --manifest-path research/mace-selective-risk-calibrator-v0-1/Cargo.toml --all-targets -- -D warnings
 ```
 
-The manifest, group-certificate and decision-assessment digests are recomputable integrity commitments, not signatures. This is an offline calibration kernel, not a production policy. Review its endpoint and assumptions before describing any MACE result as calibrated or certified.
+The manifest, group-certificate and decision-assessment digests are recomputable integrity commitments, not signatures. The new child increment adds precommitment and cluster-scope binding tests. Timestamp hashes are not independently authenticated. This is an offline calibration kernel, not a production policy. Review its endpoint and assumptions before describing any MACE result as calibrated or certified.
 
 **Coverage semantics:** `coverage` is independent-cluster acceptance probability, matching the cluster-risk endpoint. `decision_coverage` is separately reported as the equal-cluster-weighted fraction of individual decisions accepted. This prevents decision rows from being mistaken for independent risk trials.
