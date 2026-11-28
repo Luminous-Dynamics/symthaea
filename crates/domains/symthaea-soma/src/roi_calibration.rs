@@ -356,10 +356,10 @@ mod tests {
     }
 
     #[test]
-    fn report_digest_detects_content_mutation() {
+    fn report_digest_detects_identity_mutation() {
         let mut value = report();
-        value.bins[0].observed_accuracy = 0.7;
-        assert_eq!(verify_roi_calibration_report(&value), Err(RoiCalibrationError::MetricMismatch));
+        value.report_id = "calibration-mutated".to_owned();
+        assert_eq!(verify_roi_calibration_report(&value), Err(RoiCalibrationError::ReportDigestMismatch));
     }
 
     #[test]
