@@ -66,3 +66,12 @@ The `dsp` module now contains a deterministic CPU reference implementation of th
 The ERB filterbank is an ERB-axis triangular power partition, **not** a gammatone cochlear filterbank. The log-frequency representation is a re-binning of the fixed-grid STFT spectrum, **not** a true constant-Q transform. A true variable-window CQT and stateful auditory filters should be added as separate implementations with matched tests rather than silently relabeling these baselines.
 
 Known-answer tests use a bin-centred 1 kHz sinusoid at 8.192 kHz. They verify peak-bin location, recovered amplitude, complex phase, ERB-band localization, log-frequency localization, invalid geometry rejection, non-finite input rejection and exact support alignment across views.
+
+
+## Causal complex gammatone reference filterbank
+
+The new `gammatone` module uses ERB-spaced centres and the discrete repeated-pole model `H(z)=(1-r e^{jω_c}z^{-1})^{-4}`, where `r=exp(-2π·1.019·ERB(fc)/fs)`. Four cascaded complex resonators generate a cubic-exponential impulse envelope. A demodulated complex envelope and mean band power are retained.
+
+Local averaging support and causal filter-state support are explicitly separate. The filter resets at sample zero; each later frame records the entire source prefix that may influence its IIR state. This avoids claiming that a recursive filter depends only on a short local window.
+
+This is a linear, fixed-parameter approximation, not a complete cochlear model.
