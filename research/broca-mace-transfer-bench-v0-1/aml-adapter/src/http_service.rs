@@ -91,11 +91,11 @@ impl ApiAuthV1 {
             AuthSchemeV1::Token => headers
                 .get(AUTHORIZATION)
                 .and_then(|value| value.to_str().ok())
-                .and_then(|value| value.strip_prefix("Token ")),
+                .and_then(|value| strip_auth_scheme(value, "Token")),
             AuthSchemeV1::Bearer => headers
                 .get(AUTHORIZATION)
                 .and_then(|value| value.to_str().ok())
-                .and_then(|value| value.strip_prefix("Bearer ")),
+                .and_then(|value| strip_auth_scheme(value, "Bearer")),
             AuthSchemeV1::XApiKey => headers
                 .get("x-api-key")
                 .and_then(|value| value.to_str().ok()),
@@ -312,6 +312,16 @@ where
     }
 }
 
+/// HTTP authentication scheme names are case-insensitive; credential values are not.
+fn strip_auth_scheme<'a>(header_value: &'a str, expected_scheme: &str) -> Option<&'a str> {
+    let (scheme, credential) = header_value.split_once(' ')?;
+    if scheme.eq_ignore_ascii_case(expected_scheme) && !credential.is_empty() {
+        Some(credential)
+    } else {
+        None
+    }
+}
+
 fn is_json_content_type(headers: &HeaderMap) -> bool {
     headers
         .get(CONTENT_TYPE)
@@ -343,8 +353,15 @@ fn api_error(
 
 fn service_error_response(error: DurableAmlServiceErrorV1) -> Response {
     match error {
+        // A payload rebound to an existing request_id is a permanent
+        // caller conflict, not an ambiguous/in-flight write. Do not advertise
+        // it as retryable with Retry-After.
         DurableAmlServiceErrorV1::Contract(super::AmlReject::RequestIdPayloadConflict) => {
-            api_error(StatusCode::CONFLICT, "request_id_payload_conflict", Some(1))
+            api_error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "request_id_payload_conflict",
+                None,
+            )
         }
         DurableAmlServiceErrorV1::AddStillInFlight => {
             api_error(StatusCode::CONFLICT, "add_still_in_flight", Some(1))
@@ -568,6 +585,33 @@ mod tests {
         headers.remove(AUTHORIZATION);
         headers.insert("x-api-key", HeaderValue::from_static("key-secret"));
         assert!(x_api.authorize(&headers));
+    }
+
+    #[test]
+    fn authentication_scheme_is_case_insensitive_but_credential_is_exact() {
+        let token = ApiAuthV1::from_secret(AuthSchemeV1::Token, "Key-Secret").unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("token Key-Secret"));
+        assert!(token.authorize(&headers));
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("TOKEN key-secret"));
+        assert!(!token.authorize(&headers));
+
+        let bearer = ApiAuthV1::from_secret(AuthSchemeV1::Bearer, "Key-Secret").unwrap();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("bEaReR Key-Secret"));
+        assert!(bearer.authorize(&headers));
+    }
+
+    #[test]
+    fn permanent_request_id_payload_conflict_is_not_advertised_as_retryable() {
+        let response = service_error_response(DurableAmlServiceErrorV1::Contract(
+            super::AmlReject::RequestIdPayloadConflict,
+        ));
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(response.headers().get(RETRY_AFTER).is_none());
+
+        let in_flight = service_error_response(DurableAmlServiceErrorV1::AddStillInFlight);
+        assert_eq!(in_flight.status(), StatusCode::CONFLICT);
+        assert_eq!(in_flight.headers().get(RETRY_AFTER).unwrap(), "1");
     }
 
     #[test]
