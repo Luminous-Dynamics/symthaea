@@ -495,12 +495,10 @@ mod tests {
                             for candidate in 0..enc.num_colors() {
                                 let score = query.similarity(enc.color_hv(candidate));
                                 if score > best_score {
-                                    if candidate != actual as usize {
-                                        best_alternative = best_score.max(best_alternative);
-                                    }
                                     best_index = candidate;
                                     best_score = score;
-                                } else if candidate != actual as usize {
+                                }
+                                if candidate != actual as usize {
                                     best_alternative = best_alternative.max(score);
                                 }
                             }
