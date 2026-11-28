@@ -532,7 +532,6 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
         .map_err(|_| PreferenceExposureRejectV1::SpanNotUtf8Boundary)?;
     let mut previous_span: Option<(usize, usize, &str)> = None;
     let mut span_ids = BTreeSet::new();
-    let mut source_keys = BTreeSet::new();
     let mut exposed_preference_ids = BTreeSet::new();
 
     for span in &manifest.memory_spans {
@@ -568,6 +567,7 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
         }
 
         let mut prior_source_id: Option<&str> = None;
+        let mut span_source_ids = BTreeSet::new();
         for source in &span.sources {
             if !nonempty(&source.memory_item_id, 256)
                 || !lower_sha256(&source.source_receipt_sha256)
@@ -585,7 +585,7 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
             {
                 return Err(PreferenceExposureRejectV1::InvalidSourceMapping);
             }
-            if !source_keys.insert(source.memory_item_id.as_str()) {
+            if !span_source_ids.insert(source.memory_item_id.as_str()) {
                 return Err(PreferenceExposureRejectV1::DuplicateSourceMapping);
             }
             for preference_id in &source.preference_ids {
@@ -993,6 +993,39 @@ mod tests {
             verify_preference_exposure_v1(&selection, &manifest, context, request, &trusted_verifier()),
             Err(PreferenceExposureRejectV1::OverlappingMemorySpans)
         );
+    }
+
+    #[test]
+    fn repeated_memory_item_in_distinct_spans_is_measured_not_rejected() {
+        let selection = selection(PreferenceInfluenceModeV1::Support);
+        let context = b"first mention; later repeated mention";
+        let request = b"{\"input\":\"first mention; later repeated mention\"}";
+        let first = context
+            .windows(b"first mention".len())
+            .position(|window| window == b"first mention")
+            .unwrap();
+        let second = context
+            .windows(b"repeated mention".len())
+            .position(|window| window == b"repeated mention")
+            .unwrap();
+        let shared_source = || source(vec!["pref:outreach".into()], "mem:preference");
+        let manifest = manifest(
+            &selection,
+            context,
+            request,
+            vec![
+                span(context, "span-1", first, first + b"first mention".len(), vec![shared_source()]),
+                span(context, "span-2", second, second + b"repeated mention".len(), vec![shared_source()]),
+            ],
+        );
+        let verified = verify_preference_exposure_v1(
+            &selection,
+            &manifest,
+            context,
+            request,
+            &trusted_verifier(),
+        ).unwrap();
+        assert!(verified.preference_was_exposed("pref:outreach"));
     }
 
     #[test]
