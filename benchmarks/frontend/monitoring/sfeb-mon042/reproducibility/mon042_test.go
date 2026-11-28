@@ -15,14 +15,15 @@ var requiredDomains=[]string{"executor","host","hypervisor","storage","network",
 
 func testSHA(s string)string{h:=sha256.Sum256([]byte(s));return hex.EncodeToString(h[:])}
 func validInput(n int)Input{
- in:=Input{Profile:Profile,Version:Version,Mode:OfflineFixture,EvaluatedAt:fixtureNow,TrialID:"mon042-trial-001",ScenarioSHA256:testSHA("scenario-042"),RecoveryBoundarySHA256:testSHA("boundary-042"),FaultSetSHA256:testSHA("fault-set-042"),CodeRevision:"0123456789abcdef0123456789abcdef01234567",TargetFailureSignatureSHA256:targetSHA,RequiredSeeds:[]int64{1000},RequiredDomainClasses:append([]string(nil),requiredDomains...),ExpectedUnitCount:n,RequiredRunsPerUnit:1,RequiredIndependentClusters:n,MinimumReliability:0.90,ConfidenceLevel:0.95,Units:make([]ExecutionUnit,n)}
+ in:=Input{Profile:Profile,Version:Version,Mode:OfflineFixture,EvaluatedAt:fixtureNow,TrialID:"mon042-trial-001",SamplingFrameSHA256:testSHA("sampling-frame-042"),SelectionProtocolSHA256:testSHA("selection-protocol-042"),ScenarioSHA256:testSHA("scenario-042"),RecoveryBoundarySHA256:testSHA("boundary-042"),FaultSetSHA256:testSHA("fault-set-042"),CodeRevision:"0123456789abcdef0123456789abcdef01234567",TargetFailureSignatureSHA256:targetSHA,RequiredSeeds:[]int64{1000},RequiredDomainClasses:append([]string(nil),requiredDomains...),ExpectedUnitCount:n,RequiredRunsPerUnit:1,RequiredIndependentClusters:n,MinimumReliability:0.90,ConfidenceLevel:0.95,Units:make([]ExecutionUnit,n)}
  for i:=0;i<n;i++{
   domains:=map[string]string{}
   for _,name:=range requiredDomains{domains[name]=fmt.Sprintf("%s-%03d",name,i)}
   unitID:=fmt.Sprintf("unit-%03d",i)
   o:=Observation{UnitID:unitID,ReplayID:fmt.Sprintf("replay-%03d",i),TrialID:in.TrialID,ScenarioSHA256:in.ScenarioSHA256,RecoveryBoundarySHA256:in.RecoveryBoundarySHA256,FaultSetSHA256:in.FaultSetSHA256,CodeRevision:in.CodeRevision,Seed:1000,Verdict:Blocked,FailureSignatureSHA256:targetSHA,Complete:true}
   o.OutcomeReceiptSHA256=ObservationReceiptDigest(o)
-  u:=ExecutionUnit{UnitID:unitID,StratumID:"workload-profile-v1",DomainInventoryComplete:true,DependencyDomains:domains,DomainManifestSHA256:DomainManifestDigest(unitID,domains),RequiredRuns:1,Observations:[]Observation{o}}
+  ordinal:=i+1
+  u:=ExecutionUnit{UnitID:unitID,StratumID:"workload-profile-v1",SelectionOrdinal:ordinal,SelectionReceiptSHA256:SelectionReceiptDigest(unitID,"workload-profile-v1",ordinal,in.SamplingFrameSHA256,in.SelectionProtocolSHA256),DomainInventoryComplete:true,DependencyDomains:domains,DomainManifestSHA256:DomainManifestDigest(unitID,domains),RequiredRuns:1,Observations:[]Observation{o}}
   in.Units[i]=u
  }
  return in
@@ -78,6 +79,17 @@ func TestDomainManifestTamperingBlocks(t *testing.T){
  in:=validInput(29);in.Units[0].DependencyDomains["host"]="foreign-host"
  if got:=Evaluate(in);got.DesignVerdict!=Blocked{t.Fatalf("domain digest mismatch must block: %+v",got)}
 }
+
+func TestSelectionReceiptTamperingBlocks(t *testing.T){
+ in:=validInput(29);in.Units[0].SelectionOrdinal=2
+ if got:=Evaluate(in);got.DesignVerdict!=Blocked{t.Fatalf("selection receipt mismatch must block: %+v",got)}
+}
+func TestDuplicateSelectionOrdinalBlocks(t *testing.T){
+ in:=validInput(29);in.Units[1].SelectionOrdinal=in.Units[0].SelectionOrdinal
+ in.Units[1].SelectionReceiptSHA256=SelectionReceiptDigest(in.Units[1].UnitID,in.Units[1].StratumID,in.Units[1].SelectionOrdinal,in.SamplingFrameSHA256,in.SelectionProtocolSHA256)
+ if got:=Evaluate(in);got.DesignVerdict!=Blocked{t.Fatalf("duplicate selection ordinal must block: %+v",got)}
+}
+
 func TestDuplicateUnitIDBlocks(t *testing.T){
  in:=validInput(29);in.Units[1].UnitID=in.Units[0].UnitID
  if got:=Evaluate(in);got.DesignVerdict!=Blocked{t.Fatalf("duplicate unit id must block: %+v",got)}
