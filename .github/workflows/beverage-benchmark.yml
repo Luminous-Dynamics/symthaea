@@ -1,28 +1,21 @@
-name: Beverage Benchmark Contract
+name: Beverage Benchmark Schema Contract
 
 on:
   push:
     branches: [main]
     paths:
       - "Cargo.toml"
-      - "Cargo.lock"
-      - "crates/domains/symthaea-culinary/**"
       - "tools/beverage-benchmark-harness/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
       - "docs/research/beverage-engineering-scenarios-v1.json"
       - "docs/research/beverage-engineering-scenarios-v1.schema.json"
-      - "docs/research/beverage-data-sources-v1.json"
       - ".github/workflows/beverage-benchmark.yml"
   pull_request:
     paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "crates/domains/symthaea-culinary/**"
       - "tools/beverage-benchmark-harness/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
       - "docs/research/beverage-engineering-scenarios-v1.json"
       - "docs/research/beverage-engineering-scenarios-v1.schema.json"
-      - "docs/research/beverage-data-sources-v1.json"
       - ".github/workflows/beverage-benchmark.yml"
   workflow_dispatch:
 
@@ -30,65 +23,65 @@ permissions:
   contents: read
 
 concurrency:
-  group: beverage-benchmark-${{ github.event.pull_request.head.sha || github.sha }}
+  group: beverage-schema-contract-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
-  synthetic-contract:
-    name: Synthetic Corpus Contract
-    runs-on: ubuntu-latest
+  synthetic-schema-contract:
+    name: Rust 1.96 Draft 2020-12 and fixture contract
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
+          persist-credentials: false
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
 
-      - name: Format focused runners
+      - name: Format standalone auditor
         run: |
-          rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs
-          rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs
-          rustfmt --edition 2024 --check crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs
-          rustfmt --edition 2024 --check tools/beverage-benchmark-harness/src/bin/schema_contract_audit.rs
+          rustfmt +1.96.0 --edition 2024 --check tools/beverage-benchmark-harness/src/bin/schema_contract_audit.rs
+          cargo fmt --manifest-path tools/beverage-benchmark-harness/Cargo.toml -- --check
 
-      - name: Test synthetic receipt contract
-        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt
+      # The standalone harness did not previously contain a committed lockfile.
+      # Capture the resolved graph as an artifact, then require --locked for every
+      # qualification command in this run. A committed lockfile remains a follow-up.
+      - name: Generate isolated dependency lock graph
+        run: cargo generate-lockfile --manifest-path tools/beverage-benchmark-harness/Cargo.toml
 
-      - name: Test wine source auditor
-        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin wine_quality_source_audit
+      - name: Verify the generated lockfile is usable
+        run: cargo metadata --manifest-path tools/beverage-benchmark-harness/Cargo.toml --locked --format-version 1 > "$RUNNER_TEMP/beverage-cargo-metadata.json"
 
-      - name: Test fermentation time-series intake auditor
-        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit
+      - name: Unit, negative-control and semantic-oracle tests
+        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --locked --all-targets
 
-      - name: Test full Draft 2020-12 schema auditor
-        run: cargo test --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --locked --all-targets -- -D warnings
 
-      - name: Independently validate synthetic corpus schema
-        run: |
-          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- \
-            --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
-            --instance docs/research/beverage-engineering-scenarios-v1.json \
-            --out "$RUNNER_TEMP/beverage-schema-receipt.json"
-          cat "$RUNNER_TEMP/beverage-schema-receipt.json"
-
-      - name: Clippy focused runners
-        run: |
-          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- -D warnings
-          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin wine_quality_source_audit -- -D warnings
-          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin fermentation_time_series_audit -- -D warnings
-          cargo clippy --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin schema_contract_audit -- -D warnings
-
-      - name: Emit exact-head receipt
+      - name: Audit exact synthetic corpus against Draft 2020-12 schema
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --bin beverage_benchmark_receipt -- \
-            --corpus docs/research/beverage-engineering-scenarios-v1.json \
+          cargo run --manifest-path tools/beverage-benchmark-harness/Cargo.toml --locked --bin schema_contract_audit -- \
             --schema docs/research/beverage-engineering-scenarios-v1.schema.json \
+            --instance docs/research/beverage-engineering-scenarios-v1.json \
             --expected-head "$EXPECTED_HEAD" \
-            --out "$RUNNER_TEMP/beverage-benchmark-receipt.json"
-          cat "$RUNNER_TEMP/beverage-benchmark-receipt.json"
+            --out "$RUNNER_TEMP/beverage-schema-contract-receipt.json"
+          test "$(jq -r .status "$RUNNER_TEMP/beverage-schema-contract-receipt.json")" = "PASS"
+          cat "$RUNNER_TEMP/beverage-schema-contract-receipt.json"
+
+      - name: Preserve resolved lock and exact-head receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: beverage-schema-contract-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            tools/beverage-benchmark-harness/Cargo.lock
+            ${{ runner.temp }}/beverage-schema-contract-receipt.json
+          if-no-files-found: warn
+          retention-days: 30
