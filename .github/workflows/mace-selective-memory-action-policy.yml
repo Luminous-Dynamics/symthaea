@@ -1,0 +1,27 @@
+name: MACE Selective Memory Action Policy
+on:
+  pull_request:
+    paths:
+      - "research/selective-memory-actions-v0-1/**"
+      - "data/schemas/selective_memory_action_policy_v0_1.schema.json"
+      - "docs/research/SELECTIVE_MEMORY_ACTION_POLICY_V0_1.md"
+      - ".github/workflows/mace-selective-memory-action-policy.yml"
+  push:
+    branches:
+      - "research/selective-memory-actions-v0-1"
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust formatting
+        run: cargo fmt --manifest-path research/selective-memory-actions-v0-1/Cargo.toml -- --check
+      - name: Policy tests
+        run: cargo test --manifest-path research/selective-memory-actions-v0-1/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/selective-memory-actions-v0-1/Cargo.toml --all-targets -- -D warnings
+      - name: Parse JSON Schema
+        run: python3 -m json.tool data/schemas/selective_memory_action_policy_v0_1.schema.json >/dev/null
