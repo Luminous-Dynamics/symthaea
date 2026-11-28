@@ -549,6 +549,9 @@ fn validate_aci_delivery(
             != (row.outcome_state == PopulationOutcomeStateV1::Qualified)
         || eligibility_report_digest(report)? != report.report_sha256
         || delivery.delivered_round != prediction.expected_delivery_round
+        || delivery.clock_domain_id != prediction.clock_domain_id
+        || delivery.idempotency_key != format!("{}:{}", delivery.label_id, delivery.label_revision)
+        || delivery.delivered_at_unix_seconds < prediction.prediction_time_unix_seconds
         || delivery.delivered_at_unix_seconds < delivery.label_available_at_unix_seconds
         || delivery.delivered_at_unix_seconds < delivery.eligibility_report_available_at_unix_seconds
         || delivery.eligibility_report_available_at_unix_seconds < delivery.label_available_at_unix_seconds
@@ -898,9 +901,20 @@ fn validate_aci_arm(
                         delivery.label_value < lower || delivery.label_value > upper
                     }
                 };
-                if miss != expected_miss {
+                let expected_alpha_after = prediction.alpha_at_issue
+                    + prediction.learning_rate
+                        * (prediction.target_miscoverage - f64::from(expected_miss));
+                if miss != expected_miss
+                    || update.alpha_before != Some(prediction.alpha_at_issue)
+                    || update.alpha_after.is_none_or(|value| {
+                        !value.is_finite() || (value - expected_alpha_after).abs() > 1.0e-12
+                    })
+                    || update.update_sequence.is_none()
+                    || !valid_sha256(&update.calibration_state_before_sha256)
+                    || !valid_sha256(&update.calibration_state_after_sha256)
+                {
                     return Err(JointRiskTraceErrorV1(format!(
-                        "tau-ACI arm {} miss bit differs from its frozen prediction interval",
+                        "tau-ACI arm {} alpha/miss/state receipt differs from its frozen prediction and recursion",
                         arm.arm_id
                     )));
                 }
@@ -936,15 +950,25 @@ fn validate_aci_arm(
                 arm.arm_id
             )));
         };
+        let expected_degenerate_miss = match prediction.interval.kind {
+            AciIntervalKindV1::FullRealLine => false,
+            AciIntervalKindV1::Empty => true,
+            AciIntervalKindV1::Bounded => false,
+        };
+        let expected_degenerate_alpha_after = prediction.alpha_at_issue
+            + prediction.learning_rate
+                * (prediction.target_miscoverage - f64::from(expected_degenerate_miss));
         if aci_degenerate_digest(resolution)? != resolution.receipt_sha256
             || resolution.measurement_event_id != prediction.measurement_event_id
             || resolution.issued_round != prediction.round
             || resolution.resolution_round != prediction.expected_delivery_round
+            || resolution.interval_kind != prediction.interval.kind
             || (prediction.interval.kind == AciIntervalKindV1::Bounded)
-            || (prediction.interval.kind == AciIntervalKindV1::FullRealLine
-                && resolution.miscoverage_observed)
-            || (prediction.interval.kind == AciIntervalKindV1::Empty
-                && !resolution.miscoverage_observed)
+            || resolution.miscoverage_observed != expected_degenerate_miss
+            || resolution.alpha_before != prediction.alpha_at_issue
+            || (resolution.alpha_after - expected_degenerate_alpha_after).abs() > 1.0e-12
+            || !valid_sha256(&resolution.calibration_state_before_sha256)
+            || !valid_sha256(&resolution.calibration_state_after_sha256)
         {
             return Err(JointRiskTraceErrorV1(format!(
                 "tau-ACI arm {} degenerate resolution is inconsistent with frozen interval",
@@ -1013,7 +1037,7 @@ fn validate_aci_arm(
             )));
         }
         if has_degenerate
-            && prediction.interval.kind == AciIntervalKindV1::Bounded
+            && (prediction.interval.kind == AciIntervalKindV1::Bounded || has_delivery)
         {
             return Err(JointRiskTraceErrorV1(format!(
                 "tau-ACI arm {} records degenerate resolution for bounded interval {}",
@@ -1065,7 +1089,21 @@ fn validate_ca_arm(
     arm: &JointBenchmarkArmV1,
     evidence: &JointCaOcrcArmEvidenceV1,
     population: &BTreeMap<u64, &JointPopulationRowV1>,
-) -> Result<(Option<f64>, usize, usize, bool), JointRiskTraceErrorV1> {
+) -> Result<
+    (
+        Option<f64>,
+        usize,
+        usize,
+        bool,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+    ),
+    JointRiskTraceErrorV1,
+> {
     if !evidence.feedback_horizon_closed {
         return Err(JointRiskTraceErrorV1(format!(
             "CA-OCRC arm {} feedback horizon is not explicitly closed",
@@ -1203,6 +1241,15 @@ fn validate_ca_arm(
                 )));
             };
             validate_ca_feedback_input(feedback, report.round, outcome_row)?;
+            if feedback.clock_domain_id != round_input.prediction.clock_domain_id
+                || feedback.delivered_at_unix_seconds
+                    < round_input.prediction.prediction_at_unix_seconds
+            {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "CA-OCRC arm {} feedback clock/delivery chronology conflicts with round {}",
+                    arm.arm_id, report.round
+                )));
+            }
             let result = report.feedback_results.iter().find(|result| {
                 result.sample_id == feedback.sample_id
                     && result.label_id == feedback.label_id
@@ -1220,10 +1267,16 @@ fn validate_ca_arm(
                 result.label_id.as_str(),
                 result.label_revision,
             );
+            let tracked_result = result.disposition != CaOcrcFeedbackDispositionV1::NotTracked;
             if !seen_feedback_results.insert(result_key)
-                || result.originating_round != Some(outcome_row.round_id)
-                || result.actual_delay_steps
-                    != Some(report.round.saturating_sub(outcome_row.round_id))
+                || (tracked_result
+                    && (result.originating_round != Some(outcome_row.round_id)
+                        || result.actual_delay_steps
+                            != Some(report.round.saturating_sub(outcome_row.round_id))))
+                || (!tracked_result
+                    && (result.originating_round.is_some()
+                        || result.actual_delay_steps.is_some()
+                        || result.weighted_update_contribution.is_some()))
                 || ca_feedback_digest(result)? != result.feedback_receipt_sha256
             {
                 return Err(JointRiskTraceErrorV1(format!(
@@ -1270,9 +1323,17 @@ fn validate_ca_arm(
                 || (feedback.disposition == CaOcrcFeedbackDispositionV1::Updated
                     && outcome_row.outcome_state != PopulationOutcomeStateV1::Qualified)
                 || (outcome_row.outcome_state == PopulationOutcomeStateV1::Unknown
-                    && feedback.disposition != CaOcrcFeedbackDispositionV1::HeldUnknown)
+                    && !matches!(
+                        feedback.disposition,
+                        CaOcrcFeedbackDispositionV1::HeldUnknown
+                            | CaOcrcFeedbackDispositionV1::NotTracked
+                    ))
                 || (outcome_row.outcome_state == PopulationOutcomeStateV1::Blocked
-                    && feedback.disposition != CaOcrcFeedbackDispositionV1::Blocked)
+                    && !matches!(
+                        feedback.disposition,
+                        CaOcrcFeedbackDispositionV1::Blocked
+                            | CaOcrcFeedbackDispositionV1::NotTracked
+                    ))
                 || (outcome_row.outcome_state == PopulationOutcomeStateV1::Unmeasured)
             {
                 return Err(JointRiskTraceErrorV1(format!(
