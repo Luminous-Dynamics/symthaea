@@ -31,7 +31,6 @@ pub enum ApproachabilityError {
     ObservationNormExceeded,
     CounterOverflow,
     ArithmeticOverflow,
-    NegativeRealizedRegret,
     AlreadyQuarantined,
 }
 
@@ -306,10 +305,10 @@ impl ConvexTargetApproachabilityMonitor {
         if !raw_regret.is_finite() {
             return Err(ApproachabilityError::ArithmeticOverflow);
         }
-        if raw_regret < -regret_tolerance {
-            return Err(ApproachabilityError::NegativeRealizedRegret);
-        }
-        let realized_regret = raw_regret.max(0.0);
+        // Regret is signed: an adaptive learner can outperform the best
+        // fixed comparator, yielding negative regret. The pathwise identity
+        // requires preserving that sign.
+        let realized_regret = raw_regret;
 
         let subgradient = self.target.support_subgradient(&normal_used)?;
         let gradient_step = 1.0 / (self.residual_bound * (next_seen as f64).sqrt());
@@ -394,10 +393,9 @@ impl ConvexTargetApproachabilityMonitor {
         if !raw.is_finite() {
             return Err(ApproachabilityError::ArithmeticOverflow);
         }
-        if raw < -1e-9 * raw.abs().max(1.0) {
-            return Err(ApproachabilityError::NegativeRealizedRegret);
-        }
-        Ok(raw.max(0.0))
+        // Keep signed regret; negative values indicate the online learner
+        // outperformed the best fixed comparator on this realized path.
+        Ok(raw)
     }
 
     pub fn log_e_value(&self) -> f64 {
