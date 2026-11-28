@@ -108,6 +108,14 @@ pub struct BudgetContract {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReplayVerifierContract {
+    /// Independently pinned by the reviewed protocol, not supplied by the candidate receipt.
+    pub verifier_id: String,
+    /// Identifies the expected replay verifier implementation/version.
+    pub verifier_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MethodContract {
     pub contract_id: String,
     pub contract_sha256: String,
@@ -117,6 +125,7 @@ pub struct MethodContract {
     pub reference_artifact_sha256: String,
     pub reference_passage_sha256: String,
     pub review: ProtocolReview,
+    pub replay_verifier: ReplayVerifierContract,
     pub dataset: DatasetContract,
     pub preprocessing: PreprocessingContract,
     pub required_components: Vec<ComponentContract>,
@@ -294,6 +303,9 @@ fn valid_contract(contract: &MethodContract) -> bool {
         && contract.review.approved
         && !contract.review.reviewer_id.trim().is_empty()
         && is_sha256(&contract.review.review_sha256)
+        && !contract.replay_verifier.verifier_id.trim().is_empty()
+        && is_sha256(&contract.replay_verifier.verifier_sha256)
+        && contract.replay_verifier.verifier_id != contract.review.reviewer_id
         && !contract.dataset.dataset_id.trim().is_empty()
         && !contract.dataset.version.trim().is_empty()
         && is_sha256(&contract.dataset.artifact_sha256)
@@ -532,8 +544,8 @@ pub fn audit_method(contract: &MethodContract, receipt: &ExecutionReceipt) -> Au
     check(
         &mut checks, &mut flags, "replay.independent",
         receipt.replay.outcome == ReplayOutcome::Passed
-            && !receipt.replay.verifier_id.trim().is_empty()
-            && is_sha256(&receipt.replay.verifier_sha256)
+            && receipt.replay.verifier_id == contract.replay_verifier.verifier_id
+            && receipt.replay.verifier_sha256 == contract.replay_verifier.verifier_sha256
             && receipt.replay.replayed_contract_sha256 == contract.contract_sha256
             && receipt.replay.replayed_outputs == receipt.outputs,
         true, &deviations, "Independent replay is missing, failed, or not bound to the reviewed method contract.",
@@ -617,6 +629,10 @@ mod tests {
                 approved: true,
                 reviewer_id: "independent-protocol-reviewer".into(),
                 review_sha256: h('d'),
+            },
+            replay_verifier: ReplayVerifierContract {
+                verifier_id: "independent-replay-v1".into(),
+                verifier_sha256: h('8'),
             },
             dataset: DatasetContract {
                 dataset_id: "dataset-chemistry-x".into(),
@@ -710,8 +726,8 @@ mod tests {
             outputs: outputs.clone(),
             replay: ReplayReceipt {
                 outcome: ReplayOutcome::Passed,
-                verifier_id: "independent-replay-v1".into(),
-                verifier_sha256: h('8'),
+                verifier_id: contract.replay_verifier.verifier_id.clone(),
+                verifier_sha256: contract.replay_verifier.verifier_sha256.clone(),
                 replayed_contract_sha256: contract.contract_sha256.clone(),
                 replayed_outputs: outputs,
             },
@@ -732,6 +748,37 @@ mod tests {
         assert_eq!(report.disposition, Disposition::ReferenceProtocolReproduced);
         assert!(report.permissions.may_claim_reference_protocol_reproduced);
         assert!(report.permissions.may_claim_scientific_result_supported);
+    }
+
+    #[test]
+    fn replay_verifier_identity_must_match_reviewed_contract() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.replay.verifier_id = "candidate-self-review".into();
+        let report = audit_method(&c, &r);
+        assert_eq!(report.disposition, Disposition::Unresolved);
+        assert!(!report.permissions.may_claim_reference_protocol_reproduced);
+    }
+
+    #[test]
+    fn replay_verifier_implementation_must_match_reviewed_contract() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.replay.verifier_sha256 = h('9');
+        let report = audit_method(&c, &r);
+        assert_eq!(report.disposition, Disposition::Unresolved);
+        assert!(!report.permissions.may_claim_reference_protocol_reproduced);
+    }
+
+    #[test]
+    fn protocol_reviewer_cannot_also_be_the_replay_verifier() {
+        let mut c = contract();
+        c.replay_verifier.verifier_id = c.review.reviewer_id.clone();
+        let mut r = receipt(&c);
+        r.replay.verifier_id = c.replay_verifier.verifier_id.clone();
+        let report = audit_method(&c, &r);
+        assert_eq!(report.disposition, Disposition::Unresolved);
+        assert!(!report.permissions.may_claim_reference_protocol_reproduced);
     }
 
     #[test]
