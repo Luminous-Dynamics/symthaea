@@ -178,6 +178,55 @@ Do not set numeric human-performance targets before a rights-cleared pilot estim
 
 ## SOTA and industry comparison
 
+**Live competitive snapshot checked 28 November 2026.** Treat these as dated external reference points, not Melothaea results.
+
+### Production audio generation — Artificial Analysis Music Arena v1.1
+
+| Track | Current leader | Rating | 95% interval | Samples |
+|---|---|---:|---:|---:|
+| Instrumental | Suno v6 | 1148 | 1126–1170 | 2,208 |
+| Vocal | ACE Music v1 | 1161 | 1142–1180 | 2,612 |
+
+Further instrumental references: Suno v6-mini 1114 ± 21 (2,332), Mureka V9.5 1084 ± 21 (2,297), Lyria 3 Pro 1080 ± 21 (2,329). Further vocal references: Suno v6 1144 ± 17 (3,518), Suno v6-mini 1138 ± 17 (3,633), Mureka V9.5 1108 ± 17 (3,580).
+
+Sources: [instrumental leaderboard](https://artificialanalysis.ai/music/leaderboard/instrumental), [vocal leaderboard](https://artificialanalysis.ai/music/leaderboard/vocals), [methodology](https://artificialanalysis.ai/methodology/music).
+
+The Arena compares blind listener preference for tracks generated from the same prompt and modality, using Bradley–Terry maximum-likelihood ratings with 95% intervals. Defaults include approximately three-minute output, one track per prompt, seed 42 where supported, -16 LUFS integrated loudness target with -1 dBTP ceiling, no compression/limiting/EQ, and 320 kbps MP3 at 44.1 kHz. Unsupported provider controls use the closest supported setting or provider defaults. This is a production-preference benchmark; it does not measure symbolic editability, provenance or performer collaboration.
+
+### Symbolic generation — MIREX 2026
+
+MIREX 2026 evaluated a narrow piano-continuation task: four-bar prompt to twelve-bar continuation, quantized 4/4 piano. Its published ratings include:
+
+| System | Coherence | Structure | Creativity | Musicality |
+|---|---:|---:|---:|---:|
+| DAMN | 3.68 ± 0.16 | 3.39 ± 0.18 | 3.18 ± 0.16 | 3.47 ± 0.14 |
+| Anticipatory Music Transformer | 3.47 ± 0.20 | 3.34 ± 0.16 | 3.34 ± 0.16 | 3.61 ± 0.17 |
+| MuseCoco baseline | 2.79 ± 0.17 | 2.76 ± 0.15 | 3.42 ± 0.12 | 2.68 ± 0.16 |
+
+Source: [MIREX 2026 symbolic-generation results](https://futuremirex.com/mirex/wiki/2026:Symbolic_Music_Generation_Results). The study used eight prompts, twelve participants and 38 ratings per model; organizers generated eight candidates and each team selected one. This is a useful comparison but not evidence of broad multi-instrument, variable-meter or cross-cultural generalization.
+
+### Evaluator quality — MIREX CMI-RewardBench
+
+The current top listed system, CloudEar-overall, reports 73.9% preference-prediction accuracy on the 249-item core set, 60.9% on the vocal extension and 72.6% on the instrumental extension.
+
+Source: [MIREX 2026 CMI-RewardBench results](https://music-ir.org/mirex/wiki/2026:Music_Evaluation_via_CMI-RewardBench_Results). This evaluates reward-model agreement with preference, not music-generation quality.
+
+### Musical-semantic perception — MusicListenBench
+
+The 22 November 2026 preprint reports Qwen2.5-Omni GRPO training reached 99.0% on held-out clean pairs but 86.0% on FLIP/STAY, with a 25.7% false-flip rate. On real recordings, the trained model classified 27 of 42 two-strums of the same chord as different. This is direct evidence that clean-pair recognition does not establish robustness to performance variation.
+
+Source: [MusicListenBench](https://arxiv.org/abs/2611.29375). Reproduce its official scorer/splits before direct comparison; its property-relative extension remains a separate track.
+
+### Comparison rules for Melothaea
+
+- Report production preference, symbolic continuation, style identity, musical-semantic perception, editing, performer interaction and cultural qualification separately.
+- Match prompt, modality, duration, candidate count, selection policy, normalization, model/version and compute/cost when comparing external generators.
+- Do not cherry-pick more candidates than the comparator; when an external benchmark uses best-of-eight selection, disclose this and report both fixed first-sample and best-of-N results where feasible.
+- If a task or control is not supported by a comparator, report it as not comparable rather than inventing a score.
+- Use clustered uncertainty at source-work/performer level; musical windows from one recording are not independent subjects.
+- Prefer a Pareto report across quality, target fidelity, protected-feature preservation, within-style diversity, editability, latency, compute, cost and human correction burden. Do not reduce these capabilities to one reward score.
+
+
 - [MusicListenBench (22 November 2026)](https://arxiv.org/abs/2611.29375) is a key external anchor for distinguishing real musical changes from acoustic-only changes. Reproduce its official split and scorer before any direct claim; the property-relative extension must remain separate.
 - [MIREX 2026 Symbolic Music Generation](https://futuremirex.com/mirex/wiki/2026%3ASymbolic_Music_Generation_Results) provides a public subjective comparison protocol. Its published study used a small prompt set, 12 participants and best-of-eight candidate selection; this is useful context, not sufficient evidence of broad genre mastery.
 - [MIREX 2026 Music Evaluation via CMI-RewardBench](https://music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench_Results) is an evaluator-quality track, not an artistic-quality or authenticity test.
