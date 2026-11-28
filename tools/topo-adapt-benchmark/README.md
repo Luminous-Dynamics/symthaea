@@ -80,3 +80,21 @@ demand persistence, skipped-schedule rejection and context-bound state digests.
 
 Run:
     cargo test -p topo-adapt-benchmark
+
+
+## Exact robust viability and recoverability oracle (P0 reference lane)
+
+The viability module adds two separate exact finite-state calculations:
+
+- solve_robust_viability() computes a finite-horizon kernel with controller-first / disturbance-second quantifier order. All hidden states sharing an observation must accept one common action. It accounts for per-step holding cost, action cost, outcome-specific debit and a protected terminal reserve.
+- solve_recoverability(deadline) computes whether a target capability envelope can be reached in at most the deadline, and reports minimum steps, minimum starting budget and a first-action witness. Unreachable remains None, not a fabricated finite recovery time.
+
+The exact oracle is bounded to 64 states, 64 actions, 32 steps, 128 resource units and 16,384 outcome rows. These are small-instance reference limits, not scalability claims. The model is a conservative memoryless observation policy; longer-history belief-state control, stochastic viability, learned policies, physical models and cryptographic authority are outside this slice.
+
+Run:
+
+    cargo test -p topo-adapt-benchmark
+
+Fifteen viability/recoverability tests are authored. The source has not been compiled or executed on this final PR head; CI and formatting results must be checked on that exact head before promotion. The module is a synthetic reference oracle, not a learned policy or industrial/physical qualification.
+
+See docs/research/TOPO_ADAPT_VIABILITY_ORACLE_V0_1.md for the formal contract, benchmark tournament, research hypotheses, falsifiers and promotion gates.
