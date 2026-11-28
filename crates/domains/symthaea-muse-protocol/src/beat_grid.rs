@@ -460,7 +460,11 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
                 );
             } else {
                 let sum = segment.grouping.iter().try_fold(0u16, |total, value| {
-                    if *value == 0 { None } else { total.checked_add(u16::from(*value)) }
+                    if *value == 0 {
+                        None
+                    } else {
+                        total.checked_add(u16::from(*value))
+                    }
                 });
                 if sum != Some(u16::from(segment.numerator)) {
                     push(
