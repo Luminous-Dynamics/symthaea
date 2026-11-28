@@ -1,4 +1,4 @@
-# CMAQ-052 — Uncertainty-aware reference envelope and alpha split
+# CMAQ-052 — Common-conditional-mean martingale reference envelope and alpha split
 
 ## Why this is needed
 
@@ -78,7 +78,8 @@ Deterministic tests cover:
 - dimension checks;
 - atomic invalid test observations;
 - duplicate test block rejection;
-- persistent mean shift outside the target accumulating evidence.
+- persistent mean shift outside the target accumulating evidence;
+- a deterministic predictable-heteroskedastic martingale wiring fixture that carries the final reference sign into the test phase, varies conditional variance from past sign only, and checks the frozen reference target and subsequent test updates.
 
 Run:
 
