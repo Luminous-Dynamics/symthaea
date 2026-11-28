@@ -10,7 +10,7 @@ The new source evaluator is inspired by DIVE's separation of participation from 
 
 ## Implemented contract
 
-Source: `crates/domains/symthaea-soma/src/embodiment_stream_engagement.rs`.
+Source: `crates/domains/symthaea-soma/src/embodiment_stream_engagement.rs`; data contract: `SYMTHAEA_STREAM_ENGAGEMENT_SCHEMA_V1_2026-11-28.json`.
 
 Each opportunity binds:
 - stream and opportunity IDs;
@@ -67,4 +67,4 @@ Do not pool leaderboard scores across different stimuli, model input modalities,
 
 ## Evidence boundary
 
-Twelve source-level tests are authored but have not been compiled or executed. No DIVE sample, licensed benchmark data, raw audio/video, annotated continuous stream or model prediction was loaded. No response-window score or real-time latency measurement exists. Benchmark dataset licenses must be checked independently; evaluation permission does not imply model-training or media-derivative permission.
+Thirteen source-level tests are authored but have not been compiled or executed. No DIVE sample, licensed benchmark data, raw audio/video, annotated continuous stream or model prediction was loaded. No response-window score or real-time latency measurement exists. Benchmark dataset licenses must be checked independently; evaluation permission does not imply model-training or media-derivative permission.
