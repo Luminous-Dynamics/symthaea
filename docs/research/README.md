@@ -53,6 +53,7 @@ event contract.
 - [Conversational Grounded Recovery Benchmark (CGRB)](SYMTHAEA_CONVERSATIONAL_GROUNDED_RECOVERY_BENCHMARK_V0_1_2026-11-28.md)
 - [CGRB scenario JSON Schema](SYMTHAEA_CGRB_SCENARIO_SCHEMA_V0_1_2026-11-28.json)
 - [CGRB scenario positive/negative fixtures](SYMTHAEA_CGRB_SCENARIO_FIXTURES_V0_1_2026-11-28.json)
+- [CGRB Rust state-outcome reference verifier](../../crates/domains/symthaea-soma/src/cgrb_state.rs)
 - [Acoustic output observation JSON Schema](SYMTHAEA_ACOUSTIC_OUTPUT_OBSERVER_V1_2026-11-28.schema.json)
 - [Acoustic output observer positive/negative fixtures](SYMTHAEA_ACOUSTIC_OUTPUT_OBSERVER_FIXTURES_V1_2026-11-28.json)
 - [Wayland presentation-feedback ledger](../../crates/domains/symthaea-soma/src/embodiment_presentation_feedback.rs)
