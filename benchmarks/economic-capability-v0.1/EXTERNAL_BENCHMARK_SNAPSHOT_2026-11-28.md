@@ -27,6 +27,11 @@ The OSWorld 2.0 benchmark covers 108 long-horizon workflows on 31 self-hosted we
 - Independent evaluator audit: https://epoch.ai/benchmarks/osworld-2-1/review
 - Interpretation: do not use v2.1 leaderboard movement as unquestioned ground truth. Pin the release and task IDs, independently audit graders, retain task-level traces and perform blind regrades before making precise model-ranking claims.
 
+A public leaderboard mirror updated November 27, 2026 lists **81.8% partial score** for Claude Opus 5.5, 80.7% for Claude Fable 5.1 and 80.1% for Claude Sonnet 5.5. The mirror marks its displayed entries as lab-reported rather than independently rerun. These are v2.1 partial-score snapshots; they are neither binary full-task completion nor a corrected score after the Epoch audit.
+
+- Public leaderboard mirror and provenance caveat: https://benchlm.ai/benchmarks/osworld-2-1
+- Snapshot: accessed 2026-11-28.
+
 ## Software engineering agents: SWE-Bench Pro V2
 
 Scale/Reflection's September 22, 2026 SWE-Bench Pro V2 update has 642 public tasks across 11 repositories, reduced from 731 after 89 invalid tasks were removed. It corrected instructions for 69 tasks that contradicted their tests, using blind expert resolution; disabled web access during the agent phase; regraded diffs on pristine images; and added a two-sided gate requiring the reference patch to pass and the empty patch to fail. Its review caught concrete benchmark-gaming attempts and even a regression in its own reference patch.
@@ -41,10 +46,11 @@ Scale/Reflection's September 22, 2026 SWE-Bench Pro V2 update has 642 public tas
 
 LADDER comprises 145 tasks across three suites, eight categories, two embodiments, one to ten subgoals and 2,024 simulated episodes per system. Its research page reports that an un-orchestrated low-level policy drops from 85.4% success on one-subgoal tasks to 0% on five-subgoal tasks. Orchestration improves results, but the study still identifies physical execution as a limiting factor.
 
-The current project leaderboard at this snapshot displays:
-- Gemini 4 Carbon Lite via GPT-Policy: **71.5% tasks completed**, **$1.73 per completed task**;
-- Claude Fable 5.2 Lite via GPT-Policy: **66.0%**, **$7.85 per completed task**;
-- GPT-6 Astra via GPT-Policy: **63.3%**, **$6.49 per completed task**.
+The current project leaderboard separates the full 145-task suite from **LADDER-Lite**, a 10-task quick-check subset:
+- Full LADDER (145 tasks): GPT-6 Astra via GPT-Policy reports **63.3% tasks completed**, **$6.49 API/tool cost per completed task**.
+- LADDER-Lite (10 tasks): Gemini 4 Carbon Lite via GPT-Policy reports **71.5%**, **$1.73 per completed task**; Claude Fable 5.2 Lite reports **66.0%**, **$7.85 per completed task**.
+
+The 71.5% / $1.73 figure is therefore a Lite-subset result, not the full-suite leader. Keep the two denominators separate in every comparison; use the 145-task suite as the primary challenge and Lite only as a fast development diagnostic.
 
 - Research/methodology: https://ladderrobotics.ai/research
 - Current leaderboard: https://ladderrobotics.ai/
@@ -171,7 +177,8 @@ The following are stretch goals only when the exact external task set, release, 
 | OSWorld 2.0 full workflow | 20.6% binary end-to-end completion at the reported 500-step budget; 54.8% partial score | At least **25.6% binary completion** at the same 500-step budget, with no deterioration in grader-audited correctness or action safety | Do not compare partial score to binary completion; OSWorld 2.1 grading audit is an independent evaluator warning, not a corrected score |
 | ITBench-AA diagnosis | 56.2% average precision at full recall on its 59 Kubernetes root-cause tasks | At least **61.2%** on the identical task set and metric, without reducing the required recall | This is root-cause entity attribution—not remediation, restoration or safe action |
 | SWEOps-Bench verified recovery | 52.7% highest reported end-to-end recovery across six configurations; detection 72.7–90.9% | At least **60% independently verified recovery** on the same 55 incident tasks, while reporting detection and repair separately | Requires the same operator repositories, injected faults, workload, source repair process, functional checks and environment—not a new easier SRE suite |
-| LADDER long-horizon robotics | 71.5% completed tasks at $1.73 API/tool cost per completed task for the top listed configuration | At least **76.5% completion** at no more than the same reported API/tool cost on the same suite and embodiment | API/tool cost is not industrial total cost of ownership; simulation and real transfer remain separate |
+| LADDER full suite (145 tasks) | 63.3% completion; $6.49 API/tool cost per completed task for GPT-6 Astra via GPT-Policy | At least **68.3% completion** at no more than $6.49 per completed task on the same 145 tasks, policy and embodiment | Primary long-horizon comparator; simulated completion is not field reliability or safety qualification; API cost is not industrial TCO |
+| LADDER-Lite (10 tasks) | 71.5% completion; $1.73 API/tool cost per completed task for Gemini 4 Carbon Lite via GPT-Policy | At least **76.5%** at no more than $1.73 on the identical 10-task subset | Development-only quick diagnostic; must not be substituted for the 145-task full-suite result |
 | Finance Agent v2.1 | 69.47% partial-credit accuracy at $4.83/test for the leading listed entry | At least **74.5% partial-credit accuracy** at no more than $4.83/test on the identical v2.1 set and harness | Does not qualify accounting truth, point-in-time investment decisions, alpha, return or authority |
 
 These thresholds are deliberately expressed as challenge hypotheses, not minimum acceptance criteria for unrelated deployments. A team should first reproduce the reference entry and confirm its confidence interval, cost denominator, task exclusions and evaluator version. A one-off point estimate above a published leaderboard entry is not persuasive evidence of superiority.
