@@ -28,7 +28,10 @@
     "action_log_sha256",
     "result_digest_sha256",
     "resource_usage",
-    "replay"
+    "replay",
+    "system_id",
+    "system_version",
+    "harness_version"
   ],
   "properties": {
     "schema": {
@@ -264,6 +267,18 @@
           "pattern": "^[a-f0-9]{64}$"
         }
       }
+    },
+    "system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "system_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "harness_version": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }
