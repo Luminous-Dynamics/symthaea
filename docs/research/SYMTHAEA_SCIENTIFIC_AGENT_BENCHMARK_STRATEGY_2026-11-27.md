@@ -183,6 +183,40 @@ The candidate's prospective forecast must be frozen before execution. Evaluate i
 
 The initial ambition is not to beat every frontier model on every benchmark. It is to show that the same base model and tools, when governed by Symthaea's evidence/action/replay architecture, produce more verified scientific progress per unit of total cost while making fewer unsupported claims and preserving safety under evidence change.
 
+## Decision, experimental-taste and world-model tracks — 2026-11-28
+
+The portfolio above should be augmented with **diagnostic tracks that test the internal policy and world-model assumptions** which the broad research benchmarks do not isolate.
+
+| Track | External reference and result | How to use it | Symthaea target |
+|---|---|---|---|
+| RD-Bench / Decision-Centric Research | 2,000 rule-generated cases; 10 decision types instantiated from a 24-type taxonomy. On a held-out research-domain split, a state-aware 0.6B model reached 89.4% Top-1 versus 27.8% for the same recipe using only the question, and 36.4% for DeepSeek-V4.1-Flash. Calibrated prediction sets achieved 97.1% empirical coverage at mean size 1.515. [Paper](https://arxiv.org/abs/2611.00774) | Test typed decisions over a public ResearchState: evidence sufficiency, next action, stopping, conflict, routing and escalation. Treat as closed-option decision quality, not research completion. | ≥90% pooled Top-1 initially, ≥85% next-action Top-1; prediction-set coverage ≥95% with mean set size ≤1.6 and selective-risk reporting on held-out domains |
+| TasteVal / experimental taste | Eight private AI R&D tasks, 24 recruited experts and a fixed Coder to isolate experiment selection. Opus 5.5 achieved a reported 2.30× experimental-compute multiplier (95% CI 1.15–4.37) on seven scored tasks, but normalized final-performance multiplier was 1.14× (95% CI 1.01–1.31). Compute multiplier excludes Researcher inference tokens; task coverage differs by model and one refusal was excluded as missing data. [Paper](https://arxiv.org/abs/2610.06824) | Separate experiment-compute efficiency from final held-out outcome. Use one fixed executor/Coder across policy arms and fully account for inference, tools, retries and human review. | First reproduce a matched fixed-executor protocol; stretch to ≥2× experimental-compute efficiency at non-inferior final performance (predeclared −2% margin) and ≥1.1× normalized final performance. No claim without inclusive lifecycle cost |
+| Scientist World / Improve and Innovate | Paper reports 1,000 paper-derived executable environments. Its model evaluation used a fixed cohort of ten lower-compute environments: positive held-out improvement over the **reproduced source method** in 84% of Improve and 74% of Innovate attempts. These figures do not mean that the agents beat the original human authors, and they have not yet been independently replicated. [Paper/project](https://arxiv.org/abs/2611.08478) | Measure whether a method improves under protected metrics, fixed data/compute and frozen baselines. Distinguish improvement of a reproduced method from a new scientific discovery. | ≥85% positive held-out Improve and ≥80% Innovate attempts on a larger sealed cohort, with raw metrics, failed attempts, regressions, rollbacks and all compute costs published |
+| WorldTest / AutumnBench | A behavior-based world-model protocol instantiated in 43 interactive environments and 129 tasks across masked-frame prediction, change detection and planning. 517 human participants substantially outperformed five frontier models. [ICML/PMLR paper](https://proceedings.mlr.press/v306/warrier26a.html) | Test whether a model supports counterfactual and environment-level queries beyond replaying familiar trajectories. This is a world-model diagnostic, not a scientific-publication benchmark. | ≥90% of human-median performance in each query family; zero false-correct answers on deliberately underdetermined intervention controls |
+
+### Interpretation and caveats
+
+**RD-Bench is a particularly relevant design precedent.** Its key finding is not just a high Top-1 result: exposing a structured research state changed decision performance dramatically compared with asking the same model a question alone. Symthaea should therefore make the state projection and decision trace first-class, then compare state-aware against question-only ablations using identical models and task IDs. The candidate must emit probabilities or set-valued predictions and permit abstention; a hard class label alone is insufficient.
+
+**TasteVal highlights a metric trap.** Experimental-compute multiplier and final normalized performance are different axes. A system may use experiments efficiently without producing proportionally better final outcomes. Moreover, the reported compute multiplier excludes Researcher inference tokens and its seven-task Opus 5.5 cohort differs from the eight-task main cohort. Symthaea's own denominator must include inference, orchestration, tool calls, retries, executor time, experiments, validation, verification and human review. Always publish both compute-efficiency and final-quality results.
+
+**Scientist World is promising but must be interpreted narrowly.** Its reported 84%/74% positive FNI rates apply to ten evaluation environments and use the reproduced paper method as baseline. The 1,000 environments are the corpus/construction claim, not the number of evaluated tasks underlying those percentages. Until an independent reproduction and access/licensing review is complete, treat it as author-reported supporting evidence, not a settled SOTA table.
+
+**WorldTest tests whether the agent learned a useful model of the world.** Its reward-free exploration followed by environment-level queries is a good paradigm for testing causal and dynamics understanding. The large human–model gap makes it a useful stretch target, but a grid-world result cannot be generalized to general scientific research capability.
+
+### Cross-track design
+
+Create no additional evaluator. Under #11171, keep the evaluation layers separate but linked by a common episode ID and immutable receipt chain:
+
+1. **Decision layer:** RD-Bench-style state-conditioned choice and calibrated option set.
+2. **Policy layer:** #13571 sequential regret and matched fixed/random/EIG/EVSI/minimax/production-policy comparisons.
+3. **World-model layer:** open-world microcosm and WorldTest-style intervention/holdout tests.
+4. **Method layer:** METHODE method fidelity, PaperBench replication and Scientist World-style improvement.
+5. **Research-outcome layer:** Terminal-Bench-Science, DeepResearch Bench II, FrontierPhysics and ASB.
+6. **Integrity layer:** RITE/CEDAR/REPAIR, authorization, provenance, correction propagation and independent replay.
+
+Do not collapse these into a weighted total. The publishable result should be a set of Pareto frontiers and hard-gate pass vectors: verified outcome, unsupported-claim rate, false-unique/model-misspecification rate, calibration, regret, correction recovery, transfer, complete replay and inclusive cost. A candidate that fails authorization or evidence provenance does not receive credit for a correct-looking answer.
+
 ## References
 
 - [Terminal-Bench-Science official leaderboard](https://snorkel.ai/leaderboard/terminal-bench-science/)
