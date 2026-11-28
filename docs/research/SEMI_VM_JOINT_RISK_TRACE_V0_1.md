@@ -31,6 +31,15 @@ Pinned input code heads used when composing this branch:
 
 The shared benchmark does not transfer one method's guarantee to another. ACI is checked against its fixed-delay schedule; CA-OCRC against its bounded-delay/tracking policy; population inference is computed by its separate design-based estimator.
 
+## Comparison scope
+
+Each trace now declares one of two comparability claims:
+
+- **Controller ablation:** every arm must use the same global-model artifact digest and interval-method digest. This isolates controller policy/feedback semantics.
+- **End-to-end pipeline comparison:** model and interval artifacts may differ; the report labels the result accordingly and no controller-only attribution is permitted.
+
+Both scopes still share one population, physical acquisition stream, K1 evidence and independent audit design in Mode A.
+
 ## v1 — Mode A paired shared acquisition
 
 Each arm sees the same population manifest and source ledger, wafer ordering and measurement-event identities, physical-metrology selected flags and costs, K1 qualification states/revisions/payload/report digests, availability/report/delivery timestamps, acquisition-policy digest, physical-metrology budget and independent randomized audit design/draw/inclusion probabilities/reference receipts/**observed loss values**.
@@ -102,14 +111,16 @@ The first known-answer fixture is synthetic and has two rounds:
 - the independent audit samples wafer 2 with inclusion probability 1 and a separate reference receipt;
 - two paired arms share the same trace, acquisition policy, physical budget and audit draw.
 
-Seven tests currently cover:
+Nine tests currently cover:
 1. successful paired replay with separate physical/qualified/audit counts and ACI coverage;
 2. numeric/K1 row mismatch rejection;
 3. paired arms with different observed audit losses rejection;
 4. physical metrology budget overrun rejection;
 5. row/arm input-order-invariant trace digest;
 6. unmeasured row cannot carry label/report/delivery evidence;
-7. UNKNOWN/BLOCKED CA-OCRC feedback can remain visible without promoting it to an eligible update.
+7. UNKNOWN/BLOCKED CA-OCRC feedback can remain visible without promoting it to an eligible update;
+8. controller-only scope rejects different global-model or interval-method artifacts;
+9. end-to-end scope accepts a distinct interval method and preserves the scope in the report.
 
 Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 Reference Oracle are pending for the current branch.
 
