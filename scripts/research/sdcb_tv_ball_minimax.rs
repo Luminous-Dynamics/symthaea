@@ -148,18 +148,24 @@ fn glrt_ratio(outcome_one: bool) -> Q {
     alt_max.div(null_max)
 }
 
-/// Worst-null tail probability for the GLRT ordering on the two outcomes.
-fn p_sup(outcome_one: bool) -> Q {
+fn component_tail(null_p: Q, observed_score: Q) -> Q {
+    let law = bernoulli_law(null_p);
     let score_zero = glrt_ratio(false);
     let score_one = glrt_ratio(true);
-    if outcome_one {
-        // score_one is the unique largest statistic value; tail is {Y=1}.
-        NULL_LOW.max(NULL_HIGH)
-    } else if score_zero.cmp(score_one) != Ordering::Greater {
-        Q::one()
-    } else {
-        Q::one()
+    let mut tail = Q::zero();
+    if score_zero.cmp(observed_score) != Ordering::Less {
+        tail = tail.add(law[0]);
     }
+    if score_one.cmp(observed_score) != Ordering::Less {
+        tail = tail.add(law[1]);
+    }
+    tail
+}
+
+/// Conservative worst-null tail probability for the frozen GLRT statistic.
+fn p_sup(outcome_one: bool) -> Q {
+    let observed_score = glrt_ratio(outcome_one);
+    component_tail(NULL_LOW, observed_score).max(component_tail(NULL_HIGH, observed_score))
 }
 
 fn run_fixture() {
