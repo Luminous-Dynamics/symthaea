@@ -340,7 +340,7 @@ pub fn verify_financial_research(
 
     verify_payload_integrity(&manifest, evidence, resolver, &mut report);
     let temporal_by_id = verify_temporal_binding(&task, evidence, temporal, &mut report);
-    verify_semantic_relations(&task, evidence, &audit, &temporal_by_id, &mut report);
+    verify_semantic_relations(&task, &manifest, evidence, &audit, &temporal_by_id, &mut report);
 
     report.sort_findings();
     report
@@ -756,6 +756,7 @@ fn verify_temporal_binding(
 
 fn verify_semantic_relations(
     task: &Value,
+    manifest: &Value,
     artifacts: &[Value],
     audit: &Value,
     temporal_by_id: &BTreeMap<String, TemporalDisposition>,
@@ -790,13 +791,13 @@ fn verify_semantic_relations(
         );
     }
 
-    let mut evidence_by_id: BTreeMap<&str, &Value> = BTreeMap::new();
+    let mut evidence_by_id: BTreeMap<&str, (usize, &Value)> = BTreeMap::new();
     for (index, artifact) in artifacts.iter().enumerate() {
         let evidence_id = artifact
             .get("evidence_id")
             .and_then(Value::as_str)
             .unwrap_or_default();
-        if evidence_by_id.insert(evidence_id, artifact).is_some() {
+        if evidence_by_id.insert(evidence_id, (index, artifact)).is_some() {
             report.record(
                 Gate::Semantic,
                 Disposition::Fail,
@@ -912,7 +913,7 @@ fn verify_semantic_relations(
                 );
             }
 
-            let Some(source) = evidence_by_id.get(evidence_id) else {
+            let Some((source_index, source)) = evidence_by_id.get(evidence_id).copied() else {
                 report.record(
                     Gate::Semantic,
                     Disposition::Fail,
@@ -938,6 +939,59 @@ fn verify_semantic_relations(
                     "CLAIM_SOURCE_SNAPSHOT_MISMATCH",
                     format!("{relation_path}.source_snapshot_sha256"),
                     "claim relation does not bind the exact digest declared by the referenced evidence version",
+                );
+            }
+
+            let source_locator = relation
+                .get("source_locator")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let payload_ref = source
+                .get("payload_ref")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+
+            if let Some(inline_pointer) = payload_ref.strip_prefix("inline:") {
+                let expected_pointer =
+                    format!("/artifacts/{source_index}/metadata/synthetic_record");
+                if inline_pointer != expected_pointer {
+                    report.record(
+                        Gate::PayloadIntegrity,
+                        Disposition::Fail,
+                        "INLINE_PAYLOAD_POINTER_NOT_SYNTHETIC_RECORD",
+                        format!("$.artifacts[{source_index}].payload_ref"),
+                        "the v1 inline synthetic profile requires payload_ref to resolve exactly to metadata.synthetic_record",
+                    );
+                }
+
+                let locator_is_descendant = source_locator == inline_pointer
+                    || source_locator
+                        .strip_prefix(inline_pointer)
+                        .is_some_and(|suffix| suffix.starts_with('/'));
+                if !locator_is_descendant {
+                    report.record(
+                        Gate::Semantic,
+                        Disposition::Fail,
+                        "SOURCE_LOCATOR_OUTSIDE_PAYLOAD",
+                        format!("{relation_path}.source_locator"),
+                        "claim source locator is not within the exact inline payload bound by this evidence artifact",
+                    );
+                } else if manifest.pointer(source_locator).is_none() {
+                    report.record(
+                        Gate::Semantic,
+                        Disposition::Fail,
+                        "SOURCE_LOCATOR_NOT_FOUND",
+                        format!("{relation_path}.source_locator"),
+                        "claim source locator does not resolve to a value inside the exact evidence manifest",
+                    );
+                }
+            } else {
+                report.record(
+                    Gate::Semantic,
+                    Disposition::Indeterminate,
+                    "EXTERNAL_SOURCE_LOCATOR_UNVERIFIED",
+                    format!("{relation_path}.source_locator"),
+                    "payload bytes may be digest-verified, but this v0.1 verifier has no source-format locator resolver for external evidence",
                 );
             }
 
@@ -1631,6 +1685,56 @@ mod tests {
             .findings
             .iter()
             .any(|finding| finding.code == "TASK_EVIDENCE_SET_MISMATCH"));
+    }
+
+    #[test]
+    fn claim_source_locator_must_resolve_within_its_exact_inline_payload() {
+        let mut audit: Value = serde_json::from_slice(AUDIT).unwrap();
+        let manifest: Value = serde_json::from_slice(MANIFEST).unwrap();
+        let artifact = &manifest["artifacts"][0];
+        let mut claim = audit["claims"][0].clone();
+        claim["evidence_relations"][0]["source_snapshot_sha256"] =
+            artifact["content_sha256"].clone();
+        claim["evidence_relations"][0]["temporally_admissible"] = Value::Bool(true);
+        claim["evidence_relations"][0]["source_locator"] =
+            Value::String("/artifacts/0/metadata/synthetic_record/missing_field".into());
+        audit["claims"] = serde_json::json!([claim]);
+
+        let result = report(
+            &serde_json::to_vec(&audit).unwrap(),
+            &temporal(TemporalDisposition::Pass),
+        );
+
+        assert_eq!(result.semantic, Disposition::Fail);
+        assert!(result
+            .findings
+            .iter()
+            .any(|finding| finding.code == "SOURCE_LOCATOR_NOT_FOUND"));
+    }
+
+    #[test]
+    fn inline_payload_must_be_exact_synthetic_record_object() {
+        let mut manifest: Value = serde_json::from_slice(MANIFEST).unwrap();
+        manifest["artifacts"][0]["payload_ref"] =
+            Value::String("inline:/artifacts/0/metadata/synthetic_record/status".into());
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let mut task: Value = serde_json::from_slice(TASK).unwrap();
+        task["evidence_manifest_sha256"] = Value::String(sha256_hex(&manifest_bytes));
+        let task_bytes = serde_json::to_vec(&task).unwrap();
+
+        let result = verify_financial_research(
+            &task_bytes,
+            &manifest_bytes,
+            AUDIT,
+            &temporal(TemporalDisposition::Indeterminate),
+            None,
+        );
+
+        assert_eq!(result.payload_integrity, Disposition::Fail);
+        assert!(result
+            .findings
+            .iter()
+            .any(|finding| finding.code == "INLINE_PAYLOAD_POINTER_NOT_SYNTHETIC_RECORD"));
     }
 
     #[test]
