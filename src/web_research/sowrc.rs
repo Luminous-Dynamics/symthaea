@@ -368,8 +368,11 @@ pub fn evaluate_sowrc(
                 "the external audit design."
             )
             .to_owned(),
-            "The candidate probabilities and nonconformity function are frozen before labels are observed."
-                .to_owned(),
+            concat!(
+                "The candidate probabilities and nonconformity function are frozen ",
+                "before labels are observed."
+            )
+            .to_owned(),
             "The horizon and deterministic envelopes c_n=1 and b_n=1/q_min are fixed before labels."
                 .to_owned(),
             concat!(
@@ -850,7 +853,10 @@ mod tests {
         assert!(saw_nontrivial_bound);
         assert!(
             failure_probability <= per_threshold_delta + 1e-12,
-            "exact Bernoulli audit-mask failure probability {failure_probability} exceeded {per_threshold_delta}"
+            concat!(
+                "exact Bernoulli audit-mask failure probability {failure_probability} ",
+                "exceeded {per_threshold_delta}"
+            )
         );
     }
 }
