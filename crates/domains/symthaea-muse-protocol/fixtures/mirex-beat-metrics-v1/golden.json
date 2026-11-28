@@ -1,16 +1,28 @@
 {
   "schema_version": 1,
-  "reference_source": {
-    "mir_eval_version": "0.8.2",
-    "mir_eval_commit": "8db0b3812e2032544c1fc00d02d4256cab043f3d",
-    "mirex_evaluator_commit": "b9fa0b0b32e2145af31f35830f78fc9d09a4301b"
+  "oracle": {
+    "library": "mir_eval",
+    "version": "0.8.2",
+    "source_commit": "8db0b3812e2032544c1fc00d02d4256cab043f3d",
+    "evaluator_repository": "ismir-mirex/mirex-evaluation",
+    "evaluator_commit": "b9fa0b0b32e2145af31f35830f78fc9d09a4301b",
+    "metric_keys": [
+      "F-measure",
+      "Cemgil",
+      "Goto",
+      "P-score",
+      "Correct Metric Level Continuous",
+      "Correct Metric Level Total",
+      "Any Metric Level Continuous",
+      "Any Metric Level Total"
+    ],
+    "trim_seconds": 5
   },
   "sample_rate_hz": 1000,
   "total_frames": 15000,
-  "trim_seconds": 5,
   "cases": [
     {
-      "case": "perfect",
+      "name": "perfect",
       "reference_frames": [
         0,
         1000,
@@ -54,7 +66,7 @@
       }
     },
     {
-      "case": "shift_70ms",
+      "name": "shift_70ms",
       "reference_frames": [
         0,
         1000,
@@ -98,7 +110,7 @@
       }
     },
     {
-      "case": "shift_71ms",
+      "name": "shift_71ms",
       "reference_frames": [
         0,
         1000,
@@ -142,7 +154,7 @@
       }
     },
     {
-      "case": "half_time",
+      "name": "half_time",
       "reference_frames": [
         0,
         1000,
@@ -180,7 +192,7 @@
       }
     },
     {
-      "case": "double_time",
+      "name": "double_time",
       "reference_frames": [
         0,
         1000,
@@ -237,7 +249,7 @@
       }
     },
     {
-      "case": "extra_midbeat_duplicate_events",
+      "name": "extra_midbeat_duplicate_events",
       "reference_frames": [
         0,
         1000,
@@ -304,7 +316,7 @@
       }
     },
     {
-      "case": "one_missing_beat",
+      "name": "one_missing_beat",
       "reference_frames": [
         0,
         1000,
@@ -347,7 +359,7 @@
       }
     },
     {
-      "case": "offbeat_half_period",
+      "name": "offbeat_half_period",
       "reference_frames": [
         0,
         1000,
