@@ -22,6 +22,7 @@ Keep these methods separate; do not merge their guarantees or silently borrow th
 | CMAQ-048 | Fixed Fourier-feature kernel mean embedding monitored by CMAQ-046 | Exploratory distributional arm; finite feature bank and frozen conditional-mean embedding envelope |
 | CMAQ-049 | Context-blocked paired Fourier kernel discrepancy e-process | Conditional paired-distribution equality in frozen discrete pre-response contexts; finite map and context partition |
 | CMAQ-050 | Continuous-covariate product Fourier paired conditional e-process | Conditional paired-distribution equality via frozen product Fourier maps; no hard bins, finite product dimension |
+| CMAQ-051 | Fixed equal-weight portfolio of contextual and product Fourier paired e-processes | Conditional paired-distribution equality; fixed representation weights, same null, stopped member processes |
 
 For every method, freeze source revision, dependencies, score mapping, reference set, ties, warm-up, alpha, horizon and stopping rule. The CCTM/PF-CCTM arms operate on their own stated score/p-value contracts; a PRM result cannot be presented as a reproduction of either.
 
@@ -69,6 +70,25 @@ A smaller smoke run may test wiring but cannot estimate a five-percent false-ala
 **Recoverability shifts:** increasing residual variance, decreasing barrier/recoverability margin, delayed actuation, fallback degradation, and simultaneous sensor/control disturbances. Ground-truth deadlines must come from independent plant/scenario evaluation, not from the detector.
 
 For every generator, store its source, parameters, seed, split, effective block ID, rank/score receipt and exact build digest.
+
+### Representation portfolio comparisons (CMAQ-051)
+
+The representation portfolio is a *fixed mixture*, not an adaptive winner selector. It combines the contextual and product Fourier test supermartingales with pre-registered weights, currently 1/2 and 1/2:
+
+    E_portfolio,t = 0.5 E_context,t + 0.5 E_product,t.
+
+Both members must test the same conditional paired-distribution null on the same paired input sequence. The validity of the mixture does not require independence between members, but it does require each member to be valid under the same null and the weights to be fixed before observing outcomes.
+
+Compare:
+- each member alone (CMAQ-049 and CMAQ-050);
+- the pre-registered equal mixture;
+- pre-registered unequal weights chosen only on development data and frozen before holdout;
+- a post-hoc maximum over member e-values as an explicitly invalid negative control to demonstrate representation-selection bias (never present it as an anytime-valid monitor);
+- SCPT on the same paired covariate streams.
+
+Construct alternatives where the signal is visible primarily to the contextual member, primarily to the product member, visible to both, and invisible to both finite maps. Report per-member log wealth, mixture wealth, member stop times, mixture stop time, full-horizon null alarms, power/misses, H+1-restricted delay, p99 compute, memory and feature dimensions.
+
+A member crossing its own threshold is stopped and its wealth remains at the stopped value. It must not be reset, removed or reweighted after that point. The combined e-process uses the fixed mixture threshold 1/alpha. No dynamic member addition or adaptive representation weighting is allowed in this benchmark.
 
 ### Paired conditional distribution benchmarks (CMAQ-049 and CMAQ-050)
 
