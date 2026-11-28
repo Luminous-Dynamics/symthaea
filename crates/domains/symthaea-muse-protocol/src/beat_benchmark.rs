@@ -107,6 +107,8 @@ pub struct BeatBenchmarkTrack {
     pub rights_status: BeatDatasetRightsStatus,
     /// URI or immutable reference to the rights/permission decision.
     pub rights_reference: String,
+    /// Required for private external cohorts; records the permitted publication ceiling.
+    pub publication_ceiling: Option<String>,
     /// SHA-256 of the exact annotation artifact.
     pub annotation_sha256: String,
     pub annotation_provenance: BeatAnnotationProvenance,
@@ -165,6 +167,7 @@ pub enum BeatBenchmarkViolationCode {
     SplitPurposeMismatch,
     RightsNotApproved,
     EmptyRightsReference,
+    MissingPrivatePublicationCeiling,
     UnknownAnnotationProvenance,
     EmptyAnnotationRevision,
     KnownTrainingOverlap,
@@ -313,7 +316,7 @@ pub fn validate_beat_benchmark_manifest(
         let mirex_locked = is_mirex_2026
             && MIREX_2026_LOCKED_DATASETS
                 .iter()
-                .any(|locked| *locked == dataset_id);
+                .any(|locked| *locked == dataset_id.as_str());
         if mirex_locked
             && (track.split != BeatDatasetSplit::LockedTest
                 || track.purpose != BeatDatasetPurpose::BenchmarkEvaluation)
@@ -381,6 +384,19 @@ pub fn validate_beat_benchmark_manifest(
                 BeatBenchmarkViolationCode::EmptyRightsReference,
                 BeatBenchmarkViolationSeverity::Reject,
                 format!("{base}.rights_reference"),
+            );
+        }
+        if track.split == BeatDatasetSplit::PrivateExternal
+            && track
+                .publication_ceiling
+                .as_deref()
+                .is_none_or(|ceiling| ceiling.trim().is_empty())
+        {
+            push(
+                &mut violations,
+                BeatBenchmarkViolationCode::MissingPrivatePublicationCeiling,
+                BeatBenchmarkViolationSeverity::Reject,
+                format!("{base}.publication_ceiling"),
             );
         }
         if track.annotation_provenance == BeatAnnotationProvenance::Unknown {
@@ -676,7 +692,8 @@ mod tests {
             split,
             purpose,
             rights_status: BeatDatasetRightsStatus::Approved,
-            rights_reference: "https://example.org/rights/record-1".to_string(),
+            rights_reference: "urn:fixture:synthetic-rights-reference".to_string(),
+            publication_ceiling: None,
             annotation_sha256: "a".repeat(64),
             annotation_provenance: BeatAnnotationProvenance::HumanAdjudicated,
             annotation_revision: "annotation-v1".to_string(),
@@ -854,6 +871,22 @@ mod tests {
         assert!(found.contains(&BeatBenchmarkViolationCode::RightsNotApproved));
         assert!(found.contains(&BeatBenchmarkViolationCode::EmptyRightsReference));
         assert!(found.contains(&BeatBenchmarkViolationCode::UnknownAnnotationProvenance));
+    }
+
+    #[test]
+    fn requires_publication_ceiling_for_private_external_cohorts() {
+        let mut track = valid_track(
+            "yamaha-private-0001",
+            "yamaha-balanced-private",
+            BeatDatasetSplit::PrivateExternal,
+            BeatDatasetPurpose::ExternalValidation,
+            &"f".repeat(64),
+            "master-yamaha-0001",
+        );
+        track.publication_ceiling = None;
+        assert!(codes(&manifest(vec![track])).contains(
+            &BeatBenchmarkViolationCode::MissingPrivatePublicationCeiling
+        ));
     }
 
     #[test]
