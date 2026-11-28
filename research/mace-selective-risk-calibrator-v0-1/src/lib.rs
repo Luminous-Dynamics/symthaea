@@ -919,15 +919,32 @@ pub fn calibrate_selective_evidence_v1(
     Ok(CalibrationResultV1{manifest,certificates:certificates.into_values().collect()})
 }
 
-pub fn assess_decision_v1(input:&DecisionInputV1,certificate:&GroupCertificateV1)
-    ->Result<DecisionAssessmentV1,CalibrationRejectV1>{
+pub fn assess_decision_v1(
+    input: &DecisionInputV1,
+    manifest: &CalibrationManifestV1,
+    certificate: &GroupCertificateV1,
+) -> Result<DecisionAssessmentV1, CalibrationRejectV1> {
     if !valid_digest(&input.decision_need_sha256)||!valid_digest(&input.evidence_capsule_sha256)
         ||!valid_digest(&input.policy_sha256)
         ||!valid_digest(&input.sufficiency_score_definition_sha256)
         ||!valid_digest(&input.group_hierarchy_sha256)
         ||!input.sufficiency_score.is_finite()
         ||!(0.0..=1.0).contains(&input.sufficiency_score){return Err(CalibrationRejectV1::InvalidExample);}
-    let certificate_scope_matches = certificate.decision_policy_sha256 == input.policy_sha256
+    let manifest_matches = manifest.verify_integrity()
+        && valid_digest(&manifest.calibration_split_sha256)
+        && valid_digest(&manifest.evaluation_split_sha256)
+        && valid_digest(&manifest.split_audit_receipt_sha256)
+        && manifest.decision_policy_sha256 == input.policy_sha256
+        && manifest.sufficiency_score_definition_sha256 == input.sufficiency_score_definition_sha256
+        && manifest.group_hierarchy_sha256 == input.group_hierarchy_sha256
+        && certificate.calibration_manifest_sha256 == manifest.manifest_sha256
+        && certificate.decision_policy_sha256 == manifest.decision_policy_sha256
+        && certificate.sufficiency_score_definition_sha256 == manifest.sufficiency_score_definition_sha256
+        && certificate.group_hierarchy_sha256 == manifest.group_hierarchy_sha256
+        && certificate.risk_target_alpha == manifest.risk_target_alpha;
+    let certificate_scope_matches = manifest_matches
+        && certificate.verify_integrity()
+        && certificate.decision_policy_sha256 == input.policy_sha256
         && certificate.sufficiency_score_definition_sha256 == input.sufficiency_score_definition_sha256
         && certificate.group_hierarchy_sha256 == input.group_hierarchy_sha256
         && certificate.group_id == input.group_id;
@@ -937,6 +954,9 @@ pub fn assess_decision_v1(input:&DecisionInputV1,certificate:&GroupCertificateV1
     }else if input.distribution_shift_detected||certificate.status==RiskStatusV1::UnsupportedDistributionShift{
         (if input.evidence_acquisition_available{DecisionActionV1::AcquireEvidence}else{DecisionActionV1::Abstain},
         DecisionAssessmentStatusV1::CertificateSuspendedShift,"distribution shift suspends the group certificate")
+    }else if !manifest_matches {
+        (DecisionActionV1::Abstain,DecisionAssessmentStatusV1::AbstainedNotEstimable,
+         "calibration manifest integrity or certificate linkage does not match")
     }else if certificate.decision_policy_sha256!=input.policy_sha256{
         (DecisionActionV1::Abstain,DecisionAssessmentStatusV1::AbstainedNotEstimable,
          "decision policy digest does not match the calibrated certificate")
@@ -977,7 +997,7 @@ pub fn assess_decision_v1(input:&DecisionInputV1,certificate:&GroupCertificateV1
         group_id:input.group_id.clone(),action,status,
         hard_gates_pass:input.hard_gates_pass,sufficiency_score:input.sufficiency_score,
         threshold:certificate.threshold,risk_target_alpha:certificate.risk_target_alpha,
-        risk_upper_bound:if certificate_scope_matches && certificate.verify_integrity()
+        risk_upper_bound:if certificate_scope_matches
             && input.hard_gates_pass && !input.distribution_shift_detected && !certificate.distribution_shift_detected
             { certificate.risk_upper_bound } else { None },
         distribution_shift_detected:input.distribution_shift_detected||certificate.distribution_shift_detected,
@@ -1153,7 +1173,7 @@ mod tests{
             distribution_shift_detected:false,evidence_acquisition_available:false,retrieval_available:false,
             escalate_on_hard_gate:false,decision_need_sha256:digest("need"),
             evidence_capsule_sha256:digest("capsule"),policy_sha256:digest("policy")
-        },cert).unwrap();
+        },&result.manifest,cert).unwrap();
         assert_eq!(assessment.action,DecisionActionV1::Abstain);
         assert_eq!(assessment.status,DecisionAssessmentStatusV1::RejectedHardGate);
     }
@@ -1220,7 +1240,7 @@ mod tests{
             group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),hard_gates_pass:true,distribution_shift_detected:false,
             evidence_acquisition_available:true,retrieval_available:true,escalate_on_hard_gate:false,
             decision_need_sha256:digest("need"),evidence_capsule_sha256:digest("capsule"),policy_sha256:digest("policy")
-        },cert).unwrap();
+        },&result.manifest,cert).unwrap();
         assert_eq!(assessment.action,DecisionActionV1::RetrieveMore);assert!(assessment.verify_integrity());
     }
     #[test]
@@ -1234,11 +1254,11 @@ mod tests{
             distribution_shift_detected:false,evidence_acquisition_available:false,retrieval_available:false,
             escalate_on_hard_gate:false,decision_need_sha256:digest("need"),
             evidence_capsule_sha256:digest("capsule"),policy_sha256:digest("policy")};
-        let assessment=assess_decision_v1(&input,cert).unwrap();
+        let assessment=assess_decision_v1(&input,&result.manifest,cert).unwrap();
         assert_eq!(assessment.action,DecisionActionV1::AcceptAndAct);
         assert_eq!(assessment.status,DecisionAssessmentStatusV1::AcceptedUnderCertificate);
         let mut wrong=input;wrong.group_id="different".into();
-        assert_ne!(assess_decision_v1(&wrong,cert).unwrap().action,DecisionActionV1::AcceptAndAct);
+        assert_ne!(assess_decision_v1(&wrong,&result.manifest,cert).unwrap().action,DecisionActionV1::AcceptAndAct);
     }
     #[test]
     fn tampered_certificate_cannot_authorize_acceptance(){
@@ -1264,7 +1284,7 @@ mod tests{
             escalate_on_hard_gate:false,decision_need_sha256:digest("need"),
             evidence_capsule_sha256:digest("capsule"),policy_sha256:digest("different-policy")
         };
-        let assessment=assess_decision_v1(&input,cert).unwrap();
+        let assessment=assess_decision_v1(&input,&result.manifest,cert).unwrap();
         assert_eq!(assessment.action,DecisionActionV1::Abstain);
         assert_eq!(assessment.status,DecisionAssessmentStatusV1::AbstainedNotEstimable);
         assert!(assessment.verify_integrity());
@@ -1288,14 +1308,14 @@ mod tests{
             policy_sha256:digest("policy")
         };
         input.sufficiency_score_definition_sha256=digest("different-score-definition");
-        let score_mismatch=assess_decision_v1(&input,cert).unwrap();
+        let score_mismatch=assess_decision_v1(&input,&result.manifest,cert).unwrap();
         assert_eq!(score_mismatch.action,DecisionActionV1::Abstain);
         assert_eq!(score_mismatch.status,DecisionAssessmentStatusV1::AbstainedNotEstimable);
         assert_eq!(score_mismatch.risk_upper_bound,None);
 
         input.sufficiency_score_definition_sha256=cfg.sufficiency_score_definition_sha256.clone();
         input.group_hierarchy_sha256=digest("different-group-hierarchy");
-        let hierarchy_mismatch=assess_decision_v1(&input,cert).unwrap();
+        let hierarchy_mismatch=assess_decision_v1(&input,&result.manifest,cert).unwrap();
         assert_eq!(hierarchy_mismatch.action,DecisionActionV1::Abstain);
         assert_eq!(hierarchy_mismatch.status,DecisionAssessmentStatusV1::AbstainedNotEstimable);
         assert_eq!(hierarchy_mismatch.risk_upper_bound,None);
@@ -1441,6 +1461,63 @@ mod tests{
             calibrate_selective_evidence_v1(&cfg, &groups, &rows, &mismatched, &evaluation),
             Err(CalibrationRejectV1::SplitAuditRejected)
         );
+    }
+
+
+    #[test]
+    fn nonzero_unsafe_cluster_bounds_match_independent_beta_quantile_references() {
+        // One-sided Clopper-Pearson upper limits from the exact Beta(k+1,n-k)
+        // quantile; independent reference values are pinned as regression vectors.
+        let cases = [
+            (1, 10, 0.05, 0.39416330243650466),
+            (2, 20, 0.05, 0.28261852488586087),
+            (5, 100, 0.01, 0.12585173069767863),
+            (10, 100, 0.05, 0.16371762327581477),
+            (1, 100, 0.001, 0.08862688870395756),
+        ];
+        for (unsafe_count, accepted_count, delta, expected) in cases {
+            let actual = clopper_pearson_upper_v1(unsafe_count, accepted_count, delta).unwrap();
+            assert!((actual - expected).abs() < 2e-10, "k={unsafe_count}, n={accepted_count}: {actual} != {expected}");
+        }
+    }
+
+    #[test]
+    fn certificate_assessment_requires_the_matching_integral_manifest() {
+        let groups = vec![GroupSpecV1 {
+            group_id: "root".into(), parent_group_id: None,
+            allow_parent_fallback: false, distribution_shift_detected: false,
+        }];
+        let rows = examples(100, "root", 0.9, 0.0);
+        let cfg = config(&groups, &rows, vec![0.5, 0.0], 30);
+        let result = calibrate_for_test(&cfg, &groups, &rows).unwrap();
+        let cert = &result.certificates[0];
+        let input = DecisionInputV1 {
+            group_id: "root".into(),
+            sufficiency_score: 0.9,
+            sufficiency_score_definition_sha256: cfg.sufficiency_score_definition_sha256.clone(),
+            group_hierarchy_sha256: cfg.group_hierarchy_sha256.clone(),
+            hard_gates_pass: true,
+            distribution_shift_detected: false,
+            evidence_acquisition_available: false,
+            retrieval_available: false,
+            escalate_on_hard_gate: false,
+            decision_need_sha256: digest("need"),
+            evidence_capsule_sha256: digest("capsule"),
+            policy_sha256: cfg.decision_policy_sha256.clone(),
+        };
+        assert_eq!(
+            assess_decision_v1(&input, &result.manifest, cert).unwrap().action,
+            DecisionActionV1::AcceptAndAct
+        );
+
+        let mut altered_manifest = result.manifest.clone();
+        altered_manifest.candidate_code_sha256 = digest("other-candidate");
+        altered_manifest.manifest_sha256.clear();
+        altered_manifest.manifest_sha256 = digest_serialized(&altered_manifest).unwrap();
+        let rejected = assess_decision_v1(&input, &altered_manifest, cert).unwrap();
+        assert_eq!(rejected.action, DecisionActionV1::Abstain);
+        assert_eq!(rejected.status, DecisionAssessmentStatusV1::AbstainedNotEstimable);
+        assert_eq!(rejected.risk_upper_bound, None);
     }
 
 }
