@@ -477,12 +477,12 @@ impl ContextTreePortfolio {
         // Update a log-sum-exp segment tree at only the active node leaves.
         // Every fixed-prior component remains represented, whether active or
         // inactive. Dirty ancestors are recomputed deepest-first.
-        let mut next_mixture_tree = self.mixture_tree.clone();
+        let mut staged_tree_values = HashMap::new();
         let mut dirty = HashSet::new();
         for item in &staged {
             let node = &self.nodes[item.index];
             let mut tree_index = self.mixture_leaf_base + item.index;
-            next_mixture_tree[tree_index] = node.log_prior_weight + item.log_e_value;
+            staged_tree_values.insert(tree_index, node.log_prior_weight + item.log_e_value);
             tree_index /= 2;
             while tree_index > 0 {
                 dirty.insert(tree_index);
@@ -492,12 +492,15 @@ impl ContextTreePortfolio {
         let mut dirty_indices = dirty.into_iter().collect::<Vec<_>>();
         dirty_indices.sort_unstable_by(|left, right| right.cmp(left));
         for index in dirty_indices {
-            next_mixture_tree[index] = log_add_exp(
-                next_mixture_tree[index * 2],
-                next_mixture_tree[index * 2 + 1],
-            );
+            let left = staged_tree_values.get(&(index * 2))
+                .copied()
+                .unwrap_or(self.mixture_tree[index * 2]);
+            let right = staged_tree_values.get(&(index * 2 + 1))
+                .copied()
+                .unwrap_or(self.mixture_tree[index * 2 + 1]);
+            staged_tree_values.insert(index, log_add_exp(left, right));
         }
-        let log_mixture = next_mixture_tree[1];
+        let log_mixture = *staged_tree_values.get(&1).ok_or(ContextError::ArithmeticOverflow)?;
         if !log_mixture.is_finite() {
             return Err(ContextError::ArithmeticOverflow);
         }
@@ -539,7 +542,9 @@ impl ContextTreePortfolio {
         }
         self.observations_seen = sequence;
         self.pair_ids.insert(pair_id.to_string());
-        self.mixture_tree = next_mixture_tree;
+        for (index, value) in staged_tree_values {
+            self.mixture_tree[index] = value;
+        }
         self.log_mixture_e_value = log_mixture;
         self.quarantined = quarantined;
         self.trace_sha256 = trace.clone();
