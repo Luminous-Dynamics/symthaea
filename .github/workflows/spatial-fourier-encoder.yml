@@ -19,11 +19,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: spatial-fourier-encoder-\${{ github.event.pull_request.number || github.ref }}
+  group: spatial-fourier-encoder-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
-  QUALIFIED_SHA: \${{ github.event.pull_request.head.sha || github.sha }}
+  QUALIFIED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   exact-head-tests:
@@ -34,7 +34,7 @@ jobs:
       - name: Checkout exact candidate SHA
         uses: actions/checkout@v4
         with:
-          ref: \${{ env.QUALIFIED_SHA }}
+          ref: ${{ env.QUALIFIED_SHA }}
           persist-credentials: false
 
       - name: Install pinned Rust toolchain
