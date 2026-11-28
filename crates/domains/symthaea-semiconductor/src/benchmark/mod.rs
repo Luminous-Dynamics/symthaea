@@ -2,6 +2,7 @@
 
 pub mod binary_metrics;
 pub mod capacity_aware_feedback;
+pub mod conformal_interval_builder;
 pub mod delayed_conformal_aci;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
@@ -164,4 +165,13 @@ pub use capacity_aware_feedback::{
     ca_ocrc_risk_gap_bound_v1, create_ca_ocrc_engine_v1,
     optimize_ca_ocrc_proxy_policy_v1, receive_ca_ocrc_feedback_v1,
     start_ca_ocrc_round_v1,
+};
+
+pub use conformal_interval_builder::{
+    CONFORMAL_CALIBRATION_SAMPLE_SCHEMA_V1, CONFORMAL_INTERVAL_INPUT_SCHEMA_V1,
+    CONFORMAL_SCORE_POLICY_SCHEMA_V1, CONFORMAL_SET_RECEIPT_SCHEMA_V1,
+    ConformalCalibrationSampleV1, ConformalCalibrationScoreV1, ConformalIntervalInputV1,
+    ConformalScoreKindV1, ConformalScorePolicyV1, ConformalSetBuildReasonV1,
+    ConformalSetBuildStatusV1, ConformalSetBuilderErrorV1, ConformalSetReceiptV1,
+    build_conformal_interval_v1,
 };
