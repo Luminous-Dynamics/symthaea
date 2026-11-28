@@ -59,7 +59,8 @@
     "target_grid_hypothesis_id": "target-grid-primary",
     "max_phase_error_milli": 100,
     "transition_beat_ordinal_milli": 16000,
-    "max_tempo_delta_milli_bpm": 1000
+    "max_tempo_delta_milli_bpm": 1000,
+    "max_tempo_ratio_error_ppm": 10000
   },
   "protected_regions": [
     {
