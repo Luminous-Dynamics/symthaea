@@ -668,4 +668,31 @@ mod tests {
             assert!(validate_request_url(url).is_err(), "{url}");
         }
     }
+
+
+    #[tokio::test]
+    async fn reqwest_transport_preserves_dns_policy_rejection_source() {
+        // This exercises the real reqwest resolver adapter. A private answer must
+        // fail during resolution, before reqwest can open a connection.
+        let resolver = GuardedDnsResolver::with_lookup(StubLookup::with_answers(vec![vec![
+            socket("127.0.0.1"),
+        ]]));
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(2))
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
+            .dns_resolver(resolver)
+            .build()
+            .expect("guarded test client");
+
+        let error = client
+            .get("https://resolver-policy.example/")
+            .send()
+            .await
+            .expect_err("private DNS answer must be rejected before connecting");
+        assert!(
+            is_dns_policy_rejection(&error),
+            "reqwest must preserve the typed DNS policy cause: {error:?}"
+        );
+    }
 }
