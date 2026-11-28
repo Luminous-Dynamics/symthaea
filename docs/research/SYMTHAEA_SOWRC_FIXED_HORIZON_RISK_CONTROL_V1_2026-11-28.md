@@ -91,6 +91,6 @@ The fixed-horizon evaluator is not time-uniform. It does not implement multiple-
 
 ## Tests authored
 
-The production module includes 16 tests covering default admissibility across audit floors, HT arithmetic, monotone loss and safe terminal behavior, nontrivial bounds, structural fallback, delta allocation, support failures, label/score consistency, sequence and ID integrity, grid/mixture validation, bounded scores, exact Bernoulli audit-mask enumeration with design-probability weights, an exact Markov-outcome enumeration with history-adaptive predictable audit probabilities, strict tie semantics and calibration-manifest requirements.
+The production module includes 17 tests covering default admissibility across audit floors, HT arithmetic, monotone loss and safe terminal behavior, nontrivial bounds, structural fallback, delta allocation, support failures, label/score consistency, sequence and ID integrity, grid/mixture validation, bounded scores, exact Bernoulli audit-mask enumeration with design-probability weights, exact Markov-outcome enumeration with history-adaptive predictable audit probabilities, an outcome-dependent selection negative control that demonstrates undercoverage when conditional ignorability is violated, strict tie semantics and calibration-manifest requirements.
 
 These tests are imported by path into the standalone Rust 1.96 epistemic harness. They are authored, not claimed as executed until an exact-head workflow result is observed.
