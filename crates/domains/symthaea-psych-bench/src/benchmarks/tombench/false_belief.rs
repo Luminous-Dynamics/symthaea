@@ -30,6 +30,14 @@ use symthaea_core::hdc::ContinuousHV;
 /// False belief benchmark (Sally-Anne paradigm).
 pub struct FalseBeliefBenchmark;
 
+fn metric_with_bounds(samples: &[f64], lower: f64, upper: Option<f64>) -> MetricValue {
+    MetricValue::from_samples_with_bounds(
+        samples,
+        crate::registry::MetricBounds { lower, upper },
+    )
+    .expect("false-belief metric observations must satisfy declared support")
+}
+
 /// A single false-belief scenario.
 struct FalseBeliefScenario {
     /// Setup sentences (agent observes object location).
@@ -386,13 +394,13 @@ impl PsychBenchmark for FalseBeliefBenchmark {
 
         result.insert(
             "false_belief_accuracy",
-            MetricValue::from_samples(&accuracies),
+            metric_with_bounds(&accuracies, 0.0, Some(1.0)),
         );
         if !rt_ticks.is_empty() {
-            result.insert("rt_ticks", MetricValue::from_samples(&rt_ticks));
+            result.insert("rt_ticks", metric_with_bounds(&rt_ticks, 0.0, None));
         }
         #[cfg(feature = "symthaea-backend")]
-        result.insert("action_confidence", MetricValue::from_samples(&confidences));
+        result.insert("action_confidence", metric_with_bounds(&confidences, 0.0, Some(1.0)));
 
         if config.trial_trace {
             result.trial_trace = trace;

@@ -1,16 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Meditation Φ Analysis
+//! Synthetic HDC Topology Φ Demonstration (Legacy Meditation Example)
 //!
-//! Analyzes the relationship between meditation states and integrated information (Φ)
-//! using the meditation-eeg dataset (22+ subjects, BIDS format).
-//!
-//! ## Hypothesis
-//!
-//! Meditation and flow states should exhibit higher Φ values compared to
-//! distracted/wandering states, reflecting increased integration of information
-//! across brain regions.
+//! This legacy example does NOT compute Φ from participant EEG. It uses dataset
+//! directory names/event-file presence only as a source of pseudo-sample IDs,
+//! then generates seeded random, small-world, and modular HDC topologies. The
+//! resulting contrasts are synthetic topology illustrations, not evidence that
+//! meditation changes EEG-derived Φ or consciousness.
 //!
 //! ## Usage
 //!
@@ -203,7 +200,7 @@ fn compute_aggregate_stats(results: &[SubjectResults]) -> AggregateStats {
 
 fn main() {
     println!("╔═══════════════════════════════════════════════════════════════════════╗");
-    println!("║         MEDITATION Φ ANALYSIS - Symthaea Consciousness Engine         ║");
+    println!("║         SYNTHETIC HDC TOPOLOGY Φ DEMONSTRATION         ║");
     println!("╚═══════════════════════════════════════════════════════════════════════╝");
     println!();
 
@@ -242,7 +239,7 @@ fn main() {
             .collect()
     };
 
-    println!("📊 Analyzing {} subjects...", subject_dirs.len());
+    println!("📊 Generating {} synthetic pseudo-samples...", subject_dirs.len());
     println!();
 
     let mut all_results = Vec::new();
@@ -290,8 +287,8 @@ fn main() {
     println!("───────────────────────────────────────────────────────────────────────");
     println!("  Subjects analyzed:      {}", stats.n_subjects);
     println!();
-    println!("  Mean Φ (Baseline):      {:.4}", stats.mean_baseline_phi);
-    println!("  Mean Φ (Meditation):    {:.4}", stats.mean_meditation_phi);
+    println!("  Mean Φ (random topology):      {:.4}", stats.mean_baseline_phi);
+    println!("  Mean Φ (small-world topology):    {:.4}", stats.mean_meditation_phi);
     println!("  Mean Φ (Post):          {:.4}", stats.mean_post_phi);
     println!();
     println!("  Mean Φ Increase:        {:+.4}", stats.mean_phi_increase);
@@ -310,25 +307,14 @@ fn main() {
     println!("📋 HYPOTHESIS EVALUATION");
     println!("───────────────────────────────────────────────────────────────────────");
 
-    if stats.mean_phi_increase > 0.0
-        && stats.positive_increase_count as f64 / stats.n_subjects as f64 > 0.6
-    {
-        println!("  ✅ SUPPORTED: Meditation increases Φ relative to baseline");
-        println!();
-        println!("  Evidence:");
-        println!("    • Mean Φ increase: {:+.4}", stats.mean_phi_increase);
-        println!(
-            "    • {:.1}% of subjects showed increased Φ during meditation",
-            100.0 * stats.positive_increase_count as f64 / stats.n_subjects as f64
-        );
-        println!();
-        println!("  Interpretation:");
-        println!("    Meditation appears to increase information integration across");
-        println!("    brain regions, consistent with reports of unified awareness");
-        println!("    during meditative states.");
-    } else {
-        println!("  ⚠️  INCONCLUSIVE: Insufficient evidence for meditation-Φ relationship");
-    }
+    println!("  SIMULATED TOPOLOGY COMPARISON (not participant EEG):");
+    println!("    • Mean generated topology Φ difference: {:+.4}", stats.mean_phi_increase);
+    println!(
+        "    • Generated samples with positive difference: {:.1}%",
+        100.0 * stats.positive_increase_count as f64 / stats.n_subjects.max(1) as f64
+    );
+    println!("  These values are produced by seeded random/small-world/modular topology");
+    println!("  generators. They do not measure changes in any participant or meditation state.");
 
     println!();
     println!("═══════════════════════════════════════════════════════════════════════");
@@ -338,12 +324,12 @@ fn main() {
     println!("🧠 TOPOLOGY ANALYSIS");
     println!("───────────────────────────────────────────────────────────────────────");
     println!();
-    println!("  The meditation state topology (small-world) models:");
-    println!("    • High local clustering (focused attention)");
-    println!("    • Short global paths (integrated awareness)");
+    println!("  The synthetic small-world topology was generated with these construction choices:");
+    println!("    • High local clustering");
+    println!("    • Short global paths");
     println!("    • Balanced local/global connectivity");
     println!();
-    println!("  This mirrors the EEG signature of meditation:");
+    println!("  These topology properties are not an EEG signature or a claim about meditation:");
     println!("    • Increased frontal midline theta (focus)");
     println!("    • Enhanced gamma coherence (binding)");
     println!("    • Alpha synchronization (calm awareness)");

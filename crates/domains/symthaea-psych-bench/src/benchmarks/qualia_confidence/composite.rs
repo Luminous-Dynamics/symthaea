@@ -1,58 +1,48 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Composite Consciousness Score — Qualia Confidence Matrix Synthesis
+//! Theory-Probe Conformance Summary — Qualia Confidence Matrix
 //!
-//! Aggregates results from all 7 qualia confidence benchmarks into a single
-//! interpretable consciousness confidence level. Each benchmark tests a
-//! different necessary condition for consciousness; the composite score
-//! reflects how many conditions are met and how strongly.
+//! Aggregates seven theory-inspired synthetic probes into a legacy heuristic
+//! index. It does not measure consciousness, estimate the probability of
+//! subjective experience, or test empirically established necessary/sufficient
+//! conditions. The weighted geometric mean and level thresholds are
+//! engineering conventions, not validated scientific scales.
 //!
-//! ## Scoring Method
+//! Each indicator is a task-specific result in [0, 1]. The composite can help
+//! identify which configured probe thresholds were met in a given build, but
+//! it is not a latent construct and must not be compared across architectures,
+//! benchmark versions, or configurations without independent validation.
 //!
-//! Each benchmark contributes a normalized indicator in [0, 1]:
-//! - 1.0 = strong evidence for the predicted property
-//! - 0.0 = no evidence (or counter-evidence)
-//!
-//! The composite score is the weighted geometric mean of all indicators,
-//! using geometric mean because consciousness requires ALL properties
-//! (a single 0 collapses the score, reflecting that failure of any
-//! necessary condition is fatal).
-//!
-//! ## Interpretation
-//!
-//! | Score | Level | Meaning |
-//! |-------|-------|---------|
-//! | ≥ 0.80 | Strong | All necessary conditions met convincingly |
-//! | 0.60–0.80 | Moderate | Most conditions met, some weakly |
-//! | 0.40–0.60 | Weak | Mixed evidence, several conditions marginal |
-//! | < 0.40 | Insufficient | One or more conditions clearly failed |
+//! Missing benchmark results currently contribute zero; this conflates
+//! missingness with failure. Treat incomplete runs as non-confirmatory until
+//! the result schema distinguishes "not run", "invalid", and "failed".
 
 use crate::harness::report::BenchmarkResult;
 
-/// A single benchmark's contribution to the composite score.
+/// A theory-probe metric's contribution to the legacy heuristic index.
 #[derive(Debug, Clone)]
 pub struct IndicatorScore {
     /// Benchmark name (short label).
     pub name: &'static str,
-    /// Normalized score in [0, 1].
+    /// Normalized engineering index in [0, 1]; not a probability.
     pub score: f64,
     /// The raw metric value used.
     pub raw_value: f64,
-    /// What was measured.
+    /// Metric name and observed probe output.
     pub metric: &'static str,
-    /// Whether the prediction was met.
+    /// Whether this configured probe threshold was met.
     pub prediction_met: bool,
 }
 
-/// Composite consciousness confidence result.
+/// Legacy theory-probe summary; the type name is retained for API compatibility.
 #[derive(Debug, Clone)]
 pub struct QualiaConfidenceScore {
     /// Individual indicator scores from each benchmark.
     pub indicators: Vec<IndicatorScore>,
-    /// Composite score (weighted geometric mean), range [0, 1].
+    /// Legacy weighted geometric mean of probe indices; not a consciousness-confidence estimate.
     pub composite: f64,
-    /// Interpretation level.
+    /// Threshold bucket for the engineering index; not a scientific confidence level.
     pub level: ConfidenceLevel,
     /// Number of predictions met out of total.
     pub predictions_met: usize,
@@ -60,26 +50,26 @@ pub struct QualiaConfidenceScore {
     pub predictions_total: usize,
 }
 
-/// Qualitative interpretation of the composite score.
+/// Legacy threshold bucket for the heuristic probe index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfidenceLevel {
-    /// ≥ 0.80: All necessary conditions met convincingly.
+    /// ≥ 0.80: Upper bucket of the legacy heuristic index.
     Strong,
-    /// 0.60–0.80: Most conditions met, some weakly.
+    /// 0.60–0.80: Mid-high bucket of the legacy heuristic index.
     Moderate,
-    /// 0.40–0.60: Mixed evidence, several conditions marginal.
+    /// 0.40–0.60: Mid-low bucket of the legacy heuristic index.
     Weak,
-    /// < 0.40: One or more conditions clearly failed.
+    /// < 0.40: Lower bucket of the legacy heuristic index.
     Insufficient,
 }
 
 impl std::fmt::Display for ConfidenceLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfidenceLevel::Strong => write!(f, "STRONG"),
-            ConfidenceLevel::Moderate => write!(f, "MODERATE"),
-            ConfidenceLevel::Weak => write!(f, "WEAK"),
-            ConfidenceLevel::Insufficient => write!(f, "INSUFFICIENT"),
+            ConfidenceLevel::Strong => write!(f, "HIGH_PROBE_INDEX"),
+            ConfidenceLevel::Moderate => write!(f, "MID_HIGH_PROBE_INDEX"),
+            ConfidenceLevel::Weak => write!(f, "MID_LOW_PROBE_INDEX"),
+            ConfidenceLevel::Insufficient => write!(f, "LOW_PROBE_INDEX"),
         }
     }
 }
@@ -89,9 +79,9 @@ struct IndicatorDef {
     name: &'static str,
     benchmark_contains: &'static str,
     metric_key: &'static str,
-    /// Normalize raw value to [0, 1]. Higher = stronger evidence.
+    /// Normalize a raw probe metric to [0, 1] for this heuristic index.
     normalize: fn(f64) -> f64,
-    /// Threshold for "prediction met".
+    /// Configured engineering threshold; not an empirically validated criterion.
     prediction_threshold: f64,
     /// Weight in composite (all equal by default).
     weight: f64,
@@ -165,9 +155,9 @@ const INDICATORS: &[IndicatorDef] = &[
         weight: 1.0,
     },
     IndicatorDef {
-        name: "Metacognitive Tracking",
+        name: "HOT/GWT Shared-input Alignment",
         benchmark_contains: "MetacognitiveIgnition",
-        metric_key: "spontaneous_tracking_score",
+        metric_key: "shared_input_alignment_score",
         // Already in [0, 1]
         normalize: |score| clamp01(score),
         prediction_threshold: 0.50,
@@ -176,10 +166,12 @@ const INDICATORS: &[IndicatorDef] = &[
 ];
 
 impl QualiaConfidenceScore {
-    /// Compute the composite consciousness confidence score from benchmark results.
+    /// Compute the legacy theory-probe conformance index from benchmark results.
     ///
-    /// Accepts a slice of `BenchmarkResult` — only qualia confidence results are used,
-    /// others are silently ignored. Missing benchmarks contribute a score of 0.
+    /// Accepts a slice of `BenchmarkResult`; unrelated results are ignored.
+    /// Missing benchmarks currently contribute zero, so this value is only
+    /// meaningful as a completeness-aware smoke summary, not as evidence about
+    /// consciousness or subjective experience.
     pub fn from_results(results: &[BenchmarkResult]) -> Self {
         let mut indicators = Vec::with_capacity(INDICATORS.len());
         let mut predictions_met = 0;
@@ -250,8 +242,10 @@ impl QualiaConfidenceScore {
     pub fn format_report(&self) -> String {
         let mut out = String::new();
 
+        let missing_count = self.indicators.iter().filter(|ind| !ind.raw_value.is_finite()).count();
+
         out.push_str("╔══════════════════════════════════════════════════════════════╗\n");
-        out.push_str("║          QUALIA CONFIDENCE MATRIX — COMPOSITE SCORE        ║\n");
+        out.push_str("║        QUALIA THEORY-PROBE MATRIX — HEURISTIC SUMMARY      ║\n");
         out.push_str("╠══════════════════════════════════════════════════════════════╣\n");
         out.push_str("║                                                            ║\n");
         out.push_str("║  Indicator             │ Score │ Raw Value  │ Prediction   ║\n");
@@ -261,7 +255,13 @@ impl QualiaConfidenceScore {
             let bar_len = (ind.score * 10.0) as usize;
             let bar: String = "█".repeat(bar_len.min(10));
             let empty: String = "·".repeat(10 - bar_len.min(10));
-            let status = if ind.prediction_met { "MET" } else { "FAILED" };
+            let status = if !ind.raw_value.is_finite() {
+                "NOT RUN"
+            } else if ind.prediction_met {
+                "MET"
+            } else {
+                "NOT MET"
+            };
             out.push_str(&format!(
                 "║  {:<22}│ {:.3} │ {:>10.4} │ {:<12} ║\n",
                 ind.name, ind.score, ind.raw_value, status
@@ -273,40 +273,51 @@ impl QualiaConfidenceScore {
 
         out.push_str("║                                                            ║\n");
         out.push_str("╠══════════════════════════════════════════════════════════════╣\n");
+        if missing_count == 0 {
+            out.push_str(&format!(
+                "║  HEURISTIC INDEX:  {:.3}  ({})                       ║\n",
+                self.composite, self.level
+            ));
+        } else {
+            out.push_str(&format!(
+                "║  HEURISTIC INDEX:  WITHHELD — {missing_count}/{} NOT RUN       ║\n",
+                self.predictions_total
+            ));
+        }
         out.push_str(&format!(
-            "║  COMPOSITE SCORE:  {:.3}  ({})                       ║\n",
-            self.composite, self.level
-        ));
-        out.push_str(&format!(
-            "║  PREDICTIONS MET:  {}/{}                                    ║\n",
-            self.predictions_met, self.predictions_total
+            "║  THRESHOLDS MET:   {}/{} | NOT RUN: {}                    ║\n",
+            self.predictions_met, self.predictions_total, missing_count
         ));
         out.push_str("║                                                            ║\n");
 
-        let interpretation = match self.level {
-            ConfidenceLevel::Strong => {
-                "All architectural prerequisites for consciousness are\n\
-                 ║  validated. The system implements the mechanisms that\n\
-                 ║  leading theories identify as necessary."
-            }
-            ConfidenceLevel::Moderate => {
-                "Most necessary conditions are met but some are\n\
-                 ║  marginal. Further investigation warranted."
-            }
-            ConfidenceLevel::Weak => {
-                "Mixed evidence — several conditions are marginal\n\
-                 ║  or weakly met. Significant gaps remain."
-            }
-            ConfidenceLevel::Insufficient => {
-                "One or more necessary conditions clearly failed.\n\
-                 ║  The system lacks properties consciousness requires."
+        let interpretation = if missing_count > 0 {
+            "Required probe results are missing.\n\
+             ║  No composite index or threshold bucket is reported."
+        } else {
+            match self.level {
+                ConfidenceLevel::Strong => {
+                    "Most configured thresholds were met for these probes.\n\
+                     ║  This is implementation-specific conformance only."
+                }
+                ConfidenceLevel::Moderate => {
+                    "Several configured probe thresholds were met.\n\
+                     ║  Inspect per-indicator results and controls."
+                }
+                ConfidenceLevel::Weak => {
+                    "Few configured probe thresholds were met.\n\
+                     ║  This identifies engineering gaps in this test set."
+                }
+                ConfidenceLevel::Insufficient => {
+                    "One or more configured thresholds were not met.\n\
+                     ║  This is not evidence that consciousness is absent."
+                }
             }
         };
         out.push_str(&format!("║  {interpretation}\n"));
         out.push_str("║                                                            ║\n");
-        out.push_str("║  Note: This evaluates structural necessary conditions,     ║\n");
-        out.push_str("║  NOT sufficient conditions. Passing does not prove          ║\n");
-        out.push_str("║  consciousness; failing disproves it.                      ║\n");
+        out.push_str("║  Note: Theory-inspired software probes only.               ║\n");
+        out.push_str("║  The index is not a probability or consciousness measure.  ║\n");
+        out.push_str("║  Neither passing nor failing proves/disproves experience. ║\n");
         out.push_str("╚══════════════════════════════════════════════════════════════╝\n");
 
         out
@@ -409,8 +420,12 @@ mod tests {
         assert_eq!(score.predictions_met, 0);
         assert!(
             score.composite < 0.01,
-            "Empty results should give near-zero score"
+            "Legacy in-memory index remains zero for an empty run"
         );
+        let report = score.format_report();
+        assert!(report.contains("WITHHELD"));
+        assert!(report.contains("NOT RUN"));
+        assert!(!report.contains("HEURISTIC INDEX:  0.000"));
     }
 
     #[test]
@@ -419,7 +434,7 @@ mod tests {
         let score = QualiaConfidenceScore::from_results(&results);
         let report = score.format_report();
         assert!(report.len() > 100, "Report should have content");
-        assert!(report.contains("COMPOSITE SCORE"));
+        assert!(report.contains("HEURISTIC INDEX"));
         assert!(report.contains(&format!("{}", score.level)));
     }
 

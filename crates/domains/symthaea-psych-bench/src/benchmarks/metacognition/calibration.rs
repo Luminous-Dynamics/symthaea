@@ -27,6 +27,14 @@ use symthaea_core::hdc::ContinuousHV;
 /// Metacognitive Calibration benchmark.
 pub struct MetacognitiveCalibrationBenchmark;
 
+fn metric_with_bounds(samples: &[f64], lower: f64, upper: Option<f64>) -> MetricValue {
+    MetricValue::from_samples_with_bounds(
+        samples,
+        crate::registry::MetricBounds { lower, upper },
+    )
+    .expect("metacognitive calibration observations must satisfy declared support")
+}
+
 struct Difficulty {
     _name: &'static str,
     num_items: usize,
@@ -450,11 +458,14 @@ impl PsychBenchmark for MetacognitiveCalibrationBenchmark {
             }
         }
 
-        result.insert("calibration_error_ece", MetricValue::from_samples(&eces));
-        result.insert("discrimination_gamma", MetricValue::from_samples(&gammas));
-        result.insert("overconfidence", MetricValue::from_samples(&overconfs));
-        result.insert("resolution", MetricValue::from_samples(&resolutions));
-        result.insert("rt_ticks", MetricValue::from_samples(&rts));
+        result.insert("calibration_error_ece", metric_with_bounds(&eces, 0.0, Some(1.0)));
+        result.insert("discrimination_gamma", metric_with_bounds(&gammas, -1.0, Some(1.0)));
+        result.insert("overconfidence", metric_with_bounds(&overconfs, 0.0, Some(1.0)));
+        result.insert(
+            "resolution",
+            metric_with_bounds(&resolutions, 0.0, Some(0.25)),
+        );
+        result.insert("rt_ticks", metric_with_bounds(&rts, 0.0, None));
 
         if config.trial_trace {
             result.trial_trace = trace;
@@ -510,6 +521,28 @@ mod tests {
             "ECE should be in [0, 1], got {}",
             ece
         );
+    }
+
+    #[test]
+    fn calibration_intervals_respect_metric_specific_support() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            trials_per_condition: 5,
+            ..Default::default()
+        };
+        let result = MetacognitiveCalibrationBenchmark.run(&config);
+
+        let overconfidence = &result.metrics["overconfidence"];
+        assert!(overconfidence.ci_lower >= 0.0);
+        assert!(overconfidence.ci_upper <= 1.0);
+
+        let resolution = &result.metrics["resolution"];
+        assert!(resolution.ci_lower >= 0.0);
+        assert!(resolution.ci_upper <= 0.25);
+
+        let gamma = &result.metrics["discrimination_gamma"];
+        assert!(gamma.ci_lower >= -1.0);
+        assert!(gamma.ci_upper <= 1.0);
     }
 
     #[test]

@@ -145,10 +145,122 @@ impl MetricValue {
         }
     }
 
-    /// Compute from a slice of samples.
+    /// Compute a metric estimate using explicit, registry-declared support bounds.
     ///
-    /// Uses proper t-distribution critical values for the 95% CI when n < 30,
-    /// falling back to z = 1.96 for larger samples.
+    /// This is the preferred path for registered benchmarks. It does not infer
+    /// bounds from observed samples:
+    /// - finite two-sided bounds use a Wilson interval for endpoint-valued
+    ///   Bernoulli observations, otherwise a deterministic BCa bootstrap in
+    ///   normalized [0, 1] coordinates, transformed back to the metric's units;
+    /// - a lower-bounded, upper-unbounded metric uses a one-sided-clipped t
+    ///   interval and remains unbounded above.
+    ///
+    /// Samples outside declared support or non-finite values are rejected.
+    pub fn from_samples_with_bounds(
+        samples: &[f64],
+        bounds: crate::registry::MetricBounds,
+    ) -> Result<Self, MetricBoundsError> {
+        if !bounds.lower.is_finite()
+            || bounds.upper.is_some_and(|upper| !upper.is_finite() || upper < bounds.lower)
+        {
+            return Err(MetricBoundsError::InvalidBounds);
+        }
+
+        if samples.is_empty() {
+            return Ok(Self {
+                mean: 0.0,
+                std_dev: 0.0,
+                n: 0,
+                ci_lower: 0.0,
+                ci_upper: 0.0,
+            });
+        }
+
+        for (index, sample) in samples.iter().copied().enumerate() {
+            if !sample.is_finite() {
+                return Err(MetricBoundsError::NonFiniteSample { index });
+            }
+            if sample < bounds.lower || bounds.upper.is_some_and(|upper| sample > upper) {
+                return Err(MetricBoundsError::SampleOutOfBounds {
+                    index,
+                    value: sample,
+                    lower: bounds.lower,
+                    upper: bounds.upper,
+                });
+            }
+        }
+
+        let n = samples.len();
+        let mean = samples.iter().sum::<f64>() / n as f64;
+        let variance = if n > 1 {
+            samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64
+        } else {
+            0.0
+        };
+        let std_dev = variance.sqrt();
+
+        let (ci_lower, ci_upper) = if let Some(upper) = bounds.upper {
+            if upper == bounds.lower {
+                (mean, mean)
+            } else {
+                let width = upper - bounds.lower;
+                let normalized: Vec<f64> = samples
+                    .iter()
+                    .map(|sample| (sample - bounds.lower) / width)
+                    .collect();
+                let all_binary = normalized
+                    .iter()
+                    .all(|sample| *sample == 0.0 || *sample == 1.0);
+                let all_identical = samples.iter().all(|sample| *sample == samples[0]);
+                let (lower, upper) = if all_binary {
+                    // Keep Wilson uncertainty even when every Bernoulli sample
+                    // is a success or every sample is a failure.
+                    wilson_score_interval(normalized.iter().sum::<f64>() / n as f64, n)
+                } else if n == 1 || all_identical {
+                    // A degenerate non-Bernoulli bootstrap would claim false
+                    // precision. Preserve the declared support conservatively.
+                    (0.0, 1.0)
+                } else {
+                    let mut seed = 0xcbf29ce484222325_u64;
+                    for sample in &normalized {
+                        seed ^= sample.to_bits();
+                        seed = seed.wrapping_mul(0x100000001b3);
+                    }
+                    super::analysis::bootstrap_ci_bca(&normalized, 2_000, 0.05, seed)
+                };
+                (
+                    bounds.lower + lower * width,
+                    bounds.lower + upper * width,
+                )
+            }
+        } else {
+            let standard_error = std_dev / (n as f64).sqrt();
+            let critical = t_critical_95(n);
+            (
+                (mean - critical * standard_error).max(bounds.lower),
+                mean + critical * standard_error,
+            )
+        };
+
+        Ok(Self {
+            mean,
+            std_dev,
+            n,
+            ci_lower,
+            ci_upper,
+        })
+    }
+
+    /// Compute from a slice of samples with an interval appropriate to the
+    /// observed support.
+    ///
+    /// - Bernoulli samples (all values exactly 0 or 1) use a 95% Wilson score
+    ///   interval, which remains within [0, 1] and behaves better than a
+    ///   symmetric t interval for small samples and rates near 0 or 1.
+    /// - Other bounded samples in [0, 1] use a deterministic BCa bootstrap
+    ///   interval, which cannot extend beyond the resampled support.
+    /// - Unbounded continuous samples use a t interval for n < 30 and a
+    ///   normal approximation thereafter.
     pub fn from_samples(samples: &[f64]) -> Self {
         let n = samples.len();
         if n == 0 {
@@ -167,16 +279,88 @@ impl MetricValue {
             0.0
         };
         let std_dev = variance.sqrt();
-        let se = std_dev / (n as f64).sqrt();
-        let t = t_critical_95(n);
+
+        let all_binary = samples.iter().all(|&x| x == 0.0 || x == 1.0);
+        let all_unit_bounded = samples.iter().all(|&x| (0.0..=1.0).contains(&x));
+        let (ci_lower, ci_upper) = if all_binary {
+            wilson_score_interval(mean, n)
+        } else if all_unit_bounded {
+            // Derive the bootstrap seed from the observations so this API
+            // remains deterministic without requiring an additional config arg.
+            let mut seed = 0xcbf29ce484222325_u64;
+            for sample in samples {
+                seed ^= sample.to_bits();
+                seed = seed.wrapping_mul(0x100000001b3);
+            }
+            super::analysis::bootstrap_ci_bca(samples, 2_000, 0.05, seed)
+        } else {
+            let se = std_dev / (n as f64).sqrt();
+            let critical = t_critical_95(n);
+            (mean - critical * se, mean + critical * se)
+        };
+
         Self {
             mean,
             std_dev,
             n,
-            ci_lower: mean - t * se,
-            ci_upper: mean + t * se,
+            ci_lower,
+            ci_upper,
         }
     }
+}
+
+
+/// Errors raised when registry-declared metric support and observed values disagree.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MetricBoundsError {
+    InvalidBounds,
+    NonFiniteSample {
+        index: usize,
+    },
+    SampleOutOfBounds {
+        index: usize,
+        value: f64,
+        lower: f64,
+        upper: Option<f64>,
+    },
+}
+
+impl std::fmt::Display for MetricBoundsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidBounds => write!(f, "metric bounds must be finite and ordered"),
+            Self::NonFiniteSample { index } => {
+                write!(f, "metric sample at index {index} is not finite")
+            }
+            Self::SampleOutOfBounds {
+                index,
+                value,
+                lower,
+                upper,
+            } => write!(
+                f,
+                "metric sample {index} ({value}) is outside declared bounds [{lower}, {upper:?}]"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for MetricBoundsError {}
+
+/// Wilson score interval for a binomial proportion (95% confidence).
+fn wilson_score_interval(proportion: f64, n: usize) -> (f64, f64) {
+    if n == 0 {
+        return (0.0, 0.0);
+    }
+    let z = 1.959_963_984_540_054_f64;
+    let nf = n as f64;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / nf;
+    let center = (proportion + z2 / (2.0 * nf)) / denominator;
+    let half_width = z
+        * ((proportion * (1.0 - proportion) / nf + z2 / (4.0 * nf * nf)).sqrt())
+        / denominator;
+    ((center - half_width).max(0.0), (center + half_width).min(1.0))
 }
 
 /// Two-tailed t critical value for 95% CI (alpha=0.05) given sample size n.
@@ -2368,11 +2552,12 @@ pub fn is_lower_better(metric_key: &str) -> bool {
 }
 
 impl BenchmarkReport {
-    /// Compute a normalized cognitive profile: domain → score [0.0, 1.0].
+    /// Compute a legacy baseline-relative triage index: domain → [0.0, 1.0].
     ///
-    /// Groups benchmarks by domain via `domain_of()`, looks up baseline
-    /// comparisons, and averages the ratios per domain. Lower-is-better
-    /// metrics are inverted so that 1.0 always means "at or above baseline".
+    /// Groups metrics by the current domain mapper and averages capped ratios.
+    /// Metrics can have different constructs, units, reference sources, and
+    /// uncertainty; this is a debugging visualization only, not a calibrated
+    /// cognitive profile or psychometric score.
     pub fn cognitive_profile(&self) -> BTreeMap<String, f64> {
         use crate::harness::baselines::BaselineCollection;
         let bl = BaselineCollection::all();
@@ -2412,7 +2597,7 @@ impl BenchmarkReport {
             .collect()
     }
 
-    /// Format the cognitive profile as an ASCII horizontal bar chart.
+    /// Format the legacy heuristic baseline-relative index as an ASCII bar chart.
     pub fn format_profile(&self) -> String {
         let profile = self.cognitive_profile();
         if profile.is_empty() {
@@ -2420,7 +2605,7 @@ impl BenchmarkReport {
         }
 
         let bar_width = 20;
-        let mut lines = vec!["Cognitive Profile".to_string()];
+        let mut lines = vec!["Heuristic Baseline-Relative Dashboard (not psychometric)".to_string()];
 
         for (domain, score) in &profile {
             let filled = (score * bar_width as f64).round() as usize;
@@ -2433,13 +2618,13 @@ impl BenchmarkReport {
         lines.join("\n")
     }
 
-    /// Compute domain composite scores as mean z-scores per domain.
+    /// Compute legacy descriptive mean standardized differences per mapped domain.
     ///
-    /// For each benchmark, looks up the key metric's z-score (from baseline SD).
-    /// Averages z-scores within each domain to produce composite indices.
-    /// Returns `None` for domains with no z-score-enabled baselines.
-    ///
-    /// Interpretation: z=0 = human mean, z=+1 = 1 SD above human, z=-1 = 1 SD below.
+    /// This averages z-like values from heterogeneous metrics using the current
+    /// name-based baseline mapper. It is not a validated domain construct, and
+    /// z=0 does not imply population comparability unless each source/task/unit
+    /// is compatible. Keep this for debugging only; do not call it an IQ-like
+    /// or overall cognitive ability measure.
     pub fn composite_scores(&self) -> BTreeMap<String, CompositeScore> {
         use crate::harness::baselines::BaselineCollection;
         let bl = BaselineCollection::all();
@@ -2498,7 +2683,7 @@ impl BenchmarkReport {
         }
 
         let mut lines = Vec::new();
-        lines.push("Domain Composite Scores (z-score: 0=human mean)".to_string());
+        lines.push("Descriptive Reference Differences by Mapped Domain (not psychometric composites)".to_string());
         lines.push(format!(
             "{:<14} {:>6} {:>4}  {}",
             "Domain", "z", "n", "Benchmarks"
@@ -2510,7 +2695,7 @@ impl BenchmarkReport {
 
         for (domain, cs) in &composites {
             let label = if cs.mean_z > 1.0 {
-                "***" // well above human
+                "***" // far above the selected reference mean (descriptive only)
             } else if cs.mean_z > 0.5 {
                 "**"
             } else if cs.mean_z > 0.0 {
@@ -2518,7 +2703,7 @@ impl BenchmarkReport {
             } else if cs.mean_z > -0.5 {
                 ""
             } else {
-                "(!)" // notably below human
+                "(!)" // far below the selected reference mean (descriptive only)
             };
             lines.push(format!(
                 "{:<14} {:>+6.2} {:>4}  {} {}",
@@ -2774,6 +2959,147 @@ mod tests {
     use super::*;
 
     #[test]
+    fn explicit_bounds_use_wilson_for_binary_metrics() {
+        let bounds = crate::registry::MetricBounds {
+            lower: 0.0,
+            upper: Some(1.0),
+        };
+        let samples = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0];
+        let metric =
+            MetricValue::from_samples_with_bounds(&samples, bounds).expect("valid samples");
+        assert!((metric.mean - 0.9).abs() < 1e-12);
+        assert!(metric.ci_lower >= 0.0);
+        assert!(metric.ci_upper <= 1.0);
+        assert!(metric.ci_lower < metric.mean && metric.ci_upper > metric.mean);
+    }
+
+    #[test]
+    fn explicit_all_success_binary_sample_does_not_claim_perfect_certainty() {
+        let bounds = crate::registry::MetricBounds {
+            lower: 0.0,
+            upper: Some(1.0),
+        };
+        let samples = [1.0, 1.0, 1.0, 1.0, 1.0];
+        let metric = MetricValue::from_samples_with_bounds(&samples, bounds)
+            .expect("valid all-success sample");
+        assert_eq!(metric.mean, 1.0);
+        assert!(metric.ci_lower < 1.0);
+        assert_eq!(metric.ci_upper, 1.0);
+    }
+
+    #[test]
+    fn explicit_constant_continuous_sample_preserves_declared_support() {
+        let bounds = crate::registry::MetricBounds {
+            lower: -1.0,
+            upper: Some(1.0),
+        };
+        let samples = [0.25, 0.25, 0.25, 0.25];
+        let metric = MetricValue::from_samples_with_bounds(&samples, bounds)
+            .expect("valid constant continuous sample");
+        assert_eq!(metric.ci_lower, -1.0);
+        assert_eq!(metric.ci_upper, 1.0);
+    }
+
+    #[test]
+    fn explicit_signed_bounds_preserve_non_probability_indices() {
+        let bounds = crate::registry::MetricBounds {
+            lower: -1.0,
+            upper: Some(1.0),
+        };
+        let samples = [-0.2, 0.0, 0.2, 0.1, -0.1];
+        let metric = MetricValue::from_samples_with_bounds(&samples, bounds)
+            .expect("valid signed samples");
+        assert!(metric.ci_lower >= -1.0);
+        assert!(metric.ci_upper <= 1.0);
+        assert!(metric.ci_lower <= metric.mean && metric.ci_upper >= metric.mean);
+    }
+
+    #[test]
+    fn explicit_non_unit_bounds_are_transformed_back_to_metric_units() {
+        let bounds = crate::registry::MetricBounds {
+            lower: 0.0,
+            upper: Some(2.0),
+        };
+        let samples = [0.8, 1.0, 1.2, 1.8];
+        let metric = MetricValue::from_samples_with_bounds(&samples, bounds)
+            .expect("valid non-unit samples");
+        assert!(metric.ci_lower >= 0.0);
+        assert!(metric.ci_upper <= 2.0);
+        assert!(metric.ci_lower <= metric.mean && metric.ci_upper >= metric.mean);
+    }
+
+    #[test]
+    fn explicit_lower_only_bounds_keep_upper_unbounded() {
+        let bounds = crate::registry::MetricBounds {
+            lower: 0.0,
+            upper: None,
+        };
+        let samples = [2.0, 3.0, 4.0, 5.0];
+        let metric = MetricValue::from_samples_with_bounds(&samples, bounds)
+            .expect("valid non-negative unbounded samples");
+        assert!(metric.ci_lower >= 0.0);
+        assert!(metric.ci_upper > 5.0);
+        assert!(metric.ci_lower <= metric.mean && metric.ci_upper >= metric.mean);
+    }
+
+    #[test]
+    fn explicit_bounds_reject_non_finite_observations() {
+        let bounds = crate::registry::MetricBounds {
+            lower: 0.0,
+            upper: Some(1.0),
+        };
+        let error = MetricValue::from_samples_with_bounds(&[0.5, f64::NAN], bounds)
+            .expect_err("non-finite sample must be rejected");
+        assert!(matches!(error, MetricBoundsError::NonFiniteSample { index: 1 }));
+    }
+
+    #[test]
+    fn explicit_empty_sample_preserves_missing_n() {
+        let bounds = crate::registry::MetricBounds {
+            lower: -1.0,
+            upper: Some(1.0),
+        };
+        let metric = MetricValue::from_samples_with_bounds(&[], bounds).expect("empty sample");
+        assert_eq!(metric.n, 0);
+        assert_eq!(metric.mean, 0.0);
+        assert_eq!(metric.ci_lower, 0.0);
+        assert_eq!(metric.ci_upper, 0.0);
+    }
+
+    #[test]
+    fn explicit_bounds_reject_out_of_support_observations() {
+        let bounds = crate::registry::MetricBounds {
+            lower: -1.0,
+            upper: Some(1.0),
+        };
+        let error = MetricValue::from_samples_with_bounds(&[-0.2, 1.1], bounds)
+            .expect_err("out-of-range sample must be rejected");
+        assert!(matches!(
+            error,
+            MetricBoundsError::SampleOutOfBounds { index: 1, .. }
+        ));
+    }
+
+    #[test]
+    fn test_binary_sample_ci_uses_bounded_wilson_interval() {
+        let samples = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0];
+        let metric = MetricValue::from_samples(&samples);
+        assert!((metric.mean - 0.9).abs() < 1e-12);
+        assert!(metric.ci_lower >= 0.0);
+        assert!(metric.ci_upper <= 1.0);
+        assert!(metric.ci_lower < metric.mean && metric.ci_upper > metric.mean);
+    }
+
+    #[test]
+    fn test_bounded_continuous_sample_ci_stays_within_support() {
+        let samples = [0.70, 0.80, 0.90, 1.00, 0.85, 0.95];
+        let metric = MetricValue::from_samples(&samples);
+        assert!(metric.ci_lower >= 0.70 - 1e-12);
+        assert!(metric.ci_upper <= 1.00 + 1e-12);
+        assert!(metric.ci_lower <= metric.mean && metric.ci_upper >= metric.mean);
+    }
+
+    #[test]
     fn test_metric_from_samples() {
         let samples = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let m = MetricValue::from_samples(&samples);
@@ -2869,7 +3195,7 @@ mod tests {
         report.add(r);
         let output = report.format_profile();
         assert!(!output.is_empty());
-        assert!(output.contains("Cognitive Profile"), "output: {}", output);
+        assert!(output.contains("Heuristic Baseline-Relative Dashboard"), "output: {}", output);
         assert!(output.contains("WorM"), "output: {}", output);
     }
 

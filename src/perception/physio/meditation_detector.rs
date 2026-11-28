@@ -1,57 +1,36 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Meditation & Flow State Detection from Multi-Channel EEG
+//! Experimental EEG band-power proxy pipeline (legacy meditation/flow labels).
 //!
-//! Implements the scientific foundations of EEG-based meditation and flow detection:
+//! This module is an exploratory signal-feature prototype, not a validated
+//! meditation, flow, consciousness, or clinical detector. Its current power
+//! ratios are not equivalent to cross-spectral coherence or phase synchrony;
+//! reported state labels are heuristic proxies and confidence is not calibrated.
 //!
-//! ## The Superconscious States
+//! ## Scope and measurement limits
 //!
-//! Beyond ordinary waking consciousness lies a spectrum of enhanced states:
+//! The enum labels below are legacy heuristic categories, not validated
+//! psychological states or a hierarchy of consciousness. Band-power changes
+//! can be influenced by task, individual differences, artefacts, medication,
+//! eye state, reference montage, and many other factors. No single EEG feature
+//! uniquely identifies meditation, flow, awareness, or subjective experience.
 //!
-//! ```text
-//!                    ┌─────────────────────────────────────┐
-//!                    │         SUPERCONSCIOUS              │
-//!                    │   Flow, Meditation, Peak States     │
-//!                    ├─────────────────────────────────────┤
-//!     High Focus ────│  FLOW          │  ABSORPTION       │
-//!                    │  Gamma sync    │  Deep theta       │
-//!                    ├────────────────┼───────────────────┤
-//!     Low Focus  ────│  CALM          │  WANDERING        │
-//!                    │  Alpha         │  Default mode     │
-//!                    └────────────────┴───────────────────┘
-//!                         External         Internal
-//!                         Attention        Attention
-//! ```
+//! ## Candidate EEG features
 //!
-//! ## EEG Signatures of Meditation/Flow
+//! Alpha, theta, beta, and gamma power are descriptive signal features that
+//! have been studied in different attention and meditation paradigms. Their
+//! direction and interpretation depend on the practice, participant, montage,
+//! preprocessing, and task. This implementation's ratios are exploratory
+//! proxies; they do not estimate true cross-spectral coherence, phase
+//! synchrony, or a validated meditation-depth construct.
 //!
-//! ### Alpha Power (8-13 Hz)
-//! - Increases during relaxed, eyes-closed meditation
-//! - Posterior alpha = relaxed alertness
-//! - Alpha blocking = attention engagement
-//!
-//! ### Frontal Midline Theta (4-8 Hz at Fz)
-//! - Signature of focused attention and working memory
-//! - Increases in experienced meditators
-//! - Correlated with "no-mind" states in Zen
-//!
-//! ### Gamma Synchrony (30-100 Hz)
-//! - Long-range gamma coherence = cognitive binding
-//! - Expert meditators (Tibetan monks) show sustained gamma
-//! - Flow state characterized by gamma-theta coupling
-//!
-//! ### Alpha Coherence
-//! - Inter-hemispheric coherence = unified awareness
-//! - Increases with meditation experience
-//! - Marker of "whole-brain" integration
-//!
-//! ## References
+//! ## References for hypothesis generation
 //! - Lutz et al. (2004): Long-term meditators and gamma
 //! - Aftanas & Golocheikine (2001): Frontal midline theta
 //! - Cahn & Polich (2006): Meditation and EEG review
 //! - Csikszentmihalyi (1990): Flow - The Psychology of Optimal Experience
-
+//!
 use std::collections::{HashMap, VecDeque};
 use std::f64::consts::PI;
 
@@ -118,7 +97,7 @@ impl MeditationState {
         MeditationCategory::Wandering
     }
 
-    /// Overall meditation quality score
+    /// Heuristic state index; not a validated measure of meditation quality
     pub fn quality(&self) -> f64 {
         // Weighted combination emphasizing presence and flow
         0.3 * self.focus + 0.2 * self.calm + 0.3 * self.flow + 0.2 * self.presence
@@ -155,7 +134,7 @@ impl MeditationCategory {
         }
     }
 
-    /// Is this a desirable meditation state?
+    /// Does this legacy taxonomy label the category meditation-like?
     pub fn is_meditative(&self) -> bool {
         matches!(
             self,
@@ -166,7 +145,7 @@ impl MeditationCategory {
         )
     }
 
-    /// Is this a peak state?
+    /// Does this legacy taxonomy label the category peak-like?
     pub fn is_peak(&self) -> bool {
         matches!(
             self,
@@ -432,7 +411,7 @@ impl Default for FrontalMidlineTheta {
     }
 }
 
-/// Alpha Coherence detector (inter-hemispheric synchrony)
+/// Posterior alpha power-balance proxy (not a coherence estimator)
 #[derive(Debug)]
 pub struct AlphaCoherence {
     /// Smoothing factor
@@ -450,7 +429,7 @@ impl AlphaCoherence {
         }
     }
 
-    /// Compute alpha coherence between left and right hemispheres
+    /// Compare alpha band-power magnitudes; this is not signal coherence or phase synchrony
     pub fn compute(&mut self, eeg: &MeditationEEG) -> Option<f64> {
         // Use O1-O2 pair for posterior alpha coherence
         let alpha_o1 = eeg.alpha_power(MeditationChannel::O1)?;
@@ -498,7 +477,7 @@ impl Default for AlphaCoherence {
     }
 }
 
-/// Gamma Synchrony detector (flow state marker)
+/// Gamma power-balance proxy (not a synchrony/coherence estimator)
 #[derive(Debug)]
 pub struct GammaSynchrony {
     /// Smoothing factor
@@ -524,7 +503,7 @@ impl GammaSynchrony {
         self.baseline = Some(baseline);
     }
 
-    /// Compute gamma synchrony across frontal-parietal network
+    /// Compare gamma band-power magnitudes across sites; this is not synchrony
     pub fn compute(&mut self, eeg: &MeditationEEG) -> Option<f64> {
         // Gamma at frontal and parietal sites
         let gamma_fz = eeg.gamma_power(MeditationChannel::Fz)?;
@@ -615,7 +594,8 @@ impl MeditationSentinel {
         // Presence = combination of coherence and sustained attention
         let presence = (coherence * 0.6 + focus * 0.4).clamp(0.0, 1.0);
 
-        // Confidence based on signal quality
+        // Legacy placeholder only: this constant is not calibrated or a probability.
+        // Do not use it as confidence until an independent held-out calibration.
         let confidence = 0.85;
 
         let state = MeditationState::new(focus, calm, flow, presence, confidence);

@@ -20,6 +20,14 @@ use symthaea_core::hdc::ContinuousHV;
 /// N-back benchmark testing the updating function of working memory.
 pub struct NBackBenchmark;
 
+fn metric_with_bounds(samples: &[f64], lower: f64, upper: Option<f64>) -> MetricValue {
+    MetricValue::from_samples_with_bounds(
+        samples,
+        crate::registry::MetricBounds { lower, upper },
+    )
+    .expect("N-back metric observations must satisfy declared support")
+}
+
 impl NBackBenchmark {
     /// Run a single N-back trial with difficulty scaling and optional trace collection.
     fn run_trial_traced(
@@ -210,19 +218,19 @@ impl PsychBenchmark for NBackBenchmark {
 
             result.insert(
                 format!("nback_{}::hit_rate", n),
-                MetricValue::from_samples(&hit_rates),
+                metric_with_bounds(&hit_rates, 0.0, Some(1.0)),
             );
             result.insert(
                 format!("nback_{}::false_alarm_rate", n),
-                MetricValue::from_samples(&fa_rates),
+                metric_with_bounds(&fa_rates, 0.0, Some(1.0)),
             );
             result.insert(
                 format!("nback_{}::accuracy", n),
-                MetricValue::from_samples(&accuracies),
+                metric_with_bounds(&accuracies, -1.0, Some(1.0)),
             );
             result.insert(
                 format!("nback_{}::rt_ticks", n),
-                MetricValue::from_samples(&all_rts),
+                metric_with_bounds(&all_rts, 0.0, None),
             );
         }
 
@@ -254,6 +262,19 @@ mod tests {
         assert!(result.metrics.contains_key("nback_1::hit_rate"));
         assert!(result.metrics.contains_key("nback_2::hit_rate"));
         assert!(result.metrics.contains_key("nback_3::hit_rate"));
+    }
+
+    #[test]
+    fn nback_signed_discrimination_interval_respects_declared_bounds() {
+        let config = BenchmarkConfig {
+            trials_per_condition: 5,
+            dimension: 256,
+            ..Default::default()
+        };
+        let result = NBackBenchmark.run(&config);
+        let metric = &result.metrics["nback_1::accuracy"];
+        assert!(metric.ci_lower >= -1.0);
+        assert!(metric.ci_upper <= 1.0);
     }
 
     #[test]

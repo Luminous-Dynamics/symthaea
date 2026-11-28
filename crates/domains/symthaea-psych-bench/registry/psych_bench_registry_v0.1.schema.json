@@ -1,0 +1,413 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-psych-bench/registry/psych_bench_registry_v0.1.schema.json",
+  "title": "Symthaea PsychBench Registry v0.1",
+  "type": "object",
+  "required": [
+    "registry_id",
+    "registry_version",
+    "schema_version",
+    "maturity",
+    "generated_at",
+    "completeness_note",
+    "evidence_classes",
+    "comparison_policy",
+    "metric_policy",
+    "benchmarks"
+  ],
+  "properties": {
+    "registry_id": {
+      "const": "org.luminousdynamics.symthaea.psychbench"
+    },
+    "registry_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "maturity": {
+      "enum": [
+        "pilot_incomplete",
+        "complete"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "completeness_note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_classes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/evidenceClass"
+      }
+    },
+    "comparison_policy": {
+      "type": "object",
+      "required": [
+        "same_protocol_inter_system",
+        "human_normative",
+        "consciousness"
+      ],
+      "properties": {
+        "same_protocol_inter_system": {
+          "type": "string"
+        },
+        "human_normative": {
+          "type": "string"
+        },
+        "consciousness": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "metric_policy": {
+      "type": "object",
+      "required": [
+        "bounds",
+        "missing",
+        "unqualified",
+        "aggregation"
+      ],
+      "properties": {
+        "bounds": {
+          "type": "string"
+        },
+        "missing": {
+          "type": "string"
+        },
+        "unqualified": {
+          "type": "string"
+        },
+        "aggregation": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "benchmarks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/benchmark"
+      }
+    }
+  },
+  "$defs": {
+    "evidenceClass": {
+      "enum": [
+        "synthetic_mechanism",
+        "external_task",
+        "human_normed",
+        "ecological_interactive",
+        "theory_probe"
+      ]
+    },
+    "benchmark": {
+      "type": "object",
+      "required": [
+        "id",
+        "version",
+        "benchmark_name",
+        "domain",
+        "construct_card",
+        "implementation_path",
+        "evidence_classes",
+        "validation_status",
+        "stimulus_provenance",
+        "paradigm_sources",
+        "metrics",
+        "controls",
+        "comparison_eligibility"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]+$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "benchmark_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "construct_card": {
+          "$ref": "#/$defs/constructCard"
+        },
+        "implementation_path": {
+          "type": "string",
+          "pattern": "^crates/domains/symthaea-psych-bench/"
+        },
+        "evidence_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidenceClass"
+          }
+        },
+        "validation_status": {
+          "enum": [
+            "mechanics_only",
+            "unvalidated",
+            "externally_scored",
+            "human_anchored",
+            "causally_supported",
+            "independently_replicated",
+            "theory_probe_only",
+            "environment_smoke_unvalidated"
+          ]
+        },
+        "stimulus_provenance": {
+          "$ref": "#/$defs/stimulusProvenance"
+        },
+        "paradigm_sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/metric"
+          }
+        },
+        "controls": {
+          "$ref": "#/$defs/controls"
+        },
+        "comparison_eligibility": {
+          "type": "object",
+          "required": [
+            "inter_system_same_protocol",
+            "human_normative"
+          ],
+          "properties": {
+            "inter_system_same_protocol": {
+              "type": "string"
+            },
+            "human_normative": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "constructCard": {
+      "type": "object",
+      "required": [
+        "construct",
+        "operationalization",
+        "exclusions"
+      ],
+      "properties": {
+        "construct": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operationalization": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "stimulusProvenance": {
+      "type": "object",
+      "required": [
+        "kind",
+        "generator",
+        "external_dataset",
+        "licence"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generator": {
+          "type": "string"
+        },
+        "external_dataset": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "licence": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "citation",
+        "doi"
+      ],
+      "properties": {
+        "citation": {
+          "type": "string"
+        },
+        "doi": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "metric": {
+      "type": "object",
+      "required": [
+        "id",
+        "unit",
+        "bounds",
+        "direction",
+        "estimand",
+        "comparison_status",
+        "validation_status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key": {
+          "type": "string"
+        },
+        "key_pattern": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bounds": {
+          "$ref": "#/$defs/bounds"
+        },
+        "direction": {
+          "enum": [
+            "higher",
+            "lower",
+            "target",
+            "construct_diagnostic",
+            "calibration_diagnostic",
+            "diagnostic_only"
+          ]
+        },
+        "estimand": {
+          "type": "string",
+          "minLength": 1
+        },
+        "comparison_status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validation_status": {
+          "enum": [
+            "verified_in_code",
+            "feature_gated",
+            "semantics_needs_audit",
+            "not_implemented"
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "key"
+          ]
+        },
+        {
+          "required": [
+            "key_pattern"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "bounds": {
+      "type": "object",
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "controls": {
+      "type": "object",
+      "required": [
+        "status",
+        "positive_controls",
+        "negative_controls",
+        "note"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_qualified",
+            "partial",
+            "smoke_controls_only",
+            "qualified"
+          ]
+        },
+        "positive_controls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "negative_controls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

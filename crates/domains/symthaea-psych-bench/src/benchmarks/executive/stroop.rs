@@ -33,6 +33,14 @@ use symthaea_core::hdc::ContinuousHV;
 /// Stroop Color-Word Interference benchmark.
 pub struct StroopBenchmark;
 
+fn metric_with_bounds(samples: &[f64], lower: f64, upper: Option<f64>) -> MetricValue {
+    MetricValue::from_samples_with_bounds(
+        samples,
+        crate::registry::MetricBounds { lower, upper },
+    )
+    .expect("Stroop metric observations must satisfy declared support")
+}
+
 #[derive(Clone, Copy)]
 enum Condition {
     Congruent,
@@ -176,10 +184,16 @@ impl StroopBenchmark {
                 response_idx
             };
 
-            // RT proxy: deliberation ticks based on decision margin
-            let decision_margin = (sims[ink_idx] - max_sim + sims[ink_idx]).abs()
-                / (sims.iter().sum::<f64>() + 1e-10);
-            let rt_ticks = 8.0 + (1.0 - decision_margin) * 12.0;
+            // RT proxy: deliberation ticks based on the target's margin over
+            // its strongest competitor. Avoid normalizing by the sum of cosine
+            // similarities, which can be near-zero or negative.
+            let best_competitor = sims
+                .iter()
+                .enumerate()
+                .filter_map(|(index, similarity)| (index != ink_idx).then_some(*similarity))
+                .fold(f64::NEG_INFINITY, f64::max);
+            let decision_margin = (sims[ink_idx] - best_competitor).max(0.0);
+            let rt_ticks = 8.0 + (1.0 - decision_margin.min(1.0)) * 12.0;
 
             let correct = response_idx == ink_idx;
             let confidence = exp_sims[response_idx] / exp_sum;
@@ -298,21 +312,21 @@ impl PsychBenchmark for StroopBenchmark {
             all_neut_rt.extend_from_slice(&r.neutral_rt);
         }
 
-        result.insert("congruent_accuracy", MetricValue::from_samples(&cong));
-        result.insert("incongruent_accuracy", MetricValue::from_samples(&incong));
-        result.insert("neutral_accuracy", MetricValue::from_samples(&neutral));
-        result.insert("stroop_effect", MetricValue::from_samples(&effect));
+        result.insert("congruent_accuracy", metric_with_bounds(&cong, 0.0, Some(1.0)));
+        result.insert("incongruent_accuracy", metric_with_bounds(&incong, 0.0, Some(1.0)));
+        result.insert("neutral_accuracy", metric_with_bounds(&neutral, 0.0, Some(1.0)));
+        result.insert("stroop_effect", metric_with_bounds(&effect, -1.0, Some(1.0)));
 
         // RT metrics (tick-based)
         result.insert(
             "congruent::rt_ticks",
-            MetricValue::from_samples(&all_cong_rt),
+            metric_with_bounds(&all_cong_rt, 8.0, Some(20.0)),
         );
         result.insert(
             "incongruent::rt_ticks",
-            MetricValue::from_samples(&all_incong_rt),
+            metric_with_bounds(&all_incong_rt, 8.0, Some(20.0)),
         );
-        result.insert("neutral::rt_ticks", MetricValue::from_samples(&all_neut_rt));
+        result.insert("neutral::rt_ticks", metric_with_bounds(&all_neut_rt, 8.0, Some(20.0)));
 
         if config.trial_trace {
             result.trial_trace = trace;
@@ -341,6 +355,45 @@ mod tests {
         assert!(result.metrics.contains_key("incongruent_accuracy"));
         assert!(result.metrics.contains_key("neutral_accuracy"));
         assert!(result.metrics.contains_key("stroop_effect"));
+    }
+
+    #[test]
+    fn stroop_reaction_time_proxy_is_bounded_and_non_negative() {
+        let config = BenchmarkConfig {
+            dimension: 128,
+            trials_per_condition: 10,
+            trial_trace: true,
+            ..Default::default()
+        };
+        let result = StroopBenchmark.run(&config);
+        for key in [
+            "congruent::rt_ticks",
+            "incongruent::rt_ticks",
+            "neutral::rt_ticks",
+        ] {
+            let metric = &result.metrics[key];
+            assert!(
+                metric.mean >= 8.0,
+                "{key} mean below proxy floor: {}",
+                metric.mean
+            );
+            assert!(
+                metric.ci_lower >= 8.0 && metric.ci_upper <= 20.0,
+                "{key} interval escaped [8, 20]: [{}, {}]",
+                metric.ci_lower,
+                metric.ci_upper
+            );            assert!(
+                metric.mean <= 20.0,
+                "{key} mean above proxy ceiling: {}",
+                metric.mean
+            );
+        }
+        assert!(
+            result
+                .trial_trace
+                .iter()
+                .all(|trial| (8.0..=20.0).contains(&trial.rt_ticks))
+        );
     }
 
     #[test]

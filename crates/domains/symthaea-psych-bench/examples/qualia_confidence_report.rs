@@ -1,7 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Run the 7-benchmark Qualia Confidence Matrix and print the composite report.
+//! Run seven theory-inspired synthetic probes and print their heuristic conformance summary.
+//! This summary is not a measure or probability estimate of consciousness.
 //!
 //! Usage:
 //!   cargo run -p symthaea-psych-bench --example qualia_confidence_report
@@ -33,7 +34,7 @@ fn main() {
         ..Default::default()
     };
 
-    eprintln!("Running Qualia Confidence Matrix (seed={seed})...\n");
+    eprintln!("Running theory-probe diagnostics (seed={seed})...\n");
 
     let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
         Box::new(GwtAsphyxiationBenchmark),
@@ -49,14 +50,31 @@ fn main() {
     let score = QualiaConfidenceScore::from_results(&results);
 
     if json_output {
+        let complete = score.indicators.iter().all(|indicator| indicator.raw_value.is_finite());
         println!("{{");
         println!("  \"seed\": {seed},");
-        println!("  \"composite\": {:.4},", score.composite);
-        println!("  \"level\": \"{}\",", score.level);
+        println!("  \"summary_type\": \"theory_probe_heuristic_index\",");
+        println!("  \"consciousness_measure\": false,");
+        if complete {
+            println!("  \"theory_probe_heuristic_index\": {:.4},", score.composite);
+            println!("  \"heuristic_bucket\": \"{}\",", score.level);
+            // Deprecated compatibility fields: retain until downstream consumers migrate.
+            println!("  \"composite\": {:.4},", score.composite);
+            println!("  \"level\": \"{}\",", score.level);
+        } else {
+            println!("  \"theory_probe_heuristic_index\": null,");
+            println!("  \"heuristic_bucket\": \"INCOMPLETE\",");
+            // Deprecated compatibility fields: null signals that the run is incomplete.
+            println!("  \"composite\": null,");
+            println!("  \"level\": \"INCOMPLETE\",");
+        }
+        println!("  \"complete\": {complete},");
         println!(
-            "  \"predictions_met\": {}/{}",
-            score.predictions_met, score.predictions_total
+            "  \"predictions_met\": {},",
+            score.predictions_met
         );
+        println!("  \"predictions_total\": {},", score.predictions_total);
+        println!("  \"not_run\": {},", score.indicators.iter().filter(|indicator| !indicator.raw_value.is_finite()).count());
         println!("  \"indicators\": [");
         for (i, ind) in score.indicators.iter().enumerate() {
             let comma = if i + 1 < score.indicators.len() {

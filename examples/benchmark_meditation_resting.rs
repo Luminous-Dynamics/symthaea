@@ -1,17 +1,18 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # OpenNeuro Resting-State Meditation Benchmark
+//! # Synthetic Meditation EEG Mechanism Smoke Test
 //!
-//! Tests Symthaea's MeditationSentinel (Project Nous) on detection of
-//! meditation and flow states from multi-channel EEG, validated against
-//! known EEG signatures from the literature (Lutz 2004, Cahn & Polich 2006).
+//! Exercises a simulator whose category labels directly parameterize the
+//! generated frequency amplitudes. This is a synthetic mechanism smoke test,
+//! not an OpenNeuro evaluation, a human-normed benchmark, or validation of
+//! meditation depth/state detection. The generated labels are known by design.
 //!
-//! ## Validates
-//! 1. Flow state detection via gamma-theta coupling
-//! 2. Meditation depth via frontal midline theta
-//! 3. State discrimination across 6 meditation categories
-//! 4. Session tracking with progressive deepening
+//! ## Exercises
+//! 1. Recovery of simulator-defined spectral patterns
+//! 2. Separation of simulator-defined categories
+//! 3. A heuristic quality-ordering check
+//! 4. Processing throughput on generated windows
 //!
 //! ## Run
 //! ```bash
@@ -37,7 +38,7 @@ fn main() {
     // Test 1: State Detection Accuracy
     // ═══════════════════════════════════════════════════════════════
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Test 1: Meditation State Detection (6 categories)");
+    println!("Test 1: Synthetic Category Recovery (6 simulator labels)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let all_states = [
@@ -261,7 +262,7 @@ fn main() {
     // Summary
     // ═══════════════════════════════════════════════════════════════
     println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║                 VALIDATION SUMMARY                         ║");
+    println!("║                 SIMULATOR SMOKE SUMMARY                         ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
 
     let checks = vec![
@@ -293,7 +294,7 @@ fn main() {
 
     // Save
     let result_json = serde_json::json!({
-        "benchmark": "Meditation/Resting-State EEG (Synthetic OpenNeuro-like)",
+        "benchmark": "Synthetic meditation EEG mechanism smoke test",
         "timestamp": chrono::Utc::now().to_rfc3339(),
         "exact_accuracy": exact_accuracy,
         "binary_accuracy": binary_accuracy,

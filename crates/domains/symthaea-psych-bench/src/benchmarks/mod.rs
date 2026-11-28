@@ -4,6 +4,7 @@
 //! Psychological benchmark implementations.
 
 pub mod affect;
+pub mod aesthetic;
 pub mod architecture;
 pub mod attention;
 pub mod binding;
@@ -14,6 +15,7 @@ pub mod coding;
 pub mod cogbench;
 pub mod consciousness;
 pub mod creativity;
+pub mod cognitive_ecology;
 pub mod executive;
 pub mod inhibition;
 pub mod institutional_reasoning;

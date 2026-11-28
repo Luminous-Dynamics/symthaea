@@ -4,10 +4,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """
-MeditationSentinel Time-Course Validation
+Unlabelled EEG Band-Power Time-Course Summary
 
-Shows that MeditationSentinel can track meditation features over time.
-This validates the feature extraction without requiring baseline periods.
+This script plots/describes spectral features over elapsed recording time.
+It does not classify meditation, infer meditation depth, or validate the
+MeditationSentinel. Its early/late contrasts are not ground-truth state labels.
 """
 
 import numpy as np
@@ -101,7 +102,7 @@ def band_power(data, srate, fmin, fmax):
 
 
 def extract_features(data, srate):
-    """Extract meditation features."""
+    """Extract exploratory spectral features; not a state detector."""
     delta = band_power(data, srate, 1, 4)
     theta = band_power(data, srate, 4, 8)
     alpha = band_power(data, srate, 8, 13)
@@ -118,7 +119,7 @@ def extract_features(data, srate):
 
 
 def analyze_subject(bdf_path):
-    """Analyze meditation time-course for a subject."""
+    """Summarize EEG features over elapsed time; no state labels are inferred."""
     header = read_bdf_header(bdf_path)
 
     # Use frontal channel (A4 = F1 in BioSemi 64)
@@ -148,7 +149,7 @@ def analyze_subject(bdf_path):
 def main():
     print()
     print('=' * 72)
-    print(' MEDITATIONSENTINEL TIME-COURSE VALIDATION'.center(72))
+    print(' UNLABELLED EEG FEATURE TIME-COURSE'.center(72))
     print(' Feature Extraction Verification'.center(72))
     print('=' * 72)
     print()
@@ -182,7 +183,7 @@ def main():
         beta_mean = np.mean([e['beta_rel'] for e in epochs])
         index_mean = np.mean([e['meditation_index'] for e in epochs])
 
-        # Track time-course (first 5 min vs last 5 min)
+        # Track early/late spectral-feature contrast (first 5 min vs last 5 min), not state change
         first_5 = [e for e in epochs if e['time'] < 5]
         last_5 = [e for e in epochs if e['time'] > max(e['time'] for e in epochs) - 5]
 
@@ -210,7 +211,7 @@ def main():
         })
 
     print('-' * 72)
-    print(f"{'Subject':<10} {'Epochs':>7} {'Alpha':>8} {'Theta':>8} {'Beta':>8} {'M-Index':>9}")
+    print(f"{'Recording':<10} {'Epochs':>7} {'Alpha':>8} {'Theta':>8} {'Beta':>8} {'FeatureIdx':>10}")
     print('-' * 72)
 
     for f in all_features:
@@ -229,7 +230,7 @@ def main():
 
     # Aggregate results
     print('=' * 72)
-    print(' FEATURE VALIDATION RESULTS'.center(72))
+    print(' DESCRIPTIVE FEATURE SUMMARY'.center(72))
     print('=' * 72)
     print()
 
@@ -238,27 +239,27 @@ def main():
     mean_beta = np.mean([f['beta_mean'] for f in all_features]) * 100
     mean_index = np.mean([f['index_mean'] for f in all_features])
 
-    print("MEAN FEATURE VALUES DURING MEDITATION:")
-    print(f"  Alpha (8-13 Hz):  {mean_alpha:.1f}%  [Expected: 25-50% for relaxed state]")
-    print(f"  Theta (4-8 Hz):   {mean_theta:.1f}%  [Expected: 10-25% for meditation]")
-    print(f"  Beta (13-30 Hz):  {mean_beta:.1f}%   [Expected: 10-20% for calm state]")
-    print(f"  Meditation Index: {mean_index:.2f}  [Higher = deeper meditation]")
+    print("MEAN SPECTRAL FEATURE VALUES (UNLABELLED RECORDING):")
+    print(f"  Alpha (8-13 Hz):  {mean_alpha:.1f}%")
+    print(f"  Theta (4-8 Hz):   {mean_theta:.1f}%")
+    print(f"  Beta (13-30 Hz):  {mean_beta:.1f}%")
+    print(f"  Legacy band-power index: {mean_index:.2f}  [Not a depth scale]")
     print()
 
     # Time-course analysis
-    print("TIME-COURSE ANALYSIS (Early vs Late):")
+    print("UNLABELLED FEATURE CONTRAST (Early vs Late):")
     for f in all_features:
         alpha_change = (f['alpha_late'] - f['alpha_early']) / (f['alpha_early'] + 1e-10) * 100
         index_change = (f['index_late'] - f['index_early']) / (f['index_early'] + 1e-10) * 100
         print(f"  {f['subject']}: Alpha {alpha_change:+.1f}%, Index {index_change:+.1f}% "
-              f"({'deepening' if index_change > 5 else 'stable' if index_change > -5 else 'lightening'})")
+              f"({'feature index increased' if index_change > 5 else 'feature index roughly stable' if index_change > -5 else 'feature index decreased'})")
 
     print()
     print('=' * 72)
     print()
 
     # Validation assessment
-    print("VALIDATION ASSESSMENT:")
+    print("FEATURE-RANGE SANITY CHECKS (NOT STATE VALIDATION):")
     print()
 
     # Check if values are in expected ranges
@@ -271,7 +272,7 @@ def main():
         (alpha_valid, f"Alpha power in valid range: {mean_alpha:.1f}%"),
         (theta_valid, f"Theta power in valid range: {mean_theta:.1f}%"),
         (beta_valid, f"Beta power in valid range: {mean_beta:.1f}%"),
-        (index_valid, f"Meditation index > 1.0: {mean_index:.2f}"),
+        (index_valid, f"Legacy band-power index heuristic > 1.0: {mean_index:.2f}"),
         (True, f"Feature extraction working: {len(all_features)} subjects analyzed"),
     ]
 
@@ -283,9 +284,9 @@ def main():
         print(f"  [{status}] {msg}")
 
     print()
-    print("  CONCLUSION: MeditationSentinel feature extraction is working correctly.")
-    print("  The high alpha values (>50%) are consistent with experienced meditators")
-    print("  in a dedicated meditation task (eyes closed, relaxed state).")
+    print("  CONCLUSION: feature ranges were checked heuristically; no state-classification or meditation-depth validity is established.")
+    print("  Observed alpha values are descriptive only and cannot establish a meditator state or trait")
+    print("  in any specific psychological state.")
 
 
 if __name__ == '__main__':

@@ -34,6 +34,14 @@ use symthaea_core::hdc::BinaryHV;
 /// Intervention Effect benchmark: do-operator in HDC space.
 pub struct InterventionEffectBenchmark;
 
+fn metric_with_bounds(samples: &[f64], lower: f64, upper: Option<f64>) -> MetricValue {
+    MetricValue::from_samples_with_bounds(
+        samples,
+        crate::registry::MetricBounds { lower, upper },
+    )
+    .expect("causal intervention metric observations must satisfy declared support")
+}
+
 struct TrialResult {
     /// Whether intervention unbinding yields different residual than conditioning
     intervention_discrimination: f64,
@@ -236,17 +244,17 @@ impl PsychBenchmark for InterventionEffectBenchmark {
 
         result.insert(
             "intervention_discrimination",
-            MetricValue::from_samples(&intervention_vals),
+            metric_with_bounds(&intervention_vals, 0.0, Some(2.0)),
         );
         result.insert(
             "backdoor_accuracy",
-            MetricValue::from_samples(&backdoor_vals),
+            metric_with_bounds(&backdoor_vals, 0.0, Some(1.0)),
         );
         result.insert(
             "frontdoor_accuracy",
-            MetricValue::from_samples(&frontdoor_vals),
+            metric_with_bounds(&frontdoor_vals, -1.0, Some(1.0)),
         );
-        result.insert("causal_score", MetricValue::from_samples(&causal_vals));
+        result.insert("causal_score", metric_with_bounds(&causal_vals, -0.3, Some(1.4)));
 
         result.conditions = 4;
         result.trials_per_condition = config.trials_per_condition;
@@ -286,6 +294,23 @@ mod tests {
             discrim > 0.0,
             "Intervention should produce discriminable residuals, got {discrim}"
         );
+    }
+
+    #[test]
+    fn causal_metric_intervals_respect_distinct_supports() {
+        let result = InterventionEffectBenchmark.run(&default_config());
+
+        let discrimination = &result.metrics["intervention_discrimination"];
+        assert!(discrimination.ci_lower >= 0.0);
+        assert!(discrimination.ci_upper <= 2.0);
+
+        let frontdoor = &result.metrics["frontdoor_accuracy"];
+        assert!(frontdoor.ci_lower >= -1.0);
+        assert!(frontdoor.ci_upper <= 1.0);
+
+        let causal_score = &result.metrics["causal_score"];
+        assert!(causal_score.ci_lower >= -0.3);
+        assert!(causal_score.ci_upper <= 1.4);
     }
 
     #[test]
