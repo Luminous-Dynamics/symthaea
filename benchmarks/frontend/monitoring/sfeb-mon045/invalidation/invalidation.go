@@ -213,7 +213,6 @@ func Evaluate(in Input)Result{
   if e.PrerequisiteID==e.DependentID{f.block("self_dependency:"+e.PrerequisiteID)}
   if _,ok:=nodes[e.DependentID];!ok{f.block("dependent_node_missing:"+e.DependentID)}
   if e.Relation!=Requires&&e.Relation!=Context{f.block("edge_relation_invalid")}
-  if e.Relation==Requires&&!validDigest(e.ExpectedSHA256){/* the dependent claim is held during evaluation */}
   key:=e.PrerequisiteID+"\x00"+e.DependentID+"\x00"+string(e.Relation)
   if _,ok:=edgeKeys[key];ok{f.block("edge_duplicated:"+e.PrerequisiteID+":"+e.DependentID)}
   edgeKeys[key]=struct{}{}
