@@ -83,7 +83,7 @@ The renderer-independent event, projection, policy, receipt, scene, scene-graph,
 `crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs`; it checks causal relationships but is not a JSON Schema validator.
 A standalone Bevy 0.20.1 adapter has transition-aware source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
-All 211 tracked polyembodiment and temporal-foveation regression tests are authored but unexecuted; this inventory excludes pre-existing tests elsewhere in the foveation package, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
+All 213 tracked polyembodiment and temporal-foveation regression tests are authored but unexecuted; this inventory excludes pre-existing tests elsewhere in the foveation package, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
 
 ## Theoretical Foundations
 
