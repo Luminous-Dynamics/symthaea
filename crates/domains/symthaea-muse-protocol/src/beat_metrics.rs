@@ -792,7 +792,7 @@ fn continuity_scores(
     let mut total = Vec::with_capacity(variations.len());
 
     for variation in variations {
-        let annotation_count = reference.len().max(estimated.len());
+        let annotation_count = variation.len().max(estimated.len());
         let mut used = vec![false; variation.len()];
         let mut successes = vec![false; annotation_count];
 
