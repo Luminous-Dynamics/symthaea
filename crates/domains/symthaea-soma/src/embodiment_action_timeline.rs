@@ -459,7 +459,7 @@ fn empty_execution_tick(cancelled: bool, expired: bool) -> ActionExecutionTick {
     ActionExecutionTick {
         dispatch_segment_ids: Vec::new(),
         missed_segment_ids: Vec::new(),
-        elapsed_segment_ids: Vec::new(),
+        scheduled_stop_segment_ids: Vec::new(),
         stop_required_segment_ids: Vec::new(),
         cancelled,
         expired,
