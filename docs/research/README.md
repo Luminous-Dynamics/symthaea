@@ -56,6 +56,7 @@ event contract.
 - [CGRB Rust state-outcome reference verifier](../../crates/domains/symthaea-soma/src/cgrb_state.rs)
 - [CGRB harness-pinned read-only oracle interface](../../crates/domains/symthaea-soma/src/cgrb_state.rs)
 - [CGRB deterministic reference world](../../crates/domains/symthaea-soma/src/cgrb_world.rs)
+- [CGRB model/evaluator scenario projection](../../crates/domains/symthaea-soma/src/cgrb_scenario.rs)
 - [Acoustic output observation JSON Schema](SYMTHAEA_ACOUSTIC_OUTPUT_OBSERVER_V1_2026-11-28.schema.json)
 - [Acoustic output observer positive/negative fixtures](SYMTHAEA_ACOUSTIC_OUTPUT_OBSERVER_FIXTURES_V1_2026-11-28.json)
 - [Wayland presentation-feedback ledger](../../crates/domains/symthaea-soma/src/embodiment_presentation_feedback.rs)
