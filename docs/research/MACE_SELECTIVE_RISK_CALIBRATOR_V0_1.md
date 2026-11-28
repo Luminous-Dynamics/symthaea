@@ -1,12 +1,16 @@
 # MACE selective evidence risk calibrator v0.1
 
-**Status:** standalone offline calibrator and four-way assessment kernel implemented with synthetic fixtures. Dedicated Rust validation is pending.
+**Status:** standalone offline calibrator and four-way assessment kernel implemented with synthetic fixtures. The cluster-split firewall is now mandatory. Dedicated Rust validation is pending.
 
 ## Primary endpoint
 
 The primary endpoint is the probability that a new independent calibration cluster contains at least one accepted decision whose evaluator-only bounded loss exceeds a preregistered unacceptable-loss threshold. Each cluster contributes one Bernoulli observation at a given group and threshold: it is selected when at least one case passes, and unsafe when any selected case exceeds the loss limit. The fixed-sequence guarantee is applied to these independent cluster-level observations; repeated turns, assertions, evidence spans and ablation rows do not inflate the number of trials.
 
 This is deliberately stricter than per-row selective risk. Mean bounded loss and coverage are descriptive, not separately certified per-row guarantees.
+
+## Calibration/evaluation split firewall
+
+Calibration and evaluation inventories must be supplied separately. Each contains sorted, unique HMAC-SHA256 commitments for independent clusters, episodes and observations; raw identities are never accepted by the inventory contract. Both inventories must use the same commitment namespace, benchmark snapshot, task definition, group hierarchy, score definition, loss definition and independence-unit schema. The audit rejects any cluster, episode or observation overlap, including cases where only the episode or record overlaps. Evaluation outcome labels must be sealed and inaccessible to the candidate. The audit receipt binds both inventory digests and the complete preregistered policy/threshold configuration into the calibration manifest. Each calibration row must match the inventory's cluster, episode and observation commitments exactly. Cluster tokens are intended to be HMAC-SHA256 commitments produced by a trusted preprocessor with a key held outside the candidate. Synthetic tests use deterministic SHA-256 fixture tokens only. These checks validate declared inventories; they cannot prove the upstream identity mapping or custodian behavior without an independently authenticated preprocessor and evaluator.
 
 ## Exact bound and post-selection control
 
@@ -24,11 +28,11 @@ Groups form an explicit parent tree. Parent data include examples assigned to de
 2. Distribution shift: suspend the certificate and acquire or abstain.
 3. No certificate, insufficient support or risk above target: acquire or abstain.
 4. Score below the certified threshold: retrieve more, acquire, or abstain.
-5. Only a matching usable group certificate, adequate score and passing hard gates permit accept-and-act.
+5. Only a matching usable group certificate, its integrity-verified calibration manifest, adequate score and passing hard gates permit accept-and-act.
 
 ## Guarantee assumptions and limits
 
-- Calibration and evaluation splits are disjoint at the true independent cluster boundary.
+- Calibration and evaluation splits are disjoint at cluster, episode and observation levels in the supplied HMAC-commitment inventories.
 - Cluster-level unsafe indicators are independent and identically distributed, or the sampling design otherwise justifies the exact binomial bound.
 - The score, loss, policy, thresholds, group tree and hard-gate definition are frozen and hashed.
 - Decision-time assessment requires exact policy, sufficiency-score-definition and group-hierarchy digests to match the certificate; a numerically similar score or reused group name is not sufficient.
@@ -41,7 +45,7 @@ No guarantee transfers automatically to a new policy, score, hierarchy, source d
 
 ## Synthetic tests
 
-Thirteen deterministic tests cover the exact zero-violation bound and sample-size consequence, multiplicity conservatism, safe threshold selection, hard-gate dominance, risk-exceeds-target status, explicit parent fallback, shift and exchangeability suspension, hierarchy cycle/digest rejection, retrieve-more behavior, certificate-gated acceptance and tamper rejection.
+Twenty-one deterministic tests cover the exact zero- and nonzero-violation bounds against independent Beta-quantile references, multiplicity conservatism, safe threshold selection, hard-gate dominance, risk-exceeds-target status, explicit parent fallback, shift and exchangeability suspension, hierarchy cycle/digest rejection, retrieve-more behavior, certificate-gated acceptance, manifest linkage/tamper rejection, three-level split overlap, label sealing, candidate isolation and inventory-to-row commitment equality.
 
 ## Run
 
@@ -50,6 +54,6 @@ cargo test --manifest-path research/mace-selective-risk-calibrator-v0-1/Cargo.to
 cargo clippy --manifest-path research/mace-selective-risk-calibrator-v0-1/Cargo.toml --all-targets -- -D warnings
 ```
 
-The manifest, group-certificate and decision-assessment digests are recomputable integrity commitments, not signatures. This is an offline calibration kernel, not a production policy. Review its endpoint and assumptions before describing any MACE result as calibrated or certified.
+The split inventory, split audit receipt, manifest, group-certificate and decision-assessment digests are recomputable integrity commitments, not signatures. This is an offline calibration kernel, not a production policy. Review its endpoint and assumptions before describing any MACE result as calibrated or certified.
 
 **Coverage semantics:** `coverage` is independent-cluster acceptance probability, matching the cluster-risk endpoint. `decision_coverage` is separately reported as the equal-cluster-weighted fraction of individual decisions accepted. This prevents decision rows from being mistaken for independent risk trials.
