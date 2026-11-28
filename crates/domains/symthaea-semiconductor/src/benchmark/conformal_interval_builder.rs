@@ -14,18 +14,15 @@ use std::collections::BTreeSet;
 use thiserror::Error;
 
 use super::label_consumption_guard::{
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-    LabelEvidenceFrontierV1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
 
-pub const CONFORMAL_SCORE_POLICY_SCHEMA_V1: &str =
-    "luminous.semi-bench.conformal-score-policy.v1";
+pub const CONFORMAL_SCORE_POLICY_SCHEMA_V1: &str = "luminous.semi-bench.conformal-score-policy.v1";
 pub const CONFORMAL_CALIBRATION_SAMPLE_SCHEMA_V1: &str =
     "luminous.semi-bench.conformal-calibration-sample.v1";
 pub const CONFORMAL_INTERVAL_INPUT_SCHEMA_V1: &str =
     "luminous.semi-bench.conformal-interval-input.v1";
-pub const CONFORMAL_SET_RECEIPT_SCHEMA_V1: &str =
-    "luminous.semi-bench.conformal-set-receipt.v1";
+pub const CONFORMAL_SET_RECEIPT_SCHEMA_V1: &str = "luminous.semi-bench.conformal-set-receipt.v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -229,7 +226,8 @@ fn calibration_score(
     {
         return Err(ConformalSetBuildReasonV1::CalibrationReportDigestMismatch);
     }
-    if report_digest(report).map_err(|_| ConformalSetBuildReasonV1::CalibrationReportDigestMismatch)?
+    if report_digest(report)
+        .map_err(|_| ConformalSetBuildReasonV1::CalibrationReportDigestMismatch)?
         != report.report_sha256
     {
         return Err(ConformalSetBuildReasonV1::CalibrationReportDigestMismatch);
@@ -388,8 +386,7 @@ pub fn build_conformal_interval_v1(
             .then_with(|| a.label_revision.cmp(&b.label_revision))
     });
     if samples.len() > policy.maximum_calibration_samples {
-        samples = samples
-            .split_off(samples.len() - policy.maximum_calibration_samples);
+        samples = samples.split_off(samples.len() - policy.maximum_calibration_samples);
     }
 
     let mut used_labels = BTreeSet::new();
@@ -615,7 +612,11 @@ pub fn build_bounded_score_prediction_set_v1(
                 "bounded prediction-set interval overflowed".into(),
             ));
         }
-        (BoundedPredictionSetKindV1::Nontrivial, Some(lower), Some(upper))
+        (
+            BoundedPredictionSetKindV1::Nontrivial,
+            Some(lower),
+            Some(upper),
+        )
     };
 
     let mut receipt = BoundedPredictionSetReceiptV1 {
@@ -688,18 +689,28 @@ mod bounded_score_set_tests {
 
     #[test]
     fn bounded_score_threshold_maps_exactly_to_empty_interval_and_full_sets() {
-        let contract = contract(BoundedConformalScoreKindV1::BoundedScaleNormalizedAbsoluteResidual);
+        let contract =
+            contract(BoundedConformalScoreKindV1::BoundedScaleNormalizedAbsoluteResidual);
         let empty = build_bounded_score_prediction_set_v1(&contract, &input(-0.01)).unwrap();
-        assert_eq!(empty.prediction_set_kind, BoundedPredictionSetKindV1::KnownEmpty);
+        assert_eq!(
+            empty.prediction_set_kind,
+            BoundedPredictionSetKindV1::KnownEmpty
+        );
         assert!(empty.lower_bound.is_none());
 
         let interval = build_bounded_score_prediction_set_v1(&contract, &input(0.5)).unwrap();
-        assert_eq!(interval.prediction_set_kind, BoundedPredictionSetKindV1::Nontrivial);
+        assert_eq!(
+            interval.prediction_set_kind,
+            BoundedPredictionSetKindV1::Nontrivial
+        );
         assert_eq!(interval.lower_bound, Some(99.0));
         assert_eq!(interval.upper_bound, Some(101.0));
 
         let full = build_bounded_score_prediction_set_v1(&contract, &input(1.0)).unwrap();
-        assert_eq!(full.prediction_set_kind, BoundedPredictionSetKindV1::KnownFull);
+        assert_eq!(
+            full.prediction_set_kind,
+            BoundedPredictionSetKindV1::KnownFull
+        );
         assert!(full.upper_bound.is_none());
     }
 
@@ -820,7 +831,14 @@ mod tests {
     fn finite_sample_quantile_uses_the_corrected_order_statistic() {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
         let samples = (0..19)
-            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10, &policy))
+            .map(|index| {
+                sample(
+                    index,
+                    index as f64 + 1.0,
+                    1_800_000_000 + index as i64 * 10,
+                    &policy,
+                )
+            })
             .collect::<Vec<_>>();
         let output = build_conformal_interval_v1(&policy, &input(0.05), &samples).unwrap();
         assert_eq!(output.status, ConformalSetBuildStatusV1::Ready);
@@ -834,13 +852,24 @@ mod tests {
     fn too_few_qualified_calibration_labels_returns_full_set_state() {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
         let samples = (0..18)
-            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10, &policy))
+            .map(|index| {
+                sample(
+                    index,
+                    index as f64 + 1.0,
+                    1_800_000_000 + index as i64 * 10,
+                    &policy,
+                )
+            })
             .collect::<Vec<_>>();
         let output = build_conformal_interval_v1(&policy, &input(0.05), &samples).unwrap();
         assert_eq!(output.status, ConformalSetBuildStatusV1::FullSetRequired);
         assert!(output.lower_bound.is_none());
         assert!(output.upper_bound.is_none());
-        assert!(output.reasons.contains(&ConformalSetBuildReasonV1::InsufficientCalibrationForFiniteQuantile));
+        assert!(
+            output
+                .reasons
+                .contains(&ConformalSetBuildReasonV1::InsufficientCalibrationForFiniteQuantile)
+        );
     }
 
     #[test]
@@ -848,9 +877,7 @@ mod tests {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
         let mut candidate = sample(0, 1.0, 1_800_100_000, &policy);
         candidate.eligibility_report_available_at_unix_seconds = 1_800_100_001;
-        assert!(
-            build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err()
-        );
+        assert!(build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err());
     }
 
     #[test]
@@ -862,16 +889,21 @@ mod tests {
         let mut canonical = candidate.eligibility_report.clone();
         canonical.report_sha256.clear();
         candidate.eligibility_report.report_sha256 = json_sha256(&canonical).unwrap();
-        assert!(
-            build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err()
-        );
+        assert!(build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err());
     }
 
     #[test]
     fn normalized_score_uses_sample_scale_and_current_prediction_scale() {
         let policy = policy(ConformalScoreKindV1::ScaleNormalizedAbsoluteResidual, 50);
         let samples = (0..19)
-            .map(|index| sample(index, (index as f64 + 1.0) * 2.0, 1_800_000_000 + index as i64 * 10, &policy))
+            .map(|index| {
+                sample(
+                    index,
+                    (index as f64 + 1.0) * 2.0,
+                    1_800_000_000 + index as i64 * 10,
+                    &policy,
+                )
+            })
             .collect::<Vec<_>>();
         let output = build_conformal_interval_v1(&policy, &input(0.05), &samples).unwrap();
         assert_eq!(output.conformal_quantile, Some(19.0));
@@ -883,12 +915,27 @@ mod tests {
     fn calibration_window_is_capped_by_label_availability_order() {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 19);
         let samples = (0..25)
-            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10, &policy))
+            .map(|index| {
+                sample(
+                    index,
+                    index as f64 + 1.0,
+                    1_800_000_000 + index as i64 * 10,
+                    &policy,
+                )
+            })
             .collect::<Vec<_>>();
         let output = build_conformal_interval_v1(&policy, &input(0.05), &samples).unwrap();
         assert_eq!(output.calibration_sample_count, 19);
-        assert!(output.calibration_window_label_ids.contains(&"label-24".into()));
-        assert!(!output.calibration_window_label_ids.contains(&"label-0".into()));
+        assert!(
+            output
+                .calibration_window_label_ids
+                .contains(&"label-24".into())
+        );
+        assert!(
+            !output
+                .calibration_window_label_ids
+                .contains(&"label-0".into())
+        );
     }
 
     #[test]
@@ -896,21 +943,15 @@ mod tests {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
         let mut candidate = sample(0, 1.0, 1_800_000_100, &policy);
         candidate.global_model_artifact_sha256 = digest('z');
-        assert!(
-            build_conformal_interval_v1(&policy, &input(0.05), &[candidate.clone()]).is_err()
-        );
+        assert!(build_conformal_interval_v1(&policy, &input(0.05), &[candidate.clone()]).is_err());
 
         candidate = sample(0, 1.0, 1_800_000_100, &policy);
         candidate.score_policy_sha256 = digest('z');
-        assert!(
-            build_conformal_interval_v1(&policy, &input(0.05), &[candidate.clone()]).is_err()
-        );
+        assert!(build_conformal_interval_v1(&policy, &input(0.05), &[candidate.clone()]).is_err());
 
         candidate = sample(0, 1.0, 1_800_000_100, &policy);
         candidate.measurement_contract_sha256 = digest('z');
-        assert!(
-            build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err()
-        );
+        assert!(build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err());
     }
 
     #[test]
@@ -923,9 +964,7 @@ mod tests {
         let mut canonical = duplicate.eligibility_report.clone();
         canonical.report_sha256.clear();
         duplicate.eligibility_report.report_sha256 = json_sha256(&canonical).unwrap();
-        assert!(
-            build_conformal_interval_v1(&policy, &input(0.05), &[first, duplicate]).is_err()
-        );
+        assert!(build_conformal_interval_v1(&policy, &input(0.05), &[first, duplicate]).is_err());
     }
 
     #[test]
@@ -933,16 +972,21 @@ mod tests {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
         let mut candidate = sample(0, 1.0, 1_800_000_100, &policy);
         candidate.prediction_receipt_sha256 = "bad".into();
-        assert!(
-            build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err()
-        );
+        assert!(build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err());
     }
 
     #[test]
     fn set_receipt_is_deterministic_under_input_order_permutation() {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
         let mut samples = (0..19)
-            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10, &policy))
+            .map(|index| {
+                sample(
+                    index,
+                    index as f64 + 1.0,
+                    1_800_000_000 + index as i64 * 10,
+                    &policy,
+                )
+            })
             .collect::<Vec<_>>();
         let first = build_conformal_interval_v1(&policy, &input(0.05), &samples).unwrap();
         samples.reverse();
