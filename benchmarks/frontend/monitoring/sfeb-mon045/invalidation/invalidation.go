@@ -120,6 +120,7 @@ func validKind(k NodeKind)bool{switch k{case Evidence,Capability,Scope,Policy,Cl
 func validVerdict(v Verdict)bool{switch v{case Qualified,Blocked,Indeterminate:return true};return false}
 func nodeOwnEvaluation(n Node,at time.Time,skew int64)(Verdict,[]string){
  f:=newFlags()
+ if at.IsZero(){f.hold("evaluation_time_missing")}
  if !validID(n.ID)||!validKind(n.Kind)||!validDigest(n.Digest)||!validID(n.IssuerID){f.block("node_identity_or_digest_invalid")}
  if !validVerdict(n.DeclaredVerdict){f.block("node_declared_verdict_invalid")}
  if n.IssuedAt.IsZero()||n.ValidUntil.IsZero()||!n.ValidUntil.After(n.IssuedAt){f.hold("node_validity_window_invalid")}
@@ -141,6 +142,11 @@ func(h *stringHeap)Pop()any{old:=*h;n:=len(old);x:=old[n-1];*h=old[:n-1];return 
 
 func GraphDigest(nodes []Node,edges []Edge,roots []string)string{
  ns:=append([]Node(nil),nodes...)
+ for i:=range ns{
+  ns[i].IssuedAt=ns[i].IssuedAt.Round(0).UTC()
+  ns[i].ValidUntil=ns[i].ValidUntil.Round(0).UTC()
+  if ns[i].RevokedAt!=nil{revoked:=ns[i].RevokedAt.Round(0).UTC();ns[i].RevokedAt=&revoked}
+ }
  sort.Slice(ns,func(i,j int)bool{return ns[i].ID<ns[j].ID})
  es:=append([]Edge(nil),edges...)
  sort.Slice(es,func(i,j int)bool{
@@ -293,8 +299,10 @@ func Evaluate(in Input)Result{
   traceDigest:=digestJSON(trace)
   claimReasons:=append([]string(nil),reasons[claimID]...)
   for _,dep:=range invalidating{for _,code:=range reasons[dep]{claimReasons=appendUnique(claimReasons,dep+":"+code)}}
+  claimVerdict,claimExists:=effective[claimID]
+  if !claimExists{claimVerdict=Indeterminate;claimReasons=appendUnique(claimReasons,"root_claim_missing:"+claimID)}
   sort.Strings(claimReasons)
-  cr:=ClaimResult{ClaimID:claimID,Verdict:effective[claimID],DependencyNodeIDs:deps,InvalidatingNodeIDs:invalidating,DependencyTraceSHA256:traceDigest,ReasonCodes:claimReasons}
+  cr:=ClaimResult{ClaimID:claimID,Verdict:claimVerdict,DependencyNodeIDs:deps,InvalidatingNodeIDs:invalidating,DependencyTraceSHA256:traceDigest,ReasonCodes:claimReasons}
   out.Claims=append(out.Claims,cr)
   if cr.Verdict==Qualified{out.UnaffectedClaimIDs=append(out.UnaffectedClaimIDs,claimID)}else{out.ImpactedClaimIDs=append(out.ImpactedClaimIDs,claimID)}
   f.codes["root_claim:"+claimID+":"+string(cr.Verdict)]=struct{}{}
