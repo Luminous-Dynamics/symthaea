@@ -15,6 +15,7 @@
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub const ADAPTER_SCHEMA_V1: &str = "mace_longmemeval_v2_adapter_receipt_v1";
 
@@ -152,7 +153,10 @@ pub enum AdapterRejectV1 {
 }
 
 fn digest_bytes(bytes: &[u8]) -> String {
-    blake3::hash(bytes).to_hex().to_string()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn digest_serialized<T: Serialize>(value: &T) -> Result<String, AdapterRejectV1> {
