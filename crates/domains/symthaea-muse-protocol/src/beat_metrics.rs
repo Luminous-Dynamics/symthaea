@@ -185,7 +185,7 @@ pub enum MirexBeatMetricError {
 
 /// Score one beat track using the pinned MIREX/mir_eval semantics.
 ///
-/// Input event frames must be strictly increasing and source-local. The
+/// Input event frames must be non-decreasing and source-local, matching the
 /// function applies mir_eval's default five-second initial trim to both
 /// sequences before computing all eight public columns.
 pub fn score_mirex_beat_track(
@@ -570,7 +570,7 @@ fn cemgil_scores(
     let reference = frames_to_seconds(reference_frames, sample_rate_hz);
     let estimated = frames_to_seconds(estimated_frames, sample_rate_hz);
     let variations = reference_beat_variations(&reference);
-    let sigma = 0.040_f64;
+    let sigma = MIREX_CEMGIL_SIGMA_MS as f64 / 1_000.0;
     let mut scores = Vec::with_capacity(variations.len());
 
     for variation in variations {
@@ -831,7 +831,11 @@ fn continuity_scores(
                 )
             };
 
-            if phase < 0.175 && period < 0.175 {
+            let phase_threshold =
+                MIREX_CONTINUITY_PHASE_THRESHOLD_PPM as f64 / 1_000_000.0;
+            let period_threshold =
+                MIREX_CONTINUITY_PERIOD_THRESHOLD_PPM as f64 / 1_000_000.0;
+            if phase < phase_threshold && period < period_threshold {
                 used[nearest] = true;
                 successes[estimate_index] = true;
             }
@@ -953,6 +957,46 @@ mod tests {
             assert_score_close(actual, case.expected);
             assert!(!case.name.is_empty());
         }
+    }
+
+    #[test]
+    fn checked_in_mir_eval_082_fixture_matches_all_public_metric_columns() {
+        let json = include_str!("../fixtures/mirex-beat-metrics-v1/golden.json");
+        let fixture: GoldenFixtureSet = serde_json::from_str(json).unwrap();
+        assert_eq!(fixture.sample_rate_hz, 1_000);
+        assert_eq!(fixture.total_frames, 15_000);
+        assert_eq!(fixture.cases.len(), 8);
+
+        for case in fixture.cases {
+            let report = score_mirex_beat_track(
+                &case.reference_frames,
+                &case.estimated_frames,
+                fixture.sample_rate_hz,
+                fixture.total_frames,
+            )
+            .unwrap();
+            assert_score_close(report.scores, case.expected);
+            assert_eq!(
+                report.scoring_receipt.mir_eval_version,
+                MIR_EVAL_REFERENCE_VERSION
+            );
+            assert_eq!(
+                report.scoring_receipt.mirex_evaluator_commit,
+                MIREX_EVALUATOR_SOURCE_COMMIT
+            );
+            assert!(!case.name.is_empty());
+        }
+    }
+
+    #[test]
+    fn beat_and_downbeat_tasks_have_distinct_trim_receipts() {
+        let beat = mirex_beat_scoring_receipt(MirexScoringTask::BeatTracking, 48_000);
+        let downbeat = mirex_beat_scoring_receipt(
+            MirexScoringTask::DownbeatEstimation,
+            48_000,
+        );
+        assert_eq!(beat.initial_trim_seconds, 5);
+        assert_eq!(downbeat.initial_trim_seconds, 0);
     }
 
     #[test]
