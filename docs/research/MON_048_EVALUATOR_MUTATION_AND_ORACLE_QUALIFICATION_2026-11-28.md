@@ -10,7 +10,7 @@ A benchmark evaluator is part of the system under test. It must be challenged, n
 
 ## Challenge corpus
 
-`CHALLENGES-v1.json` defines 24 deterministic cases: 3 positive controls and 21 negative/adversarial controls. Each case identifies the intended mutation, expected disposition and failure family. These are oracle fixtures, not production incident observations.
+`CHALLENGES-v1.json` defines 27 deterministic cases: 3 positive controls and 24 negative/adversarial controls. Each case identifies the intended mutation, expected disposition and failure family. These are oracle fixtures, not production incident observations.
 
 ## Score dimensions
 
@@ -37,7 +37,7 @@ Report the following separately; do not collapse them into a single accuracy num
 7. An all-indeterminate evaluator fails decision-coverage gate.
 8. No aggregate score may compensate for a critical false qualification.
 
-The 24-case starter corpus is too small to substantiate a <=1% statistical false-block rate. That threshold requires a larger, appropriately sampled safe-control corpus and confidence intervals.
+The 27-case starter corpus is too small to substantiate a <=1% statistical false-block rate. That threshold requires a larger, appropriately sampled safe-control corpus and confidence intervals.
 
 ## Oracle integrity and holdouts
 
