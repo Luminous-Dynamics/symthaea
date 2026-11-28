@@ -668,16 +668,30 @@ mod tests {
 
     #[test]
     fn rejects_unknown_fields_instead_of_inventing_a_grid() {
-        let json = r#"{
-            "schema_version":1,
-            "source":{},
-            "evidence":{},
-            "disposition":"resolved",
-            "hypotheses":[],
-            "abstention_reason":null,
-            "automatic_transport_authorized":true
-        }"#;
-        assert!(serde_json::from_str::<BeatGridReportV1>(json).is_err());
+        let mut value = serde_json::to_value(report()).unwrap();
+        value.as_object_mut().unwrap().insert(
+            "automatic_transport_authorized".to_string(),
+            serde_json::Value::Bool(true),
+        );
+        assert!(serde_json::from_value::<BeatGridReportV1>(value).is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_nested_evidence_fields() {
+        let mut value = serde_json::to_value(report()).unwrap();
+        value["evidence"]
+            .as_object_mut()
+            .unwrap()
+            .insert("fabricated_confidence".to_string(), serde_json::Value::from(1.0));
+        assert!(serde_json::from_value::<BeatGridReportV1>(value).is_err());
+    }
+
+    #[test]
+    fn accepts_pulse_only_hypothesis_without_tempo_map() {
+        let mut report = report();
+        report.hypotheses[0].tempo_map.clear();
+        report.hypotheses[0].tempo_interpolation = None;
+        assert!(validate_beat_grid_report(&report).is_empty());
     }
 
     #[test]
