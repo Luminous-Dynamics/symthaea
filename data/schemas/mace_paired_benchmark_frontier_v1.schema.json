@@ -1,0 +1,317 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_paired_benchmark_frontier_v1.schema.json",
+  "title": "MACE paired benchmark frontier outcomes and report v1",
+  "description": "Task-level evaluator outcomes and matched paired frontier report. Independent cluster, not task row, is the resampling unit.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/task_outcome"
+    },
+    {
+      "$ref": "#/$defs/report"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task_outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "arm_id",
+        "independent_cluster_id",
+        "task_id",
+        "metric_values",
+        "outcome_receipt_sha256",
+        "evaluator_custody",
+        "candidate_saw_evaluator_labels"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "arm_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "independent_cluster_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "metric_values": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "outcome_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluator_custody": {
+          "const": "public_diagnostic_only"
+        },
+        "candidate_saw_evaluator_labels": {
+          "const": false
+        }
+      }
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_arm_id",
+        "candidate_arm_id",
+        "metric_id",
+        "unit",
+        "direction",
+        "mean_candidate_minus_baseline",
+        "mean_directional_gain",
+        "confidence_interval_95",
+        "worst_cluster_directional_gain",
+        "independent_cluster_count",
+        "paired_task_count"
+      ],
+      "properties": {
+        "baseline_arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "higher_is_better",
+            "lower_is_better",
+            "diagnostic_only"
+          ]
+        },
+        "mean_candidate_minus_baseline": {
+          "type": "number"
+        },
+        "mean_directional_gain": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "confidence_interval_95": {
+          "$ref": "#/$defs/ci"
+        },
+        "worst_cluster_directional_gain": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "independent_cluster_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "paired_task_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "arm_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm_id",
+        "run_id",
+        "memory_method_id",
+        "independent_cluster_count",
+        "paired_task_count",
+        "metric_means"
+      ],
+      "properties": {
+        "arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memory_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_cluster_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "paired_task_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "metric_means": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "comparison_group_id",
+        "benchmark_id",
+        "track_id",
+        "matched_comparison_receipt_sha256",
+        "metric_definition_set_sha256",
+        "baseline_arm_id",
+        "bootstrap_seed",
+        "bootstrap_replicates",
+        "inference_unit",
+        "cluster_weighting",
+        "arm_points",
+        "pairwise_effects",
+        "pareto_frontier_arm_ids",
+        "objective_metric_ids",
+        "diagnostic_metric_ids",
+        "canonical_sha256",
+        "outcome_set_sha256",
+        "outcome_count",
+        "evaluator_custody",
+        "candidate_saw_evaluator_labels"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_paired_benchmark_frontier_v1"
+        },
+        "record_type": {
+          "const": "paired_benchmark_frontier_report"
+        },
+        "comparison_group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "benchmark_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "track_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "matched_comparison_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "metric_definition_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "baseline_arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bootstrap_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bootstrap_replicates": {
+          "const": 2000
+        },
+        "inference_unit": {
+          "const": "independent_cluster"
+        },
+        "cluster_weighting": {
+          "const": "equal_cluster_weight_after_within_cluster_task_mean"
+        },
+        "arm_points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/arm_point"
+          },
+          "minItems": 2
+        },
+        "pairwise_effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/effect"
+          }
+        },
+        "pareto_frontier_arm_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "objective_metric_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "diagnostic_metric_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "outcome_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "outcome_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evaluator_custody": {
+          "const": "public_diagnostic_only"
+        },
+        "candidate_saw_evaluator_labels": {
+          "const": false
+        }
+      }
+    }
+  }
+}
