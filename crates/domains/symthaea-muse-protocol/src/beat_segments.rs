@@ -41,14 +41,20 @@ pub enum MirexSegmentBeatTrimPolicy {
     NoTrim,
 }
 
+/// Segment aggregation policy. Duration weighting is the MIREX JSIR mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MirexSegmentAggregationMode {
+    DurationWeighted,
+    ArithmeticMeanPerSegment,
+}
+
 /// Explicit policy applied to a valid-segment score request.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MirexValidSegmentScoringConfigV1 {
     pub beat_trim_policy: MirexSegmentBeatTrimPolicy,
-    /// Downbeat evaluation never inherits the beat track's five-second trim.
-    pub downbeat_initial_trim_seconds: u64,
-    pub aggregation_mode: MirexBeatAggregationMode,
+    pub aggregation_mode: MirexSegmentAggregationMode,
 }
 
 /// One independently scored valid region.
@@ -65,10 +71,23 @@ pub struct MirexValidSegmentResultV1 {
     pub downbeat_report: MirexDownbeatEventScoresV1,
 }
 
-/// Duration-weighted downbeat metrics over valid regions.
+/// Beat metric aggregate over valid segments.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MirexSegmentBeatAggregateV1 {
+    pub aggregation_mode: MirexSegmentAggregationMode,
+    pub segment_count: u64,
+    pub total_weight_frames: u64,
+    pub scores: MirexBeatMetricScores,
+}
+
+/// Downbeat metrics aggregated over valid segments.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MirexDownbeatSegmentAggregateV1 {
+    pub aggregation_mode: MirexSegmentAggregationMode,
+    pub segment_count: u64,
+    pub total_weight_frames: u64,
     pub precision: f64,
     pub recall: f64,
     pub f_measure: f64,
@@ -82,7 +101,11 @@ pub struct MirexValidSegmentScoreReportV1 {
     pub config: MirexValidSegmentScoringConfigV1,
     pub evidence: MirexBeatScoreEvidenceV1,
     pub segments: Vec<MirexValidSegmentResultV1>,
-    pub beat_aggregate: crate::beat_metrics::MirexBeatAggregateScores,
+    pub reference_beats_excluded_by_valid_mask: u64,
+    pub estimated_beats_excluded_by_valid_mask: u64,
+    pub reference_downbeats_excluded_by_valid_mask: u64,
+    pub estimated_downbeats_excluded_by_valid_mask: u64,
+    pub beat_aggregate: MirexSegmentBeatAggregateV1,
     pub downbeat_aggregate: MirexDownbeatSegmentAggregateV1,
 }
 
@@ -103,7 +126,6 @@ pub enum MirexValidSegmentError {
     EmptySegment,
     SegmentOutOfSourceBounds,
     SegmentsNotOrderedOrOverlapping,
-    EmptySegmentAfterTrim,
     AggregateDurationExceedsJsonSafeInteger,
     MetricScorerRejectedInput,
 }
@@ -274,9 +296,13 @@ pub fn score_mirex_valid_segments(
             scores: beat_report.scores,
             weight_frames: duration_frames,
         });
-        downbeat_precision_sum += downbeat_report.precision * duration_frames as f64;
-        downbeat_recall_sum += downbeat_report.recall * duration_frames as f64;
-        downbeat_f_measure_sum += downbeat_report.f_measure * duration_frames as f64;
+        let aggregation_weight = match config.aggregation_mode {
+            MirexSegmentAggregationMode::DurationWeighted => duration_frames as f64,
+            MirexSegmentAggregationMode::ArithmeticMeanPerSegment => 1.0,
+        };
+        downbeat_precision_sum += downbeat_report.precision * aggregation_weight;
+        downbeat_recall_sum += downbeat_report.recall * aggregation_weight;
+        downbeat_f_measure_sum += downbeat_report.f_measure * aggregation_weight;
 
         segment_results.push(MirexValidSegmentResultV1 {
             segment_index: segment_index as u32,
@@ -290,13 +316,34 @@ pub fn score_mirex_valid_segments(
         });
     }
 
-    let beat_aggregate = aggregate_mirex_beat_scores(
+    let track_aggregate = aggregate_mirex_beat_scores(
         &weighted_beats,
-        MirexBeatAggregationMode::DurationWeighted,
+        match config.aggregation_mode {
+            MirexSegmentAggregationMode::DurationWeighted => {
+                MirexBeatAggregationMode::DurationWeighted
+            }
+            MirexSegmentAggregationMode::ArithmeticMeanPerSegment => {
+                MirexBeatAggregationMode::ArithmeticMeanPerTrack
+            }
+        },
     )
     .ok_or(MirexValidSegmentError::MetricScorerRejectedInput)?;
-    let denominator = total_weight as f64;
+    let beat_aggregate = MirexSegmentBeatAggregateV1 {
+        aggregation_mode: config.aggregation_mode,
+        segment_count: track_aggregate.track_count,
+        total_weight_frames: track_aggregate.total_weight_frames,
+        scores: track_aggregate.scores,
+    };
+    let denominator = match config.aggregation_mode {
+        MirexSegmentAggregationMode::DurationWeighted => total_weight as f64,
+        MirexSegmentAggregationMode::ArithmeticMeanPerSegment => {
+            segment_results.len() as f64
+        }
+    };
     let downbeat_aggregate = MirexDownbeatSegmentAggregateV1 {
+        aggregation_mode: config.aggregation_mode,
+        segment_count: segment_results.len() as u64,
+        total_weight_frames: total_weight as u64,
         precision: downbeat_precision_sum / denominator,
         recall: downbeat_recall_sum / denominator,
         f_measure: downbeat_f_measure_sum / denominator,
@@ -307,6 +354,22 @@ pub fn score_mirex_valid_segments(
         config,
         evidence,
         segments: segment_results,
+        reference_beats_excluded_by_valid_mask: count_events_outside_segments(
+            reference_beat_frames,
+            valid_segments,
+        ) as u64,
+        estimated_beats_excluded_by_valid_mask: count_events_outside_segments(
+            estimated_beat_frames,
+            valid_segments,
+        ) as u64,
+        reference_downbeats_excluded_by_valid_mask: count_events_outside_segments(
+            reference_downbeat_frames,
+            valid_segments,
+        ) as u64,
+        estimated_downbeats_excluded_by_valid_mask: count_events_outside_segments(
+            estimated_downbeat_frames,
+            valid_segments,
+        ) as u64,
         beat_aggregate,
         downbeat_aggregate,
     })
@@ -330,6 +393,19 @@ fn validate_source_events(
         return Err(MirexValidSegmentError::EventOutOfSourceBounds);
     }
     Ok(())
+}
+
+fn count_events_outside_segments(
+    events: &[u64],
+    segments: &[BeatValidSegment],
+) -> usize {
+    events
+        .iter()
+        .filter(|frame| {
+            let insertion = segments.partition_point(|segment| segment.start_frame <= **frame);
+            insertion == 0 || **frame >= segments[insertion - 1].end_frame
+        })
+        .count()
 }
 
 fn events_in_segment(events: &[u64], start_frame: u64, end_frame: u64) -> Vec<u64> {
@@ -364,7 +440,7 @@ fn rebase_and_apply_global_trim(
 mod tests {
     use super::*;
 
-    fn evidence(policy: MirexSegmentBeatTrimPolicy) -> MirexBeatScoreEvidenceV1 {
+    fn evidence() -> MirexBeatScoreEvidenceV1 {
         MirexBeatScoreEvidenceV1 {
             track_id: "jsir-synthetic-track".to_string(),
             benchmark_manifest_sha256: "1".repeat(64),
@@ -380,8 +456,7 @@ mod tests {
     fn config(trim: MirexSegmentBeatTrimPolicy) -> MirexValidSegmentScoringConfigV1 {
         MirexValidSegmentScoringConfigV1 {
             beat_trim_policy: trim,
-            downbeat_initial_trim_seconds: 0,
-            aggregation_mode: MirexBeatAggregationMode::DurationWeighted,
+            aggregation_mode: MirexSegmentAggregationMode::DurationWeighted,
         }
     }
 
@@ -425,7 +500,7 @@ mod tests {
                 },
             ],
             config(MirexSegmentBeatTrimPolicy::NoTrim),
-            evidence(MirexSegmentBeatTrimPolicy::NoTrim),
+            evidence(),
         )
         .unwrap();
         assert_eq!(result.segments.len(), 2);
@@ -452,7 +527,7 @@ mod tests {
             20_000,
             &segments,
             config(MirexSegmentBeatTrimPolicy::SourceGlobalFiveSeconds),
-            evidence(MirexSegmentBeatTrimPolicy::SourceGlobalFiveSeconds),
+            evidence(),
         )
         .unwrap();
         let segment_local = score_mirex_valid_segments(
@@ -464,7 +539,7 @@ mod tests {
             20_000,
             &segments,
             config(MirexSegmentBeatTrimPolicy::SegmentLocalFiveSeconds),
-            evidence(MirexSegmentBeatTrimPolicy::SegmentLocalFiveSeconds),
+            evidence(),
         )
         .unwrap();
         assert_eq!(source_global.segments[0].beat_report.reference_beats_scored, 6);
@@ -485,7 +560,7 @@ mod tests {
                 end_frame: 5_000,
             }],
             config(MirexSegmentBeatTrimPolicy::SegmentLocalFiveSeconds),
-            evidence(MirexSegmentBeatTrimPolicy::SegmentLocalFiveSeconds),
+            evidence(),
         )
         .unwrap();
         assert_eq!(result.segments[0].downbeat_report.f_measure, 1.0);
@@ -546,12 +621,12 @@ mod tests {
                 > 0.1
         );
         assert_eq!(
-            duration.beat_aggregate.mode,
-            MirexBeatAggregationMode::DurationWeighted
+            duration.beat_aggregate.aggregation_mode,
+            MirexSegmentAggregationMode::DurationWeighted
         );
         assert_eq!(
-            arithmetic.beat_aggregate.mode,
-            MirexBeatAggregationMode::ArithmeticMeanPerTrack
+            arithmetic.beat_aggregate.aggregation_mode,
+            MirexSegmentAggregationMode::ArithmeticMeanPerSegment
         );
     }
 
@@ -589,8 +664,8 @@ mod tests {
     #[test]
     fn rejects_overlapping_segments_before_scoring() {
         let error = score_mirex_valid_segments(
-            &[],
-            &[],
+            &[1_000],
+            &[1_000],
             &[],
             &[],
             1_000,
@@ -600,9 +675,9 @@ mod tests {
                 BeatValidSegment { start_frame: 5_000, end_frame: 9_000 },
             ],
             config(MirexSegmentBeatTrimPolicy::NoTrim),
-            evidence(MirexSegmentBeatTrimPolicy::NoTrim),
+            evidence(),
         )
         .unwrap_err();
-        assert_eq!(error, MirexValidSegmentError::EmptyBeatAnnotations);
+        assert_eq!(error, MirexValidSegmentError::SegmentsNotOrderedOrOverlapping);
     }
 }
