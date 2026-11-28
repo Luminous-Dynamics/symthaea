@@ -446,10 +446,49 @@
           "minimum": 0
         },
         "beat_report": {
-          "$ref": "#/$defs/beat_track_report"
+          "$ref": "#/$defs/beat_track_report",
+          "allOf": [
+            {
+              "properties": {
+                "scoring_receipt": {
+                  "properties": {
+                    "task": {
+                      "const": "beat_tracking"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "initial_trim_seconds": {
+                  "enum": [
+                    0,
+                    5
+                  ]
+                }
+              }
+            }
+          ]
         },
         "downbeat_report": {
-          "$ref": "#/$defs/downbeat_report"
+          "$ref": "#/$defs/downbeat_report",
+          "allOf": [
+            {
+              "properties": {
+                "scoring_receipt": {
+                  "properties": {
+                    "task": {
+                      "const": "downbeat_estimation"
+                    },
+                    "initial_trim_seconds": {
+                      "const": 0
+                    }
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     },
@@ -527,5 +566,84 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "config": {
+            "properties": {
+              "beat_trim_policy": {
+                "const": "no_trim"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "segments": {
+            "items": {
+              "properties": {
+                "beat_report": {
+                  "properties": {
+                    "initial_trim_seconds": {
+                      "const": 0
+                    },
+                    "scoring_receipt": {
+                      "properties": {
+                        "initial_trim_seconds": {
+                          "const": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "config": {
+            "properties": {
+              "beat_trim_policy": {
+                "enum": [
+                  "source_global_five_seconds",
+                  "segment_local_five_seconds"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "segments": {
+            "items": {
+              "properties": {
+                "beat_report": {
+                  "properties": {
+                    "initial_trim_seconds": {
+                      "const": 5
+                    },
+                    "scoring_receipt": {
+                      "properties": {
+                        "initial_trim_seconds": {
+                          "const": 5
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
