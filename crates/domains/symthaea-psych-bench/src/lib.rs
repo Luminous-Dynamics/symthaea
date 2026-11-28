@@ -3,10 +3,14 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Symthaea Psychological Benchmark Suite
 //!
-//! Standardized evaluation of Symthaea's neuroscience-inspired subsystems
-//! against established psychological benchmarks and published human baselines.
+//! Evaluation of Symthaea's neuroscience-inspired subsystems through synthetic
+//! mechanism probes, externally grounded tasks, and selected human-anchored
+//! comparisons. Result evidence classes must be inspected before making claims.
 //!
-//! ## Benchmarks (80 across 16 domains)
+//! ## Benchmark families
+//!
+//! The authoritative inventory is maintained separately from these module docs;
+//! do not hard-code benchmark or domain totals here.
 //!
 //! - **WorM** (6) — Working memory (N-back, change detection, serial recall,
 //!   spatial updating, binding, digit span)
@@ -16,7 +20,7 @@
 //! - **Executive** (7) — Executive function (Stroop, Flanker, WCST, Iowa Gambling,
 //!   Ravens, Tower of London, dual task)
 //! - **Metacognition** (2) — Calibration, feeling of knowing
-//! - **Butlin** (1) — 14 consciousness indicators from 6 theories (RPT, GWT, HOT, PP, AST, IIT)
+//! - **Butlin** (1 suite) — 14 operational indicators across RPT, GWT, HOT, AST, PP, and agency/embodiment families; these are theory probes, not a consciousness determination
 //! - **ToMBench** (5) — Theory of Mind (false belief, faux-pas, persuasion,
 //!   strange story, hinting)
 //! - **MemoryAgent** (5) — Memory pipeline (retrieval, test-time learning,
