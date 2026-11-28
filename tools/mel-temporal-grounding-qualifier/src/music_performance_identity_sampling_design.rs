@@ -731,6 +731,8 @@ mod tests {
         );
         assert_eq!(report.source_work_cluster_count, 2);
         assert_eq!(report.crossed_performer_count, 1);
+        assert_eq!(report.performance_identity_count, 6);
+        assert_eq!(report.crossed_performance_count, 0);
         assert!(report.crossed_inference_required);
         assert!(!report.work_cluster_bootstrap_permitted_under_declared_assumption);
         assert!(!report.performer_identity_authenticated);
@@ -900,6 +902,7 @@ mod tests {
         assert_eq!(report.crossed_session_count, 0);
         assert_eq!(report.crossed_take_count, 0);
         assert_eq!(report.crossed_performance_count, 1);
+        assert_eq!(report.performance_identity_count, 5);
         assert_eq!(
             report.disposition,
             SamplingDesignDispositionV1::CrossedInferenceRequired
