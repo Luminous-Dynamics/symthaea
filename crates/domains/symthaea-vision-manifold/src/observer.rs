@@ -680,6 +680,33 @@ mod tests {
     }
 
     #[test]
+    fn witness_json_matches_v0_1_wire_contract_and_serde_enum_names() {
+        let mut observer = observer();
+        let frame = vec![96_u8; 32 * 32];
+        let witness = observer
+            .observe_frame(identity(0, 1_000_000), &frame, 32, 32, 1)
+            .unwrap();
+        let value = serde_json::to_value(&witness).unwrap();
+
+        assert_eq!(value["schema_version"], 1);
+        assert_eq!(value["producer"], "symthaea-vision-manifold");
+        assert_eq!(
+            value["observer_profile_id"],
+            TEMPORAL_OBSERVER_PROFILE_ID_V0_1
+        );
+        assert_eq!(value["identity"]["modality"], "Visible");
+        assert_eq!(value["status"], "warming_up");
+        assert!(value["metrics"]["prediction_error_q16_16"].is_null());
+        assert_eq!(value["observer_only"], true);
+        assert_eq!(value["learning_frozen"], true);
+        assert_eq!(value["raw_frame_retained"], false);
+        assert_eq!(value["actuation_authority"], false);
+        assert_eq!(value["pose_probability_claim"], false);
+        assert_eq!(value["source_authentication_claim"], false);
+        assert_eq!(value["physical_truth_claim"], false);
+    }
+
+    #[test]
     fn witness_binds_exact_frame_bytes_identity_and_frozen_profile() {
         let mut observer = observer();
         let frame = vec![96_u8; 32 * 32];
