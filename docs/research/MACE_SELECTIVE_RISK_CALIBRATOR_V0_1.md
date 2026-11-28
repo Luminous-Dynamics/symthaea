@@ -55,7 +55,7 @@ No guarantee transfers automatically to a new policy, score, hierarchy, source d
 
 ## Synthetic tests
 
-Twenty-two deterministic Rust tests cover the exact zero-violation bound and sample-size consequence, fixed-sequence stopping, simultaneous multiplicity, safe threshold selection, hard-gate precedence, risk-exceeds-target state, parent fallback, shift and exchangeability suspension, hierarchy/data/grid digest rejection, policy/score/group/cluster-scope non-transfer, retrieve-more behavior, certificate integrity, threshold precommitment ordering and source separation, and cluster-design receipt tampering, recomputed row-to-cluster assignment integrity and per-cluster workload-cap enforcement.
+Twenty-three deterministic Rust tests cover the exact zero-violation bound and sample-size consequence, fixed-sequence stopping, simultaneous multiplicity, safe threshold selection, hard-gate precedence, risk-exceeds-target state, parent fallback, shift and exchangeability suspension, hierarchy/data/grid digest rejection, policy/score/group/cluster-scope non-transfer, retrieve-more behavior, certificate integrity, threshold precommitment ordering and source separation, and cluster-design receipt tampering, recomputed row-to-cluster assignment integrity per-cluster workload-cap enforcement, and duplicate outcome-receipt rejection.
 
 ## Run
 
