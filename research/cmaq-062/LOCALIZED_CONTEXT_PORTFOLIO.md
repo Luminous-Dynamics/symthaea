@@ -113,3 +113,25 @@ Report:
 Prospective target: reduce restricted mean delay by at least 20% on three sparse-support alternatives versus global CMAQ-057 at matched alpha, without a simultaneous null-bound violation or more than 2 percentage points of worst-family power regression. This is a target, not a result.
 
 No SOTA, statistical qualification or deployment claim is made.
+
+## Executable v0.1 implementation
+
+The branch now includes a Rust crate at `research/cmaq-062` with:
+
+- Frozen root/child region definitions, half-open interval semantics `[lower, upper)`, unique node IDs, exact rational node priors, and content-addressed response/context Fourier maps.
+- One root and a validated parent-before-child inventory. Every child is contained in its parent; sibling boxes must be pairwise disjoint. A covariate therefore selects one root-to-leaf path, with exact boundary ownership.
+- One past-only feature-difference direction per node, updated only when the current covariate visits that node.
+- Positive conditional factors for active nodes; inactive nodes retain factor one and their wealth unchanged.
+- A fixed mixture over every registered node, with one global threshold and no node-specific alpha split.
+- A log-sum-exp segment tree holding every prior-weighted node wealth. Only changed leaves and their ancestors are staged and committed. The factor transforms cost O(dD) for path depth d and product feature dimension D; mixture maintenance costs O(d log N), where N is node count. State remains O(ND) across all nodes.
+- Atomic calculation of active node factors, posterior weights, segment-tree ancestors, trace and node counters before commit.
+- Tests for right-open boundary ownership, exact prior/posterior normalization, sparse-path local updates, sibling-overlap rejection and segment-tree equality against a direct fixed-prior log-sum-exp.
+
+The segment tree is intentional. Replacing a time-varying set of active-node contributions in a fixed-prior sum by dropping/re-adding inactive contributions would silently change the mixture weights over time. The tree keeps all node wealth represented continuously, including inactive nodes.
+
+### Important limitations
+
+- This first implementation supports bounded axis-aligned boxes with disjoint siblings, not arbitrary learned regions or manifold charts.
+- The node inventory is fixed before the confirmatory stream. Region discovery must occur on a separate calibration set or be introduced through another proved predictable construction.
+- The local feature bank is currently fixed Fourier features; online learned bounded encoders are the separate C061 track.
+- The probe is deterministic wiring only. It does not establish empirical Type-I calibration, sparse-shift power, or SOTA performance.
