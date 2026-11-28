@@ -14,7 +14,7 @@ The pinned upstream README states that benchmark code is MIT-licensed and conver
 
 ## Official benchmark surface
 
-The pinned release covers four synthetic domains (Finance, Technology, Healthcare and Manufacturing), with six separate question types: multi-hop, knowledge update, temporal, user-implicit, term ambiguity and abstention. The paper and this pinned release contain 715 questions. Some later third-party evaluations report 745 questions and explicitly note that their inventory is not the exact 715-question paper subset; treat that as a separate dataset snapshot, not a matched reproduction.
+The pinned release covers four synthetic domains (Finance, Technology, Healthcare and Manufacturing), with six separate question types: multi-hop, knowledge update, temporal, user-implicit, term ambiguity and abstention. The paper and this pinned release contain 715 questions. Some third-party evaluations report 745 questions and explicitly distinguish that inventory from the paper's 715-question subset; treat the 745-question inventory as a separate dataset snapshot, not a matched reproduction.
 
 Upstream retrieval behavior deliberately indexes message content only. At answer time, it formats each retrieved message with its speaker, role, channel, phase, topic, timestamp, reply target and message ID. When asking_user_id is present, the query passed to retrieval is exactly asking_user_id followed by one space and question_text; otherwise it is question_text. This adapter reproduces that projection and header ordering.
 
