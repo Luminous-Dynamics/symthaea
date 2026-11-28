@@ -135,6 +135,9 @@ impl RuntimeConfidencePolicy {
 /// observation. Call this with service.consciousness_snapshot() from a
 /// symthaea-backend build. The task context still supplies premise, freshness
 /// and clarification availability; this function only transfers model confidence.
+/// This does not establish that the cognitive loop's global prediction-confidence
+/// signal is an answer-specific calibrated probability. Validate that mapping
+/// against held-out task labels before interpreting it as one.
 #[cfg(feature = "symthaea-backend")]
 pub fn observation_with_symthaea_snapshot_confidence(
     mut observation: SelectivePredictionObservation,
