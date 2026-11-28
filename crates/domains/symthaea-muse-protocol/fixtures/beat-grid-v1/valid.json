@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "source": {
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "sample_rate_hz": 48000,
+    "channels": 2,
+    "total_frames": 100000
+  },
+  "evidence": {
+    "manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_audio_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "analysis_version": "auditory-scene-v0.1/config-17",
+    "covered_window": {
+      "start_frame": 0,
+      "end_frame": 100000
+    }
+  },
+  "disposition": "resolved",
+  "hypotheses": [
+    {
+      "hypothesis_id": "grid-120-bpm",
+      "confidence_ppm": 850000,
+      "pulse_anchors": [
+        {
+          "frame": 0,
+          "beat_index": 0,
+          "confidence_ppm": 900000
+        },
+        {
+          "frame": 24000,
+          "beat_index": 1,
+          "confidence_ppm": 920000
+        },
+        {
+          "frame": 48000,
+          "beat_index": 2,
+          "confidence_ppm": 910000
+        }
+      ],
+      "downbeat_anchors": [
+        {
+          "frame": 0,
+          "beat_index": 0,
+          "bar_index": 0,
+          "confidence_ppm": 800000
+        }
+      ],
+      "tempo_map": [
+        {
+          "frame": 0,
+          "bpm_milli": 120000,
+          "confidence_ppm": 880000
+        },
+        {
+          "frame": 48000,
+          "bpm_milli": 121000,
+          "confidence_ppm": 810000
+        }
+      ],
+      "meter_map": [
+        {
+          "start_beat_index": 0,
+          "numerator": 7,
+          "denominator": 8,
+          "grouping": [
+            2,
+            2,
+            3
+          ],
+          "confidence_ppm": 760000
+        }
+      ]
+    }
+  ],
+  "abstention_reason": null
+}
