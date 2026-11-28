@@ -8,9 +8,13 @@ A dependency-free Go prototype that verifies Ed25519-signed, claim-bound evidenc
 - Claim, trial, recovery-boundary, evidence-class and expected-source binding.
 - 256-bit challenge nonce format, issuance, uniqueness and reuse against a supplied consumed-nonce snapshot.
 - Capture freshness, expiry and bounded future clock skew.
-- Signer-to-capture-principal binding, key validity window and revocation.
+- Signer-to-capture-principal binding, key validity window and effective revocation as of receipt capture.
 - Required evidence coverage, duplicate classes, session sequence and receipt hash-chain linkage.
 - Strict CLI JSON decoding; unknown fields and trailing documents are rejected.
+
+## Revocation time semantics
+
+A receipt is rejected when the key's effective revocation timestamp is at or before the receipt capture timestamp. A later revocation does not retroactively invalidate a receipt captured before that effective time. A compromise believed to predate discovery must be represented by an effective revocation time at or before the affected capture. This offline evaluator trusts the supplied revocation timestamp only as input; MON-041 trust-store authentication and incident policy remain external.
 
 ## Safety boundary
 
