@@ -162,7 +162,7 @@ impl FoveationManager {
 
         // Optional temporal budget gates ROI work without changing upstream
         // capture cadence or granting camera/sensor permissions.
-        let mut temporal_budget_enabled = false;
+        let mut temporal_pixel_cost = None;
         if !self.pending.is_empty() {
             if let Some(budget) = self.temporal_budget.as_mut() {
                 let Some(frame) = self.frame_buffer.as_ref() else {
@@ -174,8 +174,8 @@ impl FoveationManager {
                 let height = self.patch_size.saturating_mul(3).min(frame.height as usize);
                 let estimated_pixels = width.saturating_mul(height) as u64;
                 match budget.decide(now_us, estimated_pixels, self.in_flight.len()) {
-                    Ok(TemporalBudgetDecision::Dispatch { .. }) => {
-                        temporal_budget_enabled = true;
+                    Ok(TemporalBudgetDecision::Dispatch { pixel_cost, .. }) => {
+                        temporal_pixel_cost = Some(pixel_cost);
                     }
                     Ok(TemporalBudgetDecision::Defer { .. })
                     | Ok(TemporalBudgetDecision::BudgetExhausted { .. })
@@ -218,13 +218,11 @@ impl FoveationManager {
 
                 match self.channel.request(request) {
                     Ok(rx) => {
-                        if temporal_budget_enabled {
+                        if let Some(pixel_cost) = temporal_pixel_cost {
                             if let Some(budget) = self.temporal_budget.as_mut() {
-                                let actual_pixels = (crop_width as u64).saturating_mul(crop_height as u64);
-                                // The previous decision and this commit share the same
-                                // manager update. The actual crop cannot exceed the
-                                // conservative padded-patch estimate.
-                                if budget.record_dispatch(now_us, actual_pixels).is_err() {
+                                // Charge the pre-downscale ROI estimate used in decide(),
+                                // not the smaller output dimensions after crop resizing.
+                                if budget.record_dispatch(now_us, pixel_cost).is_err() {
                                     tracing::warn!("temporal foveation budget invariant failed; disabling optional policy");
                                     self.temporal_budget = None;
                                 }
