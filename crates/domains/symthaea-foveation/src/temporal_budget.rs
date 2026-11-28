@@ -135,6 +135,7 @@ pub enum TemporalFoveationError {
     DispatchNotPermitted,
     PixelBudgetExceeded,
     FutureSourceTimestamp,
+    StaleTrigger,
 }
 
 #[derive(Debug, Clone)]
@@ -175,13 +176,21 @@ impl TemporalFoveationBudget {
     pub fn observe_trigger(
         &mut self,
         trigger: TemporalTrigger,
+        now_us: u64,
     ) -> Result<bool, TemporalFoveationError> {
         validate_trigger_id(&trigger.id)?;
         if !trigger.urgency.is_finite() || !(0.0..=1.0).contains(&trigger.urgency) {
             return Err(TemporalFoveationError::InvalidUrgency);
         }
-        if trigger.timestamp_us < self.last_refill_us {
-            return Err(TemporalFoveationError::ClockRegression);
+        // Use the caller's current source-clock sample. A trigger can arrive
+        // after the last scheduler tick, so comparing it to last_refill_us
+        // would incorrectly reject a valid event between ticks.
+        self.refill(now_us)?;
+        if trigger.timestamp_us > now_us {
+            return Err(TemporalFoveationError::FutureSourceTimestamp);
+        }
+        if now_us.saturating_sub(trigger.timestamp_us) > self.config.max_roi_age_us {
+            return Err(TemporalFoveationError::StaleTrigger);
         }
         if let Some(previous) = self.last_trigger_us {
             if trigger.timestamp_us < previous {
@@ -378,7 +387,7 @@ mod tests {
     fn explicit_high_urgency_trigger_opens_short_roi_burst() {
         let config = TemporalFoveationConfig::default();
         let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
-        assert!(budget.observe_trigger(trigger("turn-1", 100_000, 0.9)).unwrap());
+        assert!(budget.observe_trigger(trigger("turn-1", 100_000, 0.9), 100_000).unwrap());
         assert!(budget.burst_active(100_001));
         assert!(matches!(
             budget.decide(100_000, 100_000, 100_000, 0).unwrap(),
@@ -398,7 +407,7 @@ mod tests {
     fn low_urgency_trigger_does_not_open_burst() {
         let config = TemporalFoveationConfig::default();
         let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
-        assert!(!budget.observe_trigger(trigger("low-1", 10, 0.2)).unwrap());
+        assert!(!budget.observe_trigger(trigger("low-1", 10, 0.2), 10).unwrap());
         assert!(!budget.burst_active(10));
     }
 
@@ -406,9 +415,9 @@ mod tests {
     fn repeated_event_id_cannot_extend_a_burst() {
         let config = TemporalFoveationConfig::default();
         let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
-        budget.observe_trigger(trigger("turn-1", 100, 0.9)).unwrap();
+        budget.observe_trigger(trigger("turn-1", 100, 0.9), 100).unwrap();
         assert_eq!(
-            budget.observe_trigger(trigger("turn-1", 200_000, 0.9)),
+            budget.observe_trigger(trigger("turn-1", 200_000, 0.9), 200_000),
             Err(TemporalFoveationError::DuplicateTrigger)
         );
         assert!(budget.burst_active(1_500_099));
@@ -442,12 +451,35 @@ mod tests {
     }
 
     #[test]
+    fn stale_trigger_is_rejected_against_current_source_clock() {
+        let config = TemporalFoveationConfig {
+            max_roi_age_us: 100,
+            ..TemporalFoveationConfig::default()
+        };
+        let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
+        assert_eq!(
+            budget.observe_trigger(trigger("old-trigger", 100, 0.9), 201),
+            Err(TemporalFoveationError::StaleTrigger)
+        );
+    }
+
+    #[test]
+    fn future_trigger_is_rejected_against_current_source_clock() {
+        let mut budget =
+            TemporalFoveationBudget::new(TemporalFoveationConfig::default(), 0).unwrap();
+        assert_eq!(
+            budget.observe_trigger(trigger("future-trigger", 101, 0.9), 100),
+            Err(TemporalFoveationError::FutureSourceTimestamp)
+        );
+    }
+
+    #[test]
     fn trigger_time_regression_is_rejected() {
         let config = TemporalFoveationConfig::default();
         let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
-        budget.observe_trigger(trigger("turn-2", 200, 0.9)).unwrap();
+        budget.observe_trigger(trigger("turn-2", 200, 0.9), 200).unwrap();
         assert_eq!(
-            budget.observe_trigger(trigger("turn-1", 100, 0.9)),
+            budget.observe_trigger(trigger("turn-1", 100, 0.9), 210),
             Err(TemporalFoveationError::ClockRegression)
         );
     }
@@ -460,7 +492,7 @@ mod tests {
             ..TemporalFoveationConfig::default()
         };
         let mut budget = TemporalFoveationBudget::new(config, 0).unwrap();
-        budget.observe_trigger(trigger("surprise-1", 0, 1.0)).unwrap();
+        budget.observe_trigger(trigger("surprise-1", 0, 1.0), 0).unwrap();
         budget.record_dispatch(0, 180_000).unwrap();
         assert_eq!(
             budget.decide(250_000, 0, 100_000, 0).unwrap(),
