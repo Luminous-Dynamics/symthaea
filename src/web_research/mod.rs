@@ -106,6 +106,9 @@ pub mod selective_observation;
 // Custodian-randomized stratified audit sampling and inclusion probabilities
 pub mod stratified_audit;
 
+// Design-based risk estimation for stratified randomized audits
+pub mod stratified_risk;
+
 // Re-exports for ergonomic access
 pub use conjecture_feed::{
     ConjectureFeedError, ConjectureFeeder, ProvenancedConjecture, ResearchNumericDataset,
@@ -136,6 +139,10 @@ pub use selective_observation::{
 pub use stratified_audit::{
     build_stratified_random_audit_plan, AuditCandidate, AuditSelection,
     AuditStratumPlan, AuditStratumQuota, StratifiedAuditError, StratifiedAuditPlan,
+};
+pub use stratified_risk::{
+    evaluate_stratified_audit_risk, ApproximateRiskInterval, DesignBasedRiskEstimate,
+    StratifiedRiskError, StratifiedRiskReport,
 };
 pub use types::*;
 pub use verifier::{
