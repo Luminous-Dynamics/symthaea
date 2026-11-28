@@ -90,6 +90,16 @@ pub struct FlowResult {
     pub edge_maintenance_cost_units: u64,
 }
 
+/// Result of exhaustively evaluating the no-edit action and all permitted
+/// single-edge candidate additions. This is an upper-bound oracle, not a
+/// distributed or learned policy.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct CandidateDecision {
+    pub selected_candidate_id: Option<String>,
+    pub result: FlowResult,
+}
+
+
 impl Fixture {
     pub fn parse(json: &str) -> Result<Self, String> {
         serde_json::from_str(json).map_err(|e| format!("fixture JSON parse failed: {e}"))
@@ -333,6 +343,53 @@ pub fn evaluate_episode(
     result.edit_cost_units = edit_cost_units;
     result.edge_maintenance_cost_units = edge_maintenance_cost_units;
     Ok(result)
+}
+
+/// Select the best single candidate using a service-first lexicographic rule:
+/// maximize delivered flow, then minimize edit + one-step maintenance cost.
+/// Stable candidate-ID ordering resolves otherwise equal edited candidates.
+/// The evaluator observes every candidate, so this is an explicit upper bound.
+pub fn select_best_single_edge(
+    case: &Episode,
+    semantics: &GraphSemantics,
+    time: u64,
+) -> Result<CandidateDecision, String> {
+    let mut best_result = evaluate_episode(case, semantics, time, &[])?;
+    let mut best_id: Option<String> = None;
+
+    for candidate in &case.candidate_edges {
+        let id = candidate
+            .id
+            .as_deref()
+            .ok_or_else(|| format!("{}: candidate edge has no ID", case.id))?;
+        let candidate_result = evaluate_episode(case, semantics, time, &[id])?;
+
+        let candidate_cost = candidate_result
+            .edit_cost_units
+            .checked_add(candidate_result.edge_maintenance_cost_units)
+            .ok_or_else(|| format!("{}: candidate total cost overflow", case.id))?;
+        let best_cost = best_result
+            .edit_cost_units
+            .checked_add(best_result.edge_maintenance_cost_units)
+            .ok_or_else(|| format!("{}: incumbent total cost overflow", case.id))?;
+
+        let improves = candidate_result.max_flow > best_result.max_flow
+            || (candidate_result.max_flow == best_result.max_flow
+                && candidate_cost < best_cost)
+            || (candidate_result.max_flow == best_result.max_flow
+                && candidate_cost == best_cost
+                && best_id.as_deref().is_some_and(|current| id < current));
+
+        if improves {
+            best_result = candidate_result;
+            best_id = Some(id.to_string());
+        }
+    }
+
+    Ok(CandidateDecision {
+        selected_candidate_id: best_id,
+        result: best_result,
+    })
 }
 
 fn solve_flow(
