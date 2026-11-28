@@ -1,0 +1,78 @@
+name: EQC Trusted Observer Validation
+
+on:
+  push:
+    branches: [feat/eqc-trusted-observer-attestation-v0.1-2026-11-28]
+    paths:
+      - "tools/eqc-reference/**"
+      - "docs/research/eqc-observer-*.json"
+      - "docs/research/EQC_TRUSTED_OBSERVER_PROTOCOL_V0_1.md"
+      - ".github/workflows/eqc-observer-validation.yml"
+  pull_request:
+    branches: [feat/eqc-standalone-reference-v0.1-main-2026-11-28]
+    paths:
+      - "tools/eqc-reference/**"
+      - "docs/research/eqc-observer-*.json"
+      - "docs/research/EQC_TRUSTED_OBSERVER_PROTOCOL_V0_1.md"
+      - ".github/workflows/eqc-observer-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eqc-observer-validation-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  observer-verifier:
+    name: Signed receipt, trust, replay and anti-replay tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Validate observer schemas
+        run: |
+          set -euo pipefail
+          for file in docs/research/eqc-observer-*.schema.json; do jq empty "$file"; done
+
+      - name: Require the committed isolated lockfile
+        run: cargo metadata --locked --manifest-path tools/eqc-reference/Cargo.toml --format-version 1 > "$RUNNER_TEMP/eqc-observer-metadata.json"
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path tools/eqc-reference/Cargo.toml -- --check
+
+      - name: Run locked reference and observer tests
+        run: cargo test --locked --manifest-path tools/eqc-reference/Cargo.toml
+
+      - name: Preserve observer test metadata
+        run: |
+          mkdir -p "$RUNNER_TEMP/eqc-observer-evidence"
+          cp "$RUNNER_TEMP/eqc-observer-metadata.json" "$RUNNER_TEMP/eqc-observer-evidence/"
+          {
+            echo "source_head=${{ github.event.pull_request.head.sha || github.sha }}"
+            echo "checked_out_commit=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "observer_lock_sha256=$(sha256sum tools/eqc-reference/Cargo.lock | cut -d' ' -f1)"
+            echo "signature_profile=Ed25519-strict-domain-separated-exact-payload-bytes"
+          } > "$RUNNER_TEMP/eqc-observer-evidence/run-metadata.txt"
+
+      - name: Upload observer verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: eqc-observer-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/eqc-observer-evidence/
+          if-no-files-found: error
+          retention-days: 90
