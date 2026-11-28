@@ -217,6 +217,52 @@ Create no additional evaluator. Under #11171, keep the evaluation layers separat
 
 Do not collapse these into a weighted total. The publishable result should be a set of Pareto frontiers and hard-gate pass vectors: verified outcome, unsupported-claim rate, false-unique/model-misspecification rate, calibration, regret, correction recovery, transfer, complete replay and inclusive cost. A candidate that fails authorization or evidence provenance does not receive credit for a correct-looking answer.
 
+## Trajectory-derived research taste and false-unique risk — 2026-11-28
+
+Two additional findings sharpen the programme.
+
+### Taste-Bench: score decisions at the fork, not only the final trajectory
+
+The September 2026 *The Tasteful Agent* paper introduces Taste-Bench, mining decision forks from parallel engineering/research trajectories and within-trajectory detours. The evaluated model sees the prefix and available alternatives but not the downstream outcomes. The paper reports that the best of 14 frontier models answered 59.7% of 502 fork questions correctly; mean accuracy fell from 62.3% to 21.0% as the decisive evidence appeared later. A hindsight teacher distilled into a student improved held-out decision accuracy by 17.9 points and improved a separate held-out SWE-bench Pro executor comparison from 14.6% to 33.7%. [Paper and benchmark description](https://arxiv.org/abs/2609.25804).
+
+This suggests a Symthaea-native **Research Taste track**, but not a copy of the full benchmark:
+- Freeze an evidence-prefix and action menu at each fork.
+- Record the chosen action, rejected alternatives, prospective outcome distribution, downstream decision relevance and inclusive action costs.
+- Hide all post-fork outcomes from the candidate.
+- Derive the outcome ranking only from independently qualified downstream trajectories or controlled counterfactual replay.
+- Split by source task, project, domain and time so near-duplicate forks cannot cross train/test.
+- Include delayed-evidence forks, misleading early proxies, irreversible-action choices, replication-versus-pivot, stop-versus-continue and tool/experiment allocation.
+- Score choice quality, proper probability scores, regret against a finite evaluator-side oracle, calibration, resource use and integrity separately.
+
+**Critical safeguard:** a hindsight teacher may label a fork only after its outcome is qualified; the student sees only prefix-time features. Never let post-outcome labels or hidden evaluator state leak into the policy input. Report single-fork accuracy and full-trajectory improvement separately. The evaluator-side oracle is a diagnostic upper bound, not a production policy.
+
+Initial proposed targets: ≥65% held-out fork accuracy on a preregistered balanced binary subset (above the 50% chance baseline), ≥10% lower paired regret than the strongest fixed/random baseline, and a measurable held-out trajectory-success improvement under matched inclusive budgets. Require bootstrap confidence intervals clustered by source task and publish the full fork-generation attrition ledger. Do not claim frontier superiority from a target or from a small mined sample.
+
+### False-unique risk: split structural, composite and finite-budget ambiguity
+
+PR #14163 provides a useful standalone reference for three distinct failure modes: pointwise structural non-identifiability, overlap between composite mechanism families under nuisance uncertainty, and practical ambiguity at a finite sample/design budget. It also demonstrates why mechanism-instance and mechanism-family singleton denominators must remain separate, and why zero singleton denominators mean `NO_SINGLETON_COHORT`, not zero risk. Its six-episode fixture is a reference fixture, not a production SOWRC qualification.
+
+Integrate these estimands with #11060/#11171's open-world episode metrics. In particular:
+- A candidate can be a singleton in a declared grammar while the generating mechanism remains outside the evaluator's compatible set.
+- Structural identifiability at a nominal parameter point does not imply composite-family identifiability.
+- An empty candidate set, an ambiguous set and a false singleton are different terminal outcomes.
+- Report joint false-unique risk, conditional-on-singleton risk, commitment rate and coverage separately.
+- Keep evaluator-only compatibility sets, hidden mechanisms and sampling probabilities outside the agent process.
+- Any sequential confidence bound must reuse the pinned SOWRC theorem implementation and its predictable audit design; the reference script is arithmetic validation, not a replacement theorem.
+
+### Correction propagation: measure both damage containment and recovery speed
+
+The MON-045 scoped-invalidation work proposes a typed dependency DAG with required digest-pinned edges, optional context edges, expiry/revocation semantics and three-valued verdicts. This is directly relevant to scientific evidence graphs: retracting one required source should invalidate every dependent claim, but must not damage unrelated claims. It also makes a key missing metric explicit: stale-claim exposure time after a source correction.
+
+For research trajectories, add paired correction episodes:
+1. A source is corrected, retracted, expired or digest-shifted.
+2. The candidate receives only the public correction receipt.
+3. It identifies affected claims and unaffected controls.
+4. It recomputes dependent analyses and decisions.
+5. An independent evaluator checks dependency completeness, exact invalidation scope, regenerated artifact lineage and final replay.
+
+Report invalidation recall, invalidation precision, unrelated-claim damage, stale-claim exposure time, recovery latency, recomputation cost and replay success. A correct final report with an uncorrected intermediate claim still exposed should not receive a full integrity pass.
+
 ## References
 
 - [Terminal-Bench-Science official leaderboard](https://snorkel.ai/leaderboard/terminal-bench-science/)
