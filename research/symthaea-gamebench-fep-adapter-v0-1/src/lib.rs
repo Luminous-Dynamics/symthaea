@@ -82,6 +82,14 @@ impl FepNavigationCandidate {
         let x_denominator = f64::from(self.width.saturating_sub(1)).max(1.0);
         let y_denominator = f64::from(self.height.saturating_sub(1)).max(1.0);
 
+        // Goal preferences are supplied separately to the FEP agent.
+        self.agent.set_goals(
+            vec![
+                f64::from(goal.x) / x_denominator,
+                f64::from(goal.y) / y_denominator,
+            ],
+            4.0,
+        );
         Ok(FepObservation::new(
             vec![
                 f64::from(observation.position.x) / x_denominator,
@@ -90,18 +98,6 @@ impl FepNavigationCandidate {
             1.0,
             "gamebench/f1-navigation",
         ))
-        .map(|mut observation| {
-            observation.timestamp = 0;
-            // Goal preferences are supplied separately to the FEP agent.
-            self.agent.set_goals(
-                vec![
-                    f64::from(goal.x) / x_denominator,
-                    f64::from(goal.y) / y_denominator,
-                ],
-                4.0,
-            );
-            observation
-        })
     }
 
     fn index_to_action(index: usize) -> Option<Action> {
@@ -114,19 +110,58 @@ impl FepNavigationCandidate {
         }
     }
 
-    fn action_to_index(action: Action) -> usize {
-        match action {
-            Action::North => 0,
-            Action::East => 1,
-            Action::South => 2,
-            Action::West => 3,
-        }
-    }
-
     fn predicted_coordinate(mean: f64, extent: u16) -> i64 {
         let max_index = i64::from(extent.saturating_sub(1));
         (mean.clamp(0.0, 1.0) * max_index as f64).round() as i64
     }
+    fn coordinate_forecast(
+        mean: f64,
+        precision: f64,
+        extent: u16,
+    ) -> Vec<ForecastMass> {
+        let max_index = i64::from(extent.saturating_sub(1));
+        let normalized_mean = if mean.is_finite() {
+            mean.clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
+        let mean_index = normalized_mean * max_index as f64;
+        let center = mean_index.round() as i64;
+        let start = (center - 2).max(0);
+        let end = (center + 2).min(max_index);
+        let precision = if precision.is_finite() {
+            precision.clamp(1e-6, 1e6)
+        } else {
+            1.0
+        };
+        let scale = if max_index == 0 {
+            0.0
+        } else {
+            precision.sqrt() / max_index as f64
+        };
+
+        let mut weighted: Vec<(i64, f64)> = (start..=end)
+            .map(|coordinate| {
+                let z = (coordinate as f64 - mean_index) * scale;
+                (coordinate, (-0.5 * z * z).exp())
+            })
+            .collect();
+        let total: f64 = weighted.iter().map(|(_, weight)| *weight).sum();
+        if total <= 0.0 || !total.is_finite() {
+            return vec![ForecastMass {
+                value: ForecastValue::Integer(center.clamp(0, max_index)),
+                probability: 1.0,
+            }];
+        }
+        weighted
+            .drain(..)
+            .map(|(coordinate, weight)| ForecastMass {
+                value: ForecastValue::Integer(coordinate),
+                probability: weight / total,
+            })
+            .collect()
+    }
+
 }
 
 impl InteractiveCandidate<Observation, Action> for FepNavigationCandidate {
@@ -169,37 +204,25 @@ impl InteractiveCandidate<Observation, Action> for FepNavigationCandidate {
         self.pending_action = Some(action);
         self.belief_is_current = false;
 
-        let predicted_x = Self::predicted_coordinate(
-            selection.predicted_state.mean.first().copied().unwrap_or(0.5),
-            self.width,
-        );
-        let predicted_y = Self::predicted_coordinate(
-            selection.predicted_state.mean.get(1).copied().unwrap_or(0.5),
-            self.height,
-        );
-        let confidence = selection
-            .action_probabilities
-            .get(selection.action)
-            .copied()
-            .unwrap_or(0.0);
+        let predicted_x = selection.predicted_state.mean.first().copied().unwrap_or(0.5);
+        let predicted_y = selection.predicted_state.mean.get(1).copied().unwrap_or(0.5);
+        let precision_x = selection.predicted_state.precision.first().copied().unwrap_or(1.0);
+        let precision_y = selection.predicted_state.precision.get(1).copied().unwrap_or(1.0);
 
         let decision = CandidateDecision {
             action,
-            confidence,
+            // The FEP softmax is a relative action-selection distribution, not
+            // a calibrated probability of task success. Leave confidence
+            // unavailable until a held-out calibration map is qualified.
+            confidence: None,
             forecasts: vec![
                 FeatureForecast {
                     feature_id: 0,
-                    outcomes: vec![ForecastMass {
-                        value: ForecastValue::Integer(predicted_x),
-                        probability: 1.0,
-                    }],
+                    outcomes: Self::coordinate_forecast(predicted_x, precision_x, self.width),
                 },
                 FeatureForecast {
                     feature_id: 1,
-                    outcomes: vec![ForecastMass {
-                        value: ForecastValue::Integer(predicted_y),
-                        probability: 1.0,
-                    }],
+                    outcomes: Self::coordinate_forecast(predicted_y, precision_y, self.height),
                 },
             ],
         };
@@ -306,6 +329,28 @@ mod tests {
         assert!(actions.contains(&decision.action));
         assert_eq!(decision.forecasts.len(), 2);
         assert!((0.0..=1.0).contains(&decision.confidence));
+    }
+
+    #[test]
+    fn fep_forecasts_are_normalized_and_confidence_is_unavailable() {
+        let game = Game::new(fixture());
+        let observation = game.observe(symthaea_gamebench::ObservationMode::Full);
+        let actions = [Action::North, Action::East, Action::South, Action::West];
+        let mut candidate = FepNavigationCandidate::new(3, 3, 421).expect("candidate");
+        let decision = candidate
+            .decide(CandidateInput {
+                observation: &observation,
+                legal_actions: &actions,
+                remaining_actions: 12,
+                episode_step: 0,
+            })
+            .expect("decision");
+        assert_eq!(decision.confidence, None);
+        for forecast in decision.forecasts {
+            let sum: f64 = forecast.outcomes.iter().map(|mass| mass.probability).sum();
+            assert!((sum - 1.0).abs() <= 1e-6);
+            assert!(forecast.outcomes.iter().all(|mass| (0.0..=1.0).contains(&mass.probability)));
+        }
     }
 
     #[test]
