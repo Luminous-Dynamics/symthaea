@@ -299,6 +299,8 @@ pub enum ExploreMemoryError {
         actual_height: u16,
     },
     PositionOutOfBounds(&'static str),
+    AgentPositionNotObserved,
+    DuplicateObservationCell(Position),
     ConflictingObservation {
         position: Position,
         previous: Cell,
@@ -323,6 +325,8 @@ impl Display for ExploreMemoryError {
             Self::PositionOutOfBounds(name) => {
                 write!(f, "observed {name} position is outside remembered map")
             }
+            Self::AgentPositionNotObserved => write!(f, "current agent position is absent from its observation"),
+            Self::DuplicateObservationCell(position) => write!(f, "observation contains duplicate cell ({}, {})", position.x, position.y),
             Self::ConflictingObservation {
                 position,
                 previous,
@@ -380,9 +384,21 @@ impl ExploreMemory {
         if observation.position.x >= self.width || observation.position.y >= self.height {
             return Err(ExploreMemoryError::PositionOutOfBounds("agent"));
         }
+        if !observation
+            .visible_cells
+            .iter()
+            .any(|cell| cell.position == observation.position)
+        {
+            return Err(ExploreMemoryError::AgentPositionNotObserved);
+        }
+
+        let mut current_observation = HashMap::new();
         for visible in &observation.visible_cells {
             if visible.position.x >= self.width || visible.position.y >= self.height {
                 return Err(ExploreMemoryError::PositionOutOfBounds("cell"));
+            }
+            if current_observation.insert(visible.position, visible.cell).is_some() {
+                return Err(ExploreMemoryError::DuplicateObservationCell(visible.position));
             }
             if let Some(previous) = self.known_cells.get(&visible.position) {
                 if *previous != visible.cell {
@@ -393,6 +409,10 @@ impl ExploreMemory {
                     });
                 }
             }
+        }
+
+        if current_observation.get(&observation.position) == Some(&Cell::Wall) {
+            return Err(ExploreMemoryError::AgentPositionNotObserved);
         }
 
         let next_count = self
@@ -637,6 +657,43 @@ mod tests {
             )),
             Err(ExploreMemoryError::PositionOutOfBounds("agent"))
         );
+    }
+
+    #[test]
+    fn map_memory_rejects_duplicate_cells_and_missing_agent_position() {
+        let mut memory = ExploreMemory::new(3, 1).expect("memory");
+        let duplicate = ExploreObservation {
+            width: 3,
+            height: 1,
+            position: Position::new(0, 0),
+            visible_cells: vec![
+                ObservedCell { position: Position::new(0, 0), cell: Cell::Floor },
+                ObservedCell { position: Position::new(0, 0), cell: Cell::Wall },
+            ],
+            remaining_actions: 4,
+            scan_was_used_for_this_observation: false,
+        };
+        assert_eq!(
+            memory.remember(&duplicate),
+            Err(ExploreMemoryError::DuplicateObservationCell(Position::new(0, 0)))
+        );
+
+        let missing_agent = ExploreObservation {
+            width: 3,
+            height: 1,
+            position: Position::new(0, 0),
+            visible_cells: vec![ObservedCell {
+                position: Position::new(1, 0),
+                cell: Cell::Floor,
+            }],
+            remaining_actions: 4,
+            scan_was_used_for_this_observation: false,
+        };
+        assert_eq!(
+            memory.remember(&missing_agent),
+            Err(ExploreMemoryError::AgentPositionNotObserved)
+        );
+        assert!(memory.known_cells().is_empty());
     }
 
     #[test]
