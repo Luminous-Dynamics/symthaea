@@ -21,7 +21,7 @@ The crate is its own Cargo workspace and is intentionally not a member of the pr
 
 This is an environment/fixture layer, not an integrated Symthaea game-playing agent. It does not yet implement multi-object Sokoban, complex multi-key logic (beyond the defined reusable key-ID schema), full hidden-rule inference across multi-step task families, candidate-side memory/skill adapters, visual perception, signed evaluator receipts, benchmark aggregation, or external BALROG/Procgen/Crafter/GameWorld adapters.
 
-The F4 environment returns only the current observation. It does not demonstrate that Symthaea remembers anything; that must be tested by the later candidate adapter and memory ablations.
+The F6 hidden-rule environment intentionally does not derive Clone or PartialEq for its game object; its custom Debug implementation omits the evaluator-selected hidden rule, and a negative-control test checks that output. A future candidate adapter must still enforce process/API separation so the agent receives only observations and actions.\n\nThe F4 environment returns only the current observation. It does not demonstrate that Symthaea remembers anything; that must be tested by the later candidate adapter and memory ablations.
 
 ## Validation
 
