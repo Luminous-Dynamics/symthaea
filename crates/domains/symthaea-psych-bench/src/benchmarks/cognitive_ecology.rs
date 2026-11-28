@@ -195,6 +195,8 @@ pub enum TransitionError {
     WrongLocation { expected: Site, actual: Site },
     MissingWaterFilter,
     AlreadyDelivered,
+    ManifestMismatch,
+    Serialization(String),
 }
 
 impl std::fmt::Display for TransitionError {
@@ -211,6 +213,8 @@ impl std::fmt::Display for TransitionError {
             Self::WrongLocation { expected, actual } => write!(f, "action requires {expected:?}, currently at {actual:?}"),
             Self::MissingWaterFilter => write!(f, "water filter is required for delivery"),
             Self::AlreadyDelivered => write!(f, "delivery goal is already complete"),
+            Self::ManifestMismatch => write!(f, "world state belongs to a different scenario manifest"),
+            Self::Serialization(message) => write!(f, "could not serialize transition evidence: {message}"),
         }
     }
 }
@@ -252,7 +256,15 @@ pub fn step(
         return Err(TransitionError::StepLimitReached);
     }
 
-    let before_state_digest = state.digest().map_err(|_| TransitionError::StepLimitReached)?;
+    let manifest_digest = manifest
+        .digest()
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
+    if manifest_digest != state.manifest_digest {
+        return Err(TransitionError::ManifestMismatch);
+    }
+    let before_state_digest = state
+        .digest()
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
     let mut next = state.clone();
     let next_tick = next.tick + 1;
 
@@ -354,7 +366,9 @@ pub fn step(
     next.tick = next_tick;
     let event = Event { tick: next_tick, kind };
     next.event_log.push(event.clone());
-    let after_state_digest = next.digest().map_err(|_| TransitionError::StepLimitReached)?;
+    let after_state_digest = next
+        .digest()
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
     let receipt = StepReceipt {
         manifest_digest: next.manifest_digest.clone(),
         step_index: next_tick,
