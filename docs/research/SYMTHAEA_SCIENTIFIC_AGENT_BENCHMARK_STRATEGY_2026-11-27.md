@@ -106,6 +106,83 @@ A credible claim would be: *at equal or lower total cost, Symthaea produces more
 
 A leaderboard score alone cannot establish that. The evidence package must include the complete action-to-observation chain, negative controls, independent labels, and clean-room replay.
 
+## Expanded external benchmark portfolio — 2026-11-28
+
+The external suite should be a **portfolio of complementary instruments**, not a single leaderboard. These benchmarks measure different outputs, with different denominators and grading semantics. Their numbers must not be averaged together.
+
+| Benchmark | Scope and current reference | What Symthaea should use it to test | Initial target / stretch |
+|---|---|---|---|
+| Terminal-Bench-Science v0.1 | 70 tasks across five scientific domains. The public leaderboard reports GPT-6 Astra/Codex at 68.1% ±3.2 overall; the domain slices vary materially. [Official leaderboard](https://snorkel.ai/leaderboard/terminal-bench-science/) | End-to-end computational science workflows with executable artifacts and deterministic verifiers | ≥68% matched resolution, then ≥73%; require a matched +5 percentage-point lead before claiming SOTA |
+| DeepResearch Bench II | 132 report tasks, 22 domains and 9,430 expert-derived binary rubrics. The unified portal currently distinguishes GPT-5.5 scoring from a historical Gemini-2.5 evaluation; tasks 112 and 114 are temporarily excluded from current GPT-5.5 scoring, leaving 130. Pin the judge and eligible task IDs. [Paper](https://arxiv.org/abs/2601.08536) · [Unified leaderboard](https://huggingface.co/spaces/muset-ai/DeepResearch-Bench-Leaderboard) | Evidence recall, analysis, and synthesis quality in long-form research reports | ≥45% rubric pass under the pinned current judge, then ≥50%; superiority means +5 points against a contemporaneous matched submission, not against a different judge |
+| PaperBench | 20 ICML 2024 research replications decomposed into 8,316 gradable subtasks. The original paper's best tested agent scored 21%; that is a historical release result, not a current frontier ceiling. [OpenAI benchmark](https://openai.com/index/paperbench/) | Reconstructing methods, writing code, executing experiments, and reproducing published findings | ≥25% mean score, then ≥30%; report per-paper completion and artifact/replay integrity, not only the mean |
+| RE-Bench | Seven open-ended ML research-engineering environments; 71 eight-hour attempts from 61 human experts. The paper reports that the best agents beat the human comparison at two hours, while humans gained more with longer budgets and were stronger at 32 hours. [PMLR paper](https://proceedings.mlr.press/v267/wijk25a.html) | Research-engineering productivity as a function of time and compute; compare human and agent scaling curves | At two hours, match the strongest agent on ≥4/7 environments; at eight hours, reach ≥90% of expert-median score on ≥4/7; publish the full 2/8/32-hour frontier |
+| FrontierPhysics | 56 expert-authored tasks from 42 physicists across nine theoretical, computational and experimental domains. The paper reports no tested configuration passed more than 46 of 168 rollouts. Third-party leaderboards now show different aggregated views, so keep task-level results and denominators explicit. [Paper](https://arxiv.org/abs/2611.06910) · [current comparison view](https://artificialanalysis.ai/evaluations/frontierphysics) | Deep scientific reasoning, expert intuition, model criticism, experimental design, and publishable outputs | ≥35% rollout pass fraction on the pinned release, then ≥40%; compare paired task-level outcomes and rubric/verifier slices |
+| Autonomous Science Bench 0.1 | Six real laboratory pilot tasks; its published leaderboard reports resolution rates and total agent cost/time separately. It is a pilot, not a large statistical sample. [Leaderboard](https://asb.open-ssi.org/leaderboard) · [methodology](https://asb.open-ssi.org/about) | Laboratory planning, observation interpretation, and iterative experimental optimization | First reproduce the published protocol; then exceed the matched resolution/cost frontier on a larger confirmatory set with ≥10 trials per task |
+| SCI-AGENT-EXAM | 120 expert-curated tasks across 11 fields and seven workflow types. The paper reports GPT-6 Astra at 80.9 overall but only 26% of runs above its 0.95 success threshold. [Paper](https://arxiv.org/abs/2610.32441) | Broad workflow capability and trajectory stability | ≥83 overall and ≥35% of runs above 0.95 initially; stretch ≥86 and ≥50%, with full run-level distributions |
+
+### What each benchmark cannot establish
+
+- **DeepResearch Bench II** does not establish that a reported source is causally decisive, that a tool action was authorized, or that a research trajectory is replayable. It is primarily a report-quality benchmark.
+- **PaperBench** tests reproductions of a selected ML-paper set; it does not establish general scientific novelty or correct experimental policy across disciplines.
+- **RE-Bench** is a narrow seven-environment research-engineering sample. Its time-budget scaling result is valuable, but it should not be generalized to all research work.
+- **FrontierPhysics** is an expert physics portfolio; its pass rate combines hard verifiers and rubric criteria. A rollout pass rate is not the same as mean rubric score or pass@3.
+- **Terminal-Bench-Science** and **SCI-AGENT-EXAM** exercise computational workflows but do not, by themselves, establish safe external actuation or correction propagation.
+- **ASB 0.1** has only six pilot tasks. A 72.2% leaderboard resolution figure is not directly comparable to 68.1% on Terminal-Bench-Science: the task sets, sample sizes, environments and success criteria differ.
+- **BrowseComp** remains a retrieval stress test, not evidence of research method fidelity, experimental quality or scientific discovery.
+
+### The missing benchmark layer: a trajectory qualification track
+
+Do not create another disconnected evaluator. Add a trajectory-level qualification profile under Research Policy Adapter #11171 that composes the existing RITE, CEDAR, METHODE, REPAIR, WebResearch, parser, ResearchState, StateGuard, and decision/replay receipts.
+
+A sealed episode should contain:
+
+1. A versioned research objective, initial public state, evidence-prefix digest and resource vector.
+2. A candidate-side prospective decision record created before the action: legal `offer_id`, predicted outcome distribution or bounded outcome set, expected decision impact, rejected alternatives, stopping condition and forecast version.
+3. An independent authority check that the offer exists, is current and is permitted. The candidate cannot mint permissions.
+4. An executor-produced action receipt and observation record with source provenance, event time, availability time and decision time.
+5. A new ResearchState version whose claims and dependencies are recalculated from the verified receipt.
+6. Sealed evaluator adjudication, counterfactual mutation tests, and independent clean-room replay.
+
+The resulting qualification is a vector, not one confidence number:
+
+| Dimension | Required measurement | Hard gate / research target |
+|---|---|---|
+| Authorization and custody | Unauthorized actions, invalid receipts, stale offer use, digest mismatches | Zero unauthorized executions; zero accepted invalid receipts |
+| Replay and provenance | Exact independent replay rate, artifact completeness, chain-of-custody validity | 100% replay for eligible deterministic episodes; 100% valid provenance for accepted claims |
+| Forecast quality | Pre-action Brier/log loss, interval or set coverage, sharpness, calibration by domain and horizon | Improve over an uncalibrated baseline; report confidence intervals and sample size; ECE ≤0.05 only when adequately powered |
+| Decision quality | Realized terminal decision loss, normalized regret against an evaluator-only oracle, action value per resource unit | ≤10% normalized regret on tractable oracle fixtures; ≥10% lower regret than matched policy baselines |
+| Evidence responsiveness | Sensitivity to decisive changes; invariance to placebo metadata; reaction to contradiction and source removal | ≥95% correct intervention response and ≥99% placebo invariance on frozen fixtures |
+| Model adequacy | False acceptance of a misspecified candidate grammar; detection of structural and parameter support shift | ≤5% false-accept rate on sealed misspecification fixtures, with power and abstention reported separately |
+| Correction recovery | Downstream claim invalidation/recomputation precision and recall; correction propagation latency | 100% dependent-claim recall on deterministic fixtures; no stale dependent claim may remain marked verified |
+| Transfer and robustness | Held-out domains, instruments, methods, source types, missing/delayed/adversarial observations | Non-negative worst-group transfer before claiming broad capability |
+| Cost and throughput | Money, wall time, model tokens, CPU/GPU, experiments, retrieval and human review | ≥25% lower total cost at non-inferior verified outcome, or a demonstrably better cost-quality-time Pareto frontier |
+
+Hard gates are conjunctive: a task cannot pass if authorization, provenance, required receipts or replay fail, even when its final answer is correct. Forecasting scores are calculated only against outcomes adjudicated independently of the candidate. Missing labels remain missing; they are not converted to negative or positive truth.
+
+### Paradigm shift: choose actions for decision improvement, not information volume
+
+Keep two quantities separate:
+
+- **Epistemic value:** how much an observation is expected to reduce uncertainty about model structure, parameters or state.
+- **Decision value:** how much an observation is expected to improve the final decision under the actual loss function and resource constraints.
+
+An observation can be highly informative and still have no decision value if it cannot change the optimal action. Conversely, a low-entropy measurement may be decisive near a safety or resource boundary.
+
+The policy should therefore evaluate actions with a joint model over model structure (M), parameters (\Theta), and state (S), but score downstream decision impact separately. Use Bayesian EVSI only where priors are justified and calibrated; otherwise report set-valued or prior-free robust regret. Keep the exact sequential-game oracle entirely evaluator-side.
+
+The candidate's prospective forecast must be frozen before execution. Evaluate it prequentially against the actual observation. Do not allow a retrospective rationale to count as a prospective prediction. The same applies to costs: include model inference, tools, orchestration, retries, verification, experiment/material costs and human review.
+
+### Matched-comparison rules before any SOTA claim
+
+1. Pin task IDs, task release, rubrics, verifier versions, judges, model snapshots, prompts, scaffolds, tool access, context limits, time limits and budget vectors.
+2. Run the same candidate model with and without the Symthaea orchestration layer. This separates model strength from architecture value.
+3. Compare at least random, fixed-design, greedy partition/EIG, calibrated EVSI, prior-free robust/minimax, strongest public agent, and human/expert baselines where available.
+4. Use paired task seeds and matched realized budgets. Publish single-run/pass@1, mean over trials, best-of-N and pass@N as separate columns.
+5. Preserve every timeout, failed run, abstention, invalid artifact and replay failure. Report per-task and worst-domain outcomes, uncertainty intervals and full cost.
+6. Claim a frontier advantage only after an independent rerun shows either a statistically reliable ≥5-point improvement on the same scoring metric, or non-inferior verified quality (predeclared margin, e.g. −2 points) at ≥25% lower total cost.
+
+The initial ambition is not to beat every frontier model on every benchmark. It is to show that the same base model and tools, when governed by Symthaea's evidence/action/replay architecture, produce more verified scientific progress per unit of total cost while making fewer unsupported claims and preserving safety under evidence change.
+
 ## References
 
 - [Terminal-Bench-Science official leaderboard](https://snorkel.ai/leaderboard/terminal-bench-science/)
