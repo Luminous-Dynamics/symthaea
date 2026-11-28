@@ -1176,6 +1176,9 @@ mod tests{
         simultaneous.threshold_selection_method=ThresholdSelectionMethodV1::BonferroniSimultaneous;
         simultaneous.thresholds.reverse();
         simultaneous.threshold_grid_sha256=digest_serialized(&simultaneous.thresholds).unwrap();
+        // The changed threshold grid needs a new precommitment before calibration opens.
+        simultaneous.threshold_grid_precommitment_sha256=
+            compute_threshold_grid_precommitment_sha256_v1(&simultaneous).unwrap();
         let bonf=calibrate_selective_evidence_v1(&simultaneous,&groups,&rows).unwrap();
         let bonf_cert=&bonf.certificates[0];
         assert_ne!(bonf_cert.status,RiskStatusV1::Certified);
