@@ -390,3 +390,35 @@ MEL-DJ-006 must be an application layer over existing human/agent-interaction wo
 The DJ-specific copilot experiment should compare no preview, post-hoc explanation, yoked preview, one precommitted forecast, uncertainty-aware alternatives, and steerable preview. Hold model, input, candidate budget and task schedule fixed across arms. Measure whether a DJ can anticipate, correct, steer or reject a proposed action before execution, and whether this improves intent attainment without degrading agency or increasing workload.
 
 The set-level planner should compose existing candidate and evidence primitives into a DJ-specific transition graph. It returns a Pareto set over stated DJ intent, musical continuity, contrast, novelty, diversity, familiarity and technical feasibility. It must not optimize one universal "good set" scalar or learn a preference profile without an explicit scope/consent and review path.
+
+
+## 20. MEL-DJ-008 — Pareto set-trajectory planner
+
+The set-level planner is tracked in [issue #14275](https://github.com/Luminous-Dynamics/symthaea/issues/14275). It composes a directed graph: track candidates are nodes; valid transition contracts are edges; a set is a path through that graph under duration, rights, availability, musical and DJ-intent constraints.
+
+Do not optimize a single “good playlist” score. Maintain separate objectives for user-declared energy/density/tension trajectory, continuity and intentional contrast, harmonic/melodic fit where supported, tempo/phrase feasibility, diversity, novelty, familiarity, repetition, vocal/role density, correction burden and technical feasibility. Return multiple non-dominated paths and show their trade-offs. A user preference profile is explicit, scoped, inspectable and revisable; never infer persistent taste by stealth.
+
+The public DJ-AI (Audio Mostly 2025) work is an appropriate track/set planning comparator: its graph-based alignment approach and generated transitions should be evaluated under matched candidate and compute budgets. It is not automatically a direct transition-rendering comparator for all task families. Include expert DJ-curated set plans and a simple queue/nearest-neighbor baseline.
+
+Use #11297 / MUSE-ORCH-004 only as a bounded-search/Pareto design precedent, not as the same domain model. Use #12190 / MEL-MR-EVAL-042 to measure adaptive selection pressure: best-of-N or repeated optimization may increase a proxy score while reducing diversity, human intent attainment, or constraint compliance.
+
+## 21. MEL-DJ-006 — DJ copilot as precommitted and steerable commitment
+
+The DJ copilot is tracked in [issue #14274](https://github.com/Luminous-Dynamics/symthaea/issues/14274). Reuse:
+- #10088 / MEL-RMI-001 for reciprocal interaction, event sequencing, and causal intervention design;
+- #10190 / MEL-PRE-001 for predictive forecasts committed before execution and musician anticipation;
+- #10133 / MEL-RMD-001 for longitudinal memory scope and creative non-assimilation.
+
+The first DJ study should hold model, task, source tracks, candidate count, compute budget and session schedule fixed while comparing no preview, post-hoc explanation, yoked preview, one forecast, uncertainty-aware alternatives and steerable preview. Measure whether the DJ can predict the action before it happens, correct it faster, reach stated intent more reliably, and retain agency. Acceptance/click-through is not a causal outcome. A preview is not authority to execute; the runtime still requires a fresh bounded grant.
+
+## 22. Programme dependency order and exit conditions
+
+Recommended dependency order:
+1. #14245 transition contract + schema + deterministic oracle.
+2. #14269 beat-grid/tempo-map evidence and correction semantics.
+3. #14272 transition-quality baseline harness and intent-specific transition families.
+4. #14275 set-trajectory path planner over qualified nodes/edges.
+5. #14274 copilot forecasts and DJ-specific RMI/PRE experiment.
+6. MEL-DJ-005 live runtime only after the protocol, transitions, and device/audio qualification contracts are stable.
+
+The Perform shell (#14244) is presentation-only and can evolve independently. Do not wire it to mock deck actions. Keep the normal Listen player separate. The DJ engine remains a distinct runtime with a strict real-time callback boundary.
