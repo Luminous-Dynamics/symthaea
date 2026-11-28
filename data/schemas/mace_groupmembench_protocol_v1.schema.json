@@ -167,12 +167,7 @@
       "required": [
         "msg_node",
         "content",
-        "author",
-        "role",
-        "reply_to",
-        "channel",
-        "phase_name",
-        "topic"
+        "channel"
       ],
       "properties": {
         "msg_node": {
