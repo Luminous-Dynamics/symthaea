@@ -141,20 +141,20 @@ func(h *stringHeap)Push(x any){*h=append(*h,x.(string))}
 func(h *stringHeap)Pop()any{old:=*h;n:=len(old);x:=old[n-1];*h=old[:n-1];return x}
 
 func GraphDigest(nodes []Node,edges []Edge,roots []string)string{
- ns:=append([]Node(nil),nodes...)
+ ns:=make([]Node,len(nodes));copy(ns,nodes)
  for i:=range ns{
   ns[i].IssuedAt=ns[i].IssuedAt.Round(0).UTC()
   ns[i].ValidUntil=ns[i].ValidUntil.Round(0).UTC()
   if ns[i].RevokedAt!=nil{revoked:=ns[i].RevokedAt.Round(0).UTC();ns[i].RevokedAt=&revoked}
  }
  sort.Slice(ns,func(i,j int)bool{return ns[i].ID<ns[j].ID})
- es:=append([]Edge(nil),edges...)
+ es:=make([]Edge,len(edges));copy(es,edges)
  sort.Slice(es,func(i,j int)bool{
   if es[i].PrerequisiteID!=es[j].PrerequisiteID{return es[i].PrerequisiteID<es[j].PrerequisiteID}
   if es[i].DependentID!=es[j].DependentID{return es[i].DependentID<es[j].DependentID}
   return es[i].Relation<es[j].Relation
  })
- rs:=append([]string(nil),roots...);sort.Strings(rs)
+ rs:=make([]string,len(roots));copy(rs,roots);sort.Strings(rs)
  payload:=struct{Nodes []Node `json:"nodes"`;Edges []Edge `json:"edges"`;Roots []string `json:"root_claim_ids"`}{ns,es,rs}
  b,_:=json.Marshal(payload);h:=sha256.Sum256(b);return hex.EncodeToString(h[:])
 }
