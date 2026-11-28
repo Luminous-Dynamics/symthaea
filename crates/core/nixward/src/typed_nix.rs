@@ -702,6 +702,30 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_catalog_option_does_not_replace_the_original_record() {
+        let mut catalog = sample_target_catalog(NixOptionCatalogOrigin::TargetEvaluated);
+        assert_eq!(
+            catalog.register_option(
+                "networking.firewall.enable",
+                NixOptionValueKind::String,
+                Some(false),
+            ),
+            Err(TypedNixError::DuplicateCatalogOption(
+                "networking.firewall.enable".into()
+            ))
+        );
+
+        let target = sample_target_identity();
+        let mut plan = NixModulePlan::new();
+        plan.insert(
+            NixAttributePath::parse("networking.firewall.enable").unwrap(),
+            NixExpr::Bool(true),
+        )
+        .unwrap();
+        assert!(catalog.validate_plan(&target, &plan).is_ok());
+    }
+
+    #[test]
     fn target_catalog_validates_exact_option_types_and_packages() {
         let target = sample_target_identity();
         let catalog = sample_target_catalog(NixOptionCatalogOrigin::TargetEvaluated);
