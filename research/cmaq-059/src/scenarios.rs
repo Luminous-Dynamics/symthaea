@@ -384,6 +384,39 @@ mod tests {
     }
 
     #[test]
+    fn equal_marginal_conditional_pairing_scenario_has_close_marginal_means() {
+        let mut config = ScenarioConfig::standard(
+            ScenarioKind::EqualMarginalConditionalPairingShift,
+            2_048,
+        );
+        config.amplitude = 0.35;
+        let stream = generate_stream("cmaq-059-equal-marginal-check", &config, 23).unwrap();
+        let mean_x = stream.observations.iter().map(|o| o.x[0]).sum::<f64>() / 2_048.0;
+        let mean_y = stream.observations.iter().map(|o| o.y[0]).sum::<f64>() / 2_048.0;
+        // A deterministic finite-replicate smoke check of the symmetric
+        // population construction, not a proof of equal marginal laws.
+        assert!((mean_x - mean_y).abs() < 0.15);
+    }
+
+    #[test]
+    fn conditional_scale_alternative_inflates_y_variance_after_change_point() {
+        let config = ScenarioConfig::standard(ScenarioKind::ConditionalScaleShift, 4_096);
+        let stream = generate_stream("cmaq-059-scale-shift-check", &config, 29).unwrap();
+        let split = config.change_point as usize;
+        let before = &stream.observations[..split];
+        let after = &stream.observations[split..];
+        let variance = |values: &[f64]| {
+            let mean = values.iter().sum::<f64>() / values.len() as f64;
+            values.iter().map(|value| (value - mean).powi(2)).sum::<f64>()
+                / values.len() as f64
+        };
+        let x_variance = variance(&after.iter().map(|o| o.x[0]).collect::<Vec<_>>());
+        let y_variance = variance(&after.iter().map(|o| o.y[0]).collect::<Vec<_>>());
+        assert!(y_variance > x_variance * 1.2);
+        assert_eq!(before.len(), split);
+    }
+
+    #[test]
     fn invalid_scenario_horizons_and_dimensions_fail_closed() {
         let mut config = ScenarioConfig::standard(ScenarioKind::EqualConditionalIid, 16);
         config.horizon = 0;
