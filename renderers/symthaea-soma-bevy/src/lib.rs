@@ -26,6 +26,11 @@ use bevy::prelude::*;
 
 mod visual_grammar;
 mod scene_graph_layout;
+mod scene_graph_adapter;
+pub use scene_graph_adapter::{
+    AuthorizedSceneGraphSubmission, LatestSceneGraphSubmissionAck,
+    SceneGraphSubmissionAck, SceneGraphSubmissionQueue,
+};
 pub use scene_graph_layout::{
     layout_scene_graph_v2, GraphNodePlacementV2, GraphRelationPathV2,
     SceneGraphLayoutError, SceneGraphLayoutV2,
@@ -69,6 +74,8 @@ pub enum AdapterError {
     PermitChangedAfterAuthorization,
     PolicyDenied(DenialReason),
     ContinuityPlanRejected(TransitionError),
+    SceneGraphVerificationFailed(symthaea_soma::embodiment_scene_graph::SceneGraphV2Error),
+    SceneGraphLayoutFailed(scene_graph_layout::SceneGraphLayoutError),
     QueueRevisionExhausted,
 }
 
@@ -400,10 +407,15 @@ impl Plugin for SymthaeaSceneRendererPlugin {
             .init_resource::<LatestSceneSubmissionAck>()
             .init_resource::<ActiveScene>()
             .init_resource::<ActiveSceneTransition>()
+            .init_resource::<SceneGraphSubmissionQueue>()
+            .init_resource::<LatestSceneGraphSubmissionAck>()
+            .init_resource::<scene_graph_adapter::ActiveSceneGraph>()
             .add_systems(Startup, setup_camera)
             .add_systems(
                 Update,
                 (
+                    scene_graph_adapter::render_pending_scene_graph,
+                    scene_graph_adapter::enforce_active_scene_graph,
                     render_pending_scene,
                     enforce_active_scene,
                     apply_transition_weights,
@@ -428,6 +440,7 @@ fn render_pending_scene(
     mut latest_ack: ResMut<LatestSceneSubmissionAck>,
     mut active: ResMut<ActiveScene>,
     mut transition: ResMut<ActiveSceneTransition>,
+    mut active_graph: ResMut<scene_graph_adapter::ActiveSceneGraph>,
     existing: Query<(Entity, &SceneGroupId), With<RenderedSceneEntity>>,
     mut last_revision: Local<u64>,
 ) {
@@ -435,6 +448,7 @@ fn render_pending_scene(
         return;
     }
     *last_revision = queue.revision();
+    active_graph.submission = None;
     latest_ack.latest = None;
 
     let Some(submission) = queue.pending.as_ref() else {
