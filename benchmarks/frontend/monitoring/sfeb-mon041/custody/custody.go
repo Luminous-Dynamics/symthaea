@@ -124,13 +124,13 @@ func Evaluate(in Input)Result{
  if in.UsedNonces==nil{f.hold("used_nonce_registry_missing")}
  if len(in.TrustedKeys)==0{f.hold("trust_store_missing")}
  if f.blocked{out.CustodyVerdict=Blocked;out.ReasonCodes=f.sorted();return out}
- keys:=map[string]struct{pub ed25519.PublicKey; principal string; from,to time.Time; revoked bool}{}
+ keys:=map[string]struct{pub ed25519.PublicKey; principal string; from,to time.Time; revokedAt *time.Time}{}
  for _,k:=range in.TrustedKeys{
   if !validID(k.KeyID)||!validID(k.Principal){f.block("trusted_key_identity_invalid");continue}
   if _,ok:=keys[k.KeyID];ok{f.block("trusted_key_id_duplicated");continue}
   pub,ok:=publicKey(k.PublicKeyBase64);if !ok{f.block("trusted_public_key_invalid");continue}
   if k.NotBefore.IsZero()||k.NotAfter.IsZero()||!k.NotAfter.After(k.NotBefore){f.block("trusted_key_validity_invalid");continue}
-  keys[k.KeyID]=struct{pub ed25519.PublicKey;principal string;from,to time.Time;revoked bool}{pub,k.Principal,k.NotBefore,k.NotAfter,k.RevokedAt!=nil}
+  keys[k.KeyID]=struct{pub ed25519.PublicKey;principal string;from,to time.Time;revokedAt *time.Time}{pub,k.Principal,k.NotBefore,k.NotAfter,k.RevokedAt}
  }
  issued:=map[string]struct{}{};for _,n:=range in.IssuedNonces{if !validNonce(n){f.block("issued_nonce_invalid");continue};if _,ok:=issued[n];ok{f.block("issued_nonce_duplicated")};issued[n]=struct{}{}}
  used:=map[string]struct{}{};for _,n:=range in.UsedNonces{if !validNonce(n){f.block("used_nonce_invalid");continue};if _,ok:=used[n];ok{f.block("used_nonce_duplicated")};used[n]=struct{}{}}
@@ -159,7 +159,7 @@ func Evaluate(in Input)Result{
   if !in.EvaluatedAt.IsZero()&&!r.CapturedAt.IsZero()&&r.CapturedAt.Before(in.EvaluatedAt.Add(-time.Duration(in.MaxReceiptAgeSeconds)*time.Second)){rf.block("receipt_stale")}
   k,ok:=keys[r.SignerKeyID]
   if !ok{rf.hold("signer_key_not_in_trust_store")}else{
-   if k.revoked{rf.block("signer_key_revoked")}
+   if k.revokedAt!=nil&&!k.revokedAt.After(r.CapturedAt){rf.block("signer_key_revoked_at_capture")}
    if k.principal!=r.CapturePrincipal{rf.block("signer_principal_mismatch")}
    if r.CapturedAt.Before(k.from)||r.CapturedAt.After(k.to){rf.block("signer_key_not_valid_at_capture")}
    sig,e:=base64.StdEncoding.DecodeString(r.SignatureBase64);if e!=nil||len(sig)!=ed25519.SignatureSize||!ed25519.Verify(k.pub,CanonicalSigningBytes(r),sig){rf.block("receipt_signature_invalid")}
