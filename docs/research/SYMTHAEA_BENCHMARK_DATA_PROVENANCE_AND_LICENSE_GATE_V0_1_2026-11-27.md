@@ -149,7 +149,7 @@ For a requested use, operation, transformation, and caller-supplied canonical UT
 - required operation against permitted operations and explicit commercial/training/derivative/redistribution/publication flags;
 - transformation permission and derivative-media authority;
 - uniqueness of use, operation, and transformation lists;
-- the prohibition on raw media stored in public Git.
+- the prohibition on raw media stored in public Git; canonical UTC calendar validity and secure HTTPS/URN source references.
 
 Nine Rust tests cover a fictional valid authorization, commercial scope mismatch, intended-use approval mismatch, training denial, unauthorized counterfactual transformation, expired grants, raw media in Git, non-canonical time strings, and missing commercial authority.
 
