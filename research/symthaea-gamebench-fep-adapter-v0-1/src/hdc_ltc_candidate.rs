@@ -22,6 +22,7 @@ pub enum HdcLtcAdapterError {
     IncompleteMap,
     MissingGoal,
     EmptyActionSet,
+    NoRemainingBudget,
     DecisionWithoutFeedback,
     FeedbackWithoutPendingAction,
     ActionMismatch,
@@ -35,6 +36,7 @@ impl Display for HdcLtcAdapterError {
             Self::IncompleteMap => write!(f, "HDC-LTC baseline requires a complete O1 map"),
             Self::MissingGoal => write!(f, "HDC-LTC baseline requires a visible goal"),
             Self::EmptyActionSet => write!(f, "HDC-LTC candidate received no offered actions"),
+            Self::NoRemainingBudget => write!(f, "HDC-LTC candidate received no remaining action budget"),
             Self::DecisionWithoutFeedback => write!(f, "HDC-LTC candidate awaits previous transition feedback"),
             Self::FeedbackWithoutPendingAction => write!(f, "HDC-LTC transition feedback has no pending action"),
             Self::ActionMismatch => write!(f, "HDC-LTC feedback action differs from selected action"),
@@ -129,6 +131,9 @@ impl InteractiveCandidate<Observation, Action> for HdcLtcSpatialCandidate {
     ) -> Result<CandidateDecision<Action>, Self::Error> {
         if self.pending_action.is_some() {
             return Err(HdcLtcAdapterError::DecisionWithoutFeedback);
+        }
+        if input.remaining_actions == 0 {
+            return Err(HdcLtcAdapterError::NoRemainingBudget);
         }
         self.validate_observation(input.observation)?;
         let goal = input.observation.known_goal.ok_or(HdcLtcAdapterError::MissingGoal)?;
@@ -254,6 +259,22 @@ mod tests {
             .expect("decision");
         assert!(actions.contains(&decision.action));
         assert_eq!(decision.confidence, None);
+    }
+
+    #[test]
+    fn hdc_ltc_candidate_rejects_zero_action_budget() {
+        let observation = fixture();
+        let actions = [Action::North, Action::East, Action::South, Action::West];
+        let mut candidate = HdcLtcSpatialCandidate::new(3, 3, 47).expect("candidate");
+        assert_eq!(
+            candidate.decide(CandidateInput {
+                observation: &observation,
+                legal_actions: &actions,
+                remaining_actions: 0,
+                episode_step: 0,
+            }),
+            Err(HdcLtcAdapterError::NoRemainingBudget)
+        );
     }
 
     #[test]
