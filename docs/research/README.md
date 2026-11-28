@@ -40,6 +40,7 @@ event contract.
 - [Phase-anchored action timeline](SYMTHAEA_PHASE_ANCHORED_ACTION_TIMELINE_V0_1_2026-11-28.md)
 - [ROI calibration report verifier](SYMTHAEA_ROI_CALIBRATION_REPORT_V1_2026-11-28.md)
 - [Typed scene-graph renderer bridge](SYMTHAEA_TYPED_SCENE_GRAPH_RENDERER_BRIDGE_V0_1_2026-11-28.md)
+- [Competitive strategy and qualification scorecard](SYMTHAEA_POLYEMBODIMENT_COMPETITIVE_STRATEGY_V0_1_2026-11-28.md)
 - [Presentation outcome receipts](SYMTHAEA_PRESENTATION_OUTCOME_RECEIPTS_V0_1_2026-11-27.md)
 - [Compositor presentation observer](SYMTHAEA_COMPOSITOR_PRESENTATION_OBSERVER_V0_1_2026-11-27.md)
 - [Wayland presentation-feedback ledger](../../crates/domains/symthaea-soma/src/embodiment_presentation_feedback.rs)
