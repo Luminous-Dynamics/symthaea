@@ -378,6 +378,11 @@ mod tests {
                 metric.mean
             );
             assert!(
+                metric.ci_lower >= 8.0 && metric.ci_upper <= 20.0,
+                "{key} interval escaped [8, 20]: [{}, {}]",
+                metric.ci_lower,
+                metric.ci_upper
+            );            assert!(
                 metric.mean <= 20.0,
                 "{key} mean above proxy ceiling: {}",
                 metric.mean
