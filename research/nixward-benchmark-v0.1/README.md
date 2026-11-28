@@ -51,6 +51,8 @@ The seed includes 21 NixOS VM scenarios, including benign positive cases, silent
 
 - `schemas/benchmark-manifest-v0.1.schema.json` — strict Draft 2020-12 task-manifest schema.
 - `scenarios/benchmark-seed-v0.1.json` — 41 synthetic task definitions with unique case/cluster identities, target profile, prompt, state, constraints, forbidden effects, allowed tools, observations, plan requirements, postconditions, runtime tier, evaluator class, hard gates and failure injections.
+- `schemas/benchmark-run-receipt-v0.1.schema.json` — run-level and per-task receipt contract binding corpus digest, agent configuration, exact target source, evaluator/runner images, resource budgets, stage outcomes, effect flags, evidence references, cost and quarantine records.
+- `examples/run-receipt-not-run.example.json` — deliberately unexecuted example with null environment, empty tasks and empty scorecards; it is not a result.
 
 The manifest has no claimed pinned lock digests yet. Those are assigned when each executable target fixture is frozen; every actual run receipt must record the exact NixOS release, architecture, nixpkgs revision, flake.lock digest, module-set digest, Nix version and evaluator image.
 
