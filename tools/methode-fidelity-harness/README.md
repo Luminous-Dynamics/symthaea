@@ -14,7 +14,7 @@ It deliberately keeps scientific result validation separate from method fidelity
 
 ## Contents
 
-- `src/lib.rs`: typed contract, receipt, audit report and 17 deterministic tests.
+- `src/lib.rs`: typed contract, receipt, audit report and 31 deterministic tests.
 - `Cargo.toml` / `Cargo.lock`: standalone zero-dependency workspace so this slice does not depend on the monorepo workspace or its Cargo.lock.
 
 ## Checks implemented
@@ -29,7 +29,7 @@ The auditor binds:
 - metric definition digests;
 - budget-policy digest, required epochs and resource caps;
 - required output identities/digests;
-- independent replay result bound to the reviewed contract and exact output artifact list.
+- independently pinned replay-verifier identity/implementation version, separate from the protocol reviewer; replay result bound to the reviewed contract and exact output artifact list.
 
 A declared, non-critical mismatch is classified as `ExecutedWithDeclaredDeviation`, never as reference reproduction. An undeclared mismatch is unresolved. Resource overruns, incomplete execution, missing required outputs, invalid reference review or missing/failed independent replay remain unresolved even when the producer claims success.
 
@@ -43,7 +43,7 @@ cargo clippy --manifest-path tools/methode-fidelity-harness/Cargo.toml --locked 
 
 ## Limitations
 
-This first slice validates typed in-memory receipt structures. It does not yet parse an external JSON protocol, execute scientific workloads, recompute raw artifact hashes, verify scientific ground truth, or replace #12471's method compiler. The caller must supply source/artifact and independent-review receipts from their owning systems. A production integration needs an audited serialization boundary and authenticated receipt issuers before the values may be trusted.
+This first slice validates typed in-memory receipt structures. It does not yet parse an external JSON protocol, execute scientific workloads, recompute raw artifact hashes, verify scientific ground truth, or replace #12471's method compiler. The caller must supply source/artifact and independent-review receipts from their owning systems. The pinned verifier identity is an anti-substitution check, not proof that the verifier actually ran or that it is isolated. This reference does not authenticate identities, signatures, processes or service principals. A production integration still requires a separately controlled verifier service/identity, authenticated receipts, OS/service isolation, and an audited serialization boundary before replay may be treated as independent.
 
 ## External benchmark alignment
 
