@@ -776,6 +776,53 @@ mod tests {
     }
 
     #[test]
+    fn unchallenged_singleton_abstains_when_probe_budget_is_exhausted() {
+        let truth = interaction::ModelHypothesis {
+            structure: interaction::Structure::BilinearInteraction,
+            bias: 0,
+            weight_u: 1,
+            weight_v: 1,
+            interaction_weight: 1,
+        };
+        let strategies = [
+            None,
+            Some(crate::strategies::ProbeStrategy::MaximumStructureInformationGain),
+        ];
+
+        for strategy in strategies {
+            let mut episode = BlindEpisode::new_interaction_structural_shift(
+                "interaction-adequacy-budget-exhausted",
+                truth,
+                1,
+                3,
+            )
+            .unwrap();
+
+            for input in [[1, 1], [-1, -1], [-1, 0]] {
+                episode
+                    .apply(AgentAction::Probe {
+                        intervention: AgentIntervention::Pair(input),
+                    })
+                    .unwrap();
+            }
+
+            match strategy {
+                None => run_to_submission(&mut episode, 0).unwrap(),
+                Some(strategy) => run_strategy_to_submission(&mut episode, 0, strategy).unwrap(),
+            }
+
+            let score = episode.evaluate_after_submission().unwrap();
+            assert!(score.set_score.exact_version_space_match);
+            assert_eq!(score.set_score.oracle_model_count, 1);
+            assert!(score.safe_abstention);
+            assert!(!score.unnecessary_abstention);
+            assert!(score.abstained);
+            assert!(score.decision_correct);
+            assert!(!score.generating_truth_behaviorally_represented);
+        }
+    }
+
+    #[test]
     fn random_strategy_uses_a_deterministic_distinct_seed_per_decision_step() {
         let policy = crate::strategies::ProbeStrategy::Random { seed: 23 };
         let first = strategy_for_decision_step(policy, 0);
