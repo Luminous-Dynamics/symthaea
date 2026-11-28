@@ -564,6 +564,7 @@ pub enum TransitionGridBindingViolationCode {
     SourceTempoUnavailable,
     TargetTempoUnavailable,
     TempoDeltaExceeded,
+    TempoRatioExceeded,
 }
 
 /// A typed, stable result from transition-to-beat-grid evidence binding.
@@ -744,6 +745,16 @@ pub fn verify_transition_grid_binding(
                 &mut violations,
                 TransitionGridBindingViolationCode::TempoDeltaExceeded,
                 "alignment.max_tempo_delta_milli_bpm",
+            );
+        }
+        let slower_tempo = u64::from(source_tempo.min(target_tempo));
+        let tempo_ratio_error_ppm =
+            u64::from(tempo_delta) * 1_000_000 / slower_tempo;
+        if tempo_ratio_error_ppm > u64::from(alignment.max_tempo_ratio_error_ppm) {
+            push_binding(
+                &mut violations,
+                TransitionGridBindingViolationCode::TempoRatioExceeded,
+                "alignment.max_tempo_ratio_error_ppm",
             );
         }
     }
@@ -1158,6 +1169,7 @@ mod tests {
                 transition_beat_ordinal_milli: 16_000,
                 max_phase_error_milli: 100,
                 max_tempo_delta_milli_bpm: 1_000,
+                max_tempo_ratio_error_ppm: 10_000,
                 confidence_ppm: 850_000,
             }),
             protected_regions: Vec::new(),
@@ -1241,10 +1253,33 @@ mod tests {
             &source_report,
             &target_report,
         );
-        assert_eq!(
-            found[0].code,
-            TransitionGridBindingViolationCode::TempoDeltaExceeded
+        assert!(found
+            .iter()
+            .any(|violation| violation.code == TransitionGridBindingViolationCode::TempoDeltaExceeded));
+        assert!(found
+            .iter()
+            .any(|violation| violation.code == TransitionGridBindingViolationCode::TempoRatioExceeded));
+    }
+
+    #[test]
+    fn relative_tempo_tolerance_is_normalized_by_slower_track() {
+        let contract = transition_contract();
+        let mut source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        let mut target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        for point in &mut source_report.hypotheses[0].tempo_map {
+            point.bpm_milli = 60_000;
+        }
+        for point in &mut target_report.hypotheses[0].tempo_map {
+            point.bpm_milli = 61_000;
+        }
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
         );
+        assert!(found.is_empty());
     }
 
     #[test]
