@@ -951,6 +951,8 @@ mod tests {
     fn valid_feedback_uses_inverse_proxy_survival_weight() {
         let mut engine = create_ca_ocrc_engine_v1("e", "fab-clock", policy(2, 4, 0.50)).unwrap();
         start_ca_ocrc_round_v1(&mut engine, &round(0, 0.9)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(1, 0.1)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(2, 0.1)).unwrap();
         let result = receive_ca_ocrc_feedback_v1(&mut engine, &feedback(0, 2, 2.0)).unwrap();
         assert_eq!(result.disposition, CaOcrcTrackingDispositionV1::FeedbackUpdated);
         assert_eq!(result.proxy_survival_probability, Some(0.50));
@@ -967,7 +969,7 @@ mod tests {
         let second = start_ca_ocrc_round_v1(&mut engine, &round(1, 0.9)).unwrap();
         assert!(!second.admitted);
         assert_eq!(engine.capacity_saturation_count, 1);
-        let result = receive_ca_ocrc_feedback_v1(&mut engine, &feedback(1, 2, 0.5)).unwrap();
+        let result = receive_ca_ocrc_feedback_v1(&mut engine, &feedback(1, 1, 0.5)).unwrap();
         assert_eq!(result.disposition, CaOcrcTrackingDispositionV1::FeedbackNotTracked);
         assert_eq!(engine.threshold, 0.5);
     }
@@ -976,6 +978,8 @@ mod tests {
     fn unqualified_feedback_suspends_guarantee_and_does_not_update_threshold() {
         let mut engine = create_ca_ocrc_engine_v1("e", "fab-clock", policy(2, 4, 0.50)).unwrap();
         start_ca_ocrc_round_v1(&mut engine, &round(0, 0.9)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(1, 0.1)).unwrap();
+        start_ca_ocrc_round_v1(&mut engine, &round(2, 0.1)).unwrap();
         let before = engine.threshold;
         let mut input = feedback(0, 2, 2.0);
         input.eligibility_report.eligibility = LabelConsumptionEligibilityV1::Blocked;
