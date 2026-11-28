@@ -161,24 +161,26 @@ Do not claim superiority from a 16-episode smoke test. Use paired seeds, preregi
 
 ## 9. Industry comparison and external tracks
 
-Keep the internal causal-twin score separate from BALROG and GameWorld:
-- BALROG is a broad agentic reasoning suite across BabyAI, Baba Is AI, Crafter, TextWorld, MiniHack and NetHack. The BALROG repository snapshot available 2026-11-28 reports Claude Opus 5 Max at 63.40 ± 1.85 overall progress over 254 completed episodes; this is a progress metric, not task success.
-- GameWorld evaluates 34 browser games and 170 tasks with state-verifiable progress and success, across generalist and computer-use interfaces. Its official page distinguishes the standard and real-time tracks and reports a large gap between top agents and human baselines.
-- Reproduce an external benchmark only with its exact version, action interface, prompts, budgets, seeds, and scoring. Do not compare the causal-twin success rate directly with BALROG progress or GameWorld progress.
+The causal-twin track should be positioned as complementary, not as the first benchmark of causal reasoning or causal games. The field already has several relevant public benchmarks with non-equivalent targets.
 
-External references:
-- BALROG leaderboard: https://github.com/balrog-ai/experiments/blob/main/viewer.html
-- BALROG paper: https://arxiv.org/abs/2411.13543
-- GameWorld: https://gameworld-project.github.io/
-- GameWorld paper: https://arxiv.org/abs/2604.07429
+### Causal and active-discovery comparators
 
-### Snapshot used for comparison (2026-11-28)
+- **CausalGame (ICML 2026):** 14 interactive scenarios covering selection bias, hidden confounding and noisy measurements. The project reports 29 frontier LLMs; its strongest agentic result reaches 68.0% average survival against a 75% scenario win threshold and analytical optima around 78–85%. The rubric analysis reports 68.4% of agentic sessions with no meaningful causal engagement. This makes evidence of causal process—not just a successful terminal score—a core metric. https://causalgame.github.io/ ; https://proceedings.mlr.press/v306/chen26l.html
+- **Active Causal Discovery Benchmark (ACDB):** a six-level, linear-Gaussian SCM benchmark with budgeted hard interventions. Its reported best non-oracle PC + greedy active-orientation method reaches 42.7% directed F1 (SHD 4.79); raw Claude Sonnet 4.6 and GPT-5.4 active agents reach 31.7% and 22.9% directed F1. A structure-blind random DAG baseline reaches 23.6% directed F1 on the dense v0 ladder. Graph recovery is not terminal decision regret; retain both. https://arxiv.org/abs/2609.31675
+- **ACED-Bench:** 180 ACED-Core tasks (60 set-valued ancestry/descendancy and 120 constrained causal-decision tasks), plus 150 ACED-Qual questions. It explicitly tests intervention choice, evidence retention, commitment and stopping using hidden probabilistic graphical models. Prefer crosswalks and head-to-head adapters over recreating its evidence lifecycle. https://arxiv.org/abs/2610.14381
+- **Heuresis:** anonymous simulated datasets across six mechanism families; it distinguishes improvements from choosing a better existing algorithm from improvements due to actual data investigation. It reports GPT-6.1 Sol exceeding the best chosen algorithm on all six families, by 14 adjacency-F1 points on the hardest family; Claude Opus 5.5 improves by 7.4 points there. Traceable data-grounded changes are a strong precedent. https://arxiv.org/abs/2610.22846
 
-- BALROG's public experiment viewer currently exposes a Claude Opus 5 Max naive-agent submission at **63.40% ± 1.85 percentage points overall progress**, based on 254 completed episodes. Its NetHack allocation is incomplete (4 of 5 planned seeds). The metric is normalized progress, not task-success rate; it is not a causal-mechanism score.
-- GameWorld's project page reports **Gemini 3 Flash Preview at 41.9% progress / 21.2% success** on its standard generalist leaderboard, with novice and expert human progress baselines of **64.1%** and **82.6%**. GameWorld evaluates 34 browser games and 170 tasks with serialized-state verification. Its separate real-time and Fine-Control protocols must not be mixed with the standard paused benchmark.
-- A November 27 secondary leaderboard aggregation reports a **76.8% GameWorld Fine-Control** result for GPT-6.1 Terra under a 400-step protocol. Treat this as a distinct protocol snapshot and verify the corresponding official run/configuration before making a direct claim; it is not the standard GameWorld score.
+### Game-playing comparators
 
-Implication: general game progress is already a crowded and interface-sensitive target. The causal-twin track should first establish a distinct, reproducible capability—decision-sufficient causal discovery with low intervention regret—then add external tracks. A higher internal score cannot be called an industry win until a matched public benchmark protocol is independently reproduced.
+Keep the internal causal-twin score separate from general game progress:
+- **BALROG:** the official experiment viewer contains GPT-6-Astra-Max at **68.26% ± 1.97 overall progress** (255 completed episodes; 2026-09-18) and Claude-Opus-5-Max at **63.40% ± 1.85** (254 completed episodes; 2026-09-20). Progress is not task success and not causal-mechanism accuracy. The board's model submissions use their recorded interaction histories, environments, and task budgets. https://github.com/balrog-ai/experiments/blob/main/viewer.html
+- **GameWorld:** 34 browser games and 170 tasks, with serialized-state verification. Its standard generalist podium reports Gemini-3-Flash-Preview at **41.9% progress / 21.2% success**; the novice-player progress baseline is **64.1%**. Keep the generalist, computer-use, real-time and other protocol tracks distinct. https://gameworld-project.github.io/
+
+Do not compare our causal-twin success rate directly with BALROG progress, GameWorld progress/success, ACDB directed F1, CausalGame survival or Heuresis adjacency F1. An external comparison is valid only with exact benchmark version, action interface, prompts, model configuration, budgets, tool policies, seeds, graders, and complete denominators.
+
+### Competitive thesis
+
+The differentiated target is **decision-sufficient causal discovery under costed, state-changing interventions**: distinguish action-relevant causal hypotheses; preserve equivalence classes when mechanism identity is unnecessary or unidentifiable; validate the actual intervention transition and side effects; abstain on out-of-family worlds; revise memory when consequences disagree; and transfer to held-out compositions. This is a proposed research contribution, not a priority or SOTA claim.
 
 ## 10. Integration and ownership
 
