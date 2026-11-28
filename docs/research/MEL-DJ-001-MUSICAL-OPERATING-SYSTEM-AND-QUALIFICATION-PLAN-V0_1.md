@@ -422,3 +422,17 @@ Recommended dependency order:
 6. MEL-DJ-005 live runtime only after the protocol, transitions, and device/audio qualification contracts are stable.
 
 The Perform shell (#14244) is presentation-only and can evolve independently. Do not wire it to mock deck actions. Keep the normal Listen player separate. The DJ engine remains a distinct runtime with a strict real-time callback boundary.
+
+
+## 23. MEL-DJ-005 — native multi-deck runtime boundary
+
+The native runtime is tracked in [issue #14279](https://github.com/Luminous-Dynamics/symthaea/issues/14279). The existing Muse `live_output.rs` is a useful reference for CPAL device lifecycle and a synthesis-thread-to-callback ring-buffer boundary, but it is not the DJ runtime. It streams `StreamingSynth` output; the instrument `sample_player.rs` loads WAV instrument samples; `mixing.rs` is an output EQ/compressor/limiter. None provides general external-track decoding, independent deck transports, headphone cue routing, a transition mixer graph or controller interoperability.
+
+The existing implementation also exposes exactly the kinds of issues the DJ runtime must qualify rather than inherit blindly: the synthesis worker can sleep/spin while a ring buffer is full, the callback zero-fills when it under-runs, and the observed code does not provide the device-specific underrun/deadline evidence needed for DJ use. These are not necessarily defects for its existing synthesis workload; they simply do not meet the DJ runtime contract.
+
+MEL-DJ-005 therefore uses three explicit planes:
+- **Control plane:** decoder loading, source verification, user/controller commands, authorization, state transitions, device negotiation, configuration and recording manifests.
+- **Real-time data plane:** bounded preallocated PCM paths, independent deck clocks, resampling/time-stretch, mixer buses, cue/master outputs, and frame-boundary command application. No file/network I/O, decode, allocation, inference, logging, UI or unbounded lock acquisition in the callback.
+- **Evidence plane:** source and decoder digests, device/profile settings, callback-time histograms, underruns/overruns, route state, controller receipts, clock drift and recording-integrity/replay evidence.
+
+Start with a deterministic offline two-deck graph and fault injection before opening a hardware device. Then qualify one named device/OS/driver/sample-rate/buffer profile at a time. Four decks, stems, hardware controllers, recording and live copilot are later gates, not implied by a two-deck playback result.
