@@ -1,4 +1,4 @@
-# Symthaea GameBench v0.1 — navigation core
+# Symthaea GameBench v0.1 — deterministic environment core
 
 This is a **standalone research crate** and a first executable slice of issue [#14137](https://github.com/Luminous-Dynamics/symthaea/issues/14137).
 
@@ -16,7 +16,7 @@ The crate is its own Cargo workspace and is intentionally not a member of the pr
 
 ## Deliberate limits
 
-The first implementation contains F1 navigation and F2 Sokoban-like pushing. It does **not** yet implement pushing/inventory and prerequisites, partial-map exploration actions, resource chains, unknown mechanics, Sokoban event receipts, visual input, agent integration, signed receipts, benchmark aggregation, or any of the external BALROG/Procgen/GameWorld adapters.
+The first implementation contains F1 navigation and F2 Sokoban-like pushing. It does **not** yet implement keys/doors and inventory prerequisites, partial-map exploration actions, resource chains, hidden-rule discovery, Sokoban event receipts, visual input, agent integration, signed receipts, benchmark aggregation, or any of the external BALROG/Procgen/GameWorld adapters.
 
 The exact BFS routine is an evaluator reference only. It must not be exposed to the candidate agent.
 
@@ -30,4 +30,4 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 ```
 
-No execution result is claimed until the exact branch head passes these commands. A passing fixture contract would establish only this deterministic navigation implementation, not Symthaea game-playing capability.
+No execution result is claimed until the exact branch head passes these commands. A passing fixture contract would establish only these deterministic environment mechanics, not Symthaea game-playing capability.
