@@ -280,6 +280,14 @@ fn valid_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+/// Validate a full 40-hex-character Git commit object ID.
+fn valid_git_sha(value: &str) -> bool {
+    value.len() == 40
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn nonempty(value: &str) -> bool {
     !value.trim().is_empty() && value.len() <= 512
 }
@@ -844,6 +852,20 @@ mod tests {
             ),
             Err(AdapterRejectV1::QueryInputMismatch)
         );
+    }
+
+
+    #[test]
+    fn harness_commit_must_be_exact_lowercase_git_object_id() {
+        let mut binding=run_binding();
+        binding.harness_commit_sha="not-a-commit".into();
+        assert_eq!(binding.seal(),Err(AdapterRejectV1::InvalidIdentity));
+        let mut binding=run_binding();
+        binding.harness_commit_sha="A".repeat(40);
+        assert_eq!(binding.seal(),Err(AdapterRejectV1::InvalidIdentity));
+        let mut binding=run_binding();
+        binding.harness_commit_sha="a".repeat(40);
+        assert!(binding.seal().is_ok());
     }
 
 }
