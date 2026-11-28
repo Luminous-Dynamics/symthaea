@@ -187,7 +187,7 @@ pub use selection_risk_bounds::{
 pub use semi_vm_joint_risk_trace::{
     JOINT_RISK_TRACE_REPORT_SCHEMA_V1, JOINT_RISK_TRACE_SCHEMA_V1, JointArmRiskSummaryV1,
     JointBenchmarkArmV1, JointBenchmarkModeV1, JointCaOcrcArmEvidenceV1, JointControllerEvidenceV1,
-    JointControllerMethodV1, JointPopulationRowV1, JointRiskTraceErrorV1, JointRiskTraceInputV1,
-    JointRiskTraceReportV1, JointTauAciArmEvidenceV1, JointTraceStatusV1,
+    JointComparisonScopeV1, JointControllerMethodV1, JointPopulationRowV1, JointRiskTraceErrorV1,
+    JointRiskTraceInputV1, JointRiskTraceReportV1, JointTauAciArmEvidenceV1, JointTraceStatusV1,
     evaluate_joint_risk_trace_v1, seal_joint_risk_trace_v1,
 };
