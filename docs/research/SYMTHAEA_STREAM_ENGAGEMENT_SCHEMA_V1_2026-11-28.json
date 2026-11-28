@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea.stream-engagement.v1.json",
+  "title": "Symthaea continuous stream engagement evaluation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "opportunities",
+    "predictions"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.stream-engagement.v1"
+    },
+    "opportunities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/opportunity"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/prediction"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "opportunity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "opportunity_id",
+        "stream_id",
+        "clock_domain_id",
+        "event_start_monotonic_ns",
+        "response_deadline_monotonic_ns",
+        "kind",
+        "agent_was_speaking",
+        "source_event_digest"
+      ],
+      "properties": {
+        "schema": {
+          "const": "symthaea.stream-engagement.v1"
+        },
+        "opportunity_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "clock_domain_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "event_start_monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "response_deadline_monotonic_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "enum": [
+            "proactive_visual_cue",
+            "incoming_new_information",
+            "listener_backchannel",
+            "other_directed_speech",
+            "ambient_speech",
+            "human_resolution"
+          ]
+        },
+        "agent_was_speaking": {
+          "type": "boolean"
+        },
+        "source_event_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "opportunity_id",
+        "clock_domain_id",
+        "decision_at_monotonic_ns",
+        "action",
+        "response_quality"
+      ],
+      "properties": {
+        "opportunity_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "clock_domain_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "decision_at_monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "action": {
+          "enum": [
+            "intervene",
+            "adapt_output",
+            "continue_output",
+            "stay_silent",
+            "stop_output"
+          ]
+        },
+        "response_quality": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}
