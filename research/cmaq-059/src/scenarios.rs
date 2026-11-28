@@ -31,10 +31,11 @@ pub enum ScenarioKind {
     LateAbruptShift,
     TemporaryShift,
     PeriodicConditionalShift,
+    ConditionalScaleShift,
 }
 
 impl ScenarioKind {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::EqualConditionalIid,
         Self::EqualConditionalHeteroskedastic,
         Self::EqualConditionalSerial,
@@ -45,6 +46,7 @@ impl ScenarioKind {
         Self::LateAbruptShift,
         Self::TemporaryShift,
         Self::PeriodicConditionalShift,
+        Self::ConditionalScaleShift,
     ];
 
     pub fn id(self) -> &'static str {
@@ -59,6 +61,7 @@ impl ScenarioKind {
             Self::LateAbruptShift => "late-abrupt-shift",
             Self::TemporaryShift => "temporary-shift",
             Self::PeriodicConditionalShift => "periodic-conditional-shift",
+            Self::ConditionalScaleShift => "conditional-scale-shift",
         }
     }
 
@@ -116,6 +119,7 @@ impl ScenarioConfig {
             ScenarioKind::LateAbruptShift
                 | ScenarioKind::TemporaryShift
                 | ScenarioKind::PeriodicConditionalShift
+                | ScenarioKind::ConditionalScaleShift
         ) && self.change_point >= self.horizon
         {
             return Err(CalibrationError::InvalidScenarioConfig);
@@ -207,7 +211,12 @@ pub fn generate_stream(
         } else {
             0.0
         };
-        let common_mean = 0.25 * context + serial_mean;
+        let common_context_mean = if config.kind == ScenarioKind::EqualMarginalConditionalPairingShift {
+            0.0
+        } else {
+            0.25 * context
+        };
+        let common_mean = common_context_mean + serial_mean;
 
         let common_scale = if config.kind == ScenarioKind::EqualConditionalHeteroskedastic {
             0.5 + 0.3 * context.abs().min(2.0)
@@ -251,17 +260,17 @@ pub fn generate_stream(
                         * (std::f64::consts::TAU * sequence as f64 / config.period as f64).sin();
                 }
             }
+            ScenarioKind::ConditionalScaleShift => {
+                if sequence > config.change_point {
+                    y_scale *= config.amplitude.exp();
+                }
+            }
             ScenarioKind::EqualConditionalIid
             | ScenarioKind::EqualConditionalHeteroskedastic
             | ScenarioKind::EqualConditionalSerial
             | ScenarioKind::EqualConditionalCovariateDrift => {}
         }
 
-        // Reserve a variance-change alternative by using the same scenario
-        // schema with amplitude applied symmetrically in the next version.
-        // Keep this release's alternatives focused on conditional location
-        // structure; a variance-shift generator will have its own ID and
-        // preregistration rather than silently overloading one scenario.
         let x_value = x_mean + x_scale * epsilon_x;
         let y_value = y_mean + y_scale * epsilon_y;
         if !x_value.is_finite() || !y_value.is_finite() {
@@ -294,7 +303,8 @@ pub fn generate_stream(
         observations.push(observation);
     }
 
-    let stream_sha256 = hex_digest(stream_hasher.finalize().as_slice());
+    let stream_digest = stream_hasher.finalize();
+    let stream_sha256 = hex_digest(&stream_digest);
     Ok(GeneratedStream {
         experiment_id: experiment_id.to_string(),
         scenario_id: scenario_id.to_string(),
