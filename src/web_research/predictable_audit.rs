@@ -647,6 +647,109 @@ mod tests {
     }
 
     #[test]
+    fn linear_prelabel_priority_maps_to_exact_monotone_q_values() {
+        let policy = PredictableAuditQPolicy::LinearPrelabelPriority {
+            minimum: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+            maximum: DyadicInclusionProbability {
+                numerator: DYADIC_DENOMINATOR,
+            },
+        };
+        let scores = [
+            0_u64,
+            1_u64 << 51,
+            1_u64 << 52,
+            3_u64 << 51,
+            1_u64 << 53,
+        ];
+        let q_values = scores
+            .iter()
+            .map(|score| policy.inclusion_probability(*score).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            q_values.iter().map(|q| q.as_f64()).collect::<Vec<_>>(),
+            vec![0.25, 0.4375, 0.625, 0.8125, 1.0]
+        );
+        assert!(q_values.windows(2).all(|pair| {
+            pair[0].numerator <= pair[1].numerator
+        }));
+    }
+
+    #[test]
+    fn linear_prelabel_priority_policy_is_checked_for_each_event() {
+        let q_policy = PredictableAuditQPolicy::LinearPrelabelPriority {
+            minimum: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+            maximum: DyadicInclusionProbability {
+                numerator: DYADIC_DENOMINATOR,
+            },
+        };
+        let adaptive_design = PredictableAuditDesign {
+            minimum_inclusion_probability: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+            q_policy,
+            ..design()
+        };
+        let mut first = event(0, 1_u128 << 62, 0);
+        first.prelabel_priority_score_numerator = 0;
+        let mut second = event(1, 5_u128 << 61, 0);
+        second.prelabel_priority_score_numerator = 1_u64 << 52;
+        let mut third = event(2, DYADIC_DENOMINATOR, u64::MAX);
+        third.prelabel_priority_score_numerator = 1_u64 << 53;
+        let receipt = build_predictable_audit_receipt(
+            &[first.clone(), second.clone(), third],
+            &adaptive_design,
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.selections.iter()
+                .map(PredictableAuditSelection::inclusion_probability)
+                .collect::<Vec<_>>(),
+            vec![0.25, 0.625, 1.0]
+        );
+
+        second.inclusion_probability = DyadicInclusionProbability {
+            numerator: 3_u128 << 62,
+        };
+        assert_eq!(
+            build_predictable_audit_receipt(&[first, second], &adaptive_design).unwrap_err(),
+            PredictableAuditError::QPolicyMismatch { sequence_number: 1 }
+        );
+    }
+
+    #[test]
+    fn linear_prelabel_priority_rejects_invalid_score_and_range() {
+        let bad_score_policy = PredictableAuditQPolicy::LinearPrelabelPriority {
+            minimum: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+            maximum: DyadicInclusionProbability {
+                numerator: DYADIC_DENOMINATOR,
+            },
+        };
+        assert_eq!(
+            bad_score_policy.inclusion_probability((1_u64 << 53) + 1).unwrap_err(),
+            PredictableAuditError::InvalidPriorityScore((1_u64 << 53) + 1)
+        );
+
+        let bad_range = PredictableAuditQPolicy::LinearPrelabelPriority {
+            minimum: DyadicInclusionProbability {
+                numerator: 1_u128 << 63,
+            },
+            maximum: DyadicInclusionProbability {
+                numerator: 1_u128 << 62,
+            },
+        };
+        assert_eq!(
+            bad_range.inclusion_probability(0).unwrap_err(),
+            PredictableAuditError::InvalidQPolicyRange
+        );
+    }
+
+    #[test]
     fn output_receipt_does_not_expose_raw_random_words() {
         let receipt = build_predictable_audit_receipt(
             &[event(0, 1_u128 << 63, 123456789)],
