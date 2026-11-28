@@ -33,6 +33,8 @@ pub enum SpatialFourierError {
     InvalidDimension,
     /// The RBF length scale must be finite and strictly positive.
     InvalidLengthScale,
+    /// The coordinate-frame digest is the reserved all-zero value.
+    InvalidCoordinateFrameDigest,
     /// A coordinate or translation component was NaN or infinite.
     NonFiniteCoordinate,
     /// A finite input overflowed while forming a phase.
@@ -49,6 +51,9 @@ impl fmt::Display for SpatialFourierError {
             Self::InvalidDimension => write!(f, "dimension must be even and at least 8"),
             Self::InvalidLengthScale => {
                 write!(f, "length scale must be finite and strictly positive")
+            }
+            Self::InvalidCoordinateFrameDigest => {
+                write!(f, "coordinate-frame digest must not be the all-zero sentinel")
             }
             Self::NonFiniteCoordinate => {
                 write!(f, "coordinates and translations must be finite")
@@ -131,7 +136,8 @@ impl SpatialFourierEncoder {
     ///
     /// coordinate_frame_digest is supplied by the caller and should uniquely
     /// bind the coordinate axes, handedness, origin, units and qualified
-    /// transform lineage. Codes with different digests are incompatible.
+    /// transform lineage. The all-zero sentinel is rejected. Codes with
+    /// different digests are incompatible; the digest itself is not verified.
     pub fn new(
         dimension: usize,
         length_scale: f64,
@@ -143,6 +149,9 @@ impl SpatialFourierEncoder {
         }
         if !length_scale.is_finite() || length_scale <= 0.0 {
             return Err(SpatialFourierError::InvalidLengthScale);
+        }
+        if coordinate_frame_digest.iter().all(|&byte| byte == 0) {
+            return Err(SpatialFourierError::InvalidCoordinateFrameDigest);
         }
 
         let identity = EncoderIdentity {
@@ -504,12 +513,20 @@ mod tests {
             SpatialFourierError::InvalidDimension
         );
         assert_eq!(
+            SpatialFourierEncoder::new(6, 1.0, 0, [0xA5; 32]).unwrap_err(),
+            SpatialFourierError::InvalidDimension
+        );
+        assert_eq!(
             SpatialFourierEncoder::new(128, 0.0, 0, [0xA5; 32]).unwrap_err(),
             SpatialFourierError::InvalidLengthScale
         );
         assert_eq!(
             SpatialFourierEncoder::new(128, f64::NAN, 0, [0xA5; 32]).unwrap_err(),
             SpatialFourierError::InvalidLengthScale
+        );
+        assert_eq!(
+            SpatialFourierEncoder::new(128, 1.0, 0, [0; 32]).unwrap_err(),
+            SpatialFourierError::InvalidCoordinateFrameDigest
         );
         assert_eq!(
             SpatialFourierEncoder::new(128, 1.0e-309, 7, [0xA5; 32]).unwrap_err(),
