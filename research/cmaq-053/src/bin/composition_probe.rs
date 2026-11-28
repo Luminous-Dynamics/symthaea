@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     representation_inventory_sha256: digest(plan_index + 400),
                     calibration_method_sha256: digest(plan_index + 500),
                 };
-                plan_index = plan_index.checked_add(1).ok_or("plan index overflow")?;
+                plan_index = plan_index.checked_add(1).expect("plan index overflow");
 
                 let plan = ComposedRiskPlan::new(
                     &fleet,
@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .iter()
                     .map(|member| member.weight)
                     .reduce(|left, right| left.checked_add(right).expect("validated weights"))
-                    .ok_or("empty representation portfolio")?;
+                    .expect("nonempty representation portfolio");
                 println!(
                     "{},{},{},{}/{},{}/{},{}/{},{} / {}",
                     receipt.scope.asset_index,
