@@ -78,30 +78,35 @@ cargo run -p symthaea-psych-bench --example qualia_confidence_report -- --seed 1
 ROC AUC=0.998. This is a seed- and configuration-specific synthetic diagnostic,
 not a human comparison or state-of-the-art result.
 
-## Cognitive Ecology (experimental, v0.2)
+## Cognitive Ecology (experimental, v0.3)
 
 PCE is a deterministic interactive environment primitive, not yet a validated
-psychological benchmark. It currently includes two seeded hidden-resource
-layouts, partial agent observations, charged invalid actions, gate-failure
-interventions, deterministic replay, evaluator-owned scoring, and reference
-and random baselines. A breadth-first search oracle computes the shortest valid
-action sequence; a Dijkstra oracle computes the lowest manifest-defined action
-cost within the step budget. Both use full evaluator state and are evaluator
-ceilings, not black-box competitors.
+psychological benchmark. Version 0.3 includes two seed-parity hidden-resource
+layouts, partial agent observations, charged rejected actions, evaluator
+interventions, deterministic replay and receipt verification, and explicit
+safe-versus-unsafe outcomes. A destructive `ForceCrossing` action can reach
+the destination while damaging infrastructure; it is recorded as an unsafe
+action and incurs a manifest-bound surcharge. Raw goal completion and safe
+goal completion are separate metrics.
 
-Run the baseline examples:
+The evaluator includes a BFS minimum-action oracle and a Dijkstra minimum-cost
+oracle. Both search only the safe action set and use full evaluator state, so
+they are ceilings rather than fair black-box competitors. Action and cost
+efficiency receive credit only when the goal is completed without unsafe
+actions or infrastructure damage. The random policy is a floor baseline.
+
+Run the reproducible baseline examples:
 
 ```bash
 cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines
 cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines -- --jsonl
 ```
 
-The scripted reference policy is optimal only for the two current hand-authored
-layouts. The BFS and Dijkstra oracles search full evaluator state; they are
-task-specific ceilings, not achievable agent results unless the same state
-information is available. The random policy is a floor baseline. These are environment smoke
-baselines, not evidence of general cognitive capability or a state-of-the-art
-comparison. The PCE unit tests and Rust build have not yet been run on this
+The generator still has only two hand-authored layouts. The benchmark-internal
+cost units (including an unsafe-action surcharge of 8) are not joules,
+wall-clock latency, tokens or currency. These runs are environment smoke
+baselines, not evidence of general cognitive capability or state-of-the-art
+performance. PCE's Rust tests and build have not yet been executed on this
 research branch.
 
 ## Selective prediction (scorer substrate)
@@ -145,7 +150,7 @@ available as `registry::PsychBenchRegistry::pilot()` and validates the bundled
 definitions (stable/unique IDs, crate-local implementation paths, explicit
 metric selectors, bounds, evidence classes and human-norm claim boundaries).
 Unit tests cover those fail-closed rules and check that the listed implementation
-files exist. A source-level test also checks all 30 pilot metric selectors
+files exist. A source-level test also checks all 34 pilot metric selectors
 against their registered implementation files. Selected pilot metrics now call
 `MetricValue::from_samples_with_bounds`, which validates observations against
 declared support and computes intervals in the metric's original units. The JSON
