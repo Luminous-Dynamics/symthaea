@@ -1,0 +1,77 @@
+name: CMAQ-038 multi-resolution rank-spectrum monitor
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-031/**"
+      - "research/cmaq-037/**"
+      - "research/cmaq-038/**"
+      - "research/cmaq-045/**"
+      - ".github/workflows/cmaq-038.yml"
+  push:
+    branches:
+      - "research/cmaq-038-*"
+    paths:
+      - "research/cmaq-031/**"
+      - "research/cmaq-038/**"
+      - ".github/workflows/cmaq-038.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-038-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rank-spectrum:
+    name: rank-spectrum-monitor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-038/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-038/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-038/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Run paired smoke benchmark
+        run: |
+          mkdir -p cmaq-038-results
+          cargo +1.100.0 run --release --manifest-path research/cmaq-038/Cargo.toml --locked --bin paired_probe -- 64 200 20261127 > cmaq-038-results/results.csv 2> cmaq-038-results/run-metadata.txt
+      - name: Preserve smoke output
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-038-rank-spectrum-smoke
+          path: cmaq-038-results/
+          if-no-files-found: error
+          retention-days: 30
+
+  conditional-rank-dependence:
+    name: CMAQ-045 conditional rank dependence
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-045-conditional-rank-contexts-v0-1-20261127'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-045/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-045/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-045/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Paired temporal-dependence smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-045/Cargo.toml --locked --bin dependence_probe -- 32 500 20261127 250 > cmaq-045-dependence-smoke.csv
+      - name: Preserve paired probe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-045-dependence-smoke
+          path: cmaq-045-dependence-smoke.csv
+          if-no-files-found: error

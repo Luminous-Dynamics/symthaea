@@ -1,0 +1,12 @@
+[package]
+name = "cmaq-038-rank-spectrum-monitor"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Multi-resolution anytime-valid predictive-rank spectrum monitoring"
+
+[dependencies]
+cmaq-031-anytime-calibration-monitor = { path = "../cmaq-031" }
+
+[workspace]
