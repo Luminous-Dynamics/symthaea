@@ -149,8 +149,11 @@ pub struct TransitionAlignment {
     pub target_anchor_frame: u64,
     pub source_grid_hypothesis_id: String,
     pub target_grid_hypothesis_id: String,
-    /// Shared musical beat ordinal in milli-beats; integer-only for portability.
+    /// Transition-local beat ordinal in milli-beats; not a track-local beat index.
     pub beat_ordinal_milli: i64,
+    /// Maximum allowed circular phase difference between the selected source/target
+    /// pulse hypotheses, in milli-beats (0..=500, half a beat).
+    pub max_phase_error_milli: u16,
     /// Producer-supplied score in parts per million, 0..=1,000,000.
     /// It is not a calibrated probability unless a separate calibration record says so.
     pub confidence_ppm: u32,
@@ -256,6 +259,7 @@ pub enum TransitionViolationCode {
     TargetAlignmentAnchorOutOfWindow,
     EmptySourceGridHypothesisId,
     EmptyTargetGridHypothesisId,
+    AlignmentPhaseToleranceOutOfRange,
     AlignmentConfidenceOutOfRange,
     EmptyProtectedRegionReason,
     EmptyProtectedRegionWindow,
@@ -329,6 +333,13 @@ pub fn validate_transition_contract(
                 &mut violations,
                 TransitionViolationCode::EmptyTargetGridHypothesisId,
                 "alignment.target_grid_hypothesis_id",
+            );
+        }
+        if alignment.max_phase_error_milli > 500 {
+            push_violation(
+                &mut violations,
+                TransitionViolationCode::AlignmentPhaseToleranceOutOfRange,
+                "alignment.max_phase_error_milli",
             );
         }
         if alignment.confidence_ppm > 1_000_000 {
@@ -622,6 +633,7 @@ mod tests {
                 source_grid_hypothesis_id: "source-grid-primary".to_string(),
                 target_grid_hypothesis_id: "target-grid-primary".to_string(),
                 beat_ordinal_milli: 16_000,
+                max_phase_error_milli: 100,
                 confidence_ppm: 850_000,
             }),
             protected_regions: vec![ProtectedRegion {
@@ -757,6 +769,14 @@ mod tests {
         let found = codes(&contract);
         assert!(found.contains(&TransitionViolationCode::EmptySourceGridHypothesisId));
         assert!(found.contains(&TransitionViolationCode::EmptyTargetGridHypothesisId));
+    }
+
+    #[test]
+    fn rejects_alignment_phase_tolerance_above_half_a_beat() {
+        let mut contract = valid_contract();
+        contract.alignment.as_mut().unwrap().max_phase_error_milli = 501;
+        assert!(codes(&contract)
+            .contains(&TransitionViolationCode::AlignmentPhaseToleranceOutOfRange));
     }
 
     #[test]
