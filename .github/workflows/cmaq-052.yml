@@ -31,3 +31,11 @@ jobs:
         run: cargo +1.100.0 test --manifest-path research/cmaq-052/Cargo.toml --locked
       - name: Strict Clippy
         run: cargo +1.100.0 clippy --manifest-path research/cmaq-052/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Reference envelope smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-052/Cargo.toml --locked --bin reference_envelope_probe -- 32 500 20261128 250 > cmaq-052-reference-envelope-smoke.csv
+      - name: Preserve reference envelope artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-052-reference-envelope-smoke
+          path: cmaq-052-reference-envelope-smoke.csv
+          if-no-files-found: error
