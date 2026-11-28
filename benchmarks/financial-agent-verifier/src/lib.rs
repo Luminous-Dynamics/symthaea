@@ -1585,6 +1585,38 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_temporal_result_invalidates_claim_support_for_that_evidence_id() {
+        let mut audit: Value = serde_json::from_slice(AUDIT).unwrap();
+        let manifest: Value = serde_json::from_slice(MANIFEST).unwrap();
+        let artifacts = manifest["artifacts"].as_array().unwrap();
+        let mut claims = audit["claims"].as_array().unwrap().clone();
+        claims.retain(|claim| claim["claim_id"] == "C-001");
+        for claim in &mut claims {
+            for relation in claim["evidence_relations"].as_array_mut().unwrap() {
+                let artifact = artifacts
+                    .iter()
+                    .find(|artifact| artifact["evidence_id"] == relation["evidence_id"])
+                    .unwrap();
+                relation["source_snapshot_sha256"] = artifact["content_sha256"].clone();
+                relation["temporally_admissible"] = Value::Bool(true);
+            }
+        }
+        audit["claims"] = Value::Array(claims);
+        let audit_bytes = serde_json::to_vec(&audit).unwrap();
+
+        let mut temporal = temporal(TemporalDisposition::Pass);
+        temporal.evidence.push(temporal.evidence[0].clone());
+        let result = report(&audit_bytes, &temporal);
+
+        assert_eq!(result.temporal, Disposition::Fail);
+        assert_eq!(result.candidate_claims, Disposition::Fail);
+        assert!(result
+            .findings
+            .iter()
+            .any(|finding| finding.code == "DUPLICATE_TEMPORAL_EVIDENCE_RESULT"));
+    }
+
+    #[test]
     fn per_evidence_pass_is_demoted_when_principal_proof_context_is_missing() {
         let mut audit: Value = serde_json::from_slice(AUDIT).unwrap();
         let manifest: Value = serde_json::from_slice(MANIFEST).unwrap();
