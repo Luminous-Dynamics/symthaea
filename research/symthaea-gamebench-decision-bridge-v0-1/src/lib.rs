@@ -96,6 +96,8 @@ pub enum BridgeError {
     InvalidForecastProbability { outcome_id: String, value: f64 },
     ForecastProbabilityMass(f64),
     UnknownObservedOutcome(String),
+    ProbeNotAdmissible(ProbeAdmission),
+    ObservationAfterDeadline { observed_step: u64, deadline_step: u64 },
     Reference(EvaluationError),
 }
 
@@ -150,6 +152,13 @@ impl Display for BridgeError {
             Self::UnknownObservedOutcome(id) => {
                 write!(formatter, "observed outcome is not declared: {id}")
             }
+            Self::ProbeNotAdmissible(admission) => {
+                write!(formatter, "probe was not admissible for execution: {admission:?}")
+            }
+            Self::ObservationAfterDeadline { observed_step, deadline_step } => write!(
+                formatter,
+                "probe observation at step {observed_step} missed deadline {deadline_step}"
+            ),
             Self::Reference(error) => write!(formatter, "shared reference evaluator: {error}"),
         }
     }
@@ -284,6 +293,90 @@ pub fn score_outcome_forecast(
     Ok(score)
 }
 
+/// Result of applying a read-only observation to the public episode packet.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AppliedProbeObservation {
+    pub episode: CandidateEpisode,
+    pub forecast_brier_score: f64,
+}
+
+/// Apply one externally verified probe result to the candidate-visible episode.
+/// This checks timing, budget, episode/probe identity, and the pre-registered
+/// forecast, then appends only the observed public label as evidence. The
+/// shared evaluator remains responsible for posterior and decision-risk
+/// calculations.
+pub fn apply_probe_observation(
+    episode: &CandidateEpisode,
+    world: &EvaluatorWorld,
+    contract: &ProbeOutcomeContract,
+    forecast: &OutcomeForecast,
+    receipt: &ProbeObservationReceipt,
+) -> Result<AppliedProbeObservation, BridgeError> {
+    validate_probe_contract(episode, world, contract)?;
+    let forecast_brier_score = score_outcome_forecast(contract, forecast, receipt)?;
+
+    let option = episode
+        .permitted_probes
+        .iter()
+        .find(|option| option.probe_id == contract.probe_id)
+        .ok_or_else(|| BridgeError::ProbeNotPermitted(contract.probe_id.clone()))?;
+    let earliest_step = episode
+        .current_step
+        .checked_add(contract.result_delay_steps)
+        .ok_or(BridgeError::ObservationBeforeResultReady {
+            observed_step: receipt.observed_at_step,
+            earliest_step: u64::MAX,
+        })?;
+    if receipt.observed_at_step <= episode.current_step
+        || receipt.observed_at_step < earliest_step
+    {
+        return Err(BridgeError::ObservationBeforeResultReady {
+            observed_step: receipt.observed_at_step,
+            earliest_step: earliest_step.max(episode.current_step.saturating_add(1)),
+        });
+    }
+    if receipt.observed_at_step > episode.decision_deadline_step {
+        return Err(BridgeError::ObservationAfterDeadline {
+            observed_step: receipt.observed_at_step,
+            deadline_step: episode.decision_deadline_step,
+        });
+    }
+    if option.acquisition_cost > episode.remaining_probe_budget + PROBABILITY_TOLERANCE {
+        return Err(BridgeError::ProbeNotAdmissible(ProbeAdmission::OverBudget));
+    }
+
+    let probe = world
+        .probes
+        .iter()
+        .find(|probe| probe.probe_id == contract.probe_id)
+        .ok_or_else(|| BridgeError::UnknownProbe(contract.probe_id.clone()))?;
+    let evidence_channel = world
+        .evidence_channels
+        .iter()
+        .find(|channel| channel.channel_id == contract.probe_id)
+        .ok_or_else(|| BridgeError::ProbeContractMismatch(contract.probe_id.clone()))?;
+    if evidence_channel.outcomes != probe.outcomes {
+        return Err(BridgeError::ProbeContractMismatch(contract.probe_id.clone()));
+    }
+
+    let mut updated = episode.clone();
+    updated.current_step = receipt.observed_at_step;
+    updated.remaining_probe_budget =
+        (updated.remaining_probe_budget - option.acquisition_cost).max(0.0);
+    updated
+        .permitted_probes
+        .retain(|permitted| permitted.probe_id != contract.probe_id);
+    updated.evidence.push(decision_relevant_predictability::ObservedSignal {
+        channel_id: contract.probe_id.clone(),
+        outcome_id: receipt.observed_outcome_id.clone(),
+    });
+
+    Ok(AppliedProbeObservation {
+        episode: updated,
+        forecast_brier_score,
+    })
+}
+
 fn validate_probe_contract(
     episode: &CandidateEpisode,
     world: &EvaluatorWorld,
@@ -306,15 +399,17 @@ fn validate_probe_contract(
         .iter()
         .find(|option| option.probe_id == contract.probe_id)
         .ok_or_else(|| BridgeError::ProbeNotPermitted(contract.probe_id.clone()))?;
-    if public_option.result_delay_steps != contract.result_delay_steps {
-        return Err(BridgeError::ProbeContractMismatch(contract.probe_id.clone()));
-    }
-
     let evaluator_probe = world
         .probes
         .iter()
         .find(|probe| probe.probe_id == contract.probe_id)
         .ok_or_else(|| BridgeError::UnknownProbe(contract.probe_id.clone()))?;
+    if public_option.result_delay_steps != contract.result_delay_steps
+        || (public_option.acquisition_cost - evaluator_probe.acquisition_cost).abs()
+            > PROBABILITY_TOLERANCE
+    {
+        return Err(BridgeError::ProbeContractMismatch(contract.probe_id.clone()));
+    }
 
     let public_ids: BTreeSet<&str> =
         contract.outcome_ids.iter().map(String::as_str).collect();
@@ -491,18 +586,20 @@ mod tests {
             ],
         };
 
-        let world = EvaluatorWorld {
+        let mut world = EvaluatorWorld {
             states,
-            evidence_channels: vec![EvidenceChannelModel {
-                channel_id: "unused_development_channel".into(),
-                outcomes: vec![likelihood("noop", &[
-                    ("A_N0", 1.0), ("A_N1", 1.0),
-                    ("B_N0", 1.0), ("B_N1", 1.0),
-                ])],
-            }],
+            evidence_channels: Vec::new(),
             probes: vec![nuisance, switch],
             evidence_channels_conditionally_independent: true,
         };
+        world.evidence_channels = world
+            .probes
+            .iter()
+            .map(|probe| EvidenceChannelModel {
+                channel_id: probe.probe_id.clone(),
+                outcomes: probe.outcomes.clone(),
+            })
+            .collect();
 
         let nuisance_contract = ProbeOutcomeContract {
             episode_id: "gamebench-f6-development-fixture".into(),
@@ -686,6 +783,63 @@ mod tests {
             &replayed,
         );
         assert!(matches!(result, Err(BridgeError::EpisodeMismatch { .. })));
+    }
+
+    #[test]
+    fn observed_switch_trace_updates_terminal_decision_through_shared_evaluator() {
+        let (episode, world, _nuisance, switch) = fixture();
+        let forecast = forecast("inspect_switch_trace", "trace_A", "trace_B", 0.5);
+        let receipt = receipt("inspect_switch_trace", "trace_A", 1);
+        let applied = apply_probe_observation(
+            &episode, &world, &switch, &forecast, &receipt
+        ).expect("apply read-only observation");
+
+        let result = evaluate_candidate(
+            &applied.episode,
+            &world,
+            &CandidateSubmission {
+                decision_id: "choose_A".into(),
+                requested_probe_id: None,
+            },
+        ).expect("evaluate post-probe decision");
+
+        assert!((result.posterior_by_state["A_N0"] - 0.375).abs() < 1.0e-9);
+        assert!((result.posterior_by_state["A_N1"] - 0.375).abs() < 1.0e-9);
+        assert!((result.posterior_by_state["B_N0"] - 0.125).abs() < 1.0e-9);
+        assert!((result.posterior_by_state["B_N1"] - 0.125).abs() < 1.0e-9);
+        assert!((result.candidate_expected_loss - 0.25).abs() < 1.0e-9);
+        assert!(result.decision_regret.abs() < 1.0e-9);
+        assert_eq!(applied.episode.current_step, 1);
+        assert!((applied.episode.remaining_probe_budget - 0.46).abs() < 1.0e-9);
+        assert!(!applied.episode.permitted_probes.iter()
+            .any(|probe| probe.probe_id == "inspect_switch_trace"));
+        assert!((applied.forecast_brier_score - 0.5).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn nuisance_probe_updates_belief_but_not_terminal_decision() {
+        let (episode, world, nuisance, _switch) = fixture();
+        let applied = apply_probe_observation(
+            &episode,
+            &world,
+            &nuisance,
+            &forecast("inspect_lamp", "lamp_dark", "lamp_lit", 0.5),
+            &receipt("inspect_lamp", "lamp_dark", 1),
+        ).expect("apply nuisance observation");
+
+        let result = evaluate_candidate(
+            &applied.episode,
+            &world,
+            &CandidateSubmission {
+                decision_id: "abstain".into(),
+                requested_probe_id: None,
+            },
+        ).expect("evaluate after nuisance observation");
+
+        assert!((result.posterior_by_state["A_N0"] - 0.5).abs() < 1.0e-9);
+        assert!((result.posterior_by_state["B_N0"] - 0.5).abs() < 1.0e-9);
+        assert!((result.candidate_expected_loss - 0.4).abs() < 1.0e-9);
+        assert!(result.decision_regret.abs() < 1.0e-9);
     }
 
     #[test]
