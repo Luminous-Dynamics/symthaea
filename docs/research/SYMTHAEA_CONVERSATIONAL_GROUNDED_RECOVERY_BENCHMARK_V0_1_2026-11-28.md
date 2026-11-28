@@ -30,6 +30,27 @@ The core design principle is **reconcile before retry**. A timeout after a dispa
 
 CGRB is a complementary integration benchmark, not a substitute or a claim of superiority over these public suites.
 
+## 2.1 Expanded reference suite and persistent-memory boundary
+
+CGRB should compose with, not replace, current full-duplex and agent benchmarks:
+
+- **Full-Duplex-Bench v3** (arXiv:2604.04847; benchmark profile verified November 2026) supplies a live tool-use reference: 100 human-recorded requests, 79 scenarios, 12 speakers, four domains, and one-to-three chained mock-API calls with disfluencies. Its paper reports GPT-Realtime Pass@1 0.60; the benchmark catalogue reports Gemini Live 3.1 at 4.25 s task latency. Preserve source and run provenance because the catalogue itself warns that independently sourced result tables are not comparable.
+- **DuplexAct** (arXiv:2610.17738) evaluates immediate action execution and follow-through; CGRB adds the independently observed external state after these conversational actions.
+- **TACT** (arXiv:2609.27372) evaluates intent-conditioned response timing with a proper probabilistic score; use as a separate timing lane rather than a replacement for task outcome.
+- **StreamEval** measures incremental request-following and generated-content consistency; it is an adjacent content-state reference, not a remote side-effect oracle.
+- **τ-Voice v2 / τ-bench 2.0** provides a versioned grounded voice-task comparison. The October 20, 2026 leaderboard snapshot reports 79.9% customer-service call success for GPT-Live 1 with GPT-6 Astra backend and 68.5% for Gemini 3.8 Live Extended Thinking (high). These are version- and setup-specific results; do not mix them with the earlier ICML 2026 paper results.
+- **EVA-Bench 2.0** supplies a separate instruction-faithfulness slice across 213 enterprise scenarios; its October 15, 2026 snapshot reports 66.2% for Grok Voice 3.0, 49.4% for gpt-realtime-2.1 and 42.1% for Gemini 3.8 Live Extended Thinking (high).
+
+### Persistent conversational memory is a separate state plane
+
+[DuplexLedger](https://arxiv.org/abs/2610.27581) evaluates 1,094 persistent sessions, 6,564 same-session questions/checks and event-level Write/Update/Ignore/Retain decisions. The paper reports that none of five evaluated full-duplex models combines strong boundary control with coherent final-state memory; its best reported final-state fact coverage is 2.01%, while its ACT-Mem sidecar improves latest-value accuracy from 4.11% to 8.68% on 219 held-out sessions and reduces stale assertions/distractor adoption.
+
+Do not copy this memory problem into CGRB's external world-state service. The two are separate:
+- external task state: did the authorized side effect occur?
+- conversational knowledge state: what should be written, updated, ignored or retained, and what was known at valid time V and transaction/knowledge time T?
+
+For the second plane, compose with Symthaea's existing [bitemporal source-event ledger #9075](https://github.com/Luminous-Dynamics/symthaea/issues/9075) and its explicit query(valid_at=V, known_at=T) semantics. Report latest-value accuracy, final-state fact coverage, stale assertion rate, distractor adoption and historical/as-known leakage separately. A later correction must not rewrite what the agent was justified in claiming before it learned the correction.
+
 ## 3. Pilot design
 
 ### 3.1 Initial bounded pilot
