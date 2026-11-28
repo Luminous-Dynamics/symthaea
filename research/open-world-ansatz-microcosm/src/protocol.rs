@@ -1794,7 +1794,7 @@ mod tests {
         )
         .unwrap();
 
-        for intervention in [1, -1, 1] {
+        for intervention in [-1, 0, 1] {
             episode
                 .apply(AgentAction::Probe {
                     intervention: AgentIntervention::Numeric(intervention),
@@ -1980,8 +1980,8 @@ mod tests {
         }
 
         let log = numeric::ObservationLog {
-            interventions: vec![1, -1, 1],
-            measurements: vec![4, -4, 4],
+            interventions: vec![-1, 0, 1],
+            measurements: vec![-4, 0, 4],
         };
         let compatible_models = numeric::discover(&log, numeric::StructureAccess::Withheld)
             .unwrap()
