@@ -8,9 +8,14 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """
-MeditationSentinel Validation on OpenNeuro ds001787
+Exploratory band-power summary for OpenNeuro ds001787
 
-Validates meditation state detection using:
+This legacy script is NOT a meditation-state validation. It computes feature
+contrasts using an assumed early/late time split; the dataset description says
+participants were meditating and were interrupted periodically for self-ratings.
+The script does not use those self-ratings as prediction labels.
+
+Features summarized (not validated as state markers):
 - Alpha power (8-13 Hz) for relaxed focus
 - Theta power (4-8 Hz) for deep meditation
 - Alpha/Beta ratio as meditation index
@@ -217,12 +222,14 @@ def validate_subject(bdf_path, events_path):
     if len(stimulus_events) < 2:
         return None, "Not enough stimulus events"
 
-    # Extract features for meditation periods (after stimulus) vs baseline (before first stimulus)
+    # LEGACY ASSUMPTION, NOT A LABELLED CONDITION SPLIT: the windows below are
+    # selected by elapsed time and must not be interpreted as verified baseline
+    # versus meditation states without confirming the source protocol.
     epoch_duration = 30  # seconds
     samples_per_epoch = int(epoch_duration * srate)
 
-    # Approach: Compare first 2 minutes (baseline/warmup) vs rest of session (meditation)
-    # This is a common paradigm where meditation deepens over time
+    # Compare an early and late recording segment only as an exploratory
+    # within-recording feature contrast; do not infer a meditation-state change.
 
     baseline_end_time = min(120, len(data) / srate / 4)  # First 2 min or 25% of recording
     baseline_samples = int(baseline_end_time * srate)
@@ -233,7 +240,7 @@ def validate_subject(bdf_path, events_path):
         if len(epoch_data) >= samples_per_epoch:
             baseline_features.append(extract_meditation_features(epoch_data, srate))
 
-    # Meditation: from 3 minutes onwards (after settling in)
+    # Later segment: the 180-second cutoff is a legacy heuristic, not an event label.
     meditation_start = int(180 * srate)  # Start at 3 minutes
     meditation_features = []
     for start in range(meditation_start, len(data) - samples_per_epoch, samples_per_epoch):
@@ -356,7 +363,7 @@ def main():
     mean_theta_change = np.mean([r['theta_change'] for r in results])
     mean_index_change = np.mean([r['index_change'] for r in results])
 
-    print("MEDITATION vs BASELINE CHANGES:")
+    print("EARLY vs LATE FEATURE CONTRASTS (NOT BASELINE vs MEDITATION):")
     print(f"  Alpha power:      {mean_alpha_change:+.1f}%")
     print(f"  Theta power:      {mean_theta_change:+.1f}%")
     print(f"  Meditation Index: {mean_index_change:+.1f}%")
@@ -384,22 +391,22 @@ def main():
     pos_theta = sum(1 for r in results if r['theta_change'] > 0)
     pos_index = sum(1 for r in results if r['index_change'] > 0)
 
-    print("VALIDATION RESULTS:")
+    print("EXPLORATORY FEATURE SUMMARY:")
     print(f"  Subjects with increased alpha during meditation: {pos_alpha}/{len(results)}")
     print(f"  Subjects with increased theta during meditation: {pos_theta}/{len(results)}")
     print(f"  Subjects with increased meditation index:        {pos_index}/{len(results)}")
     print()
 
     if pos_alpha >= len(results) * 0.5 or pos_index >= len(results) * 0.5:
-        print("  MeditationSentinel shows expected meditation effects!")
+        print("  The chosen feature thresholds/contrasts were observed; this is not predictive validation.")
         print()
-        print("  COMPARISON TO LITERATURE:")
+        print("  Do not interpret these summaries as evidence of meditation depth or detector accuracy.")
         print("  - Alpha increase during meditation: 5-20% typical")
         print("  - Theta increase during deep meditation: 10-30% typical")
         print("  - Frontal alpha enhancement: Well-documented marker")
     else:
-        print("  Results do not show expected meditation effects.")
-        print("  Consider: different electrode selection, longer epochs, or artifact rejection.")
+        print("  The chosen feature thresholds were not met; the analysis remains exploratory.")
+        print("  Review event/self-rating alignment, channel mapping, artifacts and the study protocol before any supervised evaluation.")
 
 
 if __name__ == '__main__':
