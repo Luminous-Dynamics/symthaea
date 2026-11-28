@@ -8,6 +8,7 @@ on:
       - "docs/research/eqc-*.json"
       - "docs/research/eqc-fixtures/**"
       - "docs/research/EVIDENCE_QUALIFIED_CAPABILITY_BENCHMARK_V0_1.md"
+      - "docs/research/README.md"
       - ".github/workflows/eqc-standalone.yml"
   pull_request:
     branches: [main]
