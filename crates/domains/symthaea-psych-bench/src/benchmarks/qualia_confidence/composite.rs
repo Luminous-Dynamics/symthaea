@@ -66,10 +66,10 @@ pub enum ConfidenceLevel {
 impl std::fmt::Display for ConfidenceLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfidenceLevel::Strong => write!(f, "STRONG"),
-            ConfidenceLevel::Moderate => write!(f, "MODERATE"),
-            ConfidenceLevel::Weak => write!(f, "WEAK"),
-            ConfidenceLevel::Insufficient => write!(f, "INSUFFICIENT"),
+            ConfidenceLevel::Strong => write!(f, "HIGH_PROBE_INDEX"),
+            ConfidenceLevel::Moderate => write!(f, "MID_HIGH_PROBE_INDEX"),
+            ConfidenceLevel::Weak => write!(f, "MID_LOW_PROBE_INDEX"),
+            ConfidenceLevel::Insufficient => write!(f, "LOW_PROBE_INDEX"),
         }
     }
 }
