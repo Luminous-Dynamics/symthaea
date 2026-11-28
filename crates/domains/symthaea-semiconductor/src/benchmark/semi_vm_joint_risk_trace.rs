@@ -14,11 +14,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 use super::ca_ocrc_bounded::{
-    CaOcrcFeedbackDispositionV1, CaOcrcRoundReportV1,
+    CA_OCRC_ROUND_INPUT_SCHEMA_V1, CaOcrcFeedbackDispositionV1, CaOcrcLabelFeedbackV1,
+    CaOcrcRoundInputV1, CaOcrcRoundReportV1,
 };
 use super::delayed_aci::{
     AciDegenerateResolutionReceiptV1, AciGuaranteeStateV1, AciIntervalKindV1,
-    AciUpdateDispositionV1, DelayedAciPredictionReceiptV1, DelayedAciUpdateReceiptV1,
+    AciMissingFeedbackRecordV1, AciUpdateDispositionV1, DelayedAciLabelDeliveryV1,
+    DelayedAciPredictionReceiptV1, DelayedAciUpdateReceiptV1,
 };
 use super::selection_risk_bounds::{
     PopulationOutcomeStateV1, SelectionRiskInputV1, SelectionRiskReportV1,
@@ -71,13 +73,16 @@ pub struct JointPopulationRowV1 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct JointTauAciArmEvidenceV1 {
     pub predictions: Vec<DelayedAciPredictionReceiptV1>,
+    pub deliveries: Vec<DelayedAciLabelDeliveryV1>,
     pub updates: Vec<DelayedAciUpdateReceiptV1>,
+    pub missing_feedback: Vec<AciMissingFeedbackRecordV1>,
     pub degenerate_resolutions: Vec<AciDegenerateResolutionReceiptV1>,
     pub guarantee_state: AciGuaranteeStateV1,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct JointCaOcrcArmEvidenceV1 {
+    pub round_inputs: Vec<CaOcrcRoundInputV1>,
     pub round_reports: Vec<CaOcrcRoundReportV1>,
 }
 
@@ -211,6 +216,11 @@ fn canonicalize_trace(input: &JointRiskTraceInputV1) -> JointRiskTraceInputV1 {
         match &mut arm.controller_evidence {
             JointControllerEvidenceV1::FixedDelayTauAci(evidence) => {
                 evidence.predictions.sort_by_key(|entry| entry.round);
+                evidence.deliveries.sort_by(|left, right| {
+                    (left.delivered_round, left.sample_id.as_str(), left.label_id.as_str(), left.label_revision)
+                        .cmp(&(right.delivered_round, right.sample_id.as_str(), right.label_id.as_str(), right.label_revision))
+                });
+                evidence.missing_feedback.sort_by_key(|entry| entry.issued_round);
                 evidence.updates.sort_by(|left, right| {
                     (left.sample_id.as_str(), left.label_id.as_str(), left.label_revision)
                         .cmp(&(right.sample_id.as_str(), right.label_id.as_str(), right.label_revision))
@@ -220,6 +230,7 @@ fn canonicalize_trace(input: &JointRiskTraceInputV1) -> JointRiskTraceInputV1 {
                     .sort_by_key(|entry| entry.issued_round);
             }
             JointControllerEvidenceV1::BoundedDelayCaOcrc(evidence) => {
+                evidence.round_inputs.sort_by_key(|entry| entry.prediction.round);
                 evidence.round_reports.sort_by_key(|entry| entry.round);
                 for report in &mut evidence.round_reports {
                     report.feedback_results.sort_by(|left, right| {
@@ -442,6 +453,103 @@ fn validate_selection_risk_input(
         .map_err(|error| JointRiskTraceErrorV1(error.to_string()))
 }
 
+fn eligibility_report_digest(
+    report: &super::label_consumption_guard::LabelConsumptionEligibilityReportV1,
+) -> Result<String, JointRiskTraceErrorV1> {
+    let mut canonical = report.clone();
+    canonical.report_sha256.clear();
+    json_sha256(&canonical)
+}
+
+fn validate_aci_delivery(
+    delivery: &DelayedAciLabelDeliveryV1,
+    prediction: &DelayedAciPredictionReceiptV1,
+    row: &JointPopulationRowV1,
+) -> Result<(), JointRiskTraceErrorV1> {
+    let report = &delivery.eligibility_report;
+    if delivery.sample_id != row.sample_id
+        || delivery.measurement_event_id != row.measurement_event_id
+        || delivery.label_id != row.label_id.as_deref().unwrap_or_default()
+        || Some(delivery.label_revision) != row.label_revision
+        || Some(delivery.label_payload_sha256.as_str()) != row.label_payload_sha256.as_deref()
+        || Some(report.report_sha256.as_str()) != row.k1_report_sha256.as_deref()
+        || delivery.label_value != row.label_value.unwrap_or(f64::NAN)
+        || report.label_id != delivery.label_id
+        || report.label_revision != delivery.label_revision
+        || report.measurement_event_id != delivery.measurement_event_id
+        || report.label_sha256 != delivery.label_payload_sha256
+        || report.qualified_corrected_value != delivery.label_value
+        || report.frontier != super::label_consumption_guard::LabelEvidenceFrontierV1::CurrentAtK1
+        || report.eligibility != super::label_consumption_guard::LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+        || !report.downstream_consumption_allowed
+        || eligibility_report_digest(report)? != report.report_sha256
+        || delivery.delivered_round != prediction.expected_delivery_round
+        || delivery.delivered_at_unix_seconds < delivery.label_available_at_unix_seconds
+        || delivery.delivered_at_unix_seconds < delivery.eligibility_report_available_at_unix_seconds
+        || delivery.eligibility_report_available_at_unix_seconds < delivery.label_available_at_unix_seconds
+        || delivery.label_available_at_unix_seconds < prediction.event_time_unix_seconds
+    {
+        return Err(JointRiskTraceErrorV1(format!(
+            "ACI delivery for round {} does not match the shared K1 label/event/availability ledger",
+            row.round_id
+        )));
+    }
+    Ok(())
+}
+
+fn validate_ca_feedback_input(
+    feedback: &CaOcrcLabelFeedbackV1,
+    current_round: u64,
+    row: &JointPopulationRowV1,
+) -> Result<(), JointRiskTraceErrorV1> {
+    let report = &feedback.eligibility_report;
+    if feedback.feedback_round != current_round
+        || feedback.sample_id != row.sample_id
+        || feedback.measurement_event_id != row.measurement_event_id
+        || feedback.label_id != row.label_id.as_deref().unwrap_or_default()
+        || Some(feedback.label_revision) != row.label_revision
+        || Some(feedback.label_payload_sha256.as_str()) != row.label_payload_sha256.as_deref()
+        || Some(report.report_sha256.as_str()) != row.k1_report_sha256.as_deref()
+        || feedback.label_value != row.label_value.unwrap_or(f64::NAN)
+        || report.label_id != feedback.label_id
+        || report.label_revision != feedback.label_revision
+        || report.measurement_event_id != feedback.measurement_event_id
+        || report.label_sha256 != feedback.label_payload_sha256
+        || report.qualified_corrected_value != feedback.label_value
+        || eligibility_report_digest(report)? != report.report_sha256
+    {
+        return Err(JointRiskTraceErrorV1(format!(
+            "CA-OCRC feedback input for round {current_round} does not match shared label ledger"
+        )));
+    }
+    let expected_eligibility = match row.outcome_state {
+        PopulationOutcomeStateV1::Qualified => {
+            super::label_consumption_guard::LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+        }
+        PopulationOutcomeStateV1::Unknown => {
+            super::label_consumption_guard::LabelConsumptionEligibilityV1::Unknown
+        }
+        PopulationOutcomeStateV1::Blocked => {
+            super::label_consumption_guard::LabelConsumptionEligibilityV1::Blocked
+        }
+        PopulationOutcomeStateV1::Unmeasured => {
+            return Err(JointRiskTraceErrorV1(
+                "CA-OCRC feedback input exists for an unmeasured row".into(),
+            ));
+        }
+    };
+    if report.eligibility != expected_eligibility
+        || report.frontier
+            != super::label_consumption_guard::LabelEvidenceFrontierV1::CurrentAtK1
+    {
+        return Err(JointRiskTraceErrorV1(format!(
+            "CA-OCRC feedback K1 state disagrees with shared row {}",
+            row.round_id
+        )));
+    }
+    Ok(())
+}
+
 fn validate_aci_arm(
     arm: &JointBenchmarkArmV1,
     evidence: &JointTauAciArmEvidenceV1,
@@ -472,6 +580,54 @@ fn validate_aci_arm(
         {
             return Err(JointRiskTraceErrorV1(format!(
                 "tau-ACI arm {} prediction receipt does not bind the shared row/policy",
+                arm.arm_id
+            )));
+        }
+    }
+
+    let mut deliveries_by_sample = BTreeMap::new();
+    for delivery in &evidence.deliveries {
+        let Some(prediction) = predictions.get(delivery.sample_id.as_str()) else {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} delivery has no prediction",
+                arm.arm_id
+            )));
+        };
+        let Some(row) = population.values().find(|row| row.sample_id == delivery.sample_id) else {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} delivery references unknown sample",
+                arm.arm_id
+            )));
+        };
+        if row.outcome_state != PopulationOutcomeStateV1::Qualified {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} physical delivery was recorded for non-qualified row {}",
+                arm.arm_id, row.round_id
+            )));
+        }
+        validate_aci_delivery(delivery, prediction, row)?;
+        if deliveries_by_sample.insert(delivery.sample_id.as_str(), delivery).is_some() {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} has duplicate delivered label for sample {}",
+                arm.arm_id, delivery.sample_id
+            )));
+        }
+    }
+    let mut missing_by_sample = BTreeMap::new();
+    for missing in &evidence.missing_feedback {
+        let Some(prediction) = predictions.get(missing.sample_id.as_str()) else {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} missing-feedback record has no prediction",
+                arm.arm_id
+            )));
+        };
+        if missing.measurement_event_id != prediction.measurement_event_id
+            || missing.issued_round != prediction.round
+            || missing.expected_delivery_round != prediction.expected_delivery_round
+            || missing_by_sample.insert(missing.sample_id.as_str(), missing).is_some()
+        {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} missing-feedback record does not match its due round",
                 arm.arm_id
             )));
         }
@@ -518,7 +674,37 @@ fn validate_aci_arm(
                     arm.arm_id, row.round_id
                 )));
             }
+            let delivery = deliveries_by_sample.get(update.sample_id.as_str()).ok_or_else(|| {
+                JointRiskTraceErrorV1(format!(
+                    "tau-ACI arm {} update has no matching delivered K1 input",
+                    arm.arm_id
+                ))
+            })?;
+            if delivery.label_id != update.label_id
+                || delivery.label_revision != update.label_revision
+                || delivery.label_payload_sha256 != update.label_payload_sha256
+            {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "tau-ACI arm {} update receipt does not match delivered label revision/payload",
+                    arm.arm_id
+                )));
+            }
             if let Some(miss) = update.miscoverage_observed {
+                let expected_miss = match prediction.interval.kind {
+                    AciIntervalKindV1::FullRealLine => false,
+                    AciIntervalKindV1::Empty => true,
+                    AciIntervalKindV1::Bounded => {
+                        let lower = prediction.interval.lower.unwrap_or(f64::NAN);
+                        let upper = prediction.interval.upper.unwrap_or(f64::NAN);
+                        delivery.label_value < lower || delivery.label_value > upper
+                    }
+                };
+                if miss != expected_miss {
+                    return Err(JointRiskTraceErrorV1(format!(
+                        "tau-ACI arm {} miss bit differs from its frozen prediction interval",
+                        arm.arm_id
+                    )));
+                }
                 observed_count += 1;
                 observed_miscoverage += usize::from(miss);
             } else {
@@ -527,6 +713,13 @@ fn validate_aci_arm(
                     arm.arm_id
                 )));
             }
+        } else if row.outcome_state == PopulationOutcomeStateV1::Qualified
+            && update.disposition == AciUpdateDispositionV1::HeldUnknown
+        {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} holds an already-qualified shared label as UNKNOWN",
+                arm.arm_id
+            )));
         }
     }
 
@@ -567,16 +760,56 @@ fn validate_aci_arm(
         }
     }
 
-    let has_nonqualified_due = evidence.updates.iter().any(|update| {
-        update.disposition != AciUpdateDispositionV1::Updated
-    });
-    let should_be_uncertified = has_nonqualified_due
-        || !evidence
+    for prediction in predictions.values() {
+        let row = population
+            .values()
+            .find(|row| row.sample_id == prediction.sample_id)
+            .expect("prediction is mapped to population");
+        let has_update = evidence
             .updates
             .iter()
-            .all(|update| update.disposition == AciUpdateDispositionV1::Updated)
+            .any(|update| update.sample_id == prediction.sample_id);
+        let has_delivery = deliveries_by_sample.contains_key(prediction.sample_id.as_str());
+        let has_missing = missing_by_sample.contains_key(prediction.sample_id.as_str());
+        let has_degenerate = evidence
+            .degenerate_resolutions
+            .iter()
+            .any(|entry| entry.sample_id == prediction.sample_id);
+        let due_outcome_present = has_update || has_delivery || has_missing || has_degenerate;
+        if !due_outcome_present {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} omits due feedback/forfeit/degenerate record for sample {}",
+                arm.arm_id, prediction.sample_id
+            )));
+        }
+        if has_missing && has_update
+            && evidence.updates.iter().any(|update| {
+                update.sample_id == prediction.sample_id
+                    && update.disposition == AciUpdateDispositionV1::Updated
+            })
+        {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} both forfeits and updates the same sample",
+                arm.arm_id
+            )));
+        }
+        if row.outcome_state == PopulationOutcomeStateV1::Unmeasured && has_delivery {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} consumes delivery for unmeasured sample {}",
+                arm.arm_id, prediction.sample_id
+            )));
+        }
+    }
+    let should_be_uncertified = !evidence.missing_feedback.is_empty()
+        || evidence
+            .updates
+            .iter()
+            .any(|update| update.disposition != AciUpdateDispositionV1::Updated)
         || predictions.values().any(|prediction| {
-            let row = population.values().find(|row| row.sample_id == prediction.sample_id).unwrap();
+            let row = population
+                .values()
+                .find(|row| row.sample_id == prediction.sample_id)
+                .unwrap();
             row.outcome_state != PopulationOutcomeStateV1::Qualified
                 && prediction.interval.kind == AciIntervalKindV1::Bounded
         });
@@ -602,9 +835,22 @@ fn validate_ca_arm(
     evidence: &JointCaOcrcArmEvidenceV1,
     population: &BTreeMap<u64, &JointPopulationRowV1>,
 ) -> Result<(Option<f64>, usize, usize, bool), JointRiskTraceErrorV1> {
-    if evidence.round_reports.len() != population.len() {
+    if evidence.round_reports.len() != population.len()
+        || evidence.round_inputs.len() != population.len()
+    {
         return Err(JointRiskTraceErrorV1(format!(
-            "CA-OCRC arm {} must supply one round report per population row",
+            "CA-OCRC arm {} must supply one input and report per population row",
+            arm.arm_id
+        )));
+    }
+    let inputs_by_round: BTreeMap<u64, &CaOcrcRoundInputV1> = evidence
+        .round_inputs
+        .iter()
+        .map(|entry| (entry.prediction.round, entry))
+        .collect();
+    if inputs_by_round.len() != evidence.round_inputs.len() {
+        return Err(JointRiskTraceErrorV1(format!(
+            "CA-OCRC arm {} repeats a round input",
             arm.arm_id
         )));
     }
@@ -622,7 +868,25 @@ fn validate_ca_arm(
             )));
         };
         let prediction = &report.prediction_receipt;
-        if prediction.round != report.round
+        let round_input = inputs_by_round.get(&report.round).ok_or_else(|| {
+            JointRiskTraceErrorV1(format!(
+                "CA-OCRC arm {} report has no corresponding original round input",
+                arm.arm_id
+            ))
+        })?;
+        let mut canonical_round_input = (*round_input).clone();
+        canonical_round_input.feedbacks.sort_by(|left, right| {
+            (left.sample_id.as_str(), left.label_id.as_str(), left.label_revision).cmp(&(
+                right.sample_id.as_str(),
+                right.label_id.as_str(),
+                right.label_revision,
+            ))
+        });
+        let input_digest = json_sha256(&canonical_round_input)?;
+        if round_input.schema != CA_OCRC_ROUND_INPUT_SCHEMA_V1
+            || round_input.prediction.round != report.round
+            || report.input_sha256 != input_digest
+            || prediction.round != report.round
             || prediction.sample_id != row.sample_id
             || prediction.measurement_event_id != row.measurement_event_id
             || prediction.physical_measurement_selected != row.physical_measurement_selected
@@ -645,6 +909,18 @@ fn validate_ca_arm(
             }
         } else {
             capacity = Some(report.tracking_capacity);
+        }
+        for feedback in &round_input.feedbacks {
+            let Some(outcome_row) = population
+                .values()
+                .find(|candidate| candidate.sample_id == feedback.sample_id)
+            else {
+                return Err(JointRiskTraceErrorV1(format!(
+                    "CA-OCRC arm {} input references unknown sample {}",
+                    arm.arm_id, feedback.sample_id
+                )));
+            };
+            validate_ca_feedback_input(feedback, report.round, outcome_row)?;
         }
         weighted_feedback_sum += report.weighted_feedback_sum;
         max_occupancy = max_occupancy.max(report.tracking_occupancy_after);
