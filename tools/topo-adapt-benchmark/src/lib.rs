@@ -558,3 +558,10 @@ pub use trajectory::{
     ActionDisposition, ActionReceipt, EpisodeRuntimeState, ExogenousEvent,
     ExogenousEventKind, PolicyAction, TickReceipt,
 };
+
+mod viability;
+pub use viability::{
+    Action, FiniteHorizonGame, GameState, Outcome, RecoveryLayer, RecoveryReport,
+    StateAction, ViabilityKernel, ViabilityLayer, MAX_ACTIONS, MAX_BUDGET_UNITS,
+    MAX_HORIZON_STEPS, MAX_STATES, MAX_TOTAL_OUTCOMES,
+};
