@@ -121,6 +121,7 @@ pub struct ControllerFeedbackEvidenceV1 {
     pub feedback_delay_contract_steps: Option<u64>,
     pub actual_feedback_delay_steps: Option<u64>,
     pub feedback_round: Option<u64>,
+    pub feedback_received_at_unix_seconds: Option<i64>,
     /// CA-OCRC proxy draw and sampled horizon; absent for tau-DACI.
     pub proxy_uniform_draw: Option<f64>,
     pub proxy_delay_steps: Option<i64>,
@@ -556,6 +557,7 @@ fn validate_controller(
                 || controller.feedback_delay_contract_steps.is_some()
                 || controller.actual_feedback_delay_steps.is_some()
                 || controller.feedback_round.is_some()
+                || controller.feedback_received_at_unix_seconds.is_some()
                 || controller.proxy_uniform_draw.is_some()
                 || controller.proxy_delay_steps.is_some()
                 || controller.proxy_survival_probability.is_some()
@@ -651,7 +653,8 @@ fn validate_controller(
             }
         }
         ControllerTrackingStateV1::Pending | ControllerTrackingStateV1::Retained => {
-            if controller.prediction_receipt_sha256.is_none()
+            if controller.feedback_received_at_unix_seconds.is_some()
+                || controller.prediction_receipt_sha256.is_none()
                 || controller.feedback_receipt_sha256.is_some()
                 || controller.update_receipt_sha256.is_some()
                 || controller.controller_state_changed
@@ -664,6 +667,12 @@ fn validate_controller(
         }
         ControllerTrackingStateV1::ReceivedQualified => {
             if row.k1.state != K1QualificationStateV1::Eligible
+                || controller.feedback_received_at_unix_seconds.is_none()
+                || controller.feedback_received_at_unix_seconds
+                    .is_some_and(|received| {
+                        received < row.k1.label_available_at_unix_seconds.unwrap_or(i64::MAX)
+                            || received < row.k1.report_available_at_unix_seconds.unwrap_or(i64::MAX)
+                    })
                 || controller.prediction_receipt_sha256.is_none()
                 || controller.feedback_receipt_sha256.is_none()
                 || controller.update_receipt_sha256.is_none()
@@ -678,7 +687,13 @@ fn validate_controller(
             }
         }
         ControllerTrackingStateV1::ReceivedUnqualified => {
-            if !matches!(
+            if controller.feedback_received_at_unix_seconds.is_none()
+                || controller.feedback_received_at_unix_seconds
+                    .is_some_and(|received| {
+                        received < row.k1.label_available_at_unix_seconds.unwrap_or(i64::MAX)
+                            || received < row.k1.report_available_at_unix_seconds.unwrap_or(i64::MAX)
+                    })
+                || !matches!(
                 row.k1.state,
                 K1QualificationStateV1::Unknown | K1QualificationStateV1::Blocked
             ) || controller.prediction_receipt_sha256.is_none()
@@ -984,10 +999,12 @@ pub fn evaluate_observation_process_trace_v1(
     canonical.rounds.sort_by_key(|row| row.round_id);
     let mut round_ids = BTreeSet::new();
     let mut sample_ids = BTreeSet::new();
+    let mut event_ids = BTreeSet::new();
     let mut prediction_receipts = BTreeSet::new();
     for row in &canonical.rounds {
         if !round_ids.insert(row.round_id)
             || !sample_ids.insert(row.sample_id.as_str())
+            || !event_ids.insert(row.measurement_event_id.as_str())
             || !prediction_receipts.insert(row.prediction_receipt_sha256.as_str())
         {
             return Err(ObservationProcessTraceErrorV1(
@@ -1267,6 +1284,7 @@ mod tests {
                 feedback_delay_contract_steps: None,
                 actual_feedback_delay_steps: None,
                 feedback_round: None,
+                feedback_received_at_unix_seconds: None,
                 proxy_uniform_draw: None,
                 proxy_delay_steps: None,
                 proxy_survival_probability: None,
@@ -1665,6 +1683,7 @@ mod tests {
         trace.controller.controller_state_changed = true;
         trace.controller.actual_feedback_delay_steps = Some(2);
         trace.controller.feedback_round = Some(3);
+        trace.controller.feedback_received_at_unix_seconds = Some(1013);
         trace.controller.theorem_assumptions_intact = true;
         let mut data = input(vec![trace]);
         data.controller_kind = ObservationControllerKindV1::TauDaci;
