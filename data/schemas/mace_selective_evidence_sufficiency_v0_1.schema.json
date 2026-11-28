@@ -76,7 +76,17 @@
         "group_count",
         "familywise_delta",
         "unacceptable_loss_threshold",
-        "minimum_independent_clusters"
+        "minimum_independent_clusters",
+        "threshold_grid_source",
+        "threshold_grid_source_sha256",
+        "threshold_grid_precommitment_sha256",
+        "threshold_grid_committed_at_ms",
+        "calibration_opened_at_ms",
+        "cluster_unit_definition_sha256",
+        "cluster_sampling_design_sha256",
+        "cluster_workload_policy_sha256",
+        "cluster_assignment_manifest_sha256",
+        "cluster_design_receipt_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -207,6 +217,41 @@
         "minimum_independent_clusters": {
           "type": "integer",
           "minimum": 2
+        },
+        "threshold_grid_source": {
+          "enum": [
+            "domain_predeclared",
+            "independent_pilot"
+          ]
+        },
+        "threshold_grid_source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "threshold_grid_precommitment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "threshold_grid_committed_at_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "calibration_opened_at_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cluster_unit_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cluster_sampling_design_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cluster_workload_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cluster_assignment_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cluster_design_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
@@ -244,7 +289,10 @@
         "decision_policy_sha256",
         "sufficiency_score_definition_sha256",
         "group_hierarchy_sha256",
-        "decision_coverage"
+        "decision_coverage",
+        "cluster_unit_definition_sha256",
+        "cluster_sampling_design_sha256",
+        "cluster_workload_policy_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -459,6 +507,15 @@
               "type": "null"
             }
           ]
+        },
+        "cluster_unit_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cluster_sampling_design_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cluster_workload_policy_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       },
       "allOf": [
@@ -557,7 +614,10 @@
         "group_id",
         "threshold",
         "sufficiency_score_definition_sha256",
-        "group_hierarchy_sha256"
+        "group_hierarchy_sha256",
+        "cluster_unit_definition_sha256",
+        "cluster_sampling_design_sha256",
+        "cluster_workload_policy_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -665,6 +725,15 @@
           "$ref": "#/$defs/sha256"
         },
         "group_hierarchy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cluster_unit_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cluster_sampling_design_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cluster_workload_policy_sha256": {
           "$ref": "#/$defs/sha256"
         }
       },
