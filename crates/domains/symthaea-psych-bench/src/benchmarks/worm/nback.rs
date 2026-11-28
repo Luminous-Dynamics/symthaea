@@ -20,6 +20,14 @@ use symthaea_core::hdc::ContinuousHV;
 /// N-back benchmark testing the updating function of working memory.
 pub struct NBackBenchmark;
 
+fn metric_with_bounds(samples: &[f64], lower: f64, upper: Option<f64>) -> MetricValue {
+    MetricValue::from_samples_with_bounds(
+        samples,
+        crate::registry::MetricBounds { lower, upper },
+    )
+    .expect("N-back metric observations must satisfy declared support")
+}
+
 impl NBackBenchmark {
     /// Run a single N-back trial with difficulty scaling and optional trace collection.
     fn run_trial_traced(
@@ -210,19 +218,19 @@ impl PsychBenchmark for NBackBenchmark {
 
             result.insert(
                 format!("nback_{}::hit_rate", n),
-                MetricValue::from_samples(&hit_rates),
+                metric_with_bounds(&hit_rates, 0.0, Some(1.0)),
             );
             result.insert(
                 format!("nback_{}::false_alarm_rate", n),
-                MetricValue::from_samples(&fa_rates),
+                metric_with_bounds(&fa_rates, 0.0, Some(1.0)),
             );
             result.insert(
                 format!("nback_{}::accuracy", n),
-                MetricValue::from_samples(&accuracies),
+                metric_with_bounds(&accuracies, -1.0, Some(1.0)),
             );
             result.insert(
                 format!("nback_{}::rt_ticks", n),
-                MetricValue::from_samples(&all_rts),
+                metric_with_bounds(&all_rts, 0.0, None),
             );
         }
 
