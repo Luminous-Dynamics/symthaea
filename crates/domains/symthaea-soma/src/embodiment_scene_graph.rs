@@ -367,12 +367,13 @@ pub fn verify_scene_graph_v2(
             };
             if child.role != role
                 || child.glyph != expected_glyph
-                || child.layout_anchor != LayoutAnchor::AttachedTo { node_id: 0, slot: 0 }
-                || graph.layout_attachments.as_slice() != [SceneLayoutAttachmentV2 {
+                || child.layout_anchor != (LayoutAnchor::AttachedTo { node_id: 0, slot: 0 })
+                || graph.layout_attachments.len() != 1
+                || graph.layout_attachments[0] != (SceneLayoutAttachmentV2 {
                     source_node_id: 0,
                     target_node_id: 1,
                     slot: 0,
-                }]
+                })
             {
                 return Err(SceneGraphV2Error::InvalidNodeSet);
             }
