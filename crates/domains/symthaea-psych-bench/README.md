@@ -4,8 +4,11 @@ A Rust benchmark suite for evaluating cognitive architectures through a mixture
 of synthetic mechanism probes, externally grounded tasks, and selected
 human-anchored comparisons. The benchmark inventory is evolving; exact counts
 must be generated from the registered implementations rather than copied into
-documentation. The suite also includes the **Qualia Confidence Matrix**, a set
-of computational probes inspired by consciousness theories and psychophysics.
+documentation. The legacy **Qualia Confidence Matrix** API contains theory-
+inspired synthetic probes; its output is an engineering conformance index, not
+a measure or probability estimate of consciousness. The experimental
+**PsychBench Cognitive Ecology (PCE)** environment is being developed as a
+separate interactive evaluation family.
 
 > **Scope honesty:** most benchmarks operate on synthetic HDC stimuli and
 > validate architectural mechanics, not human-normed task performance. In
@@ -18,22 +21,23 @@ of computational probes inspired by consciousness theories and psychophysics.
 ## Quick Start
 
 ```bash
-# Run the full qualia confidence matrix (< 30 seconds)
+# Run the theory-probe conformance summary (< 30 seconds)
 cargo run -p symthaea-psych-bench --example qualia_confidence_report
 
-# Run the registered benchmark battery with composite summaries
+# Run the registered benchmark battery with descriptive summaries
 cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --composites
 
 # Run just the tests (deterministic, seed=42)
 cargo test -p symthaea-psych-bench
 ```
 
-## Qualia Confidence Matrix
+## Theory-probe conformance matrix (legacy module name: Qualia Confidence Matrix)
 
-7 computational probes inspired by GWT, IIT, HOT, FEP, Damasio, and
-psychophysics. These probes test operationalized architectural behaviors; they
-do not establish necessary or sufficient conditions for consciousness, and
-successful results do not establish subjective experience:
+Seven synthetic probes inspired by GWT, IIT, HOT, FEP, Damasio and
+psychophysics test selected operationalized architectural behaviours. Their
+weighted geometric mean is a legacy heuristic index only. It is not a measure
+of consciousness, not a probability of subjective experience, and neither
+passing nor failing proves or disproves experience:
 
 | Benchmark | Theory | What it tests | Key metric |
 |-----------|--------|---------------|------------|
@@ -73,6 +77,32 @@ cargo run -p symthaea-psych-bench --example qualia_confidence_report -- --seed 1
 **MetacognitiveIgnition illustration** (seed=42): accuracy=0.842, d'=3.63,
 ROC AUC=0.998. This is a seed- and configuration-specific synthetic diagnostic,
 not a human comparison or state-of-the-art result.
+
+## Cognitive Ecology (experimental, v0.2)
+
+PCE is a deterministic interactive environment primitive, not yet a validated
+psychological benchmark. It currently includes two seeded hidden-resource
+layouts, partial agent observations, charged invalid actions, gate-failure
+interventions, deterministic replay, evaluator-owned scoring, and reference
+and random baselines.
+
+Run the baseline examples:
+
+```bash
+cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines
+cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines -- --jsonl
+```
+
+The scripted reference policy is optimal only for the two current hand-authored
+layouts. The random policy is a floor baseline. These are environment smoke
+baselines, not evidence of general cognitive capability or a state-of-the-art
+comparison. The PCE unit tests and Rust build have not yet been run on this
+research branch.
+
+Research specifications:
+- `docs/research/PSYCHBENCH_COGNITIVE_ECOLOGY_SPEC_v0.1.md`
+- `docs/research/PSYCHBENCH_VNEXT_RESEARCH_AND_EXECUTION_PLAN_2026-11.md`
+- `docs/research/PSYCHBENCH_AWARENESSBENCH_CROSSWALK_2026-11.md`
 
 ## Dependencies
 
