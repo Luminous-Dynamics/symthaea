@@ -17,8 +17,8 @@ This design avoids modifying the official harness or changing its scoring. It al
 
 - Insert receipts preserve the official harness insertion order, tier and domain, plus trajectory, payload and source-snapshot commitments. The adapter rejects duplicate trajectories, order regressions and cross-domain mixing.
 - Query input contains only run ID, opaque invocation ID, question-text digest and optional question-image digest.
-- Pre-query selection records ordered text/image item digests and the MACE use-time and source-lineage receipt digests associated with each item.
-- Final exposure must equal an ordered prefix of the pre-query selection, because the official harness truncates by prefix. Only surviving items receive exposed-evidence links.
+- Pre-query selection records ordered text/image item digests, the MACE use-time and source-lineage receipt digests, and the canonical #13973 DecisionEvidenceUseLinkV1 digest associated with each item.
+- Final exposure must equal an ordered prefix of the pre-query selection, because the official harness truncates by prefix. Only surviving items receive exposed-evidence links; the exact per-item #13973 link commitment is carried through to the final reader-exposure receipt.
 - The final receipt binds the exact post-truncation reader request digest, reader response digest, fixed reader-model digest and reader-generation-configuration digest, along with original/final token counts, budget and memory/post-hook latency.
 - Image item hashes must cover the image bytes used by the reader, not the filesystem path. The final reader-request hash should cover the fully serialized messages after image-to-data-URL conversion.
 
@@ -44,7 +44,7 @@ The LongMemEval-V2 harness currently truncates after the backend post-query hook
 
 ## Tests
 
-Fourteen synthetic Rust tests cover strict insert order and preservation of repeated identical trajectory payloads, privacy-minimized query fields, opaque invocation IDs, pre-query binding, exact-prefix exposure, truncation and token-budget consistency, missing reader request/response, omitted tail items, cross-domain insertion, identical context bytes from distinct evidence sources, reader configuration binding, and receipt tampering.
+Eighteen synthetic Rust tests cover strict insert order and preservation of repeated identical trajectory payloads, privacy-minimized query fields, opaque invocation IDs, pre-query binding, exact-prefix exposure, truncation and token-budget consistency, missing reader request/response, omitted tail items, cross-domain insertion, identical context bytes from distinct evidence sources, reader configuration binding, and receipt tampering.
 
 ## Validation and claim boundary
 
