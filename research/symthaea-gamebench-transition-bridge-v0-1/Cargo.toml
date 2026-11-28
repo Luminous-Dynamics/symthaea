@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-gamebench-transition-bridge"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Transition-aware causal-twin scoring and receipt validation for GameBench"
+
+[workspace]
+members = ["."]
+resolver = "2"
+
+[lib]
+path = "src/lib.rs"
