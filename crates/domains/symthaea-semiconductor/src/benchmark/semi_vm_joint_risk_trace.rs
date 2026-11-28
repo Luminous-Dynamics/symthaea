@@ -124,6 +124,35 @@ pub struct JointBenchmarkArmV1 {
     pub controller_evidence: JointControllerEvidenceV1,
 }
 
+pub const JOINT_AUDIT_DRAW_SCHEMA_V1: &str =
+    "luminous.semi-bench.joint-audit-draw.v1";
+pub const JOINT_AUDIT_DRAW_ALGORITHM_V1: &str =
+    "sha256-counter-bernoulli-v1";
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct JointAuditInclusionProbabilityV1 {
+    pub round_id: u64,
+    pub inclusion_probability: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct JointAuditRandomizationReceiptV1 {
+    pub schema: String,
+    pub algorithm_id: String,
+    pub population_manifest_sha256: String,
+    /// A revealed 32-byte seed. The commitment allows the draw to be replayed;
+    /// it does not prove that the seed was generated independently or signed.
+    pub seed_hex: String,
+    pub seed_commitment_sha256: String,
+    pub randomization_source_receipt_sha256: String,
+    /// Must predate the first population event time.
+    pub randomness_committed_at_unix_seconds: i64,
+    /// One Bernoulli inclusion probability for every row in the frozen population.
+    pub inclusion_probabilities: Vec<JointAuditInclusionProbabilityV1>,
+    pub selected_round_ids: Vec<u64>,
+    pub receipt_sha256: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct JointRiskTraceInputV1 {
     pub schema: String,
@@ -133,6 +162,7 @@ pub struct JointRiskTraceInputV1 {
     pub population_manifest_sha256: String,
     pub source_ledger_sha256: String,
     pub population: Vec<JointPopulationRowV1>,
+    pub audit_randomization: JointAuditRandomizationReceiptV1,
     pub arms: Vec<JointBenchmarkArmV1>,
     pub trace_sha256: String,
 }
@@ -146,6 +176,8 @@ pub struct JointArmRiskSummaryV1 {
     pub partial_identification_upper: f64,
     pub identification_interval_width: f64,
     pub independent_audit_population_estimate: Option<f64>,
+    pub independent_audit_qualified_frame_count: Option<usize>,
+    pub independent_audit_missing_frame_count: Option<usize>,
     pub independent_audit_standard_error: Option<f64>,
     pub independent_audit_hoeffding_lower: Option<f64>,
     pub independent_audit_hoeffding_upper: Option<f64>,
@@ -185,6 +217,7 @@ pub struct JointRiskTraceReportV1 {
     pub blocked_count: usize,
     pub unmeasured_count: usize,
     pub independent_audit_count: usize,
+    pub audit_randomization_receipt_sha256: String,
     pub shared_acquisition_policy_sha256: String,
     pub arm_summaries: Vec<JointArmRiskSummaryV1>,
     pub report_sha256: String,
