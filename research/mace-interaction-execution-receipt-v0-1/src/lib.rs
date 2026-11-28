@@ -538,11 +538,9 @@ pub fn verify_interaction_execution_v1<V: InteractionExecutionVerifierV1>(
     let event_manifest_sha256 = canonical_events_digest(events)?;
     let expected_response_sha256 = digest_bytes(response_bytes);
     let mut response_commit_count = 0usize;
-    let mut response_commit_at_ms = None;
     for event in events {
         if let InteractionExecutionEventKindV1::ResponseCommitted { response_sha256 } = &event.kind {
             response_commit_count += 1;
-            response_commit_at_ms = Some(event.occurred_at_ms);
             if response_sha256 != &expected_response_sha256 {
                 return Err(InteractionExecutionRejectV1::ResponseDigestMismatch);
             }
@@ -554,8 +552,6 @@ pub fn verify_interaction_execution_v1<V: InteractionExecutionVerifierV1>(
     if response_commit_count > 1 {
         return Err(InteractionExecutionRejectV1::DuplicateResponseCommit);
     }
-    let response_commit_at_ms = response_commit_at_ms
-        .ok_or(InteractionExecutionRejectV1::MissingResponseCommit)?;
     let response_commit_event = events
         .iter()
         .find(|event| {
@@ -565,10 +561,6 @@ pub fn verify_interaction_execution_v1<V: InteractionExecutionVerifierV1>(
             )
         })
         .ok_or(InteractionExecutionRejectV1::MissingResponseCommit)?;
-    let _response_commit_order = (
-        response_commit_event.occurred_at_ms,
-        response_commit_event.event_id.as_str(),
-    );
 
     for preference in &selection.preferences {
         for requirement in &preference.requirements {
