@@ -587,9 +587,14 @@ mod tests {
                 vec![vec![1.0, 0.0], vec![0.0, 1.0]],
             )],
         };
-        let error = two_hypothesis_problem(vec![intervention])
-            .assess_intervention(&[0.5, 0.5], "probe")
-            .expect_err("constructor must reject likelihood mass below one");
+        let error = DecisionProblem::new(
+            vec!["left_rule".into(), "right_rule".into()],
+            vec!["choose_left".into(), "choose_right".into()],
+            vec![0.5, 0.5],
+            vec![vec![10.0, 0.0], vec![0.0, 10.0]],
+            vec![intervention],
+        )
+        .expect_err("constructor must reject likelihood mass below one");
         assert!(matches!(error, DecisionProblemError::ProbabilityMassMismatch { .. }));
     }
 
