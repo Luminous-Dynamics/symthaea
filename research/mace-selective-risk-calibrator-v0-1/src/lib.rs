@@ -1291,10 +1291,22 @@ mod tests{
         rows[1].independent_cluster_id=rows[0].independent_cluster_id.clone();
         let mut cfg=config(&groups,&rows,vec![0.8,0.5,0.0],2);
         cfg.maximum_observations_per_cluster=1;
+        cfg.cluster_workload_policy_sha256=digest("max_episodes_per_profile_1");
         cfg.cluster_design_receipt_sha256=compute_cluster_design_receipt_sha256_v1(&cfg).unwrap();
         assert_eq!(
             calibrate_selective_evidence_v1(&cfg,&groups,&rows),
             Err(CalibrationRejectV1::ClusterWorkloadLimitExceeded)
+        );
+    }
+
+
+    #[test]
+    fn duplicate_outcome_receipts_cannot_make_cluster_assignment_ambiguous() {
+        let mut rows=examples(2,"root",0.9,0.0);
+        rows[1].outcome_receipt_sha256=rows[0].outcome_receipt_sha256.clone();
+        assert_eq!(
+            compute_cluster_assignment_manifest_sha256_v1(&rows),
+            Err(CalibrationRejectV1::DuplicateOutcomeReceipt)
         );
     }
 
