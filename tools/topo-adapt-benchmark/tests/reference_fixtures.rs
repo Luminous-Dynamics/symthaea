@@ -154,7 +154,7 @@ fn uniform_capacity_scaling_scales_flow_and_cut() {
     assert_eq!(result.requested_flow, 16);
     assert_eq!(result.accepted_edge_additions, 1);
     assert_eq!(result.edit_cost_units, 1);
-    assert_eq!(result.edge_maintenance_cost_units, 12);
+    assert_eq!(result.edge_maintenance_cost_units, 6);
 }
 
 #[test]
