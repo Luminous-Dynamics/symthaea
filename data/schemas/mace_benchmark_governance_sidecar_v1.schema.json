@@ -309,6 +309,24 @@
           ]
         }
       }
+    },
+    "influence_evidence_level": {
+      "enum": [
+        "diagnostic",
+        "instrumented",
+        "independently_verified",
+        "causally_qualified"
+      ]
+    },
+    "hard_gates_passed": {
+      "type": "boolean"
+    },
+    "explanatory_note": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "sidecar_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "influence_evidence_level": {
@@ -328,5 +346,80 @@
   },
   "sidecar_sha256": {
     "$ref": "#/$defs/sha256"
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "influence_evidence_level": {
+            "enum": [
+              "instrumented",
+              "independently_verified",
+              "causally_qualified"
+            ]
+          }
+        },
+        "required": [
+          "influence_evidence_level"
+        ]
+      },
+      "then": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "evaluator_output_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "raw_trace_receipt_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            },
+            "required": [
+              "evaluator_output_sha256",
+              "raw_trace_receipt_sha256"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "influence_evidence_level": {
+            "const": "causally_qualified"
+          }
+        },
+        "required": [
+          "influence_evidence_level"
+        ]
+      },
+      "then": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "split_audit_receipt_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "influence_report_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "randomization_receipt_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "independent_verifier_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "split_audit_receipt_sha256",
+              "influence_report_sha256",
+              "randomization_receipt_sha256",
+              "independent_verifier_id"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }
