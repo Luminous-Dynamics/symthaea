@@ -59,6 +59,7 @@ The feedback state is one of:
 - `RETAINED`;
 - `RECEIVED_QUALIFIED`;
 - `RECEIVED_UNQUALIFIED`;
+- `CAPACITY_DENIED`;
 - `EXPIRED`;
 - `EVICTED`;
 - `IMMEDIATE_TRIVIAL`.
@@ -128,13 +129,14 @@ The report explicitly emits:
 
 ## Independent validation
 
-The module has **17 unit tests** covering:
+The module has **18 unit tests** covering:
 - disjoint population partition and worst-case bounds;
 - unselected-label rejection;
 - independent/offline audit use and online-only exclusion;
 - audit-method separation from operational measurement;
 - fixed-delay τ-DACI receipt chronology;
 - valid CA-OCRC K1 feedback and expired-feedback no-update;
+- explicit capacity-denial state distinct from unsubmitted, pending, expired and evicted;
 - capacity K versus physical acquisition M;
 - per-stage resource budgets;
 - inventory omission;
