@@ -360,3 +360,16 @@ A source inspection of the current `symthaea-muse` crate found useful adjacent c
 - `analyst.rs` is an authoritative symbolic composition/structure auditor; its symbolic facts must not be represented as audio-only recognition.
 
 Reuse these components only within their proven semantics. In particular, don't infer an observed beat grid from the generative `compute_tempo`, don't interpret FEP surprise peaks as onsets, and don't use a symbolic score's tempo map as ground-truth audio beat detection. The proposed DJ beat-tracker adapter belongs beside, not inside, those generative systems until a cross-domain interface is reviewed.
+
+
+## 18. Executable transition-quality replication work
+
+MEL-DJ-004 is now tracked as [issue #14272](https://github.com/Luminous-Dynamics/symthaea/issues/14272). It separates faithful MixWeaver reproduction from any new method. That distinction matters because MixWeaver's public post-review record narrows its current target to smooth intro/outro blending, does not include a DJtransGAN comparison, did not run a MUSHRA study, removed an objective/subjective correlation claim due to only ten pairs, and uses a non-public personal-library dataset. The benchmark will therefore:
+1. Reproduce its disclosed candidate construction and objective as closely as available, preserving an explicit deviation ledger.
+2. Add matched fixed-crossfade, key/BPM heuristic, and transparent rule-based baselines.
+3. Include hard cuts, drop swaps, vocal hand-offs, ambient bridges, variable-tempo blends, and intentional contrast with mode-specific objectives.
+4. Measure technical invariants, musical alignment, stem integrity, perceptual preference, set-intent attainment, correction burden, and compute/latency separately.
+5. Compare DJtransGAN only when the implementation, weights, license and budgets are available and protocol-compatible.
+6. Keep offline transition rendering separate from live device qualification (#MEL-DJ-005).
+
+The key methodological shift is from one universal smoothness score to **intent-conditioned, multi-objective transition quality**. A hard cut that deliberately resets energy should not be scored as a failed smooth crossfade. Preference must also be tested against human DJ transitions, not only algorithmic baselines.
