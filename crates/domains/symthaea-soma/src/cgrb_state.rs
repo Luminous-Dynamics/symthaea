@@ -159,6 +159,7 @@ pub enum CgrbRejectionReasonV1 {
 #[serde(rename_all = "snake_case")]
 pub enum CgrbViolationReasonV1 {
     EffectBeforeDispatch,
+    ObservationBeforeApplication,
     EffectAfterExpiry,
     EffectAfterRevocation,
     DuplicateOrMissingEffect,
@@ -321,7 +322,7 @@ pub fn assess_task_outcome_v1(
             CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::PostconditionNotResolved)
         }
         CgrbOperationStatusV1::NotApplied => {
-            if observation.effect_count != 0 {
+            if observation.effect_count != 0 || observation.applied_at_tick.is_some() {
                 CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::ContradictoryOracleState)
             } else if !observation.operation_terminal {
                 CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::OperationStillInFlight)
@@ -339,8 +340,11 @@ pub fn assess_task_outcome_v1(
                 }
             };
 
-            if applied_tick < dispatch_tick || observation.observed_at_tick < applied_tick {
+            if applied_tick < dispatch_tick {
                 return CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::EffectBeforeDispatch);
+            }
+            if observation.observed_at_tick < applied_tick {
+                return CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::ObservationBeforeApplication);
             }
             if applied_tick >= attempt.authority.effective_until_tick {
                 return CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::EffectAfterExpiry);
@@ -582,6 +586,35 @@ mod tests {
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::PostconditionFalse)
+        );
+    }
+
+    #[test]
+    fn observation_cannot_precede_recorded_application() {
+        let mut observed = observation();
+        observed.observed_at_tick = 18;
+        observed.applied_at_tick = Some(19);
+        let result = assess_task_outcome_v1(
+            &attempt(), &profile(), Some(&observed), "world-clock", 21, 5
+        );
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::ObservationBeforeApplication)
+        );
+    }
+
+    #[test]
+    fn not_applied_cannot_claim_an_application_timestamp() {
+        let mut observed = observation();
+        observed.operation_status = CgrbOperationStatusV1::NotApplied;
+        observed.effect_count = 0;
+        observed.applied_at_tick = Some(19);
+        let result = assess_task_outcome_v1(
+            &attempt(), &profile(), Some(&observed), "world-clock", 21, 5
+        );
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::ContradictoryOracleState)
         );
     }
 
