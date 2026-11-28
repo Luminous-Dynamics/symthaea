@@ -475,7 +475,7 @@ The standalone Rust research crate now contains deterministic environment fixtur
 | F1 Navigation | Rectangular grid, bounded moves, full and local observation, ordered trace/replay, private exact shortest-path oracle | Invalid geometry, blocked movement, action limit, tampered transition and non-contiguous event sequence |
 | F2 Pushing | Single-box Sokoban-like movement and push mechanics, private exact reachability oracle | Blocked push, wall-trapped box, duplicate walls, overlapping objects |
 | F3 Prerequisites | Single-use keys, explicit collected-key and current-inventory state, persistent unlocked doors, private exact planner | No-key locked door, no key respawn, duplicate IDs, unknown key reference, key/door overlap |
-| F4 Partial map | Current field-of-view observations and paid one-step scan; candidate-owned ExploreMemory stores only observed cells | Hidden distant cells, scan cost, previous cells absent from later views, unknown-not-floor, contradictory observation and geometry controls |
+| F4 Partial map | Current field-of-view observations and paid one-step scan; candidate-owned ExploreMemory stores only observed cells | Hidden distant cells, scan cost, previous cells absent from later views, unknown-not-floor, duplicate/incomplete observation, contradictory observation and geometry controls |
 | F5 Resource chain | Scarce gatherable piles, typed recipes, workbench, acyclic recipe dependency validation, depletion and private exact planner | Zero resource pile, recipe cycle, missing station/input, depleted pile cannot be gathered |
 | F6 Hidden mechanics | Two rule variants with identical initial observations; paid lever intervention; route determined by the revealed gate state | No-probe negative control, action budget, single-use switch, hidden rule omitted from observations and debug output |
 
@@ -545,7 +545,7 @@ The current FEP action model is intentionally simple and structured. It has not 
 
 ### 16.4 Current test inventory and qualification status
 
-The current branch contains **59 authored tests** in the environment/candidate/evaluator crate (F1–F6: 41, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 6), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **80 authored Rust tests**. These are source counts only, not observed passes.
+The current branch contains **65 authored tests** in the environment/candidate/evaluator crate (F1–F6: 47, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 6), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **80 authored Rust tests**. These are source counts only, not observed passes.
 
 Two dedicated GitHub workflows are configured:
 - `GameBench Rust v0.1`: deterministic environment, candidate contract, and policy baseline crate.
@@ -602,7 +602,7 @@ The adapter workspace now has three real Symthaea-component candidates:
 The candidate/environment crate now contains:
 - 41 F1–F6 environment tests;
 - 7 candidate-output contract tests;
-- 5 candidate-side F4 map-memory tests;
+- 6 candidate-side F4 map-memory tests;
 - 5 random / greedy baseline tests.
 
 The adapter crate contains:
@@ -610,7 +610,7 @@ The adapter crate contains:
 - 5 spatial HDC candidate tests;
 - 5 HDC-LTC candidate tests.
 
-Total: **75 authored Rust tests**. These are not observed test executions. Both focused workflows must pass rustfmt, Cargo tests, and strict Clippy on the exact PR head. The main GameBench and adapter workspaces are isolated; adapter CI also watches changes to the sibling `symthaea-core` and `symthaea-fep` source paths because it compiles those actual components.
+Total: **81 authored Rust tests**. These are not observed test executions. Both focused workflows must pass rustfmt, Cargo tests, and strict Clippy on the exact PR head. The main GameBench and adapter workspaces are isolated; adapter CI also watches changes to the sibling `symthaea-core` and `symthaea-fep` source paths because it compiles those actual components.
 
 ### 17.5 Proposed first comparative campaign
 
