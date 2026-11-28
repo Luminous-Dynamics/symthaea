@@ -59,6 +59,8 @@ pub struct CgrbAuthorityV1 {
     pub target: String,
     pub purpose: String,
     pub destination: String,
+    /// Clock domain for effective_from/effective_until/revoked_at ticks.
+    pub clock_id: String,
     pub policy_version: u64,
     pub effective_from_tick: u64,
     pub effective_until_tick: u64,
@@ -205,6 +207,7 @@ pub fn assess_task_outcome_v1(
         || attempt.precondition_state_digest.trim().is_empty()
         || attempt.postcondition_digest.trim().is_empty()
         || attempt.authority.policy_digest.trim().is_empty()
+        || attempt.authority.clock_id.trim().is_empty()
         || attempt.authority.effective_until_tick < attempt.authority.effective_from_tick
     {
         return CgrbTaskOutcomeV1::Rejected(CgrbRejectionReasonV1::InvalidAttemptContract);
@@ -212,6 +215,10 @@ pub fn assess_task_outcome_v1(
 
     if !attempt.authority.granted {
         return CgrbTaskOutcomeV1::Rejected(CgrbRejectionReasonV1::AuthorityDenied);
+    }
+
+    if attempt.clock_id != attempt.authority.clock_id {
+        return CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::ClockMismatchOrRegression);
     }
 
     if attempt.actor_token != attempt.authority.actor_token
@@ -257,11 +264,8 @@ pub fn assess_task_outcome_v1(
             oracle_profile.consistency,
             CgrbOracleConsistencyV1::Linearizable | CgrbOracleConsistencyV1::VersionedRead
         )
-        || observation.independence != CgrbOracleIndependenceV1::SeparateReadOnlyService
-        || !matches!(
-            observation.consistency,
-            CgrbOracleConsistencyV1::Linearizable | CgrbOracleConsistencyV1::VersionedRead
-        )
+        || observation.independence != oracle_profile.independence
+        || observation.consistency != oracle_profile.consistency
     {
         return CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::UntrustedOracle);
     }
@@ -410,6 +414,7 @@ mod tests {
                 target: "record-1".into(),
                 purpose: "user-requested-update".into(),
                 destination: "test-world".into(),
+                clock_id: "world-clock".into(),
                 policy_version: 3,
                 effective_from_tick: 1,
                 effective_until_tick: 100,
@@ -540,6 +545,32 @@ mod tests {
         assert_eq!(
             retry_decision_v1(&result),
             CgrbRetryDecisionV1::ReauthorizeThenRetry
+        );
+    }
+
+    #[test]
+    fn authority_window_clock_must_match_action_clock() {
+        let mut value = attempt();
+        value.authority.clock_id = "other-clock".into();
+        let result = assess_task_outcome_v1(
+            &value, &profile(), Some(&observation()), "world-clock", 21, 5
+        );
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::ClockMismatchOrRegression)
+        );
+    }
+
+    #[test]
+    fn observation_consistency_must_match_pinned_profile() {
+        let mut observed = observation();
+        observed.consistency = CgrbOracleConsistencyV1::Linearizable;
+        let result = assess_task_outcome_v1(
+            &attempt(), &profile(), Some(&observed), "world-clock", 21, 5
+        );
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::UntrustedOracle)
         );
     }
 
