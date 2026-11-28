@@ -18,6 +18,7 @@ pub struct CapsuleBindingV1 {
     pub benchmark_id: String,
     pub track_id: String,
     pub release: String,
+    pub candidate_commit_sha: String,
     pub dataset_split_sha256: String,
     pub official_metrics_sha256: String,
 }
@@ -187,6 +188,12 @@ impl BenchmarkGovernanceSidecarV1 {
         ].into_iter().flatten() {
             if !valid_sha256(value) { return Err(SidecarRejectV1::InvalidDigest); }
         }
+        if !valid_sha256(&capsule.capsule_sha256)
+            || !valid_sha256(&capsule.dataset_split_sha256)
+            || !valid_sha256(&capsule.official_metrics_sha256)
+            || !valid_git_sha(&capsule.candidate_commit_sha) {
+            return Err(SidecarRejectV1::InvalidDigest);
+        }
         if self.run_id != capsule.run_id || self.capsule_sha256 != capsule.capsule_sha256
             || self.benchmark_id != capsule.benchmark_id || self.track_id != capsule.track_id
             || self.release != capsule.release {
@@ -289,23 +296,31 @@ fn comparison_digest(gate: &ComparisonGateV1) -> Result<String, SidecarRejectV1>
     digest_serialized(&unsigned)
 }
 
+fn validate_comparison_identity(value: &ComparisonIdentityV1) -> Result<(), SidecarRejectV1> {
+    for text in [
+        value.run_id.as_str(), value.benchmark_id.as_str(), value.track_id.as_str(),
+        value.release.as_str(), value.cluster_unit.as_str(),
+    ] {
+        if !nonempty(text) { return Err(SidecarRejectV1::InvalidIdentity); }
+    }
+    for digest in [
+        value.dataset_split_sha256.as_str(), value.grader_sha256.as_str(),
+        value.metric_contract_sha256.as_str(), value.reader_model_sha256.as_str(),
+        value.prompt_sha256.as_str(), value.tool_manifest_sha256.as_str(),
+        value.budget_profile_sha256.as_str(), value.task_ids_sha256.as_str(),
+    ] {
+        if !valid_sha256(digest) { return Err(SidecarRejectV1::InvalidDigest); }
+    }
+    Ok(())
+}
+
 pub fn compare_runs_v1(
     candidate: &ComparisonIdentityV1,
     baseline: &ComparisonIdentityV1,
 ) -> Result<ComparisonGateV1, SidecarRejectV1> {
+    validate_comparison_identity(candidate)?;
+    validate_comparison_identity(baseline)?;
     let mut mismatches = Vec::new();
-    for value in [
-        candidate.dataset_split_sha256.as_str(), candidate.grader_sha256.as_str(),
-        candidate.metric_contract_sha256.as_str(), candidate.reader_model_sha256.as_str(),
-        candidate.prompt_sha256.as_str(), candidate.tool_manifest_sha256.as_str(),
-        candidate.budget_profile_sha256.as_str(), candidate.task_ids_sha256.as_str(),
-    ] {
-        if !valid_sha256(value) { return Err(SidecarRejectV1::InvalidDigest); }
-    }
-    if !nonempty(&candidate.run_id) || !nonempty(&baseline.run_id)
-        || !nonempty(&candidate.cluster_unit) || !nonempty(&baseline.cluster_unit) {
-        return Err(SidecarRejectV1::InvalidIdentity);
-    }
     if candidate.benchmark_id != baseline.benchmark_id { mismatches.push("benchmark_id".into()); }
     if candidate.track_id != baseline.track_id { mismatches.push("track_id".into()); }
     if candidate.release != baseline.release { mismatches.push("release".into()); }
@@ -353,6 +368,7 @@ mod tests {
         CapsuleBindingV1 {
             run_id: "run-001".into(), capsule_sha256: digest("capsule"),
             benchmark_id: "longmemeval_v2".into(), track_id: "small".into(), release: "v2".into(),
+            candidate_commit_sha: "0123456789abcdef0123456789abcdef01234567".into(),
             dataset_split_sha256: digest("split"), official_metrics_sha256: digest("official-metrics"),
         }
     }
@@ -504,4 +520,20 @@ mod tests {
         assert!(!value.verify_integrity());
         assert_eq!(value.validate_against(&capsule), Err(SidecarRejectV1::IntegrityMismatch));
     }
+
+    #[test]
+    fn invalid_capsule_commit_identity_is_rejected() {
+        let mut capsule = capsule();
+        capsule.candidate_commit_sha = "main".into();
+        assert_eq!(seal_sidecar_v1(sidecar(), &capsule), Err(SidecarRejectV1::InvalidDigest));
+    }
+
+    #[test]
+    fn malformed_baseline_identity_is_rejected_instead_of_becoming_a_soft_mismatch() {
+        let candidate = comparison_identity("candidate-run");
+        let mut baseline = comparison_identity("baseline-run");
+        baseline.grader_sha256 = "not-a-digest".into();
+        assert_eq!(compare_runs_v1(&candidate, &baseline), Err(SidecarRejectV1::InvalidDigest));
+    }
+
 }
