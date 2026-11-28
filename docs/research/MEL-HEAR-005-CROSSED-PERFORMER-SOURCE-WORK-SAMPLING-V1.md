@@ -23,14 +23,14 @@ The sampling manifest binds each exact comparison item and pair to:
 - sampling frame, target population, inclusion/exclusion policy and purpose-limited pseudonymization scope;
 - the explicit source-work-independence declaration and its written basis.
 
-The comparison wrapper requires exactly one sampling observation for every baseline/candidate item. It joins item, pair and source-work identity, then checks the reducer-bound performer, take and performance identity for all three arms against both model runs. A mismatch rejects before the #14019 comparator is invoked.
+The comparison wrapper requires exactly one sampling observation for every baseline/candidate item. It binds work, performer, take and performance identity to #13947. Session identity remains a supplied sidecar commitment because the current #13947 reducer has no session field; it cannot be described as a verified join to the audio or comparison case. It joins item, pair and source-work identity, then checks the reducer-bound performer, take and performance identity for all three arms against both model runs. A mismatch rejects before the #14019 comparator is invoked.
 
 ## 3. Design classification
 
-- **Work-disjoint clusters:** every required identity is present and no performer, session or take spans source works.
-- **Nested within work:** multiple performers, sessions or takes occur within a work, but none is reused across works.
+- **Work-disjoint clusters:** every required identity is present and no performer, session, take or performance realization spans source works.
+- **Nested within work:** multiple performers, sessions, takes or performance realizations occur within a work, but none is reused across works.
 - **Crossed performer, session, or take:** at least one performer, session or take identity occurs across multiple works.
-- **Insufficiently identified:** any required sampling-frame, work, performer, session or take identity is missing.
+- **Insufficiently identified:** any required sampling-frame, work, performer, session, take or performance identity is missing.
 
 A multi-performer ensemble recorded within one work is nested, not crossed. Every declared ensemble participant is retained in the membership set; it is not silently assigned to one invented musician or counted as an independent work.
 
@@ -38,7 +38,7 @@ The first two shapes receive only a **conditional** source-work-bootstrap admiss
 
 ## 4. What the admission flag does not mean
 
-The independence declaration and pseudonymous IDs are supplied study metadata. They do not authenticate a person, establish that two pseudonyms identify different people, establish that works are independently sampled, prove representativeness, or establish exchangeability. A hash is a locator/commitment, not identity proof.
+The independence declaration and pseudonymous IDs are supplied study metadata. The session axis is particularly limited: unless an independently qualified provenance record binds session IDs to source recordings, it is a declared grouping variable only. They do not authenticate a person, establish that two pseudonyms identify different people, establish that works are independently sampled, prove representativeness, or establish exchangeability. A hash is a locator/commitment, not identity proof.
 
 This v1 therefore always emits false for performer identity authentication, source-work identity authentication, sampling-independence authentication and population generalization. It does not implement crossed-cluster intervals. A crossed design is explicitly marked as requiring crossed inference, and its source-work-only comparison is rejected.
 
