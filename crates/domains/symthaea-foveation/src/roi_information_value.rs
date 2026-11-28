@@ -564,6 +564,39 @@ mod tests {
     }
 
     #[test]
+    fn roi_information_value_manifest_roundtrips_through_json() {
+        let manifest = RoiInformationValueManifestV1 {
+            schema: ROI_INFORMATION_VALUE_MANIFEST_SCHEMA_V1.to_owned(),
+            now_us: 2_000_000,
+            now_clock_domain_id: "clock:camera-1".to_owned(),
+            config: RoiInformationValueConfig::default(),
+            candidates: vec![estimate("roi-1", 0.8, 0.5, 10_000)],
+        };
+        let encoded = serde_json::to_string(&manifest).unwrap();
+        let decoded: RoiInformationValueManifestV1 = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(manifest, decoded);
+        assert_eq!(
+            rank_roi_information_value_manifest(&decoded),
+            rank_roi_information_value_manifest(&manifest)
+        );
+    }
+
+    #[test]
+    fn roi_information_value_result_serialization_is_deterministic() {
+        let manifest = RoiInformationValueManifestV1 {
+            schema: ROI_INFORMATION_VALUE_MANIFEST_SCHEMA_V1.to_owned(),
+            now_us: 2_000_000,
+            now_clock_domain_id: "clock:camera-1".to_owned(),
+            config: RoiInformationValueConfig::default(),
+            candidates: vec![estimate("roi-1", 0.8, 0.5, 10_000)],
+        };
+        let score = rank_roi_information_value_manifest(&manifest).unwrap();
+        let first = serde_json::to_string(&score).unwrap();
+        let second = serde_json::to_string(&score).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
     fn non_finite_estimates_fail_closed() {
         let mut value = estimate("roi-1", 0.8, 0.5, 10_000);
         value.latency_penalty = f32::NAN;
