@@ -9,6 +9,7 @@ on:
       - research/stratified-epistemic-audit-design-v1
       - research/epistemic-sowrc-finite-risk-control-v5
       - research/predictable-bernoulli-audit-receipt-v2
+      - research/predictable-audit-q-policy-v1
     paths:
       - "src/web_research/types.rs"
       - "src/web_research/meta_learning.rs"
