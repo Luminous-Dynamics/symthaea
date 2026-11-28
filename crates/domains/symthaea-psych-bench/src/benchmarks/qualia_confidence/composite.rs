@@ -242,6 +242,8 @@ impl QualiaConfidenceScore {
     pub fn format_report(&self) -> String {
         let mut out = String::new();
 
+        let missing_count = self.indicators.iter().filter(|ind| !ind.raw_value.is_finite()).count();
+
         out.push_str("╔══════════════════════════════════════════════════════════════╗\n");
         out.push_str("║        QUALIA THEORY-PROBE MATRIX — HEURISTIC SUMMARY      ║\n");
         out.push_str("╠══════════════════════════════════════════════════════════════╣\n");
@@ -253,7 +255,13 @@ impl QualiaConfidenceScore {
             let bar_len = (ind.score * 10.0) as usize;
             let bar: String = "█".repeat(bar_len.min(10));
             let empty: String = "·".repeat(10 - bar_len.min(10));
-            let status = if ind.prediction_met { "MET" } else { "FAILED" };
+            let status = if !ind.raw_value.is_finite() {
+                "NOT RUN"
+            } else if ind.prediction_met {
+                "MET"
+            } else {
+                "NOT MET"
+            };
             out.push_str(&format!(
                 "║  {:<22}│ {:.3} │ {:>10.4} │ {:<12} ║\n",
                 ind.name, ind.score, ind.raw_value, status
@@ -265,32 +273,44 @@ impl QualiaConfidenceScore {
 
         out.push_str("║                                                            ║\n");
         out.push_str("╠══════════════════════════════════════════════════════════════╣\n");
+        if missing_count == 0 {
+            out.push_str(&format!(
+                "║  HEURISTIC INDEX:  {:.3}  ({})                       ║\n",
+                self.composite, self.level
+            ));
+        } else {
+            out.push_str(&format!(
+                "║  HEURISTIC INDEX:  WITHHELD — {missing_count}/{} NOT RUN       ║\n",
+                self.predictions_total
+            ));
+        }
         out.push_str(&format!(
-            "║  HEURISTIC INDEX:  {:.3}  ({})                       ║\n",
-            self.composite, self.level
-        ));
-        out.push_str(&format!(
-            "║  PREDICTIONS MET:  {}/{}                                    ║\n",
-            self.predictions_met, self.predictions_total
+            "║  THRESHOLDS MET:   {}/{} | NOT RUN: {}                    ║\n",
+            self.predictions_met, self.predictions_total, missing_count
         ));
         out.push_str("║                                                            ║\n");
 
-        let interpretation = match self.level {
-            ConfidenceLevel::Strong => {
-                "Most configured thresholds were met for these probes.\n\
-                 ║  This is implementation-specific conformance only."
-            }
-            ConfidenceLevel::Moderate => {
-                "Several configured probe thresholds were met.\n\
-                 ║  Inspect per-indicator results and controls."
-            }
-            ConfidenceLevel::Weak => {
-                "Few configured probe thresholds were met.\n\
-                 ║  This identifies engineering gaps in this test set."
-            }
-            ConfidenceLevel::Insufficient => {
-                "One or more configured thresholds were not met.\n\
-                 ║  This is not evidence that consciousness is absent."
+        let interpretation = if missing_count > 0 {
+            "Required probe results are missing.\n\
+             ║  No composite index or threshold bucket is reported."
+        } else {
+            match self.level {
+                ConfidenceLevel::Strong => {
+                    "Most configured thresholds were met for these probes.\n\
+                     ║  This is implementation-specific conformance only."
+                }
+                ConfidenceLevel::Moderate => {
+                    "Several configured probe thresholds were met.\n\
+                     ║  Inspect per-indicator results and controls."
+                }
+                ConfidenceLevel::Weak => {
+                    "Few configured probe thresholds were met.\n\
+                     ║  This identifies engineering gaps in this test set."
+                }
+                ConfidenceLevel::Insufficient => {
+                    "One or more configured thresholds were not met.\n\
+                     ║  This is not evidence that consciousness is absent."
+                }
             }
         };
         out.push_str(&format!("║  {interpretation}\n"));
@@ -400,8 +420,12 @@ mod tests {
         assert_eq!(score.predictions_met, 0);
         assert!(
             score.composite < 0.01,
-            "Empty results should give near-zero score"
+            "Legacy in-memory index remains zero for an empty run"
         );
+        let report = score.format_report();
+        assert!(report.contains("WITHHELD"));
+        assert!(report.contains("NOT RUN"));
+        assert!(!report.contains("HEURISTIC INDEX:  0.000"));
     }
 
     #[test]
