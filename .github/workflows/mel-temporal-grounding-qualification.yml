@@ -451,6 +451,10 @@ jobs:
             and .work_cluster_bootstrap_permitted_under_declared_assumption == false
             and .crossed_inference_required == true
             and .performer_identity_authenticated == false
+            and .performer_membership_authenticated == false
+            and .session_identity_authenticated == false
+            and .take_identity_authenticated == false
+            and .performance_identity_authenticated == false
             and .source_work_identity_authenticated == false
             and .sampling_independence_authenticated == false
             and .population_generalization_established == false
