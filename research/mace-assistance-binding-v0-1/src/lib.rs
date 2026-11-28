@@ -483,6 +483,7 @@ pub enum AssistanceRejectV1 {
     ConstraintSetEmpty,
     DuplicateConstraintId,
     ConstraintClosureMismatch,
+    ConstraintSourceOutsideClosure,
     ConflictedEvidenceCannotBeUnqualified,
     EvidenceVerifierRejected,
     InvalidResponseSpan,
@@ -528,6 +529,7 @@ impl AssistanceRejectV1 {
             Self::ConstraintSetEmpty => "constraint_set_empty",
             Self::DuplicateConstraintId => "duplicate_constraint_id",
             Self::ConstraintClosureMismatch => "constraint_closure_mismatch",
+            Self::ConstraintSourceOutsideClosure => "constraint_source_outside_closure",
             Self::ConflictedEvidenceCannotBeUnqualified => "conflicted_evidence_cannot_be_unqualified",
             Self::EvidenceVerifierRejected => "evidence_verifier_rejected",
             Self::InvalidResponseSpan => "invalid_response_span",
@@ -591,6 +593,9 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
         if constraint.relation_closure_sha256 != closure.closure_sha256 {
             return Err(AssistanceRejectV1::ConstraintClosureMismatch);
         }
+        if closure.evidence_ids.binary_search(&constraint.source_evidence_id).is_err() {
+            return Err(AssistanceRejectV1::ConstraintSourceOutsideClosure);
+        }
         if closure.conflict_edges.iter().any(|edge| {
             (edge.left_evidence_id == constraint.source_evidence_id
                 || edge.right_evidence_id == constraint.source_evidence_id)
@@ -642,7 +647,7 @@ pub fn verify_assistance_binding_v1<V: AssistanceEvidenceVerifierV1>(
     // Multiple independently qualified sources may support the same exact
     // response claim span. Partial overlaps are rejected to avoid ambiguous
     // claim-to-evidence attribution.
-    let mut spans = BTreeSet::new();
+    let mut spans: BTreeSet<(usize, usize, String)> = BTreeSet::new();
     for claim_use in &receipt.claim_uses {
         let constraint = by_id.get(claim_use.constraint_id.as_str())
             .ok_or(AssistanceRejectV1::UnknownConstraint)?;
@@ -829,11 +834,13 @@ mod tests {
                 relation_edge("r1", "e1", "e2", RelationKindV1::SameDecision),
                 relation_edge("r2", "e2", "e3", RelationKindV1::Contradicts),
                 relation_edge("r3", "e1", "e1", RelationKindV1::SameSubject),
+                relation_edge("r4", "e1", "e4", RelationKindV1::Supports),
             ],
             &vec![
                 RelationKindV1::SameDecision,
                 RelationKindV1::Contradicts,
                 RelationKindV1::SameSubject,
+                RelationKindV1::Supports,
             ],
             &relation_context(),
             3,
@@ -917,8 +924,8 @@ mod tests {
     #[test]
     fn relation_closure_is_bounded_deterministic_and_preserves_conflict() {
         let result = closure();
-        assert_eq!(result.evidence_ids, vec!["e1".to_owned(), "e2".to_owned(), "e3".to_owned()]);
-        assert_eq!(result.traversed_edge_ids, vec!["r1".to_owned(), "r2".to_owned(), "r3".to_owned()]);
+        assert_eq!(result.evidence_ids, vec!["e1".to_owned(), "e2".to_owned(), "e3".to_owned(), "e4".to_owned()]);
+        assert_eq!(result.traversed_edge_ids, vec!["r1".to_owned(), "r2".to_owned(), "r3".to_owned(), "r4".to_owned()]);
         assert_eq!(result.conflict_edges.len(), 1);
         assert!(result.verify_integrity());
     }
