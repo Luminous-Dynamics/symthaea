@@ -226,8 +226,10 @@ impl BenchmarkGovernanceSidecarV1 {
         if flow.influence_assessed > flow.exposed || classified != flow.influence_assessed {
             return Err(SidecarRejectV1::InvalidInfluenceAccounting);
         }
-        if let (Some(p50), Some(p95)) = (self.costs.governance_latency_p50_ns, self.costs.governance_latency_p95_ns) {
-            if p95 < p50 { return Err(SidecarRejectV1::InvalidCostQuantileOrder); }
+        if let (Some(p50), Some(p95)) = (self.costs.governance_latency_p50_ns, self.costs.governance_latency_p95_ns)
+            && p95 < p50
+        {
+            return Err(SidecarRejectV1::InvalidCostQuantileOrder);
         }
         if self.hard_gates_passed && violations.total_non_compensable() != 0 {
             return Err(SidecarRejectV1::HardGateContradiction);
