@@ -207,10 +207,7 @@ impl CalibratedReferenceApproachabilityMonitor {
         }
 
         let count = reference_blocks.len() as f64;
-        let mean = sums
-            .iter()
-            .map(|sum| *sum / count)
-            .collect::<Vec<_>>();
+        let mean = sums.iter().map(|sum| *sum / count).collect::<Vec<_>>();
         if mean.iter().any(|value| !value.is_finite()) {
             return Err(CalibrationError::ArithmeticOverflow);
         }
@@ -220,8 +217,7 @@ impl CalibratedReferenceApproachabilityMonitor {
         if !confidence_log_argument.is_finite() || confidence_log_argument <= 1.0 {
             return Err(CalibrationError::ArithmeticOverflow);
         }
-        let radius = observation_norm_bound
-            * (2.0 * confidence_log_argument.ln() / count).sqrt();
+        let radius = observation_norm_bound * (2.0 * confidence_log_argument.ln() / count).sqrt();
         if !radius.is_finite() || radius <= 0.0 {
             return Err(CalibrationError::ArithmeticOverflow);
         }
@@ -410,12 +406,14 @@ mod tests {
 
     #[test]
     fn exact_alpha_budget_boundary_is_accepted() {
-        assert!(validate_risk_budget(
-            RiskFraction::new(1, 40).unwrap(),
-            RiskFraction::new(1, 40).unwrap(),
-            RiskFraction::new(1, 20).unwrap(),
-        )
-        .is_ok());
+        assert!(
+            validate_risk_budget(
+                RiskFraction::new(1, 40).unwrap(),
+                RiskFraction::new(1, 40).unwrap(),
+                RiskFraction::new(1, 20).unwrap(),
+            )
+            .is_ok()
+        );
         assert_eq!(
             validate_risk_budget(
                 RiskFraction::new(1, 30).unwrap(),
