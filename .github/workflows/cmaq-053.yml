@@ -1,0 +1,40 @@
+name: CMAQ-053 compositional fleet risk budget
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-053/**"
+      - ".github/workflows/cmaq-053.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-053-risk-budget
+  cancel-in-progress: true
+
+jobs:
+  compositional-risk-budget:
+    name: compositional-risk-budget
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-053-compositional-risk-budget-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-053/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-053/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-053/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Exact allocation composition probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-053/Cargo.toml --locked --bin composition_probe > cmaq-053-composition-smoke.csv
+      - name: Preserve exact composition artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-053-composition-smoke
+          path: cmaq-053-composition-smoke.csv
+          if-no-files-found: error
