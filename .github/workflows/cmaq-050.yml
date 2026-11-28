@@ -1,0 +1,43 @@
+name: CMAQ-050 continuous product Fourier conditional pairs
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-050/**"
+      - "research/cmaq-049/**"
+      - "research/cmaq-048/**"
+      - "research/cmaq-046/**"
+      - ".github/workflows/cmaq-050.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-050-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  product-fourier-conditional-pairs:
+    name: product-fourier-conditional-pairs
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-050-product-fourier-conditional-pairs-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-050/Cargo.toml --all -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-050/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-050/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Paired conditional-effect smoke probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-050/Cargo.toml --locked --bin product_conditional_probe -- 32 200 20261128 > cmaq-050-product-conditional-smoke.csv
+      - name: Preserve paired probe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-050-product-conditional-smoke
+          path: cmaq-050-product-conditional-smoke.csv
+          if-no-files-found: error
