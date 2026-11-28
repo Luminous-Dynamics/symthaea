@@ -303,12 +303,12 @@ Add a dedicated **MEL-DJ-007 — Adaptive Beat-Grid and Tempo-Map Qualification*
 
 | Dimension | Metric / test | Required comparison |
 |---|---|---|
-| Beat location | F1 at declared tolerance, Cemgil, P-score | Beat This! and 2026 MIREX submissions where weights/implementation are reproducible |
+| Beat location | F1 at declared tolerance, Cemgil, P-score | Beat This! and 2026 MIREX submissions where weights/implementation are reproducible; Serato Lucid Beatgrids on the DJ-use cohort where a licensed, reproducible observation protocol is available |
 | Continuity | CMLt / CMLc, long-range phase drift, beat insertion/deletion rate | Beat This!; publish accuracy/continuity trade-off |
 | Downbeat | F1, precision, recall, meter-confusion matrix | Beat This! / MIREX downbeat results |
 | Tempo map | local tempo MAE, slope/turning-point error, half/double-time confusion | constant-tempo tracker, Beat This!, human DJ correction |
-| Live adaptation | phase-lock time, reacquisition latency after tempo changes, maximum transient phase error | controlled tempo-ramp / rubato / dropout interventions |
-| DJ usability | manual corrections per ten minutes, correction time, undo rate, downstream cue/transition failure | current manual workflow and incumbent beatgrid editors |
+| Live adaptation | phase-lock time, reacquisition latency after tempo changes, maximum transient phase error | controlled tempo-ramp / rubato / dropout interventions; matched Serato Lucid Beatgrids comparison on supported material |
+| DJ usability | manual corrections per ten minutes, correction time, undo rate, downstream cue/transition failure | current manual workflow and incumbent beatgrid editors, including Serato's Fixed/Flexible modes |
 | Calibration | coverage-risk and selective accuracy of alternate grid hypotheses | forced single-grid output versus calibrated multi-hypothesis/abstention |
 
 The target on the JSIR cohort is to exceed the Beat This! reference on beat F1 (>94.70) and continuity (>83.50 CMLt), and to exceed its downbeat F-measure (>87.27), with uncertainty intervals. These are cohort-specific targets, not global thresholds. For DJ-focused electronic material, preregister a stable-tempo subset target of >=0.95 beat F1 and >=0.90 downbeat F1, while preserving CMLt >=0.90. For SMC, rubato, live drummers, tempo ramps, meter changes and edits, report separate distributions and selective coverage; do not force the stable-tempo target onto unsupported material.
