@@ -2,7 +2,7 @@
 # Adversarial fixtures for the workspace manifest preflight.
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "\${BASH_SOURCE[0]}")/../.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -53,7 +53,7 @@ name = "good"
 version = "0.1.0"
 edition = "2024"
 EOF
-printf 'pub fn fixture() {}\\n' > "$tmp/crates/core/good/src/lib.rs"
+printf '%s\\n' 'pub fn fixture() {}' > "$tmp/crates/core/good/src/lib.rs"
 
 # Positive control: a real package is admitted, all nine staging directories
 # are explicitly excluded, and the seven pre-existing exclusions remain mirrored.
@@ -78,7 +78,7 @@ grep -F "MISSING MANIFEST: crates/core/unlisted-examples-only" "$tmp/missing.log
 
 # Negative control: changing Cargo's exclusion set without changing the script
 # mirror must fail closed.
-sed '/"crates\\/domains\\/symthaea-perception",/d' "$tmp/Cargo.toml" > "$tmp/Cargo.mismatch.toml"
+grep -Fv '"crates/domains/symthaea-perception",' "$tmp/Cargo.toml" > "$tmp/Cargo.mismatch.toml"
 cp "$tmp/Cargo.mismatch.toml" "$tmp/Cargo.toml"
 if bash "$tmp/scripts/check-workspace-targets.sh" > "$tmp/mismatch.log" 2>&1; then
   echo "FAIL: mismatched exclusion mirror was accepted" >&2
