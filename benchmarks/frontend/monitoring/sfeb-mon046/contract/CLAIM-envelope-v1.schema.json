@@ -1,0 +1,399 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon046-unified-recovery-claim-v1.schema.json",
+  "title": "MON-046 Unified Recovery Claim Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "claim_id",
+    "subject",
+    "predicate",
+    "scope",
+    "evidence",
+    "appraisal",
+    "dependencies",
+    "freshness",
+    "provenance"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon046-unified-recovery-claim-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_id",
+        "environment_id",
+        "recovery_boundary_sha256"
+      ],
+      "properties": {
+        "system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recovery_boundary_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "verdict",
+        "evaluated_at",
+        "policy_sha256",
+        "reason_codes"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "backup_integrity",
+            "source_scope_coverage",
+            "capture_completeness",
+            "data_consistency",
+            "application_invariant",
+            "service_readiness",
+            "rto",
+            "rpo",
+            "independent_failure_domain",
+            "recovery_assurance"
+          ]
+        },
+        "verdict": {
+          "enum": [
+            "qualified",
+            "blocked",
+            "indeterminate"
+          ]
+        },
+        "evaluated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inventory_sha256",
+        "inventory_appraisal_sha256",
+        "required_item_ids",
+        "covered_item_ids",
+        "unknown_item_ids",
+        "unsupported_item_ids",
+        "excluded_item_ids",
+        "completeness"
+      ],
+      "properties": {
+        "inventory_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "inventory_appraisal_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "required_item_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "covered_item_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "unknown_item_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "unsupported_item_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "excluded_item_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "completeness": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "evidence_class",
+          "source_id",
+          "artifact_sha256",
+          "artifact_bytes",
+          "media_type",
+          "receipt_sha256",
+          "appraisal_sha256",
+          "captured_from",
+          "captured_through",
+          "clock_uncertainty_ms"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_class": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "artifact_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "artifact_bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "media_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "appraisal_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "captured_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "captured_through": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "clock_uncertainty_ms": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "appraisal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "custody_verdict",
+        "verifier_id",
+        "verifier_binary_sha256",
+        "trust_anchor_set_sha256",
+        "trust_snapshot_sha256",
+        "trust_epoch",
+        "revocation_checkpoint_sha256",
+        "revocation_checkpoint_at",
+        "nonce_ledger_checkpoint_sha256",
+        "artifact_bytes_rehashed"
+      ],
+      "properties": {
+        "custody_verdict": {
+          "enum": [
+            "qualified",
+            "blocked",
+            "indeterminate"
+          ]
+        },
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifier_binary_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "trust_anchor_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "trust_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "trust_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "revocation_checkpoint_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "revocation_checkpoint_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nonce_ledger_checkpoint_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifact_bytes_rehashed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim_id",
+          "claim_sha256",
+          "role"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "role": {
+            "enum": [
+              "required",
+              "context"
+            ]
+          }
+        }
+      }
+    },
+    "freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluated_at",
+        "valid_until",
+        "clock_uncertainty_ms",
+        "revocation_checkpoint_max_age_seconds",
+        "revocation_checkpoint_age_seconds",
+        "state"
+      ],
+      "properties": {
+        "evaluated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "clock_uncertainty_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "revocation_checkpoint_max_age_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "revocation_checkpoint_age_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "state": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluator_policy_sha256",
+        "evaluator_source_revision",
+        "build_provenance_sha256",
+        "oracle_version",
+        "independent_adjudication"
+      ],
+      "properties": {
+        "evaluator_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluator_source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "build_provenance_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "oracle_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_adjudication": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "pending",
+            "not_performed"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
