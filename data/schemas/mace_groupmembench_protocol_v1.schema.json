@@ -169,7 +169,6 @@
         "content",
         "author",
         "role",
-        "timestamp",
         "reply_to",
         "channel",
         "phase_name",
@@ -196,8 +195,10 @@
           ]
         },
         "timestamp": {
-          "type": "string",
-          "minLength": 1
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "reply_to": {
           "type": [
