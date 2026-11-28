@@ -1,0 +1,48 @@
+name: Sym-RSI Web Research Source Neutrality
+
+on:
+  push:
+    branches:
+      - fix/research-source-support-fail-closed-2026-11-28
+    paths:
+      - "src/web_research/researcher.rs"
+      - "src/web_research/verifier.rs"
+      - "src/web_research/types.rs"
+      - "tools/sym-rsi-web-source-neutrality/**"
+      - ".github/workflows/sym-rsi-web-source-neutrality.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "src/web_research/researcher.rs"
+      - "src/web_research/verifier.rs"
+      - "src/web_research/types.rs"
+      - "tools/sym-rsi-web-source-neutrality/**"
+      - ".github/workflows/sym-rsi-web-source-neutrality.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-neutrality:
+    name: Rust 1.96 source-neutrality contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Set up Rust 1.96
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Check production-source formatting
+        run: |
+          rustfmt --edition 2024 --check --config skip_children=true \
+            src/web_research/types.rs \
+            src/web_research/verifier.rs \
+            tools/sym-rsi-web-source-neutrality/src/lib.rs
+      - name: Test the production verifier source
+        run: cargo test --locked --manifest-path tools/sym-rsi-web-source-neutrality/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path tools/sym-rsi-web-source-neutrality/Cargo.toml --all-targets -- -D warnings
