@@ -354,6 +354,19 @@ impl EvidenceResponseConstraintV1 {
             }
             _ => {}
         }
+        match self.provenance_kind {
+            ClaimProvenanceKindV1::DirectQuotation | ClaimProvenanceKindV1::SpeakerAssertion
+                if self.action == ResponseConstraintActionV1::MayAssert =>
+            {
+                return Err(AssistanceRejectV1::ProvenanceRequiresAttribution);
+            }
+            ClaimProvenanceKindV1::DerivedInference | ClaimProvenanceKindV1::ContestedClaim
+                if self.action == ResponseConstraintActionV1::MayAssert =>
+            {
+                return Err(AssistanceRejectV1::ProvenanceRequiresQualification);
+            }
+            _ => {}
+        }
         Ok(())
     }
 }
@@ -465,6 +478,8 @@ pub enum AssistanceRejectV1 {
     ConstraintNotCurrentAtSnapshot,
     MissingRequiredSpeaker,
     MissingRequiredQualification,
+    ProvenanceRequiresAttribution,
+    ProvenanceRequiresQualification,
     ConstraintSetEmpty,
     DuplicateConstraintId,
     ConstraintClosureMismatch,
@@ -508,6 +523,8 @@ impl AssistanceRejectV1 {
             Self::ConstraintNotCurrentAtSnapshot => "constraint_not_current_at_snapshot",
             Self::MissingRequiredSpeaker => "missing_required_speaker",
             Self::MissingRequiredQualification => "missing_required_qualification",
+            Self::ProvenanceRequiresAttribution => "provenance_requires_attribution",
+            Self::ProvenanceRequiresQualification => "provenance_requires_qualification",
             Self::ConstraintSetEmpty => "constraint_set_empty",
             Self::DuplicateConstraintId => "duplicate_constraint_id",
             Self::ConstraintClosureMismatch => "constraint_closure_mismatch",
@@ -1064,6 +1081,52 @@ mod tests {
                 &receipt, b"request", bytes, &context, &vec![forbidden], &closure, &FixtureVerifier
             ),
             Err(AssistanceRejectV1::ForbiddenConstraintUsed)
+        );
+    }
+
+    #[test]
+    fn conflicted_evidence_cannot_be_bound_as_an_unqualified_assertion() {
+        let closure = closure();
+        let context = assistance_context(&closure);
+        let mut disputed = constraint(ResponseConstraintActionV1::MayAssert, true, &closure);
+        disputed.source_evidence_id = "e2".into();
+        let bytes = b"The decision is final.";
+        let receipt = response_binding(
+            &context, &vec![disputed.clone()], &closure, bytes,
+            ResponseDispositionV1::Answer, Vec::new()
+        );
+        assert_eq!(
+            verify_assistance_binding_v1(
+                &receipt, b"request", bytes, &context, &vec![disputed], &closure, &FixtureVerifier
+            ),
+            Err(AssistanceRejectV1::ConflictedEvidenceCannotBeUnqualified)
+        );
+    }
+
+    #[test]
+    fn inferred_or_contested_claims_cannot_be_marked_may_assert() {
+        let closure = closure();
+        let context = assistance_context(&closure);
+        let mut inference = constraint(ResponseConstraintActionV1::MayAssert, true, &closure);
+        inference.provenance_kind = ClaimProvenanceKindV1::DerivedInference;
+        assert_eq!(
+            verify_assistance_binding_v1(
+                &response_binding(&context, &vec![inference.clone()], &closure, b"claim",
+                    ResponseDispositionV1::Answer, Vec::new()),
+                b"request", b"claim", &context, &vec![inference], &closure, &FixtureVerifier
+            ),
+            Err(AssistanceRejectV1::ProvenanceRequiresQualification)
+        );
+
+        let mut speaker_claim = constraint(ResponseConstraintActionV1::MayAssert, true, &closure);
+        speaker_claim.provenance_kind = ClaimProvenanceKindV1::SpeakerAssertion;
+        assert_eq!(
+            verify_assistance_binding_v1(
+                &response_binding(&context, &vec![speaker_claim.clone()], &closure, b"claim",
+                    ResponseDispositionV1::Answer, Vec::new()),
+                b"request", b"claim", &context, &vec![speaker_claim], &closure, &FixtureVerifier
+            ),
+            Err(AssistanceRejectV1::ProvenanceRequiresAttribution)
         );
     }
 
