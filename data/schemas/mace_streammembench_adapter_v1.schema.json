@@ -1,0 +1,536 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/mace-streammembench-adapter-v0-1/schemas/mace_streammembench_adapter_v1.schema.json",
+  "title": "MACE StreamMemBench adapter protocol v1",
+  "description": "Candidate input, timeline receipts and two-step episode receipts. Evaluator labels and metric scores are deliberately excluded from candidate-facing records.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/run_binding"
+    },
+    {
+      "$ref": "#/$defs/stream_segment"
+    },
+    {
+      "$ref": "#/$defs/ingest_receipt"
+    },
+    {
+      "$ref": "#/$defs/response_receipt"
+    },
+    {
+      "$ref": "#/$defs/interaction_persistence"
+    },
+    {
+      "$ref": "#/$defs/episode_receipt"
+    }
+  ],
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "git_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "run_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "benchmark_id",
+        "benchmark_release",
+        "harness_commit_sha",
+        "dataset_snapshot_sha256",
+        "dataset_split_sha256",
+        "language",
+        "system_name",
+        "candidate_code_sha256",
+        "memory_config_sha256",
+        "answer_model_sha256",
+        "generation_config_sha256",
+        "cluster_unit",
+        "cluster_assignment_manifest_sha256",
+        "binding_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_streammembench_adapter_v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "benchmark_id": {
+          "const": "streammembench_v1"
+        },
+        "benchmark_release": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "harness_commit_sha": {
+          "$ref": "#/$defs/git_sha"
+        },
+        "dataset_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "dataset_split_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "language": {
+          "enum": [
+            "en",
+            "zh"
+          ]
+        },
+        "system_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "candidate_code_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "memory_config_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "answer_model_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "generation_config_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "cluster_unit": {
+          "const": "participant"
+        },
+        "cluster_assignment_manifest_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "binding_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timestamp",
+        "source",
+        "text",
+        "metadata"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "stream_segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "participant_cluster_sha256",
+        "day_id",
+        "day_ordinal",
+        "segment_ordinal",
+        "time_range",
+        "text",
+        "observations",
+        "metadata"
+      ],
+      "properties": {
+        "participant_cluster_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "day_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "day_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "segment_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "time_range": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/observation"
+          },
+          "maxItems": 10000
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "ingest_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "run_binding_sha256",
+        "participant_cluster_sha256",
+        "day_id",
+        "day_ordinal",
+        "segment_ordinal",
+        "ingest_sequence",
+        "stream_segment_sha256",
+        "previous_cursor_sha256",
+        "cursor_sha256",
+        "saved_record_manifest_sha256",
+        "saved_record_count",
+        "ingested_at_monotonic_ns",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_streammembench_adapter_v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_binding_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "participant_cluster_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "day_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "day_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "segment_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ingest_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stream_segment_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "previous_cursor_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "cursor_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "saved_record_manifest_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "saved_record_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ingested_at_monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "evidence_link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "context_item_sha256",
+        "evidence_use_receipt_sha256",
+        "decision_evidence_use_link_sha256",
+        "source_lineage_receipt_sha256"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "context_item_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "evidence_use_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "decision_evidence_use_link_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "source_lineage_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "response_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "stage",
+        "request_sha256",
+        "answer_sha256",
+        "model_request_sha256",
+        "model_response_sha256",
+        "answer_model_sha256",
+        "generation_config_sha256",
+        "context_tokens",
+        "prompt_tokens",
+        "completion_tokens",
+        "latency_ns",
+        "evidence_exposure",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_streammembench_adapter_v1"
+        },
+        "stage": {
+          "enum": [
+            "initial",
+            "revision",
+            "followup"
+          ]
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "answer_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "model_request_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "model_response_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "answer_model_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "generation_config_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "context_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prompt_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completion_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_exposure": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_link"
+          },
+          "maxItems": 10000
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "interaction_persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "run_binding_sha256",
+        "episode_id_sha256",
+        "initial_request_sha256",
+        "initial_answer_sha256",
+        "feedback_sha256",
+        "revised_answer_sha256",
+        "interaction_sha256",
+        "persistence_confirmed",
+        "persisted_at_monotonic_ns",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_streammembench_adapter_v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_binding_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "episode_id_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "initial_request_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "initial_answer_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "feedback_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "revised_answer_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interaction_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "persistence_confirmed": {
+          "type": "boolean"
+        },
+        "persisted_at_monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "episode_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "run_binding_sha256",
+        "participant_cluster_sha256",
+        "episode_id_sha256",
+        "timeline_cursor_before_sha256",
+        "timeline_cursor_after_sha256",
+        "ingested_segment_count",
+        "initial_request_sha256",
+        "initial_response",
+        "feedback_sha256",
+        "revision_response",
+        "interaction_persistence",
+        "followup_request_sha256",
+        "followup_response",
+        "saved_record_manifest_sha256",
+        "episode_receipt_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_streammembench_adapter_v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_binding_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "participant_cluster_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "episode_id_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "timeline_cursor_before_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "timeline_cursor_after_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "ingested_segment_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "initial_request_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "initial_response": {
+          "$ref": "#/$defs/response_receipt"
+        },
+        "feedback_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "revision_response": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/response_receipt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interaction_persistence": {
+          "$ref": "#/$defs/interaction_persistence"
+        },
+        "followup_request_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "followup_response": {
+          "$ref": "#/$defs/response_receipt"
+        },
+        "saved_record_manifest_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "episode_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    }
+  }
+}
