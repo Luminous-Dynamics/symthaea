@@ -656,8 +656,12 @@ fn least_cost_action_plan(manifest: &ScenarioManifest) -> Option<(Vec<Action>, u
     let mut frontier = BinaryHeap::new();
     frontier.push(Reverse((0_u64, 0_u32, initial_key.clone())));
 
-    let mut best: BTreeMap<PlannerKey, (u64, u32, Vec<Action>, WorldState)> = BTreeMap::new();
-    best.insert(initial_key, (0, 0, Vec::new(), initial));
+    // Keep a separate best cost for each (behavioral state, steps used) pair.
+    // A cheaper but longer route must not erase a slightly more expensive route
+    // that is the only one able to finish within the hard step budget.
+    let mut best: BTreeMap<(PlannerKey, u32), (u64, Vec<Action>, WorldState)> =
+        BTreeMap::new();
+    best.insert((initial_key.clone(), 0), (0, Vec::new(), initial));
 
     let actions = [
         Action::Inspect,
@@ -672,15 +676,14 @@ fn least_cost_action_plan(manifest: &ScenarioManifest) -> Option<(Vec<Action>, u
     ];
 
     while let Some(Reverse((cost, steps, key))) = frontier.pop() {
-        let Some((known_cost, known_steps, plan, state)) = best
-            .get(&key)
-            .map(|(known_cost, known_steps, plan, state)| {
-                (*known_cost, *known_steps, plan.clone(), state.clone())
-            })
+        let map_key = (key.clone(), steps);
+        let Some((known_cost, plan, state)) = best
+            .get(&map_key)
+            .map(|(known_cost, plan, state)| (*known_cost, plan.clone(), state.clone()))
         else {
             continue;
         };
-        if (cost, steps) != (known_cost, known_steps) {
+        if cost != known_cost {
             continue;
         }
         if state.delivered {
@@ -700,11 +703,10 @@ fn least_cost_action_plan(manifest: &ScenarioManifest) -> Option<(Vec<Action>, u
             ));
             let next_steps = steps + 1;
             let next_key = PlannerKey::from(&next);
+            let next_map_key = (next_key.clone(), next_steps);
             let improves = best
-                .get(&next_key)
-                .map(|(existing_cost, existing_steps, _, _)| {
-                    (next_cost, next_steps) < (*existing_cost, *existing_steps)
-                })
+                .get(&next_map_key)
+                .map(|(existing_cost, _, _)| next_cost < *existing_cost)
                 .unwrap_or(true);
             if !improves {
                 continue;
@@ -712,10 +714,7 @@ fn least_cost_action_plan(manifest: &ScenarioManifest) -> Option<(Vec<Action>, u
 
             let mut next_plan = plan.clone();
             next_plan.push(action.clone());
-            best.insert(
-                next_key.clone(),
-                (next_cost, next_steps, next_plan, next),
-            );
+            best.insert(next_map_key, (next_cost, next_plan, next));
             frontier.push(Reverse((next_cost, next_steps, next_key)));
         }
     }
