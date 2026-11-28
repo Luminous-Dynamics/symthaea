@@ -39,6 +39,15 @@ pub enum JointBenchmarkModeV1 {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum JointComparisonScopeV1 {
+    /// Isolates the controller by requiring the same global model and interval method.
+    ControllerAblation,
+    /// Compares full end-to-end pipelines; model/interval differences are allowed and must be disclosed.
+    EndToEndPipeline,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum JointControllerMethodV1 {
     FixedDelayTauAci,
     BoundedDelayCaOcrc,
@@ -117,6 +126,7 @@ pub struct JointRiskTraceInputV1 {
     pub schema: String,
     pub trace_id: String,
     pub mode: JointBenchmarkModeV1,
+    pub comparison_scope: JointComparisonScopeV1,
     pub population_manifest_sha256: String,
     pub source_ledger_sha256: String,
     pub population: Vec<JointPopulationRowV1>,
@@ -161,6 +171,7 @@ pub struct JointRiskTraceReportV1 {
     pub schema: String,
     pub trace_id: String,
     pub trace_sha256: String,
+    pub comparison_scope: JointComparisonScopeV1,
     pub status: JointTraceStatusV1,
     pub reason_codes: Vec<String>,
     pub population_count: usize,
@@ -1559,6 +1570,8 @@ pub fn evaluate_joint_risk_trace_v1(
     let mut arm_ids = BTreeSet::new();
     let mut shared_acquisition_policy: Option<&str> = None;
     let mut shared_budget: Option<f64> = None;
+    let mut shared_global_model: Option<&str> = None;
+    let mut shared_interval_method: Option<&str> = None;
     let mut arm_summaries = Vec::new();
 
     for arm in &input.arms {
@@ -1596,6 +1609,19 @@ pub fn evaluate_joint_risk_trace_v1(
             }
         } else {
             shared_budget = Some(arm.physical_metrology_budget_units);
+        }
+
+        if input.comparison_scope == JointComparisonScopeV1::ControllerAblation {
+            if shared_global_model.is_some_and(|digest| digest != arm.global_model_artifact_sha256)
+                || shared_interval_method
+                    .is_some_and(|digest| digest != arm.interval_method_sha256)
+            {
+                return Err(JointRiskTraceErrorV1(
+                    "controller-ablation arms must share the same global-model and interval-method artifacts; use end-to-end scope for pipeline comparisons".into(),
+                ));
+            }
+            shared_global_model.get_or_insert(&arm.global_model_artifact_sha256);
+            shared_interval_method.get_or_insert(&arm.interval_method_sha256);
         }
 
         let selection_report = validate_selection_risk_input(arm, input, &population)?;
@@ -1760,6 +1786,7 @@ pub fn evaluate_joint_risk_trace_v1(
         schema: JOINT_RISK_TRACE_REPORT_SCHEMA_V1.into(),
         trace_id: input.trace_id.clone(),
         trace_sha256: input.trace_sha256.clone(),
+        comparison_scope: input.comparison_scope,
         status: JointTraceStatusV1::Complete,
         reason_codes: Vec::new(),
         population_count: input.population.len(),
@@ -1998,6 +2025,7 @@ mod tests {
             schema: JOINT_RISK_TRACE_SCHEMA_V1.into(),
             trace_id: "paired-joint-fixture-v1".into(),
             mode: JointBenchmarkModeV1::PairedSharedAcquisition,
+            comparison_scope: JointComparisonScopeV1::ControllerAblation,
             population_manifest_sha256: population_manifest,
             source_ledger_sha256: source_ledger,
             population: vec![
@@ -2067,6 +2095,43 @@ mod tests {
             assert!(summary.independent_audit_population_estimate.is_some());
             assert!(summary.partial_identification_upper >= summary.partial_identification_lower);
         }
+    }
+
+    #[test]
+    fn controller_ablation_rejects_different_model_or_interval_artifacts() {
+        let mut model_mismatch = paired_fixture();
+        model_mismatch.arms[1].interval_method_sha256 = digest('a');
+        if let JointControllerEvidenceV1::FixedDelayTauAci(evidence) =
+            &mut model_mismatch.arms[1].controller_evidence
+        {
+            evidence.interval_method_sha256 = digest('a');
+        }
+        model_mismatch.trace_sha256 = seal_joint_risk_trace_v1(&model_mismatch).unwrap();
+        assert!(evaluate_joint_risk_trace_v1(&model_mismatch).is_err());
+
+        let mut global_model_mismatch = paired_fixture();
+        global_model_mismatch.arms[1].global_model_artifact_sha256 = digest('b');
+        global_model_mismatch.trace_sha256 =
+            seal_joint_risk_trace_v1(&global_model_mismatch).unwrap();
+        assert!(evaluate_joint_risk_trace_v1(&global_model_mismatch).is_err());
+    }
+
+    #[test]
+    fn end_to_end_scope_allows_different_interval_methods_and_reports_scope() {
+        let mut input = paired_fixture();
+        input.comparison_scope = JointComparisonScopeV1::EndToEndPipeline;
+        input.arms[1].interval_method_sha256 = digest('a');
+        if let JointControllerEvidenceV1::FixedDelayTauAci(evidence) =
+            &mut input.arms[1].controller_evidence
+        {
+            evidence.interval_method_sha256 = digest('a');
+        }
+        input.trace_sha256 = seal_joint_risk_trace_v1(&input).unwrap();
+        let report = evaluate_joint_risk_trace_v1(&input).unwrap();
+        assert_eq!(
+            report.comparison_scope,
+            JointComparisonScopeV1::EndToEndPipeline
+        );
     }
 
     #[test]
