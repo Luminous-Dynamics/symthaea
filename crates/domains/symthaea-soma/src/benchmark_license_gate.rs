@@ -541,7 +541,8 @@ mod tests {
 
     #[test]
     fn commercial_operation_cannot_be_requested_as_noncommercial_research() {
-        let value = manifest();
+        let mut value = manifest();
+        value.intended_use = BenchmarkIntendedUse::NoncommercialResearch;
         assert_eq!(
             validate_benchmark_license_manifest(
                 &value,
