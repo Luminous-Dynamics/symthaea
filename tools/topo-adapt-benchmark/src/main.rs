@@ -30,12 +30,7 @@ fn run() -> Result<(), String> {
             }
 
             for (variant, edits) in variants {
-                let result = evaluate_episode(
-                    case,
-                    &fixture.graph_semantics,
-                    time,
-                    &edits,
-                )?;
+                let result = evaluate_episode(case, &fixture.graph_semantics, time, &edits)?;
                 reports.push(serde_json::json!({
                     "case_id": case.id,
                     "time": time,
@@ -49,7 +44,16 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let output = serde_json::to_string_pretty(&reports).map_err(|e| e.to_string())?;
-    println!("{output}");
+    let source_commit = std::env::var("GITHUB_SHA").ok();
+    let output = serde_json::json!({
+        "status": "synthetic_reference_only",
+        "fixture_schema": fixture.schema_version,
+        "fixture_blake3": blake3::hash(FIXTURE_JSON.as_bytes()).to_hex().to_string(),
+        "source_commit": source_commit,
+        "evaluations": reports,
+        "claim_limit": "No trained controller, biological mechanism, physical repair or SOTA claim."
+    });
+    let rendered = serde_json::to_string_pretty(&output).map_err(|e| e.to_string())?;
+    println!("{rendered}");
     Ok(())
 }
