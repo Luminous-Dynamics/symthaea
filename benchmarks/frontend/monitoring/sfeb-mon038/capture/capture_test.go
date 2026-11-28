@@ -81,7 +81,12 @@ func TestDuplicatePartitionRangeBlocks(t *testing.T){in:=fixture();in.PartitionC
 func TestPartitionOutsideDeclaredCountBlocks(t *testing.T){in:=fixture();in.PartitionCaptures[0].Partition=2;for i:=range in.PartitionCaptures[0].Records{in.PartitionCaptures[0].Records[i].Partition=2};in.BusinessEvents[0].Partition=2;in.BusinessEvents[1].Partition=2;refresh(&in);expect(t,in,Blocked)}
 func TestReadUncommittedCaptureBlocks(t *testing.T){in:=fixture();in.PartitionCaptures[0].IsolationLevel="read_uncommitted";refresh(&in);expect(t,in,Blocked)}
 func TestLastStableOffsetMustBeStable(t *testing.T){in:=fixture();in.PartitionCaptures[0].LastStableOffsetBefore=105;refresh(&in);expect(t,in,Indeterminate)}
-func TestRangeCannotEndBeforeLastStableOffset(t *testing.T){in:=fixture();in.PartitionCaptures[0].EndOffsetExclusive=103;refresh(&in);expect(t,in,Indeterminate)}
+func TestRangeCannotEndBeforeLastStableOffset(t *testing.T) {
+ in:=fixture();p:=&in.PartitionCaptures[0]
+ p.LastStableOffsetBefore=103;p.LastStableOffsetAfter=103
+ p.HighWatermarkBefore=103;p.HighWatermarkAfter=103
+ refresh(&in);expect(t,in,Indeterminate)
+}
 func TestRangeCannotExtendPastLastStableOffset(t *testing.T){in:=fixture();in.PartitionCaptures[0].EndOffsetExclusive=105;refresh(&in);expect(t,in,Blocked)}
 func TestLogStartAdvancingPastCaptureStartBlocks(t *testing.T){in:=fixture();in.PartitionCaptures[0].LogStartOffsetAtEnd=101;refresh(&in);expect(t,in,Blocked)}
 func TestCompactedTopicBlocksExactHistoryClaim(t *testing.T){in:=fixture();in.TopicInventory[0].CleanupPolicy="compact,delete";in.PartitionCaptures[0].CleanupPolicy="compact,delete";refresh(&in);expect(t,in,Blocked)}
@@ -176,11 +181,11 @@ func TestLSOCannotExceedHighWatermark(t *testing.T) {
 }
 
 func TestLSOBelowHighWatermarkMeansOpenTransactionRemains(t *testing.T) {
-	in := fixture()
-	in.PartitionCaptures[0].LastStableOffsetAfter = 103
-	in.PartitionCaptures[0].EndOffsetExclusive = 103
-	refresh(&in)
-	expect(t, in, Indeterminate)
+ in:=fixture();p:=&in.PartitionCaptures[0]
+ p.LastStableOffsetBefore=102;p.LastStableOffsetAfter=102
+ p.HighWatermarkBefore=103;p.HighWatermarkAfter=103
+ p.EndOffsetExclusive=102
+ refresh(&in);expect(t,in,Indeterminate)
 }
 
 
