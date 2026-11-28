@@ -1,41 +1,94 @@
-# Decision-Relevant Predictability Metrics
+# Decision-Relevant Predictability Benchmark
 
-Dependency-free Rust metric contracts and a deterministic paired-world evaluator fixture for [issue #12546](https://github.com/Luminous-Dynamics/symthaea/issues/12546).
+**Status:** executable finite-world Bayesian and prior-free robust decision-value evaluator; broader chaotic-systems benchmark remains a protocol proposal.
 
-The package includes no candidate forecasting model. It currently provides evaluator-side primitives:
+Parent research protocol: [issue #12546](https://github.com/Luminous-Dynamics/symthaea/issues/12546).
 
-- Qualified Lyapunov-time normalization that rejects any reference exponent not marked `Reliable`.
-- Observed forecast-horizon extraction with finite-value and monotonic-time validation.
-- Information-set Bayes risk, candidate policy risk, a separately labelled perfect-information lower bound, and regret.
-- Expected value of information from expected posterior Bayes risk and acquisition cost in task-loss units.
-- Componentwise Pareto dominance over a resource vector that includes sensing, acquisition, compute, p99 latency, peak/persistent memory, training, update, preprocessing, energy and communication.
-- A paired-world fixture in which a physical hazard and a sensor-offset-only world generate exactly the same passive primary-sensor observations.
-- Separate candidate-visible episode/observation types and evaluator-only mechanism/loss records.
-- Probe permission, remaining-budget and decision-deadline admission checks.
-- Known-answer tests for passive observational equivalence, irreducible abstention risk, a decision-changing reference probe, a one-bit nuisance observation with zero decision value, and denied probes.
+Standalone Rust workspace: this directory. It has no external crate dependencies and uses a pinned Cargo.lock.
 
-The decision evaluator distinguishes the best action available under the candidate's information set from the evaluator-only perfect-information lower bound. This prevents irreducible uncertainty from being charged to the candidate as avoidable model error.
+## Research question
+
+Can a model preserve decision quality, calibrated uncertainty and useful dynamical information beyond the horizon at which exact pointwise trajectory prediction becomes unreliable, while spending fewer sensing and compute resources than fixed-cadence or prediction-only policies?
+
+Pointwise forecast accuracy, autonomous dynamical fidelity, decision utility, epistemic reliability and full resource cost are distinct evaluation axes. There should be no unqualified composite score.
+
+## Implemented finite-world evaluator
+
+The current Rust library provides:
+
+- Candidate-visible episode, observation, permitted-probe and submission types.
+- Separate evaluator-side hidden state priors, decision-loss tables and evidence/probe outcome likelihoods.
+- Explicit conditional-independence declaration for multiple evidence channels. Correlated observations require one joint channel; the evaluator does not silently multiply arbitrary marginal likelihoods.
+- Posterior updating from authorized evidence.
+- Information-set Bayes risk under a frozen worst-case decision-loss constraint.
+- A separately labelled perfect-information lower bound and irreducible information gap.
+- Candidate expected loss, worst-case risk-gate result and decision regret.
+- Exact finite-outcome expected value of sample information (EVSI), acquisition cost, net EVSI and mutual information in bits.
+- Probe permission, componentwise budget admission and decision-deadline checks.
+- A separate prior-free robust mode in `src/robust.rs`: set-valued outcome supports, worst-case minimax decision loss before/after an observation, and guaranteed worst-case decision-loss reduction without priors or likelihood magnitudes.
+- Permission, declared cost-budget and decision-deadline checks for the robust mode; acquisition cost remains separate from task loss and is never silently scalarized.
+- A typed covariance-to-robust adapter, `evaluate_covariance_guided_robust_probe`, which retains the Stage-B experiment/method IDs, D² diagnostic and covariance-matrix digest alongside the Stage-A robust result. It never turns D² into a probability, likelihood, support set or decision value.
+- Fail-closed validation of prior mass, outcome likelihood normalization, missing decision losses, unknown observations/probes and mismatched public probe contracts.
+
+The current known-answer tests include:
+- observationally equivalent passive evidence and irreducible decision risk;
+- a perfectly discriminating probe with positive net decision value;
+- a one-bit diagnostic with zero downstream decision value;
+- a frozen worst-case risk veto;
+- over-budget and late probe rejection;
+- unknown/unpermitted probe rejection;
+- malformed outcome likelihood mass;
+- rejection of multiple evidence channels when conditional independence is not declared.
+
+The evaluator is deterministic and does not simulate probe execution. It computes the value of a requested probe from the evaluator's declared likelihood model. The posterior and risk reports are evaluator outputs and must not be returned to the candidate during a confirmatory episode.
 
 ## Run
 
-```bash
+~~~bash
 cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
-cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
-```
+cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets
+cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --locked --all-targets -- -D warnings
+~~~
 
-The crate uses only the Rust standard library and is an isolated Cargo workspace. The focused workflow is pinned to Rust 1.96.0.
+Focused workflow: [Decision-Relevant Predictability Evaluator](https://github.com/Luminous-Dynamics/symthaea/actions/workflows/decision-predictability-benchmark.yml).
 
-## Paired-world evaluator boundary
+A passing run qualifies only this small finite-world evaluator. It does not qualify the full #12546 benchmark, chaotic-system reference generators, external baselines or physical sensor measurements.
 
-Candidate-facing code should receive only `CandidateEpisode` and authorized `PrimarySensorObservation` values. Evaluator-only `EvaluatorWorld` records contain the latent mechanism and action losses. The Rust type split helps make the benchmark interface explicit, but this package is **not a sandbox or process-security boundary**. Confirmatory evaluations must keep evaluator truth in a separate process or permissioned environment and release only authorized observations to candidates.
+Focused exact-head qualification: [workflow run 45383264646](https://github.com/Luminous-Dynamics/symthaea/actions/runs/45383264646), commit d66d216d77d7b9d70cbbd7e66fa75a4bda3f6738. Rust 1.96.0 formatting, **16 tests (16 passed, 0 failed)** and strict Clippy all passed. This qualifies the finite-world Bayesian and robust decision-value primitives plus the typed covariance-to-robust adapter only; it is not the full #12546 benchmark.
 
-The canonical fixture currently tests a single pair of worlds and exact deterministic probe outcomes. Its step-based deadline and budget checks are local benchmark controls, not a replacement for capture/arrival clock domains or full observation-event semantics. It does not yet implement noisy/missing/delayed probe channels or a broad world generator.
+## Decision-value modes and covariance integration
 
-## Scope and limits
+Use the Bayesian evaluator only when prior probabilities and outcome likelihoods are justified. Use the robust evaluator when the defensible information is a set of possible states/outcomes and no probability model is warranted. Keep their outputs in separate fields and separate benchmark tables.
 
-These are metric/oracle primitives and finite synthetic controls, not a complete benchmark tournament, forecasting system, physical sensor system, or safety controller. Remaining work includes broader paired-world generators, clock-domain and duplicate/stale-event controls, candidate/evaluator process isolation, independent fixture review, and matched external predictor baselines.
+The covariance-aware Stage-B planner (Symthaea PR #13453) supplies prior-free worst-case hypothesis-separation scores. Those distances can help rank experiments for discrimination, but they do not by themselves define observation outcome supports, calibrated likelihoods, or decision losses. A typed adapter must bind the actual experiment response model and downstream decision policy before any Stage-B score can feed the robust decision-value evaluator. Never relabel Mahalanobis separation as EVSI or EIG.
 
-Resource vectors are comparable only when units, measurement boundaries, hardware and workloads match. The crate does not measure physical energy or hardware performance. Lyapunov normalization is rejected unless the reference exponent is marked `Reliable`; a candidate's own unqualified estimate must not define its score.
+## Existing related implementations — separate owners
 
-No output from this crate establishes SOTA, physical reliability, consciousness or causal reconstruction.
+- [#9817](https://github.com/Luminous-Dynamics/symthaea/issues/9817) owns the active-sensing / decision-focused value-of-information task contract.
+- [PR #9821](https://github.com/Luminous-Dynamics/symthaea/pull/9821) contains a separate Rust active-sensing planner under research/temporal-bench. It estimates expected task-loss reduction, rejects high-entropy but decision-irrelevant observations, checks six sensor-specific resource dimensions, and returns a Pareto frontier with provenance-bound receipts. It is not the paired-world evaluator described here.
+- [#12407](https://github.com/Luminous-Dynamics/symthaea/issues/12407) owns observation time/mask/modality/event semantics.
+- [#12502](https://github.com/Luminous-Dynamics/symthaea/issues/12502), [#12505](https://github.com/Luminous-Dynamics/symthaea/issues/12505), [#12506](https://github.com/Luminous-Dynamics/symthaea/issues/12506) and [#12624](https://github.com/Luminous-Dynamics/symthaea/issues/12624) own known-truth dynamics, Lyapunov qualification and predictor comparisons.
+- [#5476](https://github.com/Luminous-Dynamics/symthaea/issues/5476), [#5477](https://github.com/Luminous-Dynamics/symthaea/issues/5477) and [#5478](https://github.com/Luminous-Dynamics/symthaea/issues/5478) own internal value-of-computation calibration, bounded enforcement and causal metareasoning ablations.
+
+Do not create a competing scheduler or claim that PR #9821 supplies the paired-world evaluator, chaotic reference generators, or independent evaluator process.
+
+## Evaluator security boundary
+
+The candidate-visible and evaluator-side types make the interface explicit, but a Rust type boundary in one process is **not** a process-security boundary. Confirmatory runs must keep evaluator truth, priors, hidden likelihoods and loss tables in a separately permissioned process/environment and release only authorized observations to candidates.
+
+Recorded high-rate traces can support an emulated acquisition model at requested timestamps; interpolation must not be presented as an actual observation. Physical energy claims require policy-controlled measurements on target hardware, including acquisition, wake, conversion, compute, storage and transmission.
+
+## Remaining implementation gates
+
+Before this becomes the complete #12546 benchmark:
+1. add deterministic paired-world generation with evaluator-only truth and an independently permissioned execution boundary;
+2. add multiple observation channels with joint likelihood models for correlated modalities;
+3. add noisy, missing, delayed, duplicated and stale probe/observation controls;
+4. add reference generators and qualified Lyapunov normalization for the planned dynamical systems;
+5. add persistence, linear AR, ESN, NGRC, NGRC-MDS and eligible neural baselines under matched training/compute budgets;
+6. implement the complete active-observation policy tournament and Pareto resource accounting;
+7. publish paired confidence intervals, worst-regime results and full failure denominators.
+
+Resource dimensions are comparable only when units, measurement boundaries, hardware and workloads match. This crate does not measure physical energy or hardware performance. Expected information gain about hidden state is reported separately from EVSI; a probe can reduce entropy without changing the optimal decision. The prior-free robust module is a different estimand again: it reports a guaranteed worst-case loss reduction over declared outcome-support sets, not an expectation.
+
+No output from this crate establishes SOTA, physical reliability, causal reconstruction or consciousness.

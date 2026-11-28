@@ -1,0 +1,131 @@
+{
+  "schema": "luminous.eqc.benchmark-target-matrix.v0.1",
+  "status": "research_targets_not_results",
+  "snapshot_date": "2026-11-28",
+  "principle": "Do not let task success compensate for unauthorized mutations, wrong-subject access, invalid provenance, failed independent replay, or uncontained failure.",
+  "rules": [
+    "Match task version, inputs, environment, agent/tool access, network policy, and compute/time budgets.",
+    "Publish raw capability and qualified success separately.",
+    "Publish category results, paired task-level deltas, confidence intervals, cost and energy per qualified success.",
+    "Pin the external benchmark revision; never carry scores between revisions.",
+    "Every task must pass with a reference and fail with a no-op before admission."
+  ],
+  "tracks": [
+    {
+      "id": "software-engineering",
+      "system": "Symthaea",
+      "comparators": [
+        "SWE-Bench Pro V2: 642 tasks; hidden fail-to-pass/pass-to-pass tests; pristine-image regrade",
+        "SWE Atlas: 124 Codebase Q&A, 90 Test Writing, 70 Refactoring",
+        "Terminal-Bench 2.1: 89-task corrected revision; resolution, tokens, cost",
+        "METR Time Horizon 1.1: reliability versus human-expert task duration"
+      ],
+      "metrics": [
+        "resolve_rate",
+        "qualified_resolve_rate",
+        "regression_rate",
+        "test_mutation_detection",
+        "pristine_replay_agreement",
+        "policy_violations",
+        "p50_p95_latency",
+        "tokens_cost_energy",
+        "human_interventions",
+        "cost_per_qualified_fix"
+      ],
+      "targets": {
+        "foundation": "100% task reference-pass/no-op-fail; exact source, environment, tool and verifier digests on each claimed success.",
+        "competitive": "Within 5 percentage points of the strongest matched baseline at equal budgets, with no weaker integrity or replay gates.",
+        "stretch": "Statistically supported held-out improvement in qualified resolve rate and at least 20% lower cost per qualified fix."
+      }
+    },
+    {
+      "id": "clinical-workflow",
+      "system": "Mycelix Health",
+      "comparators": [
+        "HealthAgentBench V2: 75 tasks, 9 categories; 57.3% highest listed pooled success snapshot",
+        "HL7 FHIR R4 resource/profile validation plus server behavior tests"
+      ],
+      "metrics": [
+        "task_success_by_category",
+        "wrong_patient_tenant_access",
+        "unauthorized_reads_writes",
+        "revocation_race_outcomes",
+        "state_unchanged_on_denial",
+        "FHIR_conformance",
+        "provenance_completeness",
+        "abstention_precision_recall",
+        "p50_p95_latency_cost_energy"
+      ],
+      "targets": {
+        "foundation": "100% correct identity/authority handling in deterministic controls; zero observed unauthorized mutations across at least 10,000 adversarial episodes, stratified by threat family.",
+        "competitive": "Claim direct HealthAgentBench comparison only after reproducing its full 75-task environment; otherwise compare the narrower EHR categories separately.",
+        "stretch": "Lower harm-weighted selective risk at equal coverage and at least 20% lower cost per qualified workflow."
+      }
+    },
+    {
+      "id": "scientific-simulation",
+      "system": "Symtropy",
+      "comparators": [
+        "ASME V&V 20: specified validation points with numerical and experimental uncertainty",
+        "ASME VVUQ 20.1-2024: multivariate discrepancies and shared/independent uncertainty",
+        "Rapier/Jolt/Box2D: matched release-build scenes, correctness and p50/p95/p99 latency"
+      ],
+      "metrics": [
+        "false_positive_negative_collision",
+        "analytical_reference_error",
+        "convergence_order",
+        "metamorphic_invariance",
+        "conservation_residuals",
+        "p50_p95_p99_runtime",
+        "stable_population",
+        "memory_allocations_energy",
+        "deterministic_replay_coverage"
+      ],
+      "targets": {
+        "foundation": "Zero classification errors on each frozen independent seed; exact replay on deterministic profiles and declared numeric tolerances elsewhere.",
+        "competitive": "On matched 2D/3D scenes, first match correctness/stability, then target p95 tick latency within 10% of the strongest matched comparator.",
+        "stretch": "Zero reference-classification errors on a preregistered 100,000-pair stratified 4D holdout without reducing determinism coverage."
+      }
+    },
+    {
+      "id": "trust-infrastructure",
+      "system": "Mycelix / Mycelix Prism",
+      "comparators": [
+        "W3C Verifiable Credentials and Data Integrity lifecycle tests",
+        "Pinned Holochain conductor, HDK/HDI validation and countersigning behavior"
+      ],
+      "metrics": [
+        "false_acceptance",
+        "false_rejection",
+        "revocation_propagation",
+        "replay_duplicate_rejection",
+        "equivocation_detection",
+        "cross_tenant_isolation",
+        "unknown_commit_reconciliation",
+        "independent_receipt_verification",
+        "throughput_p50_p95",
+        "recovery_time"
+      ],
+      "targets": {
+        "foundation": "100% correct deterministic lifecycle controls; unresolved commit/delivery stays unresolved until recipient-side evidence.",
+        "competitive": "Compare throughput only under matched topology, persistence, replication and fault models; report safety invariants separately.",
+        "stretch": "At least 10,000 episodes per threat family with zero observed invariant violations and cluster-aware uncertainty."
+      }
+    }
+  ],
+  "non_compensatory_gates": [
+    "authority",
+    "subject_identity",
+    "input_integrity",
+    "provenance",
+    "independent_replay",
+    "failure_containment"
+  ],
+  "statistics": {
+    "paired_task_results": true,
+    "confidence_intervals": true,
+    "task_family_clustering": true,
+    "multiple_comparison_correction": true,
+    "zero_failure_interpretation": "Zero observed failures is not zero risk. For n independent trials, approximate 95% upper bound is 3/n; use cluster-aware intervals for shared scenarios."
+  }
+}
