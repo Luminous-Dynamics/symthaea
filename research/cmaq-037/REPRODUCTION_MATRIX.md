@@ -24,6 +24,7 @@ CMAQ-035 established an internal comparison between fixed and ONS betting. CMAQ-
 | Conditional rank dependence | CMAQ-045: predictable history contexts × full dyadic rank spectrum | Targets temporal dependence with marginal rank invariance; finite context portfolio only |
 | Convex-target approachability | CMAQ-046: predictable OCO separator × support-function residual × conditional-mean e-process | Adaptive conditional-mean null; distinct from exchangeable PRM/CCTM; fixed-bet subset |
 | Controlled Blackwell action selection | CMAQ-047: OCO witness chooses from action-specific null-safe diagnostics using support-halfspace eligibility | Adaptive controlled experiment arm; requires authenticated action-conditional mean contracts and one-use outcome reconciliation |
+| Fourier kernel mean embedding | CMAQ-048: fixed paired sine/cosine random Fourier features × CMAQ-046 approachability e-process | Detects selected higher-moment/shape changes with preserved raw mean; finite feature-bank approximation and frozen null embedding target |
 | CS-risk | Anytime confidence-sequence monitor of a matched running/rolling average risk | Complementary estimand, not a like-for-like per-instance drift detector |
 
 Do not implement CCTM by multiplying repeated marginal conformal p-values or by using a rolling empirical breach rate. Implement its actual conditional calibration and martingale construction from the reference paper/code.
@@ -162,5 +163,14 @@ This is enough to motivate broader replication, not enough to claim reproduction
 - Fang (2026), *Anytime Valid Conformal Prediction on Streaming Time Series* — confidence sequences for running / rolling average miscoverage; complementary target.
 - WATCH (ICML 2025) — weighted conformal test martingales for covariate / concept shift diagnosis.
 - Timans et al. (UAI 2025) — continuous monitoring of bounded risk violations under unknown shift with testing-by-betting.
+
+Additional late-2026 comparator coverage:
+- Zheng & Zhang (17 Nov 2026), *Sequential Conditional Paired-Sample Testing with Applications to Online Monitoring* (SCPT): anytime-valid conditional kernel discrepancy tests for paired responses sharing covariates; compare only on paired/covariate-matched streams and reproduce its dependence assumptions.
+- Saha & Ramdas (30 Jul 2026), *Non-partitioned e-detectors for nonparametric sequential change detection*: aggregate point-null e-processes over candidate changepoints and take an infimum over candidate no-change distributions; it targets unknown pre/post distributions and is a comparator for reference/model uncertainty.
+- Kalinke & Gavioli-Akilagun (NeurIPS 2025), *Optimal Online Change Detection via Random Fourier Features*: nonparametric online multivariate change detection with logarithmic time/space complexity and minimax delay guarantees; include as a direct RFF comparator.
+- Njuki & Ning (21 Sep 2026), *A Sequential Nonparametric Test for Detecting Change in the Distribution Based on Energy Statistics*: windowed energy-statistic sequential detector; report its actual false-alarm criterion and avoid assuming anytime validity if the reproduced method does not provide it.
+- Shaer et al. (ICML 2026), *Testing for Distribution Shifts with Conditional Conformal Test Martingales*: fixed-reference conditional validity and protection against post-change reference contamination.
+
+These comparators have different nulls, data access, paired/covariate structure, and stopping criteria. Use separate matched benchmark families rather than forcing every method into one pooled leaderboard.
 
 CMAQ-037 is a fair reproduction and benchmarking programme, not a new statistical theorem.
