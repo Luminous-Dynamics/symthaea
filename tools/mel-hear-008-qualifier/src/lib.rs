@@ -165,9 +165,9 @@ fn approximately_equal(left: f64, right: f64) -> bool {
 fn validate_locator(value: &str, label: &str) -> Result<(), String> {
     let synthetic = value.strip_prefix("synthetic:").is_some_and(|suffix| {
         !suffix.is_empty()
-            && suffix.bytes().all(|byte| {
-                byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')
-            })
+            && suffix
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
     });
     let digest = value.strip_prefix("sha256:").is_some_and(|suffix| {
         suffix.len() == 64
@@ -178,7 +178,9 @@ fn validate_locator(value: &str, label: &str) -> Result<(), String> {
     if synthetic || digest {
         Ok(())
     } else {
-        Err(format!("{label} must be a synthetic or lowercase SHA-256 locator"))
+        Err(format!(
+            "{label} must be a synthetic or lowercase SHA-256 locator"
+        ))
     }
 }
 
@@ -194,9 +196,9 @@ fn unique_ids(values: &[String], label: &str) -> Result<BTreeSet<String>, String
 }
 
 fn fraction_value(value: &str) -> Result<f64, String> {
-    let (numerator, denominator) = value
-        .split_once('/')
-        .ok_or_else(|| "expected point-estimate fraction must use numerator/denominator".to_owned())?;
+    let (numerator, denominator) = value.split_once('/').ok_or_else(|| {
+        "expected point-estimate fraction must use numerator/denominator".to_owned()
+    })?;
     let numerator = numerator
         .parse::<f64>()
         .map_err(|_| "invalid expected point-estimate numerator".to_owned())?;
@@ -275,7 +277,11 @@ fn graph_support(
         .filter(|performer| performer_neighbors[*performer].is_empty())
         .cloned()
         .collect::<Vec<_>>();
-    let max_work_degree = work_neighbors.values().map(BTreeSet::len).max().unwrap_or(0);
+    let max_work_degree = work_neighbors
+        .values()
+        .map(BTreeSet::len)
+        .max()
+        .unwrap_or(0);
     let max_performer_degree = performer_neighbors
         .values()
         .map(BTreeSet::len)
@@ -341,7 +347,9 @@ fn validate_estimand(
         || estimand.target_population.trim().is_empty()
         || estimand.weighting_rule.trim().is_empty()
     {
-        return Err("estimand identity, target population and weighting rule are required".to_owned());
+        return Err(
+            "estimand identity, target population and weighting rule are required".to_owned(),
+        );
     }
 
     validate_marginal_weights(
@@ -362,20 +370,32 @@ fn validate_estimand(
     let mut weights_by_id = BTreeMap::new();
     for item in &estimand.cell_weights {
         if !cells_by_id.contains_key(item.cell_id.as_str()) {
-            return Err(format!("estimand {} references an unknown cell", estimand.estimand_id));
+            return Err(format!(
+                "estimand {} references an unknown cell",
+                estimand.estimand_id
+            ));
         }
         if weights_by_id.contains_key(item.cell_id.as_str()) {
-            return Err(format!("estimand {} contains duplicate cell weights", estimand.estimand_id));
+            return Err(format!(
+                "estimand {} contains duplicate cell weights",
+                estimand.estimand_id
+            ));
         }
         if !item.weight.is_finite() || item.weight <= 0.0 || item.weight > 1.0 {
-            return Err(format!("estimand {} contains an invalid cell weight", estimand.estimand_id));
+            return Err(format!(
+                "estimand {} contains an invalid cell weight",
+                estimand.estimand_id
+            ));
         }
         weights_by_id.insert(item.cell_id.as_str(), item.weight);
     }
 
     let target_weight_sum = weights_by_id.values().copied().sum::<f64>();
     if !approximately_equal(target_weight_sum, 1.0) {
-        return Err(format!("estimand {} cell weights must sum to one", estimand.estimand_id));
+        return Err(format!(
+            "estimand {} cell weights must sum to one",
+            estimand.estimand_id
+        ));
     }
 
     let missing_target_cells = weights_by_id
@@ -402,7 +422,10 @@ fn validate_estimand(
                 .iter()
                 .map(|(cell_id, weight)| {
                     let outcome = cells_by_id[cell_id].paired_effect_mean.ok_or_else(|| {
-                        format!("estimand {} references an observed cell without an outcome", estimand.estimand_id)
+                        format!(
+                            "estimand {} references an observed cell without an outcome",
+                            estimand.estimand_id
+                        )
                     })?;
                     Ok((*cell_id, *weight, outcome))
                 })
@@ -413,17 +436,28 @@ fn validate_estimand(
                 .map(|(_, weight, outcome)| weight * outcome)
                 .sum::<f64>();
 
-            let expected_decimal = estimand
-                .expected_point_estimate_decimal
-                .ok_or_else(|| format!("estimand {} is missing its expected point estimate", estimand.estimand_id))?;
+            let expected_decimal = estimand.expected_point_estimate_decimal.ok_or_else(|| {
+                format!(
+                    "estimand {} is missing its expected point estimate",
+                    estimand.estimand_id
+                )
+            })?;
             let expected_fraction = estimand
                 .expected_point_estimate_fraction
                 .as_deref()
-                .ok_or_else(|| format!("estimand {} is missing its exact expected fraction", estimand.estimand_id))?;
+                .ok_or_else(|| {
+                    format!(
+                        "estimand {} is missing its exact expected fraction",
+                        estimand.estimand_id
+                    )
+                })?;
             if !approximately_equal(estimate, expected_decimal)
                 || !approximately_equal(estimate, fraction_value(expected_fraction)?)
             {
-                return Err(format!("estimand {} does not reproduce its expected point estimate", estimand.estimand_id));
+                return Err(format!(
+                    "estimand {} does not reproduce its expected point estimate",
+                    estimand.estimand_id
+                ));
             }
 
             match estimand.kind {
@@ -433,7 +467,9 @@ fn validate_estimand(
                         .iter()
                         .any(|(_, weight, _)| !approximately_equal(*weight, expected_weight))
                     {
-                        return Err("observed-cell mean must weight every observed cell equally".to_owned());
+                        return Err(
+                            "observed-cell mean must weight every observed cell equally".to_owned()
+                        );
                     }
                 }
                 EstimandKind::EqualWorkMacroMean => {
@@ -442,13 +478,19 @@ fn validate_estimand(
                         *counts.entry(cell.work_id.as_str()).or_default() += 1;
                     }
                     if counts.len() != work_ids.len() {
-                        return Err("equal-work mean is unsupported when a work has no observed cells".to_owned());
+                        return Err(
+                            "equal-work mean is unsupported when a work has no observed cells"
+                                .to_owned(),
+                        );
                     }
                     for (cell_id, weight, _) in &contributions {
                         let work_id = cells_by_id[cell_id].work_id.as_str();
                         let expected_weight = 1.0 / (counts.len() * counts[work_id]) as f64;
                         if !approximately_equal(*weight, expected_weight) {
-                            return Err("equal-work macro weights do not give every work equal mass".to_owned());
+                            return Err(
+                                "equal-work macro weights do not give every work equal mass"
+                                    .to_owned(),
+                            );
                         }
                     }
                 }
@@ -462,7 +504,9 @@ fn validate_estimand(
                         return Err("equal-performer mean is unsupported when a performer has no observed cells".to_owned());
                     }
                     for (cell_id, weight, _) in &contributions {
-                        let performer = cells_by_id[cell_id].performer_membership[0].performer_id.as_str();
+                        let performer = cells_by_id[cell_id].performer_membership[0]
+                            .performer_id
+                            .as_str();
                         let expected_weight = 1.0 / (counts.len() * counts[performer]) as f64;
                         if !approximately_equal(*weight, expected_weight) {
                             return Err("equal-performer macro weights do not give every performer equal mass".to_owned());
@@ -494,7 +538,11 @@ fn validate_estimand(
                     estimand.estimand_id
                 ));
             }
-            if estimand.disposition_reason.as_deref().is_none_or(str::is_empty) {
+            if estimand
+                .disposition_reason
+                .as_deref()
+                .is_none_or(str::is_empty)
+            {
                 return Err(format!(
                     "not-estimable estimand {} requires a disposition reason",
                     estimand.estimand_id
@@ -504,7 +552,9 @@ fn validate_estimand(
         }
         SupportDisposition::ModelBasedSensitivity => {
             if estimand.expected_point_estimate_decimal.is_some() {
-                return Err("model-based sensitivity results require a separate model report".to_owned());
+                return Err(
+                    "model-based sensitivity results require a separate model report".to_owned(),
+                );
             }
             None
         }
@@ -540,7 +590,9 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
         .checked_mul(performer_ids.len())
         .ok_or_else(|| "potential work-performer cell count overflow".to_owned())?;
     if panel.cells.len() != potential_cells {
-        return Err("v0 requires an explicit record for every potential work-performer cell".to_owned());
+        return Err(
+            "v0 requires an explicit record for every potential work-performer cell".to_owned(),
+        );
     }
 
     let mut seen_cell_ids = BTreeSet::new();
@@ -555,7 +607,10 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
             return Err("cell references an undeclared source work".to_owned());
         }
         if cell.performer_membership.len() != 1 {
-            return Err("v0 rejects ensemble or set-valued performer cells until their estimand is defined".to_owned());
+            return Err(
+                "v0 rejects ensemble or set-valued performer cells until their estimand is defined"
+                    .to_owned(),
+            );
         }
         let membership = &cell.performer_membership[0];
         if !performer_ids.contains(&membership.performer_id) {
@@ -565,7 +620,9 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
             return Err("single-performer cell membership weight must equal one".to_owned());
         }
         if !seen_pairs.insert((cell.work_id.as_str(), membership.performer_id.as_str())) {
-            return Err("duplicate work-performer cell; aggregate repeats in one cell record".to_owned());
+            return Err(
+                "duplicate work-performer cell; aggregate repeats in one cell record".to_owned(),
+            );
         }
 
         match cell.status {
@@ -574,7 +631,10 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
                     .paired_effect_mean
                     .ok_or_else(|| "observed cells require paired_effect_mean".to_owned())?;
                 if !value.is_finite() || cell.repeat_count.is_none_or(|count| count == 0) {
-                    return Err("observed cells require a finite outcome and positive repeat_count".to_owned());
+                    return Err(
+                        "observed cells require a finite outcome and positive repeat_count"
+                            .to_owned(),
+                    );
                 }
                 observed_cells.push(cell);
             }
@@ -582,7 +642,10 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
             | CellStatus::MissingUnknown
             | CellStatus::UnjoinablePerformer => {
                 if cell.paired_effect_mean.is_some() || cell.repeat_count.is_some() {
-                    return Err("missing cells must not carry observed outcomes or repeat counts".to_owned());
+                    return Err(
+                        "missing cells must not carry observed outcomes or repeat counts"
+                            .to_owned(),
+                    );
                 }
                 if cell.missingness_reason.as_deref().is_none_or(str::is_empty) {
                     return Err("missing cells require a non-empty missingness_reason".to_owned());
@@ -595,7 +658,9 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
     let complete_cartesian_support = observed_cells.len() == potential_cells;
     let observed_pairs = seen_pairs.len();
     if observed_pairs != potential_cells {
-        return Err("incidence panel does not represent every work-performer pair exactly once".to_owned());
+        return Err(
+            "incidence panel does not represent every work-performer pair exactly once".to_owned(),
+        );
     }
 
     let support = &panel.support_audit;
@@ -610,7 +675,9 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
         || support.max_work_degree != components.3
         || support.max_performer_degree != components.4
     {
-        return Err("declared support_audit does not match recomputed incidence support".to_owned());
+        return Err(
+            "declared support_audit does not match recomputed incidence support".to_owned(),
+        );
     }
 
     let mut estimand_ids = BTreeSet::new();
@@ -731,10 +798,12 @@ mod tests {
     #[test]
     fn ensemble_membership_is_not_counted_as_independent_performers() {
         let mut panel = fixture();
-        panel.cells[0].performer_membership.push(PerformerMembership {
-            performer_id: "synthetic:performer-2".to_owned(),
-            weight: 0.5,
-        });
+        panel.cells[0]
+            .performer_membership
+            .push(PerformerMembership {
+                performer_id: "synthetic:performer-2".to_owned(),
+                weight: 0.5,
+            });
         panel.cells[0].performer_membership[0].weight = 0.5;
         assert!(audit_panel(&panel).is_err());
     }
