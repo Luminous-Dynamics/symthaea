@@ -429,7 +429,6 @@ mod tests {
         let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
         let mut plan = PlanExecutor::new(0.35);
 
-        // Step 0: search (ReadOnly, needs 0.2) — succeeds
         plan.add_step(
             NixOSCommand::Search {
                 query: "vim".into(),
@@ -437,7 +436,6 @@ mod tests {
             },
             "Search vim",
         );
-        // Step 1: rebuild (SystemCritical, needs 0.4) — fails, but NON-CRITICAL
         plan.add_optional_step(
             NixOSCommand::RebuildSwitch {
                 flake: None,
@@ -445,7 +443,6 @@ mod tests {
             },
             "Optional rebuild",
         );
-        // Step 2: search again — should still execute
         plan.add_step(
             NixOSCommand::Search {
                 query: "git".into(),
@@ -456,16 +453,22 @@ mod tests {
 
         let result = plan.execute(&mut nix_executor).await;
         assert!(
-            result.success,
-            "Plan should succeed despite non-critical failure"
+            !result.success,
+            "a plan with previews has not completed the requested mutations"
         );
-        assert_eq!(result.completed_count, 2, "Steps 0 and 2 succeed");
-        assert_eq!(result.rolled_back_count, 0, "No rollback for non-critical");
+        assert_eq!(result.completed_count, 0);
+        assert_eq!(result.previewed_count, 2);
+        assert_eq!(result.rolled_back_count, 0);
         assert_eq!(result.steps.len(), 3);
 
-        // Step 1 failed but non-critical
+        assert_eq!(result.steps[0].0.status, StepStatus::Previewed);
+        assert!(matches!(
+            &result.steps[0].1,
+            Some(ExecutionResult::PreviewOnly { .. })
+        ));
         assert!(matches!(result.steps[1].0.status, StepStatus::Failed(_)));
         assert!(!result.steps[1].0.critical);
+        assert_eq!(result.steps[2].0.status, StepStatus::Previewed);
     }
 
     #[tokio::test]
