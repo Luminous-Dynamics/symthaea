@@ -156,14 +156,16 @@ fn validate_views(record: &Value) -> Result<(usize, usize), String> {
             "erb_band_energy" if string(view, "frequency_scale")? != "erb" => {
                 return Err("ERB energy view must declare its ERB frequency scale".to_owned());
             }
-            "constant_q" if string(view, "frequency_scale")? != "log_frequency" => {
-                return Err("constant-Q view must declare log-frequency scale".to_owned());
+            "constant_q" | "log_frequency_energy"
+                if string(view, "frequency_scale")? != "log_frequency" =>
+            {
+                return Err("log-frequency views must declare log-frequency scale".to_owned());
             }
             _ => {}
         }
     }
 
-    for required in ["waveform", "complex_stft", "erb_band_energy", "constant_q"] {
+    for required in ["waveform", "complex_stft", "erb_band_energy", "log_frequency_energy"] {
         if !kinds.contains(required) {
             return Err(format!(
                 "required representation view is absent: {required}"
