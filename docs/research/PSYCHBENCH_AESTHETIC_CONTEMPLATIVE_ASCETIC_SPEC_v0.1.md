@@ -421,13 +421,26 @@ These are proposed internal release gates, not claims about universal psychometr
 3. Publish a limitations-first technical report with evidence tier per result.
 4. Conduct independent reproduction before any SOTA claim.
 
+## 8.1 First executable scorer primitive (research branch)
+
+The initial Rust scoring primitive is now present at `crates/domains/symthaea-psych-bench/src/benchmarks/aesthetic.rs` and exported as `benchmarks::aesthetic`.
+
+It intentionally separates two estimands:
+- **Population distribution prediction:** one ordinal probability distribution per item, evaluated against all human rater-item observations. It reports multiclass Brier score, log loss, modal accuracy (secondary), and per-item empirical-distribution Earth Mover Distance. It does not collapse the observed ratings to one average before scoring.
+- **Known-user personalization:** one ordinal probability distribution per rater-item pair, evaluated only against that participant's rating. It reports Brier score, log loss, and modal accuracy. This is not the unseen-user/cold-start protocol.
+
+The scorer fails closed on missing/extra predictions, duplicate rater-item records, invalid categories, malformed probability vectors, and probability-mass errors. Its tests include a deliberately bimodal population preference distribution, rater-conditioned predictions, malformed probability mass, missing personalized matches, and duplicate human records.
+
+**Implementation status:** source and unit tests have been committed, but no Cargo test/build has been executed in this environment. These are scoring primitives, not an external dataset adapter or a benchmark result. Participant/item-clustered confidence intervals, dataset adapters, registry cards, baselines and empirical human preference evaluation remain pending. The output is a point estimate; rating rows must not be treated as independent for uncertainty estimation.
+
 ## 9. Immediate engineering tickets
 
 | ID | Work item | Acceptance evidence |
 |---|---|---|
 | ACEE-001 | Add construct cards and extension registry | Schema-valid registry; duplicate IDs and missing sources rejected |
 | ACEE-002 | Implement MSC adapter | Pinned dataset manifest; split-by-base-scene tests; raw ratings retained |
-| ACEE-003 | Add pluralistic preference scorer | Pairwise and distributional scores; rater/item clustered uncertainty |
+| ACEE-005 | Implement poetry / music / personalization adapters | on006648, MADB and PAM∃LA split/provenance audits; source-held-out and user-held-out tests |
+| ACEE-003 | Add pluralistic preference scorer | Population and known-user Rust ordinal scorers implemented; clustered uncertainty, pairwise scorer and adapter integration pending |
 | ACEE-004 | Add aesthetics adversarial controls | identity, context, proxy-gaming, counterpoint and cohort tests |
 | CPASR-001 | Add contemplative/ascetic construct cards | distinct practice, purpose, agency, context, risk and stop-rule fields |
 | CPASR-002 | Implement NEMAR adapter | participant-held-out folds and reproducible signal preprocessing |
