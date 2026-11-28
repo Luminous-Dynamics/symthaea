@@ -340,7 +340,10 @@ impl ConfigWriter {
             let same_line_sibling = parsed.options.iter().any(|option| {
                 option.line == existing.line && option.path != rendered_path
             });
-            if same_line_sibling || existing.raw_value.contains('\n') || existing.raw_value.contains('\r') {
+            if same_line_sibling
+                || existing.raw_value.contains('\n')
+                || existing.raw_value.contains('\r')
+            {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     format!(
@@ -357,6 +360,16 @@ impl ConfigWriter {
                     format!("Parser returned an invalid source line for {rendered_path}"),
                 ));
             }
+            let source_line = lines[line_index].trim_start();
+            if !source_line.starts_with(&format!("{rendered_path} =")) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "Refusing nested/computed edit for {rendered_path}; only direct dotted assignments are supported"
+                    ),
+                ));
+            }
+
             let indentation = lines[line_index]
                 .chars()
                 .take_while(|character| character.is_whitespace())
@@ -368,6 +381,24 @@ impl ConfigWriter {
             }
             content
         } else {
+            let segments = rendered_path.split('.').collect::<Vec<_>>();
+            let parent_is_defined = (1..segments.len()).any(|end| {
+                let parent = segments[..end].join(".");
+                parsed.options.iter().any(|option| option.path == parent)
+            });
+            let child_is_defined = parsed
+                .options
+                .iter()
+                .any(|option| option.path.starts_with(&format!("{rendered_path}.")));
+            if parent_is_defined || child_is_defined {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "Refusing to add {rendered_path}: existing nested/parent definitions require an AST-aware edit"
+                    ),
+                ));
+            }
+
             let Some(position) = original.rfind('}') else {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
