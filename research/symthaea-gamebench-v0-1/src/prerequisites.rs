@@ -434,7 +434,7 @@ mod tests {
         game.step(Action::East).expect("unlock");
         game.step(Action::West).expect("step back through unlocked door");
         let result = game.step(Action::East).expect("re-enter unlocked door");
-        assert_eq!(result.moved, true);
+        assert!(result.moved);
         assert_eq!(result.unlocked_door, None);
         assert_eq!(result.state.key_inventory, 0);
     }
