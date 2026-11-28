@@ -11,6 +11,21 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use scraper::{Html, Selector};
 
+/// One extracted claim with byte offsets into the exact `ExtractedContent.body_text` string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtractedClaim {
+    pub text: String,
+    pub byte_start: usize,
+    pub byte_end: usize,
+}
+
+impl ExtractedClaim {
+    /// Return the exact body-text slice represented by this claim.
+    pub fn resolve<'a>(&self, body_text: &'a str) -> Option<&'a str> {
+        body_text.get(self.byte_start..self.byte_end)
+    }
+}
+
 /// Extracted content from a web page
 #[derive(Debug, Clone, Default)]
 pub struct ExtractedContent {
@@ -22,6 +37,11 @@ pub struct ExtractedContent {
     pub summary: String,
     /// Extracted individual claims
     pub claims: Vec<String>,
+    /// Claim text with exact byte spans into `body_text`.
+    ///
+    /// The offsets refer to this normalized extracted-text artifact, not the
+    /// original HTML response. Hash `body_text.as_bytes()` to pin the artifact.
+    pub claim_spans: Vec<ExtractedClaim>,
     /// Metadata (author, date, etc.)
     pub metadata: ContentMetadata,
     /// Quality score (0.0 - 1.0) based on extraction success
@@ -143,8 +163,10 @@ impl ContentExtractor {
         // Extract summary
         let summary = self.extract_summary(&document, &body_text);
 
-        // Extract individual claims
-        let claims = self.extract_claims(&body_text);
+        // Extract individual claims and preserve their exact byte positions
+        // within the normalized body-text artifact.
+        let claim_spans = self.extract_claim_spans(&body_text);
+        let claims = claim_spans.iter().map(|claim| claim.text.clone()).collect();
 
         // Calculate quality score
         let quality = self.calculate_quality(&title, &body_text, &claims);
@@ -154,6 +176,7 @@ impl ContentExtractor {
             body_text,
             summary,
             claims,
+            claim_spans,
             metadata,
             quality,
         })
@@ -416,35 +439,71 @@ impl ContentExtractor {
         String::new()
     }
 
-    /// Extract individual claims from text
-    fn extract_claims(&self, text: &str) -> Vec<String> {
+    /// Extract claims and preserve byte spans into the exact input text.
+    ///
+    /// The splitter walks UTF-8 character boundaries and trims by byte length,
+    /// so every emitted range is safe to resolve against `text` without
+    /// searching for duplicate sentence strings after the fact.
+    fn extract_claim_spans(&self, text: &str) -> Vec<ExtractedClaim> {
         let mut claims = Vec::new();
+        let mut sentence_start = 0;
 
-        // Split into sentences
-        let sentences: Vec<&str> = text
-            .split(|c| c == '.' || c == '!' || c == '?')
-            .filter(|s| !s.trim().is_empty())
-            .collect();
-
-        for sentence in sentences {
-            let sentence = sentence.trim();
-
-            // Skip too short or too long sentences
-            if sentence.len() < 20 || sentence.len() > 300 {
+        for (delimiter_index, delimiter) in text.char_indices() {
+            if !matches!(delimiter, '.' | '!' | '?') {
                 continue;
             }
 
-            // Skip sentences that are likely not claims
-            if self.is_likely_claim(sentence) {
-                claims.push(sentence.to_string());
+            self.push_claim_span(
+                text,
+                sentence_start,
+                delimiter_index,
+                &mut claims,
+            );
+            sentence_start = delimiter_index + delimiter.len_utf8();
 
-                if claims.len() >= self.max_claims {
-                    break;
-                }
+            if claims.len() >= self.max_claims {
+                return claims;
             }
         }
 
+        self.push_claim_span(text, sentence_start, text.len(), &mut claims);
         claims
+    }
+
+    fn push_claim_span(
+        &self,
+        text: &str,
+        sentence_start: usize,
+        sentence_end: usize,
+        claims: &mut Vec<ExtractedClaim>,
+    ) {
+        if claims.len() >= self.max_claims || sentence_start > sentence_end {
+            return;
+        }
+        let Some(sentence) = text.get(sentence_start..sentence_end) else {
+            return;
+        };
+        let trimmed = sentence.trim();
+        if trimmed.len() < 20 || trimmed.len() > 300 || !self.is_likely_claim(trimmed) {
+            return;
+        }
+
+        let leading_trim = sentence.len() - sentence.trim_start().len();
+        let byte_start = sentence_start + leading_trim;
+        let byte_end = byte_start + trimmed.len();
+        claims.push(ExtractedClaim {
+            text: trimmed.to_owned(),
+            byte_start,
+            byte_end,
+        });
+    }
+
+    /// Compatibility helper for callers that only need claim strings.
+    fn extract_claims(&self, text: &str) -> Vec<String> {
+        self.extract_claim_spans(text)
+            .into_iter()
+            .map(|claim| claim.text)
+            .collect()
     }
 
     /// Check if a sentence is likely a verifiable claim
@@ -599,6 +658,58 @@ mod tests {
         assert_eq!(result.title, "Test Page");
         assert!(result.body_text.contains("Rust"));
         assert!(!result.claims.is_empty());
+    }
+
+    #[test]
+    fn extracted_claim_spans_resolve_exact_trimmed_utf8_byte_ranges() {
+        let extractor = ContentExtractor::new();
+        let text = "Introductory context.  Rust is a systems programming language.  Café is a useful UTF-8 test case.";
+        let claims = extractor.extract_claim_spans(text);
+
+        assert_eq!(claims.len(), 2);
+        for claim in &claims {
+            assert_eq!(claim.resolve(text), Some(claim.text.as_str()));
+            assert!(text.is_char_boundary(claim.byte_start));
+            assert!(text.is_char_boundary(claim.byte_end));
+            assert!(claim.byte_start < claim.byte_end);
+        }
+        assert_eq!(
+            claims[0].resolve(text),
+            Some("Rust is a systems programming language")
+        );
+        assert_eq!(claims[1].resolve(text), Some("Café is a useful UTF-8 test case"));
+    }
+
+    #[test]
+    fn extracted_claim_spans_do_not_shift_when_duplicate_sentences_occur() {
+        let extractor = ContentExtractor::new();
+        let sentence = "Rust is a systems programming language";
+        let text = format!("{sentence}. A separator sentence that is not a claim. {sentence}!");
+        let claims = extractor.extract_claim_spans(&text);
+
+        assert_eq!(claims.len(), 2);
+        assert_eq!(claims[0].text, claims[1].text);
+        assert_ne!(claims[0].byte_start, claims[1].byte_start);
+        assert_eq!(claims[0].resolve(&text), Some(sentence));
+        assert_eq!(claims[1].resolve(&text), Some(sentence));
+    }
+
+    #[test]
+    fn extract_content_claim_spans_are_bound_to_normalized_body_text() {
+        let html = r#"
+        <html><body><article>
+            <p>Rust is a systems programming language. It provides memory safety without garbage collection.</p>
+        </article></body></html>
+        "#;
+        let result = ContentExtractor::new()
+            .extract(html, "https://example.com/research")
+            .unwrap();
+
+        assert_eq!(result.claims.len(), result.claim_spans.len());
+        for (claim, span) in result.claims.iter().zip(&result.claim_spans) {
+            assert_eq!(claim, &span.text);
+            assert_eq!(span.resolve(&result.body_text), Some(claim.as_str()));
+        }
     }
 
     #[test]
