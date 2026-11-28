@@ -19,7 +19,7 @@ The repository also has a separate prior-free sequential policy-oracle contribut
 
 ## Supported v0.1 scope
 
-Only **read-only, non-mutating probes** are supported, such as inspecting a switch label, reading a visible panel, or querying a non-invasive sensor. The candidate emits its forecast before the probe; after the environment returns an observed outcome, its forecast can be scored with the multiclass Brier score.
+Only **read-only, non-mutating probes** are supported, such as inspecting a switch label, reading a visible panel, or querying a non-invasive sensor. The candidate emits its forecast at the current episode step before the probe. The evaluator binds the forecast and observation receipt to the episode and probe IDs, checks the result delay and deadline, and scores the forecast with the multiclass Brier score. A verified read-only result can be appended as public evidence to a new episode packet; the shared evaluator then performs the posterior update and terminal decision-risk evaluation.
 
 World-changing actions (pulling a lever, consuming a key, advancing a hazard, opening a gate) are rejected by this adapter. The shared one-step EVSI contract does not have outcome-specific transition/utility matrices. Those actions require an explicit transition model and composition with the sequential/robust decision owners; they must not be passed off as read-only observations.
 
@@ -65,6 +65,6 @@ cargo test --manifest-path research/symthaea-gamebench-decision-bridge-v0-1/Carg
 cargo clippy --manifest-path research/symthaea-gamebench-decision-bridge-v0-1/Cargo.toml --all-targets -- -D warnings
 ~~~
 
-The 6 tests in this crate are authored source tests until exact-head CI runs them. The dependency's earlier recorded 16/16 pass does not qualify this bridge or any GameBench candidate.
+The 12 tests in this crate are authored source tests until exact-head CI runs them. They cover shared-oracle value passthrough, forecast scoring and validation, episode/probe receipt identity, pre-registration timing, result delays, budget/deadline rejection, rejection of world-mutating probes, and post-observation terminal decision updates. The dependency's earlier recorded 16/16 pass does not qualify this bridge or any GameBench candidate.
 
-No candidate campaign, hidden-mechanic learning, transfer, visual competence, or SOTA result is claimed.
+The adapter does not itself run a GameBench candidate or establish learned mechanics competence. No candidate campaign, held-out transfer, visual competence, or SOTA result is claimed.
