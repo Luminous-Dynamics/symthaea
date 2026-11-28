@@ -308,7 +308,6 @@ pub struct ActionExecutionGate {
     last_now_monotonic_ns: Option<u64>,
     seen_segment_ids: HashSet<String>,
     active_segment_ids: HashSet<String>,
-    stop_command_accepted_ids: HashSet<String>,
     cancelled: bool,
     expired: bool,
 }
@@ -332,7 +331,6 @@ impl ActionExecutionGate {
             last_now_monotonic_ns: None,
             seen_segment_ids: HashSet::new(),
             active_segment_ids: HashSet::new(),
-            stop_command_accepted_ids: HashSet::new(),
             cancelled: false,
             expired: false,
         })
@@ -350,7 +348,6 @@ impl ActionExecutionGate {
     /// Returns false for unknown or already-acknowledged segments.
     pub fn acknowledge_stop_command_accepted(&mut self, segment_id: &str) -> bool {
         if self.active_segment_ids.remove(segment_id) {
-            self.stop_command_accepted_ids.insert(segment_id.to_owned());
             true
         } else {
             false
@@ -433,7 +430,7 @@ impl ActionExecutionGate {
                 segment.segment_id == *id
                     && segment.ends_at_monotonic_ns <= now_monotonic_ns
             });
-            if scheduled_end_reached && !self.stop_command_accepted_ids.contains(id) {
+            if scheduled_end_reached {
                 scheduled_stop_segment_ids.push(id.clone());
             }
         }
