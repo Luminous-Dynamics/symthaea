@@ -61,7 +61,7 @@ A future replay executor must start from the frozen genesis policy/state and rep
 
 ## Tests
 
-Twelve Rust tests are authored:
+Thirteen Rust tests are authored:
 1. two accepted updates form a digest-linked state/journal chain;
 2. revoking update 1 directly invalidates it and taints update 2;
 3. revoking update 2 leaves update 1 unaffected;
@@ -73,7 +73,8 @@ Twelve Rust tests are authored:
 9. stale K0 frontier is UNKNOWN, not clean;
 10. read-only report is deterministic and preserves old receipts;
 11. missing/out-of-order journal sequence is rejected;
-12. empty journal has no replay requirement.
+12. empty journal has no replay requirement;
+13. mixed UNKNOWN and BLOCKED statuses preserve BLOCKED precedence while retaining direct status for each sequence.
 
 The test count will be reconciled against the exact source at validation time.
 
