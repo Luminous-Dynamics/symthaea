@@ -184,7 +184,7 @@ The adapter is **not implemented**. The `color` field must remain explicit metad
 ## 11. Build sequence
 
 
-Phase A — corpus and contract: parse the scenario corpus, verify schema and unique IDs, emit deterministic expected/actual receipts and fail-closed outcomes. The current PR proposes this specification and corpus only.
+Phase A — corpus and contract: **implemented structurally** by the ten-case synthetic corpus, Draft 2020-12 schema, offline schema/instance auditor, unique-ID and synthetic-only checks, disposition oracle, and exact-head receipt. Exact-head Rust compilation, tests, Clippy and CI are pending. This is not a scientific result.
 
 Phase B — first public-data adapter: select one dataset after checking access rights, schema, target units and batch identifiers. Pin source version and hashes; do not copy the dataset until license and terms permit.
 
