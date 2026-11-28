@@ -97,6 +97,7 @@ pub struct CaOcrcPolicyV1 {
     pub target_risk: f64,
     pub learning_rate: f64,
     pub score_bound_b: f64,
+    pub score_contract_sha256: String,
     pub initial_threshold: f64,
     pub tracking_capacity: usize,
     pub maximum_feedback_delay: u64,
@@ -292,6 +293,7 @@ fn validate_policy(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
         || policy.learning_rate <= 0.0
         || !policy.score_bound_b.is_finite()
         || policy.score_bound_b <= 0.0
+        || !valid_sha256(&policy.score_contract_sha256)
         || !policy.initial_threshold.is_finite()
         || !(0.0..=policy.score_bound_b).contains(&policy.initial_threshold)
         || policy.tracking_capacity == 0
@@ -852,6 +854,7 @@ mod tests {
             target_risk: 0.05,
             learning_rate: 0.10,
             score_bound_b: 1.0,
+            score_contract_sha256: digest('f'),
             initial_threshold: 0.5,
             tracking_capacity: capacity,
             maximum_feedback_delay: delay,
@@ -999,7 +1002,8 @@ mod tests {
         let optimized = optimize_ca_ocrc_proxy_policy_v1(2, 8, 10_000).unwrap();
         let policy = CaOcrcPolicyV1 {
             schema: CA_OCRC_POLICY_SCHEMA_V1.into(), policy_id: "optimized".into(), revision: 1,
-            target_risk: 0.05, learning_rate: 0.1, score_bound_b: 1.0, initial_threshold: 0.5,
+            target_risk: 0.05, learning_rate: 0.1, score_bound_b: 1.0,
+            score_contract_sha256: digest('f'), initial_threshold: 0.5,
             tracking_capacity: 2, maximum_feedback_delay: 8,
             proxy_delay_probabilities: optimized.proxy_delay_probabilities,
             require_source_authenticity_assertion: false, maximum_inverse_probability_weight: 10_000.0,
