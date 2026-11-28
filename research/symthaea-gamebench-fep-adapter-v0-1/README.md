@@ -39,3 +39,27 @@ cargo clippy --all-targets -- -D warnings
 ```
 
 Tests are source-authored, not yet executed in this environment. The dedicated adapter workflow is the qualification gate.
+
+## Paired F1 comparison campaign
+
+A first evaluator-owned comparison harness is available at:
+
+`examples/paired_f1.rs`
+
+Run from this package:
+
+```sh
+cargo run --release --example paired_f1
+```
+
+The harness generates 16 deterministic 7×7 maps from candidate-hidden map seeds, with a guaranteed route plus randomized branches/dead ends. Every policy sees the same map for each episode. It compares:
+
+- seeded random legal;
+- greedy Manhattan;
+- spatial HDC;
+- HDC-LTC;
+- FEP ActiveInferenceAgent.
+
+The evaluator computes an exact shortest-path reference internally and returns only aggregate path regret; the exact route is never supplied to the candidates. Per-episode CSV includes task success, candidate protocol validity, actions, exact optimum length, excess actions, p50/p95 candidate decision latency, and complete episode wall time. Aggregate rows report success/protocol-valid rates and path/latency summaries.
+
+This is a **small deterministic smoke/pilot campaign**, not a statistical SOTA evaluation: 16 related procedural layouts do not establish broad generalization or independence. The maps, candidate seeds and model configurations must be frozen before any larger held-out campaign. The harness does not yet measure calibrated physical energy or peak resident memory. Exact BFS is evaluator-only, not a fifth candidate policy.
