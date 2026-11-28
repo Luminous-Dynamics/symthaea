@@ -1,10 +1,9 @@
 #![forbid(unsafe_code)]
 
-
 //! Standalone, deterministic game-environment primitives for Symthaea GameBench.
 //!
-//! V0.1 implements only the navigation fixture (F1) and structured / local
-//! observations (O1/O2). It is a benchmark substrate, not a Symthaea agent,
+//! V0.1 implements navigation (F1), Sokoban-like pushing (F2), and structured
+//! / local observations (O1/O2). It is a benchmark substrate, not a Symthaea agent,
 //! game-playing result, or production runtime component.
 
 mod sokoban;
