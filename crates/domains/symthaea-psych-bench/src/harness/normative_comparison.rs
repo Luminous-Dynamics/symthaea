@@ -701,8 +701,8 @@ mod tests {
 
         // Verify markdown includes strengths/weaknesses sections
         let md = report.to_markdown();
-        assert!(md.contains("### Strengths"));
-        assert!(md.contains("### Weaknesses"));
+        assert!(md.contains("### Metrics above their selected reference mean"));
+        assert!(md.contains("### Metrics below their selected reference mean"));
         assert!(md.contains("Test::Strong"));
         assert!(md.contains("Test::Weak"));
     }
