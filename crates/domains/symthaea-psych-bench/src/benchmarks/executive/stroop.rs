@@ -184,10 +184,16 @@ impl StroopBenchmark {
                 response_idx
             };
 
-            // RT proxy: deliberation ticks based on decision margin
-            let decision_margin = (sims[ink_idx] - max_sim + sims[ink_idx]).abs()
-                / (sims.iter().sum::<f64>() + 1e-10);
-            let rt_ticks = 8.0 + (1.0 - decision_margin) * 12.0;
+            // RT proxy: deliberation ticks based on the target's margin over
+            // its strongest competitor. Avoid normalizing by the sum of cosine
+            // similarities, which can be near-zero or negative.
+            let best_competitor = sims
+                .iter()
+                .enumerate()
+                .filter_map(|(index, similarity)| (index != ink_idx).then_some(*similarity))
+                .fold(f64::NEG_INFINITY, f64::max);
+            let decision_margin = (sims[ink_idx] - best_competitor).max(0.0);
+            let rt_ticks = 8.0 + (1.0 - decision_margin.min(1.0)) * 12.0;
 
             let correct = response_idx == ink_idx;
             let confidence = exp_sims[response_idx] / exp_sum;
@@ -349,6 +355,25 @@ mod tests {
         assert!(result.metrics.contains_key("incongruent_accuracy"));
         assert!(result.metrics.contains_key("neutral_accuracy"));
         assert!(result.metrics.contains_key("stroop_effect"));
+    }
+
+    #[test]
+    fn stroop_reaction_time_proxy_is_bounded_and_non_negative() {
+        let config = BenchmarkConfig {
+            dimension: 128,
+            trials_per_condition: 10,
+            trial_trace: true,
+            ..Default::default()
+        };
+        let result = StroopBenchmark.run(&config);
+        for key in ["congruent::rt_ticks", "incongruent::rt_ticks", "neutral::rt_ticks"] {
+            let metric = &result.metrics[key];
+            assert!(metric.mean >= 8.0, "{key} mean below proxy floor: {}", metric.mean);
+            assert!(metric.mean <= 20.0, "{key} mean above proxy ceiling: {}", metric.mean);
+        }
+        assert!(result.trial_trace.iter().all(|trial| {
+            (8.0..=20.0).contains(&trial.rt_ticks)
+        }));
     }
 
     #[test]
