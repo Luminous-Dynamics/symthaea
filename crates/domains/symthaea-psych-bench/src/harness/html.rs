@@ -134,7 +134,7 @@ fn write_profile_radar(html: &mut String, report: &BenchmarkReport) {
 
     let _ = write!(
         html,
-        "<h2>Cognitive Profile</h2>\n<div class=\"chart-container\">\n"
+        "<h2>Heuristic Baseline-Relative Dashboard (not psychometric)</h2>\n<p>Ratios across heterogeneous benchmark metrics; use for triage only, not as a validated cognitive ability score.</p>\n<div class=\"chart-container\">\n"
     );
 
     let domains: Vec<(&String, &f64)> = profile.iter().collect();
