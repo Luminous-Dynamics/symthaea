@@ -1731,6 +1731,30 @@ mod tests {
     }
 
     #[test]
+    fn oversized_claim_set_fails_before_graph_construction() {
+        let mut audit: Value = serde_json::from_slice(AUDIT).unwrap();
+        let base_claim = audit["claims"][0].clone();
+        let claims: Vec<Value> = (0..=MAX_CLAIMS)
+            .map(|index| {
+                let mut claim = base_claim.clone();
+                claim["claim_id"] = Value::String(format!("C-{index:05}"));
+                claim
+            })
+            .collect();
+        audit["claims"] = Value::Array(claims);
+        let audit_bytes = serde_json::to_vec(&audit).unwrap();
+
+        let result = report(&audit_bytes, &temporal(TemporalDisposition::Indeterminate));
+
+        assert_eq!(result.schema, Disposition::Pass);
+        assert_eq!(result.semantic, Disposition::Fail);
+        assert!(result
+            .findings
+            .iter()
+            .any(|finding| finding.code == "CLAIM_COUNT_LIMIT_EXCEEDED"));
+    }
+
+    #[test]
     fn deep_derivation_cycles_are_checked_without_recursive_stack_growth() {
         let count = 10_000usize;
         let mut graph = BTreeMap::new();
