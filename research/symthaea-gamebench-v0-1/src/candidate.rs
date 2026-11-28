@@ -30,9 +30,10 @@ pub struct FeatureForecast {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CandidateDecision<A> {
     pub action: A,
-    /// Candidate-reported probability that its selected action is suitable.
-    /// This is a report to be calibrated, not trusted evaluator confidence.
-    pub confidence: f64,
+    /// Candidate-reported probability that its selected action achieves the
+    /// task-relevant postcondition. None means the policy has no calibrated
+    /// estimate; action-selection softmax is not a substitute for confidence.
+    pub confidence: Option<f64>,
     /// Candidate forecasts for named, evaluator-defined observation features.
     pub forecasts: Vec<FeatureForecast>,
 }
@@ -117,7 +118,10 @@ pub fn validate_decision<A: PartialEq>(
     if !legal_actions.iter().any(|action| action == &decision.action) {
         return Err(DecisionValidationError::ActionNotOffered);
     }
-    if !decision.confidence.is_finite() || !(0.0..=1.0).contains(&decision.confidence) {
+    if decision
+        .confidence
+        .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
+    {
         return Err(DecisionValidationError::InvalidConfidence);
     }
 
@@ -166,7 +170,7 @@ mod tests {
     fn valid_decision() -> CandidateDecision<u8> {
         CandidateDecision {
             action: 2,
-            confidence: 0.75,
+            confidence: Some(0.75),
             forecasts: vec![
                 FeatureForecast {
                     feature_id: 1,
@@ -211,12 +215,19 @@ mod tests {
     fn rejects_non_finite_or_out_of_range_confidence() {
         for confidence in [f64::NAN, f64::INFINITY, -0.01, 1.01] {
             let mut decision = valid_decision();
-            decision.confidence = confidence;
+            decision.confidence = Some(confidence);
             assert_eq!(
                 validate_decision(&decision, &[0, 1, 2, 3]),
                 Err(DecisionValidationError::InvalidConfidence)
             );
         }
+    }
+
+    #[test]
+    fn accepts_unavailable_confidence_without_fabricating_calibration() {
+        let mut decision = valid_decision();
+        decision.confidence = None;
+        assert_eq!(validate_decision(&decision, &[0, 1, 2, 3]), Ok(()));
     }
 
     #[test]
