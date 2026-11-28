@@ -62,7 +62,7 @@
     "evidence_class": {
       "enum": [
         "exact_finite_action",
-        "exact_continuous_action",
+        "exact_rational_action_fragment",
         "restricted_partial_isomorphism",
         "human_calibrated_nuisance",
         "sampled_proposal",
