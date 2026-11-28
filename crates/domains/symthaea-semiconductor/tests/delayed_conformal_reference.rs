@@ -135,7 +135,7 @@ fn ca_round(index: u64, draw: f64) -> CaOcrcRoundInputV1 {
 }
 
 fn ca_feedback(origin: u64, current: u64, value: f64) -> CaOcrcFeedbackV1 {
-    let payload = digest('h');
+    let payload = digest('7');
     CaOcrcFeedbackV1 {
         schema: CA_OCRC_FEEDBACK_SCHEMA_V1.into(),
         current_round: current,
@@ -179,7 +179,7 @@ fn k1_conformal_interval_builder_feeds_the_immutable_delayed_aci_prediction() {
     for index in 0..19_u64 {
         let label_id = format!("aci-label-{index}");
         let event_id = format!("aci-event-{index}");
-        let payload = digest(char::from(b'b' + (index % 20) as u8));
+        let payload = format!("{:064x}", index + 1);
         let residual = index as f64 + 1.0;
         let mut report = eligibility_report(
             &label_id,
@@ -197,10 +197,10 @@ fn k1_conformal_interval_builder_feeds_the_immutable_delayed_aci_prediction() {
             label_id,
             label_revision: 1,
             label_payload_sha256: payload,
-            prediction_receipt_sha256: digest('q'),
+            prediction_receipt_sha256: digest('8'),
             global_model_artifact_sha256: digest('a'),
             score_policy_sha256: score_policy_sha.clone(),
-            measurement_contract_sha256: digest('m'),
+            measurement_contract_sha256: digest('9'),
             event_time_unix_seconds: 1_800_000_000 + index as i64 * 10 - 120,
             prediction_at_unix_seconds: 1_800_000_000 + index as i64 * 10 - 60,
             label_available_at_unix_seconds: 1_800_000_000 + index as i64 * 10,
@@ -220,7 +220,7 @@ fn k1_conformal_interval_builder_feeds_the_immutable_delayed_aci_prediction() {
             prediction_at_unix_seconds: 1_800_001_000,
             clock_domain_id: "fab-clock".into(),
             global_model_artifact_sha256: digest('a'),
-            measurement_contract_sha256: digest('m'),
+            measurement_contract_sha256: digest('9'),
             point_prediction: 100.0,
             prediction_scale: 1.0,
             target_miscoverage: 0.05,
