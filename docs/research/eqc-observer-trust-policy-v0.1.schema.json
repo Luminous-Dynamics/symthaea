@@ -31,6 +31,8 @@
           "measurement_profile",
           "active",
           "observer_version",
+          "observer_sha256",
+          "observer_version",
           "observer_sha256"
         ],
         "properties": {
