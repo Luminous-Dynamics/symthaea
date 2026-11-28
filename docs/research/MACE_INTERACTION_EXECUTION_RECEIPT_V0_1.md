@@ -11,7 +11,7 @@ This is an execution-evidence contract, not a preference store, selector, consen
 1. The existing policy selects one or more currently applicable interaction preferences. The selection binds subject, context, decision-policy digest, source evidence receipts, scope, purpose, audience and bitemporal validity.
 2. The executor emits an ordered event stream containing applied controls, committed actions, response commitment and—when a prohibited action must not occur—a closed no-action observation window.
 3. The execution adapter creates a receipt binding request, selected decision, exact response bytes, ordered event manifest and executor build.
-4. An independent host verifier checks source/authority receipts and every executor event. For a no-action requirement it must prove that the action journal is complete through the requested observation window; absence from an incomplete log is not evidence that the action did not occur.
+4. An independent host verifier checks source/authority receipts and every executor event. Required control/action events and no-action-window closure must occur no later than the exact response-commit event; a later event cannot retroactively qualify an already emitted response. For a no-action requirement the host must prove that the action journal is complete through the requested observation window; absence from an incomplete log is not evidence that the action did not occur.
 5. The verifier returns an in-process VerifiedInteractionExecutionV1 capability. Its constructor and fields are private; a JSON receipt and re-computed SHA-256 cannot recreate the capability.
 
 ## Supported requirements
@@ -33,6 +33,6 @@ No-action coverage is a first-class event. It is not inferred from a missing too
 
 ## Tests
 
-Sixteen deterministic tests cover control realization, required actions, prohibited action detection, complete and incomplete no-action windows, context/audience mismatch, stale/future-known preferences, wrong subject, exact response binding, tampered receipts, duplicate/noncanonical events, untrusted event receipts, missing control evidence, and multiple independent preferences.
+Eighteen deterministic tests cover control realization, required actions, prohibited action detection, complete and incomplete no-action windows, context/audience mismatch, stale/future-known preferences, wrong subject, exact response binding, tampered receipts, duplicate/noncanonical events, untrusted event receipts, missing control evidence, multiple independent preferences, and control/action events that occur too late to govern the committed response.
 
 No MemPABench/OP-Bench score, production integration, semantic-quality guarantee or external authentication is claimed.
