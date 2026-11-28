@@ -1,0 +1,36 @@
+name: MEL HEAR-010 musical identity quotient
+
+on:
+  pull_request:
+    paths:
+      - "research/melothaea-musical-quotient-v0-1/**"
+      - "benchmarks/mel/schemas/melothaea-musical-identity-quotient-v0-1.schema.json"
+      - ".github/workflows/mel-hear-010-musical-quotient.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/melothaea-musical-quotient-v0-1/**"
+      - "benchmarks/mel/schemas/melothaea-musical-identity-quotient-v0-1.schema.json"
+      - ".github/workflows/mel-hear-010-musical-quotient.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  standalone-rust:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/melothaea-musical-quotient-v0-1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run tests
+        run: cargo test --locked --all-targets
+      - name: Run strict Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings

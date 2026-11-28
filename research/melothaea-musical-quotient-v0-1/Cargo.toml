@@ -1,0 +1,15 @@
+[package]
+name = "melothaea-musical-quotient"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact symbolic musical action and task-indexed quotient fixtures"
+
+# Keep this research harness isolated from the production workspace.
+[workspace]
+members = ["."]
+resolver = "2"
+
+[lib]
+path = "src/lib.rs"

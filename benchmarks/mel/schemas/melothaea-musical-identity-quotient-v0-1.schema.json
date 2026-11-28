@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/melothaea-musical-identity-quotient-v0-1.schema.json",
+  "title": "Melothaea task-indexed musical identity quotient contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "task_contract_sha256",
+    "question_sha256",
+    "candidate_domain_sha256",
+    "action",
+    "target_property",
+    "evidence_class",
+    "domain_coverage",
+    "disposition",
+    "upstream_action_certificate_sha256",
+    "upstream_quotient_certificate_sha256",
+    "runtime_pruning_authorized"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "melothaea-musical-identity-quotient-v0.1"
+    },
+    "contract_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_contract_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "question_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidate_domain_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "action": {
+      "enum": [
+        "c12_pitch_class_transposition",
+        "positive_rational_constant_tempo_scale",
+        "rubato",
+        "lossy_crop",
+        "instrument_substitution",
+        "performer_take_change",
+        "chord_inversion"
+      ]
+    },
+    "target_property": {
+      "enum": [
+        "chord_quality",
+        "root_pitch_class",
+        "relative_intervals",
+        "rhythmic_ratios",
+        "pulse_rate",
+        "absolute_duration",
+        "timbre",
+        "performance_identity"
+      ]
+    },
+    "evidence_class": {
+      "enum": [
+        "exact_finite_action",
+        "exact_rational_action_fragment",
+        "restricted_partial_isomorphism",
+        "human_calibrated_nuisance",
+        "sampled_proposal",
+        "one_way_noninvertible"
+      ]
+    },
+    "domain_coverage": {
+      "enum": ["complete", "partial", "unknown"]
+    },
+    "disposition": {
+      "enum": [
+        "fixture_hard_quotient_eligible",
+        "soft_relation_only",
+        "equivariant_not_invariant",
+        "not_estimable",
+        "unsupported"
+      ]
+    },
+    "upstream_action_certificate_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "upstream_quotient_certificate_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "human_calibration_reference_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "runtime_pruning_authorized": {
+      "const": false
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

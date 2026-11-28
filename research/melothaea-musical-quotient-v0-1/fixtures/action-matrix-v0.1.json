@@ -1,0 +1,54 @@
+{
+  "schema_version": "melothaea-musical-action-matrix-v0.1",
+  "fixture_scope": "symbolic_only",
+  "exact_actions": [
+    {
+      "action": "c12_pitch_class_transposition",
+      "group": "C12",
+      "elements": 12,
+      "preserves": ["chord_quality", "relative_intervals"],
+      "equivariant": ["root_pitch_class"]
+    },
+    {
+      "action": "positive_rational_constant_tempo_scale",
+      "group": "Q_positive_multiplicative",
+      "domain": "positive_rational_duration_multipliers_representable_in_u64",
+      "preserves": ["rhythmic_ratios"],
+      "equivariant": ["pulse_rate", "absolute_duration"]
+    }
+  ],
+  "soft_only": [
+    {
+      "action": "performer_or_take_change",
+      "requires": "independent_human_calibration",
+      "may_support": ["retrieval", "soft_grouping"],
+      "hard_quotient": false
+    },
+    {
+      "action": "rubato",
+      "requires": "property_specific_empirical_qualification",
+      "hard_quotient": false
+    },
+    {
+      "action": "sampled_or_learned_symmetry_proposal",
+      "may_support": ["candidate_ordering", "compute_allocation"],
+      "hard_quotient": false
+    }
+  ],
+  "unsupported_or_noninvertible": [
+    {
+      "action": "lossy_crop",
+      "disposition": "not_estimable"
+    },
+    {
+      "action": "instrument_substitution",
+      "disposition": "unsupported_without_task_specific_evidence"
+    },
+    {
+      "action": "chord_inversion",
+      "disposition": "not_admitted_as_group_action_in_v0"
+    }
+  ],
+  "runtime_pruning_authorized": false,
+  "claim_ceiling": "exact_symbolic_fixture_only"
+}
