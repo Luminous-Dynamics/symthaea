@@ -602,20 +602,7 @@ fn log_add_exp(a: f64, b: f64) -> f64 {
     let m = a.max(b);
     m + ((a-m).exp() + (b-m).exp()).ln()
 }
-fn log_sub_exp(total: f64, subtract: f64) -> Result<f64, ContextError> {
-    if !total.is_finite() || !subtract.is_finite() {
-        return Err(ContextError::ArithmeticOverflow);
-    }
-    let difference = subtract - total;
-    if difference > 1e-10 {
-        return Err(ContextError::PosteriorNormalizationFailure);
-    }
-    if difference >= -1e-14 {
-        return Ok(f64::NEG_INFINITY);
-    }
-    let result = total + (-difference.exp_m1()).ln();
-    if result.is_finite() { Ok(result) } else { Err(ContextError::ArithmeticOverflow) }
-}
+#[cfg(test)]
 fn log_sum_exp(values: &[f64]) -> Result<f64, ContextError> {
     if values.is_empty() || values.iter().any(|x| !x.is_finite()) {
         return Err(ContextError::ArithmeticOverflow);
