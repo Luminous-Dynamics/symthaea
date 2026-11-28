@@ -545,7 +545,7 @@ The current FEP action model is intentionally simple and structured. It has not 
 
 ### 16.4 Current test inventory and qualification status
 
-The current branch contains **58 authored tests** in the environment/candidate/evaluator crate (F1–F6: 41, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 5), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **74 authored Rust tests**. These are source counts only, not observed passes.
+The current branch contains **58 authored tests** in the environment/candidate/evaluator crate (F1–F6: 41, candidate-output contract: 7, random/greedy policy baselines: 5, evaluator-owned F1 runner: 5), plus **16 authored candidate-adapter tests** (FEP 6, spatial HDC 5, HDC-LTC 5). Total: **75 authored Rust tests**. These are source counts only, not observed passes.
 
 Two dedicated GitHub workflows are configured:
 - `GameBench Rust v0.1`: deterministic environment, candidate contract, and policy baseline crate.
@@ -643,6 +643,7 @@ The runner:
 - validates each candidate decision before applying it;
 - returns the next candidate-visible observation as transition feedback;
 - records the full environment event trace for independent replay;
+- retains the candidate's confidence and forecast distributions alongside each action for later prediction scoring;
 - computes the exact shortest-path reference privately and reports only optimal action count / excess action count;
 - records per-decision latency separately from complete episode wall time;
 - separates environment task success from candidate protocol validity.
