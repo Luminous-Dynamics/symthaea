@@ -2995,6 +2995,44 @@ mod tests {
     }
 
     #[test]
+    fn explicit_lower_only_bounds_keep_upper_unbounded() {
+        let bounds = crate::registry::MetricBounds {
+            lower: 0.0,
+            upper: None,
+        };
+        let samples = [2.0, 3.0, 4.0, 5.0];
+        let metric = MetricValue::from_samples_with_bounds(&samples, bounds)
+            .expect("valid non-negative unbounded samples");
+        assert!(metric.ci_lower >= 0.0);
+        assert!(metric.ci_upper > 5.0);
+        assert!(metric.ci_lower <= metric.mean && metric.ci_upper >= metric.mean);
+    }
+
+    #[test]
+    fn explicit_bounds_reject_non_finite_observations() {
+        let bounds = crate::registry::MetricBounds {
+            lower: 0.0,
+            upper: Some(1.0),
+        };
+        let error = MetricValue::from_samples_with_bounds(&[0.5, f64::NAN], bounds)
+            .expect_err("non-finite sample must be rejected");
+        assert!(matches!(error, MetricBoundsError::NonFiniteSample { index: 1 }));
+    }
+
+    #[test]
+    fn explicit_empty_sample_preserves_missing_n() {
+        let bounds = crate::registry::MetricBounds {
+            lower: -1.0,
+            upper: Some(1.0),
+        };
+        let metric = MetricValue::from_samples_with_bounds(&[], bounds).expect("empty sample");
+        assert_eq!(metric.n, 0);
+        assert_eq!(metric.mean, 0.0);
+        assert_eq!(metric.ci_lower, 0.0);
+        assert_eq!(metric.ci_upper, 0.0);
+    }
+
+    #[test]
     fn explicit_bounds_reject_out_of_support_observations() {
         let bounds = crate::registry::MetricBounds {
             lower: -1.0,
