@@ -330,3 +330,57 @@ fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+
+#[cfg(test)]
+mod nonce_ledger_tests {
+    use super::*;
+
+    fn ledger_path(test_name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "luminous-eqc-{}-{test_name}.json",
+            std::process::id()
+        ))
+    }
+
+    fn cleanup(path: &Path) {
+        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(PathBuf::from(format!("{}.lock", path.display())));
+        let _ = fs::remove_file(PathBuf::from(format!("{}.tmp-{}", path.display(), std::process::id())));
+    }
+
+    #[test]
+    fn nonce_ledger_round_trips_across_process_invocations() {
+        let path = ledger_path("round-trip");
+        cleanup(&path);
+        let nonce = "ab".repeat(32);
+        let ledger =
+            observer::ObserverNonceLedger::from_nonces(vec![nonce.clone()]).expect("valid nonce");
+        write_nonce_ledger(&path, &ledger).expect("write persistent nonce ledger");
+
+        let restored = read_nonce_ledger(&path).expect("read persistent nonce ledger");
+        assert!(restored.contains(&nonce));
+        assert_eq!(restored.sorted_nonces(), vec![nonce]);
+        cleanup(&path);
+    }
+
+    #[test]
+    fn nonce_ledger_rejects_duplicate_nonces() {
+        let nonce = "cd".repeat(32);
+        assert!(
+            observer::ObserverNonceLedger::from_nonces(vec![nonce.clone(), nonce]).is_err()
+        );
+    }
+
+    #[test]
+    fn nonce_ledger_lock_serializes_local_evaluator_processes() {
+        let path = ledger_path("lock");
+        cleanup(&path);
+        let first = acquire_nonce_ledger_lock(&path).expect("first evaluator acquires lock");
+        assert!(acquire_nonce_ledger_lock(&path).is_err());
+        drop(first);
+        let second = acquire_nonce_ledger_lock(&path).expect("lock released after first evaluator");
+        drop(second);
+        cleanup(&path);
+    }
+}
