@@ -488,7 +488,7 @@ mod tests {
 
     #[test]
     fn stale_observation_remains_unknown() {
-        let result = assess_task_outcome_v1(&attempt(), &profile(), Some(&observation()), 50, 5);
+        let result = assess_task_outcome_v1(&attempt(), &profile(), Some(&observation()), "world-clock", 50, 5);
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::StaleObservation)
@@ -499,7 +499,7 @@ mod tests {
     fn duplicate_effects_are_a_violation() {
         let mut observed = observation();
         observed.effect_count = 2;
-        let result = assess_task_outcome_v1(&attempt(), &profile(), Some(&observed), 21, 5);
+        let result = assess_task_outcome_v1(&attempt(), &profile(), Some(&observed), "world-clock", 21, 5);
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::DuplicateOrMissingEffect)
@@ -535,7 +535,7 @@ mod tests {
         observed.applied_at_tick = None;
         observed.effect_count = 0;
         observed.postconditions_satisfied = Some(false);
-        let result = assess_task_outcome_v1(&attempt(), &profile(), Some(&observed), 21, 5);
+        let result = assess_task_outcome_v1(&attempt(), &profile(), Some(&observed), "world-clock", 21, 5);
         assert_eq!(result, CgrbTaskOutcomeV1::NotApplied);
         assert_eq!(
             retry_decision_v1(&result),
