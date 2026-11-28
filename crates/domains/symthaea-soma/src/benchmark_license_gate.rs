@@ -224,13 +224,21 @@ pub fn validate_benchmark_license_manifest(
         return Err(BenchmarkLicenseGateError::InconsistentOperationFlags);
     }
 
-    if required_operation == BenchmarkOperation::CommercialUse
-        && !manifest.commercial_use_authorized
-    {
-        return Err(BenchmarkLicenseGateError::CommercialUseNotAuthorized);
+    if required_operation == BenchmarkOperation::CommercialUse {
+        if !is_commercial_use(requested_use) {
+            return Err(BenchmarkLicenseGateError::IntendedUseMismatch);
+        }
+        if !manifest.commercial_use_authorized {
+            return Err(BenchmarkLicenseGateError::CommercialUseNotAuthorized);
+        }
     }
-    if required_operation == BenchmarkOperation::Training && !manifest.training_use_authorized {
-        return Err(BenchmarkLicenseGateError::TrainingNotAuthorized);
+    if required_operation == BenchmarkOperation::Training {
+        if requested_use != BenchmarkIntendedUse::Training {
+            return Err(BenchmarkLicenseGateError::IntendedUseMismatch);
+        }
+        if !manifest.training_use_authorized {
+            return Err(BenchmarkLicenseGateError::TrainingNotAuthorized);
+        }
     }
     if required_operation == BenchmarkOperation::DerivativeMedia
         && !manifest.derivative_media_authorized
@@ -528,6 +536,39 @@ mod tests {
                 None,
             ),
             Err(BenchmarkLicenseGateError::IntendedUseNotApproved)
+        );
+    }
+
+    #[test]
+    fn commercial_operation_cannot_be_requested_as_noncommercial_research() {
+        let value = manifest();
+        assert_eq!(
+            validate_benchmark_license_manifest(
+                &value,
+                "2026-11-28T00:00:00Z",
+                BenchmarkIntendedUse::NoncommercialResearch,
+                BenchmarkOperation::CommercialUse,
+                None,
+            ),
+            Err(BenchmarkLicenseGateError::IntendedUseMismatch)
+        );
+    }
+
+    #[test]
+    fn training_operation_requires_training_as_the_intended_use() {
+        let mut value = manifest();
+        value.approved_intended_uses.push(BenchmarkIntendedUse::Training);
+        value.permitted_operations.push(BenchmarkOperation::Training);
+        value.training_use_authorized = true;
+        assert_eq!(
+            validate_benchmark_license_manifest(
+                &value,
+                "2026-11-28T00:00:00Z",
+                BenchmarkIntendedUse::CommercialDevelopment,
+                BenchmarkOperation::Training,
+                None,
+            ),
+            Err(BenchmarkLicenseGateError::IntendedUseMismatch)
         );
     }
 
