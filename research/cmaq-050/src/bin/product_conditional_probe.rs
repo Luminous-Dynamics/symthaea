@@ -18,8 +18,10 @@ use cmaq_050_product_fourier_conditional_pairs::ProductFourierConditionalMonitor
 const MAP_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const COVARIATE_SHA: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const TARGET_SHA: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-const RESPONSE_REFERENCE_SHA: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
-const COVARIATE_REFERENCE_SHA: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const RESPONSE_REFERENCE_SHA: &str =
+    "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+const COVARIATE_REFERENCE_SHA: &str =
+    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const POOLED_TARGET_SHA: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 const ALPHA_NUMERATOR: u32 = 1;
 const ALPHA_DENOMINATOR: u32 = 20;
@@ -90,7 +92,11 @@ fn parse_config() -> Result<Config, String> {
     if replications == 0 || horizon == 0 {
         return Err("replications and horizon must be positive".into());
     }
-    Ok(Config { replications, horizon, seed })
+    Ok(Config {
+        replications,
+        horizon,
+        seed,
+    })
 }
 
 fn response_map() -> Result<FourierFeatureMap, String> {
@@ -138,11 +144,7 @@ fn pooled_monitor() -> Result<ContextualPairedKernelMonitor, String> {
 fn draw_pair(scenario: Scenario, rng: &mut SplitMix64) -> (f64, f64, f64) {
     let z = 0.2 * rng.sign();
     match scenario {
-        Scenario::ConditionalPairNull => (
-            z,
-            0.2 * rng.sign(),
-            0.2 * rng.sign(),
-        ),
+        Scenario::ConditionalPairNull => (z, 0.2 * rng.sign(), 0.2 * rng.sign()),
         Scenario::EqualMarginalConditionalShift if z > 0.0 => (z, 0.2, 0.8),
         Scenario::EqualMarginalConditionalShift => (z, 0.8, 0.2),
     }
@@ -181,7 +183,13 @@ fn run_replication(
         let (z, x, y) = draw_pair(scenario, &mut rng);
         if product_alarm.is_none() {
             let update = product
-                .observe_pair(sequence, &format!("product-{replication}-{time}"), &[z], &[x], &[y])
+                .observe_pair(
+                    sequence,
+                    &format!("product-{replication}-{time}"),
+                    &[z],
+                    &[x],
+                    &[y],
+                )
                 .map_err(|error| format!("product monitor update failed: {error:?}"))?;
             if update.evidence.quarantined {
                 product_alarm = Some(time);
@@ -189,7 +197,13 @@ fn run_replication(
         }
         if pooled_alarm.is_none() {
             let update = pooled
-                .observe_pair(sequence, &format!("pooled-{replication}-{time}"), 0, &[x], &[y])
+                .observe_pair(
+                    sequence,
+                    &format!("pooled-{replication}-{time}"),
+                    0,
+                    &[x],
+                    &[y],
+                )
                 .map_err(|error| format!("pooled monitor update failed: {error:?}"))?;
             if update.evidence.quarantined {
                 pooled_alarm = Some(time);
@@ -222,10 +236,11 @@ fn run_replication(
 
 fn main() -> Result<(), String> {
     let config = parse_config()?;
-    let mut csv = String::from(
-        "scenario,replication,time,arm,covariate,x,y,log_e_value\n",
-    );
-    for scenario in [Scenario::ConditionalPairNull, Scenario::EqualMarginalConditionalShift] {
+    let mut csv = String::from("scenario,replication,time,arm,covariate,x,y,log_e_value\n");
+    for scenario in [
+        Scenario::ConditionalPairNull,
+        Scenario::EqualMarginalConditionalShift,
+    ] {
         let mut product_alarms = Vec::with_capacity(config.replications);
         let mut pooled_alarms = Vec::with_capacity(config.replications);
         for replication in 0..config.replications {
@@ -238,11 +253,17 @@ fn main() -> Result<(), String> {
             eprintln!(
                 "conditional_pair_null: reps={} product_false_alarms={} pooled_false_alarms={}",
                 config.replications,
-                product_alarms.iter().filter(|value| value.is_some()).count(),
+                product_alarms
+                    .iter()
+                    .filter(|value| value.is_some())
+                    .count(),
                 pooled_alarms.iter().filter(|value| value.is_some()).count(),
             );
         } else {
-            let product_detections = product_alarms.iter().filter(|value| value.is_some()).count();
+            let product_detections = product_alarms
+                .iter()
+                .filter(|value| value.is_some())
+                .count();
             let pooled_detections = pooled_alarms.iter().filter(|value| value.is_some()).count();
             eprintln!(
                 "equal_marginal_conditional_shift: reps={} product_detected={} product_misses={} product_median_time={} pooled_detected={} pooled_misses={} pooled_median_time={}",
