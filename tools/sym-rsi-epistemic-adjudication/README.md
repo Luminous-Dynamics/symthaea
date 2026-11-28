@@ -121,3 +121,20 @@ Assumptions/limitations:
 - No accuracy, scientific truth, live benchmark or SOTA claim follows from this evaluator.
 
 The production source currently contains **18 authored tests**, including exact Bernoulli mask enumeration weighted by the actual design probabilities, a Markov outcome process with history-adaptive predictable audit probabilities, and a deliberately invalid outcome-dependent selection negative control showing why conditional ignorability is necessary. The negative control is not a theorem proof. Exact Rust 1.96 formatting, tests and strict Clippy remain required.
+
+
+
+
+## Predictable Bernoulli audit receipt
+
+The production module `src/web_research/predictable_audit.rs` adds the eventwise audit-selection mechanism required by the SOWRC input contract. It is separate from the fixed-quota stratified SRSWOR design.
+
+- The custodian supplies each q_t, an independent u64 random word, the exact pre-label history digest, and frozen audit/random-stream manifest references and SHA-256 digests.
+- Inclusion probabilities use an exact dyadic grid: numerator over 2^64, restricted to multiples of 2^11, so q_t is exactly representable in binary64. A numerator of 2^64 is certainty.
+- A unit is selected exactly when random_word < q_numerator. The returned custodian receipt includes selection status, q_t, pre-label history digest and random-stream index, but omits the raw random word.
+- The full receipt is custodian-private. Do not provide it or its selected flags to the candidate researcher.
+- q_t may vary with pre-label history, but the module cannot prove the q-policy was predictable or independent of the current hidden outcome. The q-policy and its dependence on the committed history must be audited against the external manifest.
+- The adapter to SOWRC requires exactly one true-label nonconformity score for every selected audit event and rejects missing labels, nonselected labels, unknown records and invalid scores. Selected-label nonresponse is not silently treated as successful observation.
+- The module does not generate entropy, choose the q-policy, authenticate the custodian, or implement a nonresponse model.
+
+The production module includes **11 authored tests** covering exact dyadic conversion, boundary selection, q=1, probability-floor controls, digest validation, record sequencing, raw-draw privacy, history-adaptive q-values and the fail-closed SOWRC adapter. Tests are imported by path into the Rust 1.96 focused harness; no execution result is claimed until exact-head qualification.
