@@ -180,16 +180,25 @@ impl std::fmt::Display for SowrcError {
                 write!(formatter, "invalid inclusion probability for record {id}")
             }
             Self::InclusionProbabilityBelowFloor(id) => {
-                write!(formatter, "inclusion probability is below q_min for record {id}")
+                write!(
+                    formatter,
+                    "inclusion probability is below q_min for record {id}"
+                )
             }
             Self::CertainInclusionWithoutLabel(id) => {
                 write!(formatter, "q=1 but no label was observed for record {id}")
             }
             Self::LabelScoreMismatch(id) => {
-                write!(formatter, "label-observed flag and nonconformity score disagree for {id}")
+                write!(
+                    formatter,
+                    "label-observed flag and nonconformity score disagree for {id}"
+                )
             }
             Self::InvalidNonconformityScore(id) => {
-                write!(formatter, "nonconformity score must be finite and in [0, 1] for {id}")
+                write!(
+                    formatter,
+                    "nonconformity score must be finite and in [0, 1] for {id}"
+                )
             }
             Self::InvalidTargetRisk => {
                 write!(formatter, "target risk must be finite and in [0, 1]")
@@ -200,10 +209,16 @@ impl std::fmt::Display for SowrcError {
                 "threshold grid must be strictly increasing in [0, 1] and end at 1"
             ),
             Self::InvalidBettingMixture => {
-                write!(formatter, "betting fractions and mixture weights are invalid")
+                write!(
+                    formatter,
+                    "betting fractions and mixture weights are invalid"
+                )
             }
             Self::InvalidCalibrationProtocolManifest => {
-                write!(formatter, "calibration protocol manifest reference must not be empty")
+                write!(
+                    formatter,
+                    "calibration protocol manifest reference must not be empty"
+                )
             }
             Self::InvalidDesignManifest => {
                 write!(formatter, "design manifest reference must not be empty")
@@ -212,7 +227,10 @@ impl std::fmt::Display for SowrcError {
                 write!(formatter, "prediction manifest reference must not be empty")
             }
             Self::InvalidMixtureNumerics => {
-                write!(formatter, "martingale-mixture calculation produced non-finite values")
+                write!(
+                    formatter,
+                    "martingale-mixture calculation produced non-finite values"
+                )
             }
         }
     }
@@ -239,9 +257,7 @@ pub fn evaluate_sowrc(
             return Err(SowrcError::EmptyRecordId);
         }
         if !ids.insert(observation.record_id.as_str()) {
-            return Err(SowrcError::DuplicateRecordId(
-                observation.record_id.clone(),
-            ));
+            return Err(SowrcError::DuplicateRecordId(observation.record_id.clone()));
         }
         if observation.sequence_number != index {
             return Err(SowrcError::NonSequentialIndex {
@@ -261,7 +277,10 @@ pub fn evaluate_sowrc(
             ));
         }
         minimum_probability = minimum_probability.min(q);
-        match (observation.label_observed, observation.true_label_nonconformity) {
+        match (
+            observation.label_observed,
+            observation.true_label_nonconformity,
+        ) {
             (true, Some(score)) => {
                 if !score.is_finite() || !(0.0..=1.0).contains(&score) {
                     return Err(SowrcError::InvalidNonconformityScore(
@@ -280,7 +299,7 @@ pub fn evaluate_sowrc(
             _ => {
                 return Err(SowrcError::LabelScoreMismatch(
                     observation.record_id.clone(),
-                ))
+                ));
             }
         }
     }
@@ -300,22 +319,17 @@ pub fn evaluate_sowrc(
     let mut observed_scores = observations
         .iter()
         .filter_map(|observation| {
-            observation
-                .true_label_nonconformity
-                .map(|score| {
-                    (
-                        score,
-                        1.0 / observation.inclusion_probability,
-                        observation.record_id.as_str(),
-                    )
-                })
+            observation.true_label_nonconformity.map(|score| {
+                (
+                    score,
+                    1.0 / observation.inclusion_probability,
+                    observation.record_id.as_str(),
+                )
+            })
         })
         .collect::<Vec<_>>();
-    observed_scores.sort_by(|left, right| {
-        left.0
-            .total_cmp(&right.0)
-            .then_with(|| left.2.cmp(right.2))
-    });
+    observed_scores
+        .sort_by(|left, right| left.0.total_cmp(&right.0).then_with(|| left.2.cmp(right.2)));
     let mut suffix_weights = vec![0.0_f64; observed_scores.len() + 1];
     for index in (0..observed_scores.len()).rev() {
         suffix_weights[index] = suffix_weights[index + 1] + observed_scores[index].1;
@@ -362,11 +376,7 @@ pub fn evaluate_sowrc(
             report.upper_risk_bound,
             SowrcSelectionStatus::CertifiedByMixture,
         ),
-        None => (
-            1.0,
-            0.0,
-            SowrcSelectionStatus::SafeTerminalFullLabelSet,
-        ),
+        None => (1.0, 0.0, SowrcSelectionStatus::SafeTerminalFullLabelSet),
     };
 
     Ok(SowrcReport {
@@ -480,11 +490,7 @@ fn validate_config(config: &SowrcConfig) -> Result<(), SowrcError> {
     }
     let b_n = 1.0 / config.q_min;
     let mut weight_sum = 0.0_f64;
-    for (&eta, &weight) in config
-        .betting_fractions
-        .iter()
-        .zip(&config.mixture_weights)
-    {
+    for (&eta, &weight) in config.betting_fractions.iter().zip(&config.mixture_weights) {
         let kappa = kappa(eta, 1.0, b_n);
         if !eta.is_finite()
             || eta <= 0.0
@@ -655,9 +661,11 @@ mod tests {
         for q_min in [0.05, 0.10, 0.20, 0.50, 0.80, 1.0] {
             let cfg = config(q_min);
             validate_config(&cfg).unwrap();
-            assert!(cfg.betting_fractions.iter().all(|eta| {
-                kappa(*eta, 1.0, 1.0 / q_min) > 0.0
-            }));
+            assert!(
+                cfg.betting_fractions
+                    .iter()
+                    .all(|eta| { kappa(*eta, 1.0, 1.0 / q_min) > 0.0 })
+            );
         }
     }
 
@@ -885,9 +893,7 @@ mod tests {
             .map(|factor| eta_max * factor)
             .collect::<Vec<_>>();
         let weights = vec![1.0 / etas.len() as f64; etas.len()];
-        let true_losses = (0..n)
-            .map(|index| index % 2 == 0)
-            .collect::<Vec<_>>();
+        let true_losses = (0..n).map(|index| index % 2 == 0).collect::<Vec<_>>();
         let population_risk = 0.5_f64;
         let mut failure_probability = 0.0_f64;
         let mut saw_nontrivial_bound = false;
