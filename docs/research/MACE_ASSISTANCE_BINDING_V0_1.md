@@ -24,7 +24,7 @@ Every traversed edge must:
 - carry source-relation, lineage and authority receipt commitments;
 - pass the injected RelationEdgeVerifierV1.
 
-The closure is bound to the exact audience, scope, purpose, policy and bitemporal snapshot later used by the response. It is bounded by explicit maximum hops and nodes. If the node limit is exceeded, it returns no partial receipt. Contradictory edges are preserved in the receipt as conflicts; the kernel never resolves them by relevance score, recency, majority, or LLM preference. A constraint sourced from a node in a recorded contradiction cannot be emitted as an unqualified assertion.
+The builder returns a private-field `VerifiedRelationClosureV1` capability only after all traversed edges pass the injected verifier. The serializable receipt is diagnostic evidence only: deserializing it or recomputing its SHA-256 cannot recreate the in-process capability. A new process must rebuild the closure through the trusted verifier before response binding. The closure is bound to the exact audience, scope, purpose, policy and bitemporal snapshot later used by the response. It is bounded by explicit maximum hops and nodes. If the node limit is exceeded, it returns no partial receipt. Contradictory edges are preserved in the receipt as conflicts; the kernel never resolves them by relevance score, recency, majority, or LLM preference. A constraint sourced from a node in a recorded contradiction cannot be emitted as an unqualified assertion.
 
 ### Response constraint binding
 
@@ -41,7 +41,7 @@ A required attribution constraint cannot be used to state a speaker's claim as a
 
 ## What is not proven
 
-- The digest is not a signature, source authentication, proof of truth, or external witness.
+- The receipt digest is not a signature, source authentication, proof of truth, or external witness. The in-process capability proves only that this process's injected verifier accepted its traversed edges; trust depends on supplying the correct verifier at the composition root.
 - The trait implementation must independently authenticate the issuer, authority, rights, lineage, revocation and exact #13973 use receipt.
 - Byte-span binding proves where the response says a claim was placed, not that the natural-language span semantically entails the proposition digest.
 - This version does not independently segment arbitrary prose into all factual claims. A production integration must make the structured claim inventory complete or add an independently qualified semantic claim extractor.
