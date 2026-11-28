@@ -792,7 +792,9 @@ pub fn verify_aci_residual_interval_construction_v1(
         || !receipt.alpha_at_issue.is_finite()
         || receipt.alpha_at_issue <= 0.0
         || receipt.alpha_at_issue > 1.0
-        || receipt.calibration_count == 0
+        || receipt.minimum_calibration_count == 0
+        || receipt.calibration_count < receipt.minimum_calibration_count
+            && receipt.interval.kind != AciIntervalKindV1::CalibrationUnbounded
         || receipt.score_contract_id != ACI_RAW_SIGNED_RESIDUAL_SCORE_CONTRACT_V1
     {
         return Err(AciResidualWindowErrorV1(
@@ -1096,6 +1098,20 @@ mod tests {
         let window = window();
         let (construction, prediction, binding) =
             prepare_prediction(&mut engine, &window, 0, "sample-0", "event-0", 0.1);
+        let delivery = make_delivery(
+            "sample-0",
+            "event-0",
+            "label-0",
+            51.0,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+        );
+        let mut candidate_engine = engine.clone();
+        begin_delayed_aci_round_v1(&mut candidate_engine, 1).unwrap();
+        let update =
+            deliver_delayed_aci_label_v1(&mut candidate_engine, &delivery).unwrap();
+        assert_eq!(update.disposition, AciUpdateDispositionV1::Updated);
+
         let mut tampered = binding.clone();
         tampered.window_sha256 = digest('z');
         assert!(append_residual_candidate(
@@ -1103,25 +1119,10 @@ mod tests {
             &tampered,
             &construction,
             &prediction,
-            &make_delivery(
-                "sample-0",
-                "event-0",
-                "label-0",
-                51.0,
-                LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-                LabelEvidenceFrontierV1::CurrentAtK1,
-            ),
-            &dummy_update_receipt(&prediction, &tampered),
+            &delivery,
+            &update,
         )
         .is_err());
-    }
-
-    fn dummy_update_receipt(
-        prediction: &DelayedAciPredictionReceiptV1,
-        binding: &AciResidualIntervalBindingReceiptV1,
-    ) -> DelayedAciUpdateReceiptV1 {
-        let _ = (prediction, binding);
-        panic!("dummy receipt is not used by this test; binding must reject first")
     }
 
     #[test]
@@ -1177,7 +1178,7 @@ mod tests {
             LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             LabelEvidenceFrontierV1::CurrentAtK1,
         );
-        deliver_and_append_aci_residual_v1(
+        let outcome = deliver_and_append_aci_residual_v1(
             &mut engine,
             &mut window,
             &construction,
@@ -1186,6 +1187,7 @@ mod tests {
             &delivery,
         )
         .unwrap();
+        let update = outcome.update_receipt;
         assert!(window.accepted_label_revisions.contains("label-0:1"));
         assert!(append_residual_candidate(
             &window,
@@ -1193,24 +1195,55 @@ mod tests {
             &construction,
             &prediction,
             &delivery,
-            &dummy_update_receipt(&prediction, &binding),
+            &update,
         )
         .is_err());
     }
 
     #[test]
     fn fifo_eviction_is_deterministic_and_changes_window_digest() {
-        let seed = seal_aci_residual_seed_manifest_v1(
-            "full-seed",
-            (0..4).map(|value| value as f64).collect(),
+        let seed =
+            seal_aci_residual_seed_manifest_v1("full-seed", vec![-2.0, -1.0, 1.0, 2.0])
+                .unwrap();
+        let mut residual_policy = policy();
+        residual_policy.capacity = 4;
+        residual_policy.minimum_calibration_count = 1;
+        let mut residual_window =
+            create_aci_residual_window_v1("fifo", residual_policy, &seed).unwrap();
+
+        let mut aci_policy = aci_policy();
+        aci_policy.initial_phase_alpha = 0.8;
+        let mut aci_engine =
+            create_delayed_aci_engine_v1("fifo-aci", "fab-clock", aci_policy).unwrap();
+        let before = residual_window.window_sha256.clone();
+        let (construction, prediction, binding) =
+            prepare_prediction(&mut aci_engine, &residual_window, 0, "fifo-sample", "fifo-event", 0.8);
+        assert_eq!(construction.interval.kind, AciIntervalKindV1::Bounded);
+        begin_delayed_aci_round_v1(&mut aci_engine, 1).unwrap();
+        let delivery = make_delivery(
+            "fifo-sample",
+            "fifo-event",
+            "fifo-label",
+            50.0,
+            LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
+            LabelEvidenceFrontierV1::CurrentAtK1,
+        );
+        let outcome = deliver_and_append_aci_residual_v1(
+            &mut aci_engine,
+            &mut residual_window,
+            &construction,
+            &binding,
+            &prediction,
+            &delivery,
         )
         .unwrap();
-        let mut policy = policy();
-        policy.capacity = 4;
-        policy.minimum_calibration_count = 1;
-        let window = create_aci_residual_window_v1("fifo", policy, &seed).unwrap();
-        assert_eq!(window.observations.len(), 4);
-        assert_eq!(window.observations[0].signed_residual, 0.0);
+        let append = outcome.residual_append_receipt.unwrap();
+
+        assert!(append.evicted_oldest_observation);
+        assert_eq!(residual_window.observations.len(), 4);
+        assert_eq!(residual_window.observations[0].signed_residual, -1.0);
+        assert_eq!(residual_window.observations.last().unwrap().signed_residual, 0.0);
+        assert_ne!(residual_window.window_sha256, before);
     }
 
     #[test]
