@@ -241,6 +241,13 @@ fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
+/// Output IDs are opaque single-segment identifiers, never filesystem paths.
+fn is_safe_artifact_id(value: &str) -> bool {
+    !value.is_empty()
+        && !value.starts_with('.')
+        && value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+}
+
 fn check(
     checks: &mut Vec<CheckResult>,
     flags: &mut AuditFlags,
@@ -322,7 +329,7 @@ fn valid_contract(contract: &MethodContract) -> bool {
         && contract.required_metrics.iter().all(|m| !m.metric_id.trim().is_empty() && is_sha256(&m.definition_sha256))
         && is_sha256(&contract.budget.policy_sha256)
         && !contract.required_outputs.is_empty()
-        && contract.required_outputs.iter().all(|id| !id.trim().is_empty())
+        && contract.required_outputs.iter().all(|id| is_safe_artifact_id(id))
         && {
             let output_ids: BTreeSet<&str> = contract.required_outputs.iter().map(String::as_str).collect();
             output_ids.len() == contract.required_outputs.len()
@@ -392,11 +399,14 @@ fn contains_required_metrics(contract: &MethodContract, receipt: &ExecutionRecei
 }
 
 fn contains_required_outputs(contract: &MethodContract, receipt: &ExecutionReceipt) -> bool {
-    contract.required_outputs.iter().all(|required_id| {
-        receipt.outputs.iter().any(|actual| {
-            actual.artifact_id == *required_id && is_sha256(&actual.artifact_sha256)
+    let expected: BTreeSet<&str> = contract.required_outputs.iter().map(String::as_str).collect();
+    let actual: BTreeSet<&str> = receipt.outputs.iter().map(|output| output.artifact_id.as_str()).collect();
+    expected.len() == contract.required_outputs.len()
+        && actual.len() == receipt.outputs.len()
+        && expected == actual
+        && receipt.outputs.iter().all(|output| {
+            is_safe_artifact_id(&output.artifact_id) && is_sha256(&output.artifact_sha256)
         })
-    })
 }
 
 /// Audits a receipt against an independently reviewed method contract.
@@ -534,7 +544,7 @@ pub fn audit_method(contract: &MethodContract, receipt: &ExecutionReceipt) -> Au
     check(
         &mut checks, &mut flags, "outputs.complete",
         contains_required_outputs(contract, receipt),
-        true, &deviations, "One or more required output artifacts are missing or have invalid digests.",
+        true, &deviations, "The output list differs from the reviewed exact artifact allowlist or contains an invalid identifier/digest.",
     );
     check(
         &mut checks, &mut flags, "execution.complete",
@@ -581,6 +591,14 @@ pub fn audit_method(contract: &MethodContract, receipt: &ExecutionReceipt) -> Au
             check_id: "outputs.unique".to_string(),
             status: CheckStatus::Mismatch,
             explanation: "Execution receipt contains duplicate output artifact identifiers.".to_string(),
+        });
+    }
+    if receipt.outputs.iter().any(|output| !is_safe_artifact_id(&output.artifact_id)) {
+        flags.hard_failure = true;
+        checks.push(CheckResult {
+            check_id: "outputs.identifiers".to_string(),
+            status: CheckStatus::Mismatch,
+            explanation: "Output artifact identifiers must be single-segment opaque IDs, not filesystem paths.".to_string(),
         });
     }
 
@@ -1021,6 +1039,43 @@ mod tests {
         r.preprocessing_fit_scope = FitScope::AllRecords;
         r.preprocessing_fitted_record_count = u64::MAX;
         assert_eq!(disposition(&c, &r), Disposition::Unresolved);
+    }
+
+    #[test]
+    fn unreviewed_extra_output_artifact_is_rejected() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.outputs.push(OutputArtifact {
+            artifact_id: "unexpected-claim.json".into(),
+            artifact_sha256: h('9'),
+        });
+        r.replay.replayed_outputs = r.outputs.clone();
+        let report = audit_method(&c, &r);
+        assert_eq!(report.disposition, Disposition::Unresolved);
+        assert!(!report.permissions.may_claim_reference_protocol_reproduced);
+    }
+
+    #[test]
+    fn output_artifact_path_traversal_identifier_is_rejected() {
+        let c = contract();
+        let mut r = receipt(&c);
+        r.outputs[0].artifact_id = "../predictions.csv".into();
+        r.replay.replayed_outputs = r.outputs.clone();
+        let report = audit_method(&c, &r);
+        assert_eq!(report.disposition, Disposition::Unresolved);
+        assert!(!report.permissions.may_claim_reference_protocol_reproduced);
+    }
+
+    #[test]
+    fn reviewed_output_allowlist_rejects_path_like_contract_identifier() {
+        let mut c = contract();
+        c.required_outputs[0] = "../../predictions.csv".into();
+        let mut r = receipt(&c);
+        r.outputs[0].artifact_id = c.required_outputs[0].clone();
+        r.replay.replayed_outputs = r.outputs.clone();
+        let report = audit_method(&c, &r);
+        assert_eq!(report.disposition, Disposition::Unresolved);
+        assert!(!report.permissions.may_claim_reference_protocol_reproduced);
     }
 
     #[test]
