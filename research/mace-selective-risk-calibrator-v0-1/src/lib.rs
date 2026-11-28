@@ -773,6 +773,12 @@ pub fn calibrate_selective_evidence_v1(
     for row in examples{
         if !nonempty(&row.run_id)||!nonempty(&row.independent_cluster_id){return Err(CalibrationRejectV1::InvalidExample);}
         if row.run_id!=config.run_id{return Err(CalibrationRejectV1::MixedRun);}
+        if !valid_digest(&row.independent_cluster_id)
+            || !valid_digest(&row.episode_commitment_sha256)
+            || !valid_digest(&row.observation_commitment_sha256)
+        {
+            return Err(CalibrationRejectV1::InvalidExample);
+        }
         if !groups.contains_key(&row.group_id)||!row.sufficiency_score.is_finite()
             ||!(0.0..=1.0).contains(&row.sufficiency_score)||!row.decision_loss.is_finite()
             ||!(0.0..=1.0).contains(&row.decision_loss)||!valid_digest(&row.outcome_receipt_sha256){
@@ -1194,7 +1200,7 @@ mod tests{
             GroupSpecV1{group_id:"b".into(),parent_group_id:Some("a".into()),allow_parent_fallback:false,distribution_shift_detected:false}
         ];
         let rows=examples(40,"a",0.9,0.0);let cfg=config(&cyclic,&rows,vec![0.5,0.0],30);
-        assert_eq!(calibrate_selective_evidence_v1(&cfg,&cyclic,&rows),Err(CalibrationRejectV1::GroupHierarchyCycle));
+        assert_eq!(calibrate_for_test(&cfg,&cyclic,&rows),Err(CalibrationRejectV1::GroupHierarchyCycle));
         let stable=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(40,"root",0.9,0.0);let mut cfg=config(&stable,&rows,vec![0.5,0.0],30);
         cfg.calibration_data_sha256=digest("wrong");
@@ -1342,6 +1348,99 @@ mod tests{
         let rows=examples(40,"root",0.9,0.0);
         let cfg=config(&groups,&rows,vec![0.0,0.5],30);
         assert_eq!(calibrate_for_test(&cfg,&groups,&rows),Err(CalibrationRejectV1::InvalidThresholdGrid));
+    }
+
+
+    #[test]
+    fn split_firewall_rejects_overlap_at_all_three_identity_levels() {
+        let groups = vec![GroupSpecV1 {
+            group_id: "root".into(), parent_group_id: None,
+            allow_parent_fallback: false, distribution_shift_detected: false,
+        }];
+        let rows = examples(40, "root", 0.9, 0.0);
+        let cfg = config(&groups, &rows, vec![0.5, 0.0], 30);
+        let (calibration, evaluation) = split_inventories(&cfg, &rows);
+
+        let mut cluster_overlap = evaluation.clone();
+        cluster_overlap.cluster_commitments[0] = calibration.cluster_commitments[0].clone();
+        cluster_overlap.cluster_commitments.sort();
+        let cluster_overlap = finish_inventory(cluster_overlap);
+        assert_eq!(
+            audit_calibration_evaluation_splits_v1(&cfg, &calibration, &cluster_overlap),
+            Err(SplitAuditRejectV1::SplitNotDisjoint)
+        );
+
+        let mut episode_overlap = evaluation.clone();
+        episode_overlap.episode_commitments[0] = calibration.episode_commitments[0].clone();
+        episode_overlap.episode_commitments.sort();
+        let episode_overlap = finish_inventory(episode_overlap);
+        assert_eq!(
+            audit_calibration_evaluation_splits_v1(&cfg, &calibration, &episode_overlap),
+            Err(SplitAuditRejectV1::SplitNotDisjoint)
+        );
+
+        let mut observation_overlap = evaluation.clone();
+        observation_overlap.observation_commitments[0] = calibration.observation_commitments[0].clone();
+        observation_overlap.observation_commitments.sort();
+        let observation_overlap = finish_inventory(observation_overlap);
+        assert_eq!(
+            audit_calibration_evaluation_splits_v1(&cfg, &calibration, &observation_overlap),
+            Err(SplitAuditRejectV1::SplitNotDisjoint)
+        );
+    }
+
+    #[test]
+    fn split_firewall_requires_sealed_evaluation_labels_and_candidate_isolation() {
+        let groups = vec![GroupSpecV1 {
+            group_id: "root".into(), parent_group_id: None,
+            allow_parent_fallback: false, distribution_shift_detected: false,
+        }];
+        let rows = examples(40, "root", 0.9, 0.0);
+        let cfg = config(&groups, &rows, vec![0.5, 0.0], 30);
+        let (calibration, evaluation) = split_inventories(&cfg, &rows);
+
+        let mut unsealed = evaluation.clone();
+        unsealed.outcome_labels_sealed = false;
+        let unsealed = finish_inventory(unsealed);
+        assert_eq!(
+            audit_calibration_evaluation_splits_v1(&cfg, &calibration, &unsealed),
+            Err(SplitAuditRejectV1::EvaluationLabelsNotSealed)
+        );
+
+        let mut leaked = evaluation.clone();
+        leaked.candidate_outcome_access = true;
+        let leaked = finish_inventory(leaked);
+        assert_eq!(
+            audit_calibration_evaluation_splits_v1(&cfg, &calibration, &leaked),
+            Err(SplitAuditRejectV1::CandidateHasOutcomeAccess)
+        );
+    }
+
+    #[test]
+    fn calibration_manifest_binds_split_receipt_and_exact_row_commitments() {
+        let groups = vec![GroupSpecV1 {
+            group_id: "root".into(), parent_group_id: None,
+            allow_parent_fallback: false, distribution_shift_detected: false,
+        }];
+        let rows = examples(80, "root", 0.9, 0.0);
+        let cfg = config(&groups, &rows, vec![0.5, 0.0], 30);
+        let (calibration, evaluation) = split_inventories(&cfg, &rows);
+        let audit = audit_calibration_evaluation_splits_v1(&cfg, &calibration, &evaluation).unwrap();
+        assert!(audit.verify_integrity());
+        let result = calibrate_selective_evidence_v1(
+            &cfg, &groups, &rows, &calibration, &evaluation
+        ).unwrap();
+        assert_eq!(result.manifest.evaluation_split_sha256, cfg.evaluation_split_sha256);
+        assert_eq!(result.manifest.split_audit_receipt_sha256, audit.receipt_sha256);
+
+        let mut mismatched = calibration.clone();
+        mismatched.observation_commitments[0] = digest("unrelated-observation");
+        mismatched.observation_commitments.sort();
+        let mismatched = finish_inventory(mismatched);
+        assert_eq!(
+            calibrate_selective_evidence_v1(&cfg, &groups, &rows, &mismatched, &evaluation),
+            Err(CalibrationRejectV1::SplitAuditRejected)
+        );
     }
 
 }
