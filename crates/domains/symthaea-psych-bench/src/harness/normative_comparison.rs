@@ -364,6 +364,7 @@ impl NormativeReport {
         let mut out = String::new();
 
         out.push_str("## Descriptive Reference Comparison (not a clinical assessment)\n\n");
+        out.push_str("> Reference comparisons require matched task versions, metric definitions, units, administration conditions, and populations. The legacy baseline mapper does not fully enforce these compatibility checks; interpret each row as provisional until its source record is audited.\n\n");
         out.push_str(&format!(
             "Descriptive mean across listed metrics (not a global ability estimate): mean z = {:.2}, normal-CDF percentile transform = {:.1}%, interpretation = {}\n\n",
             self.overall_mean_z,
@@ -623,7 +624,7 @@ mod tests {
         assert!(md.contains("|-----------|"), "Missing table separator");
         assert!(md.contains("mean z ="), "Missing descriptive mean z");
         assert!(md.contains("not a clinical assessment"));
-        assert!(md.contains("percentile ="), "Missing overall percentile");
+        assert!(md.contains("percentile transform ="), "Missing overall percentile");
 
         // If any scores were produced, table should have data rows
         if !normative.scores.is_empty() {
