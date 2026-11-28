@@ -1,0 +1,84 @@
+{
+  "profile": "mon045-evidence-dependency-scenarios-v1",
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "id": "MON045-P001",
+      "classification": "positive_control",
+      "name": "healthy_required_dag",
+      "expected": "all requested root claims qualified"
+    },
+    {
+      "id": "MON045-N001",
+      "classification": "negative_control",
+      "name": "revoked_required_source",
+      "expected": "only dependent root claims blocked"
+    },
+    {
+      "id": "MON045-N002",
+      "classification": "negative_control",
+      "name": "expired_required_scope",
+      "expected": "dependent root claim indeterminate"
+    },
+    {
+      "id": "MON045-N003",
+      "classification": "negative_control",
+      "name": "pinned_digest_drift",
+      "expected": "dependent root claim blocked"
+    },
+    {
+      "id": "MON045-N004",
+      "classification": "negative_control",
+      "name": "missing_required_artifact",
+      "expected": "dependent root claim indeterminate"
+    },
+    {
+      "id": "MON045-N005",
+      "classification": "negative_control",
+      "name": "required_dependency_cycle",
+      "expected": "graph blocked"
+    },
+    {
+      "id": "MON045-N006",
+      "classification": "negative_control",
+      "name": "optional_context_failure",
+      "expected": "optional context visible without verdict propagation"
+    },
+    {
+      "id": "MON045-N007",
+      "classification": "negative_control",
+      "name": "unrelated_revoked_orphan",
+      "expected": "root claims remain qualified"
+    },
+    {
+      "id": "MON045-N008",
+      "classification": "negative_control",
+      "name": "duplicate_edge",
+      "expected": "graph blocked"
+    },
+    {
+      "id": "MON045-N009",
+      "classification": "negative_control",
+      "name": "future_revocation",
+      "expected": "not applied before evaluation time"
+    },
+    {
+      "id": "MON045-N010",
+      "classification": "negative_control",
+      "name": "revocation_before_issue",
+      "expected": "inconsistent history blocks"
+    },
+    {
+      "id": "MON045-N011",
+      "classification": "negative_control",
+      "name": "missing_evaluation_clock",
+      "expected": "claims indeterminate"
+    },
+    {
+      "id": "MON045-P002",
+      "classification": "positive_control",
+      "name": "canonical_ordering",
+      "expected": "same graph digest and topology across input order and equivalent UTC offsets"
+    }
+  ]
+}
