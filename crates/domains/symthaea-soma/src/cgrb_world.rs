@@ -146,14 +146,14 @@ pub struct CgrbWorldAuditEventV1 {
     pub state_digest_after: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct CgrbWorldDigestPayloadV1<'a> {
     schema: &'a str,
     state_version: u64,
     cells: &'a BTreeMap<String, BTreeMap<String, CgrbWorldValueV1>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct CgrbWorldActionDigestPayloadV1<'a> {
     contract: &'a str,
     action: &'a CgrbWorldActionV1,
