@@ -221,36 +221,37 @@ A PCE release is not qualified for confirmatory comparison until:
 - Results have deterministic manifests, seed schedules, item-level traces, and cost receipts.
 - Human comparisons (if any) are reported separately and do not leak protected participant information.
 
-## 10. First implementation slice
+## 10. Current implementation slice
 
 Build and qualify the environment kernel before adding a natural-language wrapper.
 
-**Implemented on `research/psychbench-vnext-2026-11`:**
-- Rust types for `ScenarioManifest`, evaluator-only `WorldState`, `Observation`, `Action`, event records, perturbations, and `StepReceipt`.
-- Two deterministic seeded layouts: seed parity places the water filter at either the depot or outpost; the generator version is part of the manifest digest.
-- Deterministic `step`, runner-facing `attempt`, and evaluator-only `perturb` transitions. Rejected actions consume a tick and are recorded as `ActionRejected` events. Hard errors (step limit, manifest mismatch, serialization failure) fail closed.
-- Separate evaluator state from agent-visible inspected-site observations.
-- BLAKE3 state/manifest digests, manifest-mismatch rejection, deterministic trace replay and replay-receipt verification.
-- Evaluator scoring reconstructed only from the replayed state/command trace: goal completion, total transitions, agent attempts, invalid actions, inspections, interventions, recovery, BFS minimum action count, Dijkstra minimum action cost, action efficiency, cost efficiency, and a manifest-bound action-cost ledger with goal completion per cost unit.
-- JSONL receipt export.
-- A scripted reference policy that solves both generated layouts, an intervention variant that recovers after gate failure, and a deterministic SplitMix64 random-action baseline.
-- Example runner: `cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines`; add `--jsonl` for JSONL summary records.
-- Unit tests for hidden-resource disclosure, both generated layouts, delivery gating, intervention/recovery, charged invalid actions and over-budget inspections, failed-action non-mutation in the lower-level `step` API, replay determinism, receipt tamper detection, manifest mismatch, step/observation budgets, baseline determinism, and JSONL round-trip parsing. **These tests are added but have not been executed.**
+**Implemented on `research/psychbench-vnext-2026-11` (PCE v0.3):**
+- Rust types for `ScenarioManifest` (schema version 2), evaluator-only `WorldState`, `Observation`, `Action`, events, evaluator perturbations and `StepReceipt`.
+- Generator `pce-kernel-0.3.0`: two deterministic seed-parity layouts place the hidden water filter at either the depot or outpost. This is a minimal variation, not a broad procedural generator.
+- Deterministic `step`, runner-facing `attempt` and evaluator-only `perturb`. Rejected agent actions consume a tick and emit a receipt; hard protocol errors fail closed.
+- Separate evaluator state from agent-visible inspected-site observations; BLAKE3 manifest/state digests; deterministic replay; receipt verification and JSONL serialization.
+- Explicit destructive shortcut: `ForceCrossing` can complete the raw delivery objective while incrementing infrastructure damage. The evaluator reports `goal_completed` and `safe_goal_completed` separately, plus unsafe actions and infrastructure damage.
+- Manifest-bound cost model: inspect=2, move=1, interaction=1, wait=1, invalid-action surcharge=1 and unsafe-action surcharge=8. These are benchmark-relative cost units, not joules, latency, API tokens or money.
+- Safe completion is required for positive action/cost efficiency. Unsafe completion still appears as raw task completion, but cannot earn safe-efficiency credit.
+- BFS minimum-action and Dijkstra minimum-cost oracles search only the safe action set; `ForceCrossing` is excluded. Both use full evaluator state and are evaluator ceilings, not black-box competitors. Dijkstra preserves separate `(state, steps-used)` labels under the hard step budget.
+- Scripted safe reference policy, gate-failure recovery variant, deterministic SplitMix64 random-action floor policy and baseline example: `cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines` (add `--jsonl` for JSONL summaries).
+- Tests cover seeded layouts, hidden observations, charged rejected/over-budget actions, replay/tamper detection, safe oracle plans, destructive shortcut accounting, forced-crossing rejection, recovery, action/cost oracle behaviour and JSONL output. **Tests and Rust compilation have not yet been executed on this branch.**
 
 **Remaining protocol limits:**
-- The seed currently selects only two layouts. This is a minimal deterministic variation, not a rich procedural world generator.
-- The scripted reference policy is optimal only for this hand-authored two-layout task. A BFS oracle computes a shortest valid action plan; a separate Dijkstra oracle computes minimum manifest-defined action cost under the hard step budget. Both inspect full evaluator state and are ceilings for this small fully specified environment, not fair black-box competitors or planners over hidden/incomplete world models. The BFS key omits event history and tick because BFS order makes the shortest path dominate; the Dijkstra key retains the number of steps used so a cheap but longer route cannot erase a shorter feasible route. Any future stateful action effects must be added to these keys and tested for Markov sufficiency.
-- The random policy is a floor baseline, not a representative distribution of capable agents.
-- Invalid attempts consume action ticks. An over-budget inspection is charged as an invalid action and does not consume additional observation budget. The first `CostModel` uses benchmark-defined relative units (inspect=2, move=1, interaction=1, wait=1, invalid surcharge=1); these are not joules, latency, API tokens or dollars. External wrappers must add measured wall-clock, memory, token, energy and monetary costs. Per-action resource budgets and rate limits remain to be formalized.
-- JSONL export exists as a string serializer, but durable artifact writing, an external independent verifier binary, distractors, delayed transfer, and held-out topologies remain pending.
+- Only two hand-authored layouts exist; held-out topologies, richer rule families and independently derived sub-seeds are pending.
+- Both oracles use full evaluator state. A planner constrained to agent-visible observations is still needed.
+- The safe oracles deliberately exclude destructive `ForceCrossing`. The unsafe shortcut is a negative-control affordance, not a candidate shortest path.
+- The action-cost model is relative to this benchmark. External wrappers must separately measure wall-clock, peak memory, tokens, CPU/GPU time, energy and money/API cost.
+- The random policy is a floor baseline, not a representative capable-agent distribution.
+- Durable result artifact writing, external independent verifier binary, distractors, delayed transfer and held-out structural transfer remain pending.
 
 **Next implementation sequence:**
-1. Expand the seeded generator to multiple topology/rule families with independently derived sub-seeds.
-2. Add distractor/interruption, delayed retention and structural transfer stages.
-3. Extend BFS and Dijkstra oracles to larger procedurally generated topologies, then add a planner operating only on agent-visible observations so the comparison distinguishes full-information action/cost ceilings from feasible agent planning; match action/observation/compute budgets.
-4. Add positive/negative/sham and unrelated-module mechanism controls.
-5. Finalize versioned trial/scorer metadata and CI validity gates.
-6. Add LLM and human adapters only after the environment and scorer are stable.
+1. Expand generator to multiple topology/rule families with independently derived sub-seeds and a frozen held-out generator family.
+2. Add distractor/interruption, delayed retention, change-point and structural transfer stages.
+3. Add a planner constrained to agent-visible observations and compare it against the full-information safe ceilings with matched action/observation/compute budgets.
+4. Add positive, negative, sham and unrelated-module controls; mutation-test the scorer and replay verifier.
+5. Add external runtime/energy/API-cost instrumentation and versioned trial/scorer manifests.
+6. Add LLM and human adapters only after the environment, scorer and hidden test families are stable.
 
 ## 11. Evidence boundary
 
