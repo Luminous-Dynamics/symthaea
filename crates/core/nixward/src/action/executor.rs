@@ -770,6 +770,12 @@ mod tests {
             }
             other => panic!("Expected PreviewOnly, got {other:?}"),
         }
+        assert_eq!(executor.history().len(), 1);
+        assert_eq!(
+            executor.success_rate(SafetyLevel::ReadOnly),
+            Some(0.0),
+            "a preview is recorded but never counted as an execution success"
+        );
     }
 
     #[tokio::test]
