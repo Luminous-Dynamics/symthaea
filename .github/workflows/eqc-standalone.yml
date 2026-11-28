@@ -2,7 +2,7 @@ name: EQC Standalone Reference Validation
 
 on:
   push:
-    branches: [research/eqc-standalone-v0-1-2026-11-27]
+    branches: [feat/eqc-standalone-review-2026-11-28]
     paths:
       - "tools/eqc-reference/**"
       - "docs/research/eqc-*.json"
@@ -10,7 +10,7 @@ on:
       - "docs/research/EVIDENCE_QUALIFIED_CAPABILITY_BENCHMARK_V0_1.md"
       - ".github/workflows/eqc-standalone.yml"
   pull_request:
-    branches: [main, fix/workspace-exclude-empty-core-symthaea-2026-11-21]
+    branches: [main]
     paths:
       - "tools/eqc-reference/**"
       - "docs/research/eqc-*.json"
@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: eqc-standalone-${{ github.event_name }}-${{ github.event.pull_request.head.sha || github.sha }}
@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          persist-credentials: true
+          persist-credentials: false
           fetch-depth: 1
 
       - name: Install pinned Rust toolchain
@@ -44,31 +44,17 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Generate isolated lockfile if absent
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref_name }}
+      - name: Verify isolated locked workspace resolution
         run: |
           set -euo pipefail
           manifest="tools/eqc-reference/Cargo.toml"
           lock="tools/eqc-reference/Cargo.lock"
-          # Re-resolve only this nested workspace graph. This intentionally
-          # does not touch the repository root Cargo.lock.
-          cargo metadata --manifest-path "$manifest" --format-version 1 \
-            > "$RUNNER_TEMP/eqc-cargo-metadata.json"
           test -s "$lock"
-          git add "$lock"
-          if ! git diff --cached --quiet -- "$lock"; then
-            if [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "research/eqc-standalone-v0-1-2026-11-27" ]]; then
-              git config user.name "github-actions[bot]"
-              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-              git commit -m "chore(eqc): add isolated reference evaluator lockfile"
-              git push origin HEAD:research/eqc-standalone-v0-1-2026-11-27
-            else
-              echo "The standalone EQC lockfile is not committed; refusing an unlocked PR evaluation." >&2
-              exit 1
-            fi
-          fi
+          cargo metadata --locked --manifest-path "$manifest" --format-version 1 \
+            > "$RUNNER_TEMP/eqc-cargo-metadata.json"
+          jq -e '
+            .packages | any(.[]; .name == "eqc-reference")
+          ' "$RUNNER_TEMP/eqc-cargo-metadata.json" >/dev/null
 
       - name: Validate JSON source artifacts
         run: |
