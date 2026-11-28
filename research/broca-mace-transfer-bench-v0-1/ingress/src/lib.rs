@@ -14,8 +14,9 @@ pub mod preference_exposure;
 pub use preference_exposure::{
     verify_preference_exposure_v1, ContextExposureManifestV1,
     ContextExposureVerifierV1, ContextMemorySourceV1, ContextMemorySpanV1,
-    PreferenceExposureRejectV1, PreferenceInfluenceModeV1,
-    PreferenceInfluenceSelectionV1, VerifiedPreferenceExposureV1,
+    PreferenceExposureRejectV1, PreferenceInfluenceDecisionV1,
+    PreferenceInfluenceModeV1, PreferenceInfluenceSelectionV1,
+    VerifiedPreferenceExposureV1,
 };
 pub use evidence_use::{
     link_verified_evidence_to_decision_v1, revalidate_for_use_v1,
