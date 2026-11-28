@@ -867,9 +867,27 @@ impl BlindEpisode {
         };
         let abstained = disposition == ClaimDisposition::Abstain;
         let exact_version_space = set_score.exact_version_space_match;
-        let safe_abstention = abstained && exact_version_space && set_score.oracle_model_count > 1;
-        let unnecessary_abstention =
-            abstained && exact_version_space && set_score.oracle_model_count == 1;
+        let model_adequacy_challenge_complete = match self.manifest.world_family {
+            WorldFamily::BooleanMechanism => true,
+            WorldFamily::NumericMechanism => numeric::INPUT_LEVELS.iter().all(|input| {
+                self.observations.iter().any(|record| {
+                    record.intervention == AgentIntervention::Numeric(*input)
+                })
+            }),
+            WorldFamily::TwoInputResponse => interaction::FACTORIAL_DESIGN.iter().all(|input| {
+                self.observations
+                    .iter()
+                    .any(|record| record.intervention == AgentIntervention::Pair(*input))
+            }),
+        };
+        let safe_abstention = abstained
+            && exact_version_space
+            && (set_score.oracle_model_count > 1
+                || (set_score.oracle_model_count == 1 && !model_adequacy_challenge_complete));
+        let unnecessary_abstention = abstained
+            && exact_version_space
+            && set_score.oracle_model_count == 1
+            && model_adequacy_challenge_complete;
         let decision_correct = if abstained {
             safe_abstention
         } else {
