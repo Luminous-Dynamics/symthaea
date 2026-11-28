@@ -287,8 +287,8 @@ fn main() {
     println!("───────────────────────────────────────────────────────────────────────");
     println!("  Subjects analyzed:      {}", stats.n_subjects);
     println!();
-    println!("  Mean Φ (Baseline):      {:.4}", stats.mean_baseline_phi);
-    println!("  Mean Φ (Meditation):    {:.4}", stats.mean_meditation_phi);
+    println!("  Mean Φ (random topology):      {:.4}", stats.mean_baseline_phi);
+    println!("  Mean Φ (small-world topology):    {:.4}", stats.mean_meditation_phi);
     println!("  Mean Φ (Post):          {:.4}", stats.mean_post_phi);
     println!();
     println!("  Mean Φ Increase:        {:+.4}", stats.mean_phi_increase);
@@ -307,25 +307,14 @@ fn main() {
     println!("📋 HYPOTHESIS EVALUATION");
     println!("───────────────────────────────────────────────────────────────────────");
 
-    if stats.mean_phi_increase > 0.0
-        && stats.positive_increase_count as f64 / stats.n_subjects as f64 > 0.6
-    {
-        println!("  SIMULATION ONLY: preset small-world topology differs from random topology");
-        println!();
-        println!("  Evidence:");
-        println!("    • Mean Φ increase: {:+.4}", stats.mean_phi_increase);
-        println!(
-            "    • {:.1}% of subjects showed increased Φ during meditation",
-            100.0 * stats.positive_increase_count as f64 / stats.n_subjects as f64
-        );
-        println!();
-        println!("  Interpretation:");
-        println!("    This generated topology contrast is not an empirical meditation result.\n    It must not be interpreted as a participant-level EEG or consciousness finding.\n    Synthetic topology differences can reflect their construction priors.");
-        println!("    brain regions, consistent with reports of unified awareness");
-        println!("    during meditative states.");
-    } else {
-        println!("  ⚠️  INCONCLUSIVE: Insufficient evidence for meditation-Φ relationship");
-    }
+    println!("  SIMULATED TOPOLOGY COMPARISON (not participant EEG):");
+    println!("    • Mean generated topology Φ difference: {:+.4}", stats.mean_phi_increase);
+    println!(
+        "    • Generated samples with positive difference: {:.1}%",
+        100.0 * stats.positive_increase_count as f64 / stats.n_subjects.max(1) as f64
+    );
+    println!("  These values are produced by seeded random/small-world/modular topology");
+    println!("  generators. They do not measure changes in any participant or meditation state.");
 
     println!();
     println!("═══════════════════════════════════════════════════════════════════════");
@@ -335,12 +324,12 @@ fn main() {
     println!("🧠 TOPOLOGY ANALYSIS");
     println!("───────────────────────────────────────────────────────────────────────");
     println!();
-    println!("  The meditation state topology (small-world) models:");
-    println!("    • High local clustering (focused attention)");
-    println!("    • Short global paths (integrated awareness)");
+    println!("  The synthetic small-world topology was generated with these construction choices:");
+    println!("    • High local clustering");
+    println!("    • Short global paths");
     println!("    • Balanced local/global connectivity");
     println!();
-    println!("  This mirrors the EEG signature of meditation:");
+    println!("  These topology properties are not an EEG signature or a claim about meditation:");
     println!("    • Increased frontal midline theta (focus)");
     println!("    • Enhanced gamma coherence (binding)");
     println!("    • Alpha synchronization (calm awareness)");
