@@ -2,6 +2,7 @@ package minimize
 
 import (
  "fmt"
+ "sort"
  "testing"
  "time"
 )
@@ -14,12 +15,36 @@ func tournamentFixture() (Input,[][]string) {
  revision:="0123456789abcdef0123456789abcdef01234567"
  target:=digestJSON("target-signature")
  other:=digestJSON("other-signature")
- obs:=make([]Observation,0,1<<len(ids))
- for mask:=0;mask<(1<<len(ids));mask++{
-  subset:=make([]string,0,len(ids))
-  present:=map[string]bool{}
-  for bit,id:=range ids{if mask&(1<<bit)!=0{subset=append(subset,id);present[id]=true}}
-  targetPreserved:=(present["a"]&&present["b"])||(present["k"]&&present["l"]&&present["m"])
+ targetSet:=func(subset []string)bool{
+  a:=containsID(subset,"a")&&containsID(subset,"b")
+  b:=containsID(subset,"k")&&containsID(subset,"l")&&containsID(subset,"m")
+  return a||b
+ }
+ orderA:=[]string{"a","b","c","d","e","f","g","h","i","j","k","l","m"}
+ orderB:=[]string{"k","l","m","a","b","c","d","e","f","g","h","i","j"}
+ orders:=[][]string{orderA,orderB}
+ subsets:=map[string][]string{}
+ add:=func(ids []string){canonical,ok:=canonicalFaults(ids);if !ok{panic("invalid fixture subset")};subsets[FaultSetDigest(canonical)]=canonical}
+ add(ids)
+ for _,order:=range orders{
+  current:=append([]string(nil),ids...)
+  changed:=true
+  for changed{
+   changed=false
+   for _,faultID:=range order{
+    position:=indexID(current,faultID);if position<0{continue}
+    candidate:=append([]string(nil),current[:position]...)
+    candidate=append(candidate,current[position+1:]...)
+    add(candidate)
+    if targetSet(candidate){current=candidate;changed=true;break}
+   }
+  }
+ }
+ digests:=make([]string,0,len(subsets));for d:=range subsets{digests=append(digests,d)};sort.Strings(digests)
+ obs:=make([]Observation,0,len(digests))
+ for _,d:=range digests{
+  subset:=subsets[d]
+  targetPreserved:=targetSet(subset)
   verdict:=Qualified;signature:=other
   if targetPreserved{verdict=Blocked;signature=target}
   o:=Observation{FaultIDs:subset,TrialID:"trial-mon039-tournament",FaultSetSHA256:FaultSetDigest(subset),ScenarioSHA256:scenario,RecoveryBoundarySHA256:boundary,CodeRevision:revision,ObservedAt:now.Add(-time.Minute),Verdict:verdict,FailureSignatureSHA256:signature,Complete:true}
@@ -29,9 +54,7 @@ func tournamentFixture() (Input,[][]string) {
  in:=Input{Profile:Profile,Version:Version,TrialID:"trial-mon039-tournament",Mode:OfflineFixture,EvaluatedAt:now,
   ScenarioSHA256:scenario,RecoveryBoundarySHA256:boundary,CodeRevision:revision,
   InitialFaultIDs:ids,ExpectedFailureSignatureSHA256:target,Observations:obs}
- orderA:=[]string{"a","b","c","d","e","f","g","h","i","j","k","l","m"}
- orderB:=[]string{"k","l","m","a","b","c","d","e","f","g","h","i","j"}
- return in,[][]string{orderA,orderB}
+ return in,orders
 }
 func TestExplicitReductionOrdersFindDifferentOneMinimalSets(t *testing.T){
  in,orders:=tournamentFixture()
