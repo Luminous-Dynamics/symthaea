@@ -61,10 +61,11 @@ fn matrix_vector(matrix: Mat3, vector: Vec3) -> Vec3 {
 
 fn matrix_multiply(a: Mat3, b: Mat3) -> Mat3 {
     let mut result = [[0.0; 3]; 3];
-    for row in 0..3 {
-        for col in 0..3 {
-            result[row][col] =
-                a[row][0] * b[0][col] + a[row][1] * b[1][col] + a[row][2] * b[2][col];
+    for (row_index, result_row) in result.iter_mut().enumerate() {
+        for (col_index, value) in result_row.iter_mut().enumerate() {
+            *value = (0..3)
+                .map(|inner| a[row_index][inner] * b[inner][col_index])
+                .sum();
         }
     }
     result
@@ -86,7 +87,12 @@ fn determinant(matrix: Mat3) -> f64 {
 }
 
 fn matrix_is_close(a: Mat3, b: Mat3, tolerance: f64) -> bool {
-    (0..3).all(|row| (0..3).all(|col| (a[row][col] - b[row][col]).abs() <= tolerance))
+    a.iter().zip(b.iter()).all(|(a_row, b_row)| {
+        a_row
+            .iter()
+            .zip(b_row.iter())
+            .all(|(a_value, b_value)| (a_value - b_value).abs() <= tolerance)
+    })
 }
 
 fn rotation_axis_angle(axis: Vec3, angle: f64) -> Mat3 {
