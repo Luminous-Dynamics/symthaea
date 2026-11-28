@@ -116,9 +116,6 @@ impl Rat {
     fn is_zero(self) -> bool { self.n == 0 }
     fn is_nonnegative(self) -> bool { self.n >= 0 }
 
-    fn max(self, rhs: Self) -> Exact<Self> {
-        if self.cmp(rhs)? == Ordering::Less { Ok(rhs) } else { Ok(self) }
-    }
 }
 
 impl fmt::Display for Rat {
