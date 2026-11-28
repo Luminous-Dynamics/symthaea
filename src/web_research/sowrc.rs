@@ -290,17 +290,38 @@ pub fn evaluate_sowrc(
     let c_n = 1.0_f64;
     let b_n = 1.0 / config.q_min;
     let per_threshold_delta = config.delta / config.threshold_grid.len() as f64;
-    let mut threshold_bounds = Vec::with_capacity(config.threshold_grid.len());
+    if !per_threshold_delta.is_finite() || per_threshold_delta <= 0.0 {
+        return Err(SowrcError::InvalidDelta);
+    }
 
+    // Sort observed true-label nonconformity scores once. As lambda increases,
+    // the loss set {score > lambda} shrinks monotonically; a single forward
+    // cursor and precomputed suffix weights produce every HT total in O(N+J).
+    let mut observed_scores = observations
+        .iter()
+        .filter_map(|observation| {
+            observation
+                .true_label_nonconformity
+                .map(|score| (score, 1.0 / observation.inclusion_probability, observation.record_id.as_str()))
+        })
+        .collect::<Vec<_>>();
+    observed_scores.sort_by(|left, right| {
+        left.0
+            .total_cmp(&right.0)
+            .then_with(|| left.2.cmp(right.2))
+    });
+    let mut suffix_weights = vec![0.0_f64; observed_scores.len() + 1];
+    for index in (0..observed_scores.len()).rev() {
+        suffix_weights[index] = suffix_weights[index + 1] + observed_scores[index].1;
+    }
+
+    let mut cursor = 0usize;
+    let mut threshold_bounds = Vec::with_capacity(config.threshold_grid.len());
     for &lambda in &config.threshold_grid {
-        let ht_loss_total = observations
-            .iter()
-            .filter_map(|observation| {
-                let score = observation.true_label_nonconformity?;
-                (observation.label_observed && score > lambda)
-                    .then_some(1.0 / observation.inclusion_probability)
-            })
-            .sum::<f64>();
+        while cursor < observed_scores.len() && observed_scores[cursor].0 <= lambda {
+            cursor += 1;
+        }
+        let ht_loss_total = suffix_weights[cursor];
         let empirical_weighted_risk = ht_loss_total / horizon as f64;
         let (upper_risk_bound, log_mixture_at_zero, log_mixture_at_one) =
             invert_mixture_upper_bound(
