@@ -265,6 +265,10 @@ Build challenge suites for:
 
 Measure false acceptance, false rejection, revocation propagation, replay resistance, recovery time, event throughput and latency. Report the trust/failure controls separately from throughput.
 
+## 5.5 Cross-project target matrix
+
+The proposed comparators, non-compensatory gates, reporting dimensions and staged targets are also captured in `eqc-benchmark-target-matrix-v0.1.json`. It is explicitly marked `research_targets_not_results`. The four tracks keep software engineering, clinical workflows, scientific simulation and trust infrastructure distinct; a pooled score across those domains would be meaningless.
+
 ## 6. Measurement definitions
 
 Use versioned formulas and publish per-task outcomes.
