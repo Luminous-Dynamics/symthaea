@@ -137,6 +137,26 @@ Two artifacts now define the provenance-gate record:
 
 All grant references and rights holders in these fixtures are fictional and do not constitute actual approval. The runtime gate must check both schema validity and the policy relation between `intended_use`, `approved_intended_uses`, `permitted_operations`, access state, and expiration. An accepted JSON shape is not a legal authorization.
 
-## 8. Qualification status
+## 8. Rust manifest consistency gate (2026-11-28)
+
+A fail-closed Rust manifest consistency validator now exists at `crates/domains/symthaea-soma/src/benchmark_license_gate.rs`.
+
+For a requested use, operation, transformation, and caller-supplied canonical UTC timestamp, it checks:
+- exact schema version and dataset/manifest/license identifiers;
+- digest shape, source URI and UTC timestamp validity;
+- access status, opaque grant reference, approval reference and grant expiry;
+- requested use against the manifest's intended and approved use scopes;
+- required operation against permitted operations and explicit commercial/training/derivative/redistribution/publication flags;
+- transformation permission and derivative-media authority;
+- uniqueness of use, operation, and transformation lists;
+- the prohibition on raw media stored in public Git.
+
+Nine Rust tests cover a fictional valid authorization, commercial scope mismatch, intended-use approval mismatch, training denial, unauthorized counterfactual transformation, expired grants, raw media in Git, non-canonical time strings, and missing commercial authority.
+
+The manifest validator checks consistency of declared records; it does not authenticate the rights holder, grant, contract, or access. The fictional positive fixture is not legal permission. External legal records still require private storage and counsel-reviewed provenance.
+
+The tests are authored but unexecuted. No external dataset was loaded by this work.
+
+## 9. Qualification status
 
 This document records a conservative interpretation of the public benchmark terms as displayed on 2026-11-27. It is not legal advice and does not replace reviewing the full license/contract with qualified counsel. No dataset access has been requested or granted by this implementation. No licensed benchmark media has been downloaded, modified, or run through Symthaea as part of this work.
