@@ -417,6 +417,82 @@ fn valid_stable_id(value: &str) -> bool {
         && value.as_bytes()[0].is_ascii_lowercase()
 }
 
+/// Resolve registry key syntax to source fragments.
+///
+/// Numeric placeholders like `nback_{n}::hit_rate` correspond to Rust
+/// `format!("nback_{}::hit_rate", n)`; enumerated placeholders such as
+/// `{congruent,incongruent,neutral}` are checked as alternatives.
+fn metric_source_fragments(metric: &MetricDefinition) -> Vec<String> {
+    if let Some(key) = &metric.key {
+        return vec![key.clone()];
+    }
+    let Some(pattern) = &metric.key_pattern else {
+        return Vec::new();
+    };
+
+    let Some(open) = pattern.find('{') else {
+        return vec![pattern.clone()];
+    };
+    let Some(relative_close) = pattern[open + 1..].find('}') else {
+        return vec![pattern.clone()];
+    };
+    let close = open + 1 + relative_close;
+    let placeholder = &pattern[open + 1..close];
+    let prefix = &pattern[..open];
+    let suffix = &pattern[close + 1..];
+
+    if metric.parameters.is_some() {
+        return vec![format!("{prefix}{{}}{{suffix}")];
+    }
+
+    if placeholder.contains(',') {
+        return placeholder
+            .split(',')
+            .map(|alternative| format!("{prefix}{alternative}{suffix}"))
+            .collect();
+    }
+
+    vec![format!("{prefix}{{}}{{suffix}")]
+}
+
+fn validate_metric_keys_against_source(
+    registry: &PsychBenchRegistry,
+    crate_root: &std::path::Path,
+) -> Result<(), RegistryValidationError> {
+    for benchmark in &registry.benchmarks {
+        let relative = benchmark
+            .implementation_path
+            .strip_prefix("crates/domains/symthaea-psych-bench/")
+            .ok_or_else(|| {
+                RegistryValidationError::new(format!(
+                    "benchmark {} has an implementation path outside this crate",
+                    benchmark.id
+                ))
+            })?;
+        let source_path = crate_root.join(relative);
+        let source = std::fs::read_to_string(&source_path).map_err(|error| {
+            RegistryValidationError::new(format!(
+                "cannot read implementation for {} at {}: {error}",
+                benchmark.id,
+                source_path.display()
+            ))
+        })?;
+
+        for metric in &benchmark.metrics {
+            let fragments = metric_source_fragments(metric);
+            if fragments.is_empty()
+                || fragments.iter().any(|fragment| !source.contains(fragment))
+            {
+                return Err(RegistryValidationError::new(format!(
+                    "metric selector for {} / {} does not match implementation source: {:?}",
+                    benchmark.id, metric.id, fragments
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -445,6 +521,14 @@ mod tests {
                 benchmark.implementation_path
             );
         }
+    }
+
+    #[test]
+    fn pilot_metric_keys_match_registered_implementation_sources() {
+        let registry = PsychBenchRegistry::pilot().expect("pilot registry");
+        let crate_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        validate_metric_keys_against_source(&registry, &crate_root)
+            .expect("all pilot metric keys should exist in their implementation source");
     }
 
     #[test]
