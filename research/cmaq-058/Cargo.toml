@@ -1,0 +1,19 @@
+[package]
+name = "cmaq-058-exact-restart-renewal"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact O(K) capital-restart renewal mixture over predictable conditional kernel bets"
+
+[dependencies]
+cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
+cmaq-048-fourier-kernel-approachability = { path = "../cmaq-048" }
+cmaq-053-compositional-risk-budget = { path = "../cmaq-053" }
+cmaq-054-evidence-adaptive-kernel-family = { path = "../cmaq-054" }
+cmaq-055-dyadic-start-time-prior = { path = "../cmaq-055" }
+cmaq-056-typed-null-manifest = { path = "../cmaq-056" }
+cmaq-057-predictable-adaptive-kernel-betting = { path = "../cmaq-057" }
+sha2 = "=0.10.9"
+
+[workspace]

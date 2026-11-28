@@ -1,0 +1,49 @@
+name: CMAQ-058 exact restart renewal
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-058/**"
+      - "research/cmaq-057/**"
+      - "research/cmaq-056/**"
+      - "research/cmaq-055/**"
+      - "research/cmaq-054/**"
+      - "research/cmaq-053/**"
+      - ".github/workflows/cmaq-058.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cmaq-058-exact-renewal
+  cancel-in-progress: true
+
+jobs:
+  exact-restart-renewal:
+    name: exact-restart-renewal
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-058-exact-restart-renewal-v0-1-20261128'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.100.0
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy
+      - name: Generate dependency lockfile
+        run: cargo +1.100.0 generate-lockfile --manifest-path research/cmaq-058/Cargo.toml
+      - name: Check formatting
+        run: cargo +1.100.0 fmt --manifest-path research/cmaq-058/Cargo.toml -- --check
+      - name: Run deterministic tests
+        run: cargo +1.100.0 test --manifest-path research/cmaq-058/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo +1.100.0 clippy --manifest-path research/cmaq-058/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Exact capital-restart renewal probe
+        run: cargo +1.100.0 run --release --manifest-path research/cmaq-058/Cargo.toml --locked --bin renewal_probe > cmaq-058-renewal-smoke.csv
+      - name: Preserve restart renewal receipt and lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-058-renewal-smoke
+          path: |
+            cmaq-058-renewal-smoke.csv
+            research/cmaq-058/Cargo.lock
+          if-no-files-found: error
