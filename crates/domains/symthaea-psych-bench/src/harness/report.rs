@@ -171,8 +171,8 @@ impl MetricValue {
                 mean: 0.0,
                 std_dev: 0.0,
                 n: 0,
-                ci_lower: bounds.lower,
-                ci_upper: bounds.upper.unwrap_or(bounds.lower),
+                ci_lower: 0.0,
+                ci_upper: 0.0,
             });
         }
 
@@ -180,9 +180,7 @@ impl MetricValue {
             if !sample.is_finite() {
                 return Err(MetricBoundsError::NonFiniteSample { index });
             }
-            if sample < bounds.lower
-                || bounds.upper.is_some_and(|upper| sample > upper)
-            {
+            if sample < bounds.lower || bounds.upper.is_some_and(|upper| sample > upper) {
                 return Err(MetricBoundsError::SampleOutOfBounds {
                     index,
                     value: sample,
@@ -214,10 +212,7 @@ impl MetricValue {
                     .iter()
                     .all(|sample| *sample == 0.0 || *sample == 1.0);
                 let (lower, upper) = if all_binary {
-                    wilson_score_interval(
-                        normalized.iter().sum::<f64>() / n as f64,
-                        n,
-                    )
+                    wilson_score_interval(normalized.iter().sum::<f64>() / n as f64, n)
                 } else {
                     let mut seed = 0xcbf29ce484222325_u64;
                     for sample in &normalized {
@@ -2963,7 +2958,8 @@ mod tests {
             upper: Some(1.0),
         };
         let samples = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0];
-        let metric = MetricValue::from_samples_with_bounds(&samples, bounds).expect("valid samples");
+        let metric =
+            MetricValue::from_samples_with_bounds(&samples, bounds).expect("valid samples");
         assert!((metric.mean - 0.9).abs() < 1e-12);
         assert!(metric.ci_lower >= 0.0);
         assert!(metric.ci_upper <= 1.0);
@@ -2977,7 +2973,8 @@ mod tests {
             upper: Some(1.0),
         };
         let samples = [-0.2, 0.0, 0.2, 0.1, -0.1];
-        let metric = MetricValue::from_samples_with_bounds(&samples, bounds).expect("valid signed samples");
+        let metric = MetricValue::from_samples_with_bounds(&samples, bounds)
+            .expect("valid signed samples");
         assert!(metric.ci_lower >= -1.0);
         assert!(metric.ci_upper <= 1.0);
         assert!(metric.ci_lower <= metric.mean && metric.ci_upper >= metric.mean);
@@ -2990,7 +2987,8 @@ mod tests {
             upper: Some(2.0),
         };
         let samples = [0.8, 1.0, 1.2, 1.8];
-        let metric = MetricValue::from_samples_with_bounds(&samples, bounds).expect("valid non-unit samples");
+        let metric = MetricValue::from_samples_with_bounds(&samples, bounds)
+            .expect("valid non-unit samples");
         assert!(metric.ci_lower >= 0.0);
         assert!(metric.ci_upper <= 2.0);
         assert!(metric.ci_lower <= metric.mean && metric.ci_upper >= metric.mean);
@@ -3004,7 +3002,10 @@ mod tests {
         };
         let error = MetricValue::from_samples_with_bounds(&[-0.2, 1.1], bounds)
             .expect_err("out-of-range sample must be rejected");
-        assert!(matches!(error, MetricBoundsError::SampleOutOfBounds { index: 1, .. }));
+        assert!(matches!(
+            error,
+            MetricBoundsError::SampleOutOfBounds { index: 1, .. }
+        ));
     }
 
     #[test]
