@@ -10,7 +10,8 @@
 //! and audited independently of the agent implementation.
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
+use std::cmp::Reverse;
 
 /// Versioned benchmark-internal cost units. These are task costs, not joules,
 /// wall-clock latency, API tokens, or monetary cost.
@@ -527,8 +528,11 @@ pub struct ScenarioScore {
     pub evaluator_perturbations: u32,
     pub successful_recoveries: u32,
     pub optimal_agent_steps: u32,
+    pub optimal_resource_cost_units: u64,
     /// 0 when the goal is incomplete; otherwise optimal steps / actual agent attempts, capped at 1.
     pub action_efficiency: f64,
+    /// 0 when incomplete; otherwise minimum valid plan cost / actual cost, capped at 1.
+    pub cost_efficiency: f64,
     /// Sum of benchmark-defined cost units across agent actions and rejected attempts.
     pub resource_cost_units: u64,
     /// 0 when incomplete; otherwise completed goal per benchmark-defined cost unit.
@@ -572,6 +576,28 @@ impl From<&WorldState> for PlannerKey {
             delivered: state.delivered,
             observation_budget_remaining: state.observation_budget_remaining,
         }
+    }
+}
+
+/// Convert a state-transition event to the manifest's benchmark-internal cost units.
+fn event_cost_units(kind: &EventKind, model: CostModel) -> u64 {
+    match kind {
+        EventKind::Inspected(_) => model.inspect as u64,
+        EventKind::Moved { .. } => model.move_between_sites as u64,
+        EventKind::Collected(_) | EventKind::GateOpened | EventKind::Delivered => {
+            model.interaction as u64
+        }
+        EventKind::Waited => model.wait as u64,
+        EventKind::ActionRejected { action, .. } => {
+            let action_cost = match action {
+                Action::Inspect => model.inspect,
+                Action::Move(_) => model.move_between_sites,
+                Action::Collect(_) | Action::UseValveKey | Action::Deliver => model.interaction,
+                Action::Wait => model.wait,
+            };
+            action_cost.saturating_add(model.invalid_action_surcharge) as u64
+        }
+        EventKind::Perturbed(_) => 0,
     }
 }
 
@@ -619,6 +645,90 @@ fn shortest_action_plan(manifest: &ScenarioManifest) -> Option<Vec<Action>> {
     }
 
     None
+}
+
+/// Dijkstra search for a valid plan with minimum benchmark-defined action cost.
+/// Ties are broken by fewer actions, then by the deterministic state ordering.
+/// This uses full evaluator state and is an evaluator ceiling, not an agent policy.
+fn least_cost_action_plan(manifest: &ScenarioManifest) -> Option<(Vec<Action>, u64)> {
+    let initial = WorldState::initial(manifest).ok()?;
+    let initial_key = PlannerKey::from(&initial);
+    let mut frontier = BinaryHeap::new();
+    frontier.push(Reverse((0_u64, 0_u32, initial_key.clone())));
+
+    let mut best: BTreeMap<PlannerKey, (u64, u32, Vec<Action>, WorldState)> = BTreeMap::new();
+    best.insert(initial_key, (0, 0, Vec::new(), initial));
+
+    let actions = [
+        Action::Inspect,
+        Action::Move(Site::Depot),
+        Action::Move(Site::Crossing),
+        Action::Move(Site::Outpost),
+        Action::Collect(Item::WaterFilter),
+        Action::Collect(Item::ValveKey),
+        Action::UseValveKey,
+        Action::Deliver,
+        Action::Wait,
+    ];
+
+    while let Some(Reverse((cost, steps, key))) = frontier.pop() {
+        let Some((known_cost, known_steps, plan, state)) = best.get(&key) else {
+            continue;
+        };
+        if (cost, steps) != (*known_cost, *known_steps) {
+            continue;
+        }
+        if state.delivered {
+            return Some((plan.clone(), cost));
+        }
+        if steps >= manifest.max_steps {
+            continue;
+        }
+
+        for action in &actions {
+            let Ok((next, receipt)) = step(manifest, state, action.clone()) else {
+                continue;
+            };
+            let next_cost = cost.saturating_add(event_cost_units(
+                &receipt.event.kind,
+                manifest.cost_model,
+            ));
+            let next_steps = steps + 1;
+            let next_key = PlannerKey::from(&next);
+            let improves = best
+                .get(&next_key)
+                .map(|(existing_cost, existing_steps, _, _)| {
+                    (next_cost, next_steps) < (*existing_cost, *existing_steps)
+                })
+                .unwrap_or(true);
+            if !improves {
+                continue;
+            }
+
+            let mut next_plan = plan.clone();
+            next_plan.push(action.clone());
+            best.insert(
+                next_key.clone(),
+                (next_cost, next_steps, next_plan, next),
+            );
+            frontier.push(Reverse((next_cost, next_steps, next_key)));
+        }
+    }
+
+    None
+}
+
+/// Search-based cost oracle for the current environment specification.
+pub fn run_cost_oracle(
+    manifest: &ScenarioManifest,
+) -> Result<EvaluatedTrace, TransitionError> {
+    let (plan, _minimum_cost) =
+        least_cost_action_plan(manifest).ok_or(TransitionError::PlannerExhausted)?;
+    let commands = plan
+        .into_iter()
+        .map(RecordedCommand::Agent)
+        .collect::<Vec<_>>();
+    evaluate_trace(manifest, &commands)
 }
 
 /// Search-based evaluator baseline for the current environment specification.
@@ -676,30 +786,25 @@ fn score_replayed_state(
     let optimal_agent_steps = shortest_action_plan(manifest)
         .map(|plan| plan.len() as u32)
         .unwrap_or(0);
-    let resource_cost_units = state.event_log.iter().map(|event| {
-        let model = manifest.cost_model;
-        match &event.kind {
-            EventKind::Inspected(_) => model.inspect as u64,
-            EventKind::Moved { .. } => model.move_between_sites as u64,
-            EventKind::Collected(_) | EventKind::GateOpened | EventKind::Delivered => {
-                model.interaction as u64
-            }
-            EventKind::Waited => model.wait as u64,
-            EventKind::ActionRejected { action, .. } => {
-                let action_cost = match action {
-                    Action::Inspect => model.inspect,
-                    Action::Move(_) => model.move_between_sites,
-                    Action::Collect(_) | Action::UseValveKey | Action::Deliver => model.interaction,
-                    Action::Wait => model.wait,
-                };
-                action_cost.saturating_add(model.invalid_action_surcharge) as u64
-            }
-            EventKind::Perturbed(_) => 0,
-        }
-    }).sum::<u64>();
+    let optimal_resource_cost_units = least_cost_action_plan(manifest)
+        .map(|(_, cost)| cost)
+        .unwrap_or(0);
+    let resource_cost_units = state
+        .event_log
+        .iter()
+        .map(|event| event_cost_units(&event.kind, manifest.cost_model))
+        .sum::<u64>();
 
     let action_efficiency = if state.delivered && agent_attempts > 0 && optimal_agent_steps > 0 {
         (optimal_agent_steps as f64 / agent_attempts as f64).min(1.0)
+    } else {
+        0.0
+    };
+    let cost_efficiency = if state.delivered
+        && resource_cost_units > 0
+        && optimal_resource_cost_units > 0
+    {
+        (optimal_resource_cost_units as f64 / resource_cost_units as f64).min(1.0)
     } else {
         0.0
     };
@@ -718,7 +823,9 @@ fn score_replayed_state(
         evaluator_perturbations,
         successful_recoveries,
         optimal_agent_steps,
+        optimal_resource_cost_units,
         action_efficiency,
+        cost_efficiency,
         resource_cost_units,
         goal_completion_per_cost_unit,
     }
