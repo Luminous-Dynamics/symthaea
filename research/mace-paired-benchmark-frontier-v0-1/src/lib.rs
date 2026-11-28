@@ -887,4 +887,46 @@ mod tests {
         assert!(!report.candidate_saw_evaluator_labels);
     }
 
+
+    #[test]
+    fn confirmatory_status_requires_at_least_thirty_independent_clusters() {
+        let mut manifests=vec![manifest("base","base"),manifest("candidate","candidate")];
+        for m in &mut manifests {
+            m.scored_task_count=30;
+            m.independent_cluster_count=30;
+            m.matched_controls_sha256=Some(compute_matched_controls_sha256_v1(m).unwrap());
+        }
+        let mut rows=Vec::new();
+        for index in 0..30 {
+            let cluster=format!("profile-{index:03}");
+            for (arm,score,latency,bytes) in [
+                ("base",0.6,100.0,1000.0),
+                ("candidate",0.8,90.0,800.0),
+            ] {
+                let mut row=TaskOutcomeV1{
+                    run_id:format!("run-{arm}"),
+                    arm_id:arm.into(),
+                    independent_cluster_id:cluster.clone(),
+                    task_id:format!("task-{index:03}"),
+                    outcome_receipt_sha256:String::new(),
+                    evaluator_custody:OutcomeCustodyV1::PublicDiagnosticOnly,
+                    candidate_saw_evaluator_labels:false,
+                    metric_values:BTreeMap::from([
+                        ("governance_score".into(),score),
+                        ("p95_latency_ms".into(),latency),
+                        ("index_bytes".into(),bytes),
+                        ("abstention_count".into(),0.0),
+                    ]),
+                };
+                row.outcome_receipt_sha256=task_outcome_payload_sha256_v1(&row).unwrap();
+                rows.push(row);
+            }
+        }
+        let report=paired(manifests,rows,"base");
+        assert_eq!(report.confirmatory_cluster_floor,30);
+        assert_eq!(report.inference_status,FrontierInferenceStatusV1::ConfirmatoryClusterFloorMet);
+        assert!(report.arm_points.iter().all(|point|point.inference_status==FrontierInferenceStatusV1::ConfirmatoryClusterFloorMet));
+        assert!(report.pairwise_effects.iter().all(|effect|effect.inference_status==FrontierInferenceStatusV1::ConfirmatoryClusterFloorMet));
+    }
+
 }
