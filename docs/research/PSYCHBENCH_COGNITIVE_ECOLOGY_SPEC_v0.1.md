@@ -1,6 +1,6 @@
 # PsychBench Cognitive Ecology (PCE) — Specification v0.1
 
-**Status:** proposed benchmark family; implementation not yet started  
+**Status:** proposed benchmark family; deterministic environment-kernel slice implemented on the research branch; Rust validation pending  
 **Programme:** PsychBench Next  
 **Design date:** 2026-11-28  
 **Primary purpose:** evaluate adaptive cognition in a partially observed, changing environment without collapsing distinct faculties into one score.
@@ -221,16 +221,25 @@ A PCE release is not qualified for confirmatory comparison until:
 
 ## 10. First implementation slice
 
-Build the environment kernel before adding a natural-language wrapper:
+Build and qualify the environment kernel before adding a natural-language wrapper.
 
-1. Rust structs for `WorldState`, `Event`, `LatentRule`, `Goal`, `AgentBelief`, `Observation`, `Action`, and `ScenarioManifest`.
-2. Deterministic transition function `step(state, action) -> (state, events, observation)`.
-3. Separate full-state evaluator/oracle from agent-visible observations.
-4. JSONL event receipt and replay by manifest hash.
-5. One small scenario: hidden resource dependency + persistent delivery goal + one distractor + one regime shift + delayed transfer.
-6. Scripted baseline, random baseline, and oracle planner.
-7. Ablation hooks after the base environment is deterministic and testable.
-8. Only then add the remaining scenario families and LLM/human adapters.
+**Implemented on `research/psychbench-vnext-2026-11`:**
+- Rust types for `ScenarioManifest`, evaluator-only `WorldState`, `Observation`, `Action`, event records, perturbations, and `StepReceipt`.
+- Deterministic `step` and evaluator-only `perturb` transitions.
+- Separate full evaluator state from agent-visible inspected-site observations.
+- Manifest and state digests using BLAKE3; manifest mismatch is rejected.
+- Deterministic replay of ordered agent/evaluator commands.
+- A first hidden-resource delivery path with inspection budget, valve-key dependency, locked crossing, persistent delivery goal, and injected gate failure/recovery.
+- Unit tests for hidden-resource disclosure, delivery gating, intervention/recovery, failed-action non-mutation, replay determinism, manifest mismatch, and receipt determinism. **These tests are added but have not been executed.**
+
+**Still to implement/validate:**
+1. JSONL event artifact export and external receipt verifier.
+2. Formal latent-rule/state-transition oracle and scenario generator independent of the current hand-authored fixture.
+3. A distractor/interruption stage and delayed transfer stage.
+4. Scripted baseline, random baseline, and oracle planner with cost accounting.
+5. Positive/negative/sham and unrelated-module controls.
+6. Versioned trial/scorer schema and CI validity gates.
+7. Only after the environment and scorer are stable, add LLM and human adapters.
 
 ## 11. Evidence boundary
 
