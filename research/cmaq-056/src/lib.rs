@@ -401,6 +401,20 @@ impl TypedRiskPlan {
         Ok(())
     }
 
+    /// Rebuilds the canonical manifest from the actual monitor configuration
+    /// and verifies that every Fourier bank, target, expert ID, prior and
+    /// reference binding is identical to the risk plan.
+    pub fn verify_expert_inventory(
+        &self,
+        configurations: &[KernelExpertConfig],
+    ) -> Result<(), ManifestError> {
+        let rebuilt = KernelFamilyManifest::build(
+            configurations,
+            self.calibration.clone(),
+        )?;
+        self.verify_manifest(&rebuilt)
+    }
+
     /// Verifies a legacy CMAQ-053 receipt. The legacy receipt requires a
     /// positive reference-failure budget, so it can only represent Mode B.
     /// Direct Mode A must use TypedRiskPlan until CMAQ-053 gains an explicit
@@ -917,6 +931,28 @@ mod tests {
         assert_eq!(plan.alpha_test(), local);
         assert_eq!(plan.reference_failure_budget(), None);
         plan.verify_manifest(&manifest).unwrap();
+    }
+
+    #[test]
+    fn typed_plan_recomputes_manifest_from_actual_expert_inventory() {
+        let configs = configs();
+        let manifest =
+            KernelFamilyManifest::build(&configs, NullCalibration::direct_v1()).unwrap();
+        let local = fleet().local_alpha_for(&scope()).unwrap();
+        let plan = TypedRiskPlan::new(&fleet(), scope(), local, &manifest).unwrap();
+        assert_eq!(plan.verify_expert_inventory(&configs), Ok(()));
+
+        let mut mutated = configs;
+        mutated[0].response_map = FourierFeatureMap::new(
+            1,
+            vec![vec![1.75]],
+            SHA_A.into(),
+        )
+        .unwrap();
+        assert_eq!(
+            plan.verify_expert_inventory(&mutated),
+            Err(ManifestError::ManifestDigestMismatch("manifest"))
+        );
     }
 
     #[test]
