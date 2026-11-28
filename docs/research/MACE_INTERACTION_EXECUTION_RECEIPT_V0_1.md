@@ -29,7 +29,7 @@ No-action coverage is a first-class event. It is not inferred from a missing too
 - control_equals proves that the trusted renderer/executor applied a particular control setting. It does not prove the resulting prose semantically followed a preference such as "be warm" or "be concise"; BRS/PRS, an independent evaluator and human studies remain separate.
 - A no-action result is only as strong as the injected verifier's ability to establish complete event-journal coverage and the executor's trust boundary.
 - The fixture verifier is synthetic test scaffolding and is not suitable for production.
-- This contract does not decide whether a preference is true, durable, consented, or applicable. It checks the upstream selection's scope/time and lets the host verify its authority.
+- This contract does not decide whether a preference is true, durable, consented, or applicable. It checks the upstream selection's scope/time and lets the host verify its authority. This version also does not prove that an Ignore decision was withheld from the model's prompt: that requires a complete exact provider-context exposure receipt from #13973. Conversely, Support/Dominate require positive exposure evidence. The cross-benchmark integration and this hard gate are tracked in #14264; do not treat a selected Ignore label or missing retrieval row as proof of non-exposure.
 
 ## Tests
 
