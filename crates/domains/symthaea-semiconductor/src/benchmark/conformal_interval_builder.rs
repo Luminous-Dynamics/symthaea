@@ -513,7 +513,12 @@ mod tests {
         }
     }
 
-    fn sample(index: u64, residual: f64, available_at: i64) -> ConformalCalibrationSampleV1 {
+    fn sample(
+        index: u64,
+        residual: f64,
+        available_at: i64,
+        score_policy: &ConformalScorePolicyV1,
+    ) -> ConformalCalibrationSampleV1 {
         let label_id = format!("label-{index}");
         let event_id = format!("event-{index}");
         let payload = digest(char::from(b'b' + (index % 20) as u8));
@@ -550,10 +555,7 @@ mod tests {
             label_revision: 1,
             label_payload_sha256: payload,
             global_model_artifact_sha256: digest('a'),
-            score_policy_sha256: json_sha256(&policy(
-                ConformalScoreKindV1::AbsoluteResidual,
-                50,
-            )).unwrap(),
+            score_policy_sha256: json_sha256(score_policy).unwrap(),
             measurement_contract_sha256: digest('m'),
             event_time_unix_seconds: available_at - 120,
             prediction_at_unix_seconds: available_at - 60,
@@ -569,7 +571,7 @@ mod tests {
     fn finite_sample_quantile_uses_the_corrected_order_statistic() {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
         let samples = (0..19)
-            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10))
+            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10, &policy))
             .collect::<Vec<_>>();
         let output = build_conformal_interval_v1(&policy, &input(0.05), &samples).unwrap();
         assert_eq!(output.status, ConformalSetBuildStatusV1::Ready);
@@ -595,7 +597,7 @@ mod tests {
     #[test]
     fn labels_not_available_by_prediction_cutoff_are_rejected() {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
-        let mut candidate = sample(0, 1.0, 1_800_100_000);
+        let mut candidate = sample(0, 1.0, 1_800_100_000, &policy);
         candidate.eligibility_report_available_at_unix_seconds = 1_800_100_001;
         assert!(
             build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err()
@@ -605,7 +607,7 @@ mod tests {
     #[test]
     fn blocked_or_unknown_k1_label_cannot_enter_calibration_buffer() {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
-        let mut candidate = sample(0, 1.0, 1_800_000_100);
+        let mut candidate = sample(0, 1.0, 1_800_000_100, &policy);
         candidate.eligibility_report.eligibility = LabelConsumptionEligibilityV1::Blocked;
         candidate.eligibility_report.downstream_consumption_allowed = false;
         let mut canonical = candidate.eligibility_report.clone();
@@ -620,7 +622,7 @@ mod tests {
     fn normalized_score_uses_sample_scale_and_current_prediction_scale() {
         let policy = policy(ConformalScoreKindV1::ScaleNormalizedAbsoluteResidual, 50);
         let samples = (0..19)
-            .map(|index| sample(index, (index as f64 + 1.0) * 2.0, 1_800_000_000 + index as i64 * 10))
+            .map(|index| sample(index, (index as f64 + 1.0) * 2.0, 1_800_000_000 + index as i64 * 10, &policy))
             .collect::<Vec<_>>();
         let output = build_conformal_interval_v1(&policy, &input(0.05), &samples).unwrap();
         assert_eq!(output.conformal_quantile, Some(19.0));
