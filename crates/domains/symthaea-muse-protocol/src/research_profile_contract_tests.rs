@@ -333,7 +333,9 @@ fn executable_capability_mutation_fails_closed() {
 fn catalogue_identity_mutation_fails_closed() {
     let mut profile: Value = serde_json::from_str(AMAPIANO_JSON).unwrap();
     profile["current_catalog_reference"]["catalog_id"] = Value::from(110);
-    assert!(validate_research_profile(&profile, "south-african-amapiano", 109, "Amapiano").is_err());
+    assert!(
+        validate_research_profile(&profile, "south-african-amapiano", 109, "Amapiano").is_err()
+    );
 }
 
 #[test]
