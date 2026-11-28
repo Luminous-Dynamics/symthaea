@@ -650,6 +650,37 @@ mod tests {
     }
 
     #[test]
+    fn wrong_clarification_target_is_not_credited_as_useful_information() {
+        let report = evaluate_policy_with(
+            &fixture_items(),
+            "wrong_target_control",
+            |observation| {
+                if observation.clarification_available {
+                    SelectivePolicyDecision {
+                        action: DecisionAction::RequestInformation,
+                        confidence: 0.5,
+                        clarification_target: Some(ClarificationTarget::RefreshSource),
+                    }
+                } else {
+                    SelectivePolicyDecision {
+                        action: DecisionAction::Abstain,
+                        confidence: 0.1,
+                        clarification_target: None,
+                    }
+                }
+            },
+            SelectivePredictionCostModel::default(),
+        )
+        .expect("wrong-target control remains a valid policy");
+
+        assert_eq!(report.total_information_requests, 4);
+        assert_eq!(report.useful_information_requests, 2);
+        assert_eq!(report.clarification_precision, Some(0.5));
+        assert_eq!(report.clarification_recall, Some(0.5));
+        assert_eq!(report.resolved_clarifications, 2);
+    }
+
+    #[test]
     fn external_policy_adapter_rejects_untyped_information_requests() {
         let items = fixture_items();
         let result = evaluate_policy_with(
