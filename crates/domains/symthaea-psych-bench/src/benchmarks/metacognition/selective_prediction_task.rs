@@ -588,6 +588,32 @@ mod tests {
         );
         assert_eq!(aware.clarification_precision, Some(1.0));
         assert_eq!(aware.clarification_recall, Some(1.0));
+        assert_eq!(aware.resolved_clarifications, 4);
+        assert_eq!(aware.post_clarification_answer_count, 4);
+        assert_eq!(aware.post_clarification_correct_count, 4);
+        assert_eq!(aware.post_clarification_accuracy, Some(1.0));
+        assert_eq!(aware.final_answer_accuracy, Some(1.0));
+    }
+
+    #[test]
+    fn clarification_requires_the_right_target_and_a_valid_updated_observation() {
+        let mut wrong_target = fixture_items();
+        wrong_target[7].clarification_target = Some(ClarificationTarget::RefreshSource);
+        assert!(matches!(
+            validate_items(&wrong_target),
+            Err(SelectivePredictionTaskError::InvalidClarificationObservation { .. })
+        ));
+
+        let mut invalid_update = fixture_items();
+        invalid_update[7]
+            .post_clarification_observation
+            .as_mut()
+            .expect("resolvable fixture item")
+            .clarification_available = true;
+        assert!(matches!(
+            validate_items(&invalid_update),
+            Err(SelectivePredictionTaskError::InvalidClarificationObservation { .. })
+        ));
     }
 
     #[test]
