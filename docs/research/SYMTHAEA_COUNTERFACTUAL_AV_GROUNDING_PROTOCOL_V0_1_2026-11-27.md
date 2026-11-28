@@ -165,6 +165,6 @@ Seven Rust tests cover same-audio/timing preservation, audio mismatch, timing mi
 The Rust unit tests are authored but unexecuted. The machine-readable JSON fixtures were separately parsed and their cross-condition invariants checked. Full JSON Schema 2020-12 validation, media playback, model inference, annotation reliability and benchmark execution remain outstanding.
 
 
-## 9. Qualification status
+## 11. Qualification status
 
 This protocol is a proposed benchmark lane. No paired dataset, annotation set, runtime harness, counterfactual run, or Symthaea score has been produced by this document.
