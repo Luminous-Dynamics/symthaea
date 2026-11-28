@@ -242,7 +242,7 @@ A skipped workflow, parser success, mock acknowledgement, synthetic fixture, mod
 
 `crates/domains/symthaea-soma/src/cgrb_state.rs` now contains a pure reference assessment kernel and authored regression tests. It requires a separately permissioned read-only oracle profile, exact operation/actor/action/target/policy bindings, matching precondition and postcondition digests, a comparable named clock (the current reference kernel requires authority, dispatch, oracle and evaluation ticks to share one explicitly named clock domain), a fresh observation, one attributed effect, and a true postcondition. Adapter acknowledgement is informational only. It distinguishes Committed, NotApplied, OutcomeUnknown, Rejected and Violation, and exposes a retry recommendation that requires reauthorization after a definitive no-effect observation.
 
-The verifier is not an executor, permission issuer, oracle authenticator, transaction coordinator or production connector. It requires the observation's independence and consistency class to match the pinned oracle profile exactly; it validates lower-case SHA-256/BLAKE3 content digests; rejects authority/attempt clock mismatch, contradictory application timestamps, observations preceding application, and an applied result that does not advance the prepared state version/digest. Twenty Rust regression tests are authored; they have not been compiled or executed. Cross-field semantics in the scenario manifest still require a loader/trace verifier and evaluator mutation tests.
+The verifier is not an executor, permission issuer, oracle authenticator, transaction coordinator or production connector. It requires the observation's independence and consistency class to match the pinned oracle profile exactly; it validates lower-case SHA-256/BLAKE3 content digests; rejects authority/attempt clock mismatch, contradictory application timestamps, observations preceding application, and an applied result that does not advance the prepared state version/digest. Twenty-three Rust regression tests are authored; they have not been compiled or executed. Cross-field semantics in the scenario manifest still require a loader/trace verifier and evaluator mutation tests.
 
 ## 11.2 Deterministic reference world
 
@@ -250,7 +250,7 @@ The verifier is not an executor, permission issuer, oracle authenticator, transa
 
 The module provides 13 authored regression tests covering version conflicts, precondition failure/success, non-idempotent append deduplication through stable operation keys, key/action conflicts, target binding, unsupported mutation types, seed closure, deterministic digest order, and atomic rejection.
 
-**Critical boundary:** this is a reference model, not a separate process or independent oracle. Its `reference_snapshot` must not be promoted to independent state evidence. The pure state-outcome verifier and reference world are composable test mechanics; the next missing layer is a scenario runner and an independently permissioned read-only oracle adapter. The Rust tests remain uncompiled and unexecuted.
+**Critical boundary:** this is a reference model, not a separate process or independent oracle. Its `reference_snapshot` must not be promoted to independent state evidence. The pure state-outcome verifier and reference world are composable test mechanics. A harness-pinned read-only oracle trait is now present; the missing layers are an actual separately operated oracle service, scenario runner, and fault-injection executor. The Rust tests remain uncompiled and unexecuted.
  
 ## 12. Non-claims
 
