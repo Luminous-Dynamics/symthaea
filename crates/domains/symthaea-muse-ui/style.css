@@ -1304,3 +1304,161 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+
+/* ── Perform workspace / MEL-DJ-001 P0 ─────────────────────────────── */
+.perform-page {
+    display: flex; flex-direction: column; gap: 1.15rem;
+    padding: 1.6rem 0 2.5rem; max-width: 1480px; width: 100%; margin: 0 auto;
+}
+.perform-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.perform-heading h2 {
+    margin: 0.1rem 0 0.35rem; color: var(--ink);
+    font-size: clamp(1.8rem, 3vw, 2.6rem); font-weight: 400; letter-spacing: -0.02em;
+}
+.perform-eyebrow, .perform-kicker, .perform-card-kicker {
+    margin: 0; color: var(--amber-soft); font: 0.68rem/1.4 var(--body-font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+}
+.perform-intro { margin: 0; color: var(--dim); max-width: 48rem; }
+.perform-status-chip, .perform-section-state, .perform-inline-state {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    border: 1px solid var(--border); border-radius: 999px; padding: 0.35rem 0.7rem;
+    color: var(--dim); font: 0.63rem/1.2 var(--body-font); letter-spacing: 0.09em; white-space: nowrap;
+}
+.perform-status-dot {
+    width: 0.42rem; height: 0.42rem; border-radius: 50%; background: var(--amber-soft);
+    box-shadow: 0 0 0 3px rgba(217, 160, 91, 0.09);
+}
+.perform-boundary {
+    display: flex; align-items: flex-start; gap: 0.8rem;
+    border: 1px solid rgba(217, 160, 91, 0.28); background: rgba(217, 160, 91, 0.055);
+    border-radius: 12px; padding: 0.85rem 1rem;
+}
+.perform-boundary-mark {
+    display: grid; place-items: center; flex: 0 0 1.45rem; height: 1.45rem;
+    border: 1px solid var(--amber-soft); border-radius: 50%;
+    color: var(--amber); font: 0.85rem var(--display-font);
+}
+.perform-boundary strong { color: var(--amber); font-size: 0.9rem; font-weight: 500; }
+.perform-boundary p { margin: 0.15rem 0 0; color: var(--dim); font-size: 0.82rem; }
+.perform-subnav { display: flex; flex-wrap: wrap; gap: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+.perform-subnav a {
+    display: inline-flex; gap: 0.5rem; align-items: center; padding: 0.45rem 0.8rem;
+    border: 1px solid var(--border); border-radius: 999px; color: var(--dim);
+    text-decoration: none; font-size: 0.83rem; transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.perform-subnav a span { color: var(--amber-soft); font-size: 0.67rem; }
+.perform-subnav a:hover { color: var(--ink); border-color: var(--amber-soft); background: rgba(217,160,91,0.05); }
+.perform-section { display: flex; flex-direction: column; gap: 0.75rem; scroll-margin-top: 1rem; }
+.perform-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.perform-section-heading h3 { margin: 0.1rem 0 0; font: 400 1.45rem/1.2 var(--display-font); color: var(--ink); }
+.perform-prepare-grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 0.75rem; }
+.perform-plan-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 0.75rem; }
+.perform-card {
+    min-width: 0; background: linear-gradient(145deg, rgba(42,34,25,0.82), rgba(29,25,20,0.96));
+    border: 1px solid var(--border); border-radius: 13px; padding: 1.1rem 1.15rem;
+}
+.perform-card h4 { margin: 0.35rem 0 0.45rem; color: var(--ink); font: 400 1.05rem/1.3 var(--display-font); }
+.perform-card > p:not(.perform-card-kicker):not(.perform-footnote) { margin: 0; color: var(--dim); font-size: 0.83rem; }
+.perform-card-icon {
+    display: grid; place-items: center; width: 2.25rem; height: 2.25rem; margin-bottom: 0.9rem;
+    border: 1px solid var(--amber-soft); border-radius: 10px; color: var(--amber);
+    font-size: 1.2rem; background: rgba(217,160,91,0.06);
+}
+.perform-empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.2rem;
+    min-height: 6.3rem; margin-top: 0.9rem; border: 1px dashed #51402e;
+    border-radius: 10px; background: rgba(0,0,0,0.12); text-align: center; padding: 0.7rem;
+}
+.perform-empty-orbit {
+    display: block; width: 0.65rem; height: 0.65rem; margin-bottom: 0.25rem;
+    border: 1px solid var(--amber-soft); border-radius: 50%; box-shadow: 0 0 0 5px rgba(217,160,91,0.06);
+}
+.perform-empty-state strong { color: var(--ink); font-size: 0.82rem; font-weight: 400; }
+.perform-empty-state small { color: var(--dim); font-size: 0.7rem; }
+.perform-evidence-list { list-style: none; padding: 0; margin: 0.85rem 0 0; }
+.perform-evidence-list li {
+    display: flex; justify-content: space-between; gap: 0.6rem; padding: 0.43rem 0;
+    border-bottom: 1px solid rgba(125,105,79,0.18); color: var(--dim); font-size: 0.79rem;
+}
+.perform-evidence-list li b { color: var(--amber-soft); font-weight: 400; }
+.perform-footnote { color: var(--amber-soft); font-size: 0.7rem; line-height: 1.4; margin: 0.65rem 0 0; }
+.perform-marker-row { display: flex; gap: 0.45rem; margin: 1rem 0 0.9rem; }
+.perform-marker { padding: 0.24rem 0.5rem; border-radius: 5px; font-size: 0.65rem; letter-spacing: 0.08em; }
+.perform-marker.hotcue { color: #e4bd83; background: rgba(217,160,91,0.13); border: 1px solid rgba(217,160,91,0.3); }
+.perform-marker.loop { color: #a9bd8d; background: rgba(123,160,91,0.1); border: 1px solid rgba(123,160,91,0.27); }
+.perform-marker.phrase { color: #c7a5b8; background: rgba(170,125,157,0.1); border: 1px solid rgba(170,125,157,0.25); }
+.perform-card-rule { height: 1px; background: var(--border); margin: 0.8rem 0; }
+.perform-inline-state { border-radius: 5px; font-size: 0.58rem; padding: 0.25rem 0.45rem; }
+.perform-trajectory { position: relative; height: 5.7rem; margin: 1.05rem 0 0.25rem; border-bottom: 1px solid var(--border); overflow: hidden; }
+.perform-trajectory-line {
+    position: absolute; left: 2%; right: 2%; top: 2.55rem; height: 1.5rem;
+    border-top: 2px solid var(--amber-soft); border-radius: 50%; transform: rotate(-7deg); opacity: 0.75;
+}
+.perform-trajectory-point { position: absolute; top: 2.2rem; width: 0.55rem; height: 0.55rem; border: 2px solid var(--amber); border-radius: 50%; background: var(--panel); }
+.perform-trajectory-point.p1 { left: 7%; top: 3rem; }
+.perform-trajectory-point.p2 { left: 35%; top: 2.35rem; }
+.perform-trajectory-point.p3 { left: 67%; top: 1.85rem; }
+.perform-trajectory-point.p4 { left: 92%; top: 2.65rem; }
+.perform-trajectory-labels { position: absolute; inset: auto 0 0; display: flex; justify-content: space-between; color: var(--dim); }
+.perform-trajectory-labels small { font-size: 0.59rem; letter-spacing: 0.1em; }
+.perform-contract-steps { list-style: none; display: flex; flex-direction: column; gap: 0.7rem; margin: 0.95rem 0 0; padding: 0; }
+.perform-contract-steps li { display: flex; align-items: flex-start; gap: 0.65rem; }
+.perform-contract-steps li > b { color: var(--amber-soft); font-size: 0.68rem; padding-top: 0.1rem; }
+.perform-contract-steps li span { display: flex; flex-direction: column; gap: 0.05rem; }
+.perform-contract-steps strong { color: var(--ink); font-size: 0.79rem; font-weight: 400; }
+.perform-contract-steps small { color: var(--dim); font-size: 0.72rem; }
+.perform-deck-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.perform-deck {
+    position: relative; min-height: 10.6rem; overflow: hidden; border: 1px solid var(--border);
+    border-radius: 13px; padding: 0.9rem 1rem;
+    background: radial-gradient(ellipse at 50% 50%, rgba(217,160,91,0.065), rgba(26,22,17,0.98) 70%);
+}
+.perform-deck-top, .perform-deck-bottom {
+    display: flex; justify-content: space-between; gap: 0.5rem; color: var(--dim);
+    font-size: 0.66rem; letter-spacing: 0.09em;
+}
+.perform-deck-top span:first-child { color: var(--amber); }
+.perform-deck-wave { display: flex; align-items: center; justify-content: center; gap: 3px; height: 4.2rem; opacity: 0.36; }
+.perform-deck-wave span { display: block; width: 3px; height: 1rem; min-height: 8px; background: var(--amber-soft); border-radius: 5px; }
+.perform-deck-wave span:nth-child(3n) { height: 2rem; }
+.perform-deck-wave span:nth-child(4n) { height: 2.7rem; }
+.perform-deck-wave span:nth-child(5n) { height: 1.25rem; }
+.perform-deck-wave.wave-b span { background: #8a7184; }
+.perform-deck-empty { position: absolute; inset: 3.45rem 0 auto; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; text-shadow: 0 2px 8px #16130f; }
+.perform-deck-empty strong { color: var(--ink); font: 400 1rem var(--display-font); }
+.perform-deck-empty small { color: var(--dim); font-size: 0.7rem; }
+.perform-deck-bottom { position: absolute; inset: auto 1rem 0.8rem; border-top: 1px solid rgba(125,105,79,0.2); padding-top: 0.45rem; }
+.perform-mixer-note, .perform-history {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+    padding: 0.9rem 1rem; border: 1px solid var(--border); border-radius: 12px; background: rgba(32,27,21,0.65);
+}
+.perform-mixer-note > div { display: flex; align-items: center; gap: 0.65rem; color: var(--ink); font-size: 0.82rem; }
+.perform-mixer-glyph { color: var(--amber); font-size: 1.2rem; }
+.perform-mixer-note p { margin: 0; color: var(--dim); font-size: 0.76rem; max-width: 38rem; text-align: right; }
+.perform-history { justify-content: flex-start; gap: 0.9rem; align-items: center; padding: 1.2rem; }
+.perform-history-mark { display: grid; place-items: center; flex: 0 0 2.5rem; height: 2.5rem; border: 1px solid var(--amber-soft); border-radius: 50%; color: var(--amber); font-size: 1.1rem; }
+.perform-history strong { color: var(--ink); font: 400 1.05rem var(--display-font); }
+.perform-history p { margin: 0.25rem 0; color: var(--dim); font-size: 0.82rem; }
+.perform-history small { color: var(--amber-soft); font-size: 0.68rem; }
+.perform-footer {
+    display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding-top: 0.7rem;
+    border-top: 1px solid var(--border); color: var(--amber-soft);
+    font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase;
+}
+@media (max-width: 900px) {
+    .perform-prepare-grid { grid-template-columns: 1fr 1fr; }
+    .perform-library-card { grid-column: span 2; }
+}
+@media (max-width: 620px) {
+    .perform-page { padding-top: 1rem; }
+    .perform-heading { flex-direction: column; }
+    .perform-status-chip { align-self: flex-start; }
+    .perform-prepare-grid, .perform-plan-grid, .perform-deck-grid { grid-template-columns: 1fr; }
+    .perform-library-card { grid-column: auto; }
+    .perform-mixer-note { flex-direction: column; }
+    .perform-mixer-note p { text-align: left; }
+    .perform-section-heading { align-items: flex-start; flex-direction: column; }
+    .perform-section-state { white-space: normal; }
+}
