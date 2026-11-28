@@ -882,6 +882,43 @@ mod tests {
     }
 
     #[test]
+    fn expert_identity_and_theorem_version_are_content_bound() {
+        let baseline = KernelFamilyManifest::build(
+            &configs(),
+            NullCalibration::direct_v1(),
+        )
+        .unwrap();
+
+        let mut changed_id = configs();
+        changed_id[0].expert_id = "renamed-expert".into();
+        let changed_id_manifest = KernelFamilyManifest::build(
+            &changed_id,
+            NullCalibration::direct_v1(),
+        )
+        .unwrap();
+        assert_ne!(
+            baseline.digests().portfolio_inventory_sha256,
+            changed_id_manifest.digests().portfolio_inventory_sha256
+        );
+
+        let changed_theorem = KernelFamilyManifest::build(
+            &configs(),
+            NullCalibration::DirectConditionalPairedEquality {
+                theorem_version: "conditional-paired-equality-v2".into(),
+            },
+        )
+        .unwrap();
+        assert_ne!(
+            baseline.digests().calibration_contract_sha256,
+            changed_theorem.digests().calibration_contract_sha256
+        );
+        assert_ne!(
+            baseline.digests().portfolio_inventory_sha256,
+            changed_theorem.digests().portfolio_inventory_sha256
+        );
+    }
+
+    #[test]
     fn negative_zero_is_canonicalized() {
         let positive = KernelFamilyManifest::build(&configs(), NullCalibration::direct_v1()).unwrap();
         let mut negative_configs = configs();
