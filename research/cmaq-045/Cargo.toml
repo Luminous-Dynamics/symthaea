@@ -1,0 +1,12 @@
+[package]
+name = "cmaq-045-conditional-rank-spectrum"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Predictable-context predictive-rank spectrum monitor for temporal dependence shifts"
+
+[dependencies]
+cmaq-038-rank-spectrum-monitor = { path = "../cmaq-038" }
+
+[workspace]
