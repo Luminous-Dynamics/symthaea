@@ -112,6 +112,9 @@ pub mod stratified_risk;
 // Fixed-horizon finite-sample risk control under selective observation
 pub mod sowrc;
 
+// Predictable Bernoulli audit requests and custodian-only receipts
+pub mod predictable_audit;
+
 // Re-exports for ergonomic access
 pub use conjecture_feed::{
     ConjectureFeedError, ConjectureFeeder, ProvenancedConjecture, ResearchNumericDataset,
@@ -148,6 +151,11 @@ pub use stratified_risk::{
     evaluate_stratified_audit_risk,
 };
 pub use sowrc::{SowrcConfig, SowrcError, SowrcObservation, SowrcReport, evaluate_sowrc};
+pub use predictable_audit::{
+    build_predictable_audit_receipt, DyadicInclusionProbability,
+    PredictableAuditDesign, PredictableAuditError, PredictableAuditEvent,
+    PredictableAuditReceipt,
+};
 pub use types::*;
 pub use verifier::{
     EpistemicVerifier, SourceEvidence, VerificationContext, VerificationResult, VerifierConfig,
