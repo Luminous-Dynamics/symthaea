@@ -19,6 +19,16 @@ fn next_unobserved_numeric_input(log: &numeric::ObservationLog) -> Option<i64> {
         .find(|input| !log.interventions.contains(input))
 }
 
+/// Return an unobserved factorial pair. A singleton interaction fit is not
+/// treated as adequate until the finite intervention domain is challenged.
+fn next_unobserved_interaction_input(
+    log: &interaction::ObservationLog,
+) -> Option<[i64; 2]> {
+    interaction::FACTORIAL_DESIGN
+        .into_iter()
+        .find(|input| !log.interventions.contains(input))
+}
+
 /// Baseline controller over the declared finite hypothesis family.
 pub struct FiniteEnumeratorBaseline;
 
@@ -135,7 +145,11 @@ impl FiniteEnumeratorBaseline {
         }
         let report = interaction::discover(&log, access)
             .map_err(|error| PolicyError::DiscoveryFailure(error.to_string()))?;
-        if view.remaining_probe_actions == 0 || report.compatible_models.len() <= 1 {
+        if view.remaining_probe_actions == 0
+            || report.compatible_models.is_empty()
+            || (report.compatible_models.len() == 1
+                && next_unobserved_interaction_input(&log).is_none())
+        {
             return Ok(submit(
                 view,
                 AgentClaim::Interaction {
@@ -143,6 +157,11 @@ impl FiniteEnumeratorBaseline {
                     compatible_models: report.compatible_models,
                 },
             ));
+        }
+        if report.compatible_models.len() == 1 {
+            if let Some(input) = next_unobserved_interaction_input(&log) {
+                return Ok(probe(AgentIntervention::Pair(input)));
+            }
         }
         let recommendation = interaction::recommend_discriminating_probe(&log, &report)
             .map_err(|error| PolicyError::ProbeFailure(error.to_string()))?;
@@ -274,7 +293,10 @@ impl StrategyEnumeratorBaseline {
                         .compatible_models
                 };
                 if !log.interventions.is_empty()
-                    && (view.remaining_probe_actions == 0 || models.len() <= 1)
+                    && (view.remaining_probe_actions == 0
+                        || models.is_empty()
+                        || (models.len() == 1
+                            && next_unobserved_interaction_input(&log).is_none()))
                 {
                     let count = models.len();
                     return Ok((
@@ -287,6 +309,14 @@ impl StrategyEnumeratorBaseline {
                         ),
                         ProbeScoringWork::default(),
                     ));
+                }
+                if models.len() == 1 {
+                    if let Some(input) = next_unobserved_interaction_input(&log) {
+                        return Ok((
+                            probe(AgentIntervention::Pair(input)),
+                            ProbeScoringWork::default(),
+                        ));
+                    }
                 }
             }
         }
@@ -535,6 +565,11 @@ mod tests {
         assert!(score.set_score.exact_version_space_match);
         assert!(score.decision_correct);
         assert!(score.generating_model_in_version_space);
+        let final_log = interaction_log(&episode.view().unwrap()).unwrap();
+        assert_eq!(score.probe_count, interaction::FACTORIAL_DESIGN.len());
+        assert!(interaction::FACTORIAL_DESIGN
+            .iter()
+            .all(|input| final_log.interventions.contains(input)));
     }
 
     #[test]
@@ -654,6 +689,58 @@ mod tests {
             assert_eq!(score.set_score.claimed_model_count, 0);
             assert!(score.set_score.exact_version_space_match);
             assert!(score.decision_correct);
+        }
+    }
+
+    #[test]
+    fn interaction_singleton_fit_is_challenged_against_factorial_support_shift() {
+        let truth = interaction::ModelHypothesis {
+            structure: interaction::Structure::BilinearInteraction,
+            bias: 0,
+            weight_u: 1,
+            weight_v: 1,
+            interaction_weight: 1,
+        };
+        let strategies = [
+            None,
+            Some(crate::strategies::ProbeStrategy::MaximumStructureInformationGain),
+        ];
+
+        for strategy in strategies {
+            let mut episode = BlindEpisode::new_interaction_structural_shift(
+                "interaction-structure-adequacy-f2",
+                truth,
+                1,
+                9,
+            )
+            .unwrap();
+
+            // These evaluator-controlled public observations leave one bilinear
+            // candidate, although the hidden world also contains a u² term.
+            for input in [[1, 1], [-1, -1], [-1, 0]] {
+                episode
+                    .apply(AgentAction::Probe {
+                        intervention: AgentIntervention::Pair(input),
+                    })
+                    .unwrap();
+            }
+
+            match strategy {
+                None => run_to_submission(&mut episode, 6).unwrap(),
+                Some(strategy) => run_strategy_to_submission(&mut episode, 6, strategy).unwrap(),
+            }
+
+            let score = episode.evaluate_after_submission().unwrap();
+            let final_log = interaction_log(&episode.view().unwrap()).unwrap();
+            assert!(score.probe_count > 3);
+            assert!(score.probe_count <= interaction::FACTORIAL_DESIGN.len());
+            assert!(!score.generating_model_in_version_space);
+            assert!(!score.generating_truth_behaviorally_represented);
+            assert_eq!(score.set_score.oracle_model_count, 0);
+            assert_eq!(score.set_score.claimed_model_count, 0);
+            assert!(score.set_score.exact_version_space_match);
+            assert!(score.decision_correct);
+            assert!(final_log.interventions.len() > 3);
         }
     }
 
