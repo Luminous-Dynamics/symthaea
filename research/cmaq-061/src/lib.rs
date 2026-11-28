@@ -165,7 +165,7 @@ impl PredictableEncoder {
         commit_evidence: F,
     ) -> Result<(), EncoderError>
     where
-        F: FnOnce() -> bool,
+        F: FnOnce(u64, &str) -> bool,
     {
         if prepared.base_version != self.version || prepared.base_digest != self.digest
             || self.last_sequence.is_some_and(|last| prepared.pair_sequence <= last)
@@ -173,7 +173,7 @@ impl PredictableEncoder {
             return Err(EncoderError::StaleTransaction);
         }
         let next_version = self.version.checked_add(1).ok_or(EncoderError::StaleTransaction)?;
-        if !commit_evidence() {
+        if !commit_evidence(self.version, &self.digest) {
             return Err(EncoderError::EvidenceCommitRejected);
         }
         self.weights = prepared.next_weights;
@@ -283,9 +283,9 @@ mod tests {
     fn only_commit_advances_version_and_rejects_replay() {
         let mut encoder = encoder();
         let staged = encoder.prepare_next_version(1, &[0.2, 0.4], &[0.7, -0.1], 0.01, 0.001).unwrap();
-        encoder.commit_after_evidence(staged.clone(), || true).unwrap();
+        encoder.commit_after_evidence(staged.clone(), |_, _| true).unwrap();
         assert_eq!(encoder.version(), 1);
-        assert!(matches!(encoder.commit_after_evidence(staged, || true), Err(EncoderError::StaleTransaction)));
+        assert!(matches!(encoder.commit_after_evidence(staged, |_, _| true), Err(EncoderError::StaleTransaction)));
     }
 
     #[test]
@@ -302,7 +302,7 @@ mod tests {
         let digest = encoder.digest().to_string();
         let staged = encoder.prepare_next_version(1, &[0.2, 0.4], &[0.7, -0.1], 0.01, 0.001).unwrap();
         assert!(matches!(
-            encoder.commit_after_evidence(staged, || false),
+            encoder.commit_after_evidence(staged, |_, _| false),
             Err(EncoderError::EvidenceCommitRejected)
         ));
         assert_eq!(encoder.version(), 0);
@@ -313,8 +313,10 @@ mod tests {
     fn evidence_callback_observes_old_encoder_version() {
         let mut encoder = encoder();
         let staged = encoder.prepare_next_version(1, &[0.2, 0.4], &[0.7, -0.1], 0.01, 0.001).unwrap();
-        encoder.commit_after_evidence(staged, || {
-            assert_eq!(encoder.version(), 0);
+        let encoder_digest = encoder.digest().to_string();
+        encoder.commit_after_evidence(staged, |version, digest| {
+            assert_eq!(version, 0);
+            assert_eq!(digest, encoder_digest.as_str());
             true
         }).unwrap();
         assert_eq!(encoder.version(), 1);
