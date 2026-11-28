@@ -56,6 +56,9 @@ The current v1 implementation requires at least two arms and supports tau-ACI an
 
 ### Population and selection
 - unique non-zero population rounds, sample IDs and measurement event IDs;
+- positive wafer event timestamps, strictly increasing with round order;
+- every τ-ACI and CA-OCRC prediction event time exactly matches the shared population row event time;
+- feedback delivery cannot precede the prediction issued in its delivery round;
 - measured versus unmeasured outcome/selection consistency;
 - metrology cost finite, nonnegative and zero for unselected rows;
 - K1 label ID, nonzero revision, payload and report digests for measured outcomes;
@@ -119,7 +122,7 @@ The first known-answer fixture is synthetic and has two rounds:
 - the independent audit samples wafer 2 with inclusion probability 1 and a separate reference receipt;
 - two paired arms share the same trace, acquisition policy, physical budget and audit draw.
 
-Ten tests currently cover:
+Eleven tests currently cover:
 1. successful paired replay with separate physical/qualified/audit counts and ACI coverage;
 2. numeric/K1 row mismatch rejection;
 3. paired arms with different observed audit losses rejection;
@@ -128,7 +131,8 @@ Ten tests currently cover:
 6. unmeasured row cannot carry label/report/delivery evidence;
 7. UNKNOWN/BLOCKED CA-OCRC feedback can remain visible without promoting it to an eligible update;
 8. controller-only scope rejects different global-model or interval-method artifacts;
-9. end-to-end scope accepts a distinct interval method and preserves the scope in the report;\n10. mixed τ-ACI/CA-OCRC arms replay on one shared population and audit, with the CA-OCRC theorem claim suspended when one wafer is unmeasured.
+9. end-to-end scope accepts a distinct interval method and preserves the scope in the report;\n10. mixed τ-ACI/CA-OCRC arms replay on one shared population and audit, with the CA-OCRC theorem claim suspended when one wafer is unmeasured;
+11. a paired ACI trace rejects delivery before the delivery-round prediction.
 
 Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 Reference Oracle are pending for the current branch.
 
