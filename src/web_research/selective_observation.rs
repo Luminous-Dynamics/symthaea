@@ -421,8 +421,9 @@ fn compute_population_report(
     });
 
     let total = sorted.len();
+    let record_refs: Vec<&SelectiveObservationRecord> = records.iter().collect();
     let all_indices: Vec<usize> = (0..total).collect();
-    let always_answer = weighted_point(records, &all_indices, config.minimum_sample_size);
+    let always_answer = weighted_point(&record_refs, &all_indices, config.minimum_sample_size);
     let observed_indices: Vec<usize> = sorted
         .iter()
         .enumerate()
