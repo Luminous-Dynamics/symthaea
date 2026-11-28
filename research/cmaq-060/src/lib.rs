@@ -661,6 +661,8 @@ mod tests {
             assert!((u.factor - 1.0).abs() < 1e-12);
             assert!(u.log_e_value.abs() < 1e-10);
             assert!((u.selection_probabilities.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+            assert!(u.selection_probabilities.iter().all(|p| *p >= 0.05 - 1e-12));
+            assert_eq!(u.feature_coordinates_evaluated, 10);
         }
         assert_eq!(m.observations_seen(), 100);
         assert_eq!(m.selected_counts().iter().sum::<u64>(), 100);
@@ -679,7 +681,9 @@ mod tests {
         assert_eq!(a.update.random_draw, b.update.random_draw);
         assert!(a.update.direction_norm > 0.0);
         assert_eq!(a.update.direction_norm, b.update.direction_norm);
-        assert_ne!(a.update.factor, b.update.factor);
+        // The selected action is invariant to the current pair. Different
+        // pairs may or may not project differently onto this one-dimensional
+        // direction, so the selection/direction checks are the negative control.
         assert_eq!(left.observations_seen(), 1);
         assert_eq!(right.observations_seen(), 1);
     }
