@@ -67,7 +67,6 @@ impl Display for HiddenMechanicsError {
 
 impl Error for HiddenMechanicsError {}
 
-#[derive(Clone, PartialEq, Eq)]
 pub struct HiddenMechanicsGame {
     // Private evaluator-selected rule. No getter and no rule field in
     // HiddenMechanicsObservation: the only candidate-visible evidence is the
@@ -280,9 +279,9 @@ mod tests {
 
     #[test]
     fn rejects_zero_action_budget() {
-        assert_eq!(
+        assert!(matches!(
             HiddenMechanicsGame::new(SwitchEffect::OpenNorthGate, 0),
             Err(HiddenMechanicsError::ZeroActionLimit)
-        );
+        ));
     }
 }
