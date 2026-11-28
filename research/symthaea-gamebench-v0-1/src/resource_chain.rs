@@ -19,8 +19,6 @@ pub enum ResourceKind {
 }
 
 impl ResourceKind {
-    const ALL: [Self; 4] = [Self::Wood, Self::Stone, Self::Plank, Self::Tool];
-
     pub const fn index(self) -> usize {
         match self {
             Self::Wood => 0,
@@ -62,6 +60,7 @@ pub enum CraftingSpecError {
     ZeroPileAmount,
     WallOverlapsObject(&'static str),
     WorkbenchOverlapsPile,
+    ResourceAmountOverflow,
     DuplicateRecipeOutput,
     ZeroRecipeOutput,
     EmptyRecipe,
@@ -82,6 +81,7 @@ impl Display for CraftingSpecError {
             Self::ZeroPileAmount => write!(f, "resource pile amount must be nonzero"),
             Self::WallOverlapsObject(name) => write!(f, "wall overlaps {name}"),
             Self::WorkbenchOverlapsPile => write!(f, "workbench cannot overlap a resource pile"),
+            Self::ResourceAmountOverflow => write!(f, "total resource amount exceeds inventory representation"),
             Self::DuplicateRecipeOutput => write!(f, "recipe outputs must be unique"),
             Self::ZeroRecipeOutput => write!(f, "recipe output amount must be nonzero"),
             Self::EmptyRecipe => write!(f, "recipe must have at least one input"),
@@ -150,6 +150,7 @@ impl CraftingSpec {
         }
 
         let mut pile_positions = HashSet::new();
+        let mut total_pile_amounts = [0_u64; 4];
         for pile in &piles {
             if pile.position.x >= width || pile.position.y >= height {
                 return Err(CraftingSpecError::PositionOutOfBounds("resource pile"));
@@ -157,6 +158,10 @@ impl CraftingSpec {
             if pile.amount == 0 {
                 return Err(CraftingSpecError::ZeroPileAmount);
             }
+            let total = &mut total_pile_amounts[pile.kind.index()];
+            *total = total
+                .checked_add(u64::from(pile.amount))
+                .ok_or(CraftingSpecError::ResourceAmountOverflow)?;
             if walls_set.contains(&pile.position) {
                 return Err(CraftingSpecError::WallOverlapsObject("resource pile"));
             }
@@ -373,14 +378,17 @@ fn simulate(
             }
         }
         CraftingAction::Gather => {
-            if let Some(index) = spec.piles.iter().position(|pile| {
-                pile.position == state.position && piles.get(spec.piles.iter().position(|p| p.position == pile.position).unwrap_or(usize::MAX)).copied().unwrap_or(0) > 0
+            if let Some(index) = spec.piles.iter().enumerate().position(|(index, pile)| {
+                pile.position == state.position && piles.get(index).copied().unwrap_or(0) > 0
             }) {
-                if let Some(remaining) = piles.get_mut(index) {
+                let kind = spec.piles[index].kind;
+                if let (Some(remaining), Some(quantity)) = (
+                    piles.get_mut(index),
+                    next.inventory[kind.index()].checked_add(1),
+                ) {
                     if *remaining > 0 {
                         *remaining -= 1;
-                        let kind = spec.piles[index].kind;
-                        next.inventory[kind.index()] = next.inventory[kind.index()].saturating_add(1);
+                        next.inventory[kind.index()] = quantity;
                         gathered = Some(kind);
                     }
                 }
@@ -394,12 +402,15 @@ fn simulate(
                     });
                     let next_amount = next.inventory[output.index()]
                         .checked_add(u64::from(recipe.output_amount));
-                    if enough && next_amount.is_some() {
-                        for ingredient in &recipe.inputs {
-                            next.inventory[ingredient.kind.index()] -= u64::from(ingredient.amount);
+                    if enough {
+                        if let Some(next_amount) = next_amount {
+                            for ingredient in &recipe.inputs {
+                                next.inventory[ingredient.kind.index()] -=
+                                    u64::from(ingredient.amount);
+                            }
+                            next.inventory[output.index()] = next_amount;
+                            crafted = Some(output);
                         }
-                        next.inventory[output.index()] = next_amount.unwrap_or(next.inventory[output.index()]);
-                        crafted = Some(output);
                     }
                 }
             }
@@ -574,6 +585,17 @@ mod tests {
         }
         assert_eq!(game.status(), TerminalStatus::Success);
         assert_eq!(game.state().quantity(ResourceKind::Tool), 1);
+    }
+
+    #[test]
+    fn depleted_resource_pile_cannot_be_gathered_again() {
+        let mut game = CraftingGame::new(fixture(20));
+        game.step(CraftingAction::Move(Action::East)).expect("move to wood");
+        game.step(CraftingAction::Gather).expect("first wood");
+        game.step(CraftingAction::Gather).expect("second wood");
+        let empty = game.step(CraftingAction::Gather).expect("empty gather is legal attempt");
+        assert_eq!(empty.gathered, None);
+        assert_eq!(empty.state.quantity(ResourceKind::Wood), 2);
     }
 
     #[test]
