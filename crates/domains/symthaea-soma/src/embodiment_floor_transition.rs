@@ -467,15 +467,15 @@ mod tests {
             event("hold-1", "session-3", FloorEventKind::TemporaryHold),
         ];
         let predictions = vec![
-            prediction(&events[0], 0.99, 0.10, Some(1_900_000), None),
-            prediction(&events[1], 0.99, 0.99, Some(1_950_000), Some(2_100_000)),
+            prediction(&events[0], 0.99, 0.10, Some(1_000_000), None),
+            prediction(&events[1], 0.99, 0.99, Some(1_950_000), Some(3_000_000)),
             prediction(&events[2], 0.10, 0.10, None, None),
         ];
         let result = score_floor_transitions(&events, &predictions, config()).unwrap();
         assert_eq!(result.end_of_turn.recall, Some(1.0));
         assert_eq!(result.selective_interruption.recall, Some(1.0));
-        assert_eq!(result.end_of_turn.median_signed_detection_latency_ms, Some(-0));
-        assert_eq!(result.selective_interruption.median_signed_detection_latency_ms, Some(0));
+        assert_eq!(result.end_of_turn.median_signed_detection_latency_ms, Some(-1));
+        assert_eq!(result.selective_interruption.median_signed_detection_latency_ms, Some(1));
     }
 
     #[test]
@@ -509,7 +509,7 @@ mod tests {
             prediction(&events[1], 0.99, 0.10, Some(3_000_000), None),
         ];
         let result = score_floor_transitions(&events, &predictions, config()).unwrap();
-        assert_eq!(result.end_of_turn.median_signed_detection_latency_ms, Some(0));
+        assert_eq!(result.end_of_turn.median_signed_detection_latency_ms, Some(-1));
         assert_eq!(result.end_of_turn.p95_signed_detection_latency_ms, Some(1));
     }
 
