@@ -1,0 +1,28 @@
+name: MACE TimlMemBench Protocol Adapter
+on:
+  pull_request:
+    paths:
+      - "research/mace-timlmembench-adapter-v0-1/**"
+      - "data/schemas/mace_timlmembench_raw_native_protocol_v1.schema.json"
+      - "data/schemas/mace_timlmembench_raw_native_response_v1.schema.json"
+      - "docs/research/MACE_TIMLMEMBENCH_ADAPTER_V0_1.md"
+      - ".github/workflows/mace-timlmembench-protocol-adapter.yml"
+  push:
+    branches:
+      - "research/mace-timlmembench-protocol-adapter-v0-1"
+jobs:
+  adapter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Parse protocol adapter
+        run: rustfmt --edition 2024 --emit stdout --config skip_children=true research/mace-timlmembench-adapter-v0-1/src/lib.rs >/dev/null
+      - name: Test protocol adapter
+        run: cargo test --manifest-path research/mace-timlmembench-adapter-v0-1/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/mace-timlmembench-adapter-v0-1/Cargo.toml --all-targets -- -D warnings
+      - name: Parse raw-native protocol schema
+        run: python3 -m json.tool data/schemas/mace_timlmembench_raw_native_protocol_v1.schema.json >/dev/null
+      - name: Parse raw-native response schema
+        run: python3 -m json.tool data/schemas/mace_timlmembench_raw_native_response_v1.schema.json >/dev/null

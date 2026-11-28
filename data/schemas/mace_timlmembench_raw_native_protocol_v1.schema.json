@@ -1,0 +1,578 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_timlmembench_raw_native_protocol_v1.schema.json",
+  "title": "MACE TimlMemBench raw-native adapter protocol v1",
+  "description": "Strict transport contract for reset, raw session ingestion, raw-native query and close. Scorer-only labels are never accepted by raw-native session/query requests.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/reset"
+    },
+    {
+      "$ref": "#/$defs/ingest_session"
+    },
+    {
+      "$ref": "#/$defs/query"
+    },
+    {
+      "$ref": "#/$defs/close"
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "maxItems": 64
+    },
+    "reset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_type",
+        "sample_id",
+        "language"
+      ],
+      "properties": {
+        "request_type": {
+          "const": "reset"
+        },
+        "sample_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "language": {
+          "enum": [
+            "en",
+            "zh"
+          ]
+        }
+      }
+    },
+    "session": {
+      "type": "object",
+      "required": [
+        "session_id",
+        "turns"
+      ],
+      "properties": {
+        "session_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "world_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "surface": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "participants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/safeValue"
+          }
+        },
+        "turns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/safeObject"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "turn_id",
+                  "text"
+                ],
+                "properties": {
+                  "turn_id": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "speaker_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 256
+                  },
+                  "speaker_role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 64
+                  },
+                  "timestamp": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 128
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/safeValue"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "expected_behavior"
+            ]
+          },
+          {
+            "required": [
+              "expected_answer"
+            ]
+          },
+          {
+            "required": [
+              "expected_answers"
+            ]
+          },
+          {
+            "required": [
+              "expected_memory_ids"
+            ]
+          },
+          {
+            "required": [
+              "forbidden_memory_ids"
+            ]
+          },
+          {
+            "required": [
+              "forbidden_answers"
+            ]
+          },
+          {
+            "required": [
+              "forbidden_answer_spans"
+            ]
+          },
+          {
+            "required": [
+              "expected_answer_fragments"
+            ]
+          },
+          {
+            "required": [
+              "acceptable_answers"
+            ]
+          },
+          {
+            "required": [
+              "acceptable_variants"
+            ]
+          },
+          {
+            "required": [
+              "unanswerable"
+            ]
+          },
+          {
+            "required": [
+              "expected_current_state_ids"
+            ]
+          },
+          {
+            "required": [
+              "expected_state_ids"
+            ]
+          },
+          {
+            "required": [
+              "forbidden_state_ids"
+            ]
+          },
+          {
+            "required": [
+              "state_id"
+            ]
+          },
+          {
+            "required": [
+              "gold"
+            ]
+          },
+          {
+            "required": [
+              "gold_state"
+            ]
+          },
+          {
+            "required": [
+              "gold_state_id"
+            ]
+          },
+          {
+            "required": [
+              "gold_state_ledger"
+            ]
+          },
+          {
+            "required": [
+              "answer_key"
+            ]
+          },
+          {
+            "required": [
+              "reference_answer"
+            ]
+          },
+          {
+            "required": [
+              "failure_family_ids"
+            ]
+          },
+          {
+            "required": [
+              "judge_rationale"
+            ]
+          },
+          {
+            "required": [
+              "judge_correct"
+            ]
+          },
+          {
+            "required": [
+              "judge_failure_tags"
+            ]
+          },
+          {
+            "required": [
+              "forbidden_hit"
+            ]
+          },
+          {
+            "required": [
+              "retrieval_correct"
+            ]
+          },
+          {
+            "required": [
+              "metric_scores"
+            ]
+          },
+          {
+            "required": [
+              "scorer_result"
+            ]
+          }
+        ]
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/safeValue"
+      }
+    },
+    "ingest_session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_type",
+        "sample_id",
+        "language",
+        "session"
+      ],
+      "properties": {
+        "request_type": {
+          "const": "ingest_session"
+        },
+        "sample_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "language": {
+          "enum": [
+            "en",
+            "zh"
+          ]
+        },
+        "session": {
+          "$ref": "#/$defs/session"
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_type",
+        "mode",
+        "baseline",
+        "language",
+        "sample_id",
+        "task_id",
+        "task_type",
+        "metrics",
+        "query"
+      ],
+      "properties": {
+        "request_type": {
+          "const": "query"
+        },
+        "mode": {
+          "const": "raw_native_cases"
+        },
+        "baseline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "language": {
+          "enum": [
+            "en",
+            "zh"
+          ]
+        },
+        "sample_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "task_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "task_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "case_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "metrics": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32000
+        }
+      }
+    },
+    "close": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_type"
+      ],
+      "properties": {
+        "request_type": {
+          "const": "close"
+        }
+      }
+    },
+    "safeObject": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/safeValue"
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "expected_behavior"
+            ]
+          },
+          {
+            "required": [
+              "expected_answer"
+            ]
+          },
+          {
+            "required": [
+              "expected_answers"
+            ]
+          },
+          {
+            "required": [
+              "expected_memory_ids"
+            ]
+          },
+          {
+            "required": [
+              "forbidden_memory_ids"
+            ]
+          },
+          {
+            "required": [
+              "forbidden_answers"
+            ]
+          },
+          {
+            "required": [
+              "forbidden_answer_spans"
+            ]
+          },
+          {
+            "required": [
+              "expected_answer_fragments"
+            ]
+          },
+          {
+            "required": [
+              "acceptable_answers"
+            ]
+          },
+          {
+            "required": [
+              "acceptable_variants"
+            ]
+          },
+          {
+            "required": [
+              "unanswerable"
+            ]
+          },
+          {
+            "required": [
+              "expected_current_state_ids"
+            ]
+          },
+          {
+            "required": [
+              "expected_state_ids"
+            ]
+          },
+          {
+            "required": [
+              "forbidden_state_ids"
+            ]
+          },
+          {
+            "required": [
+              "state_id"
+            ]
+          },
+          {
+            "required": [
+              "gold"
+            ]
+          },
+          {
+            "required": [
+              "gold_state"
+            ]
+          },
+          {
+            "required": [
+              "gold_state_id"
+            ]
+          },
+          {
+            "required": [
+              "gold_state_ledger"
+            ]
+          },
+          {
+            "required": [
+              "answer_key"
+            ]
+          },
+          {
+            "required": [
+              "reference_answer"
+            ]
+          },
+          {
+            "required": [
+              "failure_family_ids"
+            ]
+          },
+          {
+            "required": [
+              "judge_rationale"
+            ]
+          },
+          {
+            "required": [
+              "judge_correct"
+            ]
+          },
+          {
+            "required": [
+              "judge_failure_tags"
+            ]
+          },
+          {
+            "required": [
+              "forbidden_hit"
+            ]
+          },
+          {
+            "required": [
+              "retrieval_correct"
+            ]
+          },
+          {
+            "required": [
+              "metric_scores"
+            ]
+          },
+          {
+            "required": [
+              "scorer_result"
+            ]
+          }
+        ]
+      }
+    },
+    "safeValue": {
+      "anyOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "integer",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/safeValue"
+          }
+        },
+        {
+          "$ref": "#/$defs/safeObject"
+        }
+      ]
+    }
+  }
+}

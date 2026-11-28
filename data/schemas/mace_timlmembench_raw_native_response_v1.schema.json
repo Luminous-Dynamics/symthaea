@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_timlmembench_raw_native_response_v1.schema.json",
+  "title": "MACE TimlMemBench raw-native adapter response v1",
+  "description": "Strict response contract for the TimlMemBench raw-native JSONL protocol. Accepted answers carry a complete use-time evidence trace; unresolved/unauthorized paths must abstain.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/reset_response"
+    },
+    {
+      "$ref": "#/$defs/ingest_response"
+    },
+    {
+      "$ref": "#/$defs/query_response"
+    },
+    {
+      "$ref": "#/$defs/close_response"
+    },
+    {
+      "$ref": "#/$defs/error_response"
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reset_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "sample_id",
+        "reset_receipt_sha256"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "sample_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "reset_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "ingest_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "session_id",
+        "session_sha256",
+        "turn_count",
+        "ingest_ordinal",
+        "unverified_source_claim_count",
+        "verified_source_event_count"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "session_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "session_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "turn_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ingest_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unverified_source_claim_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "verified_source_event_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "evidence_trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_path",
+        "evidence_capsule_sha256",
+        "exposed_evidence_count",
+        "revalidated_use_receipt_count",
+        "unresolved_evidence_count",
+        "verified_source_root_count",
+        "dependency_closure_complete",
+        "source_provenance_verified",
+        "hard_gates_passed",
+        "evidence_use_link_sha256s"
+      ],
+      "properties": {
+        "decision_path": {
+          "enum": [
+            "accept_and_act",
+            "retrieve_more",
+            "acquire_evidence",
+            "abstain",
+            "escalate"
+          ]
+        },
+        "evidence_capsule_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exposed_evidence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "revalidated_use_receipt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_evidence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "verified_source_root_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dependency_closure_complete": {
+          "type": "boolean"
+        },
+        "source_provenance_verified": {
+          "type": "boolean"
+        },
+        "hard_gates_passed": {
+          "type": "boolean"
+        },
+        "evidence_use_link_sha256s": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sha256"
+          },
+          "uniqueItems": true,
+          "maxItems": 10000
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "decision_path": {
+                "const": "accept_and_act"
+              }
+            },
+            "required": [
+              "decision_path"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_capsule_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "exposed_evidence_count": {
+                "minimum": 1
+              },
+              "revalidated_use_receipt_count": {
+                "minimum": 1
+              },
+              "unresolved_evidence_count": {
+                "const": 0
+              },
+              "verified_source_root_count": {
+                "minimum": 1
+              },
+              "dependency_closure_complete": {
+                "const": true
+              },
+              "source_provenance_verified": {
+                "const": true
+              },
+              "hard_gates_passed": {
+                "const": true
+              },
+              "evidence_use_link_sha256s": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "evidence_use_link_sha256s"
+            ]
+          }
+        }
+      ]
+    },
+    "query_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "answer",
+        "retrieved_memory_ids",
+        "retrieved_texts",
+        "metadata",
+        "usage"
+      ],
+      "properties": {
+        "answer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32000
+        },
+        "retrieved_memory_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "retrieved_texts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 100000
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "mace_adapter_protocol",
+            "mace_ingest_manifest_sha256",
+            "mace_ingested_session_count",
+            "mace_ingested_turn_count",
+            "mace_evidence_trace_v1"
+          ],
+          "properties": {
+            "mace_adapter_protocol": {
+              "const": "timlmembench-jsonl-raw-native-v1"
+            },
+            "mace_ingest_manifest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "mace_ingested_session_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "mace_ingested_turn_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "mace_evidence_trace_v1": {
+              "$ref": "#/$defs/evidence_trace"
+            }
+          },
+          "additionalProperties": true
+        },
+        "usage": {
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "metadata": {
+                "properties": {
+                  "mace_evidence_trace_v1": {
+                    "properties": {
+                      "decision_path": {
+                        "const": "accept_and_act"
+                      }
+                    },
+                    "required": [
+                      "decision_path"
+                    ]
+                  }
+                },
+                "required": [
+                  "mace_evidence_trace_v1"
+                ]
+              }
+            },
+            "required": [
+              "metadata"
+            ]
+          },
+          "then": {
+            "properties": {
+              "answer": {
+                "not": {
+                  "const": "<ABSTAIN>"
+                }
+              },
+              "retrieved_memory_ids": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "metadata": {
+                "properties": {
+                  "mace_evidence_trace_v1": {
+                    "properties": {
+                      "decision_path": {
+                        "enum": [
+                          "retrieve_more",
+                          "acquire_evidence",
+                          "abstain",
+                          "escalate"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "decision_path"
+                    ]
+                  }
+                },
+                "required": [
+                  "mace_evidence_trace_v1"
+                ]
+              }
+            },
+            "required": [
+              "metadata"
+            ]
+          },
+          "then": {
+            "properties": {
+              "answer": {
+                "const": "<ABSTAIN>"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "close_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        }
+      }
+    },
+    "error_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    }
+  }
+}
