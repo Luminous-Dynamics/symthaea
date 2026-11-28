@@ -794,6 +794,9 @@ mod tests {
         }));
         assert_eq!(reports[0].scenario_id, SCENARIO_ID);
         assert_eq!(reports[0].generator_version, GENERATOR_VERSION);
+        assert!(reports.iter().all(|report| {
+            report.receipts.len() == 14 && verify_report_integrity(report).unwrap_or(false)
+        }));
     }
 
     #[test]
@@ -837,6 +840,44 @@ mod tests {
         assert_eq!(report.items, 14);
         assert_eq!(report.resolved_clarifications, 4);
         assert_eq!(report.post_clarification_accuracy, Some(1.0));
+    }
+
+    #[test]
+    fn receipts_and_report_digest_detect_tampering_and_replay_exactly() {
+        fn policy(observation: &SelectivePredictionObservation) -> SelectivePolicyDecision {
+            SelectivePredictionBaseline::PremiseAndFreshnessAware.decide(observation)
+        }
+
+        let items = fixture_items();
+        let costs = SelectivePredictionCostModel::default();
+        let report = evaluate_policy_with(&items, "replayable_policy", policy, costs)
+            .expect("policy should produce a report");
+
+        assert!(verify_report_integrity(&report).expect("digest computation"));
+        assert!(verify_report_with_policy(
+            &items,
+            "replayable_policy",
+            policy,
+            costs,
+            &report,
+        )
+        .expect("deterministic replay"));
+
+        let mut changed_metric = report.clone();
+        changed_metric.metrics.answer_rate = 0.0;
+        assert!(!verify_report_integrity(&changed_metric).expect("digest check"));
+
+        let mut changed_receipt = report.clone();
+        changed_receipt.receipts[0].initial.cost_units += 0.5;
+        assert!(!verify_report_integrity(&changed_receipt).expect("digest check"));
+        assert!(!verify_report_with_policy(
+            &items,
+            "replayable_policy",
+            policy,
+            costs,
+            &changed_receipt,
+        )
+        .expect("replay should reject changed receipt"));
     }
 
     #[test]
