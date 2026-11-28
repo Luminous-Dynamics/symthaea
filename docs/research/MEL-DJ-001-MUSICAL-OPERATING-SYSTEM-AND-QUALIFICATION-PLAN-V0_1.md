@@ -568,3 +568,68 @@ The current PR stack is:
 - #14302 beat-grid contract and phase verifier, exact head `4c2f4f166a0e382cb51e5a26883685f44ff6161e`, based on #14267's exact head.
 
 At the latest check, #14267 had CI and PR Governance queued, Showroom Integrity pending, and five skipped entries; #14302 had CI and governance queued and two skipped entries. These are not passes. The local execution container still lacks `rustc` and `cargo`, so local formatting, compilation, tests and Clippy remain unrun.
+
+
+## 29. MIREX 2026 benchmark rules and score interpretation
+
+The MIREX 2026 task page makes the public comparison protocol more precise:
+
+- The SMC and GTZAN test splits are explicitly prohibited for training, validation, model selection, parameter tuning, or any other development purpose. These are locked test sets, not a source of weak labels or convenient tuning clips.
+- Other collections may be used, but participants must clearly state dataset usage and, when applicable, the collection process in the extended abstract.
+- MIREX beat F-measure uses a 70 ms tolerance window; Cemgil uses a 40 ms Gaussian standard deviation. CMLc/CMLt and AMLc/AMLt capture continuity over longer tracked sections and must be reported alongside local accuracy.
+- The 2026 JSIR experimental set has 260 jazz recordings. Its beat labels were pre-annotated using madmom and hand-corrected; downbeats were manually marked on those beat sequences. Seven recordings overlapping the Beat This!/CASM training data (via JAAH, Hainsworth and SIMAC) were removed. Metrics are computed on annotated valid segments and weighted by duration.
+
+References:
+- MIREX 2026 beat task protocol and locked-test policy: https://music-ir.org/mirex/wiki/2026:Audio_Beat_Tracking
+- MIREX 2026 beat results: https://music-ir.org/mirex/wiki/2026:Audio_Beat_Tracking_Results
+- MIREX 2026 downbeat results: https://futuremirex.com/mirex/wiki/2026:Audio_Downbeat_Estimation_Results
+
+The JSIR Beat This! comparison remains beat F1 94.70 / CMLt 83.50 and downbeat F-measure 87.27. These are cohort- and protocol-specific references, not a global universal threshold. The new MEL-DJ-007 harness must preserve the official evaluation definitions (including valid-segment handling) when producing a MIREX-compatible scorecard; DJ-specific tempo-ramp and phase-recovery measures are additional columns, not replacements for the standardized metrics.
+
+### Dataset governance rules for the Melothaea benchmark
+
+1. GTZAN and SMC remain test-only under MIREX rules. They may not appear in any train, validation, model selection, hyperparameter search or debugging flow.
+2. osu2beat2025 and JSIR are not automatically free development sets merely because their annotations are public/visible. Record source, audio rights, annotation provenance, overlap audit, split role and allowed use before adding any example.
+3. Yamaha private cohorts are comparison references only where the data owner authorizes access and publication; no private audio or labels enter the public test fixtures.
+4. Keep source master identity, remix/edit identity and segment overlap in the split keys. A different encoding or cut of the same master is not independent test data.
+5. Publish the full metric vector and cohort counts; do not hide continuity/coverage losses behind a high beat F1.
+6. Record any human correction, retiming, or DJ beatgrid adjustment as a separate treatment/outcome. Do not overwrite ground truth with the algorithm's own corrections.
+
+## 30. Joint phase and tempo verification for a beatmatched transition
+
+The latest protocol revision requires three independently declared limits on any explicit beat alignment:
+
+- `max_phase_error_milli`: circular difference between fractional beat phases at the two selected source-local frame anchors.
+- `max_tempo_delta_milli_bpm`: maximum absolute difference between the source and target tempo-map values evaluated at their respective anchor frames.
+- `max_tempo_ratio_error_ppm`: maximum relative tempo difference, normalized by the slower tempo, in parts per million.
+
+The absolute and relative constraints are both necessary. A fixed absolute BPM tolerance behaves differently for slow and fast material. A fixed percentage can permit a musically unacceptable absolute delta in some use cases. The dual contract makes the DJ's allowed trade-off explicit and machine-checkable.
+
+The dependent implementation [PR #14317](https://github.com/Luminous-Dynamics/symthaea/pull/14317), stacked on transition-contract PR #14267, now evaluates each selected tempo map at the source-local anchor using its declared interpolation mode. It rejects missing tempo support, an excessive absolute delta, or an excessive slower-normalized ratio error. Its known-answer tests include:
+- Same fractional phase but 120 BPM against 90 BPM: reject.
+- 60 BPM against 60.5 BPM under a 1% relative tolerance and 1 BPM absolute tolerance: accept.
+- Missing tempo-map support on either side: reject.
+- Stepwise-constant and linear-in-frame-time tempo interpolation: produce distinct, deterministic values.
+
+The transition-local ordinal is named `transition_beat_ordinal_milli`; it is a DJ-set timeline label, not an observed track-local beat index. The actual track-local positions are resolved from the selected hypotheses and source-local pulse anchors.
+
+This verifier establishes only the consistency of declared reports and transition constraints. It does not establish that the underlying beat/tempo estimator is accurate, its confidence is calibrated, the selected phrases are musically compatible, or the transition sounds good. Those are separate MEL-DJ-007 and MEL-DJ-004 qualification questions.
+
+## 31. Competitive strategy update — what is already parity
+
+The late-November 2026 public capability snapshot confirms that the following are not differentiators:
+- Variable tempo beatgrids and manual warp markers (Serato Lucid Beatgrids / Fixed and Flexible modes).
+- Flexible beatgrids and stems in Traktor Pro 4.
+- Broad controller/hardware ecosystem, cloud/library integrations, and Spotify/streaming workflow features in rekordbox.
+- Third-party playlist/crate reimport and one-click import in Engine DJ 5.3.
+
+Official release notes confirm rekordbox 7.2.20 (19 Nov 2026), Engine DJ 5.3.0 (5 Nov 2026), and Traktor Pro 4.5.1 (9 Jul 2026). Serato's current support article describes moving-tempo beatgrids with Beat Warp Markers and preserving older beatgrid data until explicit reanalysis.
+
+The opportunity is not to reproduce each vendor's hardware/streaming surface. It is to outperform their observable workflows in a controlled study through:
+- Multi-hypothesis beat/tempo evidence with calibrated abstention and correction provenance.
+- Joint phase and tempo feasibility with explicit user-controlled tolerances.
+- Transition objectives conditioned on declared intent (smooth blend, hard cut, drop swap, vocal handoff, ambient bridge, deliberate contrast).
+- Portable source/analysis/transition evidence that can be consumed by more than one player.
+- Set-level Pareto trajectories and causal copilot forecasts that preserve DJ steering and veto.
+
+Compare to the vendors as products, but only make technical superiority claims on matched data, named software/hardware versions, frozen inputs, equal candidate/compute budgets, blinded DJ cohorts and pre-registered outcomes.
