@@ -45,7 +45,8 @@ No new camera, sensor, eye-tracking or raw-media capture permission is introduce
 - urgency threshold;
 - bounded rolling pixel-work token bucket;
 - max in-flight budget;
-- source-clock regression rejection;
+- source-clock regression, future-trigger and stale-trigger rejection;
+- source-frame ID matching and maximum source-age checks;
 - trigger ID exactly-once protection;
 - fractional token refill without floating-point accounting;
 - separate Dispatch, Defer, BudgetExhausted and ConcurrencyLimited outcomes.
@@ -95,16 +96,16 @@ The stale horizon is a decision-evidence bound, not proof that all tasks have th
 `FoveationManager` exposes:
 - `enable_temporal_budget(config, now_us)`;
 - `disable_temporal_budget()`;
-- `notify_temporal_trigger(trigger)`;
+- `notify_temporal_trigger(trigger, now_us)`, which checks future/stale timestamps against the current source-clock sample;
 - a read-only temporal-budget accessor.
 
 The policy is disabled by default, preserving legacy cooldown-only behavior. When enabled, it also rejects expired source frames/results and refuses to relabel an old saliency request as a crop from a newer frame.
 
-When enabled, the manager gates ROI dispatch against the temporal interval, pixel estimate and in-flight budget. The estimated token cost is the padded source ROI pixel area *before downscaling*, not the smaller resized output. The budget is committed only after the bounded background channel accepts the request. On an unexpected commit invariant failure, the optional policy is disabled and the accepted request is still tracked; it is not duplicated. Source-frame ID mismatch or stale timestamps drop pending items; completed results are checked again at collection and at GWT injection.
+When enabled, the manager gates ROI dispatch against the temporal interval, pixel estimate and in-flight budget. The estimated token cost is the padded source ROI pixel area *before downscaling*, not the smaller resized output. The caller supplies the current source-clock sample when registering triggers; valid events between scheduler ticks are not incorrectly rejected merely because the last token refill occurred earlier. The budget is committed only after the bounded background channel accepts the request. On an unexpected commit invariant failure, the optional policy is disabled and the accepted request is still tracked; it is not duplicated. Source-frame ID mismatch or stale timestamps drop pending items; completed results are checked again at collection and at GWT injection.
 
 ### 3.4 Authored tests
 
-The new policy has twelve unit tests, and the foveation manager has five integration tests. They cover:
+The new policy has fourteen unit tests, and the foveation manager has five integration tests. They cover:
 - baseline interval;
 - event burst interval;
 - low-urgency no-burst;
