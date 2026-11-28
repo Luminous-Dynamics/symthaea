@@ -31,14 +31,19 @@ fn goal_corpus_is_versioned_and_contains_independent_clusters() {
     assert_eq!(corpus["synthetic_only"].as_bool(), Some(true));
 
     let cases = corpus["cases"].as_array().expect("cases array");
-    assert!(cases.len() >= 12, "frozen goal corpus needs at least 12 cases");
+    assert!(
+        cases.len() >= 12,
+        "frozen goal corpus needs at least 12 cases"
+    );
 
     let mut case_ids = HashSet::new();
     for case in cases {
         let id = case["case_id"].as_str().expect("case_id");
         assert!(case_ids.insert(id), "duplicate case identity: {id}");
         assert!(
-            case["cluster_id"].as_str().is_some_and(|value| !value.is_empty()),
+            case["cluster_id"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty()),
             "{id}: independent task cluster is required"
         );
     }
@@ -50,11 +55,16 @@ fn goal_requirements_have_verification_obligations_and_unique_ids() {
     for case in corpus["cases"].as_array().expect("cases") {
         let case_id = case["case_id"].as_str().expect("case_id");
         let requirements = case["requirements"].as_array().expect("requirements");
-        assert!(!requirements.is_empty(), "{case_id}: at least one requirement is needed");
+        assert!(
+            !requirements.is_empty(),
+            "{case_id}: at least one requirement is needed"
+        );
 
         let mut requirement_ids = HashSet::new();
         for requirement in requirements {
-            let id = requirement["requirement_id"].as_str().expect("requirement_id");
+            let id = requirement["requirement_id"]
+                .as_str()
+                .expect("requirement_id");
             assert!(
                 requirement_ids.insert(id),
                 "{case_id}: duplicate requirement id {id}"
@@ -78,15 +88,16 @@ fn irreversible_or_high_risk_decisions_cannot_be_assumed_by_the_planner() {
         let blocking = case["expected"]["blocking_decisions"]
             .as_array()
             .expect("blocking decisions");
-        let classification = case["expected"]["classification"].as_str().expect("classification");
+        let classification = case["expected"]["classification"]
+            .as_str()
+            .expect("classification");
 
         for decision in decisions {
             let id = decision["decision_id"].as_str().expect("decision_id");
             let risk = decision["risk_if_assumed"].as_str().expect("risk");
             if risk == "irreversible" || risk == "high" {
                 assert_ne!(
-                    classification,
-                    "plan_candidate",
+                    classification, "plan_candidate",
                     "{case_id}/{id}: high-risk decisions cannot be silently assumed"
                 );
                 assert!(
@@ -118,7 +129,9 @@ fn plan_candidates_are_bound_to_a_complete_target_identity() {
             "configuration_identity",
         ] {
             assert!(
-                target[field].as_str().is_some_and(|value| !value.is_empty()),
+                target[field]
+                    .as_str()
+                    .is_some_and(|value| !value.is_empty()),
                 "{id}: plan candidate requires target.{field}"
             );
         }
