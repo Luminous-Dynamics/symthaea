@@ -53,7 +53,10 @@ impl fmt::Display for SpatialFourierError {
                 write!(f, "length scale must be finite and strictly positive")
             }
             Self::InvalidCoordinateFrameDigest => {
-                write!(f, "coordinate-frame digest must not be the all-zero sentinel")
+                write!(
+                    f,
+                    "coordinate-frame digest must not be the all-zero sentinel"
+                )
             }
             Self::NonFiniteCoordinate => {
                 write!(f, "coordinates and translations must be finite")
@@ -62,7 +65,10 @@ impl fmt::Display for SpatialFourierError {
                 write!(f, "coordinate produced a non-finite Fourier phase")
             }
             Self::ConfigurationMismatch => {
-                write!(f, "spatial Fourier codes use different encoder configurations")
+                write!(
+                    f,
+                    "spatial Fourier codes use different encoder configurations"
+                )
             }
             Self::InvalidCodeDimension => {
                 write!(f, "spatial Fourier code has an invalid vector dimension")
@@ -212,11 +218,7 @@ impl SpatialFourierEncoder {
     }
 
     /// Encode a finite 2D coordinate as cosine/sine quadrature pairs.
-    pub fn encode(
-        &self,
-        x: f64,
-        y: f64,
-    ) -> Result<SpatialFourierCode, SpatialFourierError> {
+    pub fn encode(&self, x: f64, y: f64) -> Result<SpatialFourierCode, SpatialFourierError> {
         if !x.is_finite() || !y.is_finite() {
             return Err(SpatialFourierError::NonFiniteCoordinate);
         }
@@ -323,10 +325,7 @@ impl SpatialFourierEncoder {
         Ok((dot / (norm_a.sqrt() * norm_b.sqrt())).clamp(-1.0, 1.0) as f32)
     }
 
-    fn validate_code(
-        &self,
-        code: &SpatialFourierCode,
-    ) -> Result<(), SpatialFourierError> {
+    fn validate_code(&self, code: &SpatialFourierCode) -> Result<(), SpatialFourierError> {
         if code.identity != self.identity {
             return Err(SpatialFourierError::ConfigurationMismatch);
         }
@@ -459,7 +458,9 @@ mod tests {
         let first = enc.translate(&origin, 0.35, -0.6).expect("first shift");
         let composed = enc.translate(&first, -0.2, 0.15).expect("second shift");
         let direct = enc.translate(&origin, 0.15, -0.45).expect("combined shift");
-        let inverse = enc.translate(&composed, -0.15, 0.45).expect("inverse shift");
+        let inverse = enc
+            .translate(&composed, -0.15, 0.45)
+            .expect("inverse shift");
 
         assert!(enc.similarity(&composed, &direct).expect("compatible") > 0.99999);
         assert!(enc.similarity(&inverse, &origin).expect("compatible") > 0.99999);
@@ -470,13 +471,21 @@ mod tests {
         let enc = encoder(2048, 1.0, 5501);
         let origin = enc.encode(0.0, 0.0).expect("finite origin");
         let correct = enc.translate(&origin, 0.8, 0.3).expect("correct shift");
-        let wrong_sign = enc.translate(&origin, -0.8, -0.3).expect("wrong sign control");
+        let wrong_sign = enc
+            .translate(&origin, -0.8, -0.3)
+            .expect("wrong sign control");
         let swapped_axes = enc.translate(&origin, 0.3, 0.8).expect("axis swap control");
 
         let sign_similarity = enc.similarity(&correct, &wrong_sign).expect("compatible");
         let axis_similarity = enc.similarity(&correct, &swapped_axes).expect("compatible");
-        assert!(sign_similarity < 0.6, "sign control too similar: {sign_similarity}");
-        assert!(axis_similarity < 0.95, "axis control too similar: {axis_similarity}");
+        assert!(
+            sign_similarity < 0.6,
+            "sign control too similar: {sign_similarity}"
+        );
+        assert!(
+            axis_similarity < 0.95,
+            "axis control too similar: {axis_similarity}"
+        );
     }
 
     #[test]
@@ -484,8 +493,8 @@ mod tests {
         let enc_a = encoder(256, 1.0, 1);
         let enc_b = encoder(256, 1.0, 2);
         let enc_c = encoder(256, 2.0, 1);
-        let enc_d = SpatialFourierEncoder::new(256, 1.0, 1, [0x5A; 32])
-            .expect("valid alternate frame");
+        let enc_d =
+            SpatialFourierEncoder::new(256, 1.0, 1, [0x5A; 32]).expect("valid alternate frame");
         let code_a = enc_a.encode(0.0, 0.0).expect("finite point");
         let code_b = enc_b.encode(0.0, 0.0).expect("finite point");
         let code_c = enc_c.encode(0.0, 0.0).expect("finite point");
