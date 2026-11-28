@@ -264,7 +264,8 @@ pub fn verify_envelope(
         && payload.subject_id == expectation.expected_subject_id;
     let inputs_binding =
         digest_map(&payload.input_digests)? == digest_map(&expectation.expected_inputs)?;
-    let decision_binding = payload.authorization_decision == expectation.expected_authorization_decision
+    let decision_binding = payload.authorization_decision
+        == expectation.expected_authorization_decision
         && payload.task_success == expectation.expected_task_success;
     if !task_binding || !inputs_binding || !decision_binding {
         bail!("signed observer envelope does not match the frozen task/run expectation");
@@ -302,13 +303,22 @@ pub fn verify_envelope(
 
     let mut reasons = Vec::new();
     if !replay_receipt_consistent {
-        reasons.push("replay identity, environment, status, or artifact digest is inconsistent".to_owned());
+        reasons.push(
+            "replay identity, environment, status, or artifact digest is inconsistent".to_owned(),
+        );
     }
     if !measurement_contract_pass {
-        reasons.push("observer-measured state, network, or resource limits violate the run contract".to_owned());
+        reasons.push(
+            "observer-measured state, network, or resource limits violate the run contract"
+                .to_owned(),
+        );
     }
     reasons.push(
-        "signature and trust identity are verified, but the external measurement runtime is not yet independently deployed and audited".to_owned(),
+        concat!(
+            "signature and trust identity are verified, but the external measurement runtime ",
+            "is not yet independently deployed and audited"
+        )
+        .to_owned(),
     );
 
     Ok(ObserverVerificationReport {
@@ -598,7 +608,11 @@ mod tests {
             }],
             observer_id: "trusted-observer-linux".into(),
             observer_version: "0.1.0".into(),
-            workflow_identity: "repo:Luminous-Dynamics/symthaea:workflow:eqc-observer.yml:ref:refs/heads/test".into(),
+            workflow_identity: concat!(
+                "repo:Luminous-Dynamics/symthaea:workflow:eqc-observer.yml:",
+                "ref:refs/heads/test"
+            )
+            .into(),
             measurement_profile: "linux-cgroup-v2-netns-deny-v1".into(),
             runner_os: "linux".into(),
             runner_arch: "x86_64".into(),
@@ -637,7 +651,11 @@ mod tests {
                 key_id: "test-observer-key-01".into(),
                 observer_id: "trusted-observer-linux".into(),
                 public_key_hex: encode_hex(key.verifying_key().as_bytes()),
-                workflow_identity: "repo:Luminous-Dynamics/symthaea:workflow:eqc-observer.yml:ref:refs/heads/test".into(),
+                workflow_identity: concat!(
+                "repo:Luminous-Dynamics/symthaea:workflow:eqc-observer.yml:",
+                "ref:refs/heads/test"
+            )
+            .into(),
                 measurement_profile: "linux-cgroup-v2-netns-deny-v1".into(),
                 active: true,
             }],
@@ -697,7 +715,9 @@ mod tests {
         let mut envelope = signed_envelope(&key);
         envelope.payload.network_bytes_sent = 1;
         let mut ledger = ObserverNonceLedger::default();
-        assert!(verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger).is_err());
+        assert!(
+            verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger).is_err()
+        );
         assert!(ledger.is_empty());
     }
 
@@ -707,7 +727,9 @@ mod tests {
         let mut envelope = signed_envelope(&key);
         envelope.key_id = "attacker-controlled-key".into();
         let mut ledger = ObserverNonceLedger::default();
-        assert!(verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger).is_err());
+        assert!(
+            verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger).is_err()
+        );
     }
 
     #[test]
@@ -717,7 +739,9 @@ mod tests {
         changed.workflow_identity.push_str(":substituted");
         let envelope = sign_payload(changed, "test-observer-key-01", &key).unwrap();
         let mut ledger = ObserverNonceLedger::default();
-        assert!(verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger).is_err());
+        assert!(
+            verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger).is_err()
+        );
     }
 
     #[test]
@@ -753,7 +777,13 @@ mod tests {
         changed.state_mutation_count = 1;
         let envelope = sign_payload(changed, "test-observer-key-01", &key).unwrap();
         let mut ledger = ObserverNonceLedger::default();
-        let report = verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger).unwrap();
+        let report = verify_envelope(
+            &envelope,
+            &trust_policy(&key),
+            &expectation(),
+            &mut ledger,
+        )
+        .unwrap();
         assert!(!report.measurement_contract_pass);
         assert!(!report.qualified);
     }
@@ -766,7 +796,13 @@ mod tests {
         changed.network_endpoints.push("example.invalid".into());
         let envelope = sign_payload(changed, "test-observer-key-01", &key).unwrap();
         let mut ledger = ObserverNonceLedger::default();
-        let report = verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger).unwrap();
+        let report = verify_envelope(
+            &envelope,
+            &trust_policy(&key),
+            &expectation(),
+            &mut ledger,
+        )
+        .unwrap();
         assert!(!report.measurement_contract_pass);
     }
 
@@ -804,7 +840,13 @@ mod tests {
         changed.verifier_id = changed.sut_system_id.clone();
         let envelope = sign_payload(changed, "test-observer-key-01", &key).unwrap();
         let mut ledger = ObserverNonceLedger::default();
-        let report = verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger).unwrap();
+        let report = verify_envelope(
+            &envelope,
+            &trust_policy(&key),
+            &expectation(),
+            &mut ledger,
+        )
+        .unwrap();
         assert!(!report.replay_receipt_consistent);
         assert!(!report.qualified);
     }
