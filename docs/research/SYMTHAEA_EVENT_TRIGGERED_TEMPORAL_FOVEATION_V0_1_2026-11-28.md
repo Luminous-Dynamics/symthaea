@@ -57,7 +57,8 @@ Default proposal values are:
 - trigger threshold: 0.70;
 - pixel-token capacity: 1,000,000 pixels;
 - refill: 500,000 pixel tokens/s;
-- maximum in-flight requests: 2.
+- maximum in-flight requests: 2;
+- maximum source ROI age: 500,000 µs (500 ms).
 
 These are initial engineering defaults, not empirically optimized parameters.
 
@@ -76,7 +77,20 @@ The trigger must be supplied by an upstream component that has already received 
 
 A repeated trigger ID cannot extend the burst. Trigger timestamps are checked against the foveation clock high-water mark. Low-urgency triggers are recorded but do not start a burst.
 
-### 3.3 Manager integration
+### 3.3 Source-clock freshness and frame identity
+
+The scheduler rejects a source ROI when:
+- its timestamp is in the future relative to the manager's current source-clock sample;
+- its age exceeds the configured 500 ms default horizon;
+- its source frame ID no longer matches the one full-resolution frame buffer currently retained by the manager.
+
+This frame-ID guard fixes a subtle temporal-binding failure in the original manager: it retained only the newest full-resolution frame, but queued saliency requests could remain from older frames. Cropping an old request's coordinates from a new frame and returning the old frame ID would falsely bind recognition to pixels it was not actually computed from. The updated manager drops such queued requests and increments a stale-drop counter.
+
+When the temporal policy is enabled, completed recognition results are checked again at collection time and at `drain_results_at(now_us)`, because a result can become stale while waiting in the ready queue. Legacy `drain_results()` remains available for backward compatibility; interactive consumers using the temporal policy should use `drain_results_at`.
+
+The stale horizon is a decision-evidence bound, not proof that all tasks have the same temporal needs. Task-specific horizons require a preregistered calibration study.
+
+### 3.4 Manager integration
 
 `FoveationManager` exposes:
 - `enable_temporal_budget(config, now_us)`;
@@ -84,13 +98,13 @@ A repeated trigger ID cannot extend the burst. Trigger timestamps are checked ag
 - `notify_temporal_trigger(trigger)`;
 - a read-only temporal-budget accessor.
 
-The policy is disabled by default, preserving legacy cooldown-only behavior.
+The policy is disabled by default, preserving legacy cooldown-only behavior. When enabled, it also rejects expired source frames/results and refuses to relabel an old saliency request as a crop from a newer frame.
 
-When enabled, the manager gates ROI dispatch against the temporal interval, pixel estimate and in-flight budget. The estimated token cost is the padded source ROI pixel area *before downscaling*, not the smaller resized output. The budget is committed only after the bounded background channel accepts the request. On an unexpected commit invariant failure, the optional policy is disabled and the accepted request is still tracked; it is not duplicated.
+When enabled, the manager gates ROI dispatch against the temporal interval, pixel estimate and in-flight budget. The estimated token cost is the padded source ROI pixel area *before downscaling*, not the smaller resized output. The budget is committed only after the bounded background channel accepts the request. On an unexpected commit invariant failure, the optional policy is disabled and the accepted request is still tracked; it is not duplicated. Source-frame ID mismatch or stale timestamps drop pending items; completed results are checked again at collection and at GWT injection.
 
 ### 3.4 Authored tests
 
-The new policy has ten unit tests, and the foveation manager has three integration tests. They cover:
+The new policy has twelve unit tests, and the foveation manager has five integration tests. They cover:
 - baseline interval;
 - event burst interval;
 - low-urgency no-burst;
@@ -143,13 +157,15 @@ Compare at least these arms:
 
 | Arm | Global context | ROI analysis | Purpose |
 |---|---|---|---|
-| A: sparse fixed | fixed 1 FPS | none | low-compute baseline |
-| B: fixed 2 FPS | fixed 2 FPS | none | stronger fixed baseline |
-| C: fixed 4 FPS | fixed 4 FPS | none | overload / high-sampling control |
-| D: hybrid static | fixed 1 FPS | fixed 4 FPS fixed ROI schedule | ROI benefit without event triggers |
-| E: event-triggered | fixed 1 FPS | bursts up to 4 Hz | current implemented policy |
-| F: value-of-information | fixed 1 FPS | calibrated priority and token budget | research target |
-| G: oracle ROI | fixed 1 FPS | human/oracle event windows | upper reference only |
+| A: sparse fixed | 1 FPS | none | low-compute baseline |
+| B: fixed 2 FPS | 2 FPS | none | stronger fixed baseline |
+| C: fixed 4 FPS | 4 FPS | none | overload / high-sampling control |
+| D: hybrid static | 1 FPS | fixed 4 Hz ROI schedule | ROI benefit without event triggers |
+| E: event-triggered | 1 FPS | bursts up to 4 Hz | current implemented policy |
+| F: value-of-information | 1 FPS | calibrated priority and token budget | research target |
+| G: oracle ROI | 1 FPS | human/oracle event windows | upper reference only |
+
+For arms D–G, hold the global context stream constant at 1 FPS. Only the ROI policy changes. The current code implements ROI dispatch budgeting; it does not implement or change the global-context capture scheduler. Arms A–C are separate full-frame sampling baselines.
 
 Compare under two regimes:
 1. **Matched pixel/encoder budget:** total decoded/encoded pixels and model visual tokens matched across arms.
@@ -223,7 +239,7 @@ VideoFDB demonstrates why a fixed higher frame rate is not necessarily the best 
 
 ## 10. Qualification status
 
-The Rust policy module and optional `FoveationManager` integration have been committed on the polyembodiment research branch. The implementation is source-level only:
+The Rust policy module and optional `FoveationManager` integration have been committed on the polyembodiment research branch. Source ROI freshness is checked against the caller's monotonic time; task-specific age limits still require empirical calibration. The implementation is source-level only:
 - no cargo build or test run;
 - no camera/stream runtime qualification;
 - no GPU/CPU profiling;
