@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "transition_id": "transition-0001",
+  "kind": "beatmatched_blend",
+  "source": {
+    "audio": {
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "sample_rate_hz": 44100,
+      "channels": 2,
+      "total_frames": 10000
+    },
+    "window": {
+      "start_frame": 100,
+      "end_frame": 900
+    }
+  },
+  "target": {
+    "audio": {
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "total_frames": 20000
+    },
+    "window": {
+      "start_frame": 100,
+      "end_frame": 900
+    },
+    "evidence": {
+      "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "analysis_version": "auditory-scene-v0.1/config-17",
+      "covered_window": {
+        "start_frame": 0,
+        "end_frame": 20000
+      }
+    }
+  },
+  "evidence": {
+    "timing": "supported",
+    "structure": "ambiguous",
+    "source_roles": "not_evaluated",
+    "target_roles": "unsupported",
+    "perceptual_fit": "not_evaluated"
+  },
+  "alignment": {
+    "source_anchor_frame": 400,
+    "target_anchor_frame": 600,
+    "beat_ordinal_milli": 16000,
+    "confidence_ppm": 850000
+  },
+  "protected_regions": [
+    {
+      "side": "source",
+      "window": {
+        "start_frame": 300,
+        "end_frame": 500
+      },
+      "property": "lead_vocal",
+      "reason_code": "lead_vocal_phrase"
+    }
+  ],
+  "gain_envelopes": [
+    {
+      "side": "source",
+      "points": [
+        {
+          "frame": 200,
+          "gain_millidecibels": 0
+        },
+        {
+          "frame": 800,
+          "gain_millidecibels": -6000
+        }
+      ]
+    },
+    {
+      "side": "target",
+      "points": [
+        {
+          "frame": 200,
+          "gain_millidecibels": -12000
+        },
+        {
+          "frame": 800,
+          "gain_millidecibels": 0
+        }
+      ]
+    }
+  ]
+}

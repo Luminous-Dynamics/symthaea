@@ -34,6 +34,8 @@
 /// `MUSE_152_STYLE_CATALOG_2026-07-18.md` described the registry as
 /// shipped. Declaring it is step 4a of making that document true.
 pub mod catalog;
+/// DJ transition contracts and deterministic validation (MEL-DJ-002).
+pub mod transition;
 
 use serde::{Deserialize, Serialize};
 
