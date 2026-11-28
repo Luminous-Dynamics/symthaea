@@ -223,6 +223,14 @@ A skipped workflow, parser success, mock acknowledgement, synthetic fixture, mod
 
 The verifier is not an executor, permission issuer, oracle authenticator, transaction coordinator or production connector. It requires the observation's independence and consistency class to match the pinned oracle profile exactly; it rejects authority/attempt clock mismatch, contradictory application timestamps, and an observation timestamp preceding application. Sixteen Rust regression tests are authored; they have not been compiled or executed. Cross-field semantics in the scenario manifest still require a loader/trace verifier and evaluator mutation tests.
 
+## 11.2 Deterministic reference world
+
+`crates/domains/symthaea-soma/src/cgrb_world.rs` adds a deterministic in-memory reference world for scenario mechanics. It uses typed cells, canonical ordered maps, stable state digests, version-checked prepare/apply, explicit preconditions, Set/AppendText/Remove mutations, operation-ID and keyed-idempotency replay protection, and append-only in-memory audit events. Mutations are applied to a candidate state and committed only after validation and digest construction succeed.
+
+The module provides 13 authored regression tests covering version conflicts, precondition failure/success, non-idempotent append deduplication through stable operation keys, key/action conflicts, target binding, unsupported mutation types, seed closure, deterministic digest order, and atomic rejection.
+
+**Critical boundary:** this is a reference model, not a separate process or independent oracle. Its `reference_snapshot` must not be promoted to independent state evidence. The pure state-outcome verifier and reference world are composable test mechanics; the next missing layer is a scenario runner and an independently permissioned read-only oracle adapter. The Rust tests remain uncompiled and unexecuted.
+ 
 ## 12. Non-claims
 
 This protocol does not establish a licensed dataset, production connector, atomic transaction semantics, secure external oracle, hardware safety, model quality, benchmark leadership, or deployment readiness. The first run is a controlled benchmark with an isolated world-state service. Production side effects remain out of scope until a separate connector-specific authority, safety and reconciliation qualification exists.
