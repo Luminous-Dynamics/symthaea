@@ -72,7 +72,7 @@ The initial contract artifacts are committed alongside this proposal:
 
 - `eqc-task-v0.1.schema.json`: versioned task/authority/request/expected-outcome contract.
 - `eqc-run-receipt-v0.1.schema.json`: source-head, environment, action, replay, independent-verifier and qualification receipt.
-- `eqc-seed-corpus-v0.1.json`: four synthetic public episodes covering an authorized read, wrong-subject denial, revoked-authority denial, and replayed-challenge denial.
+- `eqc-seed-corpus-v0.1.json`: seven synthetic public episodes covering an authorized read, wrong-subject denial, revoked-authority denial, replayed-challenge denial, expired-consent denial, scope mismatch, and wrong-principal denial.
 - `eqc-fixtures/*.json`: three synthetic consent/challenge artifacts; task manifests bind them to byte-level SHA-256 digests.
 - `tools/eqc-reference/`: a standalone Rust workspace with its own locked dependency graph, independent of Symthaea's root workspace.
 - `jsonschema 0.63.2`: offline Draft 2020-12 meta-schema and instance validation. HTTP and filesystem reference resolution are disabled; external references cannot silently fetch data during evaluation.
