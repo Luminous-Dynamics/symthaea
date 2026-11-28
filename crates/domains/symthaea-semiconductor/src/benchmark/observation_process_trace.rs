@@ -13,7 +13,7 @@ use std::collections::BTreeSet;
 use thiserror::Error;
 
 use super::selection_risk_bounds::{
-    IndependentAuditLossObservationV1, PopulationOutcomeStateV1, QualifiedLossObservationV1,
+    IndependentAuditLossObservationV1, QualifiedLossObservationV1,
     SelectionRiskInputV1, SelectionRiskReportV1, SelectionAuditDesignV1,
     SELECTION_RISK_INPUT_SCHEMA_V1, evaluate_selection_adjusted_population_risk_v1,
 };
@@ -330,6 +330,12 @@ fn validate_operational(
             }
         }
         OperationalAcquisitionStateV1::Measured => {
+            if evidence.inclusion_probability == Some(0.0) {
+                return Err(ObservationProcessTraceErrorV1(format!(
+                    "round {}: a measured round cannot have zero operational inclusion probability",
+                    row.round_id
+                )));
+            }
             if evidence.design_sha256.is_none()
                 || evidence.measured_at_unix_seconds.is_none()
                 || evidence.measurement_system_sha256.is_none()
@@ -548,6 +554,7 @@ fn validate_controller(
         }
         ObservationControllerKindV1::TauDaci => {
             if controller.policy_sha256.as_deref() != input.controller_policy_sha256.as_deref()
+                || controller.feedback_delay_contract_steps != input.controller_delay_steps
                 || controller.delay_contract_sha256.is_some()
                 || controller.tracking_capacity.is_some()
                 || controller.proxy_uniform_draw.is_some()
@@ -575,6 +582,7 @@ fn validate_controller(
         }
         ObservationControllerKindV1::CaOcrc => {
             if controller.policy_sha256.as_deref() != input.controller_policy_sha256.as_deref()
+                || controller.feedback_delay_contract_steps != input.controller_delay_steps
                 || controller.delay_contract_sha256.as_deref()
                     != input.controller_delay_contract_sha256.as_deref()
                 || controller.tracking_capacity != input.controller_tracking_capacity
@@ -670,7 +678,10 @@ fn validate_controller(
             }
         }
         ControllerTrackingStateV1::Expired | ControllerTrackingStateV1::Evicted => {
-            if controller.update_receipt_sha256.is_some() || controller.controller_state_changed {
+            if controller.prediction_receipt_sha256.is_none()
+                || controller.update_receipt_sha256.is_some()
+                || controller.controller_state_changed
+            {
                 return Err(ObservationProcessTraceErrorV1(format!(
                     "round {}: EXPIRED/EVICTED feedback cannot mutate online controller state",
                     row.round_id
@@ -841,7 +852,8 @@ fn validate_audit(
             }
         }
         IndependentAuditStateV1::AuditUnavailable => {
-            if input.audit_design.is_none()
+            if audit.unavailable_reason.as_deref().is_none_or(str::is_empty)
+                || input.audit_design.is_none()
                 || audit.inclusion_probability.is_none()
                 || audit.audit_selected_at_unix_seconds.is_none()
                 || audit.audit_measured_at_unix_seconds.is_some()
@@ -1043,6 +1055,27 @@ pub fn evaluate_observation_process_trace_v1(
             "independent population-risk estimator rejected the trace: {error}"
         )))?;
 
+    let operational_selected_count = canonical
+        .rounds
+        .iter()
+        .filter(|row| row.operational.state != OperationalAcquisitionStateV1::Unselected)
+        .count();
+    let audit_selected_count = canonical
+        .rounds
+        .iter()
+        .filter(|row| row.independent_audit.state != IndependentAuditStateV1::NotSelected)
+        .count();
+    if operational_selected_count > input.operational_measurement_budget {
+        return Err(ObservationProcessTraceErrorV1(
+            "operational acquisition attempts exceed the declared physical metrology budget".into(),
+        ));
+    }
+    if audit_selected_count > input.independent_audit_budget {
+        return Err(ObservationProcessTraceErrorV1(
+            "independent audit selections exceed the declared audit budget".into(),
+        ));
+    }
+
     let count = |predicate: &dyn Fn(&ObservationRoundTraceV1) -> bool| {
         canonical.rounds.iter().filter(|row| predicate(row)).count()
     };
@@ -1132,7 +1165,7 @@ mod tests {
             prediction_at_unix_seconds: 1001 + round_id as i64,
             round_time_unix_seconds: 1001 + round_id as i64,
             clock_domain_id: "fab-clock".into(),
-            prediction_receipt_sha256: digest('a'),
+            prediction_receipt_sha256: digest(char::from(b'a' + (round_id as u8 % 6))),
             model_artifact_sha256: digest('b'),
             interval_method_sha256: digest('c'),
             operational: OperationalAcquisitionEvidenceV1 {
