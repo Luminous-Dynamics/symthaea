@@ -453,6 +453,36 @@ mod tests {
     }
 
     #[test]
+    fn temporal_budget_charges_pre_downscale_roi_pixel_work() {
+        use crate::temporal_budget::TemporalFoveationConfig;
+
+        let config = FoveationConfig {
+            max_crop_pixels: 256,
+            ..FoveationConfig::default()
+        };
+        let mut mgr = FoveationManager::new(config, 128);
+        mgr.enable_temporal_budget(
+            TemporalFoveationConfig {
+                pixel_token_capacity: 200_000,
+                pixel_tokens_per_second: 1,
+                ..TemporalFoveationConfig::default()
+            },
+            0,
+        ).unwrap();
+        mgr.on_frame(make_frame(512, 512, 128));
+        mgr.on_saliency(&[(1, 1, 0.9, [0.0, 0.0])]);
+        mgr.tick(1_000_000);
+
+        // The padded source ROI is 384x384 = 147,456 pixels, even though the
+        // cropper downsizes it to the 256-pixel output budget before dispatch.
+        assert_eq!(
+            mgr.temporal_budget().unwrap().tokens_remaining(),
+            200_000 - (384 * 384)
+        );
+        assert_eq!(mgr.total_dispatched, 1);
+    }
+
+    #[test]
     fn temporal_budget_is_disabled_by_default_and_can_be_removed() {
         let mut mgr = default_manager();
         assert!(mgr.temporal_budget().is_none());
