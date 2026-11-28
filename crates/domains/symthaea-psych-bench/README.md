@@ -135,7 +135,7 @@ workflow is not validation.
 
 ## Evidence-qualified benchmark registry (pilot v0.1)
 
-The initial pilot registry covers seven selected tasks/environments and 34
+The initial pilot registry covers eight selected tasks/environments and 40
 metric definitions. It records stable IDs, implementation paths, construct
 cards, evidence classes, stimulus provenance, metric units/bounds/directions,
 validation status and comparison eligibility.
@@ -149,7 +149,7 @@ available as `registry::PsychBenchRegistry::pilot()` and validates the bundled
 definitions (stable/unique IDs, crate-local implementation paths, explicit
 metric selectors, bounds, evidence classes and human-norm claim boundaries).
 Unit tests cover those fail-closed rules and check that the listed implementation
-files exist. A source-level test also checks all 34 pilot metric selectors
+files exist. A source-level test also checks all 40 pilot metric selectors
 against their registered implementation files. Selected pilot metrics now call
 `MetricValue::from_samples_with_bounds`, which validates observations against
 declared support and computes intervals in the metric's original units. The JSON
