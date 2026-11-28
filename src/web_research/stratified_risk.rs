@@ -758,10 +758,14 @@ fn estimate_from_stratum_counts(
                 .to_owned(),
             )
         } else if !enough_audit_labels {
-            Some(format!(concat!(
-                "accepted audit label count {accepted_audit_count} is below ",
-                "the configured minimum {minimum_sample_size}"
-            )))
+            Some(format!(
+                concat!(
+                    "accepted audit label count {} is below ",
+                    "the configured minimum {}"
+                ),
+                accepted_audit_count,
+                minimum_sample_size
+            ))
         } else {
             None
         },
