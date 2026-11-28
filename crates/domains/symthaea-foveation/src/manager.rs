@@ -254,13 +254,13 @@ impl FoveationManager {
                 match self.channel.request(request) {
                     Ok(rx) => {
                         if let Some(pixel_cost) = temporal_pixel_cost {
-                            if let Some(budget) = self.temporal_budget.as_mut() {
-                                // Charge the pre-downscale ROI estimate used in decide(),
-                                // not the smaller output dimensions after crop resizing.
-                                if budget.record_dispatch(now_us, pixel_cost).is_err() {
-                                    tracing::warn!("temporal foveation budget invariant failed; disabling optional policy");
-                                    self.temporal_budget = None;
-                                }
+                            // Charge the pre-downscale ROI estimate used in decide(),
+                            // not the smaller output dimensions after crop resizing.
+                            let budget_commit_failed = self.temporal_budget.as_mut()
+                                .is_some_and(|budget| budget.record_dispatch(now_us, pixel_cost).is_err());
+                            if budget_commit_failed {
+                                tracing::warn!("temporal foveation budget invariant failed; disabling optional policy");
+                                self.temporal_budget = None;
                             }
                         }
                         self.in_flight.push(rx);
