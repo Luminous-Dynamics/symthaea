@@ -19,9 +19,8 @@ fn run() -> Result<(), String> {
         .unwrap_or_else(|| {
             std::path::PathBuf::from("research/mel-hear-008/incidence-panel-v0.json")
         });
-    let bytes = fs::read(&path).map_err(|error| {
-        format!("could not read {}: {error}", path.display())
-    })?;
+    let bytes =
+        fs::read(&path).map_err(|error| format!("could not read {}: {error}", path.display()))?;
     let panel = serde_json::from_slice(&bytes)
         .map_err(|error| format!("incidence fixture JSON is invalid: {error}"))?;
     let report = audit_panel(&panel)?;
