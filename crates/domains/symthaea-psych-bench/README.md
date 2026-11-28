@@ -119,6 +119,22 @@ For a review-ready branch, GitHub Actions should execute format, crate tests,
 clippy and the repository's applicable workflow checks. A skipped or absent
 workflow is not validation.
 
+## Evidence-qualified benchmark registry (pilot v0.1)
+
+The initial pilot registry covers seven selected tasks/environments and 28
+metric definitions. It records stable IDs, implementation paths, construct
+cards, evidence classes, stimulus provenance, metric units/bounds/directions,
+validation status and comparison eligibility.
+
+- `registry/psych_bench_registry_v0.1.json`
+- `registry/psych_bench_registry_v0.1.schema.json`
+
+This is deliberately **incomplete**: it is not yet the full crate inventory,
+does not generate README/paper counts, and is not wired into the runner or CI.
+Unknown/uncalibrated metrics are marked ineligible rather than assigned guessed
+human norms. Its current contents have had a structural JSON check, but the
+schema has not yet been integrated into automated CI validation.
+
 ## Dependencies
 
 This crate depends on:
