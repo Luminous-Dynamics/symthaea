@@ -509,11 +509,24 @@ mod tests {
         let world = InteractionWorld::new_with_quadratic_u_term(bilinear_truth(), 1).unwrap();
         let log = world.run(&[[1, 1], [-1, -1], [-1, 0]]).unwrap();
         assert_eq!(log.measurements, vec![4, 0, 0]);
-        assert!(discover(&log, StructureAccess::Withheld)
+
+        let report = discover(&log, StructureAccess::Withheld).unwrap();
+        assert_eq!(
+            report.compatible_models,
+            vec![ModelHypothesis {
+                structure: Structure::BilinearInteraction,
+                bias: 1,
+                weight_u: 1,
+                weight_v: 1,
+                interaction_weight: 1,
+            }]
+        );
+
+        let full_design = world.run(&FACTORIAL_DESIGN).unwrap();
+        assert!(discover(&full_design, StructureAccess::Withheld)
             .unwrap()
             .compatible_models
-            .len()
-            <= candidate_models(StructureAccess::Withheld).len());
+            .is_empty());
     }
 
     #[test]
