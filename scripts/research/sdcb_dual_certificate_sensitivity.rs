@@ -198,7 +198,7 @@ impl DesignPoint {
         if lambda[0].add(lambda[1]) != Q::one() {
             return false;
         }
-        if !lambda.iter().all(|x| x.is_le(Q::one())) ||
+        if !lambda.iter().all(|x| Q::zero().is_le(*x) && x.is_le(Q::one())) ||
             !w.iter().all(|x| Q::zero().is_le(*x)) {
             return false;
         }
@@ -280,6 +280,15 @@ mod tests {
             assert_eq!(point.q_max(), q);
             assert_eq!(point.test_phi_one(), phi);
             assert_eq!(point.maximin_power(), value);
+            assert_eq!(point.q_max().mul(point.test_phi_one()), ALPHA);
+            assert_eq!(point.p_min().mul(point.test_phi_one()), point.maximin_power());
+            for q in point.nulls() {
+                assert!(q.mul(point.test_phi_one()).is_le(ALPHA));
+            }
+            for p in point.alternatives() {
+                assert!(p.mul(point.test_phi_one()).is_le(Q::one()));
+                assert!(point.maximin_power().is_le(p.mul(point.test_phi_one())));
+            }
         }
     }
 
