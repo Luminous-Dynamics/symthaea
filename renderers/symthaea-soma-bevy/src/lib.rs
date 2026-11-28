@@ -30,6 +30,7 @@ mod scene_graph_adapter;
 pub use scene_graph_adapter::{
     AuthorizedSceneGraphSubmission, LatestSceneGraphSubmissionAck,
     SceneGraphSubmissionAck, SceneGraphSubmissionQueue,
+    SceneGraphNodeMetadata, SceneGraphRelationMetadata,
 };
 pub use scene_graph_layout::{
     layout_scene_graph_v2, GraphNodePlacementV2, GraphRelationPathV2,
