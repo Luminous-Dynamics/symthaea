@@ -121,6 +121,7 @@ No adapter may claim a globally atomic PostgreSQL-plus-Kafka snapshot unless a d
 - Capture leases are short-lived and scoped to one claim and evidence class.
 - Challenge nonces are single-use; duplicate nonce use blocks.
 - Key revocation, workload identity revocation, capability expiry or policy change invalidates dependent claims according to an explicit dependency graph.
+- A key revocation effective at or before receipt capture invalidates that receipt. A later revocation does not retroactively invalidate a historical signature unless the incident policy establishes an earlier compromise-effective time; that effective time must be authenticated and recorded.
 - The verifier rechecks revocation and policy immediately before issuing an action decision.
 - The enforcement point checks the fencing epoch at the point of mutation; a preflight-only check is insufficient.
 - Clock uncertainty is included in freshness decisions. Wall-clock timestamps alone do not establish ordering.
