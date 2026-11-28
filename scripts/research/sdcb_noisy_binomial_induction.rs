@@ -480,6 +480,10 @@ mod tests {
                 check.monotone_history_inequalities,
                 point.minimum_n * (point.minimum_n + 1) / 2
             );
+            assert_eq!(
+                check.null_endpoint_supermartingale_equalities,
+                point.minimum_n * (point.minimum_n + 1) / 2
+            );
             assert_eq!(rows[point.minimum_n], point.test.rejection_probability_by_success_count);
         }
     }
