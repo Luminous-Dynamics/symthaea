@@ -15,12 +15,12 @@ use thiserror::Error;
 
 use super::ca_ocrc_bounded::{
     CA_OCRC_ROUND_INPUT_SCHEMA_V1, CaOcrcFeedbackDispositionV1, CaOcrcLabelFeedbackV1,
-    CaOcrcRoundInputV1, CaOcrcRoundReportV1,
+    CaOcrcPolicyV1, CaOcrcRoundInputV1, CaOcrcRoundReportV1,
 };
 use super::delayed_aci::{
     AciDegenerateResolutionReceiptV1, AciGuaranteeStateV1, AciIntervalKindV1,
     AciMissingFeedbackRecordV1, AciUpdateDispositionV1, DelayedAciLabelDeliveryV1,
-    DelayedAciPredictionReceiptV1, DelayedAciUpdateReceiptV1,
+    DelayedAciPolicyV1, DelayedAciPredictionReceiptV1, DelayedAciUpdateReceiptV1,
 };
 use super::selection_risk_bounds::{
     PopulationOutcomeStateV1, SelectionRiskInputV1, SelectionRiskReportV1,
@@ -72,6 +72,7 @@ pub struct JointPopulationRowV1 {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct JointTauAciArmEvidenceV1 {
+    pub policy: DelayedAciPolicyV1,
     pub predictions: Vec<DelayedAciPredictionReceiptV1>,
     pub deliveries: Vec<DelayedAciLabelDeliveryV1>,
     pub updates: Vec<DelayedAciUpdateReceiptV1>,
@@ -82,6 +83,7 @@ pub struct JointTauAciArmEvidenceV1 {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct JointCaOcrcArmEvidenceV1 {
+    pub policy: CaOcrcPolicyV1,
     pub round_inputs: Vec<CaOcrcRoundInputV1>,
     pub round_reports: Vec<CaOcrcRoundReportV1>,
 }
@@ -618,6 +620,14 @@ fn validate_aci_arm(
             arm.arm_id
         )));
     }
+    if json_sha256(&evidence.policy)? != arm.controller_policy_sha256
+        || evidence.policy.delay_rounds == 0
+    {
+        return Err(JointRiskTraceErrorV1(format!(
+            "tau-ACI arm {} policy digest/delay does not match the declared arm",
+            arm.arm_id
+        )));
+    }
     let mut predictions = BTreeMap::new();
     for prediction in &evidence.predictions {
         let Some(row) = population.get(&prediction.round) else {
@@ -631,6 +641,9 @@ fn validate_aci_arm(
             || prediction.measurement_event_id != row.measurement_event_id
             || prediction.model_artifact_sha256 != arm.global_model_artifact_sha256
             || prediction.policy_sha256 != arm.controller_policy_sha256
+            || prediction.delay_rounds != evidence.policy.delay_rounds
+            || prediction.target_miscoverage != evidence.policy.target_miscoverage
+            || prediction.learning_rate != evidence.policy.learning_rate
             || prediction.phase != prediction.round % prediction.delay_rounds
             || prediction.expected_delivery_round
                 != prediction.round.checked_add(prediction.delay_rounds).unwrap_or(u64::MAX)
@@ -966,6 +979,16 @@ fn validate_ca_arm(
             arm.arm_id
         )));
     }
+    if json_sha256(&evidence.policy)? != arm.controller_policy_sha256
+        || evidence.policy.tracking_capacity == 0
+        || !evidence.policy.bounded_actual_delay_assumption_declared
+        || !valid_sha256(&evidence.policy.actual_delay_contract_sha256)
+    {
+        return Err(JointRiskTraceErrorV1(format!(
+            "CA-OCRC arm {} policy digest/capacity/delay contract does not match the declared arm",
+            arm.arm_id
+        )));
+    }
     let mut reports = BTreeMap::new();
     let mut weighted_feedback_sum = 0.0;
     let mut max_occupancy = 0_usize;
@@ -1010,6 +1033,7 @@ fn validate_ca_arm(
             || prediction.physical_measurement_selected != row.physical_measurement_selected
             || prediction.global_model_artifact_sha256 != arm.global_model_artifact_sha256
             || prediction.policy_sha256 != arm.controller_policy_sha256
+            || report.tracking_capacity != evidence.policy.tracking_capacity
             || report.tracking_occupancy_after > report.tracking_capacity
             || reports.insert(report.round, report).is_some()
         {
