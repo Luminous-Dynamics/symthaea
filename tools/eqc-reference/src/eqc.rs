@@ -934,6 +934,159 @@ mod tests {
     }
 
     #[test]
+    fn task_schema_rejects_each_missing_required_field() {
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../../../docs/research/eqc-seed-corpus-v0.1.json"
+        ))
+        .expect("seed JSON parses");
+        let root = repository_root();
+        let schema = load_schema(&root.join("docs/research/eqc-task-v0.1.schema.json"))
+            .expect("task schema meta-validates");
+        let validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("task schema compiles offline");
+        let required = [
+            "schema",
+            "task_id",
+            "domain",
+            "split",
+            "statement",
+            "actor",
+            "subject",
+            "input_refs",
+            "authority_snapshot",
+            "request",
+            "negative_controls",
+            "expected",
+            "resource_budget",
+            "required_provenance",
+        ];
+
+        for field in required {
+            let mut mutated = corpus["tasks"][0].clone();
+            mutated
+                .as_object_mut()
+                .expect("task object")
+                .remove(field);
+            assert!(
+                !validator.is_valid(&mutated),
+                "task schema must reject a task missing '{field}'"
+            );
+        }
+    }
+
+    #[test]
+    fn task_schema_rejects_unknown_fields_and_malformed_input_digests() {
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../../../docs/research/eqc-seed-corpus-v0.1.json"
+        ))
+        .expect("seed JSON parses");
+        let root = repository_root();
+        let schema = load_schema(&root.join("docs/research/eqc-task-v0.1.schema.json"))
+            .expect("task schema meta-validates");
+        let validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("task schema compiles offline");
+
+        let mut task = corpus["tasks"][0].clone();
+        task["unreviewed_override"] = json!(true);
+        assert!(!validator.is_valid(&task));
+
+        let mut task = corpus["tasks"][0].clone();
+        task["input_refs"][0]["sha256"] = json!("not-a-sha256");
+        assert!(!validator.is_valid(&task));
+    }
+
+    #[test]
+    fn receipt_schema_rejects_each_missing_required_field() {
+        let validator = receipt_schema_validator();
+        let required = [
+            "schema",
+            "run_id",
+            "task_id",
+            "task_digest_sha256",
+            "source_head",
+            "system",
+            "environment",
+            "authority_snapshot_sha256",
+            "input_digests",
+            "actions",
+            "observed_result",
+            "verifier",
+            "dimensions",
+            "qualified",
+        ];
+
+        for field in required {
+            let mut receipt = valid_receipt();
+            receipt
+                .as_object_mut()
+                .expect("receipt object")
+                .remove(field);
+            assert!(
+                !validator.is_valid(&receipt),
+                "receipt schema must reject a receipt missing '{field}'"
+            );
+        }
+    }
+
+    #[test]
+    fn qualified_receipt_rejects_each_non_compensatory_dimension_failure() {
+        let validator = receipt_schema_validator();
+        let dimensions = [
+            "capability",
+            "authority",
+            "input_integrity",
+            "provenance",
+            "reproducibility",
+            "failure_containment",
+        ];
+
+        for dimension in dimensions {
+            let mut receipt = valid_receipt();
+            receipt["dimensions"][dimension] = Value::Bool(false);
+            assert!(
+                !validator.is_valid(&receipt),
+                "qualified receipt must reject failed '{dimension}' dimension"
+            );
+        }
+    }
+
+    #[test]
+    fn qualified_receipt_rejects_malformed_provenance_digests() {
+        let validator = receipt_schema_validator();
+        for (pointer, replacement) in [
+            ("/task_digest_sha256", "bad"),
+            ("/authority_snapshot_sha256", "bad"),
+            ("/policy_digest_sha256", "bad"),
+            ("/system/model_id", "unexpected-string"),
+            ("/verifier/verifier_digest_sha256", "bad"),
+        ] {
+            let mut receipt = valid_receipt();
+            if pointer == "/system/model_id" {
+                receipt["system"]["model_id"] = json!(replacement);
+            } else {
+                let segments = pointer.trim_start_matches('/').split('/').collect::<Vec<_>>();
+                let last = segments[segments.len() - 1];
+                let parent = if segments.len() == 1 {
+                    &mut receipt
+                } else {
+                    &mut receipt[segments[0]]
+                };
+                parent[last] = json!(replacement);
+            }
+            assert!(
+                !validator.is_valid(&receipt),
+                "qualified receipt must reject malformed or unexpected '{pointer}'"
+            );
+        }
+    }
+
+    #[test]
     fn wrong_subject_fails_closed() {
         let mut task = seed_corpus().tasks.remove(0);
         task.request.subject_id = "synthetic-patient-999".into();
