@@ -523,10 +523,12 @@ mod tests {
         );
 
         let full_design = world.run(&FACTORIAL_DESIGN).unwrap();
-        assert!(discover(&full_design, StructureAccess::Withheld)
-            .unwrap()
-            .compatible_models
-            .is_empty());
+        assert!(
+            discover(&full_design, StructureAccess::Withheld)
+                .unwrap()
+                .compatible_models
+                .is_empty()
+        );
     }
 
     #[test]
