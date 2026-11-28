@@ -603,8 +603,13 @@ fn validate_observer_state(state: &ManifoldState) -> Result<(), String> {
         || state.object_memory.is_some()
         || state.working_memory.is_some()
         || state.scene_graph_enabled
+        || state.predictive_state.is_some()
+        || state.last_imagination.is_some()
         || !state.last_object_hypotheses.is_empty()
         || !state.last_geodesic.is_empty()
+        || state.last_intent_hv.as_ref().is_some_and(|intent| {
+            intent.iter().any(|value| *value != 0.0)
+        })
         || state.modality_contexts.iter().any(|context| {
             context.object_memory.is_some()
                 || context.working_memory.is_some()
@@ -612,7 +617,10 @@ fn validate_observer_state(state: &ManifoldState) -> Result<(), String> {
                 || !context.last_object_hypotheses.is_empty()
         })
     {
-        return Err("observer checkpoint violates non-retention or memory invariants".to_string());
+        return Err(
+            "observer checkpoint violates no-retention, no-learning or no-action invariants"
+                .to_string(),
+        );
     }
     Ok(())
 }
