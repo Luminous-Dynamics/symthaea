@@ -1,0 +1,25 @@
+name: MACE Matched Benchmark Contract
+on:
+  pull_request:
+    paths:
+      - "research/mace-matched-benchmark-contract-v0-1/**"
+      - "data/schemas/mace_benchmark_run_manifest_v1.schema.json"
+      - "docs/research/MACE_MATCHED_BENCHMARK_CONTRACT_V0_1.md"
+      - ".github/workflows/mace-matched-benchmark-contract.yml"
+  push:
+    branches:
+      - "research/mace-matched-benchmark-contract-v0-1"
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Parse contract module
+        run: rustfmt --edition 2024 --emit stdout --config skip_children=true research/mace-matched-benchmark-contract-v0-1/src/lib.rs >/dev/null
+      - name: Run contract tests
+        run: cargo test --manifest-path research/mace-matched-benchmark-contract-v0-1/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/mace-matched-benchmark-contract-v0-1/Cargo.toml --all-targets -- -D warnings
+      - name: Parse benchmark run schema
+        run: python3 -m json.tool data/schemas/mace_benchmark_run_manifest_v1.schema.json >/dev/null

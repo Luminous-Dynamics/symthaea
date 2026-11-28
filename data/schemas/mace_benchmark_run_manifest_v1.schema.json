@@ -1,0 +1,584 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/mace_benchmark_run_manifest_v1.schema.json",
+  "title": "MACE benchmark run manifest v1",
+  "description": "One benchmark-track run with frozen protocol, data split, reader, prompt, judge, tools, evaluator, budget, evidence class, metric definitions and lifecycle resources. This schema does not permit cross-track aggregation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "run_id",
+    "evidence_kind",
+    "benchmark_id",
+    "track_id",
+    "protocol_version",
+    "protocol_sha256",
+    "evaluator_sha256",
+    "dataset_id",
+    "dataset_revision_sha256",
+    "split_id",
+    "split_sha256",
+    "seed_set_sha256",
+    "scored_task_count",
+    "independent_cluster_count",
+    "dependence_unit",
+    "system_name",
+    "system_revision_sha256",
+    "adapter_sha256",
+    "memory_method_id",
+    "memory_method_family",
+    "reader_model_id",
+    "reader_model_revision_sha256",
+    "reader_prompt_sha256",
+    "judge_model_id",
+    "judge_model_revision_sha256",
+    "tool_contract_sha256",
+    "resource_budget_sha256",
+    "context_token_budget",
+    "max_model_calls",
+    "wall_clock_budget_ms",
+    "cpu_budget_microseconds",
+    "gpu_budget_microseconds",
+    "energy_budget_microwatt_hours",
+    "comparison_group_id",
+    "arm_id",
+    "matched_controls_sha256",
+    "candidate_saw_evaluator_labels",
+    "evaluator_isolated",
+    "evidence_uri",
+    "result_artifact_sha256",
+    "resource_receipt_sha256",
+    "metrics",
+    "resources"
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "optionalSha": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "optionalString": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2048
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "value",
+        "unit",
+        "direction",
+        "definition_sha256",
+        "denominator"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "direction": {
+          "enum": [
+            "higher_is_better",
+            "lower_is_better",
+            "diagnostic_only"
+          ]
+        },
+        "definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "denominator": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "p50_latency_ms",
+        "p95_latency_ms",
+        "p99_latency_ms",
+        "input_tokens",
+        "output_tokens",
+        "context_tokens_peak",
+        "persistent_memory_bytes",
+        "index_bytes",
+        "provenance_sidecar_bytes",
+        "tombstone_journal_bytes",
+        "cpu_microseconds",
+        "gpu_microseconds",
+        "energy_microwatt_hours",
+        "monetary_micro_usd"
+      ],
+      "properties": {
+        "p50_latency_ms": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "p95_latency_ms": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "p99_latency_ms": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "input_tokens": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "output_tokens": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context_tokens_peak": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "persistent_memory_bytes": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "index_bytes": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provenance_sidecar_bytes": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tombstone_journal_bytes": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cpu_microseconds": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gpu_microseconds": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "energy_microwatt_hours": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "monetary_micro_usd": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "mace_benchmark_run_manifest_v1"
+    },
+    "record_type": {
+      "const": "benchmark_run_manifest"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "evidence_kind": {
+      "enum": [
+        "external_reported",
+        "local_reproduction",
+        "local_experiment"
+      ]
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "track_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "protocol_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evaluator_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "dataset_revision_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "split_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "split_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seed_set_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "scored_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "independent_cluster_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "dependence_unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "system_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "system_revision_sha256": {
+      "$ref": "#/$defs/optionalSha"
+    },
+    "adapter_sha256": {
+      "$ref": "#/$defs/optionalSha"
+    },
+    "memory_method_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "memory_method_family": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "reader_model_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "reader_model_revision_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "reader_prompt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "judge_model_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "judge_model_revision_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "tool_contract_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "resource_budget_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "context_token_budget": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_model_calls": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "wall_clock_budget_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "cpu_budget_microseconds": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "gpu_budget_microseconds": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "energy_budget_microwatt_hours": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "comparison_group_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128
+    },
+    "arm_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128
+    },
+    "matched_controls_sha256": {
+      "$ref": "#/$defs/optionalSha"
+    },
+    "candidate_saw_evaluator_labels": {
+      "const": false
+    },
+    "evaluator_isolated": {
+      "const": true
+    },
+    "evidence_uri": {
+      "$ref": "#/$defs/optionalString"
+    },
+    "result_artifact_sha256": {
+      "$ref": "#/$defs/optionalSha"
+    },
+    "resource_receipt_sha256": {
+      "$ref": "#/$defs/optionalSha"
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/metric"
+      },
+      "minItems": 1
+    },
+    "resources": {
+      "$ref": "#/$defs/resources"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_kind": {
+            "const": "external_reported"
+          }
+        },
+        "required": [
+          "evidence_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evidence_uri": {
+            "type": "string",
+            "pattern": "^https://"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_kind": {
+            "enum": [
+              "local_reproduction",
+              "local_experiment"
+            ]
+          }
+        },
+        "required": [
+          "evidence_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "system_revision_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "adapter_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "result_artifact_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "resource_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison_group_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "comparison_group_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "arm_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "matched_controls_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    }
+  ]
+}
